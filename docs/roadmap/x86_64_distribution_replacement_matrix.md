@@ -376,6 +376,31 @@ modes at `native_link_accepted_rows=111`, `executable_ok_rows=111`,
 `lld_rows=0`, and `local_fail=0`. The scale audit lives in
 `docs/roadmap/x86_64_scale_air_corpus.md`.
 
+The next corpus frontier is isolated rather than cumulative:
+`distribution-zig-air-uncurated-releasefast-frontier`,
+`distribution-zig-air-uncurated-releasesafe-frontier`, and
+`distribution-zig-air-uncurated-releasesmall-frontier` cover only
+`test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
+admitting new real Zig source rows. The current frontier slice is green for all
+three release modes at `source_rows=10`, `discovered_functions=22`,
+`generic_codegen_functions=22`, `generic_cfg_functions=22`,
+`structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
+`typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
+`unsupported_functions=0`, `codegen_failures=0`,
+`object_emitted_functions=22`, `object_failures=0`,
+`llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
+green at `inspected=10`, `elf64_rel=10`, `relocation_rows=2`, `tls_rows=1`,
+`undefined_import_rows=0`, `unsupported_relocation_rows=0`, and
+`local_fail=0`. Frontier native-link and executable proof are green for all
+three modes at `native_link_accepted_rows=10`, `executable_ok_rows=10`,
+`link_only_rows=0`, `runtime_boundary_rows=0`,
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The first
+non-accepted frontier blockers are nested loop-memory CFG, nested aggregate
+field GEP, dynamic pointer-element GEP, broader branch global/TLS updates,
+mixed int-to-float multiply/add pipelines, multi-call live-value helper graphs,
+and alternate safety-guard control flow. The frontier audit lives in
+`docs/roadmap/x86_64_frontier_air_corpus.md`.
+
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:
 

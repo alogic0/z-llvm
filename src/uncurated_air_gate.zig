@@ -402,8 +402,9 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-    const air_local_fail: usize = if ((options.corpus == .expanded or options.corpus == .scale) and
-        (unsupported_functions != 0 or codegen_failures != 0 or typed_v2_fallback_functions != 0 or legacy_air_text_lowering_functions != 0 or shape_recognizer_functions != 0))
+    const air_local_fail: usize = if ((options.corpus == .expanded or options.corpus == .scale or options.corpus == .frontier) and
+        (unsupported_functions != 0 or codegen_failures != 0 or typed_v2_fallback_functions != 0 or legacy_air_text_lowering_functions != 0 or shape_recognizer_functions != 0 or
+            (options.corpus == .frontier and structural_matcher_functions != 0)))
         1
     else
         0;
@@ -573,6 +574,7 @@ const Corpus = enum {
     broad,
     expanded,
     scale,
+    frontier,
 
     fn name(self: Corpus) []const u8 {
         return switch (self) {
@@ -580,6 +582,7 @@ const Corpus = enum {
             .broad => "broad",
             .expanded => "expanded",
             .scale => "scale",
+            .frontier => "frontier",
         };
     }
 };
@@ -603,6 +606,8 @@ fn parseOptions(args: std.process.Args) !Options {
             options.corpus = .expanded;
         } else if (std.mem.eql(u8, arg, "--corpus=scale")) {
             options.corpus = .scale;
+        } else if (std.mem.eql(u8, arg, "--corpus=frontier")) {
+            options.corpus = .frontier;
         } else if (std.mem.eql(u8, arg, "--object-progress")) {
             options.object_progress = true;
         } else if (std.mem.eql(u8, arg, "--object-inspection")) {
@@ -645,7 +650,7 @@ fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
         .expanded => .{ 109, 199 },
-        .inputs, .scale => {
+        .inputs, .scale, .frontier => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
                 .{ counters.mode.name(), counters.corpus.name() },
@@ -1357,6 +1362,117 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_nested_loops.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier scalarized loop frontier values", .c_body =
+    \\extern int z_frontier_flat_window_sum(int, int) __asm__("frontier_nested_loops.frontier_flat_window_sum");
+    \\extern int z_frontier_window_threshold(int, int) __asm__("frontier_nested_loops.frontier_window_threshold");
+    \\int main(void) {
+    \\    if (z_frontier_flat_window_sum(7, 8) != 15) return 1;
+    \\    if (z_frontier_window_threshold(1, 9) != 9) return 2;
+    \\    if (z_frontier_window_threshold(0, 9) != 0) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_nested_records.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier record scalar values", .c_body =
+    \\extern int z_frontier_record_sum(int, int) __asm__("frontier_nested_records.frontier_record_sum");
+    \\extern int z_frontier_record_update(int, int) __asm__("frontier_nested_records.frontier_record_update");
+    \\int main(void) {
+    \\    if (z_frontier_record_sum(11, 31) != 42) return 1;
+    \\    if (z_frontier_record_update(1, 10) != 11) return 2;
+    \\    if (z_frontier_record_update(0, 10) != 12) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_optionals_errors.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier optional/error control flow", .c_body =
+    \\extern int z_frontier_optional_merge(int, int) __asm__("frontier_optionals_errors.frontier_optional_merge");
+    \\extern int z_frontier_error_payload(int, int) __asm__("frontier_optionals_errors.frontier_error_payload");
+    \\int main(void) {
+    \\    if (z_frontier_optional_merge(1, 30) != 30) return 1;
+    \\    if (z_frontier_optional_merge(0, 30) != -17) return 2;
+    \\    if (z_frontier_error_payload(0, 40) != 42) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_slice_pointer_arith.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier pointer load forms", .c_body =
+    \\extern int z_frontier_slice_stride_sum(const int *) __asm__("frontier_slice_pointer_arith.frontier_slice_stride_sum");
+    \\extern int z_frontier_pointer_offset_load(const int *) __asm__("frontier_slice_pointer_arith.frontier_pointer_offset_load");
+    \\int main(void) {
+    \\    int value = 37;
+    \\    if (z_frontier_slice_stride_sum(&value) != 37) return 1;
+    \\    if (z_frontier_pointer_offset_load(&value) != 37) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_comptime_constants.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier comptime constants", .c_body =
+    \\extern int z_frontier_comptime_mix(int) __asm__("frontier_comptime_constants.frontier_comptime_mix");
+    \\extern int z_frontier_static_choice(int) __asm__("frontier_comptime_constants.frontier_static_choice");
+    \\int main(void) {
+    \\    if (z_frontier_comptime_mix(5) != 26) return 1;
+    \\    if (z_frontier_static_choice(0) != 8) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_helper_graph.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier private helper graph", .c_body =
+    \\extern int z_frontier_helper_chain(int, int) __asm__("frontier_helper_graph.frontier_helper_chain");
+    \\extern int z_frontier_helper_branch(int, int) __asm__("frontier_helper_graph.frontier_helper_branch");
+    \\int main(void) {
+    \\    if (z_frontier_helper_chain(9, 99) != 10) return 1;
+    \\    if (z_frontier_helper_branch(1, 10) != 14) return 2;
+    \\    if (z_frontier_helper_branch(0, 10) != 23) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_mixed_numeric.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier mixed numeric FP", .c_body =
+    \\extern float z_frontier_mixed_float(float, float) __asm__("frontier_mixed_numeric.frontier_mixed_float");
+    \\extern double z_frontier_double_roundtrip(double, double) __asm__("frontier_mixed_numeric.frontier_double_roundtrip");
+    \\int main(void) {
+    \\    if (z_frontier_mixed_float(1.5f, 2.25f) != 3.75f) return 1;
+    \\    if (z_frontier_double_roundtrip(9.0, 2.0) != 4.5) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_globals_tls.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier global TLS updates", .c_body =
+    \\extern int z_frontier_global_branch(int, int) __asm__("frontier_globals_tls.frontier_global_branch");
+    \\extern int z_frontier_tls_branch(int, int) __asm__("frontier_globals_tls.frontier_tls_branch");
+    \\int main(void) {
+    \\    if (z_frontier_global_branch(1, 5) != 26) return 1;
+    \\    if (z_frontier_global_branch(0, 3) != 29) return 2;
+    \\    if (z_frontier_tls_branch(1, 2) != 6) return 3;
+    \\    if (z_frontier_tls_branch(0, 5) != 11) return 4;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_branch_memory.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier branch-local memory", .c_body =
+    \\extern int z_frontier_branch_store_reload(int, int *, int, int) __asm__("frontier_branch_memory.frontier_branch_store_reload");
+    \\extern int z_frontier_branch_local_mix(int, int *, int) __asm__("frontier_branch_memory.frontier_branch_local_mix");
+    \\int main(void) {
+    \\    int out = 0;
+    \\    if (z_frontier_branch_store_reload(1, &out, 20, 40) != 29 || out != 29) return 1;
+    \\    if (z_frontier_branch_store_reload(0, &out, 20, 40) != 31 || out != 31) return 2;
+    \\    if (z_frontier_branch_local_mix(1, &out, 30) != 36 || out != 36) return 3;
+    \\    if (z_frontier_branch_local_mix(0, &out, 30) != 24 || out != 24) return 4;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_safety_edges.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier safety-edge-adjacent values", .c_body =
+    \\extern int z_frontier_checked_add(int) __asm__("frontier_safety_edges.frontier_checked_add");
+    \\extern int z_frontier_bounds_guard(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_guard");
+    \\int main(void) {
+    \\    int value = 41;
+    \\    if (z_frontier_checked_add(5) != 16) return 1;
+    \\    if (z_frontier_bounds_guard(&value, 1, 0) != 41) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
     if (integratedModuleMainHarness(source)) |module_main| return .{
         .abi_mode = "c-stable-integrated-main",
         .expected = "module main expected return",
@@ -1563,14 +1679,23 @@ fn collectSources(allocator: std.mem.Allocator, io: std.Io, corpus: Corpus) ![][
         for (sources.items) |source| allocator.free(source);
         sources.deinit(allocator);
     }
+    if (corpus == .frontier) {
+        try collectSourcesFromRoot(allocator, io, &sources, "test/zig/frontier");
+        std.mem.sort([]const u8, sources.items, {}, struct {
+            fn lessThan(_: void, lhs: []const u8, rhs: []const u8) bool {
+                return std.mem.lessThan(u8, lhs, rhs);
+            }
+        }.lessThan);
+        return sources.toOwnedSlice(allocator);
+    }
     try collectSourcesFromRoot(allocator, io, &sources, "test/zig/inputs");
-    if (corpus == .broad or corpus == .expanded or corpus == .scale) {
+    if (corpus == .broad or corpus == .expanded or corpus == .scale or corpus == .frontier) {
         try collectSourcesFromRoot(allocator, io, &sources, "test/zig/integrated");
     }
-    if (corpus == .expanded or corpus == .scale) {
+    if (corpus == .expanded or corpus == .scale or corpus == .frontier) {
         try collectSourcesFromRoot(allocator, io, &sources, "test/zig/expanded");
     }
-    if (corpus == .scale) {
+    if (corpus == .scale or corpus == .frontier) {
         try collectSourcesFromRoot(allocator, io, &sources, "test/zig/scale");
     }
     std.mem.sort([]const u8, sources.items, {}, struct {

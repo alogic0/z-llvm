@@ -150,8 +150,8 @@ Active scale blocker families:
 
 Next evidence layer:
 
-- expand the scale bucket with larger call graphs, broader aggregate layouts,
-  additional TLS/global initializer forms, and more optional/error-union
-  control-flow shapes
-- keep object-inspection, native-link, and executable proof paired with scale
-  expansion so new rows do not remain object-only evidence
+- the next isolated source frontier lives in
+  `docs/roadmap/x86_64_frontier_air_corpus.md`
+- future scale expansion should keep object-inspection, native-link, and
+  executable proof paired with accepted rows so new rows do not remain
+  object-only evidence
