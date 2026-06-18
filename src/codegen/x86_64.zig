@@ -11312,6 +11312,14 @@ fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *MachineF
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgFpDirectCallReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgFpParamReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgFpLiteralReturn(allocator, machine, function, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -12221,6 +12229,58 @@ fn lowerGenericCfgFpSelectReturn(
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = false_label });
     try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgFpDirectCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or
+        !ret.ty.eql(function.ret_ty) or block.instructions.items.len != 1) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const call_result = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, call_result)) return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!call.ret_ty.eql(function.ret_ty) or call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+
+    const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgFpParamReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty)) return false;
+    if (block.instructions.items.len != 0) return false;
+    const name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const fp_index = try fpParamIndex(function, name, function.ret_ty);
+    switch (fp_index) {
+        0 => {},
+        1 => {
+            if (!function.ret_ty.eql(.double)) return error.UnsupportedCodegenAbi;
+            try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+        },
+        else => return error.UnsupportedCodegenAbi,
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -19676,6 +19736,83 @@ fn appendI32CallArgs(
     return stack_arg_count;
 }
 
+fn appendSysVScalarCallArgs(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    call: ir.CallInst,
+) !usize {
+    var int_arg_index: usize = 0;
+    var fp_arg_index: usize = 0;
+    var stack_arg_count: usize = 0;
+    for (call.args.items) |arg| {
+        if (arg.attrs != null) return error.UnsupportedCodegenAbi;
+        if (arg.ty.eql(.{ .int = 32 })) {
+            if (int_arg_index >= 6) {
+                const value = switch (arg.value) {
+                    .int => |int| try i32Value(int),
+                    .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                };
+                try machine.instructions.append(allocator, .{ .push_imm32 = value });
+                int_arg_index += 1;
+                stack_arg_count += 1;
+                continue;
+            }
+            const dst = try ArgReg.fromIndex(int_arg_index);
+            switch (arg.value) {
+                .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
+                .named => |name| {
+                    const src = try paramReg(function, name, .{ .int = 32 });
+                    if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                },
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            }
+            int_arg_index += 1;
+            continue;
+        }
+        if (arg.ty.eql(.float)) {
+            if (fp_arg_index >= 2) return error.UnsupportedCodegenAbi;
+            const bits = switch (arg.value) {
+                .fp => try fp32TextBits(arg.value),
+                .named => |name| {
+                    if (try fpParamIndex(function, name, .float) != fp_arg_index) return error.UnsupportedCodegenAbi;
+                    fp_arg_index += 1;
+                    continue;
+                },
+                .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            switch (fp_arg_index) {
+                0 => try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = bits }),
+                1 => try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = bits }),
+                else => unreachable,
+            }
+            fp_arg_index += 1;
+            continue;
+        }
+        if (arg.ty.eql(.double)) {
+            if (fp_arg_index >= 2) return error.UnsupportedCodegenAbi;
+            const bits = switch (arg.value) {
+                .fp => try fp64TextBits(arg.value),
+                .named => |name| {
+                    if (try fpParamIndex(function, name, .double) != fp_arg_index) return error.UnsupportedCodegenAbi;
+                    fp_arg_index += 1;
+                    continue;
+                },
+                .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            switch (fp_arg_index) {
+                0 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = bits }),
+                1 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = bits }),
+                else => unreachable,
+            }
+            fp_arg_index += 1;
+            continue;
+        }
+        return error.UnsupportedCodegenType;
+    }
+    return stack_arg_count;
+}
+
 fn appendMoveImmToArgReg(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -20368,6 +20505,19 @@ fn paramRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg
         };
     }
     return null;
+}
+
+fn fpParamIndex(function: ir.Function, name: []const u8, ty: ir.Type) !usize {
+    var fp_index: usize = 0;
+    for (function.params.items) |param| {
+        const param_is_fp = param.ty.eql(.float) or param.ty.eql(.double);
+        if (std.mem.eql(u8, param.name, name)) {
+            if (!param.ty.eql(ty) or !param_is_fp) return error.UnsupportedCodegenValue;
+            return fp_index;
+        }
+        if (param_is_fp) fp_index += 1;
+    }
+    return error.UnsupportedCodegenValue;
 }
 
 fn stackParamDisp8OrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?u8 {

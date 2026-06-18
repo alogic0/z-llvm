@@ -5249,6 +5249,77 @@ test "x86_64 codegen supports one stack-passed i32 call argument" {
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[6]);
 }
 
+test "x86_64 codegen supports direct f64 call return with SSE args" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc double @callee(double, double)
+        \\
+        \\define double @caller() {
+        \\entry:
+        \\  %r = call fastcc double @callee(double 6.000000e+00, double 2.000000e+00)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm0 = 0x4018_0000_0000_0000 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm1 = 0x4000_0000_0000_0000 }, machine.instructions.items[1]);
+}
+
+test "x86_64 codegen supports mixed integer and f64 direct call return" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc double @callee(i32, double)
+        \\
+        \\define double @caller() {
+        \\entry:
+        \\  %r = call fastcc double @callee(i32 7, double 6.000000e+00)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdi = 7 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm0 = 0x4018_0000_0000_0000 }, machine.instructions.items[1]);
+}
+
+test "x86_64 codegen returns first f64 parameter from mixed signature" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define fastcc double @callee(i32 %tag, double %value) {
+        \\entry:
+        \\  ret double %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[0]);
+}
+
 test "x86_64 codegen rejects unsupported call live pressure" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

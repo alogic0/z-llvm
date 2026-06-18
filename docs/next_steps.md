@@ -46,9 +46,10 @@ Selected IR-writer rows now print and enforce:
 The x86_64 lowering layer now shares SysV direct-call frame helpers for the
 aligned call prologue/epilogue and the one-slot live-parameter spill/reload
 shape used by simple direct calls. The generic helper path also covers the
-first stack-passed integer parameter/call argument in the expanded ABI frontier;
-remaining raw stack-frame emission is kept to custom multi-call, f128
-comparison, and explicit stack-slot boundary rows.
+first stack-passed integer parameter/call argument in the expanded ABI frontier
+and now assigns mixed integer/f32/f64 call arguments through separate SysV
+integer and SSE register streams; remaining raw stack-frame emission is kept to
+custom multi-call, f128 comparison, and explicit stack-slot boundary rows.
 The source-owned DescriptorV2 path now runs a local z_llvm release
 canonicalizer that rewrites eligible DescriptorV2 programs before structured
 lowering. The current source-owned gate reports
@@ -234,10 +235,10 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_numeric_casts.zig` int/float conversion bucket, the
 `expanded_branch_arrays.zig` optional-control-flow bucket, and the
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, and the
-`expanded_abi_frontier.zig` stack-argument ABI bucket, are green for
+`expanded_abi_frontier.zig` stack/mixed SysV ABI bucket, are green for
 ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=109`,
-`discovered_functions=184`, `generic_codegen_functions=184`,
-`generic_cfg_functions=184`,
+`discovered_functions=190`, `generic_codegen_functions=190`,
+`generic_cfg_functions=190`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -252,7 +253,7 @@ range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
 with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
 recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
-`object_emitted_functions=184`, `object_failures=0`,
+`object_emitted_functions=190`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
 gates report `inspected=109`, `elf64_rel=109`, `relocation_rows=18`
 (ReleaseSafe: 19 for the checked panic boundary), `tls_rows=4`,
@@ -288,7 +289,8 @@ loop with conditional accumulation. The ABI frontier row is now exported and
 executable: typed v2 accepts qualified
 helper function types such as `noinline fn (...)`, and the reusable SysV
 direct-call/frame helpers cover a seventh integer stack parameter plus one
-stack-passed integer call argument.
+stack-passed integer call argument, f32/f64 direct-call returns, and mixed
+integer/f64 call argument assignment.
 Volatile memory roundtrips, broader aggregate field stores, broader global/TLS
 addressing, and larger loop-memory dependencies remain named future generic CFG
 memory/aggregate candidates.
@@ -457,7 +459,7 @@ small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; expanded
-reports ReleaseFast `184/0`, ReleaseSafe `184/0`, ReleaseSmall `184/0`.
+reports ReleaseFast `190/0`, ReleaseSafe `190/0`, ReleaseSmall `190/0`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. The
 conditional slice-loop row has also moved into generic CFG as a conservative
