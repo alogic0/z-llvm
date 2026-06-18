@@ -363,12 +363,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=102`,
-`generic_codegen_functions=102`, `generic_cfg_functions=102`,
+frontier gate reports `source_rows=13`, `discovered_functions=105`,
+`generic_codegen_functions=105`, `generic_cfg_functions=105`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=102`, `object_failures=0`,
+`object_emitted_functions=105`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -390,8 +390,8 @@ up-to-six-live direct-call spill frame with executable proof. The selected sret/
 frontier row now covers `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
 `{ i64, i64, i64, i64, i64 }` hidden-sret returns plus stack-passed MEMORY
 aggregate field-read and byval-to-sret copy proof using layout-derived offsets;
-the Big6/Big7 follow-up extends that normal i64 MEMORY proof through
-`{ i64, i64, i64, i64, i64, i64, i64 }`, exercises multiple stack-passed
+the Big6/Big7/Big8 follow-up extends that normal i64 MEMORY proof through
+`{ i64, i64, i64, i64, i64, i64, i64, i64 }`, exercises multiple stack-passed
 user fields after the hidden sret pointer, and the nested MEMORY follow-up
 copies and reads `{ { i64, i64, i64 }, { i64, i64, i64 } }` through recursive
 leaf byte offsets. The mixed-width MEMORY follow-up copies
@@ -441,7 +441,7 @@ selected nested/array INTEGER construction returns,
 selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
 field reads plus selected packed mixed construction returns, SSE/SSE field
 reads including `[2]f64` array-in-struct, and generated normal
-MEMORY integer-leaf field/copy forms currently proven through seven flat
+MEMORY integer-leaf field/copy forms currently proven through eight flat
 fields, a nested two-Big3 aggregate, and a mixed-width
 `{ i64, i32, i64, i32 }` copy, arbitrary non-selected sret/byval copies,
 varargs, vectors, stack-passed live values, and

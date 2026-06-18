@@ -5091,6 +5091,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big7")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64, i64, i64, i64 }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big8")) {
+        return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64, i64, i64, i64, i64 }" } };
+    }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigNested")) {
         return .{ .ir_type = .{ .aggregate = "{ { i64, i64, i64 }, { i64, i64, i64 } }" } };
     }

@@ -1553,6 +1553,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big5 { long long a; long long b; long long c; long long d; long long e; };
     \\struct Big6 { long long a; long long b; long long c; long long d; long long e; long long f; };
     \\struct Big7 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; };
+    \\struct Big8 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; };
     \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\struct BigMixed { long long a; int b; long long c; int d; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
@@ -1571,6 +1572,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big7 z_frontier_big7_make(long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big7_make");
     \\extern long long z_frontier_big7_inner(struct Big7) __asm__("frontier_sysv_sret_byval.frontier_big7_inner");
     \\extern struct Big7 z_frontier_big7_copy(struct Big7) __asm__("frontier_sysv_sret_byval.frontier_big7_copy");
+    \\extern struct Big8 z_frontier_big8_make(long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big8_make");
+    \\extern long long z_frontier_big8_inner(struct Big8) __asm__("frontier_sysv_sret_byval.frontier_big8_inner");
+    \\extern struct Big8 z_frontier_big8_copy(struct Big8) __asm__("frontier_sysv_sret_byval.frontier_big8_copy");
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern long long z_frontier_big_nested_sum_inner(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_sum_inner");
     \\extern struct BigMixed z_frontier_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_big_mixed_copy");
@@ -1606,13 +1610,19 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_big7_inner(input7) != 431) return 15;
     \\    struct Big7 copied7 = z_frontier_big7_copy(input7);
     \\    if (copied7.a != 113 || copied7.b != 127 || copied7.c != 131 || copied7.d != 137 || copied7.e != 139 || copied7.f != 149 || copied7.g != 151) return 16;
+    \\    struct Big8 made8 = z_frontier_big8_make(157, 163, 167, 173, 179, 181, 191, 193);
+    \\    if (made8.a != 157 || made8.b != 163 || made8.c != 167 || made8.d != 173 || made8.e != 179 || made8.f != 181 || made8.g != 191 || made8.h != 193) return 17;
+    \\    struct Big8 input8 = { .a = 197, .b = 199, .c = 211, .d = 223, .e = 227, .f = 229, .g = 233, .h = 239 };
+    \\    if (z_frontier_big8_inner(input8) != 665) return 18;
+    \\    struct Big8 copied8 = z_frontier_big8_copy(input8);
+    \\    if (copied8.a != 197 || copied8.b != 199 || copied8.c != 211 || copied8.d != 223 || copied8.e != 227 || copied8.f != 229 || copied8.g != 233 || copied8.h != 239) return 19;
     \\    struct BigNested nested = { .left = { .a = 2, .b = 3, .c = 5 }, .right = { .a = 7, .b = 11, .c = 13 } };
-    \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 17;
+    \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 20;
     \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);
-    \\    if (copied_nested.left.a != 2 || copied_nested.left.b != 3 || copied_nested.left.c != 5 || copied_nested.right.a != 7 || copied_nested.right.b != 11 || copied_nested.right.c != 13) return 18;
+    \\    if (copied_nested.left.a != 2 || copied_nested.left.b != 3 || copied_nested.left.c != 5 || copied_nested.right.a != 7 || copied_nested.right.b != 11 || copied_nested.right.c != 13) return 21;
     \\    struct BigMixed mixed = { .a = 211, .b = 223, .c = 227, .d = 229 };
     \\    struct BigMixed copied_mixed = z_frontier_big_mixed_copy(mixed);
-    \\    if (copied_mixed.a != 211 || copied_mixed.b != 223 || copied_mixed.c != 227 || copied_mixed.d != 229) return 19;
+    \\    if (copied_mixed.a != 211 || copied_mixed.b != 223 || copied_mixed.c != 227 || copied_mixed.d != 229) return 22;
     \\    return 0;
     \\}
     \\

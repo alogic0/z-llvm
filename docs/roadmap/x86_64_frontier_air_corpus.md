@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=102
-structured_functions=102
-generic_codegen_functions=102
-generic_cfg_functions=102
+discovered_functions=105
+structured_functions=105
+generic_codegen_functions=105
+generic_cfg_functions=105
 structural_matcher_functions=0
-structured_air_v2_functions=102
-typed_air_operand_functions=102
+structured_air_v2_functions=105
+typed_air_operand_functions=105
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=102
+generic_lowering_functions=105
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=102
+object_emitted_functions=105
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -219,7 +219,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
   reads/returns including `[2]f64` array-in-struct, and generated
   normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
-  through seven flat fields, a nested two-Big3 aggregate, and a mixed-width
+  through eight flat fields, a nested two-Big3 aggregate, and a mixed-width
   `{ i64, i32, i64, i32 }` copy; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, stack-passed live
