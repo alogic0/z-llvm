@@ -181,6 +181,9 @@ aggregate sums:
   the two i64 fields are read from the SysV GPR pair
   `[2]i64` construction returns trace typed AIR v2 pointer-element stores and
   return the two elements in %rax/%rdx
+  after six leading `i64` arguments exhaust the GPR stream, `[2]i64` aggregate
+  field reads use stack offsets derived from the same recursive aggregate GEP
+  offset helper
 frontier_sysv_abi proves the first selected SSE live-across-call frame:
   one live f32/f64 value is spilled from %xmm0 to an aligned frame slot
   another f32/f64 value is passed to an external C ABI void helper

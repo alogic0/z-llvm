@@ -135,6 +135,26 @@ export fn frontier_array_pair_make(a: i64, b: i64) ArrayPair {
     return .{ .values = .{ a, b } };
 }
 
+export fn frontier_stack_array_pair_first(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, value: ArrayPair) i64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    return value.values[0];
+}
+
+export fn frontier_stack_array_pair_second(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, value: ArrayPair) i64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    return value.values[1];
+}
+
 export fn frontier_array_double_first(value: ArrayDouble) f64 {
     return value.values[0];
 }

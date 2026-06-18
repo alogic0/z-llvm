@@ -7390,6 +7390,46 @@ test "x86_64 codegen reads small INTEGER aggregate fields from SysV argument reg
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 codegen reads stack-passed register aggregate fields after GPR exhaustion" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @first(i64 %a0, i64 %a1, i64 %a2, i64 %a3, i64 %a4, i64 %a5, { [2 x i64] } %pair) {
+        \\entry:
+        \\  %slot = alloca { [2 x i64] }
+        \\  store { [2 x i64] } %pair, ptr %slot
+        \\  %field = getelementptr { [2 x i64] }, ptr %slot, i64 0, i32 0, i64 0
+        \\  %value = load i64, ptr %field
+        \\  ret i64 %value
+        \\}
+        \\
+        \\define i64 @second(i64 %a0, i64 %a1, i64 %a2, i64 %a3, i64 %a4, i64 %a5, { [2 x i64] } %pair) {
+        \\entry:
+        \\  %slot = alloca { [2 x i64] }
+        \\  store { [2 x i64] } %pair, ptr %slot
+        \\  %field = getelementptr { [2 x i64] }, ptr %slot, i64 0, i32 0, i64 1
+        \\  %value = load i64, ptr %field
+        \\  ret i64 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var first = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer first.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, first.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 8 }, first.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, first.instructions.items[1]);
+
+    var second = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer second.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, second.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 16 }, second.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, second.instructions.items[1]);
+}
+
 test "x86_64 codegen reads fields from mixed aggregate register classes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

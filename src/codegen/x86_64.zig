@@ -6102,18 +6102,24 @@ fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, gep:
         return @intCast(@as(u128, @intCast(index)) * element_size);
     }
     _ = aggregate_ty;
-    if (isAggregateType(gep.source_ty) and gep.indices.items.len == 2 and
-        gep.indices.items[0].ty.eql(.{ .int = 64 }) and isInt(gep.indices.items[0].value, 0) and
-        (gep.indices.items[1].ty.eql(.{ .int = 32 }) or gep.indices.items[1].ty.eql(.{ .int = 64 })))
+    if (isAggregateType(gep.source_ty) and gep.indices.items.len >= 2 and
+        gep.indices.items[0].ty.eql(.{ .int = 64 }) and isInt(gep.indices.items[0].value, 0))
     {
-        const field_index = switch (gep.indices.items[1].value) {
-            .int => |int| int,
-            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-        };
-        if (field_index < 0 or field_index > std.math.maxInt(usize)) return null;
-        const offset = memory_location.aggregateFieldOffsetWithLayout(layout, gep.source_ty, @intCast(field_index)) orelse return null;
-        if (offset < 0) return null;
-        return @intCast(offset);
+        var current_ty = gep.source_ty;
+        var byte_offset: u64 = 0;
+        for (gep.indices.items[1..]) |index| {
+            if (!index.ty.eql(.{ .int = 32 }) and !index.ty.eql(.{ .int = 64 })) return null;
+            const field_index = switch (index.value) {
+                .int => |int| int,
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+            };
+            if (field_index < 0 or field_index > std.math.maxInt(usize)) return null;
+            const offset = memory_location.aggregateFieldOffsetWithLayout(layout, current_ty, @intCast(field_index)) orelse return null;
+            if (offset < 0) return null;
+            byte_offset += @intCast(offset);
+            current_ty = memory_location.aggregateFieldType(current_ty, @intCast(field_index)) orelse return null;
+        }
+        return byte_offset;
     }
     return null;
 }

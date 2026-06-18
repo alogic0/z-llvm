@@ -1657,6 +1657,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct NestedPair z_frontier_nested_pair_make(int, int, int, int) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_make");
     \\extern long long z_frontier_array_pair_sum(struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_sum");
     \\extern struct ArrayPair z_frontier_array_pair_make(long long, long long) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_make");
+    \\extern long long z_frontier_stack_array_pair_first(long long, long long, long long, long long, long long, long long, struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_pair_first");
+    \\extern long long z_frontier_stack_array_pair_second(long long, long long, long long, long long, long long, long long, struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_pair_second");
     \\extern double z_frontier_array_double_first(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_first");
     \\extern double z_frontier_array_double_second(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_second");
     \\extern struct ArrayDouble z_frontier_array_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_make");
@@ -1706,6 +1708,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_array_pair_sum(array) != 42) return 11;
     \\    struct ArrayPair made_array = z_frontier_array_pair_make(17, 19);
     \\    if (made_array.values[0] != 17 || made_array.values[1] != 19) return 29;
+    \\    struct ArrayPair stack_array = { { 101, 103 } };
+    \\    if (z_frontier_stack_array_pair_first(1, 2, 3, 4, 5, 6, stack_array) != 101) return 38;
+    \\    if (z_frontier_stack_array_pair_second(1, 2, 3, 4, 5, 6, stack_array) != 103) return 39;
     \\    struct ArrayDouble array_double = { { 2.5, 4.75 } };
     \\    if (z_frontier_array_double_first(array_double) != 2.5) return 30;
     \\    if (z_frontier_array_double_second(array_double) != 4.75) return 31;

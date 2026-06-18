@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=110
-structured_functions=110
-generic_codegen_functions=110
-generic_cfg_functions=110
+discovered_functions=112
+structured_functions=112
+generic_codegen_functions=112
+generic_cfg_functions=112
 structural_matcher_functions=0
-structured_air_v2_functions=110
-typed_air_operand_functions=110
+structured_air_v2_functions=112
+typed_air_operand_functions=112
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=110
+generic_lowering_functions=112
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=110
+object_emitted_functions=112
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -169,6 +169,10 @@ Closed in the current memory/aggregate frontier slice:
   construction-return row traces typed AIR v2 array-element stores into
   flattened `insertvalue` paths and returns the two `i64` elements in
   `%rax`/`%rdx`
+- first stack-passed register aggregate row in
+  `frontier_sysv_aggregate_classes.zig`: after six leading `i64` parameters
+  exhaust the GPR stream, a `[2]i64` aggregate argument is read from the call
+  stack through the same recursive aggregate GEP offset path
 - first array-in-struct SSE/SSE aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `[2]f64` field and pointer-element
   GEPs lower from typed AIR v2, the two `double` elements are read from the
@@ -224,7 +228,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
   reads/returns including `[2]f64` array-in-struct and nested `{ { double },
-  { double } }`, and generated
+  { double } }`, selected stack-passed register aggregate field reads, and generated
   normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
   through eight flat fields, a nested two-Big3 aggregate, and a mixed-width
   `{ i64, i32, i64, i32 }` copy; X87,
