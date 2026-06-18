@@ -1635,6 +1635,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct NestedPair { struct Pair32 left; struct Pair32 right; };
     \\struct ArrayPair { long long values[2]; };
     \\struct ArrayDouble { double values[2]; };
+    \\struct DoubleBox { double value; };
+    \\struct NestedDouble { struct DoubleBox left; struct DoubleBox right; };
     \\struct NestedMixed { struct Pair32 ints; double value; };
     \\struct SmallMixed { int a; double b; };
     \\struct SmallReverseMixed { double a; int b; };
@@ -1658,6 +1660,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_array_double_first(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_first");
     \\extern double z_frontier_array_double_second(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_second");
     \\extern struct ArrayDouble z_frontier_array_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_make");
+    \\extern double z_frontier_nested_double_left(struct NestedDouble) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_left");
+    \\extern double z_frontier_nested_double_right(struct NestedDouble) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_right");
+    \\extern struct NestedDouble z_frontier_nested_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_make");
     \\extern int z_frontier_nested_mixed_int_sum(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_int_sum");
     \\extern int z_frontier_small_mixed_int(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_int");
     \\extern double z_frontier_small_mixed_float(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_float");
@@ -1704,6 +1709,11 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_array_double_second(array_double) != 4.75) return 31;
     \\    struct ArrayDouble made_array_double = z_frontier_array_double_make(6.5, 8.25);
     \\    if (made_array_double.values[0] != 6.5 || made_array_double.values[1] != 8.25) return 32;
+    \\    struct NestedDouble nested_double = { { 12.5 }, { 14.75 } };
+    \\    if (z_frontier_nested_double_left(nested_double) != 12.5) return 33;
+    \\    if (z_frontier_nested_double_right(nested_double) != 14.75) return 34;
+    \\    struct NestedDouble made_nested_double = z_frontier_nested_double_make(16.5, 18.25);
+    \\    if (made_nested_double.left.value != 16.5 || made_nested_double.right.value != 18.25) return 35;
     \\    struct NestedMixed nested_mixed = { { 47, 53 }, 59.0 };
     \\    if (z_frontier_nested_mixed_int_sum(nested_mixed) != 100) return 13;
     \\    struct SmallMixed small_mixed = { 17, 23.5 };

@@ -363,12 +363,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=105`,
-`generic_codegen_functions=105`, `generic_cfg_functions=105`,
+frontier gate reports `source_rows=13`, `discovered_functions=108`,
+`generic_codegen_functions=108`, `generic_cfg_functions=108`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=105`, `object_failures=0`,
+`object_emitted_functions=108`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -403,8 +403,9 @@ selected `{ i32, i32, double }` INTEGER/SSE field reads plus register aggregate
 returns in `%rax`/`%xmm0` through the independent SysV GPR/SSE streams,
 including adjacent `i32` lane packing into `%rax`; a noinline helper-call row
 returns the same register aggregate directly from a private helper. The SSE aggregate frontier row
-adds `{ double, double }` plus `[2]f64` array-in-struct SSE/SSE field reads
-and register aggregate return in `%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
+adds `{ double, double }`, `[2]f64` array-in-struct, and nested
+`{ { double }, { double } }` SSE/SSE field reads plus register aggregate
+return in `%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
 `{ double, i64 }`, selected `{ double, i32 }`, and selected
 `{ double, i32, i32 }` SSE/INTEGER field reads plus register aggregate returns
 in `%xmm0`/`%rax`, including high-lane `i32` extraction and adjacent `i32` lane
@@ -440,7 +441,8 @@ selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains,
 selected nested/array INTEGER construction returns,
 selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
 field reads plus selected packed mixed construction returns, SSE/SSE field
-reads including `[2]f64` array-in-struct, and generated normal
+reads including `[2]f64` array-in-struct and nested `{ { double }, { double }
+}`, and generated normal
 MEMORY integer-leaf field/copy forms currently proven through eight flat
 fields, a nested two-Big3 aggregate, and a mixed-width
 `{ i64, i32, i64, i32 }` copy, arbitrary non-selected sret/byval copies,

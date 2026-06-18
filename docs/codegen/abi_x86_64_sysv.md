@@ -146,6 +146,13 @@ aggregate reads and register aggregate return:
   pointer path
   the two `double` elements are read from the SysV SSE argument stream
   `[2]f64` construction returns through %xmm0/%xmm1
+
+frontier_sysv_aggregate_classes.NestedDouble proves nested SSE/SSE aggregate
+reads and register aggregate return:
+  `{ { double }, { double } }` typed AIR nested field GEPs lower through
+  layout-backed byte offsets
+  both `double` leaves are read from the SysV SSE argument stream
+  construction returns through %xmm0/%xmm1
 frontier_sysv_aggregate_classes.ReverseMixed proves the first reversed
 SSE/INTEGER aggregate argument field reads and register aggregate return:
   field `double` is returned from the aggregate's SSE class register
@@ -199,7 +206,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes and selected one- through six-live f32/f64 SSE spill shapes
 no varargs
 no vectors
-no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
+no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions

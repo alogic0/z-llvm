@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=105
-structured_functions=105
-generic_codegen_functions=105
-generic_cfg_functions=105
+discovered_functions=108
+structured_functions=108
+generic_codegen_functions=108
+generic_cfg_functions=108
 structural_matcher_functions=0
-structured_air_v2_functions=105
-typed_air_operand_functions=105
+structured_air_v2_functions=108
+typed_air_operand_functions=108
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=105
+generic_lowering_functions=108
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=105
+object_emitted_functions=108
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -173,6 +173,11 @@ Closed in the current memory/aggregate frontier slice:
   GEPs lower from typed AIR v2, the two `double` elements are read from the
   independent SysV SSE argument stream, and construction returns the elements
   in `%xmm0`/`%xmm1`
+- first nested SSE/SSE aggregate row in
+  `frontier_sysv_aggregate_classes.zig`: `{ { double }, { double } }` nested
+  field GEPs lower through layout-backed byte offsets, read both `double`
+  leaves from the independent SysV SSE argument stream, and return the nested
+  aggregate in `%xmm0`/`%xmm1`
 - first SSE live-across-call row in `frontier_sysv_abi.zig`: one live
   `f32`/`f64` parameter is spilled from `%xmm0` to an aligned frame slot,
   another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
@@ -217,7 +222,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   INTEGER add chains plus nested construction returns, nested mixed INTEGER/SSE integer add chains, selected
   mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
-  reads/returns including `[2]f64` array-in-struct, and generated
+  reads/returns including `[2]f64` array-in-struct and nested `{ { double },
+  { double } }`, and generated
   normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
   through eight flat fields, a nested two-Big3 aggregate, and a mixed-width
   `{ i64, i32, i64, i32 }` copy; X87,

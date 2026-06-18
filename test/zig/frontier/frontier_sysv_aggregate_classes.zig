@@ -31,6 +31,15 @@ const ArrayDouble = extern struct {
     values: [2]f64,
 };
 
+const DoubleBox = extern struct {
+    value: f64,
+};
+
+const NestedDouble = extern struct {
+    left: DoubleBox,
+    right: DoubleBox,
+};
+
 const NestedMixed = extern struct {
     ints: Pair32,
     value: f64,
@@ -136,6 +145,18 @@ export fn frontier_array_double_second(value: ArrayDouble) f64 {
 
 export fn frontier_array_double_make(a: f64, b: f64) ArrayDouble {
     return .{ .values = .{ a, b } };
+}
+
+export fn frontier_nested_double_left(value: NestedDouble) f64 {
+    return value.left.value;
+}
+
+export fn frontier_nested_double_right(value: NestedDouble) f64 {
+    return value.right.value;
+}
+
+export fn frontier_nested_double_make(a: f64, b: f64) NestedDouble {
+    return .{ .left = .{ .value = a }, .right = .{ .value = b } };
 }
 
 export fn frontier_nested_mixed_int_sum(value: NestedMixed) i32 {
