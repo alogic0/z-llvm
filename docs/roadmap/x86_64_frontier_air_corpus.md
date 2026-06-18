@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=59
-structured_functions=59
-generic_codegen_functions=59
-generic_cfg_functions=59
+discovered_functions=62
+structured_functions=62
+generic_codegen_functions=62
+generic_cfg_functions=62
 structural_matcher_functions=0
-structured_air_v2_functions=59
-typed_air_operand_functions=59
+structured_air_v2_functions=62
+typed_air_operand_functions=62
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=59
+generic_lowering_functions=62
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=59
+object_emitted_functions=62
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -117,11 +117,13 @@ Closed in the current memory/aggregate frontier slice:
   GPR argument registers through aligned stack slots around the call
 - selected sret/byval-style source-backed rows in
   `frontier_sysv_sret_byval.zig`: `{ i64, i64, i64 }`,
-  `{ i64, i64, i64, i64 }`, and `{ i64, i64, i64, i64, i64 }` returns
-  through a hidden sret pointer in `%rdi` with user arguments shifted through
-  the SysV GPR stream; the same selected normal MEMORY i64 aggregates now also
-  copy all fields from the stack-passed by-value argument to the hidden sret
-  destination using layout-derived offsets
+  `{ i64, i64, i64, i64 }`, `{ i64, i64, i64, i64, i64 }`, and
+  `{ i64, i64, i64, i64, i64, i64 }` returns through a hidden sret pointer in
+  `%rdi` with user arguments shifted through the SysV GPR stream; the six-field
+  make row proves loading a stack-passed user argument after the hidden pointer,
+  and the same selected normal MEMORY i64 aggregates now also copy all fields
+  from the stack-passed by-value argument to the hidden sret destination using
+  layout-derived offsets
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
@@ -159,11 +161,11 @@ Remaining measured frontier blockers kept out of accepted rows:
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
   INTEGER add chains, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE
-  field reads/returns, and
-  selected 3/4/5-field MEMORY i64 aggregate sret/byval field/copy forms; X87,
-  packed/unaligned aggregate ABI classes, arbitrary non-selected sret/byval copies,
-  varargs, vectors, stack-passed live values, and broader SSE live-across-call
-  frames beyond the selected one-live `f32`/`f64` direct-call shape
+  field reads/returns, and selected 3/4/5/6-field normal MEMORY i64 aggregate
+  sret/byval field/copy forms; X87, packed/unaligned aggregate ABI classes,
+  arbitrary non-selected sret/byval copies, varargs, vectors, stack-passed live
+  values, and broader SSE live-across-call frames beyond the selected one-live
+  `f32`/`f64` direct-call shape
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

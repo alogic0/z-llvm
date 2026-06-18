@@ -105,9 +105,10 @@ frontier_sysv_abi.Pair64 lowers as the selected small INTEGER/INTEGER class
 aggregate return `{ i64, i64 }` uses %rax/%rdx
 aggregate argument field 0/1 reads use the SysV integer register pair
 the selected direct-call frame spills and reloads up to six live i32 caller parameters
-frontier_sysv_sret_byval.Big3, Big4, and Big5 lower as selected MEMORY classes:
-  `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and `{ i64, i64, i64, i64, i64 }` returns store through the hidden sret pointer in %rdi
+frontier_sysv_sret_byval.Big3, Big4, Big5, and Big6 lower as selected normal MEMORY classes:
+  `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, `{ i64, i64, i64, i64, i64 }`, and `{ i64, i64, i64, i64, i64, i64 }` returns store through the hidden sret pointer in %rdi
   user i64 args are shifted through the SysV GPR stream after the hidden pointer
+  the six-field make row reads the first stack-passed user field after the hidden pointer
   by-value stack aggregate field reads and byval-to-sret copies use layout-derived stack offsets for all fields in these selected normal i64 MEMORY forms
 frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
 aggregate argument field reads and register aggregate return:
@@ -147,7 +148,7 @@ no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR s
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms
-no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes
+no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal i64 sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
 no stack-passed or broader SSE live-across-call spill/reload-heavy call frames

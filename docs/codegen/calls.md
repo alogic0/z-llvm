@@ -147,7 +147,7 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected mixed INTEGER/SSE aggregate argument field reads and register return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, selected `{ i64, i64, i64 }`/`{ i64, i64, i64, i64 }`/`{ i64, i64, i64, i64, i64 }` hidden-sret return storage, selected stack-passed MEMORY aggregate by-value field reads and byval-to-sret copies, and selected one-live f32/f64 SSE spill/reload around a direct C ABI void call
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected mixed INTEGER/SSE aggregate argument field reads and register return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, selected `{ i64, i64, i64 }`/`{ i64, i64, i64, i64 }`/`{ i64, i64, i64, i64, i64 }`/`{ i64, i64, i64, i64, i64, i64 }` hidden-sret return storage, selected stack-passed MEMORY aggregate by-value field reads and byval-to-sret copies, and selected one-live f32/f64 SSE spill/reload around a direct C ABI void call
 out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
@@ -158,9 +158,9 @@ ABI-shaped attributes:
 byval(...) and sret(...) are preserved on pointer parameters and verified
 as pointer-only annotations; the frontier additionally lowers the selected
 source-backed `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
-`{ i64, i64, i64, i64, i64 }` hidden-sret returns, stack by-value aggregate
-field-read shape, and byval-to-sret copies for all fields in those selected
-normal i64 MEMORY forms
+`{ i64, i64, i64, i64, i64 }` plus `{ i64, i64, i64, i64, i64, i64 }`
+hidden-sret returns, stack by-value aggregate field-read shape, and
+byval-to-sret copies for all fields in those selected normal i64 MEMORY forms
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax

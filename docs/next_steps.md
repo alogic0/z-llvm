@@ -306,9 +306,12 @@ spilling and reloading caller parameters through aligned frame slots. The follow
 `frontier_sysv_sret_byval.zig` row adds selected MEMORY aggregate ABI evidence:
 `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
 `{ i64, i64, i64, i64, i64 }` returns through a hidden sret pointer in `%rdi`
-with user arguments shifted through the SysV GPR stream, plus by-value
-stack-passed aggregate field reads and byval-to-sret copies for all fields in
-those selected normal i64 MEMORY aggregate forms. Boundaries still outside this
+with user arguments shifted through the SysV GPR stream. The follow-up Big6 row
+adds `{ i64, i64, i64, i64, i64, i64 }` return/copy proof and exercises the
+first stack-passed user field after the hidden sret pointer. The same selected
+normal i64 MEMORY aggregate forms use by-value stack-passed aggregate field
+reads and byval-to-sret copies for all fields through layout-derived offsets.
+Boundaries still outside this
 wave are full
 SysV aggregate classification beyond the selected INTEGER/MEMORY classes,
 arbitrary non-selected sret/byval copies, varargs, vectors, and wider
@@ -355,12 +358,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=59`,
-`generic_codegen_functions=59`, `generic_cfg_functions=59`,
+frontier gate reports `source_rows=13`, `discovered_functions=62`,
+`generic_codegen_functions=62`, `generic_cfg_functions=62`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=59`, `object_failures=0`,
+`object_emitted_functions=62`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -380,7 +383,10 @@ field reads, array-in-struct INTEGER aggregate sums, and the selected
 up-to-six-live direct-call spill frame with executable proof. The selected sret/byval
 frontier row now covers `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
 `{ i64, i64, i64, i64, i64 }` hidden-sret returns plus stack-passed MEMORY
-aggregate field-read and byval-to-sret copy proof using layout-derived offsets.
+aggregate field-read and byval-to-sret copy proof using layout-derived offsets;
+the Big6 follow-up extends that normal i64 MEMORY proof to
+`{ i64, i64, i64, i64, i64, i64 }` and exercises a stack-passed user field
+after the hidden sret pointer.
 The mixed aggregate
 class frontier row adds `{ i64, double }`
 INTEGER/SSE field reads and register aggregate return in `%rax`/`%xmm0`
@@ -396,7 +402,7 @@ private helper graphs with stack-passed live values, multiple live SSE values, o
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field
-reads, and 3/4/5-field MEMORY field/copy forms, arbitrary non-selected
+reads, and 3/4/5/6-field normal MEMORY field/copy forms, arbitrary non-selected
 sret/byval copies, varargs,
 vectors, stack-passed live values, and broader SSE live-across-call frames
 beyond the selected one-live `f32`/`f64` direct-call shape. The accepted frontier rows use typed

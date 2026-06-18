@@ -1023,7 +1023,7 @@ fn typedV2SretIntegerAggregateRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     const field_count = integerAggregateFieldCount(function_type.return_type.ir_type) orelse return false;
-    if (field_count < 3 or field_count > 5 or function_type.params.len != field_count) return false;
+    if (field_count < 3 or field_count > 6 or function_type.params.len != field_count) return false;
     for (function_type.params, 0..) |param, field_index| {
         if (!param.ir_type.eql(.{ .int = 64 })) return false;
         if (typedFieldPtrIndexCount(structured_air_v2, field_index) != 1) return false;
@@ -1039,7 +1039,7 @@ fn typedV2SretIntegerAggregateCopyRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     const field_count = integerAggregateFieldCount(function_type.return_type.ir_type) orelse return false;
-    if (field_count < 3 or field_count > 5 or function_type.params.len != 1) return false;
+    if (field_count < 3 or field_count > 6 or function_type.params.len != 1) return false;
     if (!function_type.params[0].ir_type.eql(function_type.return_type.ir_type)) return false;
     return typedOpcodeCount(structured_air_v2, "arg") == 1 and
         typedHasReturnOpcode(structured_air_v2);
@@ -1066,9 +1066,9 @@ fn lowerSretIntegerAggregateMake(
     function.linkage = .default;
     function.calling_conv = null;
     const field_count = integerAggregateFieldCount(aggregate_ty) orelse return error.UnsupportedAir;
-    if (field_count < 3 or field_count > 5) return error.UnsupportedAir;
+    if (field_count < 3 or field_count > 6) return error.UnsupportedAir;
     try function.params.append(allocator, .{ .ty = .ptr, .attrs = sretAttrsForAggregate(aggregate_ty) orelse return error.UnsupportedAir, .name = "sret" });
-    const arg_names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3", "arg4" };
+    const arg_names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3", "arg4", "arg5" };
     var param_index: usize = 0;
     while (param_index < field_count) : (param_index += 1) {
         try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = arg_names[param_index] });
@@ -1076,7 +1076,7 @@ fn lowerSretIntegerAggregateMake(
 
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
-    const field_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4" };
+    const field_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5" };
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         var gep: ir.GepInst = .{ .source_ty = aggregate_ty, .ptr = .{ .named = "sret" }, .indices = .empty };
@@ -1108,15 +1108,15 @@ fn lowerSretIntegerAggregateCopy(
     function.linkage = .default;
     function.calling_conv = null;
     const field_count = integerAggregateFieldCount(aggregate_ty) orelse return error.UnsupportedAir;
-    if (field_count < 3 or field_count > 5) return error.UnsupportedAir;
+    if (field_count < 3 or field_count > 6) return error.UnsupportedAir;
     try function.params.append(allocator, .{ .ty = .ptr, .attrs = sretAttrsForAggregate(aggregate_ty) orelse return error.UnsupportedAir, .name = "sret" });
     try function.params.append(allocator, .{ .ty = .ptr, .attrs = byvalAttrsForAggregate(aggregate_ty) orelse return error.UnsupportedAir, .name = "arg0" });
 
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
-    const src_gep_names = [_][]const u8{ "src_field0", "src_field1", "src_field2", "src_field3", "src_field4" };
-    const load_names = [_][]const u8{ "load0", "load1", "load2", "load3", "load4" };
-    const dst_gep_names = [_][]const u8{ "dst_field0", "dst_field1", "dst_field2", "dst_field3", "dst_field4" };
+    const src_gep_names = [_][]const u8{ "src_field0", "src_field1", "src_field2", "src_field3", "src_field4", "src_field5" };
+    const load_names = [_][]const u8{ "load0", "load1", "load2", "load3", "load4", "load5" };
+    const dst_gep_names = [_][]const u8{ "dst_field0", "dst_field1", "dst_field2", "dst_field3", "dst_field4", "dst_field5" };
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         const src_result = src_gep_names[field_index];
@@ -1155,6 +1155,7 @@ fn lowerSretIntegerAggregateCopy(
 }
 
 fn sretAttrsForAggregate(aggregate_ty: ir.Type) ?[]const u8 {
+    if (aggregate_ty.eql(.{ .aggregate = "{ i64, i64, i64, i64, i64, i64 }" })) return "sret({ i64, i64, i64, i64, i64, i64 })";
     if (aggregate_ty.eql(.{ .aggregate = "{ i64, i64, i64, i64, i64 }" })) return "sret({ i64, i64, i64, i64, i64 })";
     if (aggregate_ty.eql(.{ .aggregate = "{ i64, i64, i64 }" })) return "sret({ i64, i64, i64 })";
     if (aggregate_ty.eql(.{ .aggregate = "{ i64, i64, i64, i64 }" })) return "sret({ i64, i64, i64, i64 })";
@@ -1162,6 +1163,7 @@ fn sretAttrsForAggregate(aggregate_ty: ir.Type) ?[]const u8 {
 }
 
 fn byvalAttrsForAggregate(aggregate_ty: ir.Type) ?[]const u8 {
+    if (aggregate_ty.eql(.{ .aggregate = "{ i64, i64, i64, i64, i64, i64 }" })) return "byval({ i64, i64, i64, i64, i64, i64 })";
     if (aggregate_ty.eql(.{ .aggregate = "{ i64, i64, i64, i64, i64 }" })) return "byval({ i64, i64, i64, i64, i64 })";
     if (aggregate_ty.eql(.{ .aggregate = "{ i64, i64, i64 }" })) return "byval({ i64, i64, i64 })";
     if (aggregate_ty.eql(.{ .aggregate = "{ i64, i64, i64, i64 }" })) return "byval({ i64, i64, i64, i64 })";
@@ -4904,6 +4906,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big5")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64, i64 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big6")) {
+        return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64, i64, i64 }" } };
     }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };

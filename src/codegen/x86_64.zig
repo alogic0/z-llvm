@@ -13344,7 +13344,7 @@ fn lowerGenericCfgSelectedSretStores(
     if (function.params.items.len < 4) return false;
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
     const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
-    if (field_count < 3 or field_count > 5 or function.params.items.len != field_count + 1) return false;
+    if (field_count < 3 or function.params.items.len != field_count + 1) return false;
     if (!isI64Aggregate(aggregate_ty)) return false;
     if (!function.params.items[0].ty.eql(.ptr)) return false;
     if ((try paramReg(function, function.params.items[0].name, .ptr)) != .rdi) return error.UnsupportedCodegenAbi;
@@ -13367,12 +13367,21 @@ fn lowerGenericCfgSelectedSretStores(
         };
         if (!store.ty.eql(.{ .int = 64 }) or store.attrs.isBarrier() or !isNamed(store.ptr, gep_name) or
             !isNamed(store.value, function.params.items[pair_index + 1].name)) return false;
-        const src_reg = try paramReg(function, function.params.items[pair_index + 1].name, .{ .int = 64 });
-        try machine.instructions.append(allocator, .{ .store_arg64_arg_ptr_disp8 = .{
-            .ptr_reg = .rdi,
-            .src_reg = src_reg,
-            .offset = @intCast(pair_index * 8),
-        } });
+        const offset = try aggregateFieldOffsetU8(aggregate_ty, pair_index);
+        const maybe_src_reg = paramReg(function, function.params.items[pair_index + 1].name, .{ .int = 64 }) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi => null,
+            else => return err,
+        };
+        if (maybe_src_reg) |src_reg| {
+            try machine.instructions.append(allocator, .{ .store_arg64_arg_ptr_disp8 = .{
+                .ptr_reg = .rdi,
+                .src_reg = src_reg,
+                .offset = offset,
+            } });
+        } else {
+            try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try scalarParamStackDisp8(function, function.params.items[pair_index + 1].name, .{ .int = 64 }) });
+            try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = offset } });
+        }
     }
     try appendGenericCfgReturn(allocator, machine);
     return true;
@@ -13389,7 +13398,7 @@ fn lowerGenericCfgSretCopy(
     const byval_ty = byvalAggregateType(function.params.items[1].attrs) orelse return false;
     if (!byval_ty.eql(aggregate_ty)) return false;
     const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
-    if (field_count < 3 or field_count > 5 or !isI64Aggregate(aggregate_ty)) return false;
+    if (field_count < 3 or !isI64Aggregate(aggregate_ty)) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;
     const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
     if (sret_reg != .rdi) return error.UnsupportedCodegenAbi;
@@ -13429,29 +13438,65 @@ fn lowerGenericCfgSretCopy(
 }
 
 fn sretAggregateType(attrs: ?[]const u8) ?ir.Type {
+    return aggregateAbiAttrType(attrs, "sret");
+}
+
+fn byvalAggregateType(attrs: ?[]const u8) ?ir.Type {
+    return aggregateAbiAttrType(attrs, "byval");
+}
+
+fn aggregateAbiAttrType(attrs: ?[]const u8, name: []const u8) ?ir.Type {
     const text = attrs orelse return null;
-    if (std.mem.indexOf(u8, text, "sret({ i64, i64, i64, i64, i64 })") != null) {
-        return .{ .aggregate = "{ i64, i64, i64, i64, i64 }" };
-    }
-    if (std.mem.indexOf(u8, text, "sret({ i64, i64, i64, i64 })") != null) {
-        return .{ .aggregate = "{ i64, i64, i64, i64 }" };
-    }
-    if (std.mem.indexOf(u8, text, "sret({ i64, i64, i64 })") != null) {
-        return .{ .aggregate = "{ i64, i64, i64 }" };
+    var start: usize = 0;
+    while (std.mem.indexOfPos(u8, text, start, name)) |name_index| {
+        const open_index = name_index + name.len;
+        start = open_index;
+        if (open_index >= text.len or text[open_index] != '(') continue;
+        const close_index = findMatchingParen(text, open_index) orelse return null;
+        const payload = std.mem.trim(u8, text[open_index + 1 .. close_index], " \t");
+        if (payload.len >= 2 and ((payload[0] == '{' and payload[payload.len - 1] == '}') or
+            (payload[0] == '[' and payload[payload.len - 1] == ']') or
+            (payload[0] == '%' and payload.len > 1)))
+        {
+            return .{ .aggregate = payload };
+        }
+        start = close_index + 1;
     }
     return null;
 }
 
-fn byvalAggregateType(attrs: ?[]const u8) ?ir.Type {
-    const text = attrs orelse return null;
-    if (std.mem.indexOf(u8, text, "byval({ i64, i64, i64, i64, i64 })") != null) {
-        return .{ .aggregate = "{ i64, i64, i64, i64, i64 }" };
-    }
-    if (std.mem.indexOf(u8, text, "byval({ i64, i64, i64, i64 })") != null) {
-        return .{ .aggregate = "{ i64, i64, i64, i64 }" };
-    }
-    if (std.mem.indexOf(u8, text, "byval({ i64, i64, i64 })") != null) {
-        return .{ .aggregate = "{ i64, i64, i64 }" };
+fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
+    if (open_index >= text.len or text[open_index] != '(') return null;
+    var paren_depth: usize = 0;
+    var brace_depth: usize = 0;
+    var bracket_depth: usize = 0;
+    var angle_depth: usize = 0;
+    for (text[open_index..], 0..) |byte, relative_index| {
+        const index = open_index + relative_index;
+        switch (byte) {
+            '(' => paren_depth += 1,
+            ')' => {
+                if (paren_depth == 0) return null;
+                paren_depth -= 1;
+                if (paren_depth == 0 and brace_depth == 0 and bracket_depth == 0 and angle_depth == 0) return index;
+            },
+            '{' => brace_depth += 1,
+            '}' => {
+                if (brace_depth == 0) return null;
+                brace_depth -= 1;
+            },
+            '[' => bracket_depth += 1,
+            ']' => {
+                if (bracket_depth == 0) return null;
+                bracket_depth -= 1;
+            },
+            '<' => angle_depth += 1,
+            '>' => {
+                if (angle_depth == 0) return null;
+                angle_depth -= 1;
+            },
+            else => {},
+        }
     }
     return null;
 }
@@ -22238,6 +22283,25 @@ fn paramRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg
         try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
     }
     return null;
+}
+
+fn scalarParamStackDisp8(function: ir.Function, name: []const u8, ty: ir.Type) !u8 {
+    if (!isSysVIntegerParamType(ty) and !ty.eql(.float) and !ty.eql(.double)) return error.UnsupportedCodegenType;
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    var stack_eightbytes: usize = 0;
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) {
+            if (!param.ty.eql(ty)) return error.UnsupportedCodegenValue;
+            const in_register = if (isSysVIntegerParamType(ty)) gpr_index < 6 else sse_index < 8;
+            if (in_register) return error.UnsupportedCodegenAbi;
+            const offset = 8 + stack_eightbytes * 8;
+            if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            return @intCast(offset);
+        }
+        try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
+    }
+    return error.UnsupportedCodegenValue;
 }
 
 fn isSysVIntegerParamType(ty: ir.Type) bool {
