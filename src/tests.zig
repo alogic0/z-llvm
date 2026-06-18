@@ -527,6 +527,40 @@ test "memory location aggregate helpers classify array elements as fields" {
     try std.testing.expectEqual(@as(?i128, null), memory_location.aggregateFieldOffset(array_ty, 3));
 }
 
+test "x86_64 SysV aggregate classifier covers register and memory classes" {
+    const pair = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ i64, i64 }" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, pair.kind);
+    try std.testing.expectEqual(@as(u2, 2), pair.eightbyte_count);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), pair.eightbytes[0]);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), pair.eightbytes[1]);
+
+    const mixed = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ i64, double }" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, mixed.kind);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), mixed.eightbytes[0]);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), mixed.eightbytes[1]);
+
+    const reversed = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ double, i64 }" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, reversed.kind);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), reversed.eightbytes[0]);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), reversed.eightbytes[1]);
+
+    const array = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "[2 x i64]" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, array.kind);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), array.eightbytes[0]);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), array.eightbytes[1]);
+
+    const nested = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ { i32, i32 }, i64 }" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, nested.kind);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), nested.eightbytes[0]);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), nested.eightbytes[1]);
+
+    const too_large = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ i64, i64, i64 }" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.memory, too_large.kind);
+
+    const packed_struct = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "<{ i8, i64 }>" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.memory, packed_struct.kind);
+}
+
 test "memory locations can use module DataLayout for aggregate GEP offsets" {
     const input =
         \\target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
