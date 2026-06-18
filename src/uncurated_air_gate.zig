@@ -1601,6 +1601,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_mixed_int(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_int");
     \\extern double z_frontier_mixed_float(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_float");
     \\extern struct Mixed z_frontier_mixed_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_make");
+    \\extern struct Mixed z_frontier_mixed_call_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_call_make");
     \\extern double z_frontier_double_pair_first(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_first");
     \\extern double z_frontier_double_pair_second(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_second");
     \\extern struct DoublePair z_frontier_double_pair_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_make");
@@ -1608,6 +1609,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_reverse_mixed_int(struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_int");
     \\extern struct ReverseMixed z_frontier_reverse_mixed_make(double, long long) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_make");
     \\extern int z_frontier_nested_pair_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_sum");
+    \\extern int z_frontier_nested_pair_call_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_call_sum");
     \\extern long long z_frontier_array_pair_sum(struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_sum");
     \\extern int z_frontier_nested_mixed_int_sum(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_int_sum");
     \\int main(void) {
@@ -1616,6 +1618,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_mixed_float(value) != 6.25) return 2;
     \\    struct Mixed made = z_frontier_mixed_make(77, 9.5);
     \\    if (made.a != 77 || made.b != 9.5) return 3;
+    \\    struct Mixed call_made = z_frontier_mixed_call_make(81, 10.5);
+    \\    if (call_made.a != 81 || call_made.b != 10.5) return 14;
     \\    struct DoublePair doubles = { 1.25, 7.5 };
     \\    if (z_frontier_double_pair_first(doubles) != 1.25) return 4;
     \\    if (z_frontier_double_pair_second(doubles) != 7.5) return 5;
@@ -1629,6 +1633,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (made_reverse.b != 444) return 12;
     \\    struct NestedPair nested = { { 1, 2 }, { 3, 4 } };
     \\    if (z_frontier_nested_pair_sum(nested) != 10) return 10;
+    \\    if (z_frontier_nested_pair_call_sum(nested) != 10) return 15;
     \\    struct ArrayPair array = { { 11, 31 } };
     \\    if (z_frontier_array_pair_sum(array) != 42) return 11;
     \\    struct NestedMixed nested_mixed = { { 47, 53 }, 59.0 };

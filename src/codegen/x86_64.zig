@@ -5443,6 +5443,7 @@ fn lowerAggregateAbiReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    if (try lowerRegisterAggregateDirectCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSysVAggregateFieldReturn(allocator, machine, function, block, ret)) return true;
@@ -6469,6 +6470,36 @@ fn advanceSysVParamCursors(
     } else {
         stack_eightbytes.* += @intCast((classification.size_bytes + 7) / 8);
     }
+}
+
+fn lowerRegisterAggregateDirectCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(function.ret_ty) or block.instructions.items.len != 1) return false;
+    const classification = classifySysVAggregate(function.ret_ty) catch return false;
+    if (classification.kind != .register) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const call_result = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, call_result)) return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!call.ret_ty.eql(function.ret_ty) or call.callee_value != null or call.inline_asm != null) return false;
+    if (call.tail_kind != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    const stack_arg_count = appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
+        else => return err,
+    };
+    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerAggregatePairAbiFamilyReturn(
@@ -12455,14 +12486,14 @@ fn emitGenericCfgI32CallIntoEax(
     if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 9) return error.UnsupportedCodegenInstruction;
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
-    const stack_arg_count = try i32CallStackArgCount(call);
     const live_params = try liveParamsAfter(function, block, instruction_index);
-    if (stack_arg_count != 0 and live_params.count != 0) return error.UnsupportedLiveAcrossCall;
-    if (stack_arg_count == 0) {
-        try appendAlignedDirectCallPreservingI32Params(allocator, machine, function, call, live_params);
-    } else {
-        _ = try appendI32CallArgs(allocator, machine, function, call);
+    if (live_params.count == 0) {
+        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
         try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    } else {
+        const stack_arg_count = try i32CallStackArgCount(call);
+        if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+        try appendAlignedDirectCallPreservingI32Params(allocator, machine, function, call, live_params);
     }
 }
 
@@ -21470,10 +21501,12 @@ fn appendSysVScalarCallArgs(
     function: ir.Function,
     call: ir.CallInst,
 ) !usize {
-    // Selected x86_64 release rows currently support scalar SysV calls only:
-    // i32/i64 integer or pointer-class values in the integer stream, f32/f64 in
-    // the SSE stream, and up to three constant i32 stack arguments. Varargs,
-    // byval/sret attrs, vectors, and aggregate classes fail closed here.
+    // Selected x86_64 release rows currently support scalar SysV calls plus
+    // pass-through register aggregates: i32/i64 integer or pointer-class values
+    // in the integer stream, f32/f64 in the SSE stream, register aggregate
+    // parameters that are already in the destination argument registers, and up
+    // to three constant i32 stack arguments. Varargs, byval/sret attrs, vectors,
+    // MEMORY aggregates, and aggregate register shuffles fail closed here.
     if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
@@ -21560,6 +21593,10 @@ fn appendSysVScalarCallArgs(
             fp_arg_index += 1;
             continue;
         }
+        if (isAggregateType(arg.ty)) {
+            try appendSysVRegisterAggregatePassThroughArg(function, arg, &int_arg_index, &fp_arg_index);
+            continue;
+        }
         return error.UnsupportedCodegenType;
     }
     var stack_index = stack_arg_count;
@@ -21568,6 +21605,46 @@ fn appendSysVScalarCallArgs(
         try machine.instructions.append(allocator, .{ .push_imm32 = stack_args[stack_index] });
     }
     return stack_arg_count;
+}
+
+const SysVParamCursor = struct {
+    gpr: usize,
+    sse: usize,
+    stack_eightbytes: usize,
+};
+
+fn appendSysVRegisterAggregatePassThroughArg(
+    function: ir.Function,
+    arg: ir.CallArg,
+    int_arg_index: *usize,
+    fp_arg_index: *usize,
+) !void {
+    const classification = try classifySysVAggregate(arg.ty);
+    if (classification.kind != .register) return error.UnsupportedCodegenAbi;
+    const needs = sysvAggregateRegisterNeeds(classification);
+    if (int_arg_index.* + needs.gpr > 6 or fp_arg_index.* + needs.sse > 8) return error.UnsupportedCodegenAbi;
+    const name = switch (arg.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const source = try sysvParamCursorFor(function, name, arg.ty);
+    if (source.gpr != int_arg_index.* or source.sse != fp_arg_index.* or source.stack_eightbytes != 0) {
+        return error.UnsupportedCodegenAbi;
+    }
+    int_arg_index.* += needs.gpr;
+    fp_arg_index.* += needs.sse;
+}
+
+fn sysvParamCursorFor(function: ir.Function, name: []const u8, ty: ir.Type) !SysVParamCursor {
+    var cursor: SysVParamCursor = .{ .gpr = 0, .sse = 0, .stack_eightbytes = 0 };
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) {
+            if (!param.ty.eql(ty)) return error.UnsupportedCodegenType;
+            return cursor;
+        }
+        try advanceSysVParamCursors(param.ty, &cursor.gpr, &cursor.sse, &cursor.stack_eightbytes);
+    }
+    return error.UnsupportedCodegenValue;
 }
 
 fn sysvScalarCallNeedsStackArgs(call: ir.CallInst) bool {

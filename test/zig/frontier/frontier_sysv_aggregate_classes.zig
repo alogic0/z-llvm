@@ -44,6 +44,14 @@ export fn frontier_mixed_make(a: i64, b: f64) Mixed {
     return .{ .a = a, .b = b };
 }
 
+noinline fn helperMixedMake(a: i64, b: f64) Mixed {
+    return .{ .a = a, .b = b };
+}
+
+export fn frontier_mixed_call_make(a: i64, b: f64) Mixed {
+    return helperMixedMake(a, b);
+}
+
 export fn frontier_double_pair_first(value: DoublePair) f64 {
     return value.a;
 }
@@ -70,6 +78,14 @@ export fn frontier_reverse_mixed_make(a: f64, b: i64) ReverseMixed {
 
 export fn frontier_nested_pair_sum(value: NestedPair) i32 {
     return value.left.a + value.left.b + value.right.a + value.right.b;
+}
+
+noinline fn helperNestedPairSum(value: NestedPair) i32 {
+    return value.left.a + value.left.b + value.right.a + value.right.b;
+}
+
+export fn frontier_nested_pair_call_sum(value: NestedPair) i32 {
+    return helperNestedPairSum(value);
 }
 
 export fn frontier_array_pair_sum(value: ArrayPair) i64 {

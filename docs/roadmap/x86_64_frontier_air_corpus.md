@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=70
-structured_functions=70
-generic_codegen_functions=70
-generic_cfg_functions=70
+discovered_functions=74
+structured_functions=74
+generic_codegen_functions=74
+generic_cfg_functions=74
 structural_matcher_functions=0
-structured_air_v2_functions=70
-typed_air_operand_functions=70
+structured_air_v2_functions=74
+typed_air_operand_functions=74
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=70
+generic_lowering_functions=74
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=70
+object_emitted_functions=74
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -63,7 +63,7 @@ Object inspection is green for all three modes:
 ```text
 inspected=13
 elf64_rel=13
-relocation_rows=3
+relocation_rows=4
 tls_rows=1
 undefined_import_rows=1
 comdat_rows=0
@@ -132,7 +132,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
   stream and the floating member from the SSE stream; construction returns the
-  aggregate in `%rax`/`%xmm0`
+  aggregate in `%rax`/`%xmm0`; a noinline helper-call row returns the same
+  register aggregate directly from a private helper without scalarizing through
+  a selected wrapper
 - first SSE/SSE aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ double, double }` is classified as
   SSE/SSE, field reads return from the independent SSE argument stream, and
@@ -144,7 +146,9 @@ Closed in the current memory/aggregate frontier slice:
 - first nested INTEGER aggregate add-chain row in
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
-  from the SysV GPR pair without a function-name-specific lowering path
+  from the SysV GPR pair without a function-name-specific lowering path; the
+  noinline helper-call row passes the nested aggregate through the same GPR pair
+  to a private helper
 - first nested mixed aggregate integer-field add-chain row in
   `frontier_sysv_aggregate_classes.zig`: `{ { i32, i32 }, double }` field
   pointers carry `align(...)` qualifiers from typed AIR v2, are lowered through

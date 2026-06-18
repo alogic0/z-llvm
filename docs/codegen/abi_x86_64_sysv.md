@@ -110,6 +110,7 @@ First broader ABI closure wave:
 frontier_sysv_abi.Pair64 lowers as the selected small INTEGER/INTEGER class
 aggregate return `{ i64, i64 }` uses %rax/%rdx
 aggregate argument field 0/1 reads use the SysV integer register pair
+register aggregate pass-through calls are supported when the source parameter is already in the exact destination SysV GPR/SSE slots
 the selected direct-call frame spills and reloads up to six live i32 caller parameters
 frontier_sysv_sret_byval.Big3 through Big7 lower as selected normal MEMORY classes:
   `{ i64, i64, i64 }` through `{ i64, i64, i64, i64, i64, i64, i64 }` returns store through the hidden sret pointer in %rdi
@@ -123,6 +124,7 @@ aggregate argument field reads and register aggregate return:
   field `i64` is returned from the aggregate's GPR class register
   field `double` is returned from the aggregate's SSE class register
   `{ i64, double }` construction returns through %rax/%xmm0
+  a noinline helper-call row returns `{ i64, double }` directly from the private helper without scalarized wrapper lowering
 frontier_sysv_aggregate_classes.DoublePair proves the first SSE/SSE aggregate
 argument field reads and register aggregate return:
   both `double` fields are read from the SysV SSE argument stream
@@ -137,6 +139,8 @@ INTEGER aggregate field add chains:
   nested `{ i32, i32 }` fields are flattened by byte offset
   low/high 32-bit lanes are read from the SysV GPR pair without a
   function-name-specific backend path
+  a noinline helper-call row passes `{ { i32, i32 }, { i32, i32 } }` through
+  the SysV GPR pair and returns the helper's scalar sum
   `align(...)` pointer-qualified typed AIR field pointers are accepted for the
   nested mixed `{ { i32, i32 }, double }` row while preserving its SSE field
   classification

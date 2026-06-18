@@ -362,15 +362,15 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=70`,
-`generic_codegen_functions=70`, `generic_cfg_functions=70`,
+frontier gate reports `source_rows=13`, `discovered_functions=74`,
+`generic_codegen_functions=74`, `generic_cfg_functions=74`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=70`, `object_failures=0`,
+`object_emitted_functions=74`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
-`elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
+`elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
 `local_fail=0`; native-link and executable gates are also green at
 `native_link_accepted_rows=13`, `executable_ok_rows=13`,
@@ -397,7 +397,8 @@ leaf byte offsets.
 The mixed aggregate
 class frontier row adds `{ i64, double }`
 INTEGER/SSE field reads and register aggregate return in `%rax`/`%xmm0`
-through the independent SysV GPR/SSE streams. The SSE aggregate frontier row
+through the independent SysV GPR/SSE streams, plus a noinline helper-call row
+that returns the same register aggregate directly from a private helper. The SSE aggregate frontier row
 adds `{ double, double }` SSE/SSE field reads and register aggregate return in
 `%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
 `{ double, i64 }` SSE/INTEGER field reads and register aggregate return in
@@ -405,6 +406,9 @@ adds `{ double, double }` SSE/SSE field reads and register aggregate return in
 `{ { i32, i32 }, double }` typed AIR v2 field pointers with `align(...)`
 qualifiers and lowers the nested integer fields through layout-backed offsets
 from the aggregate's INTEGER class while preserving the independent SSE class.
+The nested INTEGER helper-call row passes `{ { i32, i32 }, { i32, i32 } }`
+through the SysV GPR pair to a private helper and returns the helper's scalar
+result without aggregate-specific wrapper dispatch.
 The SSE live-across-call frontier rows add selected
 one-live `f32`/`f64` spill/reload around an external C ABI `void` helper call
 and selected two-live `f32`/`f64` spill/reload frames across a no-argument

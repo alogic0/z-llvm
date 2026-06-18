@@ -383,14 +383,14 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=70`,
-`generic_codegen_functions=70`, `generic_cfg_functions=70`,
+three release modes at `source_rows=13`, `discovered_functions=74`,
+`generic_codegen_functions=74`, `generic_cfg_functions=74`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=70`, `object_failures=0`,
+`object_emitted_functions=74`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
-green at `inspected=13`, `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
+green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
 `local_fail=0`. Frontier native-link and executable proof are green for all
 three modes at `native_link_accepted_rows=13`, `executable_ok_rows=13`,
@@ -416,10 +416,14 @@ MEMORY copy/read row proves recursive leaf byte-offset handling for
 `{ { i64, i64, i64 }, { i64, i64, i64 } }`. The mixed aggregate class
 frontier row adds `{ i64, double }` INTEGER/SSE
 field reads and register aggregate return in `%rax`/`%xmm0` from the
-independent GPR/SSE streams with executable proof.
+independent GPR/SSE streams with executable proof, plus a noinline helper-call
+row that returns the same register aggregate directly from a private helper.
 The reversed mixed aggregate frontier row adds `{ double, i64 }` SSE/INTEGER
 field reads and register aggregate return in `%xmm0`/`%rax` from the
 independent SSE/GPR streams with executable proof.
+The nested INTEGER helper-call frontier row passes `{ { i32, i32 },
+{ i32, i32 } }` through the SysV GPR pair to a private helper and returns the
+helper's scalar result with executable proof.
 The SSE live-across-call frontier rows add selected one-live `f32`/`f64`
 spill/reload around an external C ABI `void` helper call and a selected
 two-live `f32`/`f64` spill/reload frame across a no-argument helper before a

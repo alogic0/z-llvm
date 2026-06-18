@@ -5902,6 +5902,72 @@ test "x86_64 codegen sums array-in-struct INTEGER aggregate fields from SysV GPR
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
+test "x86_64 codegen returns register aggregate from direct helper call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc { i64, double } @callee(i64, double)
+        \\
+        \\define { i64, double } @caller(i64 %a, double %b) {
+        \\entry:
+        \\  %r = call fastcc { i64, double } @callee(i64 %a, double %b)
+        \\  ret { i64, double } %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    switch (machine.instructions.items[1]) {
+        .direct_call => |call| {
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.{ .aggregate = "{ i64, double }" }));
+        },
+        else => return error.ExpectedDirectCall,
+    }
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
+}
+
+test "x86_64 codegen passes register aggregate argument through direct helper call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc i32 @sum({ { i32, i32 }, { i32, i32 } })
+        \\
+        \\define i32 @caller({ { i32, i32 }, { i32, i32 } } %value) {
+        \\entry:
+        \\  %r = call fastcc i32 @sum({ { i32, i32 }, { i32, i32 } } %value)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    switch (machine.instructions.items[1]) {
+        .direct_call => |call| {
+            try std.testing.expectEqualStrings("sum", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.{ .int = 32 }));
+        },
+        else => return error.ExpectedDirectCall,
+    }
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
+}
+
 test "x86_64 codegen rejects unsupported call ABI shapes" {
     const unsupported_cc_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -6410,11 +6476,11 @@ test "x86_64 codegen rejects larger aggregate call and vector return ABI boundar
     const aggregate_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\declare i32 @callee({ i32, i32, i32 })
+        \\declare i32 @callee({ i64, i64, i64 })
         \\
-        \\define i32 @caller({ i32, i32, i32 } %arg) {
+        \\define i32 @caller({ i64, i64, i64 } %arg) {
         \\entry:
-        \\  %r = call i32 @callee({ i32, i32, i32 } %arg)
+        \\  %r = call i32 @callee({ i64, i64, i64 } %arg)
         \\  ret i32 %r
         \\}
         \\
