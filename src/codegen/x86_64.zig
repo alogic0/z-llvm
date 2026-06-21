@@ -1439,7 +1439,7 @@ fn lowerDirectI32CallMainReturn(
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     if (!call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
-    if (call.args.items.len > 9) return error.UnsupportedCodegenAbi;
+    if (call.args.items.len > 12) return error.UnsupportedCodegenAbi;
 
     var add_immediate: i32 = 0;
     if (block.instructions.items.len == 1) {
@@ -12688,7 +12688,7 @@ fn emitGenericCfgI32CallIntoEax(
         try machine.instructions.append(allocator, .smin_i32_edi_esi_eax);
         return;
     }
-    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 9) return error.UnsupportedCodegenInstruction;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 12) return error.UnsupportedCodegenInstruction;
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     const live_params = try liveParamsAfter(function, block, instruction_index);
@@ -13120,7 +13120,7 @@ fn lowerGenericCfgSingleBlockDirectCallMain(allocator: std.mem.Allocator, machin
     };
     if (call.callee_value != null or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
-    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 9) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 12) return false;
     for (call.args.items) |arg| {
         if (arg.attrs != null or !arg.ty.eql(.{ .int = 32 })) return false;
         switch (arg.value) {
@@ -14634,7 +14634,7 @@ fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock
     if (call.ret_ty == .void) {
         if (result != null) return false;
     } else if (!call.ret_ty.eql(.{ .int = 32 }) or result == null) return false;
-    if (call.args.items.len > 9) return false;
+    if (call.args.items.len > 12) return false;
     if (call.inline_asm != null) return false;
     if (call.callee_value) |callee_value| {
         const callee_name = switch (callee_value) {
@@ -21815,6 +21815,20 @@ fn appendDirectCallWithStackArgs(
             try appendDirectCall(allocator, machine, symbol, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_24);
         },
+        4 => {
+            try machine.instructions.append(allocator, .sub_rsp_8);
+            try appendDirectCall(allocator, machine, symbol, ret_ty);
+            try machine.instructions.append(allocator, .add_rsp_40);
+        },
+        5 => {
+            try appendDirectCall(allocator, machine, symbol, ret_ty);
+            try machine.instructions.append(allocator, .add_rsp_40);
+        },
+        6 => {
+            try machine.instructions.append(allocator, .sub_rsp_8);
+            try appendDirectCall(allocator, machine, symbol, ret_ty);
+            try machine.instructions.append(allocator, .add_rsp_56);
+        },
         else => return error.UnsupportedCodegenAbi,
     }
 }
@@ -21840,6 +21854,20 @@ fn appendIndirectCallRaxWithStackArgs(
             try appendIndirectCallRax(allocator, machine, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_24);
         },
+        4 => {
+            try machine.instructions.append(allocator, .sub_rsp_8);
+            try appendIndirectCallRax(allocator, machine, ret_ty);
+            try machine.instructions.append(allocator, .add_rsp_40);
+        },
+        5 => {
+            try appendIndirectCallRax(allocator, machine, ret_ty);
+            try machine.instructions.append(allocator, .add_rsp_40);
+        },
+        6 => {
+            try machine.instructions.append(allocator, .sub_rsp_8);
+            try appendIndirectCallRax(allocator, machine, ret_ty);
+            try machine.instructions.append(allocator, .add_rsp_56);
+        },
         else => return error.UnsupportedCodegenAbi,
     }
 }
@@ -21853,9 +21881,9 @@ fn appendI32CallArgs(
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
     if (plan.has_non_i32_arg) return error.UnsupportedCodegenType;
-    if (plan.counts.stack_args > 3) return error.UnsupportedCodegenAbi;
+    if (plan.counts.stack_args > 6) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [3]i32 = undefined;
+    var stack_args: [6]i32 = undefined;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
@@ -21885,7 +21913,7 @@ fn appendI32CallArgs(
 }
 
 fn i32CallStackArgCount(call: ir.CallInst) !usize {
-    if (call.args.items.len > 9) return error.UnsupportedCodegenAbi;
+    if (call.args.items.len > 12) return error.UnsupportedCodegenAbi;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
@@ -21905,9 +21933,9 @@ fn appendSysVScalarCallArgs(
 ) !usize {
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
-    if (plan.counts.stack_args > 3) return error.UnsupportedCodegenAbi;
+    if (plan.counts.stack_args > 6) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [3]i32 = undefined;
+    var stack_args: [6]i32 = undefined;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
