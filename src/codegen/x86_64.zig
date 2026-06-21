@@ -22980,13 +22980,20 @@ fn fpParamIndex(function: ir.Function, name: []const u8, ty: ir.Type) !usize {
 }
 
 fn stackParamDisp8OrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?u8 {
-    for (function.params.items, 0..) |param, index| {
-        if (!std.mem.eql(u8, param.name, name)) continue;
-        if (!param.ty.eql(ty)) return error.UnsupportedCodegenValue;
-        if (index < 6) return null;
-        const stack_index = index - 6;
-        if (stack_index <= 5) return @intCast(8 + stack_index * 8);
-        return error.UnsupportedCodegenAbi;
+    if (!isSysVIntegerParamType(ty) and !ty.eql(.float) and !ty.eql(.double)) return error.UnsupportedCodegenType;
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    var stack_eightbytes: usize = 0;
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) {
+            if (!param.ty.eql(ty)) return error.UnsupportedCodegenValue;
+            const in_register = if (isSysVIntegerParamType(ty)) gpr_index < 6 else sse_index < 8;
+            if (in_register) return null;
+            const offset = 8 + stack_eightbytes * 8;
+            if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            return @intCast(offset);
+        }
+        try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
     }
     return null;
 }

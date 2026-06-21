@@ -7244,13 +7244,13 @@ test "x86_64 codegen keeps callee-saved registers out of the selected ABI alloca
     try std.testing.expectError(error.UnsupportedCodegenAbi, codegen.x86_64.ArgReg.fromIndex(6));
 }
 
-test "x86_64 codegen supports six stack-passed live i32 values across direct call" {
+test "x86_64 codegen supports more than six stack-passed live i32 values across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
         \\declare i32 @id(i32)
         \\
-        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g, i32 %h, i32 %i, i32 %j, i32 %k, i32 %l) {
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g, i32 %h, i32 %i, i32 %j, i32 %k, i32 %l, i32 %m, i32 %n) {
         \\entry:
         \\  %r = call i32 @id(i32 %a)
         \\  %ab = add i32 %a, %b
@@ -7264,7 +7264,9 @@ test "x86_64 codegen supports six stack-passed live i32 values across direct cal
         \\  %abcdefghij = add i32 %abcdefghi, %j
         \\  %abcdefghijk = add i32 %abcdefghij, %k
         \\  %abcdefghijkl = add i32 %abcdefghijk, %l
-        \\  %sum = add i32 %abcdefghijkl, %r
+        \\  %abcdefghijklm = add i32 %abcdefghijkl, %m
+        \\  %abcdefghijklmn = add i32 %abcdefghijklm, %n
+        \\  %sum = add i32 %abcdefghijklmn, %r
         \\  ret i32 %sum
         \\}
         \\
@@ -7283,6 +7285,8 @@ test "x86_64 codegen supports six stack-passed live i32 values across direct cal
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 32 });
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 40 });
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 48 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 56 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 64 });
 }
 
 test "x86_64 codegen returns small INTEGER aggregate in rax rdx" {

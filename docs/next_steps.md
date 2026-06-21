@@ -296,15 +296,15 @@ argument/return rows. Milestone 1 is closed for this selected practical SysV
 ABI subset. Remaining non-selected ABI boundaries are full aggregate
 classification beyond the selected INTEGER and normal integer-leaf MEMORY
 aggregate forms, arbitrary non-selected sret/byval copies, varargs, vectors, and live-across-call shapes
-involving more than six stack-passed `i32` values or broader SSE pressure;
+involving stack-passed `i32` values beyond the current disp8-safe model or broader SSE pressure;
 focused unit tests now fail closed for these unsupported classes.
 The first broader SysV closure wave adds `frontier_sysv_abi.zig` with small
 INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate field reads
 from the SysV integer register pair, and a selected up-to-six-live-i32
 direct-call frame that covers all six SysV GPR argument registers,
-spilling and reloading caller parameters through aligned frame slots; up to
-six stack-passed live `i32` parameters are now read from the restored incoming
-stack argument area for a post-call add-tree return. The follow-up
+spilling and reloading caller parameters through aligned frame slots; more
+than six stack-passed live `i32` parameters are now read from the restored
+incoming stack argument area for a post-call add-tree return. The follow-up
 `frontier_sysv_sret_byval.zig` row adds selected MEMORY aggregate ABI evidence:
 `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
 `{ i64, i64, i64, i64, i64 }` returns through a hidden sret pointer in `%rdi`
@@ -366,12 +366,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=122`,
-`generic_codegen_functions=122`, `generic_cfg_functions=122`,
+frontier gate reports `source_rows=13`, `discovered_functions=125`,
+`generic_codegen_functions=125`, `generic_cfg_functions=125`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=122`, `object_failures=0`,
+`object_emitted_functions=125`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -390,7 +390,7 @@ small aggregate argument field reads, nested INTEGER aggregate add-chain
 field reads, nested mixed aggregate field reads/construction,
 array-in-struct INTEGER aggregate sums, selected stack-passed register
 aggregate field reads after GPR exhaustion, and the selected
-up-to-six-live direct-call spill frame plus up-to-six stack-passed live `i32`
+up-to-six-live direct-call spill frame plus disp8-safe stack-passed live `i32`
 post-call add-tree rows with executable proof. The selected sret/byval
 frontier row now covers `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
 `{ i64, i64, i64, i64, i64 }` hidden-sret returns plus stack-passed MEMORY
@@ -442,7 +442,8 @@ named `f32`/`f64` external-call pass-through through `%xmm0..%xmm4`; immediate
 FP constant materialization now uses generic XMM loads through `%xmm0..%xmm7`.
 The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
-private helper graphs with more than six stack-passed live values, broader live SSE values
+private helper graphs with stack-passed live values beyond the current
+disp8-safe selected model, broader live SSE values
 beyond the selected one- through six-live `f32`/`f64` no-argument-call shapes
 and two-live FP-argument call shape,
 or live values across calls,
@@ -458,7 +459,8 @@ MEMORY integer-leaf field/copy forms currently proven through eight flat
 fields, a nested two-Big3 aggregate, a mixed-width
 `{ i64, i32, i64, i32 }` copy, and array-backed `{ [5 x i64] }` copy/read rows,
 arbitrary non-selected sret/byval copies,
-varargs, vectors, more than six stack-passed live values, and
+varargs, vectors, stack-passed live values beyond the current disp8-safe
+selected model, and
 broader SSE live-across-call frames beyond the selected one-live through
 six-live `f32`/`f64` no-argument-call shapes and two-live FP-argument call
 shape. The accepted frontier rows use typed

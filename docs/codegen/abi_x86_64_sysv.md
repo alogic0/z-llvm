@@ -37,8 +37,9 @@ up to three constant i32 stack-passed direct-call arguments are supported
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call
 one live i32 caller argument can be spilled to (%rsp) across one call
 up to six live i32 caller arguments can be spilled into aligned frame slots and reloaded after one direct call
-up to six stack-passed live i32 caller arguments can be added after the call
-once the local call frame is restored
+more than six stack-passed live i32 caller arguments can be added after the
+call once the local call frame is restored, within the backend's current
+disp8-safe incoming stack offset model
 one live f32/f64 caller argument can be spilled from %xmm0 into an aligned
 frame slot, reloaded after one direct C ABI void call, and returned from %xmm0
 two or three live f32/f64 caller arguments can be spilled from %xmm0/%xmm1
@@ -95,8 +96,8 @@ One to six live i32 argument registers across one direct call are accepted.
 One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
 Two to six live f32/f64 values in %xmm0..%xmm5 across one no-argument direct C
 ABI void call are accepted for the selected post-call add-return shape.
-More than six stack-passed live i32 values, SSE live values beyond the
-selected one- through six-live f32/f64 no-argument-call shapes plus the
+Stack-passed live i32 values beyond the current disp8-safe selected model, SSE
+live values beyond the selected one- through six-live f32/f64 no-argument-call shapes plus the
 two-live FP-argument call shape, and live values across multiple calls fail
 closed.
 ```
@@ -207,8 +208,9 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   five named f32/f64 arguments can be forwarded to external C ABI helpers
   through %xmm0..%xmm4; backend unit/object tests materialize immediate FP
   constant arguments through %xmm0..%xmm7
-  up to six stack-passed live i32 parameters can be added after a direct call
-  once the local call frame is restored
+  more than six stack-passed live i32 parameters can be added after a direct
+  call once the local call frame is restored; current rows prove eight and
+  twelve stack-passed live i32 values
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
 
@@ -223,8 +225,8 @@ no full lowering for all classified SysV aggregate classes beyond selected INTEG
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
-no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected up-to-six stack-passed i32, one- through six-live f32/f64 no-argument-call shapes, and two-live FP-argument call shape
-stack-passed live i32 pressure beyond six selected incoming stack arguments is rejected explicitly rather than guessed
+no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32, one- through six-live f32/f64 no-argument-call shapes, and two-live FP-argument call shape
+stack-passed live i32 pressure beyond the current disp8-safe incoming stack offset model is rejected explicitly rather than guessed
 ```
 
 ## Remaining Blocker Table
@@ -248,6 +250,6 @@ falling into a generic unsupported bucket.
 | Non-default call conventions | Fail-closed boundary | Unsupported call conventions reject with `UnsupportedCodegenAbi`. Next implementation is a per-callconv policy table; release rows remain default C/Zig-compatible only. |
 | Full caller-saved handling | Partially implemented | Selected GPR and SSE live-across-call shapes spill/reload through explicit frame slots. Next implementation is liveness-driven caller-saved clobber assignment for arbitrary live scalar values across calls. |
 | Callee-saved handling | Fail-closed boundary | The allocator currently avoids callee-saved registers; tests document the policy. Next implementation is prologue/epilogue save/restore when allocation starts using them. |
-| More than six stack-passed live values | Fail-closed boundary | Six selected incoming stack-passed `i32` values are supported. Next implementation is scalable incoming stack-param modeling beyond the current selected pressure rows. |
+| More than six stack-passed live values | Implemented selected subset | Current rows prove eight and twelve stack-passed live `i32` values via cursor-derived incoming stack offsets. Remaining boundary is pressure beyond the backend's disp8-safe stack offset model. |
 | Broader SSE live-across-call | Partially implemented | Up to six no-argument-call live `f32`/`f64` values and selected two-live FP-argument calls are supported. Next implementation is a general SSE caller-saved live-range spill/reload model. |
 | Multi-call live-value frames | Fail-closed boundary | Accepted live-across-call rows contain one call. Next implementation is a frame allocator that keeps spill slots stable across multiple calls and reload points. |

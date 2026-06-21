@@ -78,6 +78,21 @@ export fn frontier_twelve_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32
     return a + b + c + d + e + f + g + h + i + j + k + l + r;
 }
 
+export fn frontier_thirteen_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32) i32 {
+    const r = frontier_id_i32(f);
+    return a + b + c + d + e + f + g + h + i + j + k + l + m + r;
+}
+
+export fn frontier_fourteen_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32) i32 {
+    const r = frontier_id_i32(f);
+    return a + b + c + d + e + f + g + h + i + j + k + l + m + n + r;
+}
+
+export fn frontier_eighteen_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32, o: i32, p: i32, q: i32, r_arg: i32) i32 {
+    const r = frontier_id_i32(f);
+    return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r_arg + r;
+}
+
 export fn frontier_f32_live_after_call(a: f32, b: f32) f32 {
     frontier_touch_f32(b);
     return a;
