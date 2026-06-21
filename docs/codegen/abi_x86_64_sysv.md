@@ -226,3 +226,28 @@ no indirect calls, tail calls, or unsupported non-default call conventions
 no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected up-to-six stack-passed i32, one- through six-live f32/f64 no-argument-call shapes, and two-live FP-argument call shape
 stack-passed live i32 pressure beyond six selected incoming stack arguments is rejected explicitly rather than guessed
 ```
+
+## Remaining Blocker Table
+
+This table is the single status list for the x86_64 SysV ABI/codegen frontier.
+Accepted rows must be AIR-owned, typed-v2 lowered, generic-CFG codegen rows; a
+row listed as a boundary must reject with a targeted diagnostic instead of
+falling into a generic unsupported bucket.
+
+| Blocker | Status | Current evidence / next implementation |
+| --- | --- | --- |
+| Varargs | Fail-closed boundary | Parser preserves varargs declarations/calls; x86_64 codegen rejects varargs with `UnsupportedCodegenAbi`. Next implementation is a dedicated SysV varargs call planner including `%al` SSE-count and register-save-area policy. |
+| Vectors | Fail-closed boundary | Vector IR parse/verify coverage exists; x86_64 call/return codegen rejects vector ABI forms. Next implementation is either a fixed SSE-register subset or a permanent explicit boundary for release replacement rows. |
+| Arbitrary sret | Partially implemented | Normal integer-leaf MEMORY aggregate sret rows are proven for flat, nested, mixed-width, and array-backed selected forms. Next implementation is layout-driven arbitrary MEMORY aggregate copy/storage, including non-integer leaves where supported. |
+| Arbitrary byval | Partially implemented | Normal integer-leaf byval reads/copies are layout-derived for selected MEMORY aggregates. Next implementation is a general byval placement/copy path for arbitrary supported layouts and alignments. |
+| Broader aggregate classes | Partially implemented | The reusable classifier handles INTEGER, SSE, mixed INTEGER/SSE, and MEMORY decisions for <=16-byte aggregates; backend lowering accepts selected register and MEMORY forms. Next implementation is a central call planner that assigns all supported classified aggregate args/returns. |
+| Packed/unaligned aggregates | Fail-closed boundary | Packed/unaligned aggregate ABI classes are classified as MEMORY/rejected unless represented by already selected scalar field paths. Next implementation requires layout-aware unaligned load/store/copy decisions. |
+| X87 / long double | Fail-closed boundary | `x86_fp80` and X87-like classes are not accepted by local codegen. Next implementation is deferred; rows must remain explicit runtime/ABI boundaries. |
+| Indirect calls | Fail-closed boundary | Only direct named calls are accepted. Next implementation is a function-pointer call path that delegates argument/return assignment to the SysV planner. |
+| Tail calls | Fail-closed boundary | Tail, musttail, and notail markers are rejected. Next implementation is deferred until normal call-frame ownership is broader. |
+| Non-default call conventions | Fail-closed boundary | Unsupported call conventions reject with `UnsupportedCodegenAbi`. Next implementation is a per-callconv policy table; release rows remain default C/Zig-compatible only. |
+| Full caller-saved handling | Partially implemented | Selected GPR and SSE live-across-call shapes spill/reload through explicit frame slots. Next implementation is liveness-driven caller-saved clobber assignment for arbitrary live scalar values across calls. |
+| Callee-saved handling | Fail-closed boundary | The allocator currently avoids callee-saved registers; tests document the policy. Next implementation is prologue/epilogue save/restore when allocation starts using them. |
+| More than six stack-passed live values | Fail-closed boundary | Six selected incoming stack-passed `i32` values are supported. Next implementation is scalable incoming stack-param modeling beyond the current selected pressure rows. |
+| Broader SSE live-across-call | Partially implemented | Up to six no-argument-call live `f32`/`f64` values and selected two-live FP-argument calls are supported. Next implementation is a general SSE caller-saved live-range spill/reload model. |
+| Multi-call live-value frames | Fail-closed boundary | Accepted live-across-call rows contain one call. Next implementation is a frame allocator that keeps spill slots stable across multiple calls and reload points. |
