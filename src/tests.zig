@@ -5187,6 +5187,26 @@ test "x86_64 encoding stores eax through argument pointer displacement" {
     try std.testing.expectEqualSlices(u8, &.{ 0x89, 0x47, 0x0c, 0xc3 }, bytes);
 }
 
+test "x86_64 encoding stores through argument pointer disp32" {
+    var machine = codegen.x86_64.MachineFunction.init("store_ptr_disp32", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .store_arg64_arg_ptr_disp32 = .{ .ptr_reg = .rdi, .src_reg = .rsi, .offset = 128 } });
+    try machine.instructions.append(std.testing.allocator, .{ .store_rax_arg_ptr_disp32 = .{ .reg = .rdi, .offset = 136 } });
+    try machine.instructions.append(std.testing.allocator, .{ .store_eax_arg_ptr_disp32 = .{ .reg = .rdi, .offset = 144 } });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 7), mc.encoding.instructionSize(.{ .store_arg64_arg_ptr_disp32 = .{ .ptr_reg = .rdi, .src_reg = .rsi, .offset = 128 } }));
+    try std.testing.expectEqual(@as(u32, 7), mc.encoding.instructionSize(.{ .store_rax_arg_ptr_disp32 = .{ .reg = .rdi, .offset = 136 } }));
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .store_eax_arg_ptr_disp32 = .{ .reg = .rdi, .offset = 144 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x89, 0xb7, 0x80, 0x00, 0x00, 0x00,
+        0x48, 0x89, 0x87, 0x88, 0x00, 0x00, 0x00,
+        0x89, 0x87, 0x90, 0x00, 0x00, 0x00, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding spills and reloads xmm frame slots" {
     var machine = codegen.x86_64.MachineFunction.init("xmm_frame_slots", .double);
     defer machine.deinit(std.testing.allocator);

@@ -123,8 +123,8 @@ aggregate argument field 0/1 reads use the SysV integer register pair
 register aggregate pass-through calls are supported when the source parameter is already in the exact destination SysV GPR/SSE slots
 the reusable SysV planner now counts scalar and classified aggregate call returns as GPR, SSE, or MEMORY returns before row-specific emission
 the selected direct-call frame spills and reloads up to six live i32 caller parameters
-frontier_sysv_sret_byval.Big3 through Big16 lower as selected normal MEMORY classes:
-  `{ i64, i64, i64 }` through the flat sixteen-field `{ i64, ... }` form return through the hidden sret pointer in %rdi
+frontier_sysv_sret_byval.Big3 through Big20 lower as selected normal MEMORY classes:
+  `{ i64, i64, i64 }` through the flat twenty-field `{ i64, ... }` form return through the hidden sret pointer in %rdi
   user i64 args are shifted through the SysV GPR stream after the hidden pointer
   the seven-field make row reads multiple stack-passed user fields after the hidden pointer
   the typed AIR builder generates field names and sret/byval attrs instead of using a fixed field-count table
@@ -132,7 +132,7 @@ frontier_sysv_sret_byval.Big3 through Big16 lower as selected normal MEMORY clas
   `{ { i64, i64, i64 }, { i64, i64, i64 } }` proves recursive leaf byte-offset reads and copies for nested normal MEMORY aggregates
   `{ i64, i32, i64, i32 }` proves mixed-width MEMORY copies with narrow stores for `i32` leaves
   `{ [5 x i64] }` proves array-backed MEMORY copies and by-value edge field reads use the same integer-leaf byte-offset paths
-  the flat `BigN` source type parser now covers larger normal integer-leaf MEMORY aggregates, with `Big16` proving construction, field-read, and byval-to-sret copy rows
+  the flat `BigN` source type parser now covers larger normal integer-leaf MEMORY aggregates, with `Big20` proving construction, field-read, and byval-to-sret copy rows
 frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
 aggregate argument field reads and register aggregate return:
   field `i64` is returned from the aggregate's GPR class register

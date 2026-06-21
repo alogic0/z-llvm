@@ -361,13 +361,26 @@ pub const Instruction = union(enum) {
         src_reg: ArgReg,
         offset: u8,
     },
+    store_arg64_arg_ptr_disp32: struct {
+        ptr_reg: ArgReg,
+        src_reg: ArgReg,
+        offset: u32,
+    },
     store_rax_arg_ptr_disp8: struct {
         reg: ArgReg,
         offset: u8,
     },
+    store_rax_arg_ptr_disp32: struct {
+        reg: ArgReg,
+        offset: u32,
+    },
     store_eax_arg_ptr_disp8: struct {
         reg: ArgReg,
         offset: u8,
+    },
+    store_eax_arg_ptr_disp32: struct {
+        reg: ArgReg,
+        offset: u32,
     },
     store_imm8_arg_ptr_disp8: struct {
         reg: ArgReg,
@@ -6279,6 +6292,44 @@ fn appendAddStackDispEax(allocator: std.mem.Allocator, machine: *MachineFunction
         try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = @intCast(offset) });
     } else {
         try machine.instructions.append(allocator, .{ .add_stack_disp32_eax = offset });
+    }
+}
+
+fn appendStoreArg64ArgPtrDisp(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    ptr_reg: ArgReg,
+    src_reg: ArgReg,
+    offset: u32,
+) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .store_arg64_arg_ptr_disp8 = .{
+            .ptr_reg = ptr_reg,
+            .src_reg = src_reg,
+            .offset = @intCast(offset),
+        } });
+    } else {
+        try machine.instructions.append(allocator, .{ .store_arg64_arg_ptr_disp32 = .{
+            .ptr_reg = ptr_reg,
+            .src_reg = src_reg,
+            .offset = offset,
+        } });
+    }
+}
+
+fn appendStoreRaxArgPtrDisp(allocator: std.mem.Allocator, machine: *MachineFunction, reg: ArgReg, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp8 = .{ .reg = reg, .offset = @intCast(offset) } });
+    } else {
+        try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp32 = .{ .reg = reg, .offset = offset } });
+    }
+}
+
+fn appendStoreEaxArgPtrDisp(allocator: std.mem.Allocator, machine: *MachineFunction, reg: ArgReg, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .store_eax_arg_ptr_disp8 = .{ .reg = reg, .offset = @intCast(offset) } });
+    } else {
+        try machine.instructions.append(allocator, .{ .store_eax_arg_ptr_disp32 = .{ .reg = reg, .offset = offset } });
     }
 }
 
@@ -13847,20 +13898,16 @@ fn lowerGenericCfgSelectedSretStores(
         };
         if (!store.ty.eql(.{ .int = 64 }) or store.attrs.isBarrier() or !isNamed(store.ptr, gep_name) or
             !isNamed(store.value, function.params.items[pair_index + 1].name)) return false;
-        const offset = try aggregateFieldOffsetU8(aggregate_ty, pair_index);
+        const offset = try aggregateFieldOffset(aggregate_ty, pair_index);
         const maybe_src_reg = paramReg(function, function.params.items[pair_index + 1].name, .{ .int = 64 }) catch |err| switch (err) {
             error.UnsupportedCodegenAbi => null,
             else => return err,
         };
         if (maybe_src_reg) |src_reg| {
-            try machine.instructions.append(allocator, .{ .store_arg64_arg_ptr_disp8 = .{
-                .ptr_reg = .rdi,
-                .src_reg = src_reg,
-                .offset = offset,
-            } });
+            try appendStoreArg64ArgPtrDisp(allocator, machine, .rdi, src_reg, offset);
         } else {
             try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try scalarParamStackDisp8(function, function.params.items[pair_index + 1].name, .{ .int = 64 }) });
-            try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = offset } });
+            try appendStoreRaxArgPtrDisp(allocator, machine, .rdi, offset);
         }
     }
     try appendGenericCfgReturn(allocator, machine);
@@ -13910,12 +13957,12 @@ fn lowerGenericCfgSretCopy(
         if (!store.ty.eql(load.ty) or store.attrs.isBarrier() or !isNamed(store.ptr, dst_gep_name) or
             !isNamed(store.value, load_name)) return false;
 
-        const offset = try aggregateByteOffsetU8(aggregate_ty, src_offset, load.ty);
+        const offset = try aggregateByteOffset(aggregate_ty, src_offset, load.ty);
         try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
         if (load.ty.eql(.{ .int = 64 })) {
-            try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp8 = .{ .reg = sret_reg, .offset = offset } });
+            try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, offset);
         } else if (load.ty.eql(.{ .int = 32 })) {
-            try machine.instructions.append(allocator, .{ .store_eax_arg_ptr_disp8 = .{ .reg = sret_reg, .offset = offset } });
+            try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
         } else {
             return error.UnsupportedCodegenType;
         }
@@ -14026,9 +14073,23 @@ fn aggregateFieldOffsetU8(aggregate_ty: ir.Type, field_index: usize) !u8 {
     return @intCast(offset_i);
 }
 
+fn aggregateFieldOffset(aggregate_ty: ir.Type, field_index: usize) !u32 {
+    const layout = try x86_64SysVDataLayout();
+    const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+        return error.UnsupportedCodegenAbi;
+    if (offset_i < 0 or offset_i > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+    return @intCast(offset_i);
+}
+
 fn aggregateByteOffsetU8(aggregate_ty: ir.Type, field_offset: u64, field_ty: ir.Type) !u8 {
     _ = aggregateFieldIndexAtOffset(aggregate_ty, field_offset, field_ty) orelse return error.UnsupportedCodegenAbi;
     if (field_offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+    return @intCast(field_offset);
+}
+
+fn aggregateByteOffset(aggregate_ty: ir.Type, field_offset: u64, field_ty: ir.Type) !u32 {
+    _ = aggregateFieldIndexAtOffset(aggregate_ty, field_offset, field_ty) orelse return error.UnsupportedCodegenAbi;
+    if (field_offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
     return @intCast(field_offset);
 }
 
@@ -23556,8 +23617,11 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .store_eax_arg_ptr,
         .store_imm64_arg_ptr_disp8,
         .store_arg64_arg_ptr_disp8,
+        .store_arg64_arg_ptr_disp32,
         .store_rax_arg_ptr_disp8,
+        .store_rax_arg_ptr_disp32,
         .store_eax_arg_ptr_disp8,
+        .store_eax_arg_ptr_disp32,
         .store_imm8_arg_ptr_disp8,
         .load_f128_arg_ptr_xmm0,
         .load_f128_const_xmm0,
@@ -23655,7 +23719,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .shl_rcx_imm6, .or_rcx_rax, .or_rcx_rdx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_rax_arg_ptr_disp8, .store_eax_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
+        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .shl_rcx_imm6, .or_rcx_rax, .or_rcx_rdx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -23801,8 +23865,11 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .store_eax_arg_ptr,
         .store_imm64_arg_ptr_disp8,
         .store_arg64_arg_ptr_disp8,
+        .store_arg64_arg_ptr_disp32,
         .store_rax_arg_ptr_disp8,
+        .store_rax_arg_ptr_disp32,
         .store_eax_arg_ptr_disp8,
+        .store_eax_arg_ptr_disp32,
         .store_imm8_arg_ptr_disp8,
         .load_f128_arg_ptr_xmm0,
         .load_f128_const_xmm0,
