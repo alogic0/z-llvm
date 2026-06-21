@@ -7059,6 +7059,55 @@ test "x86_64 codegen returns i64 parameter from mixed integer signature" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 SysV call planner counts independent GPR SSE and stack streams" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32, i32, i32, i32, i32, i32, i32, double, double)
+        \\
+        \\define i32 @caller(i32 %a, i32 %b) {
+        \\entry:
+        \\  %r = call i32 @callee(i32 %a, i32 %b, i32 3, i32 4, i32 5, i32 6, i32 7, double 1.250000e+00, double 2.500000e+00)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call);
+    try std.testing.expectEqual(@as(usize, 6), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 2), counts.sse_args);
+    try std.testing.expectEqual(@as(usize, 1), counts.stack_args);
+    try std.testing.expectEqual(@as(usize, 0), counts.register_aggregate_args);
+}
+
+test "x86_64 SysV call planner rejects varargs explicitly" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @printf(ptr, ...)
+        \\
+        \\define i32 @caller(ptr %fmt) {
+        \\entry:
+        \\  %r = call i32 (ptr, ...) @printf(ptr %fmt, double 2.000000e+00)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
+    );
+}
+
 test "x86_64 codegen rejects vector call ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

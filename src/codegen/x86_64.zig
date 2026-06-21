@@ -21741,32 +21741,32 @@ fn appendI32CallArgs(
     function: ir.Function,
     call: ir.CallInst,
 ) !usize {
-    if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
-    if (call.args.items.len > 9) return error.UnsupportedCodegenAbi;
-    var stack_arg_count: usize = 0;
+    var plan = try planSysVCall(allocator, function, call);
+    defer plan.deinit(allocator);
+    if (plan.has_non_i32_arg) return error.UnsupportedCodegenType;
+    if (plan.counts.stack_args > 3) return error.UnsupportedCodegenAbi;
+
     var stack_args: [3]i32 = undefined;
+    var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
-        if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
-        if (index >= 6) {
-            if (stack_arg_count == stack_args.len) return error.UnsupportedCodegenAbi;
-            const value = switch (arg.value) {
-                .int => |int| try i32Value(int),
-                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-            };
-            stack_args[stack_arg_count] = value;
-            stack_arg_count += 1;
-            continue;
-        }
-        const dst = try ArgReg.fromIndex(index);
-        switch (arg.value) {
-            .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
-            .named => |name| {
-                const src = try paramReg(function, name, .{ .int = 32 });
-                if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+        const assignment = plan.assignments.items[index];
+        switch (assignment) {
+            .gpr => |dst| switch (arg.value) {
+                .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
+                .named => |name| {
+                    const src = try paramReg(function, name, .{ .int = 32 });
+                    if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                },
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             },
-            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            .stack_i32_const => |value| {
+                stack_args[stack_arg_count] = value;
+                stack_arg_count += 1;
+            },
+            .sse, .aggregate_register_passthrough => return error.UnsupportedCodegenType,
         }
     }
+
     var index = stack_arg_count;
     while (index > 0) {
         index -= 1;
@@ -21794,95 +21794,56 @@ fn appendSysVScalarCallArgs(
     function: ir.Function,
     call: ir.CallInst,
 ) !usize {
-    // Selected x86_64 release rows currently support scalar SysV calls plus
-    // pass-through register aggregates: i32/i64 integer or pointer-class values
-    // in the integer stream, f32/f64 in the SSE stream, register aggregate
-    // parameters that are already in the destination argument registers, and up
-    // to three constant i32 stack arguments. FP constants and named FP
-    // pass-through use the full SysV SSE register stream. Varargs, byval/sret
-    // attrs, vectors, MEMORY aggregates, and aggregate register shuffles fail
-    // closed here.
-    if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
-    if (call.callee_function_ty) |function_ty| {
-        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
-    }
-    var int_arg_index: usize = 0;
-    var fp_arg_index: usize = 0;
-    var stack_arg_count: usize = 0;
+    var plan = try planSysVCall(allocator, function, call);
+    defer plan.deinit(allocator);
+    if (plan.counts.stack_args > 3) return error.UnsupportedCodegenAbi;
+
     var stack_args: [3]i32 = undefined;
-    for (call.args.items) |arg| {
-        if (arg.attrs != null) return error.UnsupportedCodegenAbi;
-        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
-            if (int_arg_index >= 6) {
-                if (stack_arg_count == stack_args.len) return error.UnsupportedCodegenAbi;
-                const value = switch (arg.value) {
-                    .int => |int| try i32Value(int),
-                    .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-                };
+    var stack_arg_count: usize = 0;
+    for (call.args.items, 0..) |arg, index| {
+        const assignment = plan.assignments.items[index];
+        switch (assignment) {
+            .gpr => |dst| {
+                if (!arg.ty.eql(.{ .int = 32 }) and !arg.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+                switch (arg.value) {
+                    .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
+                    .named => |name| {
+                        const src = try sysvIntegerParamReg(function, name, arg.ty);
+                        if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                    },
+                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                }
+            },
+            .stack_i32_const => |value| {
                 stack_args[stack_arg_count] = value;
-                int_arg_index += 1;
                 stack_arg_count += 1;
-                continue;
-            }
-            const dst = try ArgReg.fromIndex(int_arg_index);
-            switch (arg.value) {
-                .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
-                .named => |name| {
-                    const src = try sysvIntegerParamReg(function, name, arg.ty);
-                    if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
-                },
-                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-            }
-            int_arg_index += 1;
-            continue;
-        }
-        if (arg.ty.eql(.float)) {
-            if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
-            switch (arg.value) {
-                .fp => try appendMoveImm32ToXmm(allocator, machine, try XmmReg.fromIndex(fp_arg_index), try fp32TextBits(arg.value)),
-                .named => |name| {
-                    const src_index = try fpParamIndex(function, name, .float);
-                    if (src_index != fp_arg_index) {
-                        if (src_index == 1 and fp_arg_index == 0) {
-                            try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
-                        } else {
-                            return error.UnsupportedCodegenAbi;
+            },
+            .sse => |dst| {
+                if (!arg.ty.eql(.float) and !arg.ty.eql(.double)) return error.UnsupportedCodegenType;
+                switch (arg.value) {
+                    .fp => if (arg.ty.eql(.float))
+                        try appendMoveImm32ToXmm(allocator, machine, dst, try fp32TextBits(arg.value))
+                    else
+                        try appendMoveImm64ToXmm(allocator, machine, dst, try fp64TextBits(arg.value)),
+                    .named => |name| {
+                        const src_index = if (arg.ty.eql(.float))
+                            try fpParamIndex(function, name, .float)
+                        else
+                            try fpParamIndex(function, name, .double);
+                        const dst_index: usize = @intFromEnum(dst);
+                        if (src_index != dst_index) {
+                            if (src_index == 1 and dst_index == 0) {
+                                try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+                            } else {
+                                return error.UnsupportedCodegenAbi;
+                            }
                         }
-                    }
-                    fp_arg_index += 1;
-                    continue;
-                },
-                .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-            }
-            fp_arg_index += 1;
-            continue;
+                    },
+                    .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                }
+            },
+            .aggregate_register_passthrough => {},
         }
-        if (arg.ty.eql(.double)) {
-            if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
-            switch (arg.value) {
-                .fp => try appendMoveImm64ToXmm(allocator, machine, try XmmReg.fromIndex(fp_arg_index), try fp64TextBits(arg.value)),
-                .named => |name| {
-                    const src_index = try fpParamIndex(function, name, .double);
-                    if (src_index != fp_arg_index) {
-                        if (src_index == 1 and fp_arg_index == 0) {
-                            try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
-                        } else {
-                            return error.UnsupportedCodegenAbi;
-                        }
-                    }
-                    fp_arg_index += 1;
-                    continue;
-                },
-                .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-            }
-            fp_arg_index += 1;
-            continue;
-        }
-        if (isAggregateType(arg.ty)) {
-            try appendSysVRegisterAggregatePassThroughArg(function, arg, &int_arg_index, &fp_arg_index);
-            continue;
-        }
-        return error.UnsupportedCodegenType;
     }
     var stack_index = stack_arg_count;
     while (stack_index > 0) {
@@ -21892,13 +21853,87 @@ fn appendSysVScalarCallArgs(
     return stack_arg_count;
 }
 
-const SysVParamCursor = struct {
-    gpr: usize,
-    sse: usize,
-    stack_eightbytes: usize,
+pub const SysVCallPlanCounts = struct {
+    gpr_args: usize = 0,
+    sse_args: usize = 0,
+    stack_args: usize = 0,
+    register_aggregate_args: usize = 0,
 };
 
-fn appendSysVRegisterAggregatePassThroughArg(
+const SysVCallArgAssignment = union(enum) {
+    gpr: ArgReg,
+    sse: XmmReg,
+    stack_i32_const: i32,
+    aggregate_register_passthrough,
+};
+
+const SysVCallPlan = struct {
+    assignments: std.ArrayList(SysVCallArgAssignment) = .empty,
+    counts: SysVCallPlanCounts = .{},
+    has_non_i32_arg: bool = false,
+
+    fn deinit(self: *SysVCallPlan, allocator: std.mem.Allocator) void {
+        self.assignments.deinit(allocator);
+    }
+};
+
+pub fn sysvCallPlanCountsForTest(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !SysVCallPlanCounts {
+    var plan = try planSysVCall(allocator, function, call);
+    defer plan.deinit(allocator);
+    return plan.counts;
+}
+
+fn planSysVCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !SysVCallPlan {
+    if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+    }
+
+    var plan: SysVCallPlan = .{};
+    errdefer plan.deinit(allocator);
+
+    var int_arg_index: usize = 0;
+    var fp_arg_index: usize = 0;
+    for (call.args.items) |arg| {
+        if (arg.attrs != null) return error.UnsupportedCodegenAbi;
+        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
+            plan.has_non_i32_arg = plan.has_non_i32_arg or !arg.ty.eql(.{ .int = 32 });
+            if (int_arg_index >= 6) {
+                const value = switch (arg.value) {
+                    .int => |int| try i32Value(int),
+                    .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                };
+                try plan.assignments.append(allocator, .{ .stack_i32_const = value });
+                int_arg_index += 1;
+                plan.counts.stack_args += 1;
+                continue;
+            }
+            try plan.assignments.append(allocator, .{ .gpr = try ArgReg.fromIndex(int_arg_index) });
+            int_arg_index += 1;
+            plan.counts.gpr_args += 1;
+            continue;
+        }
+        if (arg.ty.eql(.float) or arg.ty.eql(.double)) {
+            plan.has_non_i32_arg = true;
+            if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
+            try plan.assignments.append(allocator, .{ .sse = try XmmReg.fromIndex(fp_arg_index) });
+            fp_arg_index += 1;
+            plan.counts.sse_args += 1;
+            continue;
+        }
+        if (isAggregateType(arg.ty)) {
+            plan.has_non_i32_arg = true;
+            try planSysVRegisterAggregatePassThrough(function, arg, &int_arg_index, &fp_arg_index);
+            try plan.assignments.append(allocator, .aggregate_register_passthrough);
+            plan.counts.register_aggregate_args += 1;
+            continue;
+        }
+        return error.UnsupportedCodegenType;
+    }
+    return plan;
+}
+
+fn planSysVRegisterAggregatePassThrough(
     function: ir.Function,
     arg: ir.CallArg,
     int_arg_index: *usize,
@@ -21918,6 +21953,21 @@ fn appendSysVRegisterAggregatePassThroughArg(
     }
     int_arg_index.* += needs.gpr;
     fp_arg_index.* += needs.sse;
+}
+
+const SysVParamCursor = struct {
+    gpr: usize,
+    sse: usize,
+    stack_eightbytes: usize,
+};
+
+fn appendSysVRegisterAggregatePassThroughArg(
+    function: ir.Function,
+    arg: ir.CallArg,
+    int_arg_index: *usize,
+    fp_arg_index: *usize,
+) !void {
+    try planSysVRegisterAggregatePassThrough(function, arg, int_arg_index, fp_arg_index);
 }
 
 fn sysvParamCursorFor(function: ir.Function, name: []const u8, ty: ir.Type) !SysVParamCursor {
