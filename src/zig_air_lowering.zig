@@ -4432,15 +4432,24 @@ const LoweringContext = struct {
         const call_type = try parseFunctionType(self.allocator, signature_text);
         defer call_type.deinit(self.allocator);
         if (instruction.operands.len != call_type.params.len + 1) return error.UnsupportedAir;
-        const parsed_callee = typedCallee(callee_text) orelse return error.UnsupportedAir;
-        const callee = if (parsed_callee.external)
-            parsed_callee.name
+        const parsed_callee = typedCallee(callee_text);
+        const callee = if (parsed_callee) |direct|
+            if (direct.external)
+                direct.name
+            else
+                try self.qualifiedCalleeName(direct.name)
         else
-            try self.qualifiedCalleeName(parsed_callee.name);
+            "";
+        const callee_value: ?ir.Value = if (parsed_callee == null) blk: {
+            const callee_operand = try self.resolveTypedOperand(instruction, 0);
+            if (callee_operand.ty.ir_type != .ptr) return error.UnsupportedAir;
+            break :blk callee_operand.value;
+        } else null;
 
         var call: ir.CallInst = .{
             .ret_ty = call_type.return_type.ir_type,
             .callee = callee,
+            .callee_value = callee_value,
             .calling_conv = if (call_type.c_calling_convention) null else "fastcc",
             .args = .empty,
         };

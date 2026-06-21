@@ -207,11 +207,13 @@ unsupported call attributes
 unsupported calling conventions
 ```
 
-Narrow indirect calls are no longer part of the rejected surface: a function
-pointer parameter returning `i32` with planner-supported scalar `i32` arguments
-is lowered through generic CFG and emitted as `callq *%rax`. Indirect calls with
-aggregate ABI, tail markers, varargs, non-default call conventions, or live
-values crossing the call remain targeted ABI rejections.
+Narrow indirect calls are no longer part of the rejected surface: typed AIR v2
+resolves operand 0 as a function pointer callee for `i32` returns with
+planner-supported scalar `i32` arguments, including incoming stack parameters
+loaded into outgoing GPR call slots. The backend copies the pointer callee to
+`%rax` and emits `callq *%rax`. Indirect calls with aggregate ABI, tail
+markers, varargs, non-default call conventions, or live values crossing the
+call remain targeted ABI rejections.
 
 ## Optimizer Legality
 
@@ -234,6 +236,7 @@ direct non-void call parse/print/verify round trip
 direct void call parse/print/verify round trip
 call signature mismatch rejection
 narrow scalar indirect call through %rax
+typed AIR v2 pointer-callee indirect call with stack-param GPR assignment
 tail-call marker rejection
 invoke rejection
 call_no_args assembly fixture
