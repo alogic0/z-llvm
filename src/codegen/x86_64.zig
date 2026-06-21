@@ -12715,6 +12715,39 @@ fn emitGenericCfgI32CallIntoEax(
     }
 }
 
+fn emitGenericCfgVoidCall(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    instruction_index: usize,
+    call: ir.CallInst,
+) !void {
+    if (call.ret_ty != .void or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
+    const live_params = try liveParamsAfter(function, block, instruction_index);
+    if (live_params.count == 0) {
+        if (call.callee_value) |callee_value| {
+            const callee_name = switch (callee_value) {
+                .named => |name| name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            const callee_reg = try paramReg(function, callee_name, .ptr);
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+            const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+            try appendIndirectCallRaxWithStackArgs(allocator, machine, .void, stack_arg_count);
+            return;
+        }
+        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        try appendDirectCallWithStackArgs(allocator, machine, call.callee, .void, stack_arg_count);
+        return;
+    }
+    if (call.callee_value != null) return error.UnsupportedLiveAcrossCall;
+    const stack_arg_count = try i32CallStackArgCount(call);
+    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try appendAlignedDirectCallPreservingI32Params(allocator, machine, function, call, live_params);
+}
+
 const GenericCfgPointerSlotParam = struct {
     slot_name: []const u8,
     param_name: []const u8,
@@ -12881,14 +12914,19 @@ fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *Mach
     if (!genericCfgSupportsSingleBlockScalar(function)) return false;
     const ret = single_ret orelse return error.UnsupportedCodegenControlFlow;
     var last_eax_value: ?ir.Value = null;
-    for (block.instructions.items) |instruction| {
+    for (block.instructions.items, 0..) |instruction, instruction_index| {
         switch (instruction.kind) {
             .store => |store| {
                 try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
                 try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
                 last_eax_value = store.value;
             },
-            .binary, .icmp, .select, .load, .call => {},
+            .call => |call| {
+                if (call.ret_ty == .void and instruction.result == null) {
+                    try emitGenericCfgVoidCall(allocator, machine, function, block, instruction_index, call);
+                }
+            },
+            .binary, .icmp, .select, .load => {},
             .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
         }
     }
@@ -14593,8 +14631,10 @@ fn genericCfgSupportsSingleBlockStore(function: ir.Function, block: ir.BasicBloc
 
 fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock, result: ?[]const u8, call: ir.CallInst) bool {
     if (genericCfgSupportsSminIntrinsicCall(function, call)) return result != null;
-    if (result == null) return false;
-    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 9) return false;
+    if (call.ret_ty == .void) {
+        if (result != null) return false;
+    } else if (!call.ret_ty.eql(.{ .int = 32 }) or result == null) return false;
+    if (call.args.items.len > 9) return false;
     if (call.inline_asm != null) return false;
     if (call.callee_value) |callee_value| {
         const callee_name = switch (callee_value) {
@@ -14611,7 +14651,7 @@ fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock
         } else if (!genericCfgSupportsSingleBlockI32Value(function, block, arg.value)) return false;
     }
     if (result) |name| return genericCfgSingleBlockResultIsUsed(block, name);
-    return false;
+    return call.ret_ty == .void;
 }
 
 fn genericCfgSupportsSminIntrinsicCall(function: ir.Function, call: ir.CallInst) bool {

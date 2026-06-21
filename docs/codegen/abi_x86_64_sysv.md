@@ -227,7 +227,7 @@ no full lowering for all classified SysV aggregate classes beyond selected INTEG
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no broad indirect calls, tail calls, or unsupported non-default call conventions
-no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32, one- through six-live f32/f64 no-argument-call shapes, and two-live FP-argument call shape
+no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32, one- through six-live f32/f64 no-argument-call shapes, two-live FP-argument call shape, and selected two-call six-live i32 GPR frame
 stack-passed live i32 pressure beyond the current disp8-safe incoming stack offset model is rejected explicitly rather than guessed
 ```
 
@@ -254,4 +254,4 @@ falling into a generic unsupported bucket.
 | Callee-saved handling | Fail-closed boundary | The allocator currently avoids callee-saved registers; tests document the policy. Next implementation is prologue/epilogue save/restore when allocation starts using them. |
 | More than six stack-passed live values | Implemented selected subset | Current rows prove eight and twelve stack-passed live `i32` values via cursor-derived incoming stack offsets. Remaining boundary is pressure beyond the backend's disp8-safe stack offset model. |
 | Broader SSE live-across-call | Partially implemented | Up to six no-argument-call live `f32`/`f64` values and selected two-live FP-argument calls are supported. Next implementation is a general SSE caller-saved live-range spill/reload model. |
-| Multi-call live-value frames | Fail-closed boundary | Accepted live-across-call rows contain one call. Next implementation is a frame allocator that keeps spill slots stable across multiple calls and reload points. |
+| Multi-call live-value frames | Partially implemented | Generic CFG accepts selected straight-line void-call sequences with up to six live `i32` GPR parameters across two calls, spilling/reloading through the shared live-param frame helper for each call. Remaining boundary is arbitrary multi-call scheduling with mixed GPR/SSE/stack live values and non-void intermediate results. |

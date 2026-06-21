@@ -7895,6 +7895,51 @@ test "x86_64 codegen preserves six live i32 params across direct call" {
     try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r9, .frame_index = .slot5 } });
 }
 
+test "x86_64 generic CFG preserves six live i32 params across two void calls" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @sink()
+        \\
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f) {
+        \\entry:
+        \\  call void @sink()
+        \\  call void @sink()
+        \\  %ab = add i32 %a, %b
+        \\  %abc = add i32 %ab, %c
+        \\  %abcd = add i32 %abc, %d
+        \\  %abcde = add i32 %abcd, %e
+        \\  %abcdef = add i32 %abcde, %f
+        \\  ret i32 %abcdef
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    var spill_count: usize = 0;
+    var reload_count: usize = 0;
+    var call_count: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_arg_rsp => spill_count += 1,
+        .reload_arg_rsp => reload_count += 1,
+        .direct_call => |call| {
+            if (std.mem.eql(u8, call.symbol, "sink")) call_count += 1;
+        },
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 12), spill_count);
+    try std.testing.expectEqual(@as(usize, 12), reload_count);
+    try std.testing.expectEqual(@as(usize, 2), call_count);
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r9, .frame_index = .slot5 } });
+}
+
 test "x86_64 codegen preserves six register and three stack i32 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
