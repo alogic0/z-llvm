@@ -5,6 +5,8 @@ const Pair64 = extern struct {
 
 const Sum6Fn = *const fn (i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 const Sum12Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
+const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
+const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
 
 export fn frontier_pair64_make(a: i64, b: i64) Pair64 {
     return .{ .a = a, .b = b };
@@ -212,4 +214,12 @@ export fn frontier_five_f32_external_call(a: f32, b: f32, c: f32, d: f32, e: f32
 
 export fn frontier_five_f64_external_call(a: f64, b: f64, c: f64, d: f64, e: f64) f64 {
     return frontier_sum5_f64(a, b, c, d, e);
+}
+
+export fn frontier_indirect_five_f32_external_call(func: Sum5F32Fn, a: f32, b: f32, c: f32, d: f32, e: f32) f32 {
+    return func(a, b, c, d, e);
+}
+
+export fn frontier_indirect_five_f64_external_call(func: Sum5F64Fn, a: f64, b: f64, c: f64, d: f64, e: f64) f64 {
+    return func(a, b, c, d, e);
 }

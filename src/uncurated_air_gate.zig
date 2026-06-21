@@ -1529,6 +1529,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_six_f64_live_sum_after_call(double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_six_f64_live_sum_after_call");
     \\extern float z_frontier_five_f32_external_call(float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_five_f32_external_call");
     \\extern double z_frontier_five_f64_external_call(double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_five_f64_external_call");
+    \\extern float z_frontier_indirect_five_f32_external_call(float (*)(float, float, float, float, float), float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_indirect_five_f32_external_call");
+    \\extern double z_frontier_indirect_five_f64_external_call(double (*)(double, double, double, double, double), double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_indirect_five_f64_external_call");
     \\volatile float frontier_seen_f32 = 0.0f;
     \\volatile double frontier_seen_f64 = 0.0;
     \\void frontier_touch_f32(float value) { frontier_seen_f32 = value; }
@@ -1579,6 +1581,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_six_f64_live_sum_after_call(1.5, 2.25, 3.75, 4.5, 5.0, 6.0) != 23.0) return 20;
     \\    if (z_frontier_five_f32_external_call(1.0f, 2.0f, 3.0f, 4.0f, 5.0f) != 15.0f) return 21;
     \\    if (z_frontier_five_f64_external_call(1.5, 2.25, 3.75, 4.5, 5.0) != 17.0) return 22;
+    \\    if (z_frontier_indirect_five_f32_external_call(frontier_sum5_f32, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f) != 15.0f) return 40;
+    \\    if (z_frontier_indirect_five_f64_external_call(frontier_sum5_f64, 1.5, 2.25, 3.75, 4.5, 5.0) != 17.0) return 41;
     \\    return 0;
     \\}
     \\

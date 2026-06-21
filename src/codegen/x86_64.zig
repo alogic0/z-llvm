@@ -14143,11 +14143,22 @@ fn lowerGenericCfgFpDirectCallReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!call.ret_ty.eql(function.ret_ty) or call.callee_value != null or call.inline_asm != null) return false;
+    if (!call.ret_ty.eql(function.ret_ty) or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
 
-    const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
-    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    if (call.callee_value) |callee_value| {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        const callee_reg = try paramReg(function, callee_name, .ptr);
+        try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
+    } else {
+        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }

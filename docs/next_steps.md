@@ -373,12 +373,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=134`,
-`generic_codegen_functions=134`, `generic_cfg_functions=134`,
+frontier gate reports `source_rows=13`, `discovered_functions=136`,
+`generic_codegen_functions=136`, `generic_cfg_functions=136`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=134`, `object_failures=0`,
+`object_emitted_functions=136`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -419,6 +419,8 @@ incoming stack-passed `i32` parameters into outgoing GPR call slots, and emits
 `callq *%rax` without source-name-specific call lowering; the follow-up
 `frontier_indirect_stack_arg_forward` proves the same indirect path while
 forwarding 12 `i32` arguments, including outgoing stack slots.
+The indirect FP follow-up extends the same pointer-callee path to selected
+`f32`/`f64` calls, assigning five SSE arguments and returning through `%xmm0`.
 The mixed aggregate
 class frontier row adds `{ i64, double }`, selected `{ i32, double }`, and
 selected `{ i32, i32, double }` INTEGER/SSE field reads plus register aggregate

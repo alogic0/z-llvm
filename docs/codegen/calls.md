@@ -208,10 +208,11 @@ unsupported calling conventions
 ```
 
 Narrow indirect calls are no longer part of the rejected surface: typed AIR v2
-resolves operand 0 as a function pointer callee for `i32` returns with
-planner-supported scalar `i32` arguments, including incoming stack parameters
-loaded into outgoing GPR call slots and 12-argument forwarding through outgoing
-stack slots. The backend copies the pointer callee to `%rax` and emits
+resolves operand 0 as a function pointer callee for planner-supported scalar
+calls, including `i32` returns with incoming stack parameters loaded into
+outgoing GPR call slots, 12-argument forwarding through outgoing stack slots,
+and selected `f32`/`f64` calls with five SSE arguments returning through
+`%xmm0`. The backend copies the pointer callee to `%rax` and emits
 `callq *%rax`. Indirect calls with aggregate ABI, tail markers, varargs,
 non-default call conventions, or live values crossing the call remain targeted
 ABI rejections.
@@ -239,6 +240,7 @@ call signature mismatch rejection
 narrow scalar indirect call through %rax
 typed AIR v2 pointer-callee indirect call with stack-param GPR assignment
 typed AIR v2 pointer-callee indirect call with outgoing stack arguments
+typed AIR v2 pointer-callee indirect call with SSE arguments and FP return
 tail-call marker rejection
 invoke rejection
 call_no_args assembly fixture
