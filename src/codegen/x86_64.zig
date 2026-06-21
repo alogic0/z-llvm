@@ -21807,7 +21807,6 @@ fn appendDirectCallWithStackArgs(
             try machine.instructions.append(allocator, .add_rsp_8);
         },
         2 => {
-            try machine.instructions.append(allocator, .sub_rsp_8);
             try appendDirectCall(allocator, machine, symbol, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_24);
         },
@@ -21816,7 +21815,6 @@ fn appendDirectCallWithStackArgs(
             try machine.instructions.append(allocator, .add_rsp_24);
         },
         4 => {
-            try machine.instructions.append(allocator, .sub_rsp_8);
             try appendDirectCall(allocator, machine, symbol, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_40);
         },
@@ -21825,7 +21823,6 @@ fn appendDirectCallWithStackArgs(
             try machine.instructions.append(allocator, .add_rsp_40);
         },
         6 => {
-            try machine.instructions.append(allocator, .sub_rsp_8);
             try appendDirectCall(allocator, machine, symbol, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_56);
         },
@@ -21846,7 +21843,6 @@ fn appendIndirectCallRaxWithStackArgs(
             try machine.instructions.append(allocator, .add_rsp_8);
         },
         2 => {
-            try machine.instructions.append(allocator, .sub_rsp_8);
             try appendIndirectCallRax(allocator, machine, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_24);
         },
@@ -21855,7 +21851,6 @@ fn appendIndirectCallRaxWithStackArgs(
             try machine.instructions.append(allocator, .add_rsp_24);
         },
         4 => {
-            try machine.instructions.append(allocator, .sub_rsp_8);
             try appendIndirectCallRax(allocator, machine, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_40);
         },
@@ -21864,7 +21859,6 @@ fn appendIndirectCallRaxWithStackArgs(
             try machine.instructions.append(allocator, .add_rsp_40);
         },
         6 => {
-            try machine.instructions.append(allocator, .sub_rsp_8);
             try appendIndirectCallRax(allocator, machine, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_56);
         },
@@ -21904,6 +21898,7 @@ fn appendI32CallArgs(
         }
     }
 
+    if (stack_arg_count != 0 and stack_arg_count % 2 == 0) try machine.instructions.append(allocator, .sub_rsp_8);
     var index = stack_arg_count;
     while (index > 0) {
         index -= 1;
@@ -21982,6 +21977,7 @@ fn appendSysVScalarCallArgs(
             .aggregate_register_passthrough => {},
         }
     }
+    if (stack_arg_count != 0 and stack_arg_count % 2 == 0) try machine.instructions.append(allocator, .sub_rsp_8);
     var stack_index = stack_arg_count;
     while (stack_index > 0) {
         stack_index -= 1;

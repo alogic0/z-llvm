@@ -24,6 +24,7 @@ extern fn frontier_touch_f64(value: f64) void;
 extern fn frontier_touch_none() void;
 extern fn frontier_sum5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) f32;
 extern fn frontier_sum5_f64(a: f64, b: f64, c: f64, d: f64, e: f64) f64;
+extern fn frontier_sum12_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32;
 
 export fn frontier_two_live_after_call(a: i32, b: i32, c: i32) i32 {
     return a + b + frontier_id_i32(c);
@@ -46,6 +47,16 @@ export fn frontier_five_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32) 
 export fn frontier_six_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32 {
     const r = frontier_id_i32(f);
     return a + b + c + d + e + f + r;
+}
+
+export fn frontier_two_void_calls_six_live(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32 {
+    frontier_touch_none();
+    frontier_touch_none();
+    return a + b + c + d + e + f;
+}
+
+export fn frontier_six_stack_arg_call() i32 {
+    return frontier_sum12_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 }
 
 export fn frontier_seven_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) i32 {

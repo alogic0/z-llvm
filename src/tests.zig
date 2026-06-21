@@ -6351,13 +6351,13 @@ test "x86_64 codegen supports six stack-passed i32 call arguments" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 12 }, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 11 }, machine.instructions.items[7]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 10 }, machine.instructions.items[8]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[9]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[10]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[11]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[12]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 12 }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 11 }, machine.instructions.items[8]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 10 }, machine.instructions.items[9]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[10]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[11]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[12]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_56, machine.instructions.items[machine.instructions.items.len - 2]);
 }
 
@@ -6382,9 +6382,9 @@ test "x86_64 codegen aligns calls with two stack-passed arguments" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[7]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[8]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[8]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[machine.instructions.items.len - 2]);
 }
 
