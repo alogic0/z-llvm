@@ -44,9 +44,13 @@ selected backend subset:
   selected nested/array INTEGER aggregate construction returns are accepted
   selected nested mixed INTEGER/SSE aggregate field reads and construction returns are accepted
   selected array-in-struct INTEGER aggregate sums are accepted
-  selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument-field reads are accepted through the reusable aggregate classifier
-  selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument-field reads are accepted through the reusable aggregate classifier
-  selected SSE/SSE aggregate argument-field reads and register returns are accepted through the reusable aggregate classifier
+  selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double`
+    argument-field reads are accepted through the reusable aggregate classifier
+  selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and
+    `double` argument-field reads are accepted through the reusable aggregate
+    classifier
+  selected SSE/SSE aggregate argument-field reads and register returns are
+    accepted through the reusable aggregate classifier
 ```
 
 ## Accepted IR Contract
@@ -86,7 +90,8 @@ x86_64-linux SysV only
 i32/i64/pointer direct call arguments in the SysV integer stream
 f32/f64 direct call arguments in the independent SysV SSE stream
 i32 return in %eax, i64/pointer return in %rax, f32/f64 return in %xmm0
-planner-level return accounting for scalar, register aggregate, and direct MEMORY aggregate return classes
+planner-level return accounting for scalar, register aggregate, and direct
+  MEMORY aggregate return classes
 selected small INTEGER/INTEGER aggregate return in %rax/%rdx
 selected SSE/SSE aggregate return in %xmm0/%xmm1
 void calls with no result
@@ -148,10 +153,52 @@ and easy to inspect.
 Native backend handoff classification:
 
 ```text
-validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
-handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32/i64 arguments including selected computed block-local i32/i64 outgoing stack slots, mixed integer/SSE scalar arguments, selected named f32/f64 argument pass-through through %xmm0..%xmm4 plus backend FP constant materialization through %xmm0..%xmm7, selected small INTEGER/INTEGER aggregate return/argument reads, selected nested INTEGER aggregate pass-through helper calls and construction returns, selected array-in-struct INTEGER and SSE/SSE construction returns, selected stack-passed register aggregate field reads after GPR exhaustion, selected nested mixed INTEGER/SSE aggregate field reads/construction, selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads, register return including packed adjacent `i32` construction returns, and direct helper-call return, selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register return including packed adjacent `i32` construction returns, selected SSE/SSE aggregate argument field reads and register return including `[2]f64` array-in-struct and nested `{ { double }, { double } }`, generated normal integer-leaf MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through twenty flat fields, a nested two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and array-backed `{ [5 x i64] }` copy/read rows, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, selected two-/three-live f32/f64 spill/reload across a no-argument direct C ABI void call before post-call fadd returns, selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames, selected two-live f32/f64 spill/reload across an FP-argument void helper call, disp8-safe stack-passed live i32 post-call add-tree rows after local call-frame restoration, selected two-call six-live i32 GPR spill/reload frames, and narrow scalar function-pointer calls through `callq *%rax` when the callee is a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and selected f32/f64 SSE arguments/results
-out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected sret/byval copies, broad indirect calls, tail calls, unwind, and debug-info call-site handling
+validation-only:
+  call assembly/object fixtures validate ABI and relocation assumptions for tiny
+  direct-call cases
+handoff study:
+  the accepted call shape can be compared against Zig native AIR/MIR call
+  lowering
+accepted frontier:
+  selected stack-passed i32/i64 arguments, including selected computed
+  block-local i32/i64 outgoing stack slots
+  mixed integer/SSE scalar arguments
+  selected named f32/f64 argument pass-through through %xmm0..%xmm4 plus
+  backend FP constant materialization through %xmm0..%xmm7
+  selected small INTEGER/INTEGER aggregate return/argument reads
+  selected nested INTEGER aggregate pass-through helper calls and construction
+  returns
+  selected array-in-struct INTEGER and SSE/SSE construction returns
+  selected stack-passed register aggregate field reads after GPR exhaustion
+  selected nested mixed INTEGER/SSE aggregate field reads/construction
+  selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double`
+  argument field reads, register return including packed adjacent `i32`
+  construction returns, and direct helper-call return
+  selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and
+  `double` argument field reads and register return including packed adjacent
+  `i32` construction returns
+  selected SSE/SSE aggregate argument field reads and register return including
+  `[2]f64` array-in-struct and nested `{ { double }, { double } }`
+  generated normal integer-leaf MEMORY aggregate hidden-sret return storage and
+  byval-to-sret copies currently proven through twenty flat fields, a nested
+  two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and
+  array-backed `{ [5 x i64] }` copy/read rows
+  selected stack-passed MEMORY aggregate by-value field reads
+  selected one-live f32/f64 SSE spill/reload around a direct C ABI void call
+  selected two-/three-live f32/f64 spill/reload across a no-argument direct C
+  ABI void call before post-call fadd returns
+  selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames
+  selected two-live f32/f64 spill/reload across an FP-argument void helper call
+  disp8-safe stack-passed live i32 post-call add-tree rows after local
+  call-frame restoration
+  selected two-call six-live i32 GPR spill/reload frames
+  narrow scalar function-pointer calls through `callq *%rax` when the callee is
+  a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
+  selected f32/f64 SSE arguments/results
+out of scope:
+  varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected
+  sret/byval copies, broad indirect calls, tail calls, unwind, and debug-info
+  call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
 
@@ -169,7 +216,8 @@ and larger flat normal integer-leaf copies through `Big20`
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax
-selected SSE/SSE aggregate returns, including `[2]f64` array-in-struct and nested `{ { double }, { double } }`, are lowered in %xmm0/%xmm1
+selected SSE/SSE aggregate returns, including `[2]f64` array-in-struct and
+nested `{ { double }, { double } }`, are lowered in %xmm0/%xmm1
 selected one-live f32/f64 values across a direct C ABI void call are spilled
 from %xmm0 to an aligned frame slot and reloaded to %xmm0 for return
 selected two-live f32/f64 values across a no-argument direct C ABI void call are
@@ -187,8 +235,9 @@ INTEGER/INTEGER, nested mixed INTEGER/SSE field reads/construction,
 selected nested/array INTEGER construction-return forms,
 mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field-read forms plus selected
 packed mixed construction-return forms
-arbitrary hidden sret storage, arbitrary non-selected stack-passed byval copies, complete
-aggregate lowering for every classified shape, and multi-target ABI parity are not implemented
+arbitrary hidden sret storage, arbitrary non-selected stack-passed byval copies,
+complete aggregate lowering for every classified shape, and multi-target ABI
+parity are not implemented
 ```
 
 ## Rejected Surface
@@ -239,7 +288,8 @@ direct void call parse/print/verify round trip
 call signature mismatch rejection
 narrow scalar indirect call through %rax
 typed AIR v2 pointer-callee indirect call with stack-param GPR assignment
-typed AIR v2 pointer-callee indirect call with outgoing stack arguments through the immediate-cleanup path
+typed AIR v2 pointer-callee indirect call with outgoing stack arguments through
+  the immediate-cleanup path
 typed AIR v2 pointer-callee indirect call with SSE arguments and FP return
 typed AIR v2 pointer-callee indirect call with i64 register/stack arguments
 tail-call marker rejection
