@@ -121,6 +121,7 @@ frontier_sysv_abi.Pair64 lowers as the selected small INTEGER/INTEGER class
 aggregate return `{ i64, i64 }` uses %rax/%rdx
 aggregate argument field 0/1 reads use the SysV integer register pair
 register aggregate pass-through calls are supported when the source parameter is already in the exact destination SysV GPR/SSE slots
+the reusable SysV planner now counts scalar and classified aggregate call returns as GPR, SSE, or MEMORY returns before row-specific emission
 the selected direct-call frame spills and reloads up to six live i32 caller parameters
 frontier_sysv_sret_byval.Big3 through Big8 lower as selected normal MEMORY classes:
   `{ i64, i64, i64 }` through `{ i64, i64, i64, i64, i64, i64, i64, i64 }` returns store through the hidden sret pointer in %rdi

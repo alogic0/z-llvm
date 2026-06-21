@@ -86,6 +86,7 @@ x86_64-linux SysV only
 i32/i64/pointer direct call arguments in the SysV integer stream
 f32/f64 direct call arguments in the independent SysV SSE stream
 i32 return in %eax, i64/pointer return in %rax, f32/f64 return in %xmm0
+planner-level return accounting for scalar, register aggregate, and direct MEMORY aggregate return classes
 selected small INTEGER/INTEGER aggregate return in %rax/%rdx
 selected SSE/SSE aggregate return in %xmm0/%xmm1
 void calls with no result

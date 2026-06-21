@@ -21858,6 +21858,9 @@ pub const SysVCallPlanCounts = struct {
     sse_args: usize = 0,
     stack_args: usize = 0,
     register_aggregate_args: usize = 0,
+    gpr_returns: usize = 0,
+    sse_returns: usize = 0,
+    memory_return: bool = false,
 };
 
 const SysVCallArgAssignment = union(enum) {
@@ -21898,6 +21901,7 @@ fn planSysVCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
 
     var plan: SysVCallPlan = .{};
     errdefer plan.deinit(allocator);
+    plan.counts = try planSysVReturn(call.ret_ty);
 
     var int_arg_index: usize = 0;
     var fp_arg_index: usize = 0;
@@ -21938,6 +21942,23 @@ fn planSysVCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
         return error.UnsupportedCodegenType;
     }
     return plan;
+}
+
+fn planSysVReturn(ret_ty: ir.Type) !SysVCallPlanCounts {
+    if (ret_ty == .void) return .{};
+    if (ret_ty.eql(.{ .int = 1 }) or ret_ty.eql(.{ .int = 8 }) or ret_ty.eql(.{ .int = 16 }) or ret_ty.eql(.{ .int = 32 }) or ret_ty.eql(.{ .int = 64 }) or ret_ty == .ptr) {
+        return .{ .gpr_returns = 1 };
+    }
+    if (ret_ty == .float or ret_ty == .double) {
+        return .{ .sse_returns = 1 };
+    }
+    if (isAggregateType(ret_ty)) {
+        const classification = try classifySysVAggregate(ret_ty);
+        if (classification.kind == .memory) return .{ .memory_return = true };
+        const needs = sysvAggregateRegisterNeeds(classification);
+        return .{ .gpr_returns = needs.gpr, .sse_returns = needs.sse };
+    }
+    return error.UnsupportedCodegenType;
 }
 
 fn planSysVRegisterAggregatePassThrough(

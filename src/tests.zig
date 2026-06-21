@@ -7082,6 +7082,74 @@ test "x86_64 SysV call planner counts independent GPR SSE and stack streams" {
     try std.testing.expectEqual(@as(usize, 2), counts.sse_args);
     try std.testing.expectEqual(@as(usize, 1), counts.stack_args);
     try std.testing.expectEqual(@as(usize, 0), counts.register_aggregate_args);
+    try std.testing.expectEqual(@as(usize, 1), counts.gpr_returns);
+    try std.testing.expectEqual(@as(usize, 0), counts.sse_returns);
+    try std.testing.expect(!counts.memory_return);
+}
+
+test "x86_64 SysV call planner classifies scalar aggregate and memory returns" {
+    const scalar_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare double @callee()
+        \\
+        \\define double @caller() {
+        \\entry:
+        \\  %r = call double @callee()
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var scalar_module = try ir.Module.parse(std.testing.allocator, scalar_input);
+    defer scalar_module.deinit();
+    try scalar_module.verify();
+    const scalar_call = scalar_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const scalar_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, scalar_module.functions.items[0], scalar_call);
+    try std.testing.expectEqual(@as(usize, 0), scalar_counts.gpr_returns);
+    try std.testing.expectEqual(@as(usize, 1), scalar_counts.sse_returns);
+    try std.testing.expect(!scalar_counts.memory_return);
+
+    const mixed_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i64, double } @callee()
+        \\
+        \\define { i64, double } @caller() {
+        \\entry:
+        \\  %r = call { i64, double } @callee()
+        \\  ret { i64, double } %r
+        \\}
+        \\
+    ;
+    var mixed_module = try ir.Module.parse(std.testing.allocator, mixed_input);
+    defer mixed_module.deinit();
+    try mixed_module.verify();
+    const mixed_call = mixed_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const mixed_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, mixed_module.functions.items[0], mixed_call);
+    try std.testing.expectEqual(@as(usize, 1), mixed_counts.gpr_returns);
+    try std.testing.expectEqual(@as(usize, 1), mixed_counts.sse_returns);
+    try std.testing.expect(!mixed_counts.memory_return);
+
+    const memory_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i64, i64, i64 } @callee()
+        \\
+        \\define { i64, i64, i64 } @caller() {
+        \\entry:
+        \\  %r = call { i64, i64, i64 } @callee()
+        \\  ret { i64, i64, i64 } %r
+        \\}
+        \\
+    ;
+    var memory_module = try ir.Module.parse(std.testing.allocator, memory_input);
+    defer memory_module.deinit();
+    try memory_module.verify();
+    const memory_call = memory_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const memory_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, memory_module.functions.items[0], memory_call);
+    try std.testing.expectEqual(@as(usize, 0), memory_counts.gpr_returns);
+    try std.testing.expectEqual(@as(usize, 0), memory_counts.sse_returns);
+    try std.testing.expect(memory_counts.memory_return);
 }
 
 test "x86_64 SysV call planner rejects varargs explicitly" {
@@ -7181,6 +7249,30 @@ test "x86_64 SysV call planner rejects vector argument ABI boundary" {
         \\entry:
         \\  %r = call i32 @callee(<2 x i32> %value)
         \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedCodegenType,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
+    );
+}
+
+test "x86_64 SysV call planner rejects vector return ABI boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare <2 x i32> @callee()
+        \\
+        \\define <2 x i32> @caller() {
+        \\entry:
+        \\  %r = call <2 x i32> @callee()
+        \\  ret <2 x i32> %r
         \\}
         \\
     ;
