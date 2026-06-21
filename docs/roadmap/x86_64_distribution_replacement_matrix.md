@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=136`,
-`generic_codegen_functions=136`, `generic_cfg_functions=136`,
+three release modes at `source_rows=13`, `discovered_functions=138`,
+`generic_codegen_functions=138`, `generic_cfg_functions=138`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=136`, `object_failures=0`,
+`object_emitted_functions=138`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -453,7 +453,9 @@ forwarding into outgoing stack argument slots and outgoing GPR argument
 registers, typed AIR v2 pointer-callee indirect calls that load stack-passed
 parameters into outgoing GPR call slots or forward 12 `i32` arguments through
 outgoing stack slots before `callq *%rax`, typed AIR v2 pointer-callee
-`f32`/`f64` calls that return through `%xmm0`, and the
+`f32`/`f64` calls that return through `%xmm0`, stack-passed `i64` parameters
+loaded into outgoing GPR call slots, indirect `i64` pointer-callee calls with
+outgoing stack arguments, and the
 multi-call GPR frontier keeps six live `i32` parameters across two void C ABI
 calls through the generic CFG call path.
 The FP argument frontier also proves selected named `f32`/`f64` external-call

@@ -7338,6 +7338,40 @@ test "x86_64 generic CFG lowers narrow i32 indirect call through rax" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
 
+test "x86_64 generic CFG lowers indirect i64 call with stack parameter reload" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @caller(ptr %fn, i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i64 %f, i64 %g, i64 %h) {
+        \\entry:
+        \\  %r = call i64 %fn(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i64 %f, i64 %g, i64 %h)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rsi } }, machine.instructions.items[1]);
+
+    var saw_stack_i64_reload = false;
+    for (machine.instructions.items) |instruction| {
+        switch (instruction) {
+            .load_stack_disp8_arg64 => |load| {
+                if (load.reg == .r9 and load.disp == 8) saw_stack_i64_reload = true;
+            },
+            else => {},
+        }
+    }
+    try std.testing.expect(saw_stack_i64_reload);
+}
+
 test "x86_64 SysV call planner rejects vector argument ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

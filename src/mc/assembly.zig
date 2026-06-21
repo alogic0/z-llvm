@@ -114,6 +114,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .reload_rsp_eax => try writer.writeAll("\tmovl (%rsp), %eax\n"),
             .load_stack_disp8_rax => |offset| try writer.print("\tmovq {}(%rsp), %rax\n", .{offset}),
             .load_stack_disp8_arg32 => |load| try writer.print("\tmovl {}(%rsp), {s}\n", .{ load.disp, load.reg.name32() }),
+            .load_stack_disp8_arg64 => |load| try writer.print("\tmovq {}(%rsp), {s}\n", .{ load.disp, load.reg.name64() }),
             .load_rax_ptr_disp8_rax => |offset| try writer.print("\tmovq {}(%rax), %rax\n", .{offset}),
             .load_rax_ptr_rdx => try writer.writeAll("\tmovq (%rax), %rdx\n"),
             .load_rax_ptr_eax => try writer.writeAll("\tmovl (%rax), %eax\n"),

@@ -327,6 +327,10 @@ pub const Instruction = union(enum) {
         reg: ArgReg,
         disp: u8,
     },
+    load_stack_disp8_arg64: struct {
+        reg: ArgReg,
+        disp: u8,
+    },
     load_rax_ptr_disp8_rax: u8,
     load_rax_ptr_rdx,
     load_rax_ptr_eax,
@@ -1374,11 +1378,22 @@ fn lowerGenericCfgI64DirectCallReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!call.ret_ty.eql(.{ .int = 64 }) or call.callee_value != null or call.inline_asm != null) return false;
+    if (!call.ret_ty.eql(.{ .int = 64 }) or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
 
-    const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
-    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    if (call.callee_value) |callee_value| {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        const callee_reg = try paramReg(function, callee_name, .ptr);
+        try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
+    } else {
+        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -21985,14 +22000,22 @@ fn appendSysVScalarCallArgs(
                             error.UnsupportedCodegenAbi => null,
                             else => return err,
                         }) |src| {
-                            if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                            if (src != dst) {
+                                try machine.instructions.append(allocator, if (arg.ty.eql(.{ .int = 64 }))
+                                    .{ .mov_arg64_arg = .{ .dst = dst, .src = src } }
+                                else
+                                    .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                            }
                         } else if (arg.ty.eql(.{ .int = 32 })) {
                             try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{
                                 .reg = dst,
                                 .disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }),
                             } });
-                        } else {
-                            return error.UnsupportedCodegenAbi;
+                        } else if (arg.ty.eql(.{ .int = 64 })) {
+                            try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{
+                                .reg = dst,
+                                .disp = try scalarParamStackDisp8(function, name, .{ .int = 64 }),
+                            } });
                         }
                     },
                     .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -23403,6 +23426,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsp_eax,
         .load_stack_disp8_rax,
         .load_stack_disp8_arg32,
+        .load_stack_disp8_arg64,
         .load_rax_ptr_disp8_rax,
         .load_rax_ptr_rdx,
         .load_rax_ptr_eax,
@@ -23470,7 +23494,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm32_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32 => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64 => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -23640,6 +23664,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsp_eax,
         .load_stack_disp8_rax,
         .load_stack_disp8_arg32,
+        .load_stack_disp8_arg64,
         .load_rax_ptr_disp8_rax,
         .load_rax_ptr_rdx,
         .load_rax_ptr_eax,
