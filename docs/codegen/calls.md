@@ -239,7 +239,7 @@ direct void call parse/print/verify round trip
 call signature mismatch rejection
 narrow scalar indirect call through %rax
 typed AIR v2 pointer-callee indirect call with stack-param GPR assignment
-typed AIR v2 pointer-callee indirect call with outgoing stack arguments
+typed AIR v2 pointer-callee indirect call with outgoing stack arguments through the immediate-cleanup path
 typed AIR v2 pointer-callee indirect call with SSE arguments and FP return
 typed AIR v2 pointer-callee indirect call with i64 register/stack arguments
 tail-call marker rejection

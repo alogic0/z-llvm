@@ -5,6 +5,7 @@ const Pair64 = extern struct {
 
 const Sum6Fn = *const fn (i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 const Sum12Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
+const Sum14Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 const Sum8I64Fn = *const fn (i64, i64, i64, i64, i64, i64, i64, i64) callconv(.c) i64;
 const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
@@ -104,6 +105,10 @@ export fn frontier_indirect_stack_arg_to_registers(func: Sum6Fn, a: i32, b: i32,
 
 export fn frontier_indirect_stack_arg_forward(func: Sum12Fn, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {
     return func(a, b, c, d, e, f, g, h, i, j, k, l);
+}
+
+export fn frontier_indirect_eight_stack_arg_forward(func: Sum14Fn, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32) i32 {
+    return func(a, b, c, d, e, f, g, h, i, j, k, l, m, n);
 }
 
 export fn frontier_computed_stack_arg_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) i32 {

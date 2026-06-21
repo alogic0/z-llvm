@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=142
-structured_functions=142
-generic_codegen_functions=142
-generic_cfg_functions=142
+discovered_functions=143
+structured_functions=143
+generic_codegen_functions=143
+generic_cfg_functions=143
 structural_matcher_functions=0
-structured_air_v2_functions=142
-typed_air_operand_functions=142
+structured_air_v2_functions=143
+typed_air_operand_functions=143
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=142
+generic_lowering_functions=143
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=142
+object_emitted_functions=143
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -225,6 +225,11 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_abi.zig`: `frontier_indirect_stack_arg_forward` uses the same
   indirect `%rax` call path while forwarding 12 `i32` arguments, including
   outgoing stack slots, through the shared SysV planner.
+- typed AIR v2 pointer-callee stack forwarding through the larger cleanup path
+  in `frontier_sysv_abi.zig`: `frontier_indirect_eight_stack_arg_forward`
+  forwards 14 `i32` arguments through `callq *%rax`, proving the indirect path
+  uses the same immediate `%rsp` cleanup as direct calls with eight outgoing
+  stack slots.
 - typed AIR v2 pointer-callee SSE calls in `frontier_sysv_abi.zig`:
   `frontier_indirect_five_f32_external_call` and
   `frontier_indirect_five_f64_external_call` return through `%xmm0` after
