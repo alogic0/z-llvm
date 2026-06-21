@@ -1613,6 +1613,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big7 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; };
     \\struct Big8 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; };
     \\struct Big12 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; long long i; long long j; long long k; long long l; };
+    \\struct Big16 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; long long i; long long j; long long k; long long l; long long m; long long n; long long o; long long p; };
     \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\struct BigMixed { long long a; int b; long long c; int d; };
     \\struct BigArray { long long values[5]; };
@@ -1638,6 +1639,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big12 z_frontier_big12_make(long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big12_make");
     \\extern long long z_frontier_big12_inner(struct Big12) __asm__("frontier_sysv_sret_byval.frontier_big12_inner");
     \\extern struct Big12 z_frontier_big12_copy(struct Big12) __asm__("frontier_sysv_sret_byval.frontier_big12_copy");
+    \\extern struct Big16 z_frontier_big16_make(long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big16_make");
+    \\extern long long z_frontier_big16_inner(struct Big16) __asm__("frontier_sysv_sret_byval.frontier_big16_inner");
+    \\extern struct Big16 z_frontier_big16_copy(struct Big16) __asm__("frontier_sysv_sret_byval.frontier_big16_copy");
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern long long z_frontier_big_nested_sum_inner(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_sum_inner");
     \\extern struct BigMixed z_frontier_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_big_mixed_copy");
@@ -1687,6 +1691,11 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_big12_inner(input12) != 207) return 26;
     \\    struct Big12 copied12 = z_frontier_big12_copy(input12);
     \\    if (copied12.a != 41 || copied12.b != 43 || copied12.c != 47 || copied12.d != 53 || copied12.e != 59 || copied12.f != 61 || copied12.g != 67 || copied12.h != 71 || copied12.i != 73 || copied12.j != 79 || copied12.k != 83 || copied12.l != 89) return 27;
+    \\    struct Big16 made16 = z_frontier_big16_make(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    \\    if (made16.a != 1 || made16.h != 8 || made16.p != 16) return 28;
+    \\    if (z_frontier_big16_inner(made16) != 31) return 29;
+    \\    struct Big16 copied16 = z_frontier_big16_copy(made16);
+    \\    if (copied16.d != 4 || copied16.k != 11 || copied16.p != 16) return 30;
     \\    struct BigNested nested = { .left = { .a = 2, .b = 3, .c = 5 }, .right = { .a = 7, .b = 11, .c = 13 } };
     \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 20;
     \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);

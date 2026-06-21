@@ -73,6 +73,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x48, 0x03, 0x44, 0x24 });
                 try bytes.append(allocator, disp);
             },
+            .add_stack_disp32_eax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x03, 0x84, 0x24 });
+                try appendU32(&bytes, allocator, disp);
+            },
+            .add_stack_disp32_rax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x03, 0x84, 0x24 });
+                try appendU32(&bytes, allocator, disp);
+            },
             .add_eax_imm32 => |value| {
                 try bytes.append(allocator, 0x05);
                 try appendI32(&bytes, allocator, value);
@@ -234,6 +242,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x44, 0x24 });
                 try bytes.append(allocator, disp);
             },
+            .load_stack_disp32_rax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x84, 0x24 });
+                try appendU32(&bytes, allocator, disp);
+            },
             .load_stack_disp8_arg32 => |load| try encodeStackDisp8ToArg32(&bytes, allocator, load.reg, load.disp),
             .load_stack_disp8_arg64 => |load| try encodeStackDisp8ToArg64(&bytes, allocator, load.reg, load.disp),
             .load_rax_ptr_disp8_rax => |disp| {
@@ -383,6 +395,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .add_arg_high32_eax => |reg| (if (reg.rexR()) @as(u32, 3) else 3) + 6,
         .add_stack_disp8_eax => 4,
         .add_stack_disp8_rax => 5,
+        .add_stack_disp32_eax => 7,
+        .add_stack_disp32_rax => 8,
         .add_eax_imm32 => 5,
         .shl_eax_imm5 => 3,
         .or_eax_imm32 => 5,
@@ -458,6 +472,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .reload_rdi_rsp24, .reload_rsi_rsp24 => 5,
         .reload_rsp_eax => 3,
         .load_stack_disp8_rax => 5,
+        .load_stack_disp32_rax => 8,
         .load_stack_disp8_arg32 => |load| if (load.reg.rexR()) 5 else 4,
         .load_stack_disp8_arg64 => 5,
         .load_rax_ptr_disp8_rax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,

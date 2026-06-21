@@ -5953,6 +5953,40 @@ test "x86_64 codegen reads five-field memory aggregate by-value fields" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
+test "x86_64 codegen reads sixteen-field memory aggregate by-value fields with disp32" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @inner({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } %value) {
+        \\entry:
+        \\  %slot = alloca { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }
+        \\  store { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } %value, ptr %slot
+        \\  %field3 = getelementptr { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, ptr %slot, i64 0, i32 3
+        \\  %d = load i64, ptr %field3
+        \\  %field10 = getelementptr { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, ptr %slot, i64 0, i32 10
+        \\  %k = load i64, ptr %field10
+        \\  %sum = add i64 %d, %k
+        \\  %field15 = getelementptr { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, ptr %slot, i64 0, i32 15
+        \\  %p = load i64, ptr %field15
+        \\  %total = add i64 %sum, %p
+        \\  ret i64 %total
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 32 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_stack_disp8_rax = 88 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_stack_disp32_rax = 128 }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
+}
+
 test "x86_64 codegen reads nested memory aggregate by-value fields" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

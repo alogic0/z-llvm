@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=143
-structured_functions=143
-generic_codegen_functions=143
-generic_cfg_functions=143
+discovered_functions=146
+structured_functions=146
+generic_codegen_functions=146
+generic_cfg_functions=146
 structural_matcher_functions=0
-structured_air_v2_functions=143
-typed_air_operand_functions=143
+structured_air_v2_functions=146
+typed_air_operand_functions=146
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=143
+generic_lowering_functions=146
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=143
+object_emitted_functions=146
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -126,12 +126,13 @@ Closed in the current memory/aggregate frontier slice:
   generates field names and ABI attrs instead of using a fixed field-count
   table, and the same selected normal MEMORY aggregates copy all scalar integer
   leaves from the stack-passed by-value argument to the hidden sret destination
-  using layout-derived byte offsets, including the nested `{ { i64, i64, i64 },
+  using layout-derived byte offsets, including the flat sixteen-field BigN row,
+  the nested `{ { i64, i64, i64 },
   { i64, i64, i64 } }` copy/read row and the mixed-width
   `{ i64, i32, i64, i32 }` copy row; the array-backed `{ [5 x i64] }` rows
   prove the same byte-offset copy and by-value field-read paths for integer
   array leaves inside a normal MEMORY aggregate; the flat `BigN` typed parser
-  now covers larger normal integer-leaf MEMORY aggregates through `Big12`
+  now covers larger normal integer-leaf MEMORY aggregates through `Big16`
   construction, field-read, and byval-to-sret copy rows
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }`, selected
@@ -293,7 +294,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   reads/returns including `[2]f64` array-in-struct and nested `{ { double },
   { double } }`, selected stack-passed register aggregate field reads, and generated
   normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
-  through eight flat fields, a nested two-Big3 aggregate, a mixed-width
+  through sixteen flat fields, a nested two-Big3 aggregate, a mixed-width
   `{ i64, i32, i64, i32 }` copy, and array-backed `{ [5 x i64] }` copy/read rows; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, more than six

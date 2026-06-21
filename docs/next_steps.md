@@ -373,12 +373,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=143`,
-`generic_codegen_functions=143`, `generic_cfg_functions=143`,
+frontier gate reports `source_rows=13`, `discovered_functions=146`,
+`generic_codegen_functions=146`, `generic_cfg_functions=146`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=143`, `object_failures=0`,
+`object_emitted_functions=146`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -412,7 +412,7 @@ using narrow `i32` stores for `i32` leaves. The array-backed MEMORY follow-up
 copies `{ [5 x i64] }` leaves and reads edge array fields through the same
 byte-offset paths. The BigN parser follow-up removes the fixed Big3..Big8 type
 enumeration and proves the same flat normal integer-leaf sret/byval path
-through `Big12` construction, field-read, and copy rows.
+through `Big16` construction, field-read, and copy rows.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads
 incoming stack-passed `i32` parameters into outgoing GPR call slots, and emits
@@ -476,7 +476,7 @@ selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
 field reads plus selected packed mixed construction returns, SSE/SSE field
 reads including `[2]f64` array-in-struct and nested `{ { double }, { double }
 }`, selected stack-passed register aggregate field reads, and generated normal
-MEMORY integer-leaf field/copy forms currently proven through eight flat
+MEMORY integer-leaf field/copy forms currently proven through sixteen flat
 fields, a nested two-Big3 aggregate, a mixed-width
 `{ i64, i32, i64, i32 }` copy, and array-backed `{ [5 x i64] }` copy/read rows,
 arbitrary non-selected sret/byval copies,

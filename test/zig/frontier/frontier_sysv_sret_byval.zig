@@ -64,6 +64,25 @@ const Big12 = extern struct {
     l: i64,
 };
 
+const Big16 = extern struct {
+    a: i64,
+    b: i64,
+    c: i64,
+    d: i64,
+    e: i64,
+    f: i64,
+    g: i64,
+    h: i64,
+    i: i64,
+    j: i64,
+    k: i64,
+    l: i64,
+    m: i64,
+    n: i64,
+    o: i64,
+    p: i64,
+};
+
 const BigNested = extern struct {
     left: Big3,
     right: Big3,
@@ -165,6 +184,18 @@ export fn frontier_big12_inner(value: Big12) i64 {
 }
 
 export fn frontier_big12_copy(value: Big12) Big12 {
+    return value;
+}
+
+export fn frontier_big16_make(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64, i: i64, j: i64, k: i64, l: i64, m: i64, n: i64, o: i64, p: i64) Big16 {
+    return .{ .a = a, .b = b, .c = c, .d = d, .e = e, .f = f, .g = g, .h = h, .i = i, .j = j, .k = k, .l = l, .m = m, .n = n, .o = o, .p = p };
+}
+
+export fn frontier_big16_inner(value: Big16) i64 {
+    return value.d + value.k + value.p;
+}
+
+export fn frontier_big16_copy(value: Big16) Big16 {
     return value;
 }
 

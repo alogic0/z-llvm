@@ -202,6 +202,8 @@ pub const Instruction = union(enum) {
     add_arg_high32_eax: ArgReg,
     add_stack_disp8_eax: u8,
     add_stack_disp8_rax: u8,
+    add_stack_disp32_eax: u32,
+    add_stack_disp32_rax: u32,
     add_eax_imm32: i32,
     shl_eax_imm5: u5,
     or_eax_imm32: i32,
@@ -326,6 +328,7 @@ pub const Instruction = union(enum) {
     reload_rsi_rsp24,
     reload_rsp_eax: FrameIndex,
     load_stack_disp8_rax: u8,
+    load_stack_disp32_rax: u32,
     load_stack_disp8_arg32: struct {
         reg: ArgReg,
         disp: u8,
@@ -6245,13 +6248,37 @@ fn emitAggregateIntegerTerm(
         .stack => |offset| {
             if (first) return error.UnsupportedCodegenAbi;
             if (ty.eql(.{ .int = 64 })) {
-                try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = offset });
+                try appendAddStackDispRax(allocator, machine, offset);
             } else if (ty.eql(.{ .int = 32 })) {
-                try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = offset });
+                try appendAddStackDispEax(allocator, machine, offset);
             } else {
                 return error.UnsupportedCodegenAbi;
             }
         },
+    }
+}
+
+fn appendLoadStackDispRax(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(offset) });
+    } else {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_rax = offset });
+    }
+}
+
+fn appendAddStackDispRax(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = @intCast(offset) });
+    } else {
+        try machine.instructions.append(allocator, .{ .add_stack_disp32_rax = offset });
+    }
+}
+
+fn appendAddStackDispEax(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = @intCast(offset) });
+    } else {
+        try machine.instructions.append(allocator, .{ .add_stack_disp32_eax = offset });
     }
 }
 
@@ -6260,7 +6287,7 @@ const SysVIntegerAggregateFieldLocation = union(enum) {
         reg: ArgReg,
         offset_in_eightbyte: u3,
     },
-    stack: u8,
+    stack: u32,
 };
 
 fn sysvIntegerAggregateFieldLocation(
@@ -6290,7 +6317,7 @@ fn sysvIntegerAggregateFieldLocation(
             const needed = sysvAggregateRegisterNeeds(classification);
             if (gpr_index + needed.gpr > 6 or sse_index + needed.sse > 8) {
                 const offset = 8 + stack_eightbytes * 8 + field_offset;
-                if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+                if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
                 return .{ .stack = @intCast(offset) };
             }
             const prior = sysvAggregateRegisterNeedsBefore(classification, @intCast(field_eightbyte));
@@ -6382,9 +6409,9 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
     if (!try collectAggregateIntegerAddTerms(block, ret.value orelse return error.InvalidRet, .{ .int = 64 }, field_loads, &terms, &term_count)) return false;
     if (term_count < 2) return false;
 
-    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try stackAggregateByteDisp8(aggregate_ty, terms[0].offset, .{ .int = 64 }) });
+    try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, terms[0].offset, .{ .int = 64 }));
     for (terms[1..term_count]) |term| {
-        try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = try stackAggregateByteDisp8(aggregate_ty, term.offset, .{ .int = 64 }) });
+        try appendAddStackDispRax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, term.offset, .{ .int = 64 }));
     }
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -6465,6 +6492,13 @@ fn stackAggregateByteDisp8(aggregate_ty: ir.Type, field_offset: u64, field_ty: i
     return @intCast(offset);
 }
 
+fn stackAggregateByteDisp(aggregate_ty: ir.Type, field_offset: u64, field_ty: ir.Type) !u32 {
+    _ = aggregateFieldIndexAtOffset(aggregate_ty, field_offset, field_ty) orelse return error.UnsupportedCodegenAbi;
+    const offset = 8 + field_offset;
+    if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+    return @intCast(offset);
+}
+
 fn validateAggregateFieldGep(instruction: ir.Instruction, aggregate_ty: ir.Type, base_name: []const u8, field_index: i128) !void {
     const gep = switch (instruction.kind) {
         .gep => |gep| gep,
@@ -6532,7 +6566,7 @@ fn emitSysVIntegerAggregateFieldLocationReturn(
         },
         .stack => |offset| {
             if (!field_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenAbi;
-            try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = offset });
+            try appendLoadStackDispRax(allocator, machine, offset);
         },
     }
 }
@@ -6565,7 +6599,7 @@ fn emitSysVAggregateFieldLocationReturn(
         },
         .stack => |offset| {
             if (!field_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenAbi;
-            try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = offset });
+            try appendLoadStackDispRax(allocator, machine, offset);
         },
     }
 }
@@ -6573,7 +6607,7 @@ fn emitSysVAggregateFieldLocationReturn(
 const SysVAggregateFieldLocation = union(enum) {
     gpr: ArgReg,
     sse: XmmReg,
-    stack: u8,
+    stack: u32,
 };
 
 fn sysvAggregateFieldLocation(
@@ -6622,7 +6656,7 @@ fn sysvAggregateFieldLocationByOffset(
             const needed = sysvAggregateRegisterNeeds(classification);
             if (gpr_index + needed.gpr > 6 or sse_index + needed.sse > 8) {
                 const offset = 8 + stack_eightbytes * 8 + field_offset;
-                if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+                if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
                 return .{ .stack = @intCast(offset) };
             }
             const prior = sysvAggregateRegisterNeedsBefore(classification, @intCast(field_eightbyte));
@@ -13877,7 +13911,7 @@ fn lowerGenericCfgSretCopy(
             !isNamed(store.value, load_name)) return false;
 
         const offset = try aggregateByteOffsetU8(aggregate_ty, src_offset, load.ty);
-        try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try stackAggregateByteDisp8(aggregate_ty, src_offset, load.ty) });
+        try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
         if (load.ty.eql(.{ .int = 64 })) {
             try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp8 = .{ .reg = sret_reg, .offset = offset } });
         } else if (load.ty.eql(.{ .int = 32 })) {
@@ -23419,6 +23453,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .add_arg_high32_eax,
         .add_stack_disp8_eax,
         .add_stack_disp8_rax,
+        .add_stack_disp32_eax,
+        .add_stack_disp32_rax,
         .add_eax_imm32,
         .shl_eax_imm5,
         .or_eax_imm32,
@@ -23507,6 +23543,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsi_rsp24,
         .reload_rsp_eax,
         .load_stack_disp8_rax,
+        .load_stack_disp32_rax,
         .load_stack_disp8_arg32,
         .load_stack_disp8_arg64,
         .load_rax_ptr_disp8_rax,
@@ -23569,7 +23606,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 eax_defined = function.ret_ty == .void or sysvAggregateReturnHasNoGpr(function.ret_ty);
             }
         },
-        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm64_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
@@ -23661,6 +23698,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .add_arg_high32_eax,
         .add_stack_disp8_eax,
         .add_stack_disp8_rax,
+        .add_stack_disp32_eax,
+        .add_stack_disp32_rax,
         .add_eax_imm32,
         .shl_eax_imm5,
         .or_eax_imm32,
@@ -23749,6 +23788,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsi_rsp24,
         .reload_rsp_eax,
         .load_stack_disp8_rax,
+        .load_stack_disp32_rax,
         .load_stack_disp8_arg32,
         .load_stack_disp8_arg64,
         .load_rax_ptr_disp8_rax,
