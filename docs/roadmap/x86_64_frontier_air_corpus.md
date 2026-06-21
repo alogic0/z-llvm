@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=140
-structured_functions=140
-generic_codegen_functions=140
-generic_cfg_functions=140
+discovered_functions=142
+structured_functions=142
+generic_codegen_functions=142
+generic_cfg_functions=142
 structural_matcher_functions=0
-structured_air_v2_functions=140
-typed_air_operand_functions=140
+structured_air_v2_functions=142
+typed_air_operand_functions=142
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=140
+generic_lowering_functions=142
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=140
+object_emitted_functions=142
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -201,6 +201,10 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_six_stack_arg_call` calls a C helper with 12 scalar arguments. The
   backend reserves alignment padding before pushing stack arguments so arg 7 is
   visible at the callee's first stack-argument slot.
+- eight and twelve stack-passed scalar `i32` call arguments in
+  `frontier_sysv_abi.zig`: `frontier_eight_stack_arg_call` and
+  `frontier_twelve_stack_arg_call` reuse the same push-based SysV planner and
+  clean larger outgoing stack areas with immediate `%rsp` adjustment.
 - named stack-parameter forwarding for stack-passed scalar `i32` call
   arguments in `frontier_sysv_abi.zig`: `frontier_stack_arg_forward` forwards
   all 12 incoming C ABI arguments to an external helper, copying the incoming

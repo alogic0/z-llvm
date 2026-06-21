@@ -33,7 +33,7 @@ reaches %xmm0..%xmm7
 i1 branch conditions use the matching low 8-bit argument registers
 i32/i64/pointer direct-call operands use the first-six integer argument register order
 f32/f64 direct-call operands use the independent SSE register order
-up to six scalar i32/i64 stack-passed direct-call arguments are supported, including constants, named incoming stack/register parameters, and selected block-local computed i32/i64 values
+up to twelve scalar i32/i64 stack-passed direct-call arguments are supported, including constants, named incoming stack/register parameters, and selected block-local computed i32/i64 values
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call
 one live i32 caller argument can be spilled to (%rsp) across one call
 up to six live i32 caller arguments can be spilled into aligned frame slots and reloaded after one direct call
@@ -210,7 +210,7 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   five named f32/f64 arguments can be forwarded to external C ABI helpers
   through %xmm0..%xmm4; backend unit/object tests materialize immediate FP
   constant arguments through %xmm0..%xmm7
-  up to six stack-passed scalar `i32` call arguments are pushed in reverse order
+  up to twelve stack-passed scalar `i32` call arguments are pushed in reverse order
   with 16-byte call-site alignment preserved; the same path can forward named
   incoming stack-passed `i32` parameters by copying their stack slots into the
   outgoing stack argument area or by loading them into outgoing GPR argument
@@ -258,6 +258,6 @@ falling into a generic unsupported bucket.
 | Non-default call conventions | Fail-closed boundary | Unsupported call conventions reject with `UnsupportedCodegenAbi`. Next implementation is a per-callconv policy table; release rows remain default C/Zig-compatible only. |
 | Full caller-saved handling | Partially implemented | Selected GPR and SSE live-across-call shapes spill/reload through explicit frame slots. Next implementation is liveness-driven caller-saved clobber assignment for arbitrary live scalar values across calls. |
 | Callee-saved handling | Fail-closed boundary | The allocator currently avoids callee-saved registers; tests document the policy. Next implementation is prologue/epilogue save/restore when allocation starts using them. |
-| More than six stack-passed live values | Implemented selected subset | Current rows prove six stack-passed scalar `i32` call arguments, selected block-local computed `i32`/`i64` stack call arguments, named incoming stack-parameter forwarding for stack call slots, stack-parameter assignment into outgoing GPR call registers for `i32` and `i64`, and eight/twelve stack-passed live `i32` values via cursor-derived incoming stack offsets. Remaining boundary is pressure beyond the backend's disp8-safe stack offset model and computed outgoing stack values outside the selected integer add-immediate forms. |
+| More than six stack-passed live values | Implemented selected subset | Current rows prove eight and twelve outgoing stack-passed scalar `i32` call arguments, selected block-local computed `i32`/`i64` stack call arguments, named incoming stack-parameter forwarding for stack call slots, stack-parameter assignment into outgoing GPR call registers for `i32` and `i64`, and eight/twelve stack-passed live `i32` values via cursor-derived incoming stack offsets. Remaining boundary is pressure beyond the backend's disp8-safe stack offset model and computed outgoing stack values outside the selected integer add-immediate forms. |
 | Broader SSE live-across-call | Partially implemented | Up to six no-argument-call live `f32`/`f64` values and selected two-live FP-argument calls are supported. Next implementation is a general SSE caller-saved live-range spill/reload model. |
 | Multi-call live-value frames | Partially implemented | Generic CFG accepts selected straight-line void-call sequences with up to six live `i32` GPR parameters across two calls, spilling/reloading through the shared live-param frame helper for each call. Remaining boundary is arbitrary multi-call scheduling with mixed GPR/SSE/stack live values and non-void intermediate results. |

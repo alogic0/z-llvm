@@ -32,6 +32,8 @@ extern fn frontier_sum5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) f32;
 extern fn frontier_sum5_f64(a: f64, b: f64, c: f64, d: f64, e: f64) f64;
 extern fn frontier_sum6_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32;
 extern fn frontier_sum12_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32;
+extern fn frontier_sum14_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32) i32;
+extern fn frontier_sum18_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32, o: i32, p: i32, q: i32, r: i32) i32;
 extern fn frontier_sum6_i64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64) i64;
 extern fn frontier_sum8_i64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64) i64;
 
@@ -66,6 +68,14 @@ export fn frontier_two_void_calls_six_live(a: i32, b: i32, c: i32, d: i32, e: i3
 
 export fn frontier_six_stack_arg_call() i32 {
     return frontier_sum12_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+}
+
+export fn frontier_eight_stack_arg_call() i32 {
+    return frontier_sum14_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14);
+}
+
+export fn frontier_twelve_stack_arg_call() i32 {
+    return frontier_sum18_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18);
 }
 
 export fn frontier_stack_arg_forward(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {

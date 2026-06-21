@@ -296,6 +296,7 @@ pub const Instruction = union(enum) {
     add_rsp_40,
     sub_rsp_56,
     add_rsp_56,
+    add_rsp_imm8: u8,
     spill_arg_rsp: struct {
         frame_index: FrameIndex,
         reg: ArgReg,
@@ -12752,7 +12753,7 @@ fn emitGenericCfgI32CallIntoEax(
         try machine.instructions.append(allocator, .smin_i32_edi_esi_eax);
         return;
     }
-    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 12) return error.UnsupportedCodegenInstruction;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 18) return error.UnsupportedCodegenInstruction;
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     const live_params = try liveParamsAfter(function, block, instruction_index);
@@ -14709,7 +14710,7 @@ fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock
     if (call.ret_ty == .void) {
         if (result != null) return false;
     } else if (!call.ret_ty.eql(.{ .int = 32 }) or result == null) return false;
-    if (call.args.items.len > 12) return false;
+    if (call.args.items.len > 18) return false;
     if (call.inline_asm != null) return false;
     if (call.callee_value) |callee_value| {
         const callee_name = switch (callee_value) {
@@ -21879,34 +21880,9 @@ fn appendDirectCallWithStackArgs(
     ret_ty: ir.Type,
     stack_arg_count: usize,
 ) !void {
-    switch (stack_arg_count) {
-        0 => try appendAlignedDirectCall(allocator, machine, symbol, ret_ty),
-        1 => {
-            try appendDirectCall(allocator, machine, symbol, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_8);
-        },
-        2 => {
-            try appendDirectCall(allocator, machine, symbol, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_24);
-        },
-        3 => {
-            try appendDirectCall(allocator, machine, symbol, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_24);
-        },
-        4 => {
-            try appendDirectCall(allocator, machine, symbol, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_40);
-        },
-        5 => {
-            try appendDirectCall(allocator, machine, symbol, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_40);
-        },
-        6 => {
-            try appendDirectCall(allocator, machine, symbol, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_56);
-        },
-        else => return error.UnsupportedCodegenAbi,
-    }
+    if (stack_arg_count == 0) return appendAlignedDirectCall(allocator, machine, symbol, ret_ty);
+    try appendDirectCall(allocator, machine, symbol, ret_ty);
+    try appendStackArgCallCleanup(allocator, machine, stack_arg_count);
 }
 
 fn appendIndirectCallRaxWithStackArgs(
@@ -21915,33 +21891,23 @@ fn appendIndirectCallRaxWithStackArgs(
     ret_ty: ir.Type,
     stack_arg_count: usize,
 ) !void {
-    switch (stack_arg_count) {
-        0 => try appendAlignedIndirectCallRax(allocator, machine, ret_ty),
-        1 => {
-            try appendIndirectCallRax(allocator, machine, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_8);
+    if (stack_arg_count == 0) return appendAlignedIndirectCallRax(allocator, machine, ret_ty);
+    try appendIndirectCallRax(allocator, machine, ret_ty);
+    try appendStackArgCallCleanup(allocator, machine, stack_arg_count);
+}
+
+fn appendStackArgCallCleanup(allocator: std.mem.Allocator, machine: *MachineFunction, stack_arg_count: usize) !void {
+    if (stack_arg_count == 0 or stack_arg_count > 12) return error.UnsupportedCodegenAbi;
+    const cleanup_bytes = stack_arg_count * 8 + if (stack_arg_count % 2 == 0) @as(usize, 8) else 0;
+    switch (cleanup_bytes) {
+        8 => try machine.instructions.append(allocator, .add_rsp_8),
+        24 => try machine.instructions.append(allocator, .add_rsp_24),
+        40 => try machine.instructions.append(allocator, .add_rsp_40),
+        56 => try machine.instructions.append(allocator, .add_rsp_56),
+        else => {
+            if (cleanup_bytes > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            try machine.instructions.append(allocator, .{ .add_rsp_imm8 = @intCast(cleanup_bytes) });
         },
-        2 => {
-            try appendIndirectCallRax(allocator, machine, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_24);
-        },
-        3 => {
-            try appendIndirectCallRax(allocator, machine, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_24);
-        },
-        4 => {
-            try appendIndirectCallRax(allocator, machine, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_40);
-        },
-        5 => {
-            try appendIndirectCallRax(allocator, machine, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_40);
-        },
-        6 => {
-            try appendIndirectCallRax(allocator, machine, ret_ty);
-            try machine.instructions.append(allocator, .add_rsp_56);
-        },
-        else => return error.UnsupportedCodegenAbi,
     }
 }
 
@@ -21954,9 +21920,9 @@ fn appendI32CallArgs(
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
     if (plan.has_non_i32_arg) return error.UnsupportedCodegenType;
-    if (plan.counts.stack_args > 6) return error.UnsupportedCodegenAbi;
+    if (plan.counts.stack_args > 12) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [6]StackScalarCallArg = undefined;
+    var stack_args: [12]StackScalarCallArg = undefined;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
@@ -22038,9 +22004,9 @@ fn appendSysVScalarCallArgsWithBlock(
 ) anyerror!usize {
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
-    if (plan.counts.stack_args > 6) return error.UnsupportedCodegenAbi;
+    if (plan.counts.stack_args > 12) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [6]StackScalarCallArg = undefined;
+    var stack_args: [12]StackScalarCallArg = undefined;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
@@ -23529,6 +23495,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .add_rsp_40,
         .sub_rsp_56,
         .add_rsp_56,
+        .add_rsp_imm8,
         .spill_arg_rsp,
         .reload_arg_rsp,
         .spill_xmm32_rsp,
@@ -23627,6 +23594,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
         .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
         .sub_rsp_56, .add_rsp_56 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 56) % 16),
+        .add_rsp_imm8 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
         .spill_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .reload_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .spill_xmm32_rsp, .spill_xmm64_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
@@ -23769,6 +23737,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .add_rsp_40,
         .sub_rsp_56,
         .add_rsp_56,
+        .add_rsp_imm8,
         .spill_arg_rsp,
         .reload_arg_rsp,
         .spill_xmm32_rsp,

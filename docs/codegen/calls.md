@@ -252,7 +252,7 @@ call_stack_slot stack-memory-to-call assembly, objdump, and readelf fixture
 call_internal assembly and objdump fixture
 unsupported non-default calling convention diagnostic
 multiple stack-passed i32 call arguments
-six stack-passed scalar i32 call arguments with explicit alignment cleanup
+eight/twelve stack-passed scalar i32 call arguments with explicit immediate cleanup
 named stack-passed i32 parameter forwarding into outgoing stack call slots
 named stack-passed i32 parameter loading into outgoing GPR call registers
 selected computed block-local i32/i64 values pushed into outgoing stack call slots
