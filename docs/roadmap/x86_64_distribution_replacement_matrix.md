@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=125`,
-`generic_codegen_functions=125`, `generic_cfg_functions=125`,
+three release modes at `source_rows=13`, `discovered_functions=128`,
+`generic_codegen_functions=128`, `generic_cfg_functions=128`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=125`, `object_failures=0`,
+`object_emitted_functions=128`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -466,7 +466,8 @@ selected stack-passed register aggregate field reads, and
 generated normal MEMORY i64
 sret/byval field/copy forms currently proven through eight flat fields and a
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy and
-array-backed `{ [5 x i64] }` copy/read rows,
+array-backed `{ [5 x i64] }` copy/read rows plus the BigN-backed `Big12`
+construction/copy rows,
 arbitrary non-selected sret/byval copies,
 varargs, vectors, stack-passed live values beyond the current disp8-safe selected model,
 and broader SSE live-across-call frames beyond the selected one-live through

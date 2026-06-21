@@ -131,6 +131,7 @@ frontier_sysv_sret_byval.Big3 through Big8 lower as selected normal MEMORY class
   `{ { i64, i64, i64 }, { i64, i64, i64 } }` proves recursive leaf byte-offset reads and copies for nested normal MEMORY aggregates
   `{ i64, i32, i64, i32 }` proves mixed-width MEMORY copies with narrow stores for `i32` leaves
   `{ [5 x i64] }` proves array-backed MEMORY copies and by-value edge field reads use the same integer-leaf byte-offset paths
+  the flat `BigN` source type parser now covers larger normal integer-leaf MEMORY aggregates, with `Big12` proving construction, field-read, and byval-to-sret copy rows
 frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
 aggregate argument field reads and register aggregate return:
   field `i64` is returned from the aggregate's GPR class register

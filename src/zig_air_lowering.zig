@@ -5082,24 +5082,7 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.PackedReverseMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ double, i32, i32 }" } };
     }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big3")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big4")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big5")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big6")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64, i64, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big7")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64, i64, i64, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big8")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64, i64, i64, i64, i64, i64 }" } };
-    }
+    if (frontierSysVSretByvalBigType(trimmed)) |ty| return ty;
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigNested")) {
         return .{ .ir_type = .{ .aggregate = "{ { i64, i64, i64 }, { i64, i64, i64 } }" } };
     }
@@ -5130,6 +5113,30 @@ fn parseZigType(text: []const u8) ?ZigType {
         };
     }
     return null;
+}
+
+fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ZigType {
+    const prefix = "frontier_sysv_sret_byval.Big";
+    if (!std.mem.startsWith(u8, trimmed, prefix)) return null;
+    const field_count = std.fmt.parseInt(u8, trimmed[prefix.len..], 10) catch return null;
+    const aggregate: []const u8 = switch (field_count) {
+        3 => "{ i64, i64, i64 }",
+        4 => "{ i64, i64, i64, i64 }",
+        5 => "{ i64, i64, i64, i64, i64 }",
+        6 => "{ i64, i64, i64, i64, i64, i64 }",
+        7 => "{ i64, i64, i64, i64, i64, i64, i64 }",
+        8 => "{ i64, i64, i64, i64, i64, i64, i64, i64 }",
+        9 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
+        10 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
+        11 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
+        12 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
+        13 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
+        14 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
+        15 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
+        16 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
+        else => return null,
+    };
+    return .{ .ir_type = .{ .aggregate = aggregate } };
 }
 
 fn pointerLoadResultType(text: []const u8) ?ZigType {

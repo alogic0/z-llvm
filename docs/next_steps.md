@@ -366,12 +366,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=125`,
-`generic_codegen_functions=125`, `generic_cfg_functions=125`,
+frontier gate reports `source_rows=13`, `discovered_functions=128`,
+`generic_codegen_functions=128`, `generic_cfg_functions=128`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=125`, `object_failures=0`,
+`object_emitted_functions=128`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -403,7 +403,9 @@ leaf byte offsets. The mixed-width MEMORY follow-up copies
 `{ i64, i32, i64, i32 }` through the same layout-derived byte offsets while
 using narrow `i32` stores for `i32` leaves. The array-backed MEMORY follow-up
 copies `{ [5 x i64] }` leaves and reads edge array fields through the same
-byte-offset paths.
+byte-offset paths. The BigN parser follow-up removes the fixed Big3..Big8 type
+enumeration and proves the same flat normal integer-leaf sret/byval path
+through `Big12` construction, field-read, and copy rows.
 The mixed aggregate
 class frontier row adds `{ i64, double }`, selected `{ i32, double }`, and
 selected `{ i32, i32, double }` INTEGER/SSE field reads plus register aggregate

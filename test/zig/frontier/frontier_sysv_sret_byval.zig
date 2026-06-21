@@ -49,6 +49,21 @@ const Big8 = extern struct {
     h: i64,
 };
 
+const Big12 = extern struct {
+    a: i64,
+    b: i64,
+    c: i64,
+    d: i64,
+    e: i64,
+    f: i64,
+    g: i64,
+    h: i64,
+    i: i64,
+    j: i64,
+    k: i64,
+    l: i64,
+};
+
 const BigNested = extern struct {
     left: Big3,
     right: Big3,
@@ -138,6 +153,18 @@ export fn frontier_big8_inner(value: Big8) i64 {
 }
 
 export fn frontier_big8_copy(value: Big8) Big8 {
+    return value;
+}
+
+export fn frontier_big12_make(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64, i: i64, j: i64, k: i64, l: i64) Big12 {
+    return .{ .a = a, .b = b, .c = c, .d = d, .e = e, .f = f, .g = g, .h = h, .i = i, .j = j, .k = k, .l = l };
+}
+
+export fn frontier_big12_inner(value: Big12) i64 {
+    return value.c + value.h + value.l;
+}
+
+export fn frontier_big12_copy(value: Big12) Big12 {
     return value;
 }
 

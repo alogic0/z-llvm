@@ -163,7 +163,8 @@ source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by
 aggregate field-read shape, and byval-to-sret copies for all fields in those
 selected forms; the current frontier proves this through eight i64 fields,
 mixed-width integer leaves, multiple stack-passed user fields after the hidden
-sret pointer, and array-backed integer copy/read leaves through `{ [5 x i64] }`
+sret pointer, array-backed integer copy/read leaves through `{ [5 x i64] }`,
+and larger flat normal integer-leaf copies through `Big12`
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax
