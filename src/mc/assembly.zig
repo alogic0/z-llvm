@@ -95,6 +95,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .sub_rsp_8 => try writer.writeAll("\tsubq $8, %rsp\n"),
             .add_rsp_8 => try writer.writeAll("\taddq $8, %rsp\n"),
             .push_imm32 => |value| try writer.print("\tpushq ${}\n", .{value}),
+            .push_stack_disp8 => |offset| try writer.print("\tpushq {}(%rsp)\n", .{offset}),
             .sub_rsp_24 => try writer.writeAll("\tsubq $24, %rsp\n"),
             .add_rsp_24 => try writer.writeAll("\taddq $24, %rsp\n"),
             .sub_rsp_40 => try writer.writeAll("\tsubq $40, %rsp\n"),

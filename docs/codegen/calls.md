@@ -245,6 +245,7 @@ call_internal assembly and objdump fixture
 unsupported non-default calling convention diagnostic
 multiple stack-passed i32 call arguments
 six stack-passed scalar i32 call arguments with explicit alignment cleanup
+named stack-passed i32 parameter forwarding into outgoing stack call slots
 mixed integer/SSE scalar call streams
 selected small INTEGER/INTEGER aggregate return and argument-field reads
 selected mixed INTEGER/SSE aggregate argument-field reads

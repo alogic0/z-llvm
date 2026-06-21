@@ -59,6 +59,10 @@ export fn frontier_six_stack_arg_call() i32 {
     return frontier_sum12_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 }
 
+export fn frontier_stack_arg_forward(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {
+    return frontier_sum12_i32(a, b, c, d, e, f, g, h, i, j, k, l);
+}
+
 export fn frontier_seven_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) i32 {
     const r = frontier_id_i32(f);
     return a + b + c + d + e + f + g + r;

@@ -211,7 +211,9 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   through %xmm0..%xmm4; backend unit/object tests materialize immediate FP
   constant arguments through %xmm0..%xmm7
   up to six stack-passed scalar `i32` call arguments are pushed in reverse order
-  with 16-byte call-site alignment preserved
+  with 16-byte call-site alignment preserved; the same path can forward named
+  incoming stack-passed `i32` parameters by copying their stack slots into the
+  outgoing stack argument area
   more than six stack-passed live i32 parameters can be added after a direct
   call once the local call frame is restored; current rows prove eight and
   twelve stack-passed live i32 values
@@ -254,6 +256,6 @@ falling into a generic unsupported bucket.
 | Non-default call conventions | Fail-closed boundary | Unsupported call conventions reject with `UnsupportedCodegenAbi`. Next implementation is a per-callconv policy table; release rows remain default C/Zig-compatible only. |
 | Full caller-saved handling | Partially implemented | Selected GPR and SSE live-across-call shapes spill/reload through explicit frame slots. Next implementation is liveness-driven caller-saved clobber assignment for arbitrary live scalar values across calls. |
 | Callee-saved handling | Fail-closed boundary | The allocator currently avoids callee-saved registers; tests document the policy. Next implementation is prologue/epilogue save/restore when allocation starts using them. |
-| More than six stack-passed live values | Implemented selected subset | Current rows prove six stack-passed scalar `i32` call arguments and eight/twelve stack-passed live `i32` values via cursor-derived incoming stack offsets. Remaining boundary is pressure beyond the backend's disp8-safe stack offset model and non-constant stack-passed call arguments. |
+| More than six stack-passed live values | Implemented selected subset | Current rows prove six stack-passed scalar `i32` call arguments, named incoming stack-parameter forwarding for those stack call slots, and eight/twelve stack-passed live `i32` values via cursor-derived incoming stack offsets. Remaining boundary is pressure beyond the backend's disp8-safe stack offset model and computed non-parameter stack-passed call arguments. |
 | Broader SSE live-across-call | Partially implemented | Up to six no-argument-call live `f32`/`f64` values and selected two-live FP-argument calls are supported. Next implementation is a general SSE caller-saved live-range spill/reload model. |
 | Multi-call live-value frames | Partially implemented | Generic CFG accepts selected straight-line void-call sequences with up to six live `i32` GPR parameters across two calls, spilling/reloading through the shared live-param frame helper for each call. Remaining boundary is arbitrary multi-call scheduling with mixed GPR/SSE/stack live values and non-void intermediate results. |

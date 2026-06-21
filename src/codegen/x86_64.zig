@@ -287,6 +287,7 @@ pub const Instruction = union(enum) {
     sub_rsp_8,
     add_rsp_8,
     push_imm32: i32,
+    push_stack_disp8: u8,
     sub_rsp_24,
     add_rsp_24,
     sub_rsp_40,
@@ -14647,7 +14648,11 @@ fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock
     for (call.args.items, 0..) |arg, index| {
         if (!arg.ty.eql(.{ .int = 32 })) return false;
         if (index >= 6) {
-            if (arg.value != .int) return false;
+            switch (arg.value) {
+                .int => {},
+                .named => |name| if ((scalarParamStackDisp8(function, name, .{ .int = 32 }) catch null) == null) return false,
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+            }
         } else if (!genericCfgSupportsSingleBlockI32Value(function, block, arg.value)) return false;
     }
     if (result) |name| return genericCfgSingleBlockResultIsUsed(block, name);
@@ -21877,7 +21882,7 @@ fn appendI32CallArgs(
     if (plan.has_non_i32_arg) return error.UnsupportedCodegenType;
     if (plan.counts.stack_args > 6) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [6]i32 = undefined;
+    var stack_args: [6]StackI32CallArg = undefined;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
@@ -21891,18 +21896,27 @@ fn appendI32CallArgs(
                 .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             },
             .stack_i32_const => |value| {
-                stack_args[stack_arg_count] = value;
+                stack_args[stack_arg_count] = .{ .imm = value };
+                stack_arg_count += 1;
+            },
+            .stack_i32_param => |name| {
+                stack_args[stack_arg_count] = .{ .stack_disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }) };
                 stack_arg_count += 1;
             },
             .sse, .aggregate_register_passthrough => return error.UnsupportedCodegenType,
         }
     }
 
-    if (stack_arg_count != 0 and stack_arg_count % 2 == 0) try machine.instructions.append(allocator, .sub_rsp_8);
+    var reserved_stack_bytes: usize = 0;
+    if (stack_arg_count != 0 and stack_arg_count % 2 == 0) {
+        try machine.instructions.append(allocator, .sub_rsp_8);
+        reserved_stack_bytes = 8;
+    }
     var index = stack_arg_count;
     while (index > 0) {
         index -= 1;
-        try machine.instructions.append(allocator, .{ .push_imm32 = stack_args[index] });
+        try appendStackI32CallArg(allocator, machine, stack_args[index], reserved_stack_bytes);
+        reserved_stack_bytes += 8;
     }
     return stack_arg_count;
 }
@@ -21913,7 +21927,10 @@ fn i32CallStackArgCount(call: ir.CallInst) !usize {
     for (call.args.items, 0..) |arg, index| {
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
         if (index >= 6) {
-            if (arg.value != .int) return error.UnsupportedCodegenValue;
+            switch (arg.value) {
+                .int, .named => {},
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            }
             stack_arg_count += 1;
         }
     }
@@ -21930,7 +21947,7 @@ fn appendSysVScalarCallArgs(
     defer plan.deinit(allocator);
     if (plan.counts.stack_args > 6) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [6]i32 = undefined;
+    var stack_args: [6]StackI32CallArg = undefined;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
@@ -21947,7 +21964,11 @@ fn appendSysVScalarCallArgs(
                 }
             },
             .stack_i32_const => |value| {
-                stack_args[stack_arg_count] = value;
+                stack_args[stack_arg_count] = .{ .imm = value };
+                stack_arg_count += 1;
+            },
+            .stack_i32_param => |name| {
+                stack_args[stack_arg_count] = .{ .stack_disp = try scalarParamStackDisp8(function, name, arg.ty) };
                 stack_arg_count += 1;
             },
             .sse => |dst| {
@@ -21977,11 +21998,16 @@ fn appendSysVScalarCallArgs(
             .aggregate_register_passthrough => {},
         }
     }
-    if (stack_arg_count != 0 and stack_arg_count % 2 == 0) try machine.instructions.append(allocator, .sub_rsp_8);
+    var reserved_stack_bytes: usize = 0;
+    if (stack_arg_count != 0 and stack_arg_count % 2 == 0) {
+        try machine.instructions.append(allocator, .sub_rsp_8);
+        reserved_stack_bytes = 8;
+    }
     var stack_index = stack_arg_count;
     while (stack_index > 0) {
         stack_index -= 1;
-        try machine.instructions.append(allocator, .{ .push_imm32 = stack_args[stack_index] });
+        try appendStackI32CallArg(allocator, machine, stack_args[stack_index], reserved_stack_bytes);
+        reserved_stack_bytes += 8;
     }
     return stack_arg_count;
 }
@@ -22000,6 +22026,7 @@ const SysVCallArgAssignment = union(enum) {
     gpr: ArgReg,
     sse: XmmReg,
     stack_i32_const: i32,
+    stack_i32_param: []const u8,
     aggregate_register_passthrough,
 };
 
@@ -22043,11 +22070,12 @@ fn planSysVCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
         if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
             plan.has_non_i32_arg = plan.has_non_i32_arg or !arg.ty.eql(.{ .int = 32 });
             if (int_arg_index >= 6) {
-                const value = switch (arg.value) {
-                    .int => |int| try i32Value(int),
-                    .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                const assignment: SysVCallArgAssignment = switch (arg.value) {
+                    .int => |int| .{ .stack_i32_const = try i32Value(int) },
+                    .named => |name| .{ .stack_i32_param = name },
+                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                 };
-                try plan.assignments.append(allocator, .{ .stack_i32_const = value });
+                try plan.assignments.append(allocator, assignment);
                 int_arg_index += 1;
                 plan.counts.stack_args += 1;
                 continue;
@@ -22193,6 +22221,27 @@ fn appendMoveImm64ToXmm(
     bits: u64,
 ) !void {
     try machine.instructions.append(allocator, .{ .mov_imm64_xmm = .{ .reg = reg, .bits = bits } });
+}
+
+const StackI32CallArg = union(enum) {
+    imm: i32,
+    stack_disp: u8,
+};
+
+fn appendStackI32CallArg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    arg: StackI32CallArg,
+    reserved_stack_bytes: usize,
+) !void {
+    switch (arg) {
+        .imm => |value| try machine.instructions.append(allocator, .{ .push_imm32 = value }),
+        .stack_disp => |base_offset| {
+            const adjusted = @as(usize, base_offset) + reserved_stack_bytes;
+            if (adjusted > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            try machine.instructions.append(allocator, .{ .push_stack_disp8 = @intCast(adjusted) });
+        },
+    }
 }
 
 fn appendAlignedDirectCallPreservingI32Param(
@@ -23300,6 +23349,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .sub_rsp_8,
         .add_rsp_8,
         .push_imm32,
+        .push_stack_disp8,
         .sub_rsp_24,
         .add_rsp_24,
         .sub_rsp_40,
@@ -23398,7 +23448,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             eax_defined = ret_ty != .void;
         },
         .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
-        .push_imm32 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
+        .push_imm32, .push_stack_disp8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
         .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
         .sub_rsp_56, .add_rsp_56 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 56) % 16),
@@ -23535,6 +23585,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .sub_rsp_8,
         .add_rsp_8,
         .push_imm32,
+        .push_stack_disp8,
         .sub_rsp_24,
         .add_rsp_24,
         .sub_rsp_40,
