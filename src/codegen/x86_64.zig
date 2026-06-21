@@ -21885,6 +21885,13 @@ pub fn sysvCallPlanCountsForTest(allocator: std.mem.Allocator, function: ir.Func
 
 fn planSysVCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !SysVCallPlan {
     if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenAbi;
+    if (call.ret_attrs != null or call.attrs != null or call.operand_bundle != null) return error.UnsupportedCodegenAbi;
+    if (call.calling_conv) |calling_conv| {
+        if (!std.mem.eql(u8, calling_conv, "ccc") and !std.mem.eql(u8, calling_conv, "fastcc")) {
+            return error.UnsupportedCodegenAbi;
+        }
+    }
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
     }

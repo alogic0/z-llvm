@@ -7108,6 +7108,93 @@ test "x86_64 SysV call planner rejects varargs explicitly" {
     );
 }
 
+test "x86_64 SysV call planner rejects indirect tail and unsupported callconv boundaries" {
+    const indirect_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, i32 %a) {
+        \\entry:
+        \\  %r = call i32 %fn(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_module = try ir.Module.parse(std.testing.allocator, indirect_input);
+    defer indirect_module.deinit();
+    try indirect_module.verify();
+    const indirect_call = indirect_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_module.functions.items[0], indirect_call),
+    );
+
+    const tail_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32)
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = tail call i32 @callee(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var tail_module = try ir.Module.parse(std.testing.allocator, tail_input);
+    defer tail_module.deinit();
+    try tail_module.verify();
+    const tail_call = tail_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, tail_module.functions.items[0], tail_call),
+    );
+
+    const callconv_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare coldcc i32 @callee(i32)
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = call coldcc i32 @callee(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var callconv_module = try ir.Module.parse(std.testing.allocator, callconv_input);
+    defer callconv_module.deinit();
+    try callconv_module.verify();
+    const callconv_call = callconv_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, callconv_module.functions.items[0], callconv_call),
+    );
+}
+
+test "x86_64 SysV call planner rejects vector argument ABI boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(<2 x i32>)
+        \\
+        \\define i32 @caller(<2 x i32> %value) {
+        \\entry:
+        \\  %r = call i32 @callee(<2 x i32> %value)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedCodegenType,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
+    );
+}
+
 test "x86_64 codegen rejects vector call ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
