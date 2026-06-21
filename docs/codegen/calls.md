@@ -246,6 +246,7 @@ unsupported non-default calling convention diagnostic
 multiple stack-passed i32 call arguments
 six stack-passed scalar i32 call arguments with explicit alignment cleanup
 named stack-passed i32 parameter forwarding into outgoing stack call slots
+named stack-passed i32 parameter loading into outgoing GPR call registers
 mixed integer/SSE scalar call streams
 selected small INTEGER/INTEGER aggregate return and argument-field reads
 selected mixed INTEGER/SSE aggregate argument-field reads

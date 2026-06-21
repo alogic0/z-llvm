@@ -323,6 +323,10 @@ pub const Instruction = union(enum) {
     reload_rsi_rsp24,
     reload_rsp_eax: FrameIndex,
     load_stack_disp8_rax: u8,
+    load_stack_disp8_arg32: struct {
+        reg: ArgReg,
+        disp: u8,
+    },
     load_rax_ptr_disp8_rax: u8,
     load_rax_ptr_rdx,
     load_rax_ptr_eax,
@@ -21890,8 +21894,17 @@ fn appendI32CallArgs(
             .gpr => |dst| switch (arg.value) {
                 .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
                 .named => |name| {
-                    const src = try paramReg(function, name, .{ .int = 32 });
-                    if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                    if (paramRegOrNull(function, name, .{ .int = 32 }) catch |err| switch (err) {
+                        error.UnsupportedCodegenAbi => null,
+                        else => return err,
+                    }) |src| {
+                        if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{
+                            .reg = dst,
+                            .disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }),
+                        } });
+                    }
                 },
                 .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             },
@@ -21957,8 +21970,19 @@ fn appendSysVScalarCallArgs(
                 switch (arg.value) {
                     .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
                     .named => |name| {
-                        const src = try sysvIntegerParamReg(function, name, arg.ty);
-                        if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                        if (sysvIntegerParamRegOrNull(function, name, arg.ty) catch |err| switch (err) {
+                            error.UnsupportedCodegenAbi => null,
+                            else => return err,
+                        }) |src| {
+                            if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                        } else if (arg.ty.eql(.{ .int = 32 })) {
+                            try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{
+                                .reg = dst,
+                                .disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }),
+                            } });
+                        } else {
+                            return error.UnsupportedCodegenAbi;
+                        }
                     },
                     .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                 }
@@ -23367,6 +23391,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsi_rsp24,
         .reload_rsp_eax,
         .load_stack_disp8_rax,
+        .load_stack_disp8_arg32,
         .load_rax_ptr_disp8_rax,
         .load_rax_ptr_rdx,
         .load_rax_ptr_eax,
@@ -23434,7 +23459,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm32_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32 => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -23603,6 +23628,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsi_rsp24,
         .reload_rsp_eax,
         .load_stack_disp8_rax,
+        .load_stack_disp8_arg32,
         .load_rax_ptr_disp8_rax,
         .load_rax_ptr_rdx,
         .load_rax_ptr_eax,

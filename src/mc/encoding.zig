@@ -231,6 +231,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x44, 0x24 });
                 try bytes.append(allocator, disp);
             },
+            .load_stack_disp8_arg32 => |load| try encodeStackDisp8ToArg32(&bytes, allocator, load.reg, load.disp),
             .load_rax_ptr_disp8_rax => |disp| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0x8b });
                 if (disp == 0) {
@@ -451,6 +452,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .reload_rdi_rsp24, .reload_rsi_rsp24 => 5,
         .reload_rsp_eax => 3,
         .load_stack_disp8_rax => 5,
+        .load_stack_disp8_arg32 => |load| if (load.reg.rexR()) 5 else 4,
         .load_rax_ptr_disp8_rax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,
         .load_rax_ptr_rdx => 3,
         .load_rax_ptr_eax => 2,
@@ -607,6 +609,14 @@ fn encodeFrameSlotToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator,
     try bytes.append(allocator, (if (disp == 0) @as(u8, 0x04) else @as(u8, 0x44)) | (@as(u8, reg.lowCode()) << 3));
     try bytes.append(allocator, 0x24);
     if (disp != 0) try bytes.append(allocator, disp);
+}
+
+fn encodeStackDisp8ToArg32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, disp: u8) !void {
+    if (reg.rexR()) try bytes.append(allocator, 0x44);
+    try bytes.append(allocator, 0x8b);
+    try bytes.append(allocator, 0x44 | (@as(u8, reg.lowCode()) << 3));
+    try bytes.append(allocator, 0x24);
+    try bytes.append(allocator, disp);
 }
 
 fn encodeXmmFrameSlot(

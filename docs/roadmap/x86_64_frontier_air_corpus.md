@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=131
-structured_functions=131
-generic_codegen_functions=131
-generic_cfg_functions=131
+discovered_functions=132
+structured_functions=132
+generic_codegen_functions=132
+generic_cfg_functions=132
 structural_matcher_functions=0
-structured_air_v2_functions=131
-typed_air_operand_functions=131
+structured_air_v2_functions=132
+typed_air_operand_functions=132
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=131
+generic_lowering_functions=132
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=131
+object_emitted_functions=132
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -205,6 +205,10 @@ Closed in the current memory/aggregate frontier slice:
   arguments in `frontier_sysv_abi.zig`: `frontier_stack_arg_forward` forwards
   all 12 incoming C ABI arguments to an external helper, copying the incoming
   stack slots into outgoing stack argument slots after alignment padding.
+- named stack-parameter register assignment for scalar `i32` call arguments in
+  `frontier_sysv_abi.zig`: `frontier_stack_arg_to_registers` loads incoming
+  stack-passed parameters into outgoing `%edi`..`%r9d` argument registers for a
+  six-argument helper call.
 - selected multi-call live-value frame in `frontier_sysv_abi.zig`:
   `frontier_two_void_calls_six_live` keeps six live GPR `i32` values across two
   void C ABI calls through the generic CFG live-param spill/reload helper.
