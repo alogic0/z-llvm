@@ -60,6 +60,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
             .mov_arg64_arg => |mov| try encodeReg64ToReg64(&bytes, allocator, mov.dst, mov.src),
+            .push_arg => |reg| try encodePushArg(&bytes, allocator, reg),
+            .push_rax => try bytes.append(allocator, 0x50),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .add_arg64_rax => |reg| try encodeRegToRax64Binary(&bytes, allocator, 0x01, reg),
             .add_arg_high32_eax => |reg| try encodeAddHigh32ToEax(&bytes, allocator, reg),
@@ -373,6 +375,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .mov_arg64_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
+        .push_arg => |reg| if (reg.rexB()) 2 else 1,
+        .push_rax => 1,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
         .add_arg64_rax => |reg| if (reg.rexR()) 3 else 2,
         .add_arg_high32_eax => |reg| (if (reg.rexR()) @as(u32, 3) else 3) + 6,
@@ -593,6 +597,11 @@ fn encodeReg64ToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, d
     try bytes.append(allocator, rex);
     try bytes.append(allocator, 0x89);
     try bytes.append(allocator, 0xc0 | (@as(u8, src.lowCode()) << 3) | @as(u8, dst.lowCode()));
+}
+
+fn encodePushArg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    if (reg.rexB()) try bytes.append(allocator, 0x41);
+    try bytes.append(allocator, 0x50 + @as(u8, reg.lowCode()));
 }
 
 fn encodeRegToFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {

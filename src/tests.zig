@@ -7372,6 +7372,33 @@ test "x86_64 generic CFG lowers indirect i64 call with stack parameter reload" {
     try std.testing.expect(saw_stack_i64_reload);
 }
 
+test "x86_64 generic CFG lowers computed i32 stack call argument" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @sum12(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32)
+        \\
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\entry:
+        \\  %x = add i32 %g, 1
+        \\  %r = call i32 @sum12(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %x, i32 8, i32 9, i32 10, i32 11, i32 12)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .push_imm32 = 12 });
+    try expectMachineInstruction(machine.instructions.items, .push_rax);
+    try expectMachineInstruction(machine.instructions.items, .{ .add_eax_imm32 = 1 });
+}
+
 test "x86_64 SysV call planner rejects vector argument ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

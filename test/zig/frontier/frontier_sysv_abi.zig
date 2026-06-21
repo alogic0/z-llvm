@@ -96,6 +96,11 @@ export fn frontier_indirect_stack_arg_forward(func: Sum12Fn, a: i32, b: i32, c: 
     return func(a, b, c, d, e, f, g, h, i, j, k, l);
 }
 
+export fn frontier_computed_stack_arg_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) i32 {
+    const computed = g + 1;
+    return frontier_sum12_i32(a, b, c, d, e, f, computed, 8, 9, 10, 11, 12);
+}
+
 export fn frontier_i64_stack_arg_to_registers(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64, i: i64, j: i64, k: i64, l: i64) i64 {
     _ = a;
     _ = b;

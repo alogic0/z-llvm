@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=138
-structured_functions=138
-generic_codegen_functions=138
-generic_cfg_functions=138
+discovered_functions=139
+structured_functions=139
+generic_codegen_functions=139
+generic_cfg_functions=139
 structural_matcher_functions=0
-structured_air_v2_functions=138
-typed_air_operand_functions=138
+structured_air_v2_functions=139
+typed_air_operand_functions=139
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=138
+generic_lowering_functions=139
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=138
+object_emitted_functions=139
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -209,6 +209,10 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_abi.zig`: `frontier_stack_arg_to_registers` loads incoming
   stack-passed parameters into outgoing `%edi`..`%r9d` argument registers for a
   six-argument helper call.
+- selected computed stack-passed scalar `i32` call argument in
+  `frontier_sysv_abi.zig`: `frontier_computed_stack_arg_call` computes a
+  block-local `i32`, materializes it through `%eax`, and pushes it into the
+  outgoing stack argument area through the shared SysV scalar planner.
 - typed AIR v2 pointer-callee register assignment in
   `frontier_sysv_abi.zig`: `frontier_indirect_stack_arg_to_registers` resolves
   operand 0 as a callee value, copies it to `%rax`, loads incoming stack-passed
