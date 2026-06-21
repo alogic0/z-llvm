@@ -273,6 +273,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, 0xe8);
                 try appendI32(&bytes, allocator, 0);
             },
+            .indirect_call_rax => try bytes.appendSlice(allocator, &.{ 0xff, 0xd0 }),
             .cmp_arg8_imm8 => |cmp| try encodeCmp8Imm(&bytes, allocator, cmp.reg, cmp.imm),
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
             .test_arg32 => |reg| try encodeTest32(&bytes, allocator, reg),
@@ -472,6 +473,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_rsp_rdi => 3,
         .and_rsp_neg16 => 4,
         .direct_call, .noreturn_direct_call => 5,
+        .indirect_call_rax => 2,
         .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,

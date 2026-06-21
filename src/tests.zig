@@ -6275,24 +6275,6 @@ test "x86_64 codegen rejects unsupported call ABI shapes" {
         error.UnsupportedCodegenAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, tail_call_module.target_triple.?, tail_call_module.functions.items[0]),
     );
-
-    const indirect_call_input =
-        \\target triple = "x86_64-unknown-linux-gnu"
-        \\
-        \\define i32 @caller(ptr %fn, i32 %a) {
-        \\entry:
-        \\  %r = call i32 %fn(i32 %a)
-        \\  ret i32 %r
-        \\}
-        \\
-    ;
-    var indirect_call_module = try ir.Module.parse(std.testing.allocator, indirect_call_input);
-    defer indirect_call_module.deinit();
-    try indirect_call_module.verify();
-    try std.testing.expectError(
-        error.UnsupportedCodegenInstruction,
-        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_call_module.target_triple.?, indirect_call_module.functions.items[0]),
-    );
 }
 
 test "x86_64 codegen supports one stack-passed i32 call argument" {
@@ -7176,7 +7158,7 @@ test "x86_64 SysV call planner rejects varargs explicitly" {
     );
 }
 
-test "x86_64 SysV call planner rejects indirect tail and unsupported callconv boundaries" {
+test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail callconv boundaries" {
     const indirect_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -7191,10 +7173,9 @@ test "x86_64 SysV call planner rejects indirect tail and unsupported callconv bo
     defer indirect_module.deinit();
     try indirect_module.verify();
     const indirect_call = indirect_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
-    try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
-        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_module.functions.items[0], indirect_call),
-    );
+    const indirect_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_module.functions.items[0], indirect_call);
+    try std.testing.expectEqual(@as(usize, 1), indirect_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), indirect_counts.gpr_returns);
 
     const tail_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -7237,6 +7218,33 @@ test "x86_64 SysV call planner rejects indirect tail and unsupported callconv bo
         error.UnsupportedCodegenAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, callconv_module.functions.items[0], callconv_call),
     );
+}
+
+test "x86_64 generic CFG lowers narrow i32 indirect call through rax" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, i32 %a) {
+        \\entry:
+        \\  %r = call i32 %fn(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_arg = .{ .dst = .rdi, .src = .rsi } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .indirect_call_rax = .{ .int = 32 } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
 
 test "x86_64 SysV call planner rejects vector argument ABI boundary" {

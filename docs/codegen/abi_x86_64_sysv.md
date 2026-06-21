@@ -226,7 +226,7 @@ no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE field reads/construction, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
-no indirect calls, tail calls, or unsupported non-default call conventions
+no broad indirect calls, tail calls, or unsupported non-default call conventions
 no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32, one- through six-live f32/f64 no-argument-call shapes, and two-live FP-argument call shape
 stack-passed live i32 pressure beyond the current disp8-safe incoming stack offset model is rejected explicitly rather than guessed
 ```
@@ -247,7 +247,7 @@ falling into a generic unsupported bucket.
 | Broader aggregate classes | Partially implemented | The reusable classifier handles INTEGER, SSE, mixed INTEGER/SSE, and MEMORY decisions for <=16-byte aggregates; backend lowering accepts selected register and MEMORY forms. Next implementation is a central call planner that assigns all supported classified aggregate args/returns. |
 | Packed/unaligned aggregates | Fail-closed boundary | Packed/unaligned aggregate ABI classes are classified as MEMORY/rejected unless represented by already selected scalar field paths. Next implementation requires layout-aware unaligned load/store/copy decisions. |
 | X87 / long double | Fail-closed boundary | `x86_fp80` and X87-like classes are not accepted by local codegen. Next implementation is deferred; rows must remain explicit runtime/ABI boundaries. |
-| Indirect calls | Fail-closed boundary | Only direct named calls are accepted. Next implementation is a function-pointer call path that delegates argument/return assignment to the SysV planner. |
+| Indirect calls | Partially implemented | Narrow scalar function-pointer calls are accepted when the callee is a pointer parameter, the result is `i32`, arguments are planner-supported scalar `i32` values, and no live values cross the call. The backend emits `callq *%rax` after assigning arguments through the SysV planner. Aggregate returns/arguments, varargs, tail calls, and live-across-call indirect calls remain fail-closed boundaries. |
 | Tail calls | Fail-closed boundary | Tail, musttail, and notail markers are rejected. Next implementation is deferred until normal call-frame ownership is broader. |
 | Non-default call conventions | Fail-closed boundary | Unsupported call conventions reject with `UnsupportedCodegenAbi`. Next implementation is a per-callconv policy table; release rows remain default C/Zig-compatible only. |
 | Full caller-saved handling | Partially implemented | Selected GPR and SSE live-across-call shapes spill/reload through explicit frame slots. Next implementation is liveness-driven caller-saved clobber assignment for arbitrary live scalar values across calls. |
