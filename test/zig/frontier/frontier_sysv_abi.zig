@@ -115,6 +115,11 @@ export fn frontier_indirect_i64_stack_arg_forward(func: Sum8I64Fn, a: i64, b: i6
     return func(a, b, c, d, e, f, g, h);
 }
 
+export fn frontier_computed_i64_stack_arg_call(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64) i64 {
+    const computed = g + 1;
+    return frontier_sum8_i64(a, b, c, d, e, f, computed, 8);
+}
+
 export fn frontier_seven_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) i32 {
     const r = frontier_id_i32(f);
     return a + b + c + d + e + f + g + r;

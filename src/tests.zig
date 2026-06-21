@@ -7399,6 +7399,33 @@ test "x86_64 generic CFG lowers computed i32 stack call argument" {
     try expectMachineInstruction(machine.instructions.items, .{ .add_eax_imm32 = 1 });
 }
 
+test "x86_64 generic CFG lowers computed i64 stack call argument" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @sum8(i64, i64, i64, i64, i64, i64, i64, i64)
+        \\
+        \\define i64 @caller(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i64 %f, i64 %g) {
+        \\entry:
+        \\  %x = add i64 %g, 1
+        \\  %r = call i64 @sum8(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i64 %f, i64 %x, i64 8)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .push_imm32 = 8 });
+    try expectMachineInstruction(machine.instructions.items, .push_rax);
+    try expectMachineInstruction(machine.instructions.items, .{ .add_rax_imm8 = 1 });
+}
+
 test "x86_64 SysV call planner rejects vector argument ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

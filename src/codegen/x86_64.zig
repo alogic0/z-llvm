@@ -1371,8 +1371,8 @@ fn lowerGenericCfgI64DirectCallReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 1) return false;
-    const instruction = block.instructions.items[0];
+    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len == 0 or block.instructions.items.len > 2) return false;
+    const instruction = block.instructions.items[block.instructions.items.len - 1];
     if (instruction.removed) return false;
     const call_result = instruction.result orelse return false;
     if (!isNamed(ret.value orelse return error.InvalidRet, call_result)) return false;
@@ -1390,10 +1390,10 @@ fn lowerGenericCfgI64DirectCallReturn(
         };
         const callee_reg = try paramReg(function, callee_name, .ptr);
         try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
-        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
         try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
     } else {
-        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
         try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
     }
     try machine.instructions.append(allocator, .ret);
@@ -12610,6 +12610,48 @@ fn emitGenericCfgI32ValueIntoEax(
     }
 }
 
+fn emitGenericCfgI64ValueIntoRax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+) !void {
+    switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_rax = try i64Value(int) }),
+        .named => |name| {
+            if (sysvIntegerParamRegOrNull(function, name, .{ .int = 64 }) catch |err| switch (err) {
+                error.UnsupportedCodegenAbi => null,
+                else => return err,
+            }) |reg| {
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+                return;
+            }
+            if (scalarParamStackDisp8(function, name, .{ .int = 64 }) catch |err| switch (err) {
+                error.UnsupportedCodegenValue => null,
+                else => return err,
+            }) |offset| {
+                try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = offset });
+                return;
+            }
+            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
+            const binary = switch (instruction.kind) {
+                .binary => |binary| binary,
+                else => return error.UnsupportedCodegenInstruction,
+            };
+            if (!binary.ty.eql(.{ .int = 64 }) or binary.op != .add) return error.UnsupportedCodegenInstruction;
+            const rhs = switch (binary.rhs) {
+                .int => |int| try i64Value(int),
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            if (rhs < 0 or rhs > 127) return error.UnsupportedCodegenValue;
+            try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, binary.lhs);
+            if (rhs != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = @intCast(rhs) });
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
 fn emitGenericCfgI32AddValueToEax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -22052,6 +22094,10 @@ fn appendSysVScalarCallArgsWithBlock(
                     const block = maybe_block orelse return error.UnsupportedCodegenAbi;
                     if (!genericCfgSupportsSingleBlockI32Value(function, block, .{ .named = name })) return error.UnsupportedCodegenValue;
                     stack_args[stack_arg_count] = .{ .computed_i32 = .{ .named = name } };
+                } else if (arg.ty.eql(.{ .int = 64 })) {
+                    _ = maybe_block orelse return error.UnsupportedCodegenAbi;
+                    if (!genericCfgSupportsI64Value(function, .{ .named = name })) return error.UnsupportedCodegenValue;
+                    stack_args[stack_arg_count] = .{ .computed_i64 = .{ .named = name } };
                 } else {
                     return error.UnsupportedCodegenAbi;
                 }
@@ -22091,6 +22137,13 @@ fn appendSysVScalarCallArgsWithBlock(
                 if (precomputed_stack_arg) return error.UnsupportedCodegenAbi;
                 const block = maybe_block orelse return error.UnsupportedCodegenAbi;
                 try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
+                stack_arg.* = .precomputed_rax;
+                precomputed_stack_arg = true;
+            },
+            .computed_i64 => |value| {
+                if (precomputed_stack_arg) return error.UnsupportedCodegenAbi;
+                const block = maybe_block orelse return error.UnsupportedCodegenAbi;
+                try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, value);
                 stack_arg.* = .precomputed_rax;
                 precomputed_stack_arg = true;
             },
@@ -22328,6 +22381,7 @@ const StackScalarCallArg = union(enum) {
     stack_disp: u8,
     arg_reg: ArgReg,
     computed_i32: ir.Value,
+    computed_i64: ir.Value,
     precomputed_rax,
 };
 
@@ -22345,6 +22399,11 @@ fn appendStackScalarCallArg(
         .computed_i32 => |value| {
             const block = maybe_block orelse return error.UnsupportedCodegenAbi;
             try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
+            try machine.instructions.append(allocator, .push_rax);
+        },
+        .computed_i64 => |value| {
+            const block = maybe_block orelse return error.UnsupportedCodegenAbi;
+            try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, value);
             try machine.instructions.append(allocator, .push_rax);
         },
         .precomputed_rax => try machine.instructions.append(allocator, .push_rax),

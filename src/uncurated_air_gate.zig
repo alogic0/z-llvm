@@ -1507,6 +1507,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_computed_stack_arg_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_computed_stack_arg_call");
     \\extern long long z_frontier_i64_stack_arg_to_registers(long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_i64_stack_arg_to_registers");
     \\extern long long z_frontier_indirect_i64_stack_arg_forward(long long (*)(long long, long long, long long, long long, long long, long long, long long, long long), long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_i64_stack_arg_forward");
+    \\extern long long z_frontier_computed_i64_stack_arg_call(long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_computed_i64_stack_arg_call");
     \\extern int z_frontier_seven_live_after_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_seven_live_after_call");
     \\extern int z_frontier_eight_live_after_call(int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_eight_live_after_call");
     \\extern int z_frontier_nine_live_after_call(int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_nine_live_after_call");
@@ -1564,6 +1565,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_computed_stack_arg_call(1, 2, 3, 4, 5, 6, 7) != 79) return 44;
     \\    if (z_frontier_i64_stack_arg_to_registers(1, 2, 3, 4, 5, 6, 7000000000LL, 8000000000LL, 9000000000LL, 10000000000LL, 11000000000LL, 12000000000LL) != 57000000000LL) return 42;
     \\    if (z_frontier_indirect_i64_stack_arg_forward(frontier_sum8_i64, 1000000000LL, 2000000000LL, 3000000000LL, 4000000000LL, 5000000000LL, 6000000000LL, 7000000000LL, 8000000000LL) != 36000000000LL) return 43;
+    \\    if (z_frontier_computed_i64_stack_arg_call(1, 2, 3, 4, 5, 6, 7) != 37) return 45;
     \\    if (z_frontier_seven_live_after_call(2, 3, 5, 7, 11, 13, 17) != 71) return 23;
     \\    if (z_frontier_eight_live_after_call(2, 3, 5, 7, 11, 13, 17, 19) != 90) return 24;
     \\    if (z_frontier_nine_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23) != 113) return 25;
