@@ -4,6 +4,7 @@ const Pair64 = extern struct {
 };
 
 const Sum6Fn = *const fn (i32, i32, i32, i32, i32, i32) callconv(.c) i32;
+const Sum12Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 
 export fn frontier_pair64_make(a: i64, b: i64) Pair64 {
     return .{ .a = a, .b = b };
@@ -84,6 +85,10 @@ export fn frontier_indirect_stack_arg_to_registers(func: Sum6Fn, a: i32, b: i32,
     _ = e;
     _ = f;
     return func(g, h, i, j, k, l);
+}
+
+export fn frontier_indirect_stack_arg_forward(func: Sum12Fn, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {
+    return func(a, b, c, d, e, f, g, h, i, j, k, l);
 }
 
 export fn frontier_seven_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) i32 {

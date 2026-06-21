@@ -1503,6 +1503,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_stack_arg_forward(int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_stack_arg_forward");
     \\extern int z_frontier_stack_arg_to_registers(int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_stack_arg_to_registers");
     \\extern int z_frontier_indirect_stack_arg_to_registers(int (*)(int, int, int, int, int, int), int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_indirect_stack_arg_to_registers");
+    \\extern int z_frontier_indirect_stack_arg_forward(int (*)(int, int, int, int, int, int, int, int, int, int, int, int), int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_indirect_stack_arg_forward");
     \\extern int z_frontier_seven_live_after_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_seven_live_after_call");
     \\extern int z_frontier_eight_live_after_call(int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_eight_live_after_call");
     \\extern int z_frontier_nine_live_after_call(int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_nine_live_after_call");
@@ -1552,6 +1553,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_stack_arg_forward(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 78) return 36;
     \\    if (z_frontier_stack_arg_to_registers(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 57) return 37;
     \\    if (z_frontier_indirect_stack_arg_to_registers(frontier_sum6_i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 57) return 38;
+    \\    if (z_frontier_indirect_stack_arg_forward(frontier_sum12_i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 78) return 39;
     \\    if (z_frontier_seven_live_after_call(2, 3, 5, 7, 11, 13, 17) != 71) return 23;
     \\    if (z_frontier_eight_live_after_call(2, 3, 5, 7, 11, 13, 17, 19) != 90) return 24;
     \\    if (z_frontier_nine_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23) != 113) return 25;

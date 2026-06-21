@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=133
-structured_functions=133
-generic_codegen_functions=133
-generic_cfg_functions=133
+discovered_functions=134
+structured_functions=134
+generic_codegen_functions=134
+generic_cfg_functions=134
 structural_matcher_functions=0
-structured_air_v2_functions=133
-typed_air_operand_functions=133
+structured_air_v2_functions=134
+typed_air_operand_functions=134
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=133
+generic_lowering_functions=134
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=133
+object_emitted_functions=134
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -213,6 +213,10 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_abi.zig`: `frontier_indirect_stack_arg_to_registers` resolves
   operand 0 as a callee value, copies it to `%rax`, loads incoming stack-passed
   `i32` parameters into outgoing `%edi`..`%r9d`, and emits `callq *%rax`.
+- typed AIR v2 pointer-callee stack forwarding in
+  `frontier_sysv_abi.zig`: `frontier_indirect_stack_arg_forward` uses the same
+  indirect `%rax` call path while forwarding 12 `i32` arguments, including
+  outgoing stack slots, through the shared SysV planner.
 - selected multi-call live-value frame in `frontier_sysv_abi.zig`:
   `frontier_two_void_calls_six_live` keeps six live GPR `i32` values across two
   void C ABI calls through the generic CFG live-param spill/reload helper.
