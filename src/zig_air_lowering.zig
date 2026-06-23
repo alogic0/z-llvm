@@ -1173,23 +1173,23 @@ fn isAggregateIrType(ty: ir.Type) bool {
     };
 }
 
-const IntegerAggregateLeaf = struct {
+const AggregateCopyLeaf = struct {
     offset: u64,
     ty: ir.Type,
 };
 
-fn collectIntegerAggregateLeaves(allocator: std.mem.Allocator, aggregate_ty: ir.Type) ![]IntegerAggregateLeaf {
-    var leaves: std.ArrayList(IntegerAggregateLeaf) = .empty;
+fn collectAggregateCopyLeaves(allocator: std.mem.Allocator, aggregate_ty: ir.Type) ![]AggregateCopyLeaf {
+    var leaves: std.ArrayList(AggregateCopyLeaf) = .empty;
     errdefer leaves.deinit(allocator);
     const layout = target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch return error.UnsupportedAir;
-    try collectIntegerAggregateLeavesInto(allocator, &leaves, layout, aggregate_ty, 0);
+    try collectAggregateCopyLeavesInto(allocator, &leaves, layout, aggregate_ty, 0);
     if (leaves.items.len < 3) return error.UnsupportedAir;
     return try leaves.toOwnedSlice(allocator);
 }
 
-fn collectIntegerAggregateLeavesInto(
+fn collectAggregateCopyLeavesInto(
     allocator: std.mem.Allocator,
-    leaves: *std.ArrayList(IntegerAggregateLeaf),
+    leaves: *std.ArrayList(AggregateCopyLeaf),
     layout: target_mod.DataLayout,
     aggregate_ty: ir.Type,
     base_offset: u64,
@@ -1205,7 +1205,7 @@ fn collectIntegerAggregateLeavesInto(
         if (supportedAggregateCopyLeaf(field_ty)) {
             try leaves.append(allocator, .{ .offset = field_offset, .ty = field_ty });
         } else if (isAggregateIrType(field_ty)) {
-            try collectIntegerAggregateLeavesInto(allocator, leaves, layout, field_ty, field_offset);
+            try collectAggregateCopyLeavesInto(allocator, leaves, layout, field_ty, field_offset);
         } else {
             return error.UnsupportedAir;
         }
@@ -1266,7 +1266,7 @@ fn lowerSretIntegerAggregateCopy(
     errdefer function.deinit(allocator);
     function.linkage = .default;
     function.calling_conv = null;
-    const leaves = try collectIntegerAggregateLeaves(allocator, aggregate_ty);
+    const leaves = try collectAggregateCopyLeaves(allocator, aggregate_ty);
     defer allocator.free(leaves);
     try function.params.append(allocator, .{ .ty = .ptr, .attrs = try sretAttrsForAggregate(module, aggregate_ty), .name = "sret" });
     try function.params.append(allocator, .{ .ty = .ptr, .attrs = try byvalAttrsForAggregate(module, aggregate_ty), .name = "arg0" });

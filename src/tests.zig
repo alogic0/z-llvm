@@ -7754,6 +7754,46 @@ test "x86_64 SysV call planner rejects vector return ABI boundary" {
     );
 }
 
+test "x86_64 SysV call planner rejects X87 ABI boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @callee(x86_fp80)
+        \\
+        \\define void @caller(x86_fp80 %value) {
+        \\entry:
+        \\  call void @callee(x86_fp80 %value)
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedCodegenType,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
+    );
+}
+
+test "parser rejects packed aggregate ABI signatures before x86_64 codegen" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @callee(<{ i8, i64 }>)
+        \\
+        \\define i64 @caller(<{ i8, i64 }> %value) {
+        \\entry:
+        \\  %r = call i64 @callee(<{ i8, i64 }> %value)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, input));
+}
+
 test "x86_64 codegen rejects vector call ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -7881,6 +7921,26 @@ test "x86_64 codegen rejects larger aggregate call and vector return ABI boundar
     try std.testing.expectError(
         error.UnsupportedCodegenType,
         codegen.x86_64.lowerFunction(std.testing.allocator, vector_return_module.target_triple.?, vector_return_module.functions.items[0]),
+    );
+}
+
+test "x86_64 codegen rejects X87 return ABI boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define x86_fp80 @caller(x86_fp80 %value) {
+        \\entry:
+        \\  ret x86_fp80 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedCodegenType,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
     );
 }
 

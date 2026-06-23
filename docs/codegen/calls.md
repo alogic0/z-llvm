@@ -328,7 +328,7 @@ selected two-/three-live f32/f64 no-argument-call spill/reload frames
 selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames
 unsupported broader stack-passed and broader SSE live-across-call pressure diagnostic
 tested callee-saved policy: the selected allocator does not allocate callee-saved GPRs
-unsupported varargs/vector/sret/byval/larger aggregate ABI diagnostics
+unsupported varargs/vector/X87/packed aggregate/sret/byval/larger aggregate ABI diagnostics
 ```
 
 Object relocation fixtures cover the current direct external call subset with
