@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=192
-structured_functions=192
-generic_codegen_functions=192
-generic_cfg_functions=192
+discovered_functions=194
+structured_functions=194
+generic_codegen_functions=194
+generic_cfg_functions=194
 structural_matcher_functions=0
-structured_air_v2_functions=192
-typed_air_operand_functions=192
+structured_air_v2_functions=194
+typed_air_operand_functions=194
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=192
+generic_lowering_functions=194
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=192
+object_emitted_functions=194
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -242,10 +242,12 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_six_stack_arg_call` calls a C helper with 12 scalar arguments. The
   backend reserves alignment padding before pushing stack arguments so arg 7 is
   visible at the callee's first stack-argument slot.
-- eight and twelve stack-passed scalar `i32` call arguments in
-  `frontier_sysv_abi.zig`: `frontier_eight_stack_arg_call` and
-  `frontier_twelve_stack_arg_call` reuse the same push-based SysV planner and
-  clean larger outgoing stack areas with immediate `%rsp` adjustment.
+- eight, twelve, and eighteen stack-passed scalar `i32` call arguments in
+  `frontier_sysv_abi.zig`: `frontier_eight_stack_arg_call`,
+  `frontier_twelve_stack_arg_call`, and `frontier_eighteen_stack_arg_call`
+  reuse the same push-based SysV planner and clean larger outgoing stack areas
+  with immediate `%rsp` adjustment. The indirect eighteen-stack-argument row
+  also proves disp32 stack-source reloads after outgoing stack pushes.
 - named stack-parameter forwarding for stack-passed scalar `i32` call
   arguments in `frontier_sysv_abi.zig`: `frontier_stack_arg_forward` forwards
   all 12 incoming C ABI arguments to an external helper, copying the incoming

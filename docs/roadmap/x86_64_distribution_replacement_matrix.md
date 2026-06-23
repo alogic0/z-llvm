@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=192`,
-`generic_codegen_functions=192`, `generic_cfg_functions=192`,
+three release modes at `source_rows=13`, `discovered_functions=194`,
+`generic_codegen_functions=194`, `generic_cfg_functions=194`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=192`, `object_failures=0`,
+`object_emitted_functions=194`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -451,7 +451,7 @@ before post-call `fadd` returns, selected two-live no-argument pointer-callee
 `f32`/`f64` spill/reload frames across `callq *%rax`, and selected two-live
 `f32`/`f64` spill/reload across a helper call that consumes the second live
 value as its first FP argument.
-The SysV scalar stack frontier now also proves up to twelve stack-passed
+The SysV scalar stack frontier now also proves up to eighteen stack-passed
 `i32` call arguments with immediate `%rsp` cleanup, seven/eight/twelve
 stack-passed live `i32` values within the current disp8-safe incoming stack
 offset model, named stack-parameter forwarding into outgoing stack argument

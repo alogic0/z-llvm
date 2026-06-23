@@ -297,6 +297,7 @@ pub const Instruction = union(enum) {
     add_rsp_8,
     push_imm32: i32,
     push_stack_disp8: u8,
+    push_stack_disp32: u32,
     sub_rsp_24,
     add_rsp_24,
     sub_rsp_40,
@@ -304,6 +305,7 @@ pub const Instruction = union(enum) {
     sub_rsp_56,
     add_rsp_56,
     add_rsp_imm8: u8,
+    add_rsp_imm32: u32,
     spill_arg_rsp: struct {
         frame_index: FrameIndex,
         reg: ArgReg,
@@ -353,6 +355,14 @@ pub const Instruction = union(enum) {
     load_stack_disp8_arg64: struct {
         reg: ArgReg,
         disp: u8,
+    },
+    load_stack_disp32_arg32: struct {
+        reg: ArgReg,
+        disp: u32,
+    },
+    load_stack_disp32_arg64: struct {
+        reg: ArgReg,
+        disp: u32,
     },
     load_rax_ptr_disp8_rax: u8,
     load_rax_ptr_rdx,
@@ -1511,7 +1521,7 @@ fn lowerDirectI32CallMainReturn(
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     if (!call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
-    if (call.args.items.len > 12) return error.UnsupportedCodegenAbi;
+    if (call.args.items.len > max_sysv_stack_call_args + 6) return error.UnsupportedCodegenAbi;
 
     var add_immediate: i32 = 0;
     if (block.instructions.items.len == 1) {
@@ -13583,7 +13593,7 @@ fn lowerGenericCfgSingleBlockDirectCallMain(allocator: std.mem.Allocator, machin
     };
     if (call.callee_value != null or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
-    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 12) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > max_sysv_stack_call_args + 6) return false;
     for (call.args.items) |arg| {
         if (arg.attrs != null or !arg.ty.eql(.{ .int = 32 })) return false;
         switch (arg.value) {
@@ -22330,7 +22340,7 @@ fn appendIndirectCallRaxWithStackArgs(
 }
 
 fn appendStackArgCallCleanup(allocator: std.mem.Allocator, machine: *MachineFunction, stack_arg_count: usize) !void {
-    if (stack_arg_count == 0 or stack_arg_count > 12) return error.UnsupportedCodegenAbi;
+    if (stack_arg_count == 0 or stack_arg_count > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
     const cleanup_bytes = stack_arg_count * 8 + if (stack_arg_count % 2 == 0) @as(usize, 8) else 0;
     switch (cleanup_bytes) {
         8 => try machine.instructions.append(allocator, .add_rsp_8),
@@ -22338,8 +22348,13 @@ fn appendStackArgCallCleanup(allocator: std.mem.Allocator, machine: *MachineFunc
         40 => try machine.instructions.append(allocator, .add_rsp_40),
         56 => try machine.instructions.append(allocator, .add_rsp_56),
         else => {
-            if (cleanup_bytes > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
-            try machine.instructions.append(allocator, .{ .add_rsp_imm8 = @intCast(cleanup_bytes) });
+            if (cleanup_bytes <= std.math.maxInt(i8)) {
+                try machine.instructions.append(allocator, .{ .add_rsp_imm8 = @intCast(cleanup_bytes) });
+            } else if (cleanup_bytes <= std.math.maxInt(u32)) {
+                try machine.instructions.append(allocator, .{ .add_rsp_imm32 = @intCast(cleanup_bytes) });
+            } else {
+                return error.UnsupportedCodegenAbi;
+            }
         },
     }
 }
@@ -22353,9 +22368,9 @@ fn appendI32CallArgs(
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
     if (plan.has_non_i32_arg) return error.UnsupportedCodegenType;
-    if (plan.counts.stack_args > 12) return error.UnsupportedCodegenAbi;
+    if (plan.counts.stack_args > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [12]StackScalarCallArg = undefined;
+    var stack_args: [max_sysv_stack_call_args]StackScalarCallArg = undefined;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
@@ -22369,10 +22384,7 @@ fn appendI32CallArgs(
                     }) |src| {
                         if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
                     } else {
-                        try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{
-                            .reg = dst,
-                            .disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }),
-                        } });
+                        try appendLoadStackDispArg32(allocator, machine, dst, try scalarParamStackDisp8(function, name, .{ .int = 32 }));
                     }
                 },
                 .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -22404,7 +22416,7 @@ fn appendI32CallArgs(
 }
 
 fn i32CallStackArgCount(call: ir.CallInst) !usize {
-    if (call.args.items.len > 12) return error.UnsupportedCodegenAbi;
+    if (call.args.items.len > max_sysv_stack_call_args + 6) return error.UnsupportedCodegenAbi;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
@@ -22437,9 +22449,9 @@ fn appendSysVScalarCallArgsWithBlock(
 ) anyerror!usize {
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
-    if (plan.counts.stack_args > 12) return error.UnsupportedCodegenAbi;
+    if (plan.counts.stack_args > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [12]StackScalarCallArg = undefined;
+    var stack_args: [max_sysv_stack_call_args]StackScalarCallArg = undefined;
     var stack_arg_count: usize = 0;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
@@ -22531,15 +22543,9 @@ fn appendSysVScalarCallArgsWithBlock(
                                     .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
                             }
                         } else if (arg.ty.eql(.{ .int = 32 })) {
-                            try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{
-                                .reg = dst,
-                                .disp = try adjustedIncomingStackDisp8(try scalarParamStackDisp8(function, name, .{ .int = 32 }), incoming_stack_adjust),
-                            } });
+                            try appendLoadStackDispArg32(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, .{ .int = 32 })) + incoming_stack_adjust);
                         } else if (arg.ty.eql(.{ .int = 64 })) {
-                            try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{
-                                .reg = dst,
-                                .disp = try adjustedIncomingStackDisp8(try scalarParamStackDisp8(function, name, .{ .int = 64 }), incoming_stack_adjust),
-                            } });
+                            try appendLoadStackDispArg64(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, .{ .int = 64 })) + incoming_stack_adjust);
                         }
                     },
                     .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -22594,6 +22600,36 @@ fn adjustedIncomingStackDisp8(base_offset: u8, incoming_stack_adjust: usize) !u8
     const adjusted = @as(usize, base_offset) + incoming_stack_adjust;
     if (adjusted > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
     return @intCast(adjusted);
+}
+
+fn appendLoadStackDispArg32(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: ArgReg,
+    offset: usize,
+) !void {
+    if (offset <= std.math.maxInt(i8)) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{ .reg = reg, .disp = @intCast(offset) } });
+    } else if (offset <= std.math.maxInt(u32)) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_arg32 = .{ .reg = reg, .disp = @intCast(offset) } });
+    } else {
+        return error.UnsupportedCodegenAbi;
+    }
+}
+
+fn appendLoadStackDispArg64(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: ArgReg,
+    offset: usize,
+) !void {
+    if (offset <= std.math.maxInt(i8)) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{ .reg = reg, .disp = @intCast(offset) } });
+    } else if (offset <= std.math.maxInt(u32)) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_arg64 = .{ .reg = reg, .disp = @intCast(offset) } });
+    } else {
+        return error.UnsupportedCodegenAbi;
+    }
 }
 
 pub const SysVCallPlanCounts = struct {
@@ -22830,21 +22866,19 @@ fn appendSysVRegisterAggregatePassThroughArg(
             .integer => {
                 const dst = try ArgReg.fromIndex(dest.gpr + gpr_offset);
                 const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8 + incoming_stack_adjust;
-                if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
-                try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{
-                    .reg = dst,
-                    .disp = @intCast(offset),
-                } });
+                try appendLoadStackDispArg64(allocator, machine, dst, offset);
                 gpr_offset += 1;
             },
             .sse => {
                 const dst = try XmmReg.fromIndex(dest.sse + sse_offset);
                 const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8 + incoming_stack_adjust;
-                if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
-                try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm = .{
-                    .reg = dst,
-                    .disp = @intCast(offset),
-                } });
+                if (offset <= std.math.maxInt(i8)) {
+                    try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm = .{ .reg = dst, .disp = @intCast(offset) } });
+                } else if (offset <= std.math.maxInt(u32)) {
+                    try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm = .{ .reg = dst, .disp = @intCast(offset) } });
+                } else {
+                    return error.UnsupportedCodegenAbi;
+                }
                 sse_offset += 1;
             },
         }
@@ -22852,7 +22886,7 @@ fn appendSysVRegisterAggregatePassThroughArg(
 }
 
 fn appendSysVStackAggregatePassThroughArgs(
-    stack_args: *[12]StackScalarCallArg,
+    stack_args: *[max_sysv_stack_call_args]StackScalarCallArg,
     stack_arg_count: *usize,
     pass: SysVRegisterAggregatePassThrough,
 ) !void {
@@ -22904,9 +22938,9 @@ fn appendSysVMemoryAggregateStackPassThroughArgs(
 ) !usize {
     if (classification.kind != .memory or classification.size_bytes == 0) return error.UnsupportedCodegenAbi;
     const stack_arg_count = @as(usize, @intCast((classification.size_bytes + 7) / 8));
-    if (stack_arg_count == 0 or stack_arg_count > 12) return error.UnsupportedCodegenAbi;
+    if (stack_arg_count == 0 or stack_arg_count > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
 
-    var stack_args: [12]StackScalarCallArg = undefined;
+    var stack_args: [max_sysv_stack_call_args]StackScalarCallArg = undefined;
     var index: usize = 0;
     while (index < stack_arg_count) : (index += 1) {
         const offset = 8 + (source.stack_eightbytes + index) * 8;
@@ -23006,6 +23040,8 @@ const StackScalarCallArg = union(enum) {
     precomputed_rax,
 };
 
+const max_sysv_stack_call_args = 24;
+
 fn appendStackScalarCallArg(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -23031,8 +23067,13 @@ fn appendStackScalarCallArg(
         .precomputed_rax => try machine.instructions.append(allocator, .push_rax),
         .stack_disp => |base_offset| {
             const adjusted = @as(usize, base_offset) + reserved_stack_bytes;
-            if (adjusted > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
-            try machine.instructions.append(allocator, .{ .push_stack_disp8 = @intCast(adjusted) });
+            if (adjusted <= std.math.maxInt(i8)) {
+                try machine.instructions.append(allocator, .{ .push_stack_disp8 = @intCast(adjusted) });
+            } else if (adjusted <= std.math.maxInt(u32)) {
+                try machine.instructions.append(allocator, .{ .push_stack_disp32 = @intCast(adjusted) });
+            } else {
+                return error.UnsupportedCodegenAbi;
+            }
         },
     }
 }
@@ -24222,6 +24263,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .add_rsp_8,
         .push_imm32,
         .push_stack_disp8,
+        .push_stack_disp32,
         .push_arg,
         .push_rax,
         .push_xmm64,
@@ -24232,6 +24274,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .sub_rsp_56,
         .add_rsp_56,
         .add_rsp_imm8,
+        .add_rsp_imm32,
         .spill_arg_rsp,
         .reload_arg_rsp,
         .spill_xmm32_rsp,
@@ -24252,6 +24295,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .load_stack_disp32_xmm,
         .load_stack_disp8_arg32,
         .load_stack_disp8_arg64,
+        .load_stack_disp32_arg32,
+        .load_stack_disp32_arg64,
         .load_rax_ptr_disp8_rax,
         .load_rax_ptr_rdx,
         .load_rax_ptr_eax,
@@ -24326,7 +24371,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm32_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64 => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64 => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -24340,11 +24385,12 @@ pub fn verifyFunction(function: MachineFunction) !void {
             eax_defined = ret_ty != .void;
         },
         .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
-        .push_imm32, .push_stack_disp8, .push_arg, .push_rax, .push_xmm64 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
+        .push_imm32, .push_stack_disp8, .push_stack_disp32, .push_arg, .push_rax, .push_xmm64 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
         .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
         .sub_rsp_56, .add_rsp_56 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 56) % 16),
         .add_rsp_imm8 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
+        .add_rsp_imm32 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
         .spill_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .reload_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .spill_xmm32_rsp, .spill_xmm64_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
@@ -24482,6 +24528,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .add_rsp_8,
         .push_imm32,
         .push_stack_disp8,
+        .push_stack_disp32,
         .push_arg,
         .push_rax,
         .push_xmm64,
@@ -24492,6 +24539,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .sub_rsp_56,
         .add_rsp_56,
         .add_rsp_imm8,
+        .add_rsp_imm32,
         .spill_arg_rsp,
         .reload_arg_rsp,
         .spill_xmm32_rsp,
@@ -24512,6 +24560,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .load_stack_disp32_xmm,
         .load_stack_disp8_arg32,
         .load_stack_disp8_arg64,
+        .load_stack_disp32_arg32,
+        .load_stack_disp32_arg64,
         .load_rax_ptr_disp8_rax,
         .load_rax_ptr_rdx,
         .load_rax_ptr_eax,

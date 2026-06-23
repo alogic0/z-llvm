@@ -307,7 +307,7 @@ direct-call frame that covers all six SysV GPR argument registers,
 spilling and reloading caller parameters through aligned frame slots; more
 than six stack-passed live `i32` parameters are now read from the restored
 incoming stack argument area for a post-call add-tree return. The same frontier
-source now proves eight and twelve stack-passed scalar `i32` call arguments
+source now proves eight, twelve, and eighteen stack-passed scalar `i32` call arguments
 with immediate `%rsp` cleanup, plus forwarding of named incoming stack-passed
 `i32` parameters into outgoing stack-argument slots and outgoing GPR argument
 registers, and seven/eight/twelve stack-passed live `i32` values within the
@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=192`,
-`generic_codegen_functions=192`, `generic_cfg_functions=192`,
+frontier gate reports `source_rows=13`, `discovered_functions=194`,
+`generic_codegen_functions=194`, `generic_cfg_functions=194`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=192`, `object_failures=0`,
+`object_emitted_functions=194`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
