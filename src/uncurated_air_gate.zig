@@ -1619,6 +1619,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct BigMixed { long long a; int b; long long c; int d; };
     \\struct BigArray { long long values[5]; };
     \\struct BigDouble { double a; double b; double c; };
+    \\struct BigFloat { float a; float b; float c; float d; float e; };
     \\struct BigPtrDouble { const long long *ptr; double value; long long tag; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
@@ -1654,6 +1655,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigArray z_frontier_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_copy");
     \\extern long long z_frontier_big_array_sum_edges(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_sum_edges");
     \\extern struct BigDouble z_frontier_big_double_copy(struct BigDouble) __asm__("frontier_sysv_sret_byval.frontier_big_double_copy");
+    \\extern struct BigFloat z_frontier_big_float_copy(struct BigFloat) __asm__("frontier_sysv_sret_byval.frontier_big_float_copy");
     \\extern struct BigPtrDouble z_frontier_big_ptr_double_copy(struct BigPtrDouble) __asm__("frontier_sysv_sret_byval.frontier_big_ptr_double_copy");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
@@ -1723,6 +1725,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct BigDouble big_double = { .a = 1.5, .b = 2.25, .c = 3.75 };
     \\    struct BigDouble copied_big_double = z_frontier_big_double_copy(big_double);
     \\    if (copied_big_double.a != 1.5 || copied_big_double.b != 2.25 || copied_big_double.c != 3.75) return 34;
+    \\    struct BigFloat big_float = { .a = 1.25f, .b = 2.5f, .c = 3.75f, .d = 4.5f, .e = 5.25f };
+    \\    struct BigFloat copied_big_float = z_frontier_big_float_copy(big_float);
+    \\    if (copied_big_float.a != 1.25f || copied_big_float.b != 2.5f || copied_big_float.c != 3.75f || copied_big_float.d != 4.5f || copied_big_float.e != 5.25f) return 36;
     \\    long long pointed = 987654321LL;
     \\    struct BigPtrDouble ptr_double = { .ptr = &pointed, .value = 6.5, .tag = 1234567LL };
     \\    struct BigPtrDouble copied_ptr_double = z_frontier_big_ptr_double_copy(ptr_double);

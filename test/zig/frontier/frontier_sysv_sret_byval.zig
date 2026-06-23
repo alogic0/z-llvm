@@ -128,6 +128,14 @@ const BigDouble = extern struct {
     c: f64,
 };
 
+const BigFloat = extern struct {
+    a: f32,
+    b: f32,
+    c: f32,
+    d: f32,
+    e: f32,
+};
+
 const BigPtrDouble = extern struct {
     ptr: *const i64,
     value: f64,
@@ -267,6 +275,10 @@ export fn frontier_big_array_sum_edges(value: BigArray) i64 {
 }
 
 export fn frontier_big_double_copy(value: BigDouble) BigDouble {
+    return value;
+}
+
+export fn frontier_big_float_copy(value: BigFloat) BigFloat {
     return value;
 }
 

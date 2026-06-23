@@ -186,7 +186,8 @@ accepted frontier:
   byval-to-sret copies currently proven through twenty flat fields, a nested
   two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and
   array-backed `{ [5 x i64] }` copy/read rows, plus the first
-  `{ double, double, double }` double-leaf byval-to-sret copy row and
+  `{ double, double, double }` double-leaf byval-to-sret copy row,
+  `{ float, float, float, float, float }` f32-leaf byval-to-sret copy row, and
   `{ ptr, double, i64 }` pointer/`double`/integer byval-to-sret copy row
   selected stack-passed MEMORY aggregate by-value field reads
   selected one-live f32/f64 SSE spill/reload around a direct C ABI void call
@@ -217,9 +218,9 @@ aggregate field-read shape, and byval-to-sret copies for all fields in those
 selected forms; the current frontier proves this through eight i64 fields,
 mixed-width integer leaves, multiple stack-passed user fields after the hidden
 sret pointer, array-backed integer copy/read leaves through `{ [5 x i64] }`,
-larger flat normal integer-leaf copies through `Big20`, and the first
-double-leaf copy through `BigDouble`, and pointer/`double`/integer copy
-through `BigPtrDouble`
+larger flat normal integer-leaf copies through `Big20`, the first
+double-leaf copy through `BigDouble`, f32-leaf copy through `BigFloat`, and
+pointer/`double`/integer copy through `BigPtrDouble`
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax

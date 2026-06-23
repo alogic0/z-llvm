@@ -5231,6 +5231,30 @@ test "x86_64 encoding loads and stores xmm0 through stack and argument pointer d
     }, bytes);
 }
 
+test "x86_64 encoding loads and stores f32 xmm0 through stack and argument pointer displacements" {
+    var machine = codegen.x86_64.MachineFunction.init("copy_xmm0_f32_ptr", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp8_xmm0_f32 = 16 });
+    try machine.instructions.append(std.testing.allocator, .{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 24 } });
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp32_xmm0_f32 = 128 });
+    try machine.instructions.append(std.testing.allocator, .{ .store_xmm0_f32_arg_ptr_disp32 = .{ .reg = .rdi, .offset = 136 } });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .load_stack_disp8_xmm0_f32 = 16 }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 24 } }));
+    try std.testing.expectEqual(@as(u32, 9), mc.encoding.instructionSize(.{ .load_stack_disp32_xmm0_f32 = 128 }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .store_xmm0_f32_arg_ptr_disp32 = .{ .reg = .rdi, .offset = 136 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0xf3, 0x0f, 0x10, 0x44, 0x24, 0x10,
+        0xf3, 0x0f, 0x11, 0x47, 0x18, 0xf3,
+        0x0f, 0x10, 0x84, 0x24, 0x80, 0x00,
+        0x00, 0x00, 0xf3, 0x0f, 0x11, 0x87,
+        0x88, 0x00, 0x00, 0x00, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding loads stack displacements into arbitrary xmm registers" {
     var machine = codegen.x86_64.MachineFunction.init("load_xmm_stack", .void);
     defer machine.deinit(std.testing.allocator);
@@ -6302,6 +6326,52 @@ test "x86_64 codegen copies pointer and double memory aggregate leaves from byva
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 24 }, machine.instructions.items[4]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 16 } }, machine.instructions.items[5]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
+}
+
+test "x86_64 codegen copies f32 memory aggregate leaves from byval to sret" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @copy(ptr noalias sret({ float, float, float, float, float }) %out, ptr byval({ float, float, float, float, float }) %value) {
+        \\entry:
+        \\  %src0 = getelementptr i8, ptr %value, i64 0
+        \\  %load0 = load float, ptr %src0
+        \\  %dst0 = getelementptr i8, ptr %out, i64 0
+        \\  store float %load0, ptr %dst0
+        \\  %src1 = getelementptr i8, ptr %value, i64 4
+        \\  %load1 = load float, ptr %src1
+        \\  %dst1 = getelementptr i8, ptr %out, i64 4
+        \\  store float %load1, ptr %dst1
+        \\  %src2 = getelementptr i8, ptr %value, i64 8
+        \\  %load2 = load float, ptr %src2
+        \\  %dst2 = getelementptr i8, ptr %out, i64 8
+        \\  store float %load2, ptr %dst2
+        \\  %src3 = getelementptr i8, ptr %value, i64 12
+        \\  %load3 = load float, ptr %src3
+        \\  %dst3 = getelementptr i8, ptr %out, i64 12
+        \\  store float %load3, ptr %dst3
+        \\  %src4 = getelementptr i8, ptr %value, i64 16
+        \\  %load4 = load float, ptr %src4
+        \\  %dst4 = getelementptr i8, ptr %out, i64 16
+        \\  store float %load4, ptr %dst4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    var field_index: usize = 0;
+    while (field_index < 5) : (field_index += 1) {
+        try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_xmm0_f32 = @intCast(8 + field_index * 4) }, machine.instructions.items[field_index * 2]);
+        try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = .rdi, .offset = @intCast(field_index * 4) } }, machine.instructions.items[field_index * 2 + 1]);
+    }
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[10]);
 }
 
 test "x86_64 codegen returns register aggregate from direct helper call" {

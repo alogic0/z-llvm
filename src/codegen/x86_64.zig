@@ -331,6 +331,8 @@ pub const Instruction = union(enum) {
     load_stack_disp32_rax: u32,
     load_stack_disp8_xmm0: u8,
     load_stack_disp32_xmm0: u32,
+    load_stack_disp8_xmm0_f32: u8,
+    load_stack_disp32_xmm0_f32: u32,
     load_stack_disp8_xmm: struct {
         reg: XmmReg,
         disp: u8,
@@ -397,6 +399,14 @@ pub const Instruction = union(enum) {
         offset: u8,
     },
     store_xmm0_arg_ptr_disp32: struct {
+        reg: ArgReg,
+        offset: u32,
+    },
+    store_xmm0_f32_arg_ptr_disp8: struct {
+        reg: ArgReg,
+        offset: u8,
+    },
+    store_xmm0_f32_arg_ptr_disp32: struct {
         reg: ArgReg,
         offset: u32,
     },
@@ -6446,6 +6456,14 @@ fn appendLoadStackDispXmm0(allocator: std.mem.Allocator, machine: *MachineFuncti
     }
 }
 
+fn appendLoadStackDispXmm0F32(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm0_f32 = @intCast(offset) });
+    } else {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm0_f32 = offset });
+    }
+}
+
 fn appendLoadStackDispXmm(allocator: std.mem.Allocator, machine: *MachineFunction, reg: XmmReg, offset: u32) !void {
     if (reg == .xmm0) return appendLoadStackDispXmm0(allocator, machine, offset);
     if (offset <= 127) {
@@ -6514,6 +6532,14 @@ fn appendStoreXmm0ArgPtrDisp(allocator: std.mem.Allocator, machine: *MachineFunc
         try machine.instructions.append(allocator, .{ .store_xmm0_arg_ptr_disp8 = .{ .reg = reg, .offset = @intCast(offset) } });
     } else {
         try machine.instructions.append(allocator, .{ .store_xmm0_arg_ptr_disp32 = .{ .reg = reg, .offset = offset } });
+    }
+}
+
+fn appendStoreXmm0F32ArgPtrDisp(allocator: std.mem.Allocator, machine: *MachineFunction, reg: ArgReg, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = reg, .offset = @intCast(offset) } });
+    } else {
+        try machine.instructions.append(allocator, .{ .store_xmm0_f32_arg_ptr_disp32 = .{ .reg = reg, .offset = offset } });
     }
 }
 
@@ -6690,7 +6716,7 @@ fn isSupportedAggregateCopyLeafAggregate(aggregate_ty: ir.Type) bool {
 }
 
 fn supportedAggregateCopyLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.double);
+    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
 }
 
 fn aggregateFieldIndexFromGep(instruction: ir.Instruction, aggregate_ty: ir.Type, base_name: []const u8) ?usize {
@@ -14142,7 +14168,10 @@ fn lowerGenericCfgSretCopy(
             !isNamed(store.value, load_name)) return false;
 
         const offset = try aggregateByteOffset(aggregate_ty, src_offset, load.ty);
-        if (load.ty.eql(.double)) {
+        if (load.ty.eql(.float)) {
+            try appendLoadStackDispXmm0F32(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendStoreXmm0F32ArgPtrDisp(allocator, machine, sret_reg, offset);
+        } else if (load.ty.eql(.double)) {
             try appendLoadStackDispXmm0(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
             try appendStoreXmm0ArgPtrDisp(allocator, machine, sret_reg, offset);
         } else if (load.ty.eql(.{ .int = 64 }) or load.ty.eql(.ptr)) {
@@ -23842,6 +23871,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .load_stack_disp32_rax,
         .load_stack_disp8_xmm0,
         .load_stack_disp32_xmm0,
+        .load_stack_disp8_xmm0_f32,
+        .load_stack_disp32_xmm0_f32,
         .load_stack_disp8_xmm,
         .load_stack_disp32_xmm,
         .load_stack_disp8_arg32,
@@ -23863,6 +23894,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .store_eax_arg_ptr_disp32,
         .store_xmm0_arg_ptr_disp8,
         .store_xmm0_arg_ptr_disp32,
+        .store_xmm0_f32_arg_ptr_disp8,
+        .store_xmm0_f32_arg_ptr_disp32,
         .store_imm8_arg_ptr_disp8,
         .load_f128_arg_ptr_xmm0,
         .load_f128_const_xmm0,
@@ -23960,7 +23993,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .shl_rcx_imm6, .or_rcx_rax, .or_rcx_rdx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm0, .load_stack_disp32_xmm0, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
+        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .shl_rcx_imm6, .or_rcx_rax, .or_rcx_rdx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_xmm0_f32_arg_ptr_disp8, .store_xmm0_f32_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm0, .load_stack_disp32_xmm0, .load_stack_disp8_xmm0_f32, .load_stack_disp32_xmm0_f32, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -24096,6 +24129,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .load_stack_disp32_rax,
         .load_stack_disp8_xmm0,
         .load_stack_disp32_xmm0,
+        .load_stack_disp8_xmm0_f32,
+        .load_stack_disp32_xmm0_f32,
         .load_stack_disp8_xmm,
         .load_stack_disp32_xmm,
         .load_stack_disp8_arg32,
@@ -24117,6 +24152,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .store_eax_arg_ptr_disp32,
         .store_xmm0_arg_ptr_disp8,
         .store_xmm0_arg_ptr_disp32,
+        .store_xmm0_f32_arg_ptr_disp8,
+        .store_xmm0_f32_arg_ptr_disp32,
         .store_imm8_arg_ptr_disp8,
         .load_f128_arg_ptr_xmm0,
         .load_f128_const_xmm0,

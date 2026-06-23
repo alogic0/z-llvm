@@ -375,12 +375,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=155`,
-`generic_codegen_functions=155`, `generic_cfg_functions=155`,
+frontier gate reports `source_rows=13`, `discovered_functions=156`,
+`generic_codegen_functions=156`, `generic_cfg_functions=156`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=155`, `object_failures=0`,
+`object_emitted_functions=156`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -417,7 +417,9 @@ enumeration and proves the same flat normal integer-leaf sret/byval path
 through `Big20` construction, field-read, and copy rows. The `BigDouble`
 follow-up adds the first double-leaf byval-to-sret MEMORY aggregate copy row,
 and `BigPtrDouble` proves the same layout-derived copy path for pointer,
-`double`, and `i64` leaves in one MEMORY aggregate.
+`double`, and `i64` leaves in one MEMORY aggregate. `BigFloat` adds five-`f32`
+MEMORY aggregate copy proof through dedicated `movss` stack loads and
+hidden-sret stores.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads
 incoming stack-passed `i32` parameters into outgoing GPR call slots, and emits
@@ -663,7 +665,7 @@ small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; frontier
-reports ReleaseFast `155/0`, ReleaseSafe `155/0`, ReleaseSmall `155/0`; expanded
+reports ReleaseFast `156/0`, ReleaseSafe `156/0`, ReleaseSmall `156/0`; expanded
 reports ReleaseFast `199/0`, ReleaseSafe `199/0`, ReleaseSmall `199/0`.
 The scale frontier reports ReleaseFast `216/0`, ReleaseSafe `216/0`, and
 ReleaseSmall `216/0`.
