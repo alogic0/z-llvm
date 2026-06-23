@@ -142,6 +142,8 @@ const BigPtrDouble = extern struct {
     tag: i64,
 };
 
+const Big3CopyFn = *const fn (Big3) callconv(.c) Big3;
+const Big4CopyFn = *const fn (Big4) callconv(.c) Big4;
 const Big5CopyFn = *const fn (Big5) callconv(.c) Big5;
 const BigNestedCopyFn = *const fn (BigNested) callconv(.c) BigNested;
 const BigMixedCopyFn = *const fn (BigMixed) callconv(.c) BigMixed;
@@ -162,6 +164,14 @@ export fn frontier_big3_copy(value: Big3) Big3 {
     return value;
 }
 
+export fn frontier_direct_big3_copy(value: Big3) Big3 {
+    return frontier_big3_copy(value);
+}
+
+export fn frontier_indirect_big3_copy(func: Big3CopyFn, value: Big3) Big3 {
+    return func(value);
+}
+
 export fn frontier_big4_make(a: i64, b: i64, c: i64, d: i64) Big4 {
     return .{ .a = a, .b = b, .c = c, .d = d };
 }
@@ -172,6 +182,14 @@ export fn frontier_big4_edges(value: Big4) i64 {
 
 export fn frontier_big4_copy(value: Big4) Big4 {
     return value;
+}
+
+export fn frontier_direct_big4_copy(value: Big4) Big4 {
+    return frontier_big4_copy(value);
+}
+
+export fn frontier_indirect_big4_copy(func: Big4CopyFn, value: Big4) Big4 {
+    return func(value);
 }
 
 export fn frontier_big5_make(a: i64, b: i64, c: i64, d: i64, e: i64) Big5 {
