@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=166
-structured_functions=166
-generic_codegen_functions=166
-generic_cfg_functions=166
+discovered_functions=170
+structured_functions=170
+generic_codegen_functions=170
+generic_cfg_functions=170
 structural_matcher_functions=0
-structured_air_v2_functions=166
-typed_air_operand_functions=166
+structured_air_v2_functions=170
+typed_air_operand_functions=170
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=166
+generic_lowering_functions=170
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=166
+object_emitted_functions=170
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -267,6 +267,13 @@ Closed in the current memory/aggregate frontier slice:
   parameters into outgoing GPR call slots, and
   `frontier_indirect_i64_stack_arg_forward` combines pointer-callee `%rax`
   calls with 64-bit register moves plus outgoing stack argument forwarding.
+- selected indirect register aggregate rows in `frontier_sysv_abi.zig` and
+  `frontier_sysv_aggregate_classes.zig`: `frontier_indirect_pair64_make` and
+  `frontier_indirect_pair64_first` prove INTEGER/INTEGER aggregate return and
+  argument forwarding through function pointers, while
+  `frontier_indirect_array_double_make` and
+  `frontier_indirect_array_double_sum` prove the same `%rax` indirect-call path
+  for SSE/SSE `[2]f64` aggregate return and argument forwarding.
 - selected computed stack-passed scalar `i64` call argument in
   `frontier_sysv_abi.zig`: `frontier_computed_i64_stack_arg_call` computes a
   block-local `i64`, materializes it through `%rax`, and pushes it into the

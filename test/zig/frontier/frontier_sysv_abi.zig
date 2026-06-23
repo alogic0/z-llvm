@@ -9,6 +9,8 @@ const Sum14Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32
 const Sum8I64Fn = *const fn (i64, i64, i64, i64, i64, i64, i64, i64) callconv(.c) i64;
 const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
+const MakePair64Fn = *const fn (i64, i64) callconv(.c) Pair64;
+const Pair64FirstFn = *const fn (Pair64) callconv(.c) i64;
 
 export fn frontier_pair64_make(a: i64, b: i64) Pair64 {
     return .{ .a = a, .b = b };
@@ -128,6 +130,14 @@ export fn frontier_i64_stack_arg_to_registers(a: i64, b: i64, c: i64, d: i64, e:
 
 export fn frontier_indirect_i64_stack_arg_forward(func: Sum8I64Fn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64) i64 {
     return func(a, b, c, d, e, f, g, h);
+}
+
+export fn frontier_indirect_pair64_make(func: MakePair64Fn, a: i64, b: i64) Pair64 {
+    return func(a, b);
+}
+
+export fn frontier_indirect_pair64_first(func: Pair64FirstFn, value: Pair64) i64 {
+    return func(value);
 }
 
 export fn frontier_computed_i64_stack_arg_call(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64) i64 {

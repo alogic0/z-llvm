@@ -1510,6 +1510,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_computed_stack_arg_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_computed_stack_arg_call");
     \\extern long long z_frontier_i64_stack_arg_to_registers(long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_i64_stack_arg_to_registers");
     \\extern long long z_frontier_indirect_i64_stack_arg_forward(long long (*)(long long, long long, long long, long long, long long, long long, long long, long long), long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_i64_stack_arg_forward");
+    \\extern struct Pair64 z_frontier_indirect_pair64_make(struct Pair64 (*)(long long, long long), long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_pair64_make");
+    \\extern long long z_frontier_indirect_pair64_first(long long (*)(struct Pair64), struct Pair64) __asm__("frontier_sysv_abi.frontier_indirect_pair64_first");
     \\extern long long z_frontier_computed_i64_stack_arg_call(long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_computed_i64_stack_arg_call");
     \\extern int z_frontier_seven_live_after_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_seven_live_after_call");
     \\extern int z_frontier_eight_live_after_call(int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_eight_live_after_call");
@@ -1551,6 +1553,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\int frontier_sum18_i32(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p, int q, int r) { return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r; }
     \\long long frontier_sum6_i64(long long a, long long b, long long c, long long d, long long e, long long f) { return a + b + c + d + e + f; }
     \\long long frontier_sum8_i64(long long a, long long b, long long c, long long d, long long e, long long f, long long g, long long h) { return a + b + c + d + e + f + g + h; }
+    \\struct Pair64 frontier_make_pair64(long long a, long long b) { struct Pair64 result = { a, b }; return result; }
+    \\long long frontier_pair64_first(struct Pair64 value) { return value.a; }
     \\int main(void) {
     \\    struct Pair64 pair = z_frontier_pair64_make(0x1122334455667788LL, 0x0102030405060708LL);
     \\    if (pair.a != 0x1122334455667788LL || pair.b != 0x0102030405060708LL) return 1;
@@ -1573,6 +1577,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_computed_stack_arg_call(1, 2, 3, 4, 5, 6, 7) != 79) return 44;
     \\    if (z_frontier_i64_stack_arg_to_registers(1, 2, 3, 4, 5, 6, 7000000000LL, 8000000000LL, 9000000000LL, 10000000000LL, 11000000000LL, 12000000000LL) != 57000000000LL) return 42;
     \\    if (z_frontier_indirect_i64_stack_arg_forward(frontier_sum8_i64, 1000000000LL, 2000000000LL, 3000000000LL, 4000000000LL, 5000000000LL, 6000000000LL, 7000000000LL, 8000000000LL) != 36000000000LL) return 43;
+    \\    struct Pair64 indirect_pair = z_frontier_indirect_pair64_make(frontier_make_pair64, 1234, 5678);
+    \\    if (indirect_pair.a != 1234 || indirect_pair.b != 5678) return 49;
+    \\    if (z_frontier_indirect_pair64_first(frontier_pair64_first, indirect_pair) != 1234) return 50;
     \\    if (z_frontier_computed_i64_stack_arg_call(1, 2, 3, 4, 5, 6, 7) != 37) return 45;
     \\    if (z_frontier_seven_live_after_call(2, 3, 5, 7, 11, 13, 17) != 71) return 23;
     \\    if (z_frontier_eight_live_after_call(2, 3, 5, 7, 11, 13, 17, 19) != 90) return 24;
@@ -1779,6 +1786,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct ArrayDouble z_frontier_array_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_make");
     \\extern double z_frontier_stack_array_double_call_sum(double, double, double, double, double, double, double, double, struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_double_call_sum");
     \\extern double z_frontier_register_array_double_call_sum_after_eight(struct ArrayDouble, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_aggregate_classes.frontier_register_array_double_call_sum_after_eight");
+    \\extern struct ArrayDouble z_frontier_indirect_array_double_make(struct ArrayDouble (*)(double, double), double, double) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_array_double_make");
+    \\extern double z_frontier_indirect_array_double_sum(double (*)(struct ArrayDouble), struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_array_double_sum");
     \\extern double z_frontier_nested_double_left(struct NestedDouble) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_left");
     \\extern double z_frontier_nested_double_right(struct NestedDouble) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_right");
     \\extern struct NestedDouble z_frontier_nested_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_make");
@@ -1797,6 +1806,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_packed_reverse_mixed_low_int(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_low_int");
     \\extern int z_frontier_packed_reverse_mixed_high_int(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_high_int");
     \\extern struct PackedReverseMixed z_frontier_packed_reverse_mixed_make(double, int, int) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_make");
+    \\struct ArrayDouble frontier_make_array_double(double a, double b) { struct ArrayDouble result = { { a, b } }; return result; }
+    \\double frontier_sum_array_double(struct ArrayDouble value) { return value.values[0] + value.values[1]; }
     \\int main(void) {
     \\    struct Mixed value = { 123456789LL, 6.25 };
     \\    if (z_frontier_mixed_int(value) != 123456789LL) return 1;
@@ -1841,6 +1852,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (made_array_double.values[0] != 6.5 || made_array_double.values[1] != 8.25) return 32;
     \\    if (z_frontier_stack_array_double_call_sum(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, array_double) != 7.25) return 41;
     \\    if (z_frontier_register_array_double_call_sum_after_eight(array_double, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0) != 7.25) return 53;
+    \\    struct ArrayDouble indirect_array_double = z_frontier_indirect_array_double_make(frontier_make_array_double, 9.25, 10.5);
+    \\    if (indirect_array_double.values[0] != 9.25 || indirect_array_double.values[1] != 10.5) return 54;
+    \\    if (z_frontier_indirect_array_double_sum(frontier_sum_array_double, indirect_array_double) != 19.75) return 55;
     \\    struct NestedDouble nested_double = { { 12.5 }, { 14.75 } };
     \\    if (z_frontier_nested_double_left(nested_double) != 12.5) return 33;
     \\    if (z_frontier_nested_double_right(nested_double) != 14.75) return 34;

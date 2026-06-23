@@ -375,12 +375,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=166`,
-`generic_codegen_functions=166`, `generic_cfg_functions=166`,
+frontier gate reports `source_rows=13`, `discovered_functions=170`,
+`generic_codegen_functions=170`, `generic_cfg_functions=170`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=166`, `object_failures=0`,
+`object_emitted_functions=170`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -444,6 +444,11 @@ The indirect FP follow-up extends the same pointer-callee path to selected
 The scalar integer follow-up fixes 64-bit call argument movement and stack
 loads, proving incoming stack-passed `i64` values can feed outgoing GPR call
 slots and indirect `%rax` calls can forward `i64` register and stack arguments.
+The indirect aggregate follow-up routes selected pointer-callee register
+aggregate calls through the same SysV planner: INTEGER/INTEGER `Pair64`
+arguments and returns flow through `%rdi`/`%rsi` and `%rax`/`%rdx`, while
+SSE/SSE `[2]f64` aggregate arguments and returns flow through `%xmm0`/`%xmm1`,
+with executable C ABI checks in all three release modes.
 The mixed aggregate
 class frontier row adds `{ i64, double }`, selected `{ i32, double }`, and
 selected `{ i32, i32, double }` INTEGER/SSE field reads plus register aggregate

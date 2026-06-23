@@ -30,6 +30,8 @@ const ArrayPair = extern struct {
 const ArrayDouble = extern struct {
     values: [2]f64,
 };
+const ArrayDoubleMakeFn = *const fn (f64, f64) callconv(.c) ArrayDouble;
+const ArrayDoubleSumFn = *const fn (ArrayDouble) callconv(.c) f64;
 
 const DoubleBox = extern struct {
     value: f64,
@@ -257,6 +259,14 @@ export fn frontier_stack_array_double_call_sum(a0: f64, a1: f64, a2: f64, a3: f6
 
 export fn frontier_register_array_double_call_sum_after_eight(value: ArrayDouble, a0: f64, a1: f64, a2: f64, a3: f64, a4: f64, a5: f64, a6: f64, a7: f64) f64 {
     return helperArrayDoubleSumAfterEight(a0, a1, a2, a3, a4, a5, a6, a7, value);
+}
+
+export fn frontier_indirect_array_double_make(func: ArrayDoubleMakeFn, a: f64, b: f64) ArrayDouble {
+    return func(a, b);
+}
+
+export fn frontier_indirect_array_double_sum(func: ArrayDoubleSumFn, value: ArrayDouble) f64 {
+    return func(value);
 }
 
 export fn frontier_nested_double_left(value: NestedDouble) f64 {
