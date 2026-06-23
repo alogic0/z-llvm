@@ -310,7 +310,8 @@ incoming stack argument area for a post-call add-tree return. The same frontier
 source now proves eight and twelve stack-passed scalar `i32` call arguments
 with immediate `%rsp` cleanup, plus forwarding of named incoming stack-passed
 `i32` parameters into outgoing stack-argument slots and outgoing GPR argument
-registers. It also proves a selected
+registers, and seven/eight/twelve stack-passed live `i32` values within the
+current disp8-safe incoming stack offset model. It also proves a selected
 two-call/six-live GPR frame through the generic CFG void-call path. The follow-up
 `frontier_sysv_sret_byval.zig` row adds selected MEMORY aggregate ABI evidence:
 `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and

@@ -453,10 +453,12 @@ four-, five-, and six-live `f32`/`f64` spill/reload frames across the same
 helper shape before three-, four-, and five-step post-call `fadd` returns,
 plus selected two-live `f32`/`f64` spill/reload across a helper call that
 consumes the second live value as its first FP argument.
-The SysV scalar stack frontier now also proves eight and twelve stack-passed
-`i32` call arguments with immediate `%rsp` cleanup, named stack-parameter
-forwarding into outgoing stack argument slots and outgoing GPR argument
-registers, typed AIR v2 pointer-callee indirect calls that load stack-passed
+The SysV scalar stack frontier now also proves up to twelve stack-passed
+`i32` call arguments with immediate `%rsp` cleanup, seven/eight/twelve
+stack-passed live `i32` values within the current disp8-safe incoming stack
+offset model, named stack-parameter forwarding into outgoing stack argument
+slots and outgoing GPR argument registers, typed AIR v2 pointer-callee indirect
+calls that load stack-passed
 parameters into outgoing GPR call slots or forward 12/14 `i32` arguments
 through outgoing stack slots before `callq *%rax`, typed AIR v2 pointer-callee
 `f32`/`f64` calls that return through `%xmm0`, stack-passed `i64` parameters
