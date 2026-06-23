@@ -145,11 +145,13 @@ aggregate argument field reads and register aggregate return:
   stack-passed INTEGER aggregate parameters can now be forwarded into outgoing register aggregate helper calls by loading the source stack eightbytes into the destination GPR pair
   stack-passed INTEGER/INTEGER aggregate parameters can also be forwarded into
   outgoing stack aggregate slots when preceding scalar arguments exhaust the
-  callee GPR stream; SSE stack-destination aggregate forwarding remains an
-  explicit future boundary
+  callee GPR stream
   register-sourced INTEGER/INTEGER aggregates use the same stack destination
   path and are pushed before scalar call arguments are assigned, so source GPRs
   are not clobbered by outgoing `%rdi`/`%rsi` reuse
+  register-sourced SSE/SSE aggregates use the same stack destination path by
+  materializing each outgoing eightbyte with `sub rsp, 8` plus `movsd` from the
+  source XMM register before scalar FP arguments are assigned
   shifted in-register mixed aggregate parameters can move the INTEGER eightbyte
   between GPR argument slots before helper calls when the SSE eightbyte already
   occupies the required destination SSE slot

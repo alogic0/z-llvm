@@ -219,6 +219,18 @@ noinline fn helperArrayDoubleSum(value: ArrayDouble) f64 {
     return value.values[0] + value.values[1];
 }
 
+noinline fn helperArrayDoubleSumAfterEight(a0: f64, a1: f64, a2: f64, a3: f64, a4: f64, a5: f64, a6: f64, a7: f64, value: ArrayDouble) f64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    return value.values[0] + value.values[1];
+}
+
 export fn frontier_array_double_first(value: ArrayDouble) f64 {
     return value.values[0];
 }
@@ -241,6 +253,10 @@ export fn frontier_stack_array_double_call_sum(a0: f64, a1: f64, a2: f64, a3: f6
     _ = a6;
     _ = a7;
     return helperArrayDoubleSum(value);
+}
+
+export fn frontier_register_array_double_call_sum_after_eight(value: ArrayDouble, a0: f64, a1: f64, a2: f64, a3: f64, a4: f64, a5: f64, a6: f64, a7: f64) f64 {
+    return helperArrayDoubleSumAfterEight(a0, a1, a2, a3, a4, a5, a6, a7, value);
 }
 
 export fn frontier_nested_double_left(value: NestedDouble) f64 {

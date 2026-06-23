@@ -194,6 +194,7 @@ pub const Instruction = union(enum) {
     },
     push_arg: ArgReg,
     push_rax,
+    push_xmm64: XmmReg,
     binary_arg_eax: struct {
         op: MachineBinaryOp,
         reg: ArgReg,
@@ -6173,10 +6174,6 @@ fn lowerRegisterAggregateDoubleFieldAddReturn(
     ret: anytype,
 ) !bool {
     if (!ret.ty.eql(.double) or !function.ret_ty.eql(.double)) return false;
-    if (function.params.items.len != 1) return false;
-    const aggregate_ty = function.params.items[0].ty;
-    const classification = classifySysVAggregate(aggregate_ty) catch return false;
-    if (classification.kind != .register) return false;
     if (block.instructions.items.len < 5) return false;
 
     const alloca_inst = block.instructions.items[0];
@@ -6187,14 +6184,19 @@ fn lowerRegisterAggregateDoubleFieldAddReturn(
         .alloca => |alloca| alloca,
         else => return false,
     };
-    if (!alloca.allocated_ty.eql(aggregate_ty)) return false;
+    const aggregate_ty = alloca.allocated_ty;
+    const classification = classifySysVAggregate(aggregate_ty) catch return false;
+    if (classification.kind != .register) return false;
 
     const store = switch (store_inst.kind) {
         .store => |store| store,
         else => return false,
     };
-    if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name) or
-        !isNamed(store.value, function.params.items[0].name)) return false;
+    if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name)) return false;
+    const param_name = switch (store.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
 
     var pointer_offsets = std.StringHashMap(u64).init(allocator);
     defer pointer_offsets.deinit();
@@ -6240,8 +6242,8 @@ fn lowerRegisterAggregateDoubleFieldAddReturn(
     if (!try collectAggregateDoubleAddTerms(block, ret.value orelse return error.InvalidRet, field_loads, &terms, &term_count)) return false;
     if (term_count != 2) return false;
 
-    try emitAggregateDoubleTerm(allocator, machine, function, aggregate_ty, terms[0], .xmm0);
-    try emitAggregateDoubleTerm(allocator, machine, function, aggregate_ty, terms[1], .xmm1);
+    try emitAggregateDoubleTerm(allocator, machine, function, param_name, aggregate_ty, terms[0], .xmm0);
+    try emitAggregateDoubleTerm(allocator, machine, function, param_name, aggregate_ty, terms[1], .xmm1);
     try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -6431,11 +6433,12 @@ fn emitAggregateDoubleTerm(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
+    param_name: []const u8,
     aggregate_ty: ir.Type,
     term: AggregateDoubleAddTerm,
     dest: XmmReg,
 ) !void {
-    const location = try sysvAggregateFieldLocationByOffset(function, function.params.items[0].name, aggregate_ty, term.offset, .double);
+    const location = try sysvAggregateFieldLocationByOffset(function, param_name, aggregate_ty, term.offset, .double);
     switch (location) {
         .sse => |reg| {
             if (reg == dest) return;
@@ -22442,17 +22445,29 @@ fn appendSysVScalarCallArgsWithBlock(
                     else
                         try appendMoveImm64ToXmm(allocator, machine, dst, try fp64TextBits(arg.value)),
                     .named => |name| {
-                        const src_index = if (arg.ty.eql(.float))
-                            try fpParamIndex(function, name, .float)
+                        if ((if (arg.ty.eql(.float))
+                            fpParamIndex(function, name, .float)
                         else
-                            try fpParamIndex(function, name, .double);
-                        const dst_index: usize = @intFromEnum(dst);
-                        if (src_index != dst_index) {
-                            if (src_index == 1 and dst_index == 0) {
-                                try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
-                            } else {
-                                return error.UnsupportedCodegenAbi;
+                            fpParamIndex(function, name, .double)) catch |err| switch (err) {
+                            error.UnsupportedCodegenAbi => null,
+                            else => return err,
+                        }) |src_index| {
+                            const dst_index: usize = @intFromEnum(dst);
+                            if (src_index != dst_index) {
+                                try machine.instructions.append(allocator, .{ .movapd_xmm = .{
+                                    .dst = dst,
+                                    .src = try XmmReg.fromIndex(src_index),
+                                } });
                             }
+                        } else if (arg.ty.eql(.double)) {
+                            try appendLoadStackDispXmm(
+                                allocator,
+                                machine,
+                                dst,
+                                try adjustedIncomingStackDisp8(try scalarParamStackDisp8(function, name, .double), incoming_stack_adjust),
+                            );
+                        } else {
+                            return error.UnsupportedCodegenAbi;
                         }
                     },
                     .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -22737,15 +22752,25 @@ fn appendSysVStackAggregatePassThroughArgs(
         .stack => {},
         .registers => return error.UnsupportedCodegenAbi,
     }
-    if (!pass.classification.isIntegerOnly()) return error.UnsupportedCodegenAbi;
     const needs = sysvAggregateRegisterNeeds(pass.classification);
-    const source_in_registers = pass.source.gpr + needs.gpr <= 6;
+    const source_in_registers = pass.source.gpr + needs.gpr <= 6 and pass.source.sse + needs.sse <= 8;
     if (source_in_registers) {
         if (pass.source.stack_eightbytes != 0) return error.UnsupportedCodegenAbi;
+        var sse_offset: usize = 0;
         var gpr_offset: usize = 0;
-        while (gpr_offset < needs.gpr) : (gpr_offset += 1) {
+        var eightbyte_index: usize = 0;
+        while (eightbyte_index < pass.classification.eightbyte_count) : (eightbyte_index += 1) {
             if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
-            stack_args[stack_arg_count.*] = .{ .arg_reg = try ArgReg.fromIndex(pass.source.gpr + gpr_offset) };
+            switch (pass.classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi) {
+                .integer => {
+                    stack_args[stack_arg_count.*] = .{ .arg_reg = try ArgReg.fromIndex(pass.source.gpr + gpr_offset) };
+                    gpr_offset += 1;
+                },
+                .sse => {
+                    stack_args[stack_arg_count.*] = .{ .xmm_reg = try XmmReg.fromIndex(pass.source.sse + sse_offset) };
+                    sse_offset += 1;
+                },
+            }
             stack_arg_count.* += 1;
         }
         return;
@@ -22753,7 +22778,7 @@ fn appendSysVStackAggregatePassThroughArgs(
 
     var eightbyte_index: usize = 0;
     while (eightbyte_index < pass.classification.eightbyte_count) : (eightbyte_index += 1) {
-        if (pass.classification.eightbytes[eightbyte_index] != .integer) return error.UnsupportedCodegenAbi;
+        _ = pass.classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi;
         if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
         const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8;
         if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
@@ -22830,6 +22855,7 @@ const StackScalarCallArg = union(enum) {
     imm: i32,
     stack_disp: u8,
     arg_reg: ArgReg,
+    xmm_reg: XmmReg,
     computed_i32: ir.Value,
     computed_i64: ir.Value,
     precomputed_rax,
@@ -22846,6 +22872,7 @@ fn appendStackScalarCallArg(
     switch (arg) {
         .imm => |value| try machine.instructions.append(allocator, .{ .push_imm32 = value }),
         .arg_reg => |reg| try machine.instructions.append(allocator, .{ .push_arg = reg }),
+        .xmm_reg => |reg| try machine.instructions.append(allocator, .{ .push_xmm64 = reg }),
         .computed_i32 => |value| {
             const block = maybe_block orelse return error.UnsupportedCodegenAbi;
             try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
@@ -23798,14 +23825,17 @@ fn isSysVIntegerParamType(ty: ir.Type) bool {
 }
 
 fn fpParamIndex(function: ir.Function, name: []const u8, ty: ir.Type) !usize {
-    var fp_index: usize = 0;
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {
         const param_is_fp = param.ty.eql(.float) or param.ty.eql(.double);
         if (std.mem.eql(u8, param.name, name)) {
             if (!param.ty.eql(ty) or !param_is_fp) return error.UnsupportedCodegenValue;
-            return fp_index;
+            if (sse_index >= 8) return error.UnsupportedCodegenAbi;
+            return sse_index;
         }
-        if (param_is_fp) fp_index += 1;
+        try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
     }
     return error.UnsupportedCodegenValue;
 }
@@ -23976,6 +24006,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .push_stack_disp8,
         .push_arg,
         .push_rax,
+        .push_xmm64,
         .sub_rsp_24,
         .add_rsp_24,
         .sub_rsp_40,
@@ -24091,7 +24122,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             eax_defined = ret_ty != .void;
         },
         .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
-        .push_imm32, .push_stack_disp8, .push_arg, .push_rax => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
+        .push_imm32, .push_stack_disp8, .push_arg, .push_rax, .push_xmm64 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
         .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
         .sub_rsp_56, .add_rsp_56 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 56) % 16),
@@ -24235,6 +24266,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .push_stack_disp8,
         .push_arg,
         .push_rax,
+        .push_xmm64,
         .sub_rsp_24,
         .add_rsp_24,
         .sub_rsp_40,

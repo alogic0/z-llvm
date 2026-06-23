@@ -1778,6 +1778,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_array_double_second(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_second");
     \\extern struct ArrayDouble z_frontier_array_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_make");
     \\extern double z_frontier_stack_array_double_call_sum(double, double, double, double, double, double, double, double, struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_double_call_sum");
+    \\extern double z_frontier_register_array_double_call_sum_after_eight(struct ArrayDouble, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_aggregate_classes.frontier_register_array_double_call_sum_after_eight");
     \\extern double z_frontier_nested_double_left(struct NestedDouble) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_left");
     \\extern double z_frontier_nested_double_right(struct NestedDouble) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_right");
     \\extern struct NestedDouble z_frontier_nested_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_make");
@@ -1839,6 +1840,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct ArrayDouble made_array_double = z_frontier_array_double_make(6.5, 8.25);
     \\    if (made_array_double.values[0] != 6.5 || made_array_double.values[1] != 8.25) return 32;
     \\    if (z_frontier_stack_array_double_call_sum(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, array_double) != 7.25) return 41;
+    \\    if (z_frontier_register_array_double_call_sum_after_eight(array_double, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0) != 7.25) return 53;
     \\    struct NestedDouble nested_double = { { 12.5 }, { 14.75 } };
     \\    if (z_frontier_nested_double_left(nested_double) != 12.5) return 33;
     \\    if (z_frontier_nested_double_right(nested_double) != 14.75) return 34;

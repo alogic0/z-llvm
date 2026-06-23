@@ -238,6 +238,8 @@ selected stack-passed INTEGER/INTEGER aggregate parameters are also pushed into
 outgoing stack aggregate slots when the callee-side GPR stream is exhausted
 register-sourced INTEGER/INTEGER aggregate stack arguments are pushed before
 scalar call-register assignment to avoid clobbering the source GPR pair
+register-sourced SSE/SSE aggregate stack arguments are materialized before
+scalar FP call-register assignment with an XMM-to-stack eightbyte push helper
 selected shifted mixed aggregate parameters move the INTEGER eightbyte between
 GPR argument slots before helper calls when the SSE eightbyte already matches
 the outgoing SSE slot

@@ -62,6 +62,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .mov_arg64_arg => |mov| try encodeReg64ToReg64(&bytes, allocator, mov.dst, mov.src),
             .push_arg => |reg| try encodePushArg(&bytes, allocator, reg),
             .push_rax => try bytes.append(allocator, 0x50),
+            .push_xmm64 => |reg| try encodePushXmm64(&bytes, allocator, reg),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .add_arg64_rax => |reg| try encodeRegToRax64Binary(&bytes, allocator, 0x01, reg),
             .add_arg_high32_eax => |reg| try encodeAddHigh32ToEax(&bytes, allocator, reg),
@@ -426,6 +427,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_arg64_arg => 3,
         .push_arg => |reg| if (reg.rexB()) 2 else 1,
         .push_rax => 1,
+        .push_xmm64 => 9,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
         .add_arg64_rax => |reg| if (reg.rexR()) 3 else 2,
         .add_arg_high32_eax => |reg| (if (reg.rexR()) @as(u32, 3) else 3) + 6,
@@ -667,6 +669,11 @@ fn encodeReg64ToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, d
 fn encodePushArg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
     if (reg.rexB()) try bytes.append(allocator, 0x41);
     try bytes.append(allocator, 0x50 + @as(u8, reg.lowCode()));
+}
+
+fn encodePushXmm64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.XmmReg) !void {
+    try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 });
+    try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x11, 0x04 | (@as(u8, reg.lowCode()) << 3), 0x24 });
 }
 
 fn encodeRegToFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {

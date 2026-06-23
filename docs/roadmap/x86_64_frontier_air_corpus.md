@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=164
-structured_functions=164
-generic_codegen_functions=164
-generic_cfg_functions=164
+discovered_functions=166
+structured_functions=166
+generic_codegen_functions=166
+generic_cfg_functions=166
 structural_matcher_functions=0
-structured_air_v2_functions=164
-typed_air_operand_functions=164
+structured_air_v2_functions=166
+typed_air_operand_functions=166
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=164
+generic_lowering_functions=166
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=164
+object_emitted_functions=166
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -207,7 +207,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_aggregate_classes.zig`: `[2]f64` field and pointer-element
   GEPs lower from typed AIR v2, the two `double` elements are read from the
   independent SysV SSE argument stream, and construction returns the elements
-  in `%xmm0`/`%xmm1`
+  in `%xmm0`/`%xmm1`; `frontier_register_array_double_call_sum_after_eight`
+  proves register-sourced SSE/SSE aggregate stack forwarding after the callee
+  SSE stream is exhausted by eight leading scalar `double` arguments
 - first nested SSE/SSE aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `{ { double }, { double } }` nested
   field GEPs lower through layout-backed byte offsets, read both `double`

@@ -6753,7 +6753,7 @@ test "x86_64 codegen preserves live f64 parameter across direct call" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }, machine.instructions.items[1]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.movapd_xmm1_xmm0, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm0, .src = .xmm1 } }, machine.instructions.items[2]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }, machine.instructions.items[4]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[5]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
@@ -6782,7 +6782,7 @@ test "x86_64 codegen preserves live f32 parameter across direct call" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }, machine.instructions.items[1]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.movapd_xmm1_xmm0, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm0, .src = .xmm1 } }, machine.instructions.items[2]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }, machine.instructions.items[4]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[5]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
@@ -6884,7 +6884,7 @@ test "x86_64 codegen preserves two live f32 params across FP argument call" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
     try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
-    try expectMachineInstruction(machine.instructions.items, .movapd_xmm1_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .{ .movapd_xmm = .{ .dst = .xmm0, .src = .xmm1 } });
     try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
     try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
     try expectMachineInstruction(machine.instructions.items, .addss_xmm1_xmm0);
@@ -6914,7 +6914,7 @@ test "x86_64 codegen preserves two live f64 params across FP argument call" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
     try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
-    try expectMachineInstruction(machine.instructions.items, .movapd_xmm1_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .{ .movapd_xmm = .{ .dst = .xmm0, .src = .xmm1 } });
     try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
     try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
     try expectMachineInstruction(machine.instructions.items, .addsd_xmm1_xmm0);
@@ -7656,6 +7656,41 @@ test "x86_64 generic CFG forwards register integer aggregate to stack aggregate 
     try std.testing.expect(call.ret_ty.eql(.{ .int = 64 }));
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[10]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[11]);
+}
+
+test "x86_64 generic CFG forwards register SSE aggregate to stack aggregate call before clobbering XMMs" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare double @sum_double_pair_after_eight(double, double, double, double, double, double, double, double, { [2 x double] })
+        \\
+        \\define double @caller({ [2 x double] } %value) {
+        \\entry:
+        \\  %r = call double @sum_double_pair_after_eight(double 1.000000e+00, double 2.000000e+00, double 3.000000e+00, double 4.000000e+00, double 5.000000e+00, double 6.000000e+00, double 7.000000e+00, double 8.000000e+00, { [2 x double] } %value)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_xmm64 = .xmm1 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_xmm64 = .xmm0 }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm0, .bits = 0x3ff0_0000_0000_0000 } }, machine.instructions.items[3]);
+    const call = switch (machine.instructions.items[11]) {
+        .direct_call => |call| call,
+        else => return error.ExpectedDirectCall,
+    };
+    try std.testing.expectEqualStrings("sum_double_pair_after_eight", call.symbol);
+    try std.testing.expect(call.ret_ty.eql(.double));
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[12]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[13]);
 }
 
 test "x86_64 generic CFG shifts register aggregate GPRs for mixed aggregate call" {

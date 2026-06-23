@@ -23,6 +23,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_arg64_arg => |mov| try writer.print("\tmovq {s}, {s}\n", .{ mov.src.name64(), mov.dst.name64() }),
             .push_arg => |reg| try writer.print("\tpushq {s}\n", .{reg.name64()}),
             .push_rax => try writer.writeAll("\tpushq %rax\n"),
+            .push_xmm64 => |reg| try writer.print("\tsubq $8, %rsp\n\tmovsd {s}, (%rsp)\n", .{reg.name()}),
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
             .add_arg64_rax => |reg| try writer.print("\taddq {s}, %rax\n", .{reg.name64()}),
             .add_arg_high32_eax => |reg| try writer.print("\tmovq {s}, %rcx\n\tshrq $32, %rcx\n\taddl %ecx, %eax\n", .{reg.name64()}),
