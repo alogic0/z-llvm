@@ -182,6 +182,9 @@ accepted frontier:
   selected stack-sourced INTEGER aggregate forwarding into outgoing GPR
   aggregate helper calls and selected stack-sourced SSE/SSE aggregate
   forwarding into outgoing XMM aggregate helper calls
+  selected shifted in-register mixed aggregate helper calls where the INTEGER
+  eightbyte moves between GPR argument slots and the SSE eightbyte already
+  occupies the destination SSE slot
   generated normal integer-leaf MEMORY aggregate hidden-sret return storage and
   byval-to-sret copies currently proven through twenty flat fields, a nested
   two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and
@@ -228,6 +231,9 @@ selected SSE/SSE aggregate returns, including `[2]f64` array-in-struct and
 nested `{ { double }, { double } }`, are lowered in %xmm0/%xmm1
 selected stack-passed INTEGER aggregate parameters are loaded from the caller
 stack into outgoing GPR aggregate slots before helper calls
+selected shifted mixed aggregate parameters move the INTEGER eightbyte between
+GPR argument slots before helper calls when the SSE eightbyte already matches
+the outgoing SSE slot
 selected one-live f32/f64 values across a direct C ABI void call are spilled
 from %xmm0 to an aligned frame slot and reloaded to %xmm0 for return
 selected two-live f32/f64 values across a no-argument direct C ABI void call are
@@ -321,6 +327,7 @@ selected small INTEGER/INTEGER aggregate return and argument-field reads
 selected mixed INTEGER/SSE aggregate argument-field reads
 selected reversed mixed SSE/INTEGER aggregate argument-field reads
 selected SSE/SSE aggregate argument-field reads and register returns
+selected shifted in-register mixed aggregate pass-through calls
 selected up-to-six-live-i32 spill/reload call frame
 selected two-call six-live-i32 spill/reload call frame
 selected disp8-safe stack-passed live i32 post-call add-tree rows

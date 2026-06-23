@@ -7584,6 +7584,40 @@ test "x86_64 generic CFG forwards stack-passed mixed aggregate to register aggre
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
 
+test "x86_64 generic CFG shifts register aggregate GPRs for mixed aggregate call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @mixed_int({ i64, double })
+        \\
+        \\define i64 @caller(i64 %prefix, { i64, double } %value) {
+        \\entry:
+        \\  %r = call i64 @mixed_int({ i64, double } %value)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rsi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(machine.instructions.items[0]));
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[1]);
+    const call = switch (machine.instructions.items[2]) {
+        .direct_call => |call| call,
+        else => return error.ExpectedDirectCall,
+    };
+    try std.testing.expectEqualStrings("mixed_int", call.symbol);
+    try std.testing.expect(call.ret_ty.eql(.{ .int = 64 }));
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
+}
+
 test "x86_64 SysV call planner rejects varargs explicitly" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

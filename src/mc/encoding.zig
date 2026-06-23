@@ -422,7 +422,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .movq_xmm_rax => 5,
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
-        .mov_arg64_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
+        .mov_arg64_arg => 3,
         .push_arg => |reg| if (reg.rexB()) 2 else 1,
         .push_rax => 1,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,

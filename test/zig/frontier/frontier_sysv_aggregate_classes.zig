@@ -101,6 +101,11 @@ export fn frontier_stack_mixed_call_int(a0: i64, a1: i64, a2: i64, a3: i64, a4: 
     return helperMixedInt(value);
 }
 
+export fn frontier_shifted_mixed_call_int(prefix: i64, value: Mixed) i64 {
+    _ = prefix;
+    return helperMixedInt(value);
+}
+
 export fn frontier_double_pair_first(value: DoublePair) f64 {
     return value.a;
 }

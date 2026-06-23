@@ -22581,10 +22581,6 @@ fn planSysVRegisterAggregatePassThrough(
     const source = try sysvParamCursorFor(function, name, arg.ty);
     int_arg_index.* += needs.gpr;
     fp_arg_index.* += needs.sse;
-    const source_in_registers = source.gpr + needs.gpr <= 6 and source.sse + needs.sse <= 8;
-    if (source_in_registers and (source.gpr != dest_gpr or source.sse != dest_sse or source.stack_eightbytes != 0)) {
-        return error.UnsupportedCodegenAbi;
-    }
     return .{
         .classification = classification,
         .source = source,
@@ -22606,7 +22602,31 @@ fn appendSysVRegisterAggregatePassThroughArg(
 ) !void {
     const needs = sysvAggregateRegisterNeeds(pass.classification);
     const source_in_registers = pass.source.gpr + needs.gpr <= 6 and pass.source.sse + needs.sse <= 8;
-    if (source_in_registers) return;
+    if (source_in_registers) {
+        if (pass.source.stack_eightbytes != 0) return error.UnsupportedCodegenAbi;
+        if (pass.source.sse != pass.dest_sse) return error.UnsupportedCodegenAbi;
+        if (pass.source.gpr == pass.dest_gpr) return;
+
+        if (pass.dest_gpr < pass.source.gpr) {
+            var gpr_offset: usize = 0;
+            while (gpr_offset < needs.gpr) : (gpr_offset += 1) {
+                try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{
+                    .dst = try ArgReg.fromIndex(pass.dest_gpr + gpr_offset),
+                    .src = try ArgReg.fromIndex(pass.source.gpr + gpr_offset),
+                } });
+            }
+        } else {
+            var remaining = needs.gpr;
+            while (remaining > 0) {
+                remaining -= 1;
+                try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{
+                    .dst = try ArgReg.fromIndex(pass.dest_gpr + remaining),
+                    .src = try ArgReg.fromIndex(pass.source.gpr + remaining),
+                } });
+            }
+        }
+        return;
+    }
 
     var gpr_offset: usize = 0;
     var sse_offset: usize = 0;

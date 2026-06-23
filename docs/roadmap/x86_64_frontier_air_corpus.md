@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=158
-structured_functions=158
-generic_codegen_functions=158
-generic_cfg_functions=158
+discovered_functions=159
+structured_functions=159
+generic_codegen_functions=159
+generic_cfg_functions=159
 structural_matcher_functions=0
-structured_air_v2_functions=158
-typed_air_operand_functions=158
+structured_air_v2_functions=159
+typed_air_operand_functions=159
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=158
+generic_lowering_functions=159
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=158
+object_emitted_functions=159
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -152,7 +152,10 @@ Closed in the current memory/aggregate frontier slice:
   aggregate into a private helper by loading the stack eightbytes into outgoing
   GPR aggregate slots, and `frontier_stack_mixed_call_int` forwards a
   stack-passed `{ i64, double }` mixed aggregate by loading the INTEGER
-  eightbyte into the outgoing GPR stream and the SSE eightbyte into `%xmm0`
+  eightbyte into the outgoing GPR stream and the SSE eightbyte into `%xmm0`;
+  `frontier_shifted_mixed_call_int` now proves in-register aggregate
+  pass-through can move a shifted INTEGER eightbyte from `%rsi` to `%rdi`
+  before the helper call instead of requiring exact source/destination slots
 - first SSE/SSE aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ double, double }` is classified as
   SSE/SSE, field reads return from the independent SSE argument stream, and

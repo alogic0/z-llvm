@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=158`,
-`generic_codegen_functions=158`, `generic_cfg_functions=158`,
+three release modes at `source_rows=13`, `discovered_functions=159`,
+`generic_codegen_functions=159`, `generic_cfg_functions=159`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=158`, `object_failures=0`,
+`object_emitted_functions=159`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -478,7 +478,8 @@ plus selected packed mixed construction returns, SSE/SSE field-read/return inclu
 selected stack-passed register aggregate field reads,
 selected stack-sourced INTEGER aggregate forwarding into outgoing register
 aggregate helper calls, selected stack-sourced SSE/SSE aggregate forwarding
-into outgoing XMM aggregate helper calls, and
+into outgoing XMM aggregate helper calls, selected shifted in-register mixed
+aggregate GPR movement before helper calls, and
 generated normal MEMORY i64
 sret/byval field/copy forms currently proven through twenty flat fields and a
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy and

@@ -1756,6 +1756,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Mixed z_frontier_mixed_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_make");
     \\extern struct Mixed z_frontier_mixed_call_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_call_make");
     \\extern long long z_frontier_stack_mixed_call_int(long long, long long, long long, long long, long long, long long, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_mixed_call_int");
+    \\extern long long z_frontier_shifted_mixed_call_int(long long, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_mixed_call_int");
     \\extern double z_frontier_double_pair_first(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_first");
     \\extern double z_frontier_double_pair_second(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_second");
     \\extern struct DoublePair z_frontier_double_pair_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_make");
@@ -1801,6 +1802,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct Mixed call_made = z_frontier_mixed_call_make(81, 10.5);
     \\    if (call_made.a != 81 || call_made.b != 10.5) return 14;
     \\    if (z_frontier_stack_mixed_call_int(1, 2, 3, 4, 5, 6, value) != 123456789LL) return 48;
+    \\    if (z_frontier_shifted_mixed_call_int(99, value) != 123456789LL) return 49;
     \\    struct DoublePair doubles = { 1.25, 7.5 };
     \\    if (z_frontier_double_pair_first(doubles) != 1.25) return 4;
     \\    if (z_frontier_double_pair_second(doubles) != 7.5) return 5;
