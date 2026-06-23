@@ -10,6 +10,7 @@ const Sum8I64Fn = *const fn (i64, i64, i64, i64, i64, i64, i64, i64) callconv(.c
 const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
 const IdI32Fn = *const fn (i32) callconv(.c) i32;
+const VoidFn = *const fn () callconv(.c) void;
 const MakePair64Fn = *const fn (i64, i64) callconv(.c) Pair64;
 const Pair64FirstFn = *const fn (Pair64) callconv(.c) i64;
 
@@ -67,6 +68,12 @@ export fn frontier_six_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f
 export fn frontier_two_void_calls_six_live(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32 {
     frontier_touch_none();
     frontier_touch_none();
+    return a + b + c + d + e + f;
+}
+
+export fn frontier_two_indirect_void_calls_six_live(func: VoidFn, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32 {
+    func();
+    func();
     return a + b + c + d + e + f;
 }
 

@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=172
-structured_functions=172
-generic_codegen_functions=172
-generic_cfg_functions=172
+discovered_functions=173
+structured_functions=173
+generic_codegen_functions=173
+generic_cfg_functions=173
 structural_matcher_functions=0
-structured_air_v2_functions=172
-typed_air_operand_functions=172
+structured_air_v2_functions=173
+typed_air_operand_functions=173
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=172
+generic_lowering_functions=173
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=172
+object_emitted_functions=173
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -288,7 +288,9 @@ Closed in the current memory/aggregate frontier slice:
   outgoing stack argument area through the same shared SysV scalar planner.
 - selected multi-call live-value frame in `frontier_sysv_abi.zig`:
   `frontier_two_void_calls_six_live` keeps six live GPR `i32` values across two
-  void C ABI calls through the generic CFG live-param spill/reload helper.
+  void C ABI calls through the generic CFG live-param spill/reload helper;
+  `frontier_two_indirect_void_calls_six_live` proves the same frame path around
+  two pointer-callee `callq *%rax` calls.
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded
