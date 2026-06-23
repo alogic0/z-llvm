@@ -143,6 +143,10 @@ aggregate argument field reads and register aggregate return:
   `{ i64, double }` construction returns through %rax/%xmm0
   a noinline helper-call row returns `{ i64, double }` directly from the private helper without scalarized wrapper lowering
   stack-passed INTEGER aggregate parameters can now be forwarded into outgoing register aggregate helper calls by loading the source stack eightbytes into the destination GPR pair
+  stack-passed INTEGER/INTEGER aggregate parameters can also be forwarded into
+  outgoing stack aggregate slots when preceding scalar arguments exhaust the
+  callee GPR stream; SSE stack-destination aggregate forwarding remains an
+  explicit future boundary
   shifted in-register mixed aggregate parameters can move the INTEGER eightbyte
   between GPR argument slots before helper calls when the SSE eightbyte already
   occupies the required destination SSE slot

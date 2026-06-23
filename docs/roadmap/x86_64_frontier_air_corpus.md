@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=161
-structured_functions=161
-generic_codegen_functions=161
-generic_cfg_functions=161
+discovered_functions=163
+structured_functions=163
+generic_codegen_functions=163
+generic_cfg_functions=163
 structural_matcher_functions=0
-structured_air_v2_functions=161
-typed_air_operand_functions=161
+structured_air_v2_functions=163
+typed_air_operand_functions=163
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=161
+generic_lowering_functions=163
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=161
+object_emitted_functions=163
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -195,7 +195,11 @@ Closed in the current memory/aggregate frontier slice:
 - first stack-passed register aggregate row in
   `frontier_sysv_aggregate_classes.zig`: after six leading `i64` parameters
   exhaust the GPR stream, a `[2]i64` aggregate argument is read from the call
-  stack through the same recursive aggregate GEP offset path
+  stack through the same recursive aggregate GEP offset path; the follow-up
+  `frontier_stack_array_pair_call_sum_after_six` row passes the same
+  stack-sourced aggregate through to a helper whose outgoing aggregate
+  destination is also the SysV stack area, proving integer aggregate stack
+  argument forwarding without register-slot assumptions
 - first array-in-struct SSE/SSE aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `[2]f64` field and pointer-element
   GEPs lower from typed AIR v2, the two `double` elements are read from the

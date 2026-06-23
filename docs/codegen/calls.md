@@ -234,6 +234,8 @@ selected SSE/SSE aggregate returns, including `[2]f64` array-in-struct and
 nested `{ { double }, { double } }`, are lowered in %xmm0/%xmm1
 selected stack-passed INTEGER aggregate parameters are loaded from the caller
 stack into outgoing GPR aggregate slots before helper calls
+selected stack-passed INTEGER/INTEGER aggregate parameters are also pushed into
+outgoing stack aggregate slots when the callee-side GPR stream is exhausted
 selected shifted mixed aggregate parameters move the INTEGER eightbyte between
 GPR argument slots before helper calls when the SSE eightbyte already matches
 the outgoing SSE slot

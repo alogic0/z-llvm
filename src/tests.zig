@@ -7584,6 +7584,40 @@ test "x86_64 generic CFG forwards stack-passed mixed aggregate to register aggre
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
 
+test "x86_64 generic CFG forwards stack-passed integer aggregate to stack aggregate call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @sum_pair_after_six(i64, i64, i64, i64, i64, i64, { [2 x i64] })
+        \\
+        \\define i64 @caller(i64 %a0, i64 %a1, i64 %a2, i64 %a3, i64 %a4, i64 %a5, { [2 x i64] } %value) {
+        \\entry:
+        \\  %r = call i64 @sum_pair_after_six(i64 %a0, i64 %a1, i64 %a2, i64 %a3, i64 %a4, i64 %a5, { [2 x i64] } %value)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_stack_disp8 = 24 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_stack_disp8 = 24 }, machine.instructions.items[2]);
+    const call = switch (machine.instructions.items[3]) {
+        .direct_call => |call| call,
+        else => return error.ExpectedDirectCall,
+    };
+    try std.testing.expectEqualStrings("sum_pair_after_six", call.symbol);
+    try std.testing.expect(call.ret_ty.eql(.{ .int = 64 }));
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+}
+
 test "x86_64 generic CFG shifts register aggregate GPRs for mixed aggregate call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

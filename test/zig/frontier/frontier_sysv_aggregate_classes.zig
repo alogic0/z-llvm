@@ -155,6 +155,16 @@ noinline fn helperArrayPairSum(value: ArrayPair) i64 {
     return value.values[0] + value.values[1];
 }
 
+noinline fn helperArrayPairSumAfterSix(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, value: ArrayPair) i64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    return value.values[0] + value.values[1];
+}
+
 export fn frontier_nested_pair_make(a: i32, b: i32, c: i32, d: i32) NestedPair {
     return .{ .left = .{ .a = a, .b = b }, .right = .{ .a = c, .b = d } };
 }
@@ -195,6 +205,10 @@ export fn frontier_stack_array_pair_call_sum(a0: i64, a1: i64, a2: i64, a3: i64,
     _ = a4;
     _ = a5;
     return helperArrayPairSum(value);
+}
+
+export fn frontier_stack_array_pair_call_sum_after_six(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, value: ArrayPair) i64 {
+    return helperArrayPairSumAfterSix(a0, a1, a2, a3, a4, a5, value);
 }
 
 noinline fn helperArrayDoubleSum(value: ArrayDouble) f64 {
