@@ -83,8 +83,22 @@ noinline fn helperMixedMake(a: i64, b: f64) Mixed {
     return .{ .a = a, .b = b };
 }
 
+noinline fn helperMixedInt(value: Mixed) i64 {
+    return value.a;
+}
+
 export fn frontier_mixed_call_make(a: i64, b: f64) Mixed {
     return helperMixedMake(a, b);
+}
+
+export fn frontier_stack_mixed_call_int(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, value: Mixed) i64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    return helperMixedInt(value);
 }
 
 export fn frontier_double_pair_first(value: DoublePair) f64 {
