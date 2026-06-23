@@ -6676,21 +6676,21 @@ fn isI64LeafAggregate(aggregate_ty: ir.Type) bool {
     return true;
 }
 
-fn isSupportedIntegerLeafAggregate(aggregate_ty: ir.Type) bool {
+fn isSupportedAggregateCopyLeafAggregate(aggregate_ty: ir.Type) bool {
     const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
     if (field_count == 0) return false;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return false;
-        if (supportedAggregateIntegerLeaf(field_ty)) continue;
-        if (isAggregateType(field_ty) and isSupportedIntegerLeafAggregate(field_ty)) continue;
+        if (supportedAggregateCopyLeaf(field_ty)) continue;
+        if (isAggregateType(field_ty) and isSupportedAggregateCopyLeafAggregate(field_ty)) continue;
         return false;
     }
     return true;
 }
 
-fn supportedAggregateIntegerLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.double);
+fn supportedAggregateCopyLeaf(ty: ir.Type) bool {
+    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.double);
 }
 
 fn aggregateFieldIndexFromGep(instruction: ir.Instruction, aggregate_ty: ir.Type, base_name: []const u8) ?usize {
@@ -14108,7 +14108,7 @@ fn lowerGenericCfgSretCopy(
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
     const byval_ty = byvalAggregateType(function.params.items[1].attrs) orelse return false;
     if (!byval_ty.eql(aggregate_ty)) return false;
-    if (!isSupportedIntegerLeafAggregate(aggregate_ty)) return false;
+    if (!isSupportedAggregateCopyLeafAggregate(aggregate_ty)) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;
     const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
     if (sret_reg != .rdi) return error.UnsupportedCodegenAbi;
@@ -14133,7 +14133,7 @@ fn lowerGenericCfgSretCopy(
             .load => |load| load,
             else => return false,
         };
-        if (!supportedAggregateIntegerLeaf(load.ty) or load.attrs.isBarrier() or !isNamed(load.ptr, src_gep_name)) return false;
+        if (!supportedAggregateCopyLeaf(load.ty) or load.attrs.isBarrier() or !isNamed(load.ptr, src_gep_name)) return false;
         const store = switch (store_inst.kind) {
             .store => |store| store,
             else => return false,
@@ -14145,7 +14145,7 @@ fn lowerGenericCfgSretCopy(
         if (load.ty.eql(.double)) {
             try appendLoadStackDispXmm0(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
             try appendStoreXmm0ArgPtrDisp(allocator, machine, sret_reg, offset);
-        } else if (load.ty.eql(.{ .int = 64 })) {
+        } else if (load.ty.eql(.{ .int = 64 }) or load.ty.eql(.ptr)) {
             try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
             try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, offset);
         } else if (load.ty.eql(.{ .int = 32 })) {
@@ -14168,7 +14168,7 @@ fn aggregateCopyGepOffset(instruction: ir.Instruction, aggregate_ty: ir.Type, ba
     const layout = x86_64SysVDataLayout() catch return null;
     const offset = aggregateGepByteOffset(layout, aggregate_ty, gep) orelse return null;
     const field_ty = aggregateLeafTypeAtOffset(layout, aggregate_ty, offset) orelse return null;
-    if (!supportedAggregateIntegerLeaf(field_ty)) return null;
+    if (!supportedAggregateCopyLeaf(field_ty)) return null;
     return offset;
 }
 

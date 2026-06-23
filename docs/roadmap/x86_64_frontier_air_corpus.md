@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=154
-structured_functions=154
-generic_codegen_functions=154
-generic_cfg_functions=154
+discovered_functions=155
+structured_functions=155
+generic_codegen_functions=155
+generic_cfg_functions=155
 structural_matcher_functions=0
-structured_air_v2_functions=154
-typed_air_operand_functions=154
+structured_air_v2_functions=155
+typed_air_operand_functions=155
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=154
+generic_lowering_functions=155
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=154
+object_emitted_functions=155
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -135,7 +135,9 @@ Closed in the current memory/aggregate frontier slice:
   now covers larger normal integer-leaf MEMORY aggregates through `Big20`
   construction, field-read, and byval-to-sret copy rows; the `BigDouble` row
   adds the first double-leaf MEMORY byval-to-sret copy proof through XMM
-  `movsd` stack loads and hidden-sret stores
+  `movsd` stack loads and hidden-sret stores, and the `BigPtrDouble` row
+  proves the same layout-derived copy path for pointer, `double`, and `i64`
+  leaves in one MEMORY aggregate
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }`, selected
   `{ i32, double }`, and selected `{ i32, i32, double }` forms are classified as
@@ -301,9 +303,10 @@ Remaining measured frontier blockers kept out of accepted rows:
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
   reads/returns including `[2]f64` array-in-struct and nested `{ { double },
   { double } }`, selected stack-passed register aggregate field reads, and generated
-  normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
+  normal MEMORY aggregate sret/byval field/copy forms currently proven
   through twenty flat fields, a nested two-Big3 aggregate, a mixed-width
-  `{ i64, i32, i64, i32 }` copy, and array-backed `{ [5 x i64] }` copy/read rows; X87,
+  `{ i64, i32, i64, i32 }` copy, array-backed `{ [5 x i64] }` copy/read rows,
+  a `double`-leaf copy, and a mixed pointer/`double`/`i64` copy; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, more than six
   stack-passed live values, and broader SSE live-across-call frames beyond the

@@ -1126,7 +1126,7 @@ fn typedV2SretIntegerAggregateCopyRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    const leaf_count = supportedIntegerAggregateLeafCount(function_type.return_type.ir_type) orelse return false;
+    const leaf_count = supportedAggregateCopyLeafCount(function_type.return_type.ir_type) orelse return false;
     if (leaf_count < 3 or function_type.params.len != 1) return false;
     if (!function_type.params[0].ir_type.eql(function_type.return_type.ir_type)) return false;
     return typedOpcodeCount(structured_air_v2, "arg") == 1 and
@@ -1144,17 +1144,17 @@ fn integerAggregateFieldCount(ty: ir.Type) ?usize {
     return field_count;
 }
 
-fn supportedIntegerAggregateLeafCount(ty: ir.Type) ?usize {
+fn supportedAggregateCopyLeafCount(ty: ir.Type) ?usize {
     const field_count = aggregateFieldCount(ty) orelse return null;
     if (field_count == 0) return null;
     var count: usize = 0;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         const field_ty = memory_location.aggregateFieldType(ty, field_index) orelse return null;
-        if (supportedAggregateIntegerLeaf(field_ty)) {
+        if (supportedAggregateCopyLeaf(field_ty)) {
             count += 1;
         } else if (isAggregateIrType(field_ty)) {
-            count += supportedIntegerAggregateLeafCount(field_ty) orelse return null;
+            count += supportedAggregateCopyLeafCount(field_ty) orelse return null;
         } else {
             return null;
         }
@@ -1162,8 +1162,8 @@ fn supportedIntegerAggregateLeafCount(ty: ir.Type) ?usize {
     return count;
 }
 
-fn supportedAggregateIntegerLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.double);
+fn supportedAggregateCopyLeaf(ty: ir.Type) bool {
+    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.double);
 }
 
 fn isAggregateIrType(ty: ir.Type) bool {
@@ -1202,7 +1202,7 @@ fn collectIntegerAggregateLeavesInto(
         const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return error.UnsupportedAir;
         if (offset_i < 0) return error.UnsupportedAir;
         const field_offset = base_offset + @as(u64, @intCast(offset_i));
-        if (supportedAggregateIntegerLeaf(field_ty)) {
+        if (supportedAggregateCopyLeaf(field_ty)) {
             try leaves.append(allocator, .{ .offset = field_offset, .ty = field_ty });
         } else if (isAggregateIrType(field_ty)) {
             try collectIntegerAggregateLeavesInto(allocator, leaves, layout, field_ty, field_offset);
@@ -5103,6 +5103,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigDouble")) {
         return .{ .ir_type = .{ .aggregate = "{ double, double, double }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigPtrDouble")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, double, i64 }" } };
     }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };

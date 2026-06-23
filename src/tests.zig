@@ -6265,6 +6265,45 @@ test "x86_64 codegen copies mixed-width memory aggregate leaves from byval to sr
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[8]);
 }
 
+test "x86_64 codegen copies pointer and double memory aggregate leaves from byval to sret" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @copy(ptr noalias sret({ ptr, double, i64 }) %out, ptr byval({ ptr, double, i64 }) %value) {
+        \\entry:
+        \\  %src0 = getelementptr i8, ptr %value, i64 0
+        \\  %load0 = load ptr, ptr %src0
+        \\  %dst0 = getelementptr i8, ptr %out, i64 0
+        \\  store ptr %load0, ptr %dst0
+        \\  %src1 = getelementptr i8, ptr %value, i64 8
+        \\  %load1 = load double, ptr %src1
+        \\  %dst1 = getelementptr i8, ptr %out, i64 8
+        \\  store double %load1, ptr %dst1
+        \\  %src2 = getelementptr i8, ptr %value, i64 16
+        \\  %load2 = load i64, ptr %src2
+        \\  %dst2 = getelementptr i8, ptr %out, i64 16
+        \\  store i64 %load2, ptr %dst2
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 8 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 0 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_xmm0 = 16 }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_xmm0_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 8 } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 24 }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 16 } }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
+}
+
 test "x86_64 codegen returns register aggregate from direct helper call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

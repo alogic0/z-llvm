@@ -134,6 +134,7 @@ frontier_sysv_sret_byval.Big3 through Big20 lower as selected normal MEMORY clas
   `{ [5 x i64] }` proves array-backed MEMORY copies and by-value edge field reads use the same integer-leaf byte-offset paths
   the flat `BigN` source type parser now covers larger normal integer-leaf MEMORY aggregates, with `Big20` proving construction, field-read, and byval-to-sret copy rows
   `{ double, double, double }` proves the first double-leaf byval-to-sret MEMORY aggregate copy path through XMM `movsd` stack loads and hidden-sret stores
+  `{ ptr, double, i64 }` proves mixed pointer/`double`/integer MEMORY aggregate copy leaves through the same layout-derived byte-offset path
 frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
 aggregate argument field reads and register aggregate return:
   field `i64` is returned from the aggregate's GPR class register
@@ -232,8 +233,8 @@ no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR s
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE field reads/construction, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
-no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
-no arbitrary non-selected sret/byval copy lowering
+no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal supported-leaf sret/byval forms
+no arbitrary non-selected sret/byval copy lowering outside supported `i32`/`i64`/pointer/`f64` leaves
 no broad indirect calls, tail calls, or unsupported non-default call conventions
 no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32/i64, computed stack-passed i32/i64, one- through six-live f32/f64 no-argument-call shapes, two-live FP-argument call shape, and selected two-call six-live i32 GPR frame
 stack-passed live integer pressure beyond the current disp8-safe incoming stack offset model is rejected explicitly rather than guessed
@@ -250,8 +251,8 @@ falling into a generic unsupported bucket.
 | --- | --- | --- |
 | Varargs | Fail-closed boundary | Parser preserves varargs declarations/calls; x86_64 codegen rejects varargs with `UnsupportedCodegenAbi`. Next implementation is a dedicated SysV varargs call planner including `%al` SSE-count and register-save-area policy. |
 | Vectors | Fail-closed boundary | Vector IR parse/verify coverage exists; x86_64 call/return codegen rejects vector ABI forms. Next implementation is either a fixed SSE-register subset or a permanent explicit boundary for release replacement rows. |
-| Arbitrary sret | Partially implemented | Normal integer-leaf MEMORY aggregate sret rows are proven for flat, nested, mixed-width, and array-backed selected forms, and the first double-leaf copy row is proven through `BigDouble`. Next implementation is layout-driven arbitrary MEMORY aggregate copy/storage for broader non-integer leaves. |
-| Arbitrary byval | Partially implemented | Normal integer-leaf byval reads/copies are layout-derived for selected MEMORY aggregates, with a double-leaf byval-to-sret copy now covered. Next implementation is a general byval placement/copy path for arbitrary supported layouts and alignments. |
+| Arbitrary sret | Partially implemented | Normal supported-leaf MEMORY aggregate sret rows are proven for flat, nested, mixed-width, array-backed, `double`, and pointer/`double`/integer selected forms. The current layout-derived copy path supports `i32`, `i64`, pointer, and `f64` leaves. Next implementation is broader arbitrary MEMORY aggregate copy/storage for packed, unaligned, X87, vector, and other unsupported leaves. |
+| Arbitrary byval | Partially implemented | Normal supported-leaf byval reads/copies are layout-derived for selected MEMORY aggregates, including pointer and `double` leaves. Next implementation is a general byval placement/copy path for unsupported layouts and alignments. |
 | Broader aggregate classes | Partially implemented | The reusable classifier handles INTEGER, SSE, mixed INTEGER/SSE, and MEMORY decisions for <=16-byte aggregates; backend lowering accepts selected register and MEMORY forms, including stack-sourced INTEGER aggregate forwarding into GPR aggregate helper calls and stack-sourced SSE/SSE aggregate forwarding into XMM aggregate helper calls. Next implementation is a central call planner that assigns all supported classified aggregate args/returns. |
 | Packed/unaligned aggregates | Fail-closed boundary | Packed/unaligned aggregate ABI classes are classified as MEMORY/rejected unless represented by already selected scalar field paths. Next implementation requires layout-aware unaligned load/store/copy decisions. |
 | X87 / long double | Fail-closed boundary | `x86_fp80` and X87-like classes are not accepted by local codegen. Next implementation is deferred; rows must remain explicit runtime/ABI boundaries. |
