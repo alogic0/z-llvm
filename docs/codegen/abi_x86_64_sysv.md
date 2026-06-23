@@ -147,6 +147,9 @@ aggregate argument field reads and register aggregate return:
   outgoing stack aggregate slots when preceding scalar arguments exhaust the
   callee GPR stream; SSE stack-destination aggregate forwarding remains an
   explicit future boundary
+  register-sourced INTEGER/INTEGER aggregates use the same stack destination
+  path and are pushed before scalar call arguments are assigned, so source GPRs
+  are not clobbered by outgoing `%rdi`/`%rsi` reuse
   shifted in-register mixed aggregate parameters can move the INTEGER eightbyte
   between GPR argument slots before helper calls when the SSE eightbyte already
   occupies the required destination SSE slot

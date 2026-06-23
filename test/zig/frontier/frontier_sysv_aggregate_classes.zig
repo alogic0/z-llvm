@@ -211,6 +211,10 @@ export fn frontier_stack_array_pair_call_sum_after_six(a0: i64, a1: i64, a2: i64
     return helperArrayPairSumAfterSix(a0, a1, a2, a3, a4, a5, value);
 }
 
+export fn frontier_register_array_pair_call_sum_after_six(value: ArrayPair) i64 {
+    return helperArrayPairSumAfterSix(1, 2, 3, 4, 5, 6, value);
+}
+
 noinline fn helperArrayDoubleSum(value: ArrayDouble) f64 {
     return value.values[0] + value.values[1];
 }

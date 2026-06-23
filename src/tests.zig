@@ -6503,9 +6503,9 @@ test "x86_64 codegen supports one stack-passed i32 call argument" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r8 = 5 }, machine.instructions.items[4]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r9 = 6 }, machine.instructions.items[5]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r8 = 5 }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r9 = 6 }, machine.instructions.items[6]);
 }
 
 test "x86_64 codegen supports multiple stack-passed i32 call arguments" {
@@ -6529,9 +6529,9 @@ test "x86_64 codegen supports multiple stack-passed i32 call arguments" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[7]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[8]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[2]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[machine.instructions.items.len - 2]);
 }
 
@@ -6556,13 +6556,13 @@ test "x86_64 codegen supports six stack-passed i32 call arguments" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 12 }, machine.instructions.items[7]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 11 }, machine.instructions.items[8]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 10 }, machine.instructions.items[9]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[10]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[11]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[12]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 12 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 11 }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 10 }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[6]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_56, machine.instructions.items[machine.instructions.items.len - 2]);
 }
 
@@ -6587,8 +6587,8 @@ test "x86_64 codegen supports eight stack-passed i32 call arguments" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 14 }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 14 }, machine.instructions.items[1]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_rsp_imm8 = 72 }, machine.instructions.items[machine.instructions.items.len - 2]);
 }
 
@@ -6613,8 +6613,8 @@ test "x86_64 codegen supports twelve stack-passed i32 call arguments" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 18 }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 18 }, machine.instructions.items[1]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_rsp_imm8 = 104 }, machine.instructions.items[machine.instructions.items.len - 2]);
 }
 
@@ -6699,9 +6699,9 @@ test "x86_64 codegen aligns calls with two stack-passed arguments" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[7]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[8]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[2]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[machine.instructions.items.len - 2]);
 }
 
@@ -7199,11 +7199,11 @@ test "x86_64 codegen supports mixed integer and SSE call streams with stack args
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdi = 1 }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm32_xmm = .{ .reg = .xmm0, .bits = 0x4000_0000 } }, machine.instructions.items[1]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rsi = 3 }, machine.instructions.items[2]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm1, .bits = 0x4010_0000_0000_0000 } }, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[8]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdi = 1 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm32_xmm = .{ .reg = .xmm0, .bits = 0x4000_0000 } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rsi = 3 }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm1, .bits = 0x4010_0000_0000_0000 } }, machine.instructions.items[4]);
 }
 
 test "x86_64 codegen supports five named f64 pass-through call args" {
@@ -7618,6 +7618,46 @@ test "x86_64 generic CFG forwards stack-passed integer aggregate to stack aggreg
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
 
+test "x86_64 generic CFG forwards register integer aggregate to stack aggregate call before clobbering args" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @sum_pair_after_six(i64, i64, i64, i64, i64, i64, { [2 x i64] })
+        \\
+        \\define i64 @caller({ [2 x i64] } %value) {
+        \\entry:
+        \\  %r = call i64 @sum_pair_after_six(i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, { [2 x i64] } %value)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_arg = .rsi }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_arg = .rdi }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdi = 1 }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rsi = 2 }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdx = 3 }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rcx = 4 }, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r8 = 5 }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r9 = 6 }, machine.instructions.items[8]);
+    const call = switch (machine.instructions.items[9]) {
+        .direct_call => |call| call,
+        else => return error.ExpectedDirectCall,
+    };
+    try std.testing.expectEqualStrings("sum_pair_after_six", call.symbol);
+    try std.testing.expect(call.ret_ty.eql(.{ .int = 64 }));
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[10]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[11]);
+}
+
 test "x86_64 generic CFG shifts register aggregate GPRs for mixed aggregate call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -7819,17 +7859,21 @@ test "x86_64 generic CFG lowers indirect i64 call with stack parameter reload" {
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rsi } }, machine.instructions.items[1]);
 
+    var saw_shifted_first_arg = false;
     var saw_stack_i64_reload = false;
     for (machine.instructions.items) |instruction| {
         switch (instruction) {
+            .mov_arg64_arg => |mov| {
+                if (mov.dst == .rdi and mov.src == .rsi) saw_shifted_first_arg = true;
+            },
             .load_stack_disp8_arg64 => |load| {
-                if (load.reg == .r9 and load.disp == 8) saw_stack_i64_reload = true;
+                if (load.reg == .r9 and load.disp == 32) saw_stack_i64_reload = true;
             },
             else => {},
         }
     }
+    try std.testing.expect(saw_shifted_first_arg);
     try std.testing.expect(saw_stack_i64_reload);
 }
 

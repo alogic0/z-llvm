@@ -22333,36 +22333,7 @@ fn appendSysVScalarCallArgsWithBlock(
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
         switch (assignment) {
-            .gpr => |dst| {
-                if (!arg.ty.eql(.{ .int = 32 }) and !arg.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
-                switch (arg.value) {
-                    .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
-                    .named => |name| {
-                        if (sysvIntegerParamRegOrNull(function, name, arg.ty) catch |err| switch (err) {
-                            error.UnsupportedCodegenAbi => null,
-                            else => return err,
-                        }) |src| {
-                            if (src != dst) {
-                                try machine.instructions.append(allocator, if (arg.ty.eql(.{ .int = 64 }))
-                                    .{ .mov_arg64_arg = .{ .dst = dst, .src = src } }
-                                else
-                                    .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
-                            }
-                        } else if (arg.ty.eql(.{ .int = 32 })) {
-                            try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{
-                                .reg = dst,
-                                .disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }),
-                            } });
-                        } else if (arg.ty.eql(.{ .int = 64 })) {
-                            try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{
-                                .reg = dst,
-                                .disp = try scalarParamStackDisp8(function, name, .{ .int = 64 }),
-                            } });
-                        }
-                    },
-                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-                }
-            },
+            .gpr, .sse, .aggregate_register_passthrough => {},
             .stack_i32_const => |value| {
                 stack_args[stack_arg_count] = .{ .imm = value };
                 stack_arg_count += 1;
@@ -22390,33 +22361,6 @@ fn appendSysVScalarCallArgsWithBlock(
                     return error.UnsupportedCodegenAbi;
                 }
                 stack_arg_count += 1;
-            },
-            .sse => |dst| {
-                if (!arg.ty.eql(.float) and !arg.ty.eql(.double)) return error.UnsupportedCodegenType;
-                switch (arg.value) {
-                    .fp => if (arg.ty.eql(.float))
-                        try appendMoveImm32ToXmm(allocator, machine, dst, try fp32TextBits(arg.value))
-                    else
-                        try appendMoveImm64ToXmm(allocator, machine, dst, try fp64TextBits(arg.value)),
-                    .named => |name| {
-                        const src_index = if (arg.ty.eql(.float))
-                            try fpParamIndex(function, name, .float)
-                        else
-                            try fpParamIndex(function, name, .double);
-                        const dst_index: usize = @intFromEnum(dst);
-                        if (src_index != dst_index) {
-                            if (src_index == 1 and dst_index == 0) {
-                                try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
-                            } else {
-                                return error.UnsupportedCodegenAbi;
-                            }
-                        }
-                    },
-                    .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-                }
-            },
-            .aggregate_register_passthrough => |aggregate| {
-                try appendSysVRegisterAggregatePassThroughArg(allocator, machine, aggregate);
             },
             .aggregate_stack_passthrough => |aggregate| {
                 try appendSysVStackAggregatePassThroughArgs(&stack_args, &stack_arg_count, aggregate);
@@ -22455,7 +22399,78 @@ fn appendSysVScalarCallArgsWithBlock(
         try appendStackScalarCallArg(allocator, machine, function, maybe_block, stack_args[stack_index], reserved_stack_bytes);
         reserved_stack_bytes += 8;
     }
+    const incoming_stack_adjust = reserved_stack_bytes;
+
+    for (call.args.items, 0..) |arg, index| {
+        const assignment = plan.assignments.items[index];
+        switch (assignment) {
+            .gpr => |dst| {
+                if (!arg.ty.eql(.{ .int = 32 }) and !arg.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+                switch (arg.value) {
+                    .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
+                    .named => |name| {
+                        if (sysvIntegerParamRegOrNull(function, name, arg.ty) catch |err| switch (err) {
+                            error.UnsupportedCodegenAbi => null,
+                            else => return err,
+                        }) |src| {
+                            if (src != dst) {
+                                try machine.instructions.append(allocator, if (arg.ty.eql(.{ .int = 64 }))
+                                    .{ .mov_arg64_arg = .{ .dst = dst, .src = src } }
+                                else
+                                    .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                            }
+                        } else if (arg.ty.eql(.{ .int = 32 })) {
+                            try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{
+                                .reg = dst,
+                                .disp = try adjustedIncomingStackDisp8(try scalarParamStackDisp8(function, name, .{ .int = 32 }), incoming_stack_adjust),
+                            } });
+                        } else if (arg.ty.eql(.{ .int = 64 })) {
+                            try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{
+                                .reg = dst,
+                                .disp = try adjustedIncomingStackDisp8(try scalarParamStackDisp8(function, name, .{ .int = 64 }), incoming_stack_adjust),
+                            } });
+                        }
+                    },
+                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                }
+            },
+            .sse => |dst| {
+                if (!arg.ty.eql(.float) and !arg.ty.eql(.double)) return error.UnsupportedCodegenType;
+                switch (arg.value) {
+                    .fp => if (arg.ty.eql(.float))
+                        try appendMoveImm32ToXmm(allocator, machine, dst, try fp32TextBits(arg.value))
+                    else
+                        try appendMoveImm64ToXmm(allocator, machine, dst, try fp64TextBits(arg.value)),
+                    .named => |name| {
+                        const src_index = if (arg.ty.eql(.float))
+                            try fpParamIndex(function, name, .float)
+                        else
+                            try fpParamIndex(function, name, .double);
+                        const dst_index: usize = @intFromEnum(dst);
+                        if (src_index != dst_index) {
+                            if (src_index == 1 and dst_index == 0) {
+                                try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+                            } else {
+                                return error.UnsupportedCodegenAbi;
+                            }
+                        }
+                    },
+                    .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                }
+            },
+            .aggregate_register_passthrough => |aggregate| {
+                try appendSysVRegisterAggregatePassThroughArg(allocator, machine, aggregate, incoming_stack_adjust);
+            },
+            .stack_i32_const, .stack_i32_param, .aggregate_stack_passthrough => {},
+        }
+    }
     return stack_arg_count;
+}
+
+fn adjustedIncomingStackDisp8(base_offset: u8, incoming_stack_adjust: usize) !u8 {
+    const adjusted = @as(usize, base_offset) + incoming_stack_adjust;
+    if (adjusted > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+    return @intCast(adjusted);
 }
 
 pub const SysVCallPlanCounts = struct {
@@ -22630,6 +22645,7 @@ fn appendSysVRegisterAggregatePassThroughArg(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     pass: SysVRegisterAggregatePassThrough,
+    incoming_stack_adjust: usize,
 ) !void {
     const dest = switch (pass.dest) {
         .registers => |dest| dest,
@@ -22690,7 +22706,7 @@ fn appendSysVRegisterAggregatePassThroughArg(
         switch (pass.classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi) {
             .integer => {
                 const dst = try ArgReg.fromIndex(dest.gpr + gpr_offset);
-                const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8;
+                const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8 + incoming_stack_adjust;
                 if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
                 try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{
                     .reg = dst,
@@ -22700,7 +22716,7 @@ fn appendSysVRegisterAggregatePassThroughArg(
             },
             .sse => {
                 const dst = try XmmReg.fromIndex(dest.sse + sse_offset);
-                const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8;
+                const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8 + incoming_stack_adjust;
                 if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
                 try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm = .{
                     .reg = dst,
