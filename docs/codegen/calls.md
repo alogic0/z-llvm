@@ -179,6 +179,8 @@ accepted frontier:
   `i32` construction returns
   selected SSE/SSE aggregate argument field reads and register return including
   `[2]f64` array-in-struct and nested `{ { double }, { double } }`
+  selected stack-sourced INTEGER aggregate forwarding into outgoing register
+  aggregate helper calls
   generated normal integer-leaf MEMORY aggregate hidden-sret return storage and
   byval-to-sret copies currently proven through twenty flat fields, a nested
   two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and
@@ -220,6 +222,8 @@ selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax
 selected SSE/SSE aggregate returns, including `[2]f64` array-in-struct and
 nested `{ { double }, { double } }`, are lowered in %xmm0/%xmm1
+selected stack-passed INTEGER aggregate parameters are loaded from the caller
+stack into outgoing GPR aggregate slots before helper calls
 selected one-live f32/f64 values across a direct C ABI void call are spilled
 from %xmm0 to an aligned frame slot and reloaded to %xmm0 for return
 selected two-live f32/f64 values across a no-argument direct C ABI void call are

@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=150
-structured_functions=150
-generic_codegen_functions=150
-generic_cfg_functions=150
+discovered_functions=152
+structured_functions=152
+generic_codegen_functions=152
+generic_cfg_functions=152
 structural_matcher_functions=0
-structured_air_v2_functions=150
-typed_air_operand_functions=150
+structured_air_v2_functions=152
+typed_air_operand_functions=152
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=150
+generic_lowering_functions=152
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=150
+object_emitted_functions=152
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -144,7 +144,10 @@ Closed in the current memory/aggregate frontier slice:
   `i64` aggregate in `%rax`/`%xmm0`, while the packed mixed construction row
   packs adjacent low/high `i32` fields into `%rax` and returns the `double` in
   `%xmm0`; a noinline helper-call row returns the same register aggregate
-  directly from a private helper without scalarizing through a selected wrapper
+  directly from a private helper without scalarizing through a selected wrapper;
+  `frontier_stack_array_pair_call_sum` forwards a stack-passed INTEGER
+  aggregate into a private helper by loading the stack eightbytes into outgoing
+  GPR aggregate slots
 - first SSE/SSE aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ double, double }` is classified as
   SSE/SSE, field reads return from the independent SSE argument stream, and

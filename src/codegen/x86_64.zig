@@ -22218,7 +22218,9 @@ fn appendSysVScalarCallArgsWithBlock(
                     .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                 }
             },
-            .aggregate_register_passthrough => {},
+            .aggregate_register_passthrough => |aggregate| {
+                try appendSysVRegisterAggregatePassThroughArg(allocator, machine, aggregate);
+            },
         }
     }
     var precomputed_stack_arg = false;
@@ -22271,7 +22273,14 @@ const SysVCallArgAssignment = union(enum) {
     sse: XmmReg,
     stack_i32_const: i32,
     stack_i32_param: []const u8,
-    aggregate_register_passthrough,
+    aggregate_register_passthrough: SysVRegisterAggregatePassThrough,
+};
+
+const SysVRegisterAggregatePassThrough = struct {
+    classification: SysVAggregateClassification,
+    source: SysVParamCursor,
+    dest_gpr: usize,
+    dest_sse: usize,
 };
 
 const SysVCallPlan = struct {
@@ -22339,8 +22348,8 @@ fn planSysVCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
         }
         if (isAggregateType(arg.ty)) {
             plan.has_non_i32_arg = true;
-            try planSysVRegisterAggregatePassThrough(function, arg, &int_arg_index, &fp_arg_index);
-            try plan.assignments.append(allocator, .aggregate_register_passthrough);
+            const pass = try planSysVRegisterAggregatePassThrough(function, arg, &int_arg_index, &fp_arg_index);
+            try plan.assignments.append(allocator, .{ .aggregate_register_passthrough = pass });
             plan.counts.register_aggregate_args += 1;
             continue;
         }
@@ -22371,21 +22380,31 @@ fn planSysVRegisterAggregatePassThrough(
     arg: ir.CallArg,
     int_arg_index: *usize,
     fp_arg_index: *usize,
-) !void {
+) !SysVRegisterAggregatePassThrough {
     const classification = try classifySysVAggregate(arg.ty);
     if (classification.kind != .register) return error.UnsupportedCodegenAbi;
     const needs = sysvAggregateRegisterNeeds(classification);
     if (int_arg_index.* + needs.gpr > 6 or fp_arg_index.* + needs.sse > 8) return error.UnsupportedCodegenAbi;
+    const dest_gpr = int_arg_index.*;
+    const dest_sse = fp_arg_index.*;
     const name = switch (arg.value) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
     const source = try sysvParamCursorFor(function, name, arg.ty);
-    if (source.gpr != int_arg_index.* or source.sse != fp_arg_index.* or source.stack_eightbytes != 0) {
-        return error.UnsupportedCodegenAbi;
-    }
     int_arg_index.* += needs.gpr;
     fp_arg_index.* += needs.sse;
+    const source_in_registers = source.gpr + needs.gpr <= 6 and source.sse + needs.sse <= 8;
+    if (source_in_registers and (source.gpr != dest_gpr or source.sse != dest_sse or source.stack_eightbytes != 0)) {
+        return error.UnsupportedCodegenAbi;
+    }
+    if (!source_in_registers and !classification.isIntegerOnly()) return error.UnsupportedCodegenAbi;
+    return .{
+        .classification = classification,
+        .source = source,
+        .dest_gpr = dest_gpr,
+        .dest_sse = dest_sse,
+    };
 }
 
 const SysVParamCursor = struct {
@@ -22395,12 +22414,31 @@ const SysVParamCursor = struct {
 };
 
 fn appendSysVRegisterAggregatePassThroughArg(
-    function: ir.Function,
-    arg: ir.CallArg,
-    int_arg_index: *usize,
-    fp_arg_index: *usize,
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    pass: SysVRegisterAggregatePassThrough,
 ) !void {
-    try planSysVRegisterAggregatePassThrough(function, arg, int_arg_index, fp_arg_index);
+    const needs = sysvAggregateRegisterNeeds(pass.classification);
+    const source_in_registers = pass.source.gpr + needs.gpr <= 6 and pass.source.sse + needs.sse <= 8;
+    if (source_in_registers) return;
+
+    var gpr_offset: usize = 0;
+    var eightbyte_index: usize = 0;
+    while (eightbyte_index < pass.classification.eightbyte_count) : (eightbyte_index += 1) {
+        switch (pass.classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi) {
+            .integer => {
+                const dst = try ArgReg.fromIndex(pass.dest_gpr + gpr_offset);
+                const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8;
+                if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+                try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{
+                    .reg = dst,
+                    .disp = @intCast(offset),
+                } });
+                gpr_offset += 1;
+            },
+            .sse => return error.UnsupportedCodegenAbi,
+        }
+    }
 }
 
 fn sysvParamCursorFor(function: ir.Function, name: []const u8, ty: ir.Type) !SysVParamCursor {

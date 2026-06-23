@@ -1757,6 +1757,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct ArrayPair z_frontier_array_pair_make(long long, long long) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_make");
     \\extern long long z_frontier_stack_array_pair_first(long long, long long, long long, long long, long long, long long, struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_pair_first");
     \\extern long long z_frontier_stack_array_pair_second(long long, long long, long long, long long, long long, long long, struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_pair_second");
+    \\extern long long z_frontier_stack_array_pair_call_sum(long long, long long, long long, long long, long long, long long, struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_pair_call_sum");
     \\extern double z_frontier_array_double_first(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_first");
     \\extern double z_frontier_array_double_second(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_second");
     \\extern struct ArrayDouble z_frontier_array_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_make");
@@ -1809,6 +1810,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct ArrayPair stack_array = { { 101, 103 } };
     \\    if (z_frontier_stack_array_pair_first(1, 2, 3, 4, 5, 6, stack_array) != 101) return 38;
     \\    if (z_frontier_stack_array_pair_second(1, 2, 3, 4, 5, 6, stack_array) != 103) return 39;
+    \\    if (z_frontier_stack_array_pair_call_sum(1, 2, 3, 4, 5, 6, stack_array) != 204) return 40;
     \\    struct ArrayDouble array_double = { { 2.5, 4.75 } };
     \\    if (z_frontier_array_double_first(array_double) != 2.5) return 30;
     \\    if (z_frontier_array_double_second(array_double) != 4.75) return 31;
