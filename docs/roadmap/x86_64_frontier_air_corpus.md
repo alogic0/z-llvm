@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=176
-structured_functions=176
-generic_codegen_functions=176
-generic_cfg_functions=176
+discovered_functions=180
+structured_functions=180
+generic_codegen_functions=180
+generic_cfg_functions=180
 structural_matcher_functions=0
-structured_air_v2_functions=176
-typed_air_operand_functions=176
+structured_air_v2_functions=180
+typed_air_operand_functions=180
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=176
+generic_lowering_functions=180
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=176
+object_emitted_functions=180
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -139,12 +139,15 @@ Closed in the current memory/aggregate frontier slice:
   same layout-derived copy path for pointer, `double`, and `i64` leaves in one
   MEMORY aggregate, and `BigFloat` proves five `f32` leaves through dedicated
   `movss` stack loads and hidden-sret stores; `frontier_direct_big5_copy`,
-  `frontier_indirect_big5_copy`, `frontier_direct_big_ptr_double_copy`, and
+  `frontier_indirect_big5_copy`, `frontier_direct_big_double_copy`,
+  `frontier_indirect_big_double_copy`, `frontier_direct_big_float_copy`,
+  `frontier_indirect_big_float_copy`,
+  `frontier_direct_big_ptr_double_copy`, and
   `frontier_indirect_big_ptr_double_copy` prove normal supported-leaf MEMORY
-  aggregates with integer, pointer, and `double` leaves can flow through direct
-  and indirect calls by preserving the hidden sret pointer, forwarding pointer
-  callees through `%rax` when needed, and copying incoming by-value stack slots
-  to outgoing stack slots before the call
+  aggregates with integer, pure FP, pointer, and mixed pointer/FP/integer
+  leaves can flow through direct and indirect calls by preserving the hidden
+  sret pointer, forwarding pointer callees through `%rax` when needed, and
+  copying incoming by-value stack slots to outgoing stack slots before the call
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }`, selected
   `{ i32, double }`, and selected `{ i32, i32, double }` forms are classified as

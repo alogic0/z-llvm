@@ -143,6 +143,8 @@ const BigPtrDouble = extern struct {
 };
 
 const Big5CopyFn = *const fn (Big5) callconv(.c) Big5;
+const BigDoubleCopyFn = *const fn (BigDouble) callconv(.c) BigDouble;
+const BigFloatCopyFn = *const fn (BigFloat) callconv(.c) BigFloat;
 const BigPtrDoubleCopyFn = *const fn (BigPtrDouble) callconv(.c) BigPtrDouble;
 
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
@@ -289,8 +291,24 @@ export fn frontier_big_double_copy(value: BigDouble) BigDouble {
     return value;
 }
 
+export fn frontier_direct_big_double_copy(value: BigDouble) BigDouble {
+    return frontier_big_double_copy(value);
+}
+
+export fn frontier_indirect_big_double_copy(func: BigDoubleCopyFn, value: BigDouble) BigDouble {
+    return func(value);
+}
+
 export fn frontier_big_float_copy(value: BigFloat) BigFloat {
     return value;
+}
+
+export fn frontier_direct_big_float_copy(value: BigFloat) BigFloat {
+    return frontier_big_float_copy(value);
+}
+
+export fn frontier_indirect_big_float_copy(func: BigFloatCopyFn, value: BigFloat) BigFloat {
+    return func(value);
 }
 
 export fn frontier_big_ptr_double_copy(value: BigPtrDouble) BigPtrDouble {
