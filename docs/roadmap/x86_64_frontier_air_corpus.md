@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=171
-structured_functions=171
-generic_codegen_functions=171
-generic_cfg_functions=171
+discovered_functions=172
+structured_functions=172
+generic_codegen_functions=172
+generic_cfg_functions=172
 structural_matcher_functions=0
-structured_air_v2_functions=171
-typed_air_operand_functions=171
+structured_air_v2_functions=172
+typed_air_operand_functions=172
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=171
+generic_lowering_functions=172
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=171
+object_emitted_functions=172
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -278,6 +278,10 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_indirect_array_double_make` and
   `frontier_indirect_array_double_sum` prove the same `%rax` indirect-call path
   for SSE/SSE `[2]f64` aggregate return and argument forwarding.
+- selected live-across-indirect-call row in `frontier_sysv_abi.zig`:
+  `frontier_indirect_two_live_after_call` uses the same generic CFG
+  spill/reload frame as direct calls while copying the pointer callee to `%rax`
+  and assigning the scalar call argument through `%edi`.
 - selected computed stack-passed scalar `i64` call argument in
   `frontier_sysv_abi.zig`: `frontier_computed_i64_stack_arg_call` computes a
   block-local `i64`, materializes it through `%rax`, and pushes it into the

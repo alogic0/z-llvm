@@ -1512,6 +1512,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_indirect_i64_stack_arg_forward(long long (*)(long long, long long, long long, long long, long long, long long, long long, long long), long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_i64_stack_arg_forward");
     \\extern struct Pair64 z_frontier_indirect_pair64_make(struct Pair64 (*)(long long, long long), long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_pair64_make");
     \\extern long long z_frontier_indirect_pair64_first(long long (*)(struct Pair64), struct Pair64) __asm__("frontier_sysv_abi.frontier_indirect_pair64_first");
+    \\extern int z_frontier_indirect_two_live_after_call(int (*)(int), int, int, int) __asm__("frontier_sysv_abi.frontier_indirect_two_live_after_call");
     \\extern long long z_frontier_computed_i64_stack_arg_call(long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_computed_i64_stack_arg_call");
     \\extern int z_frontier_seven_live_after_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_seven_live_after_call");
     \\extern int z_frontier_eight_live_after_call(int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_eight_live_after_call");
@@ -1553,6 +1554,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\int frontier_sum18_i32(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p, int q, int r) { return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r; }
     \\long long frontier_sum6_i64(long long a, long long b, long long c, long long d, long long e, long long f) { return a + b + c + d + e + f; }
     \\long long frontier_sum8_i64(long long a, long long b, long long c, long long d, long long e, long long f, long long g, long long h) { return a + b + c + d + e + f + g + h; }
+    \\int frontier_id_c_i32(int value) { return value; }
     \\struct Pair64 frontier_make_pair64(long long a, long long b) { struct Pair64 result = { a, b }; return result; }
     \\long long frontier_pair64_first(struct Pair64 value) { return value.a; }
     \\int main(void) {
@@ -1580,6 +1582,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct Pair64 indirect_pair = z_frontier_indirect_pair64_make(frontier_make_pair64, 1234, 5678);
     \\    if (indirect_pair.a != 1234 || indirect_pair.b != 5678) return 49;
     \\    if (z_frontier_indirect_pair64_first(frontier_pair64_first, indirect_pair) != 1234) return 50;
+    \\    if (z_frontier_indirect_two_live_after_call(frontier_id_c_i32, 5, 7, 11) != 23) return 51;
     \\    if (z_frontier_computed_i64_stack_arg_call(1, 2, 3, 4, 5, 6, 7) != 37) return 45;
     \\    if (z_frontier_seven_live_after_call(2, 3, 5, 7, 11, 13, 17) != 71) return 23;
     \\    if (z_frontier_eight_live_after_call(2, 3, 5, 7, 11, 13, 17, 19) != 90) return 24;

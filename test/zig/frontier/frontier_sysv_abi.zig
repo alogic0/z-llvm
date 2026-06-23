@@ -9,6 +9,7 @@ const Sum14Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32
 const Sum8I64Fn = *const fn (i64, i64, i64, i64, i64, i64, i64, i64) callconv(.c) i64;
 const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
+const IdI32Fn = *const fn (i32) callconv(.c) i32;
 const MakePair64Fn = *const fn (i64, i64) callconv(.c) Pair64;
 const Pair64FirstFn = *const fn (Pair64) callconv(.c) i64;
 
@@ -111,6 +112,11 @@ export fn frontier_indirect_stack_arg_forward(func: Sum12Fn, a: i32, b: i32, c: 
 
 export fn frontier_indirect_eight_stack_arg_forward(func: Sum14Fn, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32) i32 {
     return func(a, b, c, d, e, f, g, h, i, j, k, l, m, n);
+}
+
+export fn frontier_indirect_two_live_after_call(func: IdI32Fn, a: i32, b: i32, c: i32) i32 {
+    const r = func(a);
+    return b + c + r;
 }
 
 export fn frontier_computed_stack_arg_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) i32 {

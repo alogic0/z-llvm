@@ -13154,10 +13154,17 @@ fn emitGenericCfgI32CallIntoEax(
         const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
         try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
     } else {
-        if (call.callee_value != null) return error.UnsupportedLiveAcrossCall;
         const stack_arg_count = try i32CallStackArgCount(call);
         if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
-        try appendAlignedDirectCallPreservingI32Params(allocator, machine, function, call, live_params);
+        if (call.callee_value) |callee_value| {
+            const callee_name = switch (callee_value) {
+                .named => |name| name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) });
+        } else {
+            try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
+        }
     }
 }
 
@@ -13188,10 +13195,17 @@ fn emitGenericCfgVoidCall(
         try appendDirectCallWithStackArgs(allocator, machine, call.callee, .void, stack_arg_count);
         return;
     }
-    if (call.callee_value != null) return error.UnsupportedLiveAcrossCall;
     const stack_arg_count = try i32CallStackArgCount(call);
     if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
-    try appendAlignedDirectCallPreservingI32Params(allocator, machine, function, call, live_params);
+    if (call.callee_value) |callee_value| {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) });
+    } else {
+        try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
+    }
 }
 
 const GenericCfgPointerSlotParam = struct {
@@ -23029,10 +23043,26 @@ fn appendAlignedDirectCallPreservingI32Params(
     call: ir.CallInst,
     live_params: LiveParamSet,
 ) !void {
+    try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
+}
+
+const SysVCallTarget = union(enum) {
+    direct: []const u8,
+    indirect_from_reg: ArgReg,
+};
+
+fn appendAlignedCallPreservingI32Params(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    call: ir.CallInst,
+    live_params: LiveParamSet,
+    call_target: SysVCallTarget,
+) !void {
     switch (live_params.count) {
         0 => {
             _ = try appendI32CallArgs(allocator, machine, function, call);
-            try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
+            try appendAlignedSysVCallTarget(allocator, machine, call_target, call.ret_ty);
         },
         1 => {
             try appendStackFrame(allocator, machine, 8);
@@ -23040,8 +23070,9 @@ fn appendAlignedDirectCallPreservingI32Params(
                 .frame_index = .slot0,
                 .reg = live_params.regs[0],
             } });
+            try setupSysVCallTarget(allocator, machine, call_target);
             _ = try appendI32CallArgs(allocator, machine, function, call);
-            try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+            try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
             try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
                 .reg = live_params.regs[0],
                 .frame_index = .slot0,
@@ -23058,8 +23089,9 @@ fn appendAlignedDirectCallPreservingI32Params(
                     .reg = live_params.regs[index],
                 } });
             }
+            try setupSysVCallTarget(allocator, machine, call_target);
             _ = try appendI32CallArgs(allocator, machine, function, call);
-            try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+            try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
             index = 0;
             while (index < live_params.count) : (index += 1) {
                 try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
@@ -23070,6 +23102,40 @@ fn appendAlignedDirectCallPreservingI32Params(
             try appendStackFrameEnd(allocator, machine, frame_bytes);
         },
         else => return error.UnsupportedLiveAcrossCall,
+    }
+}
+
+fn setupSysVCallTarget(allocator: std.mem.Allocator, machine: *MachineFunction, call_target: SysVCallTarget) !void {
+    switch (call_target) {
+        .direct => {},
+        .indirect_from_reg => |reg| try machine.instructions.append(allocator, .{ .mov_arg_rax = reg }),
+    }
+}
+
+fn appendSysVCallTarget(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    call_target: SysVCallTarget,
+    ret_ty: ir.Type,
+) !void {
+    switch (call_target) {
+        .direct => |symbol| try appendDirectCall(allocator, machine, symbol, ret_ty),
+        .indirect_from_reg => try appendIndirectCallRax(allocator, machine, ret_ty),
+    }
+}
+
+fn appendAlignedSysVCallTarget(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    call_target: SysVCallTarget,
+    ret_ty: ir.Type,
+) !void {
+    switch (call_target) {
+        .direct => |symbol| try appendAlignedDirectCall(allocator, machine, symbol, ret_ty),
+        .indirect_from_reg => {
+            try setupSysVCallTarget(allocator, machine, call_target);
+            try appendAlignedIndirectCallRax(allocator, machine, ret_ty);
+        },
     }
 }
 

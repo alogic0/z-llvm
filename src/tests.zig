@@ -7908,6 +7908,38 @@ test "x86_64 generic CFG lowers narrow i32 indirect call through rax" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
 
+test "x86_64 generic CFG preserves live i32 params across indirect call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, i32 %a, i32 %b, i32 %c) {
+        \\entry:
+        \\  %r = call i32 %fn(i32 %a)
+        \\  %sum0 = add i32 %r, %b
+        \\  %sum1 = add i32 %sum0, %c
+        \\  ret i32 %sum1
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_24);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rdx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rcx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_arg = .{ .dst = .rdi, .src = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .indirect_call_rax = .{ .int = 32 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot1 } });
+    try expectMachineInstruction(machine.instructions.items, .add_rsp_24);
+}
+
 test "x86_64 generic CFG lowers indirect i64 call with stack parameter reload" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
