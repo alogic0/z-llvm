@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=186`,
-`generic_codegen_functions=186`, `generic_cfg_functions=186`,
+frontier gate reports `source_rows=13`, `discovered_functions=188`,
+`generic_codegen_functions=188`, `generic_cfg_functions=188`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=186`, `object_failures=0`,
+`object_emitted_functions=188`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -421,7 +421,7 @@ and `BigPtrDouble` proves the same layout-derived copy path for pointer,
 `double`, and `i64` leaves in one MEMORY aggregate. `BigFloat` adds five-`f32`
 MEMORY aggregate copy proof through dedicated `movss` stack loads and
 hidden-sret stores. Direct and indirect MEMORY aggregate calls are now proven
-for Big5, BigDouble, BigFloat, BigPtrDouble, BigNested, and BigArray by
+for Big5, BigDouble, BigFloat, BigPtrDouble, BigNested, BigMixed, and BigArray by
 preserving the hidden sret pointer, forwarding pointer callees through `%rax`,
 and copying incoming by-value stack slots to outgoing stack slots before the
 call.

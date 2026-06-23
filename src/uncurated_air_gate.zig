@@ -1672,6 +1672,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigNested z_frontier_indirect_big_nested_copy(struct BigNested (*)(struct BigNested), struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_nested_copy");
     \\extern long long z_frontier_big_nested_sum_inner(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_sum_inner");
     \\extern struct BigMixed z_frontier_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_big_mixed_copy");
+    \\extern struct BigMixed z_frontier_direct_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_direct_big_mixed_copy");
+    \\extern struct BigMixed z_frontier_indirect_big_mixed_copy(struct BigMixed (*)(struct BigMixed), struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_mixed_copy");
     \\extern struct BigArray z_frontier_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_copy");
     \\extern struct BigArray z_frontier_direct_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_direct_big_array_copy");
     \\extern struct BigArray z_frontier_indirect_big_array_copy(struct BigArray (*)(struct BigArray), struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_array_copy");
@@ -1754,6 +1756,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct BigMixed mixed = { .a = 211, .b = 223, .c = 227, .d = 229 };
     \\    struct BigMixed copied_mixed = z_frontier_big_mixed_copy(mixed);
     \\    if (copied_mixed.a != 211 || copied_mixed.b != 223 || copied_mixed.c != 227 || copied_mixed.d != 229) return 22;
+    \\    struct BigMixed direct_mixed = z_frontier_direct_big_mixed_copy(mixed);
+    \\    if (direct_mixed.a != 211 || direct_mixed.b != 223 || direct_mixed.c != 227 || direct_mixed.d != 229) return 64;
+    \\    struct BigMixed indirect_mixed = z_frontier_indirect_big_mixed_copy(z_frontier_big_mixed_copy, mixed);
+    \\    if (indirect_mixed.a != 211 || indirect_mixed.b != 223 || indirect_mixed.c != 227 || indirect_mixed.d != 229) return 65;
     \\    struct BigArray array = { .values = { 233, 239, 241, 251, 257 } };
     \\    struct BigArray copied_array = z_frontier_big_array_copy(array);
     \\    if (copied_array.values[0] != 233 || copied_array.values[1] != 239 || copied_array.values[2] != 241 || copied_array.values[3] != 251 || copied_array.values[4] != 257) return 23;

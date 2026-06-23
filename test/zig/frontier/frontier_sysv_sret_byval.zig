@@ -144,6 +144,7 @@ const BigPtrDouble = extern struct {
 
 const Big5CopyFn = *const fn (Big5) callconv(.c) Big5;
 const BigNestedCopyFn = *const fn (BigNested) callconv(.c) BigNested;
+const BigMixedCopyFn = *const fn (BigMixed) callconv(.c) BigMixed;
 const BigArrayCopyFn = *const fn (BigArray) callconv(.c) BigArray;
 const BigDoubleCopyFn = *const fn (BigDouble) callconv(.c) BigDouble;
 const BigFloatCopyFn = *const fn (BigFloat) callconv(.c) BigFloat;
@@ -287,6 +288,14 @@ export fn frontier_big_nested_sum_inner(value: BigNested) i64 {
 
 export fn frontier_big_mixed_copy(value: BigMixed) BigMixed {
     return value;
+}
+
+export fn frontier_direct_big_mixed_copy(value: BigMixed) BigMixed {
+    return frontier_big_mixed_copy(value);
+}
+
+export fn frontier_indirect_big_mixed_copy(func: BigMixedCopyFn, value: BigMixed) BigMixed {
+    return func(value);
 }
 
 export fn frontier_big_array_copy(value: BigArray) BigArray {
