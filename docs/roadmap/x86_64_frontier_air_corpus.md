@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=182
-structured_functions=182
-generic_codegen_functions=182
-generic_cfg_functions=182
+discovered_functions=186
+structured_functions=186
+generic_codegen_functions=186
+generic_cfg_functions=186
 structural_matcher_functions=0
-structured_air_v2_functions=182
-typed_air_operand_functions=182
+structured_air_v2_functions=186
+typed_air_operand_functions=186
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=182
+generic_lowering_functions=186
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=182
+object_emitted_functions=186
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -147,7 +147,11 @@ Closed in the current memory/aggregate frontier slice:
   aggregates with integer, pure FP, pointer, and mixed pointer/FP/integer
   leaves can flow through direct and indirect calls by preserving the hidden
   sret pointer, forwarding pointer callees through `%rax` when needed, and
-  copying incoming by-value stack slots to outgoing stack slots before the call
+  copying incoming by-value stack slots to outgoing stack slots before the
+  call; `frontier_direct_big_nested_copy`,
+  `frontier_indirect_big_nested_copy`, `frontier_direct_big_array_copy`, and
+  `frontier_indirect_big_array_copy` prove the same call path for recursive
+  nested aggregate leaves and array-backed aggregate leaves
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }`, selected
   `{ i32, double }`, and selected `{ i32, i32, double }` forms are classified as

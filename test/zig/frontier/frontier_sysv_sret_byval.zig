@@ -143,6 +143,8 @@ const BigPtrDouble = extern struct {
 };
 
 const Big5CopyFn = *const fn (Big5) callconv(.c) Big5;
+const BigNestedCopyFn = *const fn (BigNested) callconv(.c) BigNested;
+const BigArrayCopyFn = *const fn (BigArray) callconv(.c) BigArray;
 const BigDoubleCopyFn = *const fn (BigDouble) callconv(.c) BigDouble;
 const BigFloatCopyFn = *const fn (BigFloat) callconv(.c) BigFloat;
 const BigPtrDoubleCopyFn = *const fn (BigPtrDouble) callconv(.c) BigPtrDouble;
@@ -271,6 +273,14 @@ export fn frontier_big_nested_copy(value: BigNested) BigNested {
     return value;
 }
 
+export fn frontier_direct_big_nested_copy(value: BigNested) BigNested {
+    return frontier_big_nested_copy(value);
+}
+
+export fn frontier_indirect_big_nested_copy(func: BigNestedCopyFn, value: BigNested) BigNested {
+    return func(value);
+}
+
 export fn frontier_big_nested_sum_inner(value: BigNested) i64 {
     return value.left.b + value.right.c;
 }
@@ -281,6 +291,14 @@ export fn frontier_big_mixed_copy(value: BigMixed) BigMixed {
 
 export fn frontier_big_array_copy(value: BigArray) BigArray {
     return value;
+}
+
+export fn frontier_direct_big_array_copy(value: BigArray) BigArray {
+    return frontier_big_array_copy(value);
+}
+
+export fn frontier_indirect_big_array_copy(func: BigArrayCopyFn, value: BigArray) BigArray {
+    return func(value);
 }
 
 export fn frontier_big_array_sum_edges(value: BigArray) i64 {
