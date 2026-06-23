@@ -361,6 +361,7 @@ selected disp8-safe stack-passed live i32 post-call add-tree rows
 selected one-live f32/f64 SSE spill/reload call frame
 selected two-/three-live f32/f64 no-argument-call spill/reload frames
 selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames
+selected two-live f32/f64 no-argument pointer-callee spill/reload frames
 unsupported broader stack-passed and broader SSE live-across-call pressure diagnostic
 tested callee-saved policy: the selected allocator does not allocate callee-saved GPRs
 unsupported varargs/vector/X87/packed aggregate/sret/byval/larger aggregate ABI diagnostics

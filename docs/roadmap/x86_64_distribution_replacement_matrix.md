@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=180`,
-`generic_codegen_functions=180`, `generic_cfg_functions=180`,
+three release modes at `source_rows=13`, `discovered_functions=182`,
+`generic_codegen_functions=182`, `generic_cfg_functions=182`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=180`, `object_failures=0`,
+`object_emitted_functions=182`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -445,14 +445,12 @@ the same layout-backed field path for nested SSE leaves and returns through
 stack-passed `[2]f64` aggregate into an outgoing register aggregate helper call
 by loading incoming stack eightbytes into `%xmm0`/`%xmm1`.
 The SSE live-across-call frontier rows add selected one-live `f32`/`f64`
-spill/reload around an external C ABI `void` helper call, selected two-live
-`f32`/`f64` spill/reload frames across a no-argument helper before a post-call
-`fadd` return, selected three-live `f32`/`f64` spill/reload frames across the
-same helper shape before a two-step post-call `fadd` return, and selected
-four-, five-, and six-live `f32`/`f64` spill/reload frames across the same
-helper shape before three-, four-, and five-step post-call `fadd` returns,
-plus selected two-live `f32`/`f64` spill/reload across a helper call that
-consumes the second live value as its first FP argument.
+spill/reload around an external C ABI `void` helper call, two- through
+six-live `f32`/`f64` spill/reload frames across no-argument helper calls
+before post-call `fadd` returns, selected two-live no-argument pointer-callee
+`f32`/`f64` spill/reload frames across `callq *%rax`, and selected two-live
+`f32`/`f64` spill/reload across a helper call that consumes the second live
+value as its first FP argument.
 The SysV scalar stack frontier now also proves up to twelve stack-passed
 `i32` call arguments with immediate `%rsp` cleanup, seven/eight/twelve
 stack-passed live `i32` values within the current disp8-safe incoming stack
@@ -471,8 +469,10 @@ pass-through through `%xmm0..%xmm4`; backend unit/object tests materialize
 immediate FP constants through `%xmm0..%xmm7`.
 Remaining non-accepted
 blockers are mixed int-to-float multiply/add pipelines, helper graphs with
-stack-passed live values beyond the current disp8-safe selected model, broader live SSE values beyond the selected
-no-argument-call shapes and two-live FP-argument call shape, or live values across calls,
+stack-passed live values beyond the current disp8-safe selected model, broader
+live SSE values beyond the selected no-argument-call shapes,
+two-live no-argument pointer-callee shape, and two-live FP-argument call shape,
+or live values across calls,
 alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
@@ -498,8 +498,8 @@ aggregate calls for Big5, BigDouble, BigFloat, and BigPtrDouble,
 arbitrary non-selected sret/byval copies,
 varargs, vectors, stack-passed live values beyond the current disp8-safe selected model,
 and broader SSE live-across-call frames beyond the selected one-live through
-six-live `f32`/`f64` no-argument-call shapes and two-live FP-argument call
-shape.
+six-live `f32`/`f64` no-argument-call shapes, two-live no-argument
+pointer-callee shape, and two-live FP-argument call shape.
 The frontier audit lives in
 `docs/roadmap/x86_64_frontier_air_corpus.md`.
 

@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=180
-structured_functions=180
-generic_codegen_functions=180
-generic_cfg_functions=180
+discovered_functions=182
+structured_functions=182
+generic_codegen_functions=182
+generic_cfg_functions=182
 structural_matcher_functions=0
-structured_air_v2_functions=180
-typed_air_operand_functions=180
+structured_air_v2_functions=182
+typed_air_operand_functions=182
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=180
+generic_lowering_functions=182
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=180
+object_emitted_functions=182
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -320,6 +320,10 @@ Closed in the current memory/aggregate frontier slice:
   two live `f32` or `f64` parameters are spilled, `%xmm1` is assigned to the
   helper's first FP argument, and both live values are reloaded for the
   post-call `fadd` return
+- selected indirect SSE live-across-call rows in `frontier_sysv_abi.zig`: two
+  live `f32` or `f64` parameters are spilled, the pointer callee is moved to
+  `%rax`, `callq *%rax` is emitted, and both live values are reloaded for the
+  post-call `fadd` return
 - selected named FP argument pass-through rows in `frontier_sysv_abi.zig`:
   five `f32` and five `f64` parameters are forwarded to external C ABI helpers
   through `%xmm0..%xmm4`; backend unit/object tests materialize immediate FP
@@ -350,8 +354,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   arbitrary non-selected sret/byval copies, varargs, vectors, more than six
   stack-passed live values, and broader SSE live-across-call frames beyond the
   selected one-live through six-live `f32`/`f64` no-argument-call shapes,
-  two-live FP-argument call shape, and selected named `%xmm0..%xmm4`
-  pass-through calls
+  two-live FP-argument call shape, selected two-live no-argument pointer-callee
+  call shape, and selected named `%xmm0..%xmm4` pass-through calls
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

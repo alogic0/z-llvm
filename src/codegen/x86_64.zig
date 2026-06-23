@@ -14659,13 +14659,21 @@ fn lowerGenericCfgFpVoidCallParamReturn(
         .call => |call| call,
         else => return false,
     };
-    if (call.ret_ty != .void or call.callee_value != null or call.inline_asm != null) return false;
+    if (call.ret_ty != .void or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
     if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
     }
     if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
+    const call_target: SysVCallTarget = if (call.callee_value) |callee_value| blk: {
+        if (call.args.items.len != 0) return error.UnsupportedLiveAcrossCall;
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = call.callee };
 
     try appendStackFrame(allocator, machine, 8);
     const live_reg = try XmmReg.fromIndex(live_index);
@@ -14674,8 +14682,9 @@ fn lowerGenericCfgFpVoidCallParamReturn(
     } else {
         try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = live_reg, .frame_index = .slot0 } });
     }
+    try setupSysVCallTarget(allocator, machine, call_target);
     _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
-    try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+    try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
     } else {
@@ -14702,13 +14711,21 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         .call => |call| call,
         else => return false,
     };
-    if (call.ret_ty != .void or call.callee_value != null or call.inline_asm != null) return false;
+    if (call.ret_ty != .void or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
     if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
     }
     if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
+    const call_target: SysVCallTarget = if (call.callee_value) |callee_value| blk: {
+        if (call.args.items.len != 0) return error.UnsupportedLiveAcrossCall;
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = call.callee };
 
     const addend_count = try collectFpVoidCallFaddParamChain(function, block, ret.value orelse return error.InvalidRet);
     if (addend_count < 2 or addend_count > 6) return error.UnsupportedLiveAcrossCall;
@@ -14725,8 +14742,9 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
             try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = reg, .frame_index = frame_index } });
         }
     }
+    try setupSysVCallTarget(allocator, machine, call_target);
     _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
-    try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+    try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, 0) } });
         index = 1;
