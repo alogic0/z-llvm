@@ -1671,6 +1671,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigDouble z_frontier_big_double_copy(struct BigDouble) __asm__("frontier_sysv_sret_byval.frontier_big_double_copy");
     \\extern struct BigFloat z_frontier_big_float_copy(struct BigFloat) __asm__("frontier_sysv_sret_byval.frontier_big_float_copy");
     \\extern struct BigPtrDouble z_frontier_big_ptr_double_copy(struct BigPtrDouble) __asm__("frontier_sysv_sret_byval.frontier_big_ptr_double_copy");
+    \\extern struct BigPtrDouble z_frontier_direct_big_ptr_double_copy(struct BigPtrDouble) __asm__("frontier_sysv_sret_byval.frontier_direct_big_ptr_double_copy");
+    \\extern struct BigPtrDouble z_frontier_indirect_big_ptr_double_copy(struct BigPtrDouble (*)(struct BigPtrDouble), struct BigPtrDouble) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_ptr_double_copy");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -1750,6 +1752,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct BigPtrDouble ptr_double = { .ptr = &pointed, .value = 6.5, .tag = 1234567LL };
     \\    struct BigPtrDouble copied_ptr_double = z_frontier_big_ptr_double_copy(ptr_double);
     \\    if (copied_ptr_double.ptr != &pointed || *copied_ptr_double.ptr != 987654321LL || copied_ptr_double.value != 6.5 || copied_ptr_double.tag != 1234567LL) return 35;
+    \\    struct BigPtrDouble direct_ptr_double = z_frontier_direct_big_ptr_double_copy(ptr_double);
+    \\    if (direct_ptr_double.ptr != &pointed || *direct_ptr_double.ptr != 987654321LL || direct_ptr_double.value != 6.5 || direct_ptr_double.tag != 1234567LL) return 54;
+    \\    struct BigPtrDouble indirect_ptr_double = z_frontier_indirect_big_ptr_double_copy(z_frontier_big_ptr_double_copy, ptr_double);
+    \\    if (indirect_ptr_double.ptr != &pointed || *indirect_ptr_double.ptr != 987654321LL || indirect_ptr_double.value != 6.5 || indirect_ptr_double.tag != 1234567LL) return 55;
     \\    return 0;
     \\}
     \\
