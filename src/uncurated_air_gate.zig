@@ -1638,6 +1638,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_big5_edges(struct Big5) __asm__("frontier_sysv_sret_byval.frontier_big5_edges");
     \\extern long long z_frontier_big5_inner(struct Big5) __asm__("frontier_sysv_sret_byval.frontier_big5_inner");
     \\extern struct Big5 z_frontier_big5_copy(struct Big5) __asm__("frontier_sysv_sret_byval.frontier_big5_copy");
+    \\extern struct Big5 z_frontier_indirect_big5_copy(struct Big5 (*)(struct Big5), struct Big5) __asm__("frontier_sysv_sret_byval.frontier_indirect_big5_copy");
     \\extern struct Big6 z_frontier_big6_make(long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big6_make");
     \\extern long long z_frontier_big6_middle(struct Big6) __asm__("frontier_sysv_sret_byval.frontier_big6_middle");
     \\extern struct Big6 z_frontier_big6_copy(struct Big6) __asm__("frontier_sysv_sret_byval.frontier_big6_copy");
@@ -1684,6 +1685,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_big5_inner(input5) != 40) return 9;
     \\    struct Big5 copied5 = z_frontier_big5_copy(input5);
     \\    if (copied5.a != 13 || copied5.b != 17 || copied5.c != 19 || copied5.d != 23 || copied5.e != 29) return 10;
+    \\    struct Big5 indirect5 = z_frontier_indirect_big5_copy(z_frontier_big5_copy, input5);
+    \\    if (indirect5.a != 13 || indirect5.b != 17 || indirect5.c != 19 || indirect5.d != 23 || indirect5.e != 29) return 39;
     \\    struct Big6 made6 = z_frontier_big6_make(31, 37, 41, 43, 47, 53);
     \\    if (made6.a != 31 || made6.b != 37 || made6.c != 41 || made6.d != 43 || made6.e != 47 || made6.f != 53) return 11;
     \\    struct Big6 input6 = { .a = 59, .b = 61, .c = 67, .d = 71, .e = 73, .f = 79 };

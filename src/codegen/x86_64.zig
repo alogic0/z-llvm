@@ -5547,6 +5547,7 @@ fn lowerAggregateAbiReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    if (try lowerMemoryAggregateIndirectCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateDirectCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
@@ -5557,6 +5558,63 @@ fn lowerAggregateAbiReturn(
     if (try lowerTruncI64ArgReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMakePairReturn(allocator, machine, function, block, ret)) return true;
     return false;
+}
+
+fn lowerMemoryAggregateIndirectCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(function.ret_ty) or block.instructions.items.len != 1) return false;
+    const classification = classifySysVAggregate(function.ret_ty) catch return false;
+    if (classification.kind != .memory or classification.size_bytes == 0) return false;
+    if (!isSupportedAggregateCopyLeafAggregate(function.ret_ty)) return false;
+
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const call_result = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, call_result)) return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!call.ret_ty.eql(function.ret_ty) or call.inline_asm != null) return false;
+    if (call.tail_kind != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (call.callee_value == null or call.args.items.len != 1) return false;
+
+    const callee_name = switch (call.callee_value.?) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const callee_reg = try paramRegWithInitialGpr(function, callee_name, .ptr, 1);
+    if (callee_reg == .rdi) return error.UnsupportedCodegenAbi;
+
+    const aggregate_arg = call.args.items[0];
+    if (!aggregate_arg.ty.eql(function.ret_ty)) return false;
+    const aggregate_name = switch (aggregate_arg.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const source = try sysvParamCursorForWithInitial(function, aggregate_name, aggregate_arg.ty, .{
+        .gpr = 1,
+        .sse = 0,
+        .stack_eightbytes = 0,
+    });
+
+    const stack_arg_count = try appendSysVMemoryAggregateStackPassThroughArgs(
+        allocator,
+        machine,
+        function,
+        source,
+        classification,
+    );
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+    try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 pub const SysVAggregateEightbyteClass = enum {
@@ -22802,8 +22860,45 @@ fn appendSysVStackAggregatePassThroughArgs(
     }
 }
 
+fn appendSysVMemoryAggregateStackPassThroughArgs(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    source: SysVParamCursor,
+    classification: SysVAggregateClassification,
+) !usize {
+    if (classification.kind != .memory or classification.size_bytes == 0) return error.UnsupportedCodegenAbi;
+    const stack_arg_count = @as(usize, @intCast((classification.size_bytes + 7) / 8));
+    if (stack_arg_count == 0 or stack_arg_count > 12) return error.UnsupportedCodegenAbi;
+
+    var stack_args: [12]StackScalarCallArg = undefined;
+    var index: usize = 0;
+    while (index < stack_arg_count) : (index += 1) {
+        const offset = 8 + (source.stack_eightbytes + index) * 8;
+        if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+        stack_args[index] = .{ .stack_disp = @intCast(offset) };
+    }
+
+    var reserved_stack_bytes: usize = 0;
+    if (stack_arg_count % 2 == 0) {
+        try machine.instructions.append(allocator, .sub_rsp_8);
+        reserved_stack_bytes = 8;
+    }
+    var stack_index = stack_arg_count;
+    while (stack_index > 0) {
+        stack_index -= 1;
+        try appendStackScalarCallArg(allocator, machine, function, null, stack_args[stack_index], reserved_stack_bytes);
+        reserved_stack_bytes += 8;
+    }
+    return stack_arg_count;
+}
+
 fn sysvParamCursorFor(function: ir.Function, name: []const u8, ty: ir.Type) !SysVParamCursor {
-    var cursor: SysVParamCursor = .{ .gpr = 0, .sse = 0, .stack_eightbytes = 0 };
+    return try sysvParamCursorForWithInitial(function, name, ty, .{ .gpr = 0, .sse = 0, .stack_eightbytes = 0 });
+}
+
+fn sysvParamCursorForWithInitial(function: ir.Function, name: []const u8, ty: ir.Type, initial: SysVParamCursor) !SysVParamCursor {
+    var cursor: SysVParamCursor = initial;
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, name)) {
             if (!param.ty.eql(ty)) return error.UnsupportedCodegenType;
@@ -23800,8 +23895,16 @@ fn sysvIntegerParamRegOrNull(function: ir.Function, name: []const u8, ty: ir.Typ
 }
 
 fn paramRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg {
+    return try paramRegOrNullWithInitialGpr(function, name, ty, 0);
+}
+
+fn paramRegWithInitialGpr(function: ir.Function, name: []const u8, ty: ir.Type, initial_gpr: usize) !ArgReg {
+    return try paramRegOrNullWithInitialGpr(function, name, ty, initial_gpr) orelse error.UnsupportedCodegenValue;
+}
+
+fn paramRegOrNullWithInitialGpr(function: ir.Function, name: []const u8, ty: ir.Type, initial_gpr: usize) !?ArgReg {
     if (!isSysVIntegerParamType(ty)) return error.UnsupportedCodegenType;
-    var gpr_index: usize = 0;
+    var gpr_index: usize = initial_gpr;
     var sse_index: usize = 0;
     var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {

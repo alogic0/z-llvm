@@ -291,10 +291,13 @@ call slots, 12-argument forwarding through outgoing stack slots, selected
 `f32`/`f64` calls with five SSE arguments returning through `%xmm0`, selected
 `i64` register/stack argument forwarding, selected INTEGER/INTEGER aggregate
 arguments/returns through GPR pairs, and selected SSE/SSE `[2]f64` aggregate
-arguments/returns through XMM pairs. The backend copies the pointer callee to
-`%rax` and emits `callq *%rax`. Indirect calls with MEMORY aggregate ABI, tail
-markers, varargs, non-default call conventions, unsupported aggregate classes,
-or live values crossing the call remain targeted ABI rejections.
+arguments/returns through XMM pairs. Normal supported-leaf MEMORY aggregate
+byval-to-sret indirect calls are also accepted: the backend preserves the hidden
+sret pointer, forwards the pointer callee through `%rax`, copies the incoming
+aggregate stack slots to outgoing stack slots, and emits `callq *%rax`. Indirect
+calls with unsupported MEMORY aggregate leaves/layouts, tail markers, varargs,
+non-default call conventions, unsupported aggregate classes, or live values
+crossing the call remain targeted ABI rejections.
 
 ## Optimizer Legality
 

@@ -142,6 +142,8 @@ const BigPtrDouble = extern struct {
     tag: i64,
 };
 
+const Big5CopyFn = *const fn (Big5) callconv(.c) Big5;
+
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
     return .{ .a = a, .b = b, .c = c };
 }
@@ -180,6 +182,10 @@ export fn frontier_big5_inner(value: Big5) i64 {
 
 export fn frontier_big5_copy(value: Big5) Big5 {
     return value;
+}
+
+export fn frontier_indirect_big5_copy(func: Big5CopyFn, value: Big5) Big5 {
+    return func(value);
 }
 
 export fn frontier_big6_make(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64) Big6 {
