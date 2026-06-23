@@ -130,6 +130,15 @@ export fn frontier_reverse_mixed_make(a: f64, b: i64) ReverseMixed {
     return .{ .a = a, .b = b };
 }
 
+noinline fn helperReverseMixedFloat(value: ReverseMixed) f64 {
+    return value.a;
+}
+
+export fn frontier_shifted_reverse_mixed_call_float(prefix: f64, value: ReverseMixed) f64 {
+    _ = prefix;
+    return helperReverseMixedFloat(value);
+}
+
 export fn frontier_nested_pair_sum(value: NestedPair) i32 {
     return value.left.a + value.left.b + value.right.a + value.right.b;
 }

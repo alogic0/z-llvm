@@ -259,6 +259,10 @@ pub const Instruction = union(enum) {
     subss_xmm1_xmm0,
     divsd_xmm1_xmm0,
     movapd_xmm1_xmm0,
+    movapd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
     cvtsi2ss_edi_xmm0,
     cvtsi2sd_edi_xmm0,
     cvtsi2ss_rdi_xmm0,
@@ -22604,25 +22608,45 @@ fn appendSysVRegisterAggregatePassThroughArg(
     const source_in_registers = pass.source.gpr + needs.gpr <= 6 and pass.source.sse + needs.sse <= 8;
     if (source_in_registers) {
         if (pass.source.stack_eightbytes != 0) return error.UnsupportedCodegenAbi;
-        if (pass.source.sse != pass.dest_sse) return error.UnsupportedCodegenAbi;
-        if (pass.source.gpr == pass.dest_gpr) return;
-
-        if (pass.dest_gpr < pass.source.gpr) {
-            var gpr_offset: usize = 0;
-            while (gpr_offset < needs.gpr) : (gpr_offset += 1) {
-                try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{
-                    .dst = try ArgReg.fromIndex(pass.dest_gpr + gpr_offset),
-                    .src = try ArgReg.fromIndex(pass.source.gpr + gpr_offset),
-                } });
+        if (pass.source.gpr != pass.dest_gpr) {
+            if (pass.dest_gpr < pass.source.gpr) {
+                var gpr_offset: usize = 0;
+                while (gpr_offset < needs.gpr) : (gpr_offset += 1) {
+                    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{
+                        .dst = try ArgReg.fromIndex(pass.dest_gpr + gpr_offset),
+                        .src = try ArgReg.fromIndex(pass.source.gpr + gpr_offset),
+                    } });
+                }
+            } else {
+                var remaining = needs.gpr;
+                while (remaining > 0) {
+                    remaining -= 1;
+                    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{
+                        .dst = try ArgReg.fromIndex(pass.dest_gpr + remaining),
+                        .src = try ArgReg.fromIndex(pass.source.gpr + remaining),
+                    } });
+                }
             }
-        } else {
-            var remaining = needs.gpr;
-            while (remaining > 0) {
-                remaining -= 1;
-                try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{
-                    .dst = try ArgReg.fromIndex(pass.dest_gpr + remaining),
-                    .src = try ArgReg.fromIndex(pass.source.gpr + remaining),
-                } });
+        }
+
+        if (pass.source.sse != pass.dest_sse) {
+            if (pass.dest_sse < pass.source.sse) {
+                var sse_offset: usize = 0;
+                while (sse_offset < needs.sse) : (sse_offset += 1) {
+                    try machine.instructions.append(allocator, .{ .movapd_xmm = .{
+                        .dst = try XmmReg.fromIndex(pass.dest_sse + sse_offset),
+                        .src = try XmmReg.fromIndex(pass.source.sse + sse_offset),
+                    } });
+                }
+            } else {
+                var remaining = needs.sse;
+                while (remaining > 0) {
+                    remaining -= 1;
+                    try machine.instructions.append(allocator, .{ .movapd_xmm = .{
+                        .dst = try XmmReg.fromIndex(pass.dest_sse + remaining),
+                        .src = try XmmReg.fromIndex(pass.source.sse + remaining),
+                    } });
+                }
             }
         }
         return;
@@ -23844,6 +23868,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .subss_xmm1_xmm0,
         .divsd_xmm1_xmm0,
         .movapd_xmm1_xmm0,
+        .movapd_xmm,
         .cvtsi2ss_edi_xmm0,
         .cvtsi2sd_edi_xmm0,
         .cvtsi2ss_rdi_xmm0,
@@ -23964,7 +23989,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 eax_defined = function.ret_ty == .void or sysvAggregateReturnHasNoGpr(function.ret_ty);
             }
         },
-        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .movapd_xmm, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm64_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
@@ -24102,6 +24127,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .subss_xmm1_xmm0,
         .divsd_xmm1_xmm0,
         .movapd_xmm1_xmm0,
+        .movapd_xmm,
         .cvtsi2ss_edi_xmm0,
         .cvtsi2sd_edi_xmm0,
         .cvtsi2ss_rdi_xmm0,

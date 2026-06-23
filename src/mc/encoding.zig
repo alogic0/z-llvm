@@ -169,6 +169,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .subss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5c, 0xc1 }),
             .divsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x5e, 0xc1 }),
             .movapd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x28, 0xc1 }),
+            .movapd_xmm => |mov| try encodeMovapdXmm(&bytes, allocator, mov.dst, mov.src),
             .cvtsi2ss_edi_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x2a, 0xc7 }),
             .cvtsi2sd_edi_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x2a, 0xc7 }),
             .cvtsi2ss_rdi_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x48, 0x0f, 0x2a, 0xc7 }),
@@ -474,7 +475,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .addss_xmm1_xmm0 => 4,
         .subss_xmm1_xmm0 => 4,
         .divsd_xmm1_xmm0 => 4,
-        .movapd_xmm1_xmm0 => 4,
+        .movapd_xmm1_xmm0, .movapd_xmm => 4,
         .cvtsi2ss_edi_xmm0 => 4,
         .cvtsi2sd_edi_xmm0 => 4,
         .cvtsi2ss_rdi_xmm0 => 5,
@@ -935,6 +936,11 @@ fn encodeCmp16Imm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: 
     try bytes.append(allocator, 0x81);
     try bytes.append(allocator, 0xf8 | @as(u8, reg.lowCode()));
     try appendU16(bytes, allocator, imm);
+}
+
+fn encodeMovapdXmm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: x86_64.XmmReg, src: x86_64.XmmReg) !void {
+    try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x28 });
+    try bytes.append(allocator, 0xc0 | (@as(u8, dst.lowCode()) << 3) | @as(u8, src.lowCode()));
 }
 
 fn encodeCmpRcxToArg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {

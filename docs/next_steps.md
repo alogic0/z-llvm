@@ -375,12 +375,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=159`,
-`generic_codegen_functions=159`, `generic_cfg_functions=159`,
+frontier gate reports `source_rows=13`, `discovered_functions=161`,
+`generic_codegen_functions=161`, `generic_cfg_functions=161`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=159`, `object_failures=0`,
+`object_emitted_functions=161`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -436,6 +436,9 @@ The shifted mixed aggregate follow-up removes the exact-register-slot
 requirement for the GPR half of selected in-register aggregate pass-through
 calls: `{ i64, double }` can now move its INTEGER eightbyte from `%rsi` to
 `%rdi` while reusing the existing `%xmm0` SSE half.
+The reversed mixed follow-up adds the mirrored SSE move: `{ double, i64 }` can
+move its floating eightbyte from `%xmm1` to `%xmm0` with the generic XMM move
+helper while reusing the existing GPR half.
 The indirect FP follow-up extends the same pointer-callee path to selected
 `f32`/`f64` calls, assigning five SSE arguments and returning through `%xmm0`.
 The scalar integer follow-up fixes 64-bit call argument movement and stack
@@ -671,7 +674,7 @@ small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; frontier
-reports ReleaseFast `159/0`, ReleaseSafe `159/0`, ReleaseSmall `159/0`; expanded
+reports ReleaseFast `161/0`, ReleaseSafe `161/0`, ReleaseSmall `161/0`; expanded
 reports ReleaseFast `199/0`, ReleaseSafe `199/0`, ReleaseSmall `199/0`.
 The scale frontier reports ReleaseFast `216/0`, ReleaseSafe `216/0`, and
 ReleaseSmall `216/0`.

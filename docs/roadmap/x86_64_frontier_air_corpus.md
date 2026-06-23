@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=159
-structured_functions=159
-generic_codegen_functions=159
-generic_cfg_functions=159
+discovered_functions=161
+structured_functions=161
+generic_codegen_functions=161
+generic_cfg_functions=161
 structural_matcher_functions=0
-structured_air_v2_functions=159
-typed_air_operand_functions=159
+structured_air_v2_functions=161
+typed_air_operand_functions=161
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=159
+generic_lowering_functions=161
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=159
+object_emitted_functions=161
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -169,7 +169,9 @@ Closed in the current memory/aggregate frontier slice:
   SSE/INTEGER, field reads return from the independent SSE/GPR streams including
   high 32-bit integer lanes, construction returns the `i64` aggregate in
   `%xmm0`/`%rax`, and the packed reversed construction row packs adjacent
-  low/high `i32` fields into `%rax`
+  low/high `i32` fields into `%rax`; `frontier_shifted_reverse_mixed_call_float`
+  proves shifted in-register SSE aggregate pass-through by moving `%xmm1` to
+  `%xmm0` with the generic XMM move helper before a private helper call
 - first nested INTEGER aggregate add-chain row in
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
