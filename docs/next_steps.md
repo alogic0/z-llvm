@@ -375,12 +375,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=152`,
-`generic_codegen_functions=152`, `generic_cfg_functions=152`,
+frontier gate reports `source_rows=13`, `discovered_functions=154`,
+`generic_codegen_functions=154`, `generic_cfg_functions=154`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=152`, `object_failures=0`,
+`object_emitted_functions=154`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -439,7 +439,9 @@ including adjacent `i32` lane packing into `%rax`; a noinline helper-call row
 returns the same register aggregate directly from a private helper. The SSE aggregate frontier row
 adds `{ double, double }`, `[2]f64` array-in-struct, and nested
 `{ { double }, { double } }` SSE/SSE field reads plus register aggregate
-return in `%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
+return in `%xmm0`/`%xmm1`, and forwards a stack-passed `[2]f64` SSE/SSE
+aggregate into a private helper by loading incoming stack eightbytes into
+outgoing XMM aggregate slots. The reversed mixed aggregate frontier row adds
 `{ double, i64 }`, selected `{ double, i32 }`, and selected
 `{ double, i32, i32 }` SSE/INTEGER field reads plus register aggregate returns
 in `%xmm0`/`%rax`, including high-lane `i32` extraction and adjacent `i32` lane
@@ -658,7 +660,8 @@ selects, constant-return `i8 switch` CFGs, void `i32` global/TLS store helpers,
 small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
-ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; expanded
+ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; frontier
+reports ReleaseFast `154/0`, ReleaseSafe `154/0`, ReleaseSmall `154/0`; expanded
 reports ReleaseFast `199/0`, ReleaseSafe `199/0`, ReleaseSmall `199/0`.
 The scale frontier reports ReleaseFast `216/0`, ReleaseSafe `216/0`, and
 ReleaseSmall `216/0`.

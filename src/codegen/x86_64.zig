@@ -331,6 +331,14 @@ pub const Instruction = union(enum) {
     load_stack_disp32_rax: u32,
     load_stack_disp8_xmm0: u8,
     load_stack_disp32_xmm0: u32,
+    load_stack_disp8_xmm: struct {
+        reg: XmmReg,
+        disp: u8,
+    },
+    load_stack_disp32_xmm: struct {
+        reg: XmmReg,
+        disp: u32,
+    },
     load_stack_disp8_arg32: struct {
         reg: ArgReg,
         disp: u8,
@@ -5529,6 +5537,7 @@ fn lowerAggregateAbiReturn(
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSysVAggregateFieldReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateIntegerFieldAddReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerRegisterAggregateDoubleFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMemoryIntegerAggregateFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerTruncI64ArgReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMakePairReturn(allocator, machine, function, block, ret)) return true;
@@ -6051,6 +6060,14 @@ const AggregateIntegerAddTerm = struct {
     offset: u64,
 };
 
+const AggregateDoubleFieldLoad = struct {
+    offset: u64,
+};
+
+const AggregateDoubleAddTerm = struct {
+    offset: u64,
+};
+
 fn lowerRegisterAggregateIntegerFieldAddReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -6131,6 +6148,115 @@ fn lowerRegisterAggregateIntegerFieldAddReturn(
     }
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerRegisterAggregateDoubleFieldAddReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.double) or !function.ret_ty.eql(.double)) return false;
+    if (function.params.items.len != 1) return false;
+    const aggregate_ty = function.params.items[0].ty;
+    const classification = classifySysVAggregate(aggregate_ty) catch return false;
+    if (classification.kind != .register) return false;
+    if (block.instructions.items.len < 5) return false;
+
+    const alloca_inst = block.instructions.items[0];
+    const store_inst = block.instructions.items[1];
+    if (alloca_inst.removed or store_inst.removed) return false;
+    const alloca_name = alloca_inst.result orelse return false;
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    if (!alloca.allocated_ty.eql(aggregate_ty)) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name) or
+        !isNamed(store.value, function.params.items[0].name)) return false;
+
+    var pointer_offsets = std.StringHashMap(u64).init(allocator);
+    defer pointer_offsets.deinit();
+    try pointer_offsets.put(alloca_name, 0);
+
+    var field_loads = std.StringHashMap(AggregateDoubleFieldLoad).init(allocator);
+    defer field_loads.deinit();
+
+    const layout = try x86_64SysVDataLayout();
+    for (block.instructions.items[2..]) |instruction| {
+        if (instruction.removed) return false;
+        switch (instruction.kind) {
+            .gep => |gep| {
+                const result = instruction.result orelse return false;
+                const base_name = switch (gep.ptr) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                const base_offset = pointer_offsets.get(base_name) orelse return false;
+                const offset = aggregateGepByteOffset(layout, aggregate_ty, gep) orelse return false;
+                try pointer_offsets.put(result, base_offset + offset);
+            },
+            .load => |load| {
+                const result = instruction.result orelse return false;
+                if (!load.ty.eql(.double) or load.attrs.isBarrier()) return false;
+                const ptr_name = switch (load.ptr) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                const offset = pointer_offsets.get(ptr_name) orelse return false;
+                _ = aggregateFieldIndexAtOffset(aggregate_ty, offset, load.ty) orelse return false;
+                try field_loads.put(result, .{ .offset = offset });
+            },
+            .binary => |binary| {
+                if (binary.op != .fadd or !binary.ty.eql(.double)) return false;
+            },
+            .phi, .fcmp, .icmp, .select, .cast, .freeze, .alloca, .store, .call, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+        }
+    }
+
+    var terms: [2]AggregateDoubleAddTerm = undefined;
+    var term_count: usize = 0;
+    if (!try collectAggregateDoubleAddTerms(block, ret.value orelse return error.InvalidRet, field_loads, &terms, &term_count)) return false;
+    if (term_count != 2) return false;
+
+    try emitAggregateDoubleTerm(allocator, machine, function, aggregate_ty, terms[0], .xmm0);
+    try emitAggregateDoubleTerm(allocator, machine, function, aggregate_ty, terms[1], .xmm1);
+    try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn collectAggregateDoubleAddTerms(
+    block: ir.BasicBlock,
+    value: ir.Value,
+    field_loads: std.StringHashMap(AggregateDoubleFieldLoad),
+    terms: *[2]AggregateDoubleAddTerm,
+    term_count: *usize,
+) !bool {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (field_loads.get(name)) |load| {
+        if (term_count.* >= terms.len) return error.UnsupportedCodegenAbi;
+        terms[term_count.*] = .{ .offset = load.offset };
+        term_count.* += 1;
+        return true;
+    }
+    const instruction = findInstruction(block, name) orelse return false;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (binary.op != .fadd or !binary.ty.eql(.double)) return false;
+    if (!try collectAggregateDoubleAddTerms(block, binary.lhs, field_loads, terms, term_count)) return false;
+    return try collectAggregateDoubleAddTerms(block, binary.rhs, field_loads, terms, term_count);
 }
 
 fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, gep: ir.GepInst) ?u64 {
@@ -6281,6 +6407,29 @@ fn emitAggregateIntegerTerm(
     }
 }
 
+fn emitAggregateDoubleTerm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    aggregate_ty: ir.Type,
+    term: AggregateDoubleAddTerm,
+    dest: XmmReg,
+) !void {
+    const location = try sysvAggregateFieldLocationByOffset(function, function.params.items[0].name, aggregate_ty, term.offset, .double);
+    switch (location) {
+        .sse => |reg| {
+            if (reg == dest) return;
+            if (dest == .xmm0 and reg == .xmm1) {
+                try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+                return;
+            }
+            return error.UnsupportedCodegenAbi;
+        },
+        .stack => |offset| try appendLoadStackDispXmm(allocator, machine, dest, offset),
+        .gpr => return error.UnsupportedCodegenAbi,
+    }
+}
+
 fn appendLoadStackDispRax(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
     if (offset <= 127) {
         try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(offset) });
@@ -6294,6 +6443,15 @@ fn appendLoadStackDispXmm0(allocator: std.mem.Allocator, machine: *MachineFuncti
         try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm0 = @intCast(offset) });
     } else {
         try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm0 = offset });
+    }
+}
+
+fn appendLoadStackDispXmm(allocator: std.mem.Allocator, machine: *MachineFunction, reg: XmmReg, offset: u32) !void {
+    if (reg == .xmm0) return appendLoadStackDispXmm0(allocator, machine, offset);
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm = .{ .reg = reg, .disp = @intCast(offset) } });
+    } else {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm = .{ .reg = reg, .disp = offset } });
     }
 }
 
@@ -22398,7 +22556,6 @@ fn planSysVRegisterAggregatePassThrough(
     if (source_in_registers and (source.gpr != dest_gpr or source.sse != dest_sse or source.stack_eightbytes != 0)) {
         return error.UnsupportedCodegenAbi;
     }
-    if (!source_in_registers and !classification.isIntegerOnly()) return error.UnsupportedCodegenAbi;
     return .{
         .classification = classification,
         .source = source,
@@ -22423,6 +22580,7 @@ fn appendSysVRegisterAggregatePassThroughArg(
     if (source_in_registers) return;
 
     var gpr_offset: usize = 0;
+    var sse_offset: usize = 0;
     var eightbyte_index: usize = 0;
     while (eightbyte_index < pass.classification.eightbyte_count) : (eightbyte_index += 1) {
         switch (pass.classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi) {
@@ -22436,7 +22594,16 @@ fn appendSysVRegisterAggregatePassThroughArg(
                 } });
                 gpr_offset += 1;
             },
-            .sse => return error.UnsupportedCodegenAbi,
+            .sse => {
+                const dst = try XmmReg.fromIndex(pass.dest_sse + sse_offset);
+                const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8;
+                if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+                try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm = .{
+                    .reg = dst,
+                    .disp = @intCast(offset),
+                } });
+                sse_offset += 1;
+            },
         }
     }
 }
@@ -23675,6 +23842,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .load_stack_disp32_rax,
         .load_stack_disp8_xmm0,
         .load_stack_disp32_xmm0,
+        .load_stack_disp8_xmm,
+        .load_stack_disp32_xmm,
         .load_stack_disp8_arg32,
         .load_stack_disp8_arg64,
         .load_rax_ptr_disp8_rax,
@@ -23791,7 +23960,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .shl_rcx_imm6, .or_rcx_rax, .or_rcx_rdx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm0, .load_stack_disp32_xmm0, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
+        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .shl_rcx_imm6, .or_rcx_rax, .or_rcx_rdx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm0, .load_stack_disp32_xmm0, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -23927,6 +24096,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .load_stack_disp32_rax,
         .load_stack_disp8_xmm0,
         .load_stack_disp32_xmm0,
+        .load_stack_disp8_xmm,
+        .load_stack_disp32_xmm,
         .load_stack_disp8_arg32,
         .load_stack_disp8_arg64,
         .load_rax_ptr_disp8_rax,

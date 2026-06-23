@@ -254,6 +254,18 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x10, 0x84, 0x24 });
                 try appendU32(&bytes, allocator, disp);
             },
+            .load_stack_disp8_xmm => |load| {
+                try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x10 });
+                try bytes.append(allocator, 0x44 | (@as(u8, load.reg.lowCode()) << 3));
+                try bytes.append(allocator, 0x24);
+                try bytes.append(allocator, load.disp);
+            },
+            .load_stack_disp32_xmm => |load| {
+                try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x10 });
+                try bytes.append(allocator, 0x84 | (@as(u8, load.reg.lowCode()) << 3));
+                try bytes.append(allocator, 0x24);
+                try appendU32(&bytes, allocator, load.disp);
+            },
             .load_stack_disp8_arg32 => |load| try encodeStackDisp8ToArg32(&bytes, allocator, load.reg, load.disp),
             .load_stack_disp8_arg64 => |load| try encodeStackDisp8ToArg64(&bytes, allocator, load.reg, load.disp),
             .load_rax_ptr_disp8_rax => |disp| {
@@ -488,6 +500,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .load_stack_disp32_rax => 8,
         .load_stack_disp8_xmm0 => 6,
         .load_stack_disp32_xmm0 => 9,
+        .load_stack_disp8_xmm => 6,
+        .load_stack_disp32_xmm => 9,
         .load_stack_disp8_arg32 => |load| if (load.reg.rexR()) 5 else 4,
         .load_stack_disp8_arg64 => 5,
         .load_rax_ptr_disp8_rax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,

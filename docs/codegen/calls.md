@@ -179,8 +179,9 @@ accepted frontier:
   `i32` construction returns
   selected SSE/SSE aggregate argument field reads and register return including
   `[2]f64` array-in-struct and nested `{ { double }, { double } }`
-  selected stack-sourced INTEGER aggregate forwarding into outgoing register
-  aggregate helper calls
+  selected stack-sourced INTEGER aggregate forwarding into outgoing GPR
+  aggregate helper calls and selected stack-sourced SSE/SSE aggregate
+  forwarding into outgoing XMM aggregate helper calls
   generated normal integer-leaf MEMORY aggregate hidden-sret return storage and
   byval-to-sret copies currently proven through twenty flat fields, a nested
   two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and

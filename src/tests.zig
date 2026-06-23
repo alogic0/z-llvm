@@ -5231,6 +5231,24 @@ test "x86_64 encoding loads and stores xmm0 through stack and argument pointer d
     }, bytes);
 }
 
+test "x86_64 encoding loads stack displacements into arbitrary xmm registers" {
+    var machine = codegen.x86_64.MachineFunction.init("load_xmm_stack", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp8_xmm = .{ .reg = .xmm1, .disp = 16 } });
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp32_xmm = .{ .reg = .xmm2, .disp = 128 } });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .load_stack_disp8_xmm = .{ .reg = .xmm1, .disp = 16 } }));
+    try std.testing.expectEqual(@as(u32, 9), mc.encoding.instructionSize(.{ .load_stack_disp32_xmm = .{ .reg = .xmm2, .disp = 128 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0xf2, 0x0f, 0x10, 0x4c, 0x24, 0x10,
+        0xf2, 0x0f, 0x10, 0x94, 0x24, 0x80,
+        0x00, 0x00, 0x00, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding spills and reloads xmm frame slots" {
     var machine = codegen.x86_64.MachineFunction.init("xmm_frame_slots", .double);
     defer machine.deinit(std.testing.allocator);
@@ -7385,6 +7403,40 @@ test "x86_64 generic CFG forwards stack-passed integer aggregate to register agg
     };
     try std.testing.expectEqualStrings("sum_pair", call.symbol);
     try std.testing.expect(call.ret_ty.eql(.{ .int = 64 }));
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+}
+
+test "x86_64 generic CFG forwards stack-passed SSE aggregate to register aggregate call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare double @sum_double_pair({ [2 x double] })
+        \\
+        \\define double @caller(double %a0, double %a1, double %a2, double %a3, double %a4, double %a5, double %a6, double %a7, { [2 x double] } %value) {
+        \\entry:
+        \\  %r = call double @sum_double_pair({ [2 x double] } %value)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_xmm = .{ .reg = .xmm0, .disp = 8 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_xmm = .{ .reg = .xmm1, .disp = 16 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[2]);
+    const call = switch (machine.instructions.items[3]) {
+        .direct_call => |call| call,
+        else => return error.ExpectedDirectCall,
+    };
+    try std.testing.expectEqualStrings("sum_double_pair", call.symbol);
+    try std.testing.expect(call.ret_ty.eql(.double));
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[4]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
