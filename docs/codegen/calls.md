@@ -292,9 +292,10 @@ call slots, 12-argument forwarding through outgoing stack slots, selected
 `i64` register/stack argument forwarding, selected INTEGER/INTEGER aggregate
 arguments/returns through GPR pairs, and selected SSE/SSE `[2]f64` aggregate
 arguments/returns through XMM pairs. Normal supported-leaf MEMORY aggregate
-byval-to-sret indirect calls are also accepted: the backend preserves the hidden
-sret pointer, forwards the pointer callee through `%rax`, copies the incoming
-aggregate stack slots to outgoing stack slots, and emits `callq *%rax`.
+byval-to-sret direct and indirect calls are also accepted: the backend preserves
+the hidden sret pointer, forwards pointer callees through `%rax` when needed,
+copies the incoming aggregate stack slots to outgoing stack slots, and emits
+the call.
 Selected live `i32` values can also cross an indirect call through the same
 spill/reload frame used by direct calls. Indirect calls with unsupported MEMORY
 aggregate leaves/layouts, tail markers, varargs, non-default call conventions,

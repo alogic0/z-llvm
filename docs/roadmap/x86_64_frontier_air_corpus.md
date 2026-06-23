@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=173
-structured_functions=173
-generic_codegen_functions=173
-generic_cfg_functions=173
+discovered_functions=174
+structured_functions=174
+generic_codegen_functions=174
+generic_cfg_functions=174
 structural_matcher_functions=0
-structured_air_v2_functions=173
-typed_air_operand_functions=173
+structured_air_v2_functions=174
+typed_air_operand_functions=174
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=173
+generic_lowering_functions=174
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=173
+object_emitted_functions=174
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -138,11 +138,11 @@ Closed in the current memory/aggregate frontier slice:
   `movsd` stack loads and hidden-sret stores, the `BigPtrDouble` row proves the
   same layout-derived copy path for pointer, `double`, and `i64` leaves in one
   MEMORY aggregate, and `BigFloat` proves five `f32` leaves through dedicated
-  `movss` stack loads and hidden-sret stores; `frontier_indirect_big5_copy`
-  proves the same normal supported-leaf MEMORY aggregate can flow through an
-  indirect call by preserving the hidden sret pointer, forwarding the pointer
-  callee through `%rax`, and copying incoming by-value stack slots to outgoing
-  stack slots before `callq *%rax`
+  `movss` stack loads and hidden-sret stores; `frontier_direct_big5_copy` and
+  `frontier_indirect_big5_copy` prove the same normal supported-leaf MEMORY
+  aggregate can flow through direct and indirect calls by preserving the hidden
+  sret pointer, forwarding pointer callees through `%rax` when needed, and
+  copying incoming by-value stack slots to outgoing stack slots before the call
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }`, selected
   `{ i32, double }`, and selected `{ i32, i32, double }` forms are classified as

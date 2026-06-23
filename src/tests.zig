@@ -7881,6 +7881,42 @@ test "x86_64 generic CFG forwards memory aggregate through hidden-sret indirect 
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[8]);
 }
 
+test "x86_64 generic CFG forwards memory aggregate through hidden-sret direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i64, i64, i64, i64, i64 } @callee({ i64, i64, i64, i64, i64 })
+        \\
+        \\define { i64, i64, i64, i64, i64 } @caller({ i64, i64, i64, i64, i64 } %value) {
+        \\entry:
+        \\  %r = call { i64, i64, i64, i64, i64 } @callee({ i64, i64, i64, i64, i64 } %value)
+        \\  ret { i64, i64, i64, i64, i64 } %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_stack_disp8 = 40 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_stack_disp8 = 40 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_stack_disp8 = 40 }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_stack_disp8 = 40 }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_stack_disp8 = 40 }, machine.instructions.items[4]);
+    const call = switch (machine.instructions.items[5]) {
+        .direct_call => |call| call,
+        else => return error.ExpectedDirectCall,
+    };
+    try std.testing.expectEqualStrings("callee", call.symbol);
+    try std.testing.expectEqualStrings("{ i64, i64, i64, i64, i64 }", call.ret_ty.aggregate);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_40, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[7]);
+}
+
 test "x86_64 generic CFG lowers narrow i32 indirect call through rax" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

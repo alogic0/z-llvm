@@ -5547,7 +5547,7 @@ fn lowerAggregateAbiReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (try lowerMemoryAggregateIndirectCallReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerMemoryAggregateCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateDirectCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
@@ -5560,7 +5560,7 @@ fn lowerAggregateAbiReturn(
     return false;
 }
 
-fn lowerMemoryAggregateIndirectCallReturn(
+fn lowerMemoryAggregateCallReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -5583,14 +5583,17 @@ fn lowerMemoryAggregateIndirectCallReturn(
     if (!call.ret_ty.eql(function.ret_ty) or call.inline_asm != null) return false;
     if (call.tail_kind != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
-    if (call.callee_value == null or call.args.items.len != 1) return false;
+    if (call.args.items.len != 1) return false;
 
-    const callee_name = switch (call.callee_value.?) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    const callee_reg = try paramRegWithInitialGpr(function, callee_name, .ptr, 1);
-    if (callee_reg == .rdi) return error.UnsupportedCodegenAbi;
+    const call_target: SysVCallTarget = if (call.callee_value) |callee_value| target: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        const callee_reg = try paramRegWithInitialGpr(function, callee_name, .ptr, 1);
+        if (callee_reg == .rdi) return error.UnsupportedCodegenAbi;
+        break :target .{ .indirect_from_reg = callee_reg };
+    } else .{ .direct = call.callee };
 
     const aggregate_arg = call.args.items[0];
     if (!aggregate_arg.ty.eql(function.ret_ty)) return false;
@@ -5611,8 +5614,8 @@ fn lowerMemoryAggregateIndirectCallReturn(
         source,
         classification,
     );
-    try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
-    try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
+    try setupSysVCallTarget(allocator, machine, call_target);
+    try appendSysVCallTargetWithStackArgs(allocator, machine, call_target, call.ret_ty, stack_arg_count);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -23136,6 +23139,19 @@ fn appendAlignedSysVCallTarget(
             try setupSysVCallTarget(allocator, machine, call_target);
             try appendAlignedIndirectCallRax(allocator, machine, ret_ty);
         },
+    }
+}
+
+fn appendSysVCallTargetWithStackArgs(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    call_target: SysVCallTarget,
+    ret_ty: ir.Type,
+    stack_arg_count: usize,
+) !void {
+    switch (call_target) {
+        .direct => |symbol| try appendDirectCallWithStackArgs(allocator, machine, symbol, ret_ty, stack_arg_count),
+        .indirect_from_reg => try appendIndirectCallRaxWithStackArgs(allocator, machine, ret_ty, stack_arg_count),
     }
 }
 

@@ -184,6 +184,10 @@ export fn frontier_big5_copy(value: Big5) Big5 {
     return value;
 }
 
+export fn frontier_direct_big5_copy(value: Big5) Big5 {
+    return frontier_big5_copy(value);
+}
+
 export fn frontier_indirect_big5_copy(func: Big5CopyFn, value: Big5) Big5 {
     return func(value);
 }
