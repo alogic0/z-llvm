@@ -1618,6 +1618,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\struct BigMixed { long long a; int b; long long c; int d; };
     \\struct BigArray { long long values[5]; };
+    \\struct BigDouble { double a; double b; double c; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
     \\extern struct Big3 z_frontier_big3_copy(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_copy");
@@ -1651,6 +1652,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigMixed z_frontier_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_big_mixed_copy");
     \\extern struct BigArray z_frontier_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_copy");
     \\extern long long z_frontier_big_array_sum_edges(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_sum_edges");
+    \\extern struct BigDouble z_frontier_big_double_copy(struct BigDouble) __asm__("frontier_sysv_sret_byval.frontier_big_double_copy");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -1716,6 +1718,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct BigArray copied_array = z_frontier_big_array_copy(array);
     \\    if (copied_array.values[0] != 233 || copied_array.values[1] != 239 || copied_array.values[2] != 241 || copied_array.values[3] != 251 || copied_array.values[4] != 257) return 23;
     \\    if (z_frontier_big_array_sum_edges(array) != 490) return 24;
+    \\    struct BigDouble big_double = { .a = 1.5, .b = 2.25, .c = 3.75 };
+    \\    struct BigDouble copied_big_double = z_frontier_big_double_copy(big_double);
+    \\    if (copied_big_double.a != 1.5 || copied_big_double.b != 2.25 || copied_big_double.c != 3.75) return 34;
     \\    return 0;
     \\}
     \\

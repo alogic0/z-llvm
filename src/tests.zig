@@ -5207,6 +5207,30 @@ test "x86_64 encoding stores through argument pointer disp32" {
     }, bytes);
 }
 
+test "x86_64 encoding loads and stores xmm0 through stack and argument pointer displacements" {
+    var machine = codegen.x86_64.MachineFunction.init("copy_xmm0_ptr", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp8_xmm0 = 16 });
+    try machine.instructions.append(std.testing.allocator, .{ .store_xmm0_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 24 } });
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp32_xmm0 = 128 });
+    try machine.instructions.append(std.testing.allocator, .{ .store_xmm0_arg_ptr_disp32 = .{ .reg = .rdi, .offset = 136 } });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .load_stack_disp8_xmm0 = 16 }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .store_xmm0_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 24 } }));
+    try std.testing.expectEqual(@as(u32, 9), mc.encoding.instructionSize(.{ .load_stack_disp32_xmm0 = 128 }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .store_xmm0_arg_ptr_disp32 = .{ .reg = .rdi, .offset = 136 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0xf2, 0x0f, 0x10, 0x44, 0x24, 0x10,
+        0xf2, 0x0f, 0x11, 0x47, 0x18, 0xf2,
+        0x0f, 0x10, 0x84, 0x24, 0x80, 0x00,
+        0x00, 0x00, 0xf2, 0x0f, 0x11, 0x87,
+        0x88, 0x00, 0x00, 0x00, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding spills and reloads xmm frame slots" {
     var machine = codegen.x86_64.MachineFunction.init("xmm_frame_slots", .double);
     defer machine.deinit(std.testing.allocator);

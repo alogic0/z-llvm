@@ -182,7 +182,8 @@ accepted frontier:
   generated normal integer-leaf MEMORY aggregate hidden-sret return storage and
   byval-to-sret copies currently proven through twenty flat fields, a nested
   two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and
-  array-backed `{ [5 x i64] }` copy/read rows
+  array-backed `{ [5 x i64] }` copy/read rows, plus the first
+  `{ double, double, double }` double-leaf byval-to-sret copy row
   selected stack-passed MEMORY aggregate by-value field reads
   selected one-live f32/f64 SSE spill/reload around a direct C ABI void call
   selected two-/three-live f32/f64 spill/reload across a no-argument direct C
@@ -212,7 +213,8 @@ aggregate field-read shape, and byval-to-sret copies for all fields in those
 selected forms; the current frontier proves this through eight i64 fields,
 mixed-width integer leaves, multiple stack-passed user fields after the hidden
 sret pointer, array-backed integer copy/read leaves through `{ [5 x i64] }`,
-and larger flat normal integer-leaf copies through `Big20`
+larger flat normal integer-leaf copies through `Big20`, and the first
+double-leaf copy through `BigDouble`
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax
@@ -247,7 +249,7 @@ The first slice rejects:
 ```text
 inline assembly calls
 varargs
-byval/sret lowering beyond the generated normal integer-leaf MEMORY aggregate frontier
+byval/sret lowering beyond the generated selected normal MEMORY aggregate frontier
 operand bundles
 invoke
 callbr

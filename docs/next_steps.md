@@ -296,7 +296,7 @@ f32/f64 direct-call returns, i64 direct-call returns/pass-through,
 mixed integer/f32/f64 call argument assignment, and selected two-i32 aggregate
 argument/return rows. Milestone 1 is closed for this selected practical SysV
 ABI subset. Remaining non-selected ABI boundaries are full aggregate
-classification beyond the selected INTEGER and normal integer-leaf MEMORY
+classification beyond the selected INTEGER and selected normal MEMORY
 aggregate forms, arbitrary non-selected sret/byval copies, varargs, vectors, and live-across-call shapes
 involving stack-passed `i32` values beyond the current disp8-safe model or broader SSE pressure;
 focused unit tests now fail closed for these unsupported classes.
@@ -325,10 +325,12 @@ MEMORY aggregate forms use by-value stack-passed aggregate field reads and
 byval-to-sret copies for all scalar integer leaves through layout-derived
 offsets, including the nested two-Big3 aggregate row and the mixed-width
 `{ i64, i32, i64, i32 }` copy row plus the array-backed `{ [5 x i64] }`
-copy/read rows.
+copy/read rows. The `BigDouble` row adds the first double-leaf MEMORY
+byval-to-sret copy proof through typed-v2 leaves and XMM `movsd` stack/sret
+stores.
 Boundaries still outside this
 wave are full
-SysV aggregate classification beyond the selected INTEGER/normal integer-leaf MEMORY classes,
+SysV aggregate classification beyond the selected INTEGER and selected normal MEMORY classes,
 arbitrary non-selected sret/byval copies, varargs, vectors, and wider
 spill/reload pressure.
 
@@ -373,12 +375,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=149`,
-`generic_codegen_functions=149`, `generic_cfg_functions=149`,
+frontier gate reports `source_rows=13`, `discovered_functions=150`,
+`generic_codegen_functions=150`, `generic_cfg_functions=150`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=149`, `object_failures=0`,
+`object_emitted_functions=150`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -412,7 +414,8 @@ using narrow `i32` stores for `i32` leaves. The array-backed MEMORY follow-up
 copies `{ [5 x i64] }` leaves and reads edge array fields through the same
 byte-offset paths. The BigN parser follow-up removes the fixed Big3..Big8 type
 enumeration and proves the same flat normal integer-leaf sret/byval path
-through `Big20` construction, field-read, and copy rows.
+through `Big20` construction, field-read, and copy rows. The `BigDouble`
+follow-up adds the first double-leaf byval-to-sret MEMORY aggregate copy row.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads
 incoming stack-passed `i32` parameters into outgoing GPR call slots, and emits

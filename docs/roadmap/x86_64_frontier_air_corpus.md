@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=149
-structured_functions=149
-generic_codegen_functions=149
-generic_cfg_functions=149
+discovered_functions=150
+structured_functions=150
+generic_codegen_functions=150
+generic_cfg_functions=150
 structural_matcher_functions=0
-structured_air_v2_functions=149
-typed_air_operand_functions=149
+structured_air_v2_functions=150
+typed_air_operand_functions=150
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=149
+generic_lowering_functions=150
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=149
+object_emitted_functions=150
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -133,7 +133,9 @@ Closed in the current memory/aggregate frontier slice:
   prove the same byte-offset copy and by-value field-read paths for integer
   array leaves inside a normal MEMORY aggregate; the flat `BigN` typed parser
   now covers larger normal integer-leaf MEMORY aggregates through `Big20`
-  construction, field-read, and byval-to-sret copy rows
+  construction, field-read, and byval-to-sret copy rows; the `BigDouble` row
+  adds the first double-leaf MEMORY byval-to-sret copy proof through XMM
+  `movsd` stack loads and hidden-sret stores
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }`, selected
   `{ i32, double }`, and selected `{ i32, i32, double }` forms are classified as

@@ -122,6 +122,12 @@ const BigArray = extern struct {
     values: [5]i64,
 };
 
+const BigDouble = extern struct {
+    a: f64,
+    b: f64,
+    c: f64,
+};
+
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
     return .{ .a = a, .b = b, .c = c };
 }
@@ -252,4 +258,8 @@ export fn frontier_big_array_copy(value: BigArray) BigArray {
 
 export fn frontier_big_array_sum_edges(value: BigArray) i64 {
     return value.values[0] + value.values[4];
+}
+
+export fn frontier_big_double_copy(value: BigDouble) BigDouble {
+    return value;
 }

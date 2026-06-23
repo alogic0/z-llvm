@@ -1163,7 +1163,7 @@ fn supportedIntegerAggregateLeafCount(ty: ir.Type) ?usize {
 }
 
 fn supportedAggregateIntegerLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 });
+    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.double);
 }
 
 fn isAggregateIrType(ty: ir.Type) bool {
@@ -5100,6 +5100,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigArray")) {
         return .{ .ir_type = .{ .aggregate = "{ [5 x i64] }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigDouble")) {
+        return .{ .ir_type = .{ .aggregate = "{ double, double, double }" } };
     }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
