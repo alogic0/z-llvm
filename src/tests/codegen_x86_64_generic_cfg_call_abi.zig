@@ -712,6 +712,48 @@ test "x86_64 generic CFG forwards memory aggregate through hidden-sret direct ca
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[7]);
 }
 
+test "x86_64 SysV call planner assigns memory aggregates through stack passthrough" {
+    const direct_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee({ i64, i64, i64 })
+        \\
+        \\define i32 @caller({ i64, i64, i64 } %value) {
+        \\entry:
+        \\  %r = call i32 @callee({ i64, i64, i64 } %value)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var direct_module = try ir.Module.parse(std.testing.allocator, direct_input);
+    defer direct_module.deinit();
+    try direct_module.verify();
+    const direct_call = direct_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const direct_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, direct_module.functions.items[0], direct_call);
+    try std.testing.expectEqual(@as(usize, 3), direct_counts.stack_args);
+    try std.testing.expectEqual(@as(usize, 0), direct_counts.register_aggregate_args);
+    try std.testing.expectEqual(@as(usize, 1), direct_counts.gpr_returns);
+
+    const indirect_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, { i64, i64, i64 } %value) {
+        \\entry:
+        \\  %r = call i32 %fn({ i64, i64, i64 } %value)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_module = try ir.Module.parse(std.testing.allocator, indirect_input);
+    defer indirect_module.deinit();
+    try indirect_module.verify();
+    const indirect_call = indirect_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(indirect_call.callee_value != null);
+    const indirect_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_module.functions.items[0], indirect_call);
+    try std.testing.expectEqual(direct_counts.stack_args, indirect_counts.stack_args);
+    try std.testing.expectEqual(direct_counts.gpr_returns, indirect_counts.gpr_returns);
+}
+
 test "x86_64 generic CFG lowers narrow i32 indirect call through rax" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1108,7 +1150,7 @@ test "x86_64 codegen rejects sret and byval call ABI boundaries" {
     );
 }
 
-test "x86_64 codegen rejects larger aggregate call and vector return ABI boundaries" {
+test "x86_64 codegen accepts memory aggregate stack call and rejects vector return boundary" {
     const aggregate_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -1124,10 +1166,20 @@ test "x86_64 codegen rejects larger aggregate call and vector return ABI boundar
     var aggregate_module = try ir.Module.parse(std.testing.allocator, aggregate_input);
     defer aggregate_module.deinit();
     try aggregate_module.verify();
-    try std.testing.expectError(
-        error.UnsupportedCodegenType,
-        codegen.x86_64.lowerFunction(std.testing.allocator, aggregate_module.target_triple.?, aggregate_module.functions.items[0]),
-    );
+    var aggregate_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, aggregate_module.target_triple.?, aggregate_module.functions.items[0]);
+    defer aggregate_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, aggregate_machine.codegen_path);
+    try expectMachineInstruction(aggregate_machine.instructions.items, .{ .push_stack_disp8 = 24 });
+    var saw_direct_call = false;
+    for (aggregate_machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_direct_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.{ .int = 32 }));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_direct_call);
 
     const vector_return_input =
         \\target triple = "x86_64-unknown-linux-gnu"

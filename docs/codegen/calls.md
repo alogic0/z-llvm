@@ -306,7 +306,9 @@ arguments/returns through XMM pairs. Normal supported-leaf MEMORY aggregate
 byval-to-sret direct and indirect calls are also accepted: the backend preserves
 the hidden sret pointer, forwards pointer callees through `%rax` when needed,
 copies the incoming aggregate stack slots to outgoing stack slots, and emits
-the call.
+the call. Normal MEMORY aggregate by-value arguments are now assigned by the
+central SysV call planner for both direct and function-pointer calls; unsupported
+MEMORY leaves/layouts still reject before codegen.
 Selected live `i32` values can also cross an indirect call through the same
 spill/reload frame used by direct calls. Indirect calls with unsupported MEMORY
 aggregate leaves/layouts, tail markers, varargs, non-default call conventions,

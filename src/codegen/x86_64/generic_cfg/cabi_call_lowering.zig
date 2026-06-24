@@ -428,6 +428,19 @@ pub fn appendSysVStackAggregatePassThroughArgs(
         .stack => {},
         .registers => return error.UnsupportedCodegenAbi,
     }
+    if (pass.classification.kind == .memory) {
+        const stack_eightbytes = sysv_abi.aggregateStackEightbytes(pass.classification);
+        if (stack_eightbytes == 0) return error.UnsupportedCodegenAbi;
+        var index: usize = 0;
+        while (index < stack_eightbytes) : (index += 1) {
+            if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
+            const offset = 8 + (pass.source.stack_eightbytes + index) * 8;
+            if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            stack_args[stack_arg_count.*] = .{ .stack_disp = @intCast(offset) };
+            stack_arg_count.* += 1;
+        }
+        return;
+    }
     const needs = sysvAggregateRegisterNeeds(pass.classification);
     const source_in_registers = pass.source.gpr + needs.gpr <= 6 and pass.source.sse + needs.sse <= 8;
     if (source_in_registers) {

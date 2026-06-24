@@ -372,7 +372,7 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
                     try plan.assignments.append(allocator, .{ .aggregate_register_passthrough = pass });
                 },
                 .stack => {
-                    plan.counts.stack_args += @intCast(pass.classification.eightbyte_count);
+                    plan.counts.stack_args += aggregateStackEightbytes(pass.classification);
                     try plan.assignments.append(allocator, .{ .aggregate_stack_passthrough = pass });
                 },
             }
@@ -465,13 +465,19 @@ fn planAggregatePassThrough(
     int_arg_index: *usize,
     fp_arg_index: *usize,
 ) !RegisterAggregatePassThrough {
-    if (classification.kind != .register) return error.UnsupportedCodegenAbi;
-    const needs = aggregateRegisterNeeds(classification);
     const name = switch (arg.value) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
     const source = try paramCursorFor(function, name, arg.ty);
+    if (classification.kind == .memory) {
+        return .{
+            .classification = classification,
+            .source = source,
+            .dest = .stack,
+        };
+    }
+    const needs = aggregateRegisterNeeds(classification);
     const dest: AggregatePassDestination = if (int_arg_index.* + needs.gpr <= 6 and fp_arg_index.* + needs.sse <= 8) dest: {
         const dest_gpr = int_arg_index.*;
         const dest_sse = fp_arg_index.*;
@@ -483,6 +489,13 @@ fn planAggregatePassThrough(
         .classification = classification,
         .source = source,
         .dest = dest,
+    };
+}
+
+pub fn aggregateStackEightbytes(classification: AggregateClassification) usize {
+    return switch (classification.kind) {
+        .register => classification.eightbyte_count,
+        .memory => @intCast((classification.size_bytes + 7) / 8),
     };
 }
 
