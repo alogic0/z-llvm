@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=293`,
-`generic_codegen_functions=293`, `generic_cfg_functions=293`,
+three release modes at `source_rows=13`, `discovered_functions=297`,
+`generic_codegen_functions=297`, `generic_cfg_functions=297`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=293`, `object_failures=0`,
+`object_emitted_functions=297`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -499,9 +499,9 @@ post-call `fadd`.
 The two-result FP follow-up preserves a first direct or pointer-callee C ABI
 `f32`/`f64` call result across a second direct or pointer-callee FP result call,
 then reloads the saved XMM slot for the final `fadd`.
-The mixed-width follow-up preserves a first direct or pointer-callee `f32`
-result across a second direct or pointer-callee `f64` result call, reloads and
-extends it with `cvtss2sd`, then performs the final `f64` add.
+The mixed-width follow-up preserves direct or pointer-callee `f32`/`f64` result
+pairs in either order, reloads and extends the `f32` result with `cvtss2sd`,
+then performs the final `f64` add.
 The FP argument frontier also proves selected named `f32`/`f64` external-call
 pass-through through `%xmm0..%xmm4`; backend unit/object tests materialize
 immediate FP constants through `%xmm0..%xmm7`.

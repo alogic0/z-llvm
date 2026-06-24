@@ -265,6 +265,30 @@ export fn frontier_mixed_indirect_both_f32_f64_results_across_calls(first_func: 
     return @as(f64, first) + second;
 }
 
+export fn frontier_mixed_f64_f32_results_across_calls(a: f64, b: f32) f64 {
+    const first = frontier_ordered_f64(a);
+    const second = frontier_ordered2_f32(b);
+    return first + @as(f64, second);
+}
+
+export fn frontier_mixed_indirect_first_f64_f32_results_across_calls(func: IdF64Fn, a: f64, b: f32) f64 {
+    const first = func(a);
+    const second = frontier_ordered2_f32(b);
+    return first + @as(f64, second);
+}
+
+export fn frontier_mixed_indirect_second_f64_f32_results_across_calls(func: IdF32Fn, a: f64, b: f32) f64 {
+    const first = frontier_ordered_f64(a);
+    const second = func(b);
+    return first + @as(f64, second);
+}
+
+export fn frontier_mixed_indirect_both_f64_f32_results_across_calls(first_func: IdF64Fn, second_func: IdF32Fn, a: f64, b: f32) f64 {
+    const first = first_func(a);
+    const second = second_func(b);
+    return first + @as(f64, second);
+}
+
 export fn frontier_six_stack_arg_call() i32 {
     return frontier_sum12_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 }

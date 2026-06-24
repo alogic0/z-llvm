@@ -722,6 +722,37 @@ test "x86_64 codegen preserves mixed f32 f64 call results across calls" {
     try expectMachineInstruction(machine.instructions.items, .addsd_xmm1_xmm0);
 }
 
+test "x86_64 codegen preserves mixed f64 f32 call results across calls" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare double @first(double)
+        \\declare float @second(float)
+        \\
+        \\define double @caller(double %a, float %b) {
+        \\entry:
+        \\  %first = call double @first(double %a)
+        \\  %second = call float @second(float %b)
+        \\  %wide = fpext float %second to double
+        \\  %sum = fadd double %first, %wide
+        \\  ret double %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .cvtss2sd_xmm0_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .addsd_xmm1_xmm0);
+}
+
 test "x86_64 codegen preserves three live f32 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

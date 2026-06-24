@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=293
-structured_functions=293
-generic_codegen_functions=293
-generic_cfg_functions=293
+discovered_functions=297
+structured_functions=297
+generic_codegen_functions=297
+generic_cfg_functions=297
 structural_matcher_functions=0
-structured_air_v2_functions=293
-typed_air_operand_functions=293
+structured_air_v2_functions=297
+typed_air_operand_functions=297
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=293
+generic_lowering_functions=297
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=293
+object_emitted_functions=297
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -447,11 +447,15 @@ Closed in the current memory/aggregate frontier slice:
 - selected mixed-width FP call-result frames in `frontier_sysv_abi.zig`:
   `frontier_mixed_f32_f64_results_across_calls`,
   `frontier_mixed_indirect_first_f32_f64_results_across_calls`,
-  `frontier_mixed_indirect_second_f32_f64_results_across_calls`, and
-  `frontier_mixed_indirect_both_f32_f64_results_across_calls` spill the first
-  `float` call result, preserve the later `double` call argument and pointer
-  callee when needed, reload the first result, extend it with `cvtss2sd`, and
-  add it to the second `double` call result.
+  `frontier_mixed_indirect_second_f32_f64_results_across_calls`,
+  `frontier_mixed_indirect_both_f32_f64_results_across_calls`,
+  `frontier_mixed_f64_f32_results_across_calls`,
+  `frontier_mixed_indirect_first_f64_f32_results_across_calls`,
+  `frontier_mixed_indirect_second_f64_f32_results_across_calls`, and
+  `frontier_mixed_indirect_both_f64_f32_results_across_calls` spill the first
+  FP call result, preserve the later FP call argument and pointer callee when
+  needed, extend the `float` result with `cvtss2sd`, and return the final
+  `double` add.
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded
