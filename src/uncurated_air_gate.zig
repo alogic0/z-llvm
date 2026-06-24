@@ -1516,6 +1516,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_two_i32_results_live_across_void_call(int, int) __asm__("frontier_sysv_abi.frontier_two_i32_results_live_across_void_call");
     \\extern int z_frontier_two_i32_results_live_across_indirect_void_call(void (*)(void), int, int) __asm__("frontier_sysv_abi.frontier_two_i32_results_live_across_indirect_void_call");
     \\extern int z_frontier_indirect_first_i32_result_live_across_void_call(int (*)(int), int, int) __asm__("frontier_sysv_abi.frontier_indirect_first_i32_result_live_across_void_call");
+    \\extern int z_frontier_indirect_second_i32_result_live_across_void_call(int (*)(int), int, int) __asm__("frontier_sysv_abi.frontier_indirect_second_i32_result_live_across_void_call");
+    \\extern int z_frontier_indirect_both_i32_results_live_across_indirect_void_call(int (*)(int), int (*)(int), void (*)(void), int, int) __asm__("frontier_sysv_abi.frontier_indirect_both_i32_results_live_across_indirect_void_call");
     \\extern double z_frontier_f64_result_live_across_void_call(double, double) __asm__("frontier_sysv_abi.frontier_f64_result_live_across_void_call");
     \\extern double z_frontier_f64_result_live_across_indirect_void_call(void (*)(void), double, double) __asm__("frontier_sysv_abi.frontier_f64_result_live_across_indirect_void_call");
     \\extern double z_frontier_indirect_f64_result_live_across_void_call(double (*)(double), double, double) __asm__("frontier_sysv_abi.frontier_indirect_f64_result_live_across_void_call");
@@ -1754,6 +1756,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_two_i32_results_live_across_indirect_void_call(frontier_touch_ordered_after_two, 31, 37) != 111 || frontier_order_step != 3) return 84;
     \\    frontier_order_step = 0;
     \\    if (z_frontier_indirect_first_i32_result_live_across_void_call(frontier_ordered_i32, 41, 43) != 137 || frontier_order_step != 3) return 85;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_indirect_second_i32_result_live_across_void_call(frontier_ordered2_i32, 47, 53) != 159 || frontier_order_step != 3) return 86;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_indirect_both_i32_results_live_across_indirect_void_call(frontier_ordered_i32, frontier_ordered2_i32, frontier_touch_ordered_after_two, 59, 61) != 191 || frontier_order_step != 3) return 87;
     \\    if (z_frontier_six_stack_arg_call() != 78) return 35;
     \\    if (z_frontier_eight_stack_arg_call() != 105) return 46;
     \\    if (z_frontier_twelve_stack_arg_call() != 171) return 47;

@@ -448,9 +448,16 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
         .call => |call| call,
         else => return false,
     };
-    if (!second_call.ret_ty.eql(.{ .int = 32 }) or second_call.callee_value != null or second_call.inline_asm != null) return false;
+    if (!second_call.ret_ty.eql(.{ .int = 32 }) or second_call.inline_asm != null) return false;
     if (!callIsFastcc(second_call.calling_conv)) try validateDefaultCallConv(second_call.calling_conv);
     if (sysvScalarCallNeedsStackArgs(second_call)) return false;
+    const second_call_target: SysVCallTarget = if (second_call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = second_call.callee };
 
     const third_call = switch (third_call_inst.kind) {
         .call => |call| call,
@@ -512,11 +519,11 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
         .direct => null,
         .indirect_from_reg => |reg| reg,
     };
-    const first_callee_reg: ?shared.ArgReg = switch (first_call_target) {
+    const second_callee_reg: ?shared.ArgReg = switch (second_call_target) {
         .direct => null,
         .indirect_from_reg => |reg| reg,
     };
-    const frame_bytes: u8 = if (third_callee_reg != null or first_callee_reg != null) 40 else 24;
+    const frame_bytes: u8 = if (third_callee_reg != null or second_callee_reg != null) 40 else 24;
 
     try appendStackFrame(allocator, machine, frame_bytes);
     if (extra_param_reg) |reg| {
@@ -525,29 +532,30 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
     if (second_arg_live_reg) |reg| {
         try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot4, .reg = reg } });
     }
-    if (third_callee_reg) |reg| {
+    if (second_callee_reg) |reg| {
         try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = reg } });
     }
-    if (first_callee_reg) |reg| {
-        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot7, .reg = reg } });
-        try setupSysVCallTarget(allocator, machine, first_call_target);
+    if (third_callee_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = reg } });
     }
+    try setupSysVCallTarget(allocator, machine, first_call_target);
     const first_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, first_call);
     if (first_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
     try appendSysVCallTarget(allocator, machine, first_call_target, first_call.ret_ty);
     try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot0 });
-    if (first_callee_reg) |reg| {
-        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot7 } });
+    if (second_callee_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot6 } });
     }
+    try setupSysVCallTarget(allocator, machine, second_call_target);
     if (second_arg_live_reg) |reg| {
         try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = reg, .frame_index = .slot4 } });
     }
     const second_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, second_call);
     if (second_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
-    try appendDirectCall(allocator, machine, second_call.callee, second_call.ret_ty);
+    try appendSysVCallTarget(allocator, machine, second_call_target, second_call.ret_ty);
     try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot2 });
     if (third_callee_reg) |reg| {
-        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot6 } });
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot8 } });
     }
     try setupSysVCallTarget(allocator, machine, third_call_target);
     try appendSysVCallTarget(allocator, machine, third_call_target, .void);

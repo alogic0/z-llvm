@@ -243,6 +243,20 @@ export fn frontier_indirect_first_i32_result_live_across_void_call(func: IdI32Fn
     return first + second + a;
 }
 
+export fn frontier_indirect_second_i32_result_live_across_void_call(func: IdI32Fn, a: i32, b: i32) i32 {
+    const first = frontier_ordered_i32(a);
+    const second = func(b);
+    frontier_touch_ordered_after_two();
+    return first + second + a;
+}
+
+export fn frontier_indirect_both_i32_results_live_across_indirect_void_call(first_func: IdI32Fn, second_func: IdI32Fn, later: VoidFn, a: i32, b: i32) i32 {
+    const first = first_func(a);
+    const second = second_func(b);
+    later();
+    return first + second + a;
+}
+
 export fn frontier_f64_result_live_across_void_call(a: f64, b: f64) f64 {
     const first = frontier_ordered_f64(a);
     frontier_touch_ordered();

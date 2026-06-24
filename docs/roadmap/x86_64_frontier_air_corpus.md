@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=310
-structured_functions=310
-generic_codegen_functions=310
-generic_cfg_functions=310
+discovered_functions=312
+structured_functions=312
+generic_codegen_functions=312
+generic_cfg_functions=312
 structural_matcher_functions=0
-structured_air_v2_functions=310
-typed_air_operand_functions=310
+structured_air_v2_functions=312
+typed_air_operand_functions=312
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=310
+generic_lowering_functions=312
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=310
+object_emitted_functions=312
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -416,10 +416,13 @@ Closed in the current memory/aggregate frontier slice:
   the final add tree.
 - selected indirect-first two-result live-across-later-call frame in
   `frontier_sysv_abi.zig`:
-  `frontier_indirect_first_i32_result_live_across_void_call` routes the first
-  ordered `i32` call through a function pointer target, then preserves the
-  second ordered result and later side-effecting `void` call sequence through
-  the same generic SysV call-target and frame spill/reload path.
+  `frontier_indirect_first_i32_result_live_across_void_call`,
+  `frontier_indirect_second_i32_result_live_across_void_call`, and
+  `frontier_indirect_both_i32_results_live_across_indirect_void_call` route the
+  first ordered call, second ordered call, or both ordered calls through
+  function pointer targets, preserve any later pointer-callee `void` call in a
+  non-overlapping 64-bit frame slot, then reload both saved `i32` results for
+  the final add tree.
 - selected FP call-result live-across-later-call frames in
   `frontier_sysv_abi.zig`:
   `frontier_f64_result_live_across_void_call`,
