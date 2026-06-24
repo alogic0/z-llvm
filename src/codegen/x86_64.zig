@@ -3,12 +3,18 @@ const ir = @import("../ir.zig");
 const target = @import("../target.zig");
 const memory_location = @import("../analysis/memory_location.zig");
 const x86_64_types = @import("x86_64/types.zig");
+const sysv_abi = @import("x86_64/sysv_abi.zig");
 
 pub const ArgReg = x86_64_types.ArgReg;
 pub const XmmReg = x86_64_types.XmmReg;
 pub const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 pub const FrameIndex = x86_64_types.FrameIndex;
 pub const CodegenPath = x86_64_types.CodegenPath;
+pub const SysVAggregateEightbyteClass = sysv_abi.AggregateEightbyteClass;
+pub const SysVAggregateKind = sysv_abi.AggregateKind;
+pub const SysVAggregateClassification = sysv_abi.AggregateClassification;
+
+const SysVSmallIntegerAggregate = sysv_abi.SmallIntegerAggregate;
 
 const x86_64_machine = @import("x86_64/machine.zig");
 
@@ -5145,196 +5151,20 @@ fn lowerMemoryAggregateCallReturn(
     return true;
 }
 
-pub const SysVAggregateEightbyteClass = enum {
-    integer,
-    sse,
-};
-
-pub const SysVAggregateKind = enum {
-    register,
-    memory,
-};
-
-pub const SysVAggregateClassification = struct {
-    kind: SysVAggregateKind,
-    eightbytes: [2]?SysVAggregateEightbyteClass = .{ null, null },
-    eightbyte_count: u2 = 0,
-    size_bytes: u64 = 0,
-
-    pub fn isIntegerOnly(classification: SysVAggregateClassification) bool {
-        if (classification.kind != .register or classification.eightbyte_count == 0) return false;
-        var index: usize = 0;
-        while (index < classification.eightbyte_count) : (index += 1) {
-            if (classification.eightbytes[index] != .integer) return false;
-        }
-        return true;
-    }
-
-    pub fn isSseOnly(classification: SysVAggregateClassification) bool {
-        if (classification.kind != .register or classification.eightbyte_count == 0) return false;
-        var index: usize = 0;
-        while (index < classification.eightbyte_count) : (index += 1) {
-            if (classification.eightbytes[index] != .sse) return false;
-        }
-        return true;
-    }
-};
-
 fn x86_64SysVDataLayout() !target.DataLayout {
-    return target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    return sysv_abi.dataLayout();
 }
 
 pub fn classifySysVAggregateForTest(ty: ir.Type) !SysVAggregateClassification {
-    return try classifySysVAggregate(ty);
+    return try sysv_abi.classifyAggregateForTest(ty);
 }
 
 fn classifySysVAggregate(ty: ir.Type) !SysVAggregateClassification {
-    switch (ty) {
-        .aggregate => |text| {
-            const trimmed = std.mem.trim(u8, text, " \t");
-            if (std.mem.startsWith(u8, trimmed, "<{")) return .{ .kind = .memory };
-        },
-        else => {},
-    }
-    const layout = try x86_64SysVDataLayout();
-    const size = try layout.typeStoreSizeBytes(ty);
-    if (size == 0 or size > 16) return .{ .kind = .memory, .size_bytes = size };
-
-    const classification = try classifySysVAggregateSized(layout, ty, size);
-    return if (classification.kind == .register and classification.eightbyte_count == 0)
-        .{ .kind = .memory, .size_bytes = size }
-    else
-        classification;
+    return try sysv_abi.classifyAggregate(ty);
 }
-
-fn classifySysVAggregateSized(layout: target.DataLayout, ty: ir.Type, size: u64) !SysVAggregateClassification {
-    var classification = SysVAggregateClassification{
-        .kind = .register,
-        .eightbyte_count = @intCast((size + 7) / 8),
-        .size_bytes = size,
-    };
-    try classifySysVAggregateInto(layout, ty, 0, &classification);
-    return classification;
-}
-
-fn classifySysVAggregateInto(
-    layout: target.DataLayout,
-    ty: ir.Type,
-    base_offset: u64,
-    classification: *SysVAggregateClassification,
-) !void {
-    if (classification.kind == .memory) return;
-    switch (ty) {
-        .aggregate => |text| {
-            const trimmed = std.mem.trim(u8, text, " \t");
-            if (std.mem.startsWith(u8, trimmed, "<{")) {
-                classification.kind = .memory;
-                return;
-            }
-            var field_index: usize = 0;
-            var saw_field = false;
-            while (memory_location.aggregateFieldType(ty, field_index)) |field_ty| : (field_index += 1) {
-                saw_field = true;
-                const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, ty, field_index) orelse {
-                    classification.kind = .memory;
-                    return;
-                };
-                if (field_offset_i < 0) {
-                    classification.kind = .memory;
-                    return;
-                }
-                const field_offset: u64 = @intCast(field_offset_i);
-                const field_size = try layout.typeStoreSizeBytes(field_ty);
-                const field_align_bytes = bitsToBytes(try layout.typeAbiAlignmentBits(field_ty));
-                if (field_align_bytes != 0 and field_offset % field_align_bytes != 0) {
-                    classification.kind = .memory;
-                    return;
-                }
-                try classifySysVAggregateInto(layout, field_ty, base_offset + field_offset, classification);
-                if (base_offset + field_offset + field_size > 16) {
-                    classification.kind = .memory;
-                    return;
-                }
-            }
-            if (!saw_field) classification.kind = .memory;
-        },
-        .int, .ptr => {
-            const size = try layout.typeStoreSizeBytes(ty);
-            try mergeSysVAggregateClass(classification, base_offset, size, .integer);
-        },
-        .float, .double, .vector => {
-            const size = sysvScalarOrVectorSizeBytes(ty) orelse {
-                classification.kind = .memory;
-                return;
-            };
-            if (size > 16) {
-                classification.kind = .memory;
-                return;
-            }
-            try mergeSysVAggregateClass(classification, base_offset, size, .sse);
-        },
-        .x86_fp80, .fp128, .void, .metadata => classification.kind = .memory,
-    }
-}
-
-fn mergeSysVAggregateClass(
-    classification: *SysVAggregateClassification,
-    offset: u64,
-    size: u64,
-    class: SysVAggregateEightbyteClass,
-) !void {
-    if (size == 0) return;
-    if (offset + size > 16) {
-        classification.kind = .memory;
-        return;
-    }
-    const first = offset / 8;
-    const last = (offset + size - 1) / 8;
-    var index = first;
-    while (index <= last) : (index += 1) {
-        if (index >= classification.eightbytes.len) {
-            classification.kind = .memory;
-            return;
-        }
-        const slot = &classification.eightbytes[@intCast(index)];
-        slot.* = mergeSysVEightbyte(slot.*, class);
-    }
-}
-
-fn mergeSysVEightbyte(existing: ?SysVAggregateEightbyteClass, incoming: SysVAggregateEightbyteClass) SysVAggregateEightbyteClass {
-    const current = existing orelse return incoming;
-    if (current == .integer or incoming == .integer) return .integer;
-    return .sse;
-}
-
-fn sysvScalarOrVectorSizeBytes(ty: ir.Type) ?u64 {
-    return switch (ty) {
-        .float => 4,
-        .double => 8,
-        .vector => |vector| vector.len * (switch (vector.elem_ty) {
-            .int => |bits| if (bits % 8 == 0) bits / 8 else return null,
-            .float => 4,
-            .double => 8,
-            .ptr => 8,
-        }),
-        .void, .int, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => null,
-    };
-}
-
-fn bitsToBytes(bits: u16) u64 {
-    return (@as(u64, bits) + 7) / 8;
-}
-
-const SysVSmallIntegerAggregate = struct {
-    eightbytes: u2,
-    size_bytes: u8,
-};
 
 fn classifySysVSmallIntegerAggregate(ty: ir.Type) ?SysVSmallIntegerAggregate {
-    const classification = classifySysVAggregate(ty) catch return null;
-    if (!classification.isIntegerOnly()) return null;
-    if (classification.size_bytes > std.math.maxInt(u8)) return null;
-    return .{ .eightbytes = classification.eightbyte_count, .size_bytes = @intCast(classification.size_bytes) };
+    return sysv_abi.classifySmallIntegerAggregate(ty);
 }
 
 fn lowerSmallIntegerAggregateReturn(
