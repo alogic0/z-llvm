@@ -1,0 +1,18 @@
+const impl = @import("core_impl.zig");
+
+pub const genericCfgLoopSumPlan = impl.genericCfgLoopSumPlan;
+pub const lowerGenericCfgFunction = impl.lowerGenericCfgFunction;
+pub const lowerGenericCfgMultiBlockCallGlobalCheckMain = impl.lowerGenericCfgMultiBlockCallGlobalCheckMain;
+pub const lowerGenericCfgMultiBlockTwoCallCheckMain = impl.lowerGenericCfgMultiBlockTwoCallCheckMain;
+pub const lowerGenericCfgSingleBlockAggregateAbi = impl.lowerGenericCfgSingleBlockAggregateAbi;
+pub const lowerGenericCfgSingleBlockCallChainMain = impl.lowerGenericCfgSingleBlockCallChainMain;
+pub const lowerGenericCfgSingleBlockCallCheckMain = impl.lowerGenericCfgSingleBlockCallCheckMain;
+pub const lowerGenericCfgSingleBlockDirectCallMain = impl.lowerGenericCfgSingleBlockDirectCallMain;
+pub const lowerGenericCfgSingleBlockEffectBarrier = impl.lowerGenericCfgSingleBlockEffectBarrier;
+pub const lowerGenericCfgSingleBlockFp = impl.lowerGenericCfgSingleBlockFp;
+pub const lowerGenericCfgSingleBlockI64 = impl.lowerGenericCfgSingleBlockI64;
+pub const lowerGenericCfgSingleBlockPackedBits = impl.lowerGenericCfgSingleBlockPackedBits;
+pub const lowerGenericCfgSingleBlockScalar = impl.lowerGenericCfgSingleBlockScalar;
+pub const lowerGenericCfgSingleBlockUpdateGetMain = impl.lowerGenericCfgSingleBlockUpdateGetMain;
+pub const lowerGenericCfgSingleBlockVoid = impl.lowerGenericCfgSingleBlockVoid;
+pub const lowerGenericCfgSingleBlockVoidCallMain = impl.lowerGenericCfgSingleBlockVoidCallMain;

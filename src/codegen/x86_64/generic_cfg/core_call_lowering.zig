@@ -1,0 +1,27 @@
+const impl = @import("core_impl.zig");
+
+pub const appendAlignedDirectCallPreservingI32Param = impl.appendAlignedDirectCallPreservingI32Param;
+pub const appendI32CallArgs = impl.appendI32CallArgs;
+pub const appendSysVMemoryAggregateStackPassThroughArgs = impl.appendSysVMemoryAggregateStackPassThroughArgs;
+pub const appendSysVScalarCallArgs = impl.appendSysVScalarCallArgs;
+pub const appendSysVScalarCallArgsWithBlock = impl.appendSysVScalarCallArgsWithBlock;
+pub const blockIndex = impl.blockIndex;
+pub const findInstruction = impl.findInstruction;
+pub const fpParamIndex = impl.fpParamIndex;
+pub const identityCastFrom = impl.identityCastFrom;
+pub const isSelectI1ToI32ZeroOne = impl.isSelectI1ToI32ZeroOne;
+pub const lowerReturnTerminator = impl.lowerReturnTerminator;
+pub const lowerReturnValue = impl.lowerReturnValue;
+pub const lowerReturnValueAfterCalls = impl.lowerReturnValueAfterCalls;
+pub const matchIcmpEqParamImm = impl.matchIcmpEqParamImm;
+pub const paramReg = impl.paramReg;
+pub const paramRegOrNull = impl.paramRegOrNull;
+pub const paramRegWithInitialGpr = impl.paramRegWithInitialGpr;
+pub const paramValueReg = impl.paramValueReg;
+pub const phiHasIncoming = impl.phiHasIncoming;
+pub const phiHasIncomingInt = impl.phiHasIncomingInt;
+pub const singleLiveParamAfter = impl.singleLiveParamAfter;
+pub const sysvCallPlanCountsForTest = impl.sysvCallPlanCountsForTest;
+pub const sysvIntegerParamReg = impl.sysvIntegerParamReg;
+pub const sysvParamCursorForWithInitial = impl.sysvParamCursorForWithInitial;
+pub const valueReferencesGlobal = impl.valueReferencesGlobal;
