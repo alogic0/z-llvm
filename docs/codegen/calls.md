@@ -284,7 +284,7 @@ The first slice rejects:
 inline assembly calls
 direct and function-pointer varargs (`UnsupportedVarargsAbi`)
 vectors, including vector-containing aggregate ABI forms (`UnsupportedVectorAbi`)
-X87 / long double (`UnsupportedLongDoubleAbi`)
+X87 / long double, including aggregate-contained long-double leaves (`UnsupportedLongDoubleAbi`)
 packed aggregate ABI call/return forms, including direct planner inputs and
 packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`)
 byval/sret lowering beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
