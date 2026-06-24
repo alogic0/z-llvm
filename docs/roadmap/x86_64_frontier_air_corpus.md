@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=320
-structured_functions=320
-generic_codegen_functions=320
-generic_cfg_functions=320
+discovered_functions=323
+structured_functions=323
+generic_codegen_functions=323
+generic_cfg_functions=323
 structural_matcher_functions=0
-structured_air_v2_functions=320
-typed_air_operand_functions=320
+structured_air_v2_functions=323
+typed_air_operand_functions=323
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=320
+generic_lowering_functions=323
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=320
+object_emitted_functions=323
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -487,7 +487,10 @@ Closed in the current memory/aggregate frontier slice:
   results after a later direct or pointer-callee `void` call.
 - selected two-result i64 live-addend-across-later-void frames in
   `frontier_sysv_abi.zig`:
-  `frontier_two_i64_results_with_live_across_void_call` and
+  `frontier_two_i64_results_with_live_across_void_call`,
+  `frontier_two_i64_results_with_live_across_indirect_void_call`,
+  `frontier_indirect_first_two_i64_results_with_live_across_void_call`,
+  `frontier_indirect_second_two_i64_results_with_live_across_void_call`, and
   `frontier_indirect_both_two_i64_results_with_live_across_indirect_void_call`
   reuse the same two-result/later-void lowering path while also spilling an
   independent live `i64` addend across both non-void calls and the final direct
