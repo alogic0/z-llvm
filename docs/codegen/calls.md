@@ -247,6 +247,9 @@ accepted frontier:
   selected mixed two-result FP call frames where the first `float` call result
   is reloaded, extended to `double`, and added to a later direct or
   pointer-callee `double` call result
+  selected mixed two-result FP call frames with one live `double` addend
+  preserved across both non-void calls and added after the mixed-width result
+  sum
   selected direct/pointer-callee i64 result live-across-later-void frames where
   the live addend and later pointer callee are preserved in aligned frame slots
   before the result is reloaded into `%rax` for the final add
