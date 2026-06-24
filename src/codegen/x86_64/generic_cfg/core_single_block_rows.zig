@@ -778,6 +778,10 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgTwoI64CallResultsWithLiveReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgTwoI64CallResultsReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -1088,6 +1092,140 @@ fn lowerGenericCfgTwoI64CallResultsReturn(
     try appendSysVCallTarget(allocator, machine, second_call_target, second_call.ret_ty);
     try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = 0 });
     try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn lowerGenericCfgTwoI64CallResultsWithLiveReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 4) return false;
+    const first_call_inst = block.instructions.items[0];
+    const second_call_inst = block.instructions.items[1];
+    const first_add_inst = block.instructions.items[2];
+    const second_add_inst = block.instructions.items[3];
+    if (first_call_inst.removed or second_call_inst.removed or first_add_inst.removed or second_add_inst.removed) return false;
+    const first_result = first_call_inst.result orelse return false;
+    const second_result = second_call_inst.result orelse return false;
+    const first_add_result = first_add_inst.result orelse return false;
+    const second_add_result = second_add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, second_add_result)) return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!first_call.ret_ty.eql(.{ .int = 64 }) or first_call.inline_asm != null) return false;
+    if (!callIsFastcc(first_call.calling_conv)) try validateDefaultCallConv(first_call.calling_conv);
+    if (sysvScalarCallNeedsStackArgs(first_call)) return false;
+    const first_call_target: SysVCallTarget = if (first_call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = first_call.callee };
+
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!second_call.ret_ty.eql(.{ .int = 64 }) or second_call.inline_asm != null) return false;
+    if (!callIsFastcc(second_call.calling_conv)) try validateDefaultCallConv(second_call.calling_conv);
+    if (sysvScalarCallNeedsStackArgs(second_call)) return false;
+    const second_call_target: SysVCallTarget = if (second_call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = second_call.callee };
+
+    const first_add = switch (first_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    const second_add = switch (second_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (!first_add.ty.eql(.{ .int = 64 }) or first_add.op != .add) return false;
+    if (!second_add.ty.eql(.{ .int = 64 }) or second_add.op != .add) return false;
+    if (!valueReferencesAddResult(second_add.lhs, first_add_result) and !valueReferencesAddResult(second_add.rhs, first_add_result)) return false;
+
+    var leaves: [3]ir.Value = undefined;
+    var leaf_count: usize = 0;
+    try collectTwoAddLeaves(first_add_result, first_add, second_add, &leaves, &leaf_count);
+    var has_first = false;
+    var has_second = false;
+    var extra_value: ?ir.Value = null;
+    for (leaves[0..leaf_count]) |leaf| {
+        if (isNamed(leaf, first_result)) {
+            if (has_first) return false;
+            has_first = true;
+        } else if (isNamed(leaf, second_result)) {
+            if (has_second) return false;
+            has_second = true;
+        } else if (extra_value == null) {
+            extra_value = leaf;
+        } else {
+            return false;
+        }
+    }
+    if (!has_first or !has_second) return false;
+    const extra = extra_value orelse return false;
+    if (secondCallUsesValue(second_call, extra)) return false;
+
+    const extra_param_reg = switch (extra) {
+        .named => |name| try paramReg(function, name, .{ .int = 64 }),
+        .int => null,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const second_arg_live_reg = try secondCallSingleI64ParamArgReg(function, second_call);
+    const second_callee_reg: ?ArgReg = switch (second_call_target) {
+        .direct => null,
+        .indirect_from_reg => |reg| reg,
+    };
+
+    try appendStackFrame(allocator, machine, 40);
+    if (second_callee_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = reg } });
+    }
+    if (second_arg_live_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot4, .reg = reg } });
+    }
+    if (extra_param_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = reg } });
+    }
+    try setupSysVCallTarget(allocator, machine, first_call_target);
+    const first_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, first_call);
+    if (first_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try appendSysVCallTarget(allocator, machine, first_call_target, first_call.ret_ty);
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    if (second_callee_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot2 } });
+    }
+    try setupSysVCallTarget(allocator, machine, second_call_target);
+    if (second_arg_live_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+    }
+    const second_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, second_call);
+    if (second_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try appendSysVCallTarget(allocator, machine, second_call_target, second_call.ret_ty);
+    try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = 0 });
+    switch (extra) {
+        .int => |int| try machine.instructions.append(allocator, .{ .add_rax_imm8 = @intCast(try i64Value(int)) }),
+        .named => {
+            if (extra_param_reg == null) return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = 24 });
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
+    }
+    try appendStackFrameEnd(allocator, machine, 40);
     try appendGenericCfgReturn(allocator, machine);
     return true;
 }
