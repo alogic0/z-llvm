@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=234`,
-`generic_codegen_functions=234`, `generic_cfg_functions=234`,
+three release modes at `source_rows=13`, `discovered_functions=240`,
+`generic_codegen_functions=240`, `generic_cfg_functions=240`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=234`, `object_failures=0`,
+`object_emitted_functions=240`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -502,9 +502,9 @@ Remaining non-accepted
 blockers are helper graphs with
 stack-passed live values beyond the current disp8-safe selected model, broader
 live SSE values beyond the selected no-argument-call shapes,
+selected direct two-/three-/six-live FP-argument call shapes,
 two-live no-argument and one-FP-argument pointer-callee shapes,
 three-/four-/six-live two-/three-/five-FP-argument pointer-callee shapes, and
-two-live FP-argument call shape,
 or arbitrary mixed/non-void live values across calls beyond the selected
 direct/indirect/later-void, indirect-later-void, and indirect-first ordered
 `i32` result rows,
@@ -538,8 +538,8 @@ varargs, vectors, stack-passed live values beyond the current disp8-safe selecte
 and broader SSE live-across-call frames beyond the selected one-live through
 six-live `f32`/`f64` no-argument-call shapes, two-live no-argument
 pointer-callee shapes, selected three-/four-/six-live
-two-/three-/five-FP-argument pointer-callee shapes, and two-live FP-argument
-call shape.
+two-/three-/five-FP-argument pointer-callee shapes, and selected direct
+two-/three-/six-live FP-argument call shapes.
 The frontier audit lives in
 `docs/roadmap/x86_64_frontier_air_corpus.md`.
 

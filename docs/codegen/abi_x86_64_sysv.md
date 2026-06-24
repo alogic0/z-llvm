@@ -98,8 +98,9 @@ One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
 Two to six live f32/f64 values in %xmm0..%xmm5 across one no-argument direct C
 ABI void call are accepted for the selected post-call add-return shape.
 Stack-passed live i32 values beyond the current disp8-safe selected model, SSE
-live values beyond the selected one- through six-live f32/f64 no-argument-call shapes plus the
-two-live FP-argument call shape, and live values across multiple calls fail
+live values beyond the selected one- through six-live f32/f64 no-argument-call
+shapes plus selected direct two-/three-/six-live FP-argument call shapes, and
+live values across multiple calls fail
 closed.
 ```
 
@@ -275,7 +276,7 @@ Known gaps:
 
 ```text
 no callee-saved register saves
-no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one- through six-live f32/f64 SSE spill shapes, selected two-live FP-argument call shape, and selected pointer-callee FP call shapes through six live values and five FP helper arguments
+no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one- through six-live f32/f64 SSE spill shapes, selected direct two-/three-/six-live FP-argument call shapes, and selected pointer-callee FP call shapes through six live values and five FP helper arguments
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, single-eightbyte `{ f32, f32 }` SSE construction returns and helper-call pass-through, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE field reads/construction, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
@@ -284,7 +285,7 @@ no arbitrary non-selected sret/byval copy lowering outside supported `i8`/`i16`/
 no broad indirect calls beyond selected scalar, register-aggregate, and normal
 supported-leaf MEMORY aggregate byval-to-sret forms, tail calls, or unsupported
 non-default call conventions
-no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32/i64, computed stack-passed i32/i64, one- through six-live f32/f64 no-argument-call shapes, two-live FP-argument call shape, selected pointer-callee FP call shapes through six live values and five FP helper arguments, and selected two-call six-live i32 GPR frame
+no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32/i64, computed stack-passed i32/i64, one- through six-live f32/f64 no-argument-call shapes, selected direct two-/three-/six-live FP-argument call shapes, selected pointer-callee FP call shapes through six live values and five FP helper arguments, and selected two-call six-live i32 GPR frame
 stack-passed live integer pressure beyond the current disp8-safe incoming stack offset model is rejected explicitly rather than guessed
 ```
 
@@ -310,5 +311,5 @@ falling into a generic unsupported bucket.
 | Full caller-saved handling | Partially implemented | Selected GPR and SSE live-across-call shapes spill/reload through explicit frame slots. Next implementation is liveness-driven caller-saved clobber assignment for arbitrary live scalar values across calls. |
 | Callee-saved handling | Fail-closed boundary | The allocator currently avoids callee-saved registers; tests document the policy. Callee-saved allocation remains outside the current claim, and prologue/epilogue save/restore must be implemented before those registers can enter allocation. |
 | More than six stack-passed live values | Implemented selected subset | Current rows prove up to eighteen outgoing stack-passed scalar `i32` call arguments, selected block-local computed `i32`/`i64` stack call arguments, named incoming stack-parameter forwarding for stack call slots, stack-parameter assignment into outgoing GPR argument registers with disp8/disp32 stack-source reloads, and seven/eight/twelve/thirteen/fourteen/eighteen stack-passed live `i32` values via cursor-derived incoming stack offsets. Remaining boundary is pressure beyond the backend's selected incoming stack offset model and computed outgoing stack values outside the selected integer add-immediate forms. |
-| Broader SSE live-across-call | Partially implemented | Up to six no-argument-call live `f32`/`f64` values, selected two-live FP-argument calls, and selected pointer-callee calls through six live values and five FP helper arguments are supported. Next implementation is a general SSE caller-saved live-range spill/reload model. |
+| Broader SSE live-across-call | Partially implemented | Up to six no-argument-call live `f32`/`f64` values, selected direct two-/three-/six-live FP-argument calls, and selected pointer-callee calls through six live values and five FP helper arguments are supported. Next implementation is a general SSE caller-saved live-range spill/reload model. |
 | Multi-call live-value frames | Partially implemented | Generic CFG accepts selected straight-line direct and pointer-callee void-call sequences with up to six live `i32` GPR parameters across two calls, spilling/reloading through the shared live-param frame helper for each call. It also accepts selected ordered `i32` result cases: a first C ABI `i32` call result plus live `i32` parameter across a later side-effecting `void` call, a first C ABI `i32` result across a second C ABI `i32` call whose scalar argument is assigned by the call planner, the pointer-callee variant where the second call target and argument are preserved across the first call then reloaded for `callq *%rax`, two ordered `i32` call results preserved across a later side-effecting `void` call, the pointer-callee variant of that later `void` call, and the pointer-callee variant of the first ordered `i32` call. Remaining boundary is arbitrary multi-call scheduling with mixed GPR/SSE/stack live values and non-void intermediate results beyond those selected direct/indirect/later-void `i32` result shapes. |

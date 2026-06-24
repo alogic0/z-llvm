@@ -212,7 +212,8 @@ accepted frontier:
   selected two-/three-live f32/f64 spill/reload across a no-argument direct C
   ABI void call before post-call fadd returns
   selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames
-  selected two-live f32/f64 spill/reload across an FP-argument void helper call
+  selected direct two-/three-/six-live f32/f64 spill/reload across
+  one-/two-/five-FP-argument void helper calls
   disp8-safe stack-passed live i32 post-call add-tree rows after local
   call-frame restoration
   selected two-call six-live i32 GPR spill/reload frames

@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=234`,
-`generic_codegen_functions=234`, `generic_cfg_functions=234`,
+frontier gate reports `source_rows=13`, `discovered_functions=240`,
+`generic_codegen_functions=240`, `generic_cfg_functions=240`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=234`, `object_failures=0`,
+`object_emitted_functions=240`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -496,13 +496,14 @@ elements in `%rax`/`%rdx` or `%xmm0`/`%xmm1`.
 The SSE live-across-call frontier rows add selected
 one-live `f32`/`f64` spill/reload around an external C ABI `void` helper call,
 two- through six-live `f32`/`f64` spill/reload frames across no-argument helper
-calls before post-call `fadd` returns, selected two-live no-argument
+calls before post-call `fadd` returns, selected direct two-/three-/six-live
+one-/two-/five-FP-argument helper-call spill/reload frames,
+selected two-live no-argument
 pointer-callee `f32`/`f64` spill/reload frames before a post-call `fadd`
 return, selected two-live one-FP-argument pointer-callee spill/reload frames,
 selected three-/four-/six-live two-/three-/five-FP-argument pointer-callee
 spill/reload frames,
-and selected two-live `f32`/`f64` spill/reload across a helper call that
-consumes the second live value as its first FP argument. The same shared scalar
+and the same shared scalar
 planner now preserves live `i32` GPR parameters across direct and pointer-callee
 `f64`-argument `void` calls before the post-call integer add. The FP argument
 frontier now also proves selected
@@ -534,9 +535,9 @@ The
 remaining frontier backlog is private helper graphs with stack-passed live values beyond the current
 disp8-safe selected model, broader live SSE values
 beyond the selected one- through six-live `f32`/`f64` no-argument-call shapes,
+selected direct two-/three-/six-live FP-argument call shapes,
 two-live no-argument and one-FP-argument pointer-callee shapes,
 three-/four-/six-live two-/three-/five-FP-argument pointer-callee shapes, and
-two-live FP-argument call shape,
 or arbitrary mixed/non-void live values across calls beyond the selected
 direct/indirect/later-void, indirect-later-void, and indirect-first ordered
 `i32` result rows,
@@ -557,7 +558,8 @@ arbitrary non-selected sret/byval copies,
 varargs, vectors, stack-passed live values beyond the current disp8-safe
 selected model, and
 broader SSE live-across-call frames beyond the selected one-live through
-six-live `f32`/`f64` no-argument-call shapes, two-live FP-argument call shape,
+six-live `f32`/`f64` no-argument-call shapes, selected direct
+two-/three-/six-live FP-argument call shapes,
 selected two-live no-argument and one-FP-argument pointer-callee call shapes,
 and selected three-/four-/six-live two-/three-/five-FP-argument pointer-callee
 call shapes. The accepted frontier rows use typed

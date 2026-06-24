@@ -41,6 +41,12 @@ noinline fn frontier_id_i32(value: i32) i32 {
 
 extern fn frontier_touch_f32(value: f32) void;
 extern fn frontier_touch_f64(value: f64) void;
+extern fn frontier_touch2_f32(a: f32, b: f32) void;
+extern fn frontier_touch2_f64(a: f64, b: f64) void;
+extern fn frontier_touch3_f32(a: f32, b: f32, c: f32) void;
+extern fn frontier_touch3_f64(a: f64, b: f64, c: f64) void;
+extern fn frontier_touch5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) void;
+extern fn frontier_touch5_f64(a: f64, b: f64, c: f64, d: f64, e: f64) void;
 extern fn frontier_touch_none() void;
 extern fn frontier_touch_ordered() void;
 extern fn frontier_touch_ordered_after_two() void;
@@ -302,6 +308,36 @@ export fn frontier_two_f32_live_sum_after_arg_call(a: f32, b: f32) f32 {
 export fn frontier_two_f64_live_sum_after_arg_call(a: f64, b: f64) f64 {
     frontier_touch_f64(b);
     return a + b;
+}
+
+export fn frontier_three_f32_live_sum_after_two_arg_call(a: f32, b: f32, c: f32) f32 {
+    frontier_touch2_f32(b, c);
+    return a + b + c;
+}
+
+export fn frontier_three_f64_live_sum_after_two_arg_call(a: f64, b: f64, c: f64) f64 {
+    frontier_touch2_f64(b, c);
+    return a + b + c;
+}
+
+export fn frontier_four_f32_live_sum_after_three_arg_call(a: f32, b: f32, c: f32, d: f32) f32 {
+    frontier_touch3_f32(b, c, d);
+    return a + b + c + d;
+}
+
+export fn frontier_four_f64_live_sum_after_three_arg_call(a: f64, b: f64, c: f64, d: f64) f64 {
+    frontier_touch3_f64(b, c, d);
+    return a + b + c + d;
+}
+
+export fn frontier_six_f32_live_sum_after_five_arg_call(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) f32 {
+    frontier_touch5_f32(b, c, d, e, f);
+    return a + b + c + d + e + f;
+}
+
+export fn frontier_six_f64_live_sum_after_five_arg_call(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64) f64 {
+    frontier_touch5_f64(b, c, d, e, f);
+    return a + b + c + d + e + f;
 }
 
 export fn frontier_i32_live_across_f64_arg_call(a: i32, b: f64, c: i32) i32 {
