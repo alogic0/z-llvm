@@ -1,5 +1,6 @@
 const impl = @import("core_impl.zig");
 const diagnostics = @import("core_diagnostics.zig");
+const checked = @import("core_checked.zig");
 const std = impl.std;
 const ir = impl.ir;
 
@@ -44,11 +45,11 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *impl.Mach
         return true;
     }
     if (impl.genericCfgSupportsCheckedGuard(function)) {
-        if (try impl.lowerCheckedIntFromFloat(allocator, machine, function)) {
+        if (try checked.lowerCheckedIntFromFloat(allocator, machine, function)) {
             machine.codegen_path = .generic_cfg;
             return true;
         }
-        if (try impl.lowerCheckedTableLookup(allocator, machine, function)) {
+        if (try checked.lowerCheckedTableLookup(allocator, machine, function)) {
             machine.codegen_path = .generic_cfg;
             return true;
         }
