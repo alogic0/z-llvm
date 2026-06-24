@@ -12,6 +12,8 @@ const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
 const TouchF32Fn = *const fn (f32) callconv(.c) void;
 const TouchF64Fn = *const fn (f64) callconv(.c) void;
+const Touch2F32Fn = *const fn (f32, f32) callconv(.c) void;
+const Touch2F64Fn = *const fn (f64, f64) callconv(.c) void;
 const IdI32Fn = *const fn (i32) callconv(.c) i32;
 const VoidFn = *const fn () callconv(.c) void;
 const MakePair64Fn = *const fn (i64, i64) callconv(.c) Pair64;
@@ -263,6 +265,16 @@ export fn frontier_indirect_two_f32_live_sum_after_arg_call(func: TouchF32Fn, a:
 export fn frontier_indirect_two_f64_live_sum_after_arg_call(func: TouchF64Fn, a: f64, b: f64) f64 {
     func(b);
     return a + b;
+}
+
+export fn frontier_indirect_three_f32_live_sum_after_two_arg_call(func: Touch2F32Fn, a: f32, b: f32, c: f32) f32 {
+    func(b, c);
+    return a + b + c;
+}
+
+export fn frontier_indirect_three_f64_live_sum_after_two_arg_call(func: Touch2F64Fn, a: f64, b: f64, c: f64) f64 {
+    func(b, c);
+    return a + b + c;
 }
 
 export fn frontier_three_f32_live_sum_after_call(a: f32, b: f32, c: f32) f32 {
