@@ -105,6 +105,8 @@ selected first i32 call result plus live i32 caller argument across a later
 selected pointer-callee variant of that i32-returning call using 64-bit
   frame spill/reload for the second call target
 selected two i32 call results preserved across a later side-effecting void call
+selected pointer-callee variant of that later void call using 64-bit frame
+  spill/reload for the call target
 one fixed i32 stack slot can feed the first direct-call argument
 ```
 
@@ -223,6 +225,8 @@ accepted frontier:
   `callq *%rax`
   selected two-result live-across-later-call frame where both saved i32 call
   results are reloaded after a side-effecting void call
+  selected indirect later-void variant where the final void call target is
+  preserved across both i32 calls and reloaded before `callq *%rax`
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results

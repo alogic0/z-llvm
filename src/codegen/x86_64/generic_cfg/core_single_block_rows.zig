@@ -445,8 +445,15 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
         .call => |call| call,
         else => return false,
     };
-    if (third_call.ret_ty != .void or third_call.args.items.len != 0 or third_call.callee_value != null or third_call.inline_asm != null) return false;
+    if (third_call.ret_ty != .void or third_call.args.items.len != 0 or third_call.inline_asm != null) return false;
     if (!callIsFastcc(third_call.calling_conv)) try validateDefaultCallConv(third_call.calling_conv);
+    const third_call_target: SysVCallTarget = if (third_call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = third_call.callee };
 
     const first_add = switch (first_add_inst.kind) {
         .binary => |binary| binary,
@@ -490,13 +497,21 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
     if (extra_value) |value| {
         if (secondCallUsesValue(second_call, value)) return false;
     }
+    const third_callee_reg: ?shared.ArgReg = switch (third_call_target) {
+        .direct => null,
+        .indirect_from_reg => |reg| reg,
+    };
+    const frame_bytes: u8 = if (third_callee_reg != null) 40 else 24;
 
-    try appendStackFrame(allocator, machine, 24);
+    try appendStackFrame(allocator, machine, frame_bytes);
     if (extra_param_reg) |reg| {
         try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = reg } });
     }
     if (second_arg_live_reg) |reg| {
         try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot4, .reg = reg } });
+    }
+    if (third_callee_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = reg } });
     }
     const first_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, first_call);
     if (first_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
@@ -509,7 +524,11 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
     if (second_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
     try appendDirectCall(allocator, machine, second_call.callee, second_call.ret_ty);
     try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot2 });
-    try appendDirectCall(allocator, machine, third_call.callee, .void);
+    if (third_callee_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot6 } });
+    }
+    try setupSysVCallTarget(allocator, machine, third_call_target);
+    try appendSysVCallTarget(allocator, machine, third_call_target, .void);
     try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
     try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = 8 });
     if (extra_value) |value| switch (value) {
@@ -520,7 +539,7 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
     };
-    try appendStackFrameEnd(allocator, machine, 24);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
     return true;
 }
