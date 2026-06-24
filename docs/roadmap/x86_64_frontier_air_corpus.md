@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=263
-structured_functions=263
-generic_codegen_functions=263
-generic_cfg_functions=263
+discovered_functions=265
+structured_functions=265
+generic_codegen_functions=265
+generic_cfg_functions=265
 structural_matcher_functions=0
-structured_air_v2_functions=263
-typed_air_operand_functions=263
+structured_air_v2_functions=265
+typed_air_operand_functions=265
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=263
+generic_lowering_functions=265
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=263
+object_emitted_functions=265
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -335,10 +335,12 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_i32_swapped_direct_call`, `frontier_i64_swapped_direct_call`,
   `frontier_ptr_swapped_direct_call`, `frontier_i32_swapped_indirect_call`,
   `frontier_i64_swapped_indirect_call`, and
-  `frontier_ptr_swapped_indirect_call` prove the generic push/pop
-  parallel-copy scheduler for integer and pointer register-source call
-  arguments across direct and function-pointer C ABI calls with executable
-  checks.
+  `frontier_ptr_swapped_indirect_call` prove two-register swaps; the
+  `frontier_i32_three_cycle_direct_call` and
+  `frontier_i64_three_cycle_direct_call` rows prove three-register
+  permutations. These rows use the generic push/pop parallel-copy scheduler for
+  integer and pointer register-source call arguments across direct and
+  function-pointer C ABI calls with executable checks.
 - selected multi-call live-value frame in `frontier_sysv_abi.zig`:
   `frontier_two_void_calls_six_live` keeps six live GPR `i32` values across two
   void C ABI calls through the generic CFG live-param spill/reload helper;
