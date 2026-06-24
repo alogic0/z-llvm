@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=335
-structured_functions=335
-generic_codegen_functions=335
-generic_cfg_functions=335
+discovered_functions=339
+structured_functions=339
+generic_codegen_functions=339
+generic_cfg_functions=339
 structural_matcher_functions=0
-structured_air_v2_functions=335
-typed_air_operand_functions=335
+structured_air_v2_functions=339
+typed_air_operand_functions=339
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=335
+generic_lowering_functions=339
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=335
+object_emitted_functions=339
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -522,10 +522,14 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_mixed_f32_f64_results_with_live_across_calls`,
   `frontier_mixed_indirect_first_f32_f64_results_with_live_across_calls`,
   `frontier_mixed_indirect_second_f32_f64_results_with_live_across_calls`, and
-  `frontier_mixed_indirect_both_f32_f64_results_with_live_across_calls`
-  preserve the later `double` argument, any second pointer callee, the first
-  `float` result, and an independent live `double` addend across both
-  non-void calls before producing the final three-value `double` sum.
+  `frontier_mixed_indirect_both_f32_f64_results_with_live_across_calls`, plus
+  the reversed `frontier_mixed_f64_f32_results_with_live_across_calls`,
+  `frontier_mixed_indirect_first_f64_f32_results_with_live_across_calls`,
+  `frontier_mixed_indirect_second_f64_f32_results_with_live_across_calls`, and
+  `frontier_mixed_indirect_both_f64_f32_results_with_live_across_calls`
+  preserve the later FP argument, any second pointer callee, the first FP
+  result, and an independent live `double` addend across both non-void calls
+  before producing the final three-value `double` sum.
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded
