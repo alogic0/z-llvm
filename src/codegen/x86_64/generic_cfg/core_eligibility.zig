@@ -83,6 +83,7 @@ pub const lowerGenericCfgSingleBlockEffectBarrier = single_block_rows.lowerGener
 pub const lowerGenericCfgSingleBlockFp = single_block_rows.lowerGenericCfgSingleBlockFp;
 pub const lowerGenericCfgSingleBlockI64 = single_block_rows.lowerGenericCfgSingleBlockI64;
 pub const lowerGenericCfgSingleBlockPackedBits = single_block_rows.lowerGenericCfgSingleBlockPackedBits;
+pub const lowerGenericCfgSingleBlockPtr = single_block_rows.lowerGenericCfgSingleBlockPtr;
 pub const lowerGenericCfgSingleBlockScalar = single_block_rows.lowerGenericCfgSingleBlockScalar;
 pub const lowerGenericCfgSingleBlockUpdateGetMain = single_block_rows.lowerGenericCfgSingleBlockUpdateGetMain;
 pub const lowerGenericCfgSingleBlockVoid = single_block_rows.lowerGenericCfgSingleBlockVoid;

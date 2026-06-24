@@ -379,6 +379,62 @@ test "x86_64 generic CFG lowers null pointer call args through planner" {
     try std.testing.expect(saw_call);
 }
 
+test "x86_64 generic CFG returns pointer parameter in rax" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define ptr @caller(i32 %tag, ptr %value) {
+        \\entry:
+        \\  ret ptr %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 generic CFG returns direct pointer call result" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare ptr @callee(ptr, i64)
+        \\
+        \\define ptr @caller(ptr %value, i64 %tag) {
+        \\entry:
+        \\  %r = call ptr @callee(ptr %value, i64 %tag)
+        \\  ret ptr %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    var saw_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.ptr));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_call);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "x86_64 SysV call planner classifies scalar aggregate and memory returns" {
     const scalar_input =
         \\target triple = "x86_64-unknown-linux-gnu"

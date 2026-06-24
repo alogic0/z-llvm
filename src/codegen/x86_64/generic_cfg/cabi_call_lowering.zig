@@ -1484,6 +1484,28 @@ pub fn lowerSelectedI64ConstReturn(
     return true;
 }
 
+fn isSysVGprReturnType(ty: ir.Type) bool {
+    return ty.eql(.{ .int = 64 }) or ty.eql(.ptr);
+}
+
+pub fn lowerGenericCfgGprParamReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!isSysVGprReturnType(ret.ty) or block.instructions.items.len != 0) return false;
+    const name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const reg = try sysvIntegerParamReg(function, name, ret.ty);
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 pub fn lowerGenericCfgI64ParamReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -1491,25 +1513,18 @@ pub fn lowerGenericCfgI64ParamReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 0) return false;
-    const name = switch (ret.value orelse return error.InvalidRet) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-    };
-    const reg = try sysvIntegerParamReg(function, name, .{ .int = 64 });
-    try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
-    try machine.instructions.append(allocator, .ret);
-    return true;
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    return try lowerGenericCfgGprParamReturn(allocator, machine, function, block, ret);
 }
 
-pub fn lowerGenericCfgI64DirectCallReturn(
+pub fn lowerGenericCfgGprDirectCallReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len == 0 or block.instructions.items.len > 2) return false;
+    if (!isSysVGprReturnType(ret.ty) or block.instructions.items.len == 0 or block.instructions.items.len > 2) return false;
     const instruction = block.instructions.items[block.instructions.items.len - 1];
     if (instruction.removed) return false;
     const call_result = instruction.result orelse return false;
@@ -1518,7 +1533,7 @@ pub fn lowerGenericCfgI64DirectCallReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!call.ret_ty.eql(.{ .int = 64 }) or call.inline_asm != null) return false;
+    if (!call.ret_ty.eql(ret.ty) or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
 
     if (call.callee_value) |callee_value| {
@@ -1536,4 +1551,15 @@ pub fn lowerGenericCfgI64DirectCallReturn(
     }
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+pub fn lowerGenericCfgI64DirectCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    return try lowerGenericCfgGprDirectCallReturn(allocator, machine, function, block, ret);
 }

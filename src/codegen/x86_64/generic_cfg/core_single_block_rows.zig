@@ -90,6 +90,8 @@ const lowerAtomicAddReturn = core_single_block_misc.lowerAtomicAddReturn;
 const lowerErrorUnionI64SelectReturn = core_single_block_misc.lowerErrorUnionI64SelectReturn;
 const lowerGenericCfgByteTableLookupReturn = core_single_block_misc.lowerGenericCfgByteTableLookupReturn;
 const lowerGenericCfgI64DirectCallReturn = cabi_call_lowering.lowerGenericCfgI64DirectCallReturn;
+const lowerGenericCfgGprDirectCallReturn = cabi_call_lowering.lowerGenericCfgGprDirectCallReturn;
+const lowerGenericCfgGprParamReturn = cabi_call_lowering.lowerGenericCfgGprParamReturn;
 const lowerGenericCfgI64ParamReturn = cabi_call_lowering.lowerGenericCfgI64ParamReturn;
 const lowerGenericCfgDynamicPointerLoadReturn = core_memory_lowering.lowerGenericCfgDynamicPointerLoadReturn;
 const lowerGenericCfgStructFieldLoadReturn = core_memory_lowering.lowerGenericCfgStructFieldLoadReturn;
@@ -731,6 +733,24 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         return true;
     }
     if (try lowerErrorUnionI64SelectReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    return false;
+}
+
+pub fn lowerGenericCfgSingleBlockPtr(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.ptr) or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (try lowerGenericCfgGprParamReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgGprDirectCallReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

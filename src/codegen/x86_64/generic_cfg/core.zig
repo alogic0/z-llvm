@@ -51,6 +51,7 @@ pub const lowerGenericCfgSingleBlockEffectBarrier = eligibility.lowerGenericCfgS
 pub const lowerGenericCfgSingleBlockFp = eligibility.lowerGenericCfgSingleBlockFp;
 pub const lowerGenericCfgSingleBlockI64 = eligibility.lowerGenericCfgSingleBlockI64;
 pub const lowerGenericCfgSingleBlockPackedBits = eligibility.lowerGenericCfgSingleBlockPackedBits;
+pub const lowerGenericCfgSingleBlockPtr = eligibility.lowerGenericCfgSingleBlockPtr;
 pub const lowerGenericCfgSingleBlockScalar = eligibility.lowerGenericCfgSingleBlockScalar;
 pub const lowerGenericCfgSingleBlockUpdateGetMain = eligibility.lowerGenericCfgSingleBlockUpdateGetMain;
 pub const lowerGenericCfgSingleBlockVoid = eligibility.lowerGenericCfgSingleBlockVoid;

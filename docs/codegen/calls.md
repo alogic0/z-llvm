@@ -95,6 +95,8 @@ pointer call arguments are assigned by the central SysV call planner and
   pointer slots
 f32/f64 direct call arguments in the independent SysV SSE stream
 i32 return in %eax, i64/pointer return in %rax, f32/f64 return in %xmm0
+pointer parameter returns and pointer-returning direct calls share the generic
+SysV GPR return helper instead of a selected pointer-return row
 planner-level return accounting for scalar, register aggregate, and direct
   MEMORY aggregate return classes
 selected small INTEGER/INTEGER aggregate return in %rax/%rdx

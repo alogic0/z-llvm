@@ -23,7 +23,7 @@ Implemented subset:
 
 ```text
 i32 return value in %eax
-i64 and pointer-class return values in %rax for selected rows
+i64 and pointer-class return values use the generic SysV GPR return path in %rax
 f32/f64 return values in %xmm0 for selected rows
 first six integer/pointer-class register arguments are recognized as %edi, %esi, %edx, %ecx, %r8d, and %r9d for i32 values
 i64/pointer-class arguments use the corresponding 64-bit GPR view for selected rows
@@ -36,6 +36,8 @@ the central SysV call planner assigns pointer call arguments through the same
 scalar path as i64: register pointer arguments use 64-bit GPR moves, and
 stack-passed pointer arguments reuse the outgoing stack-slot helper; null
 pointer constants are supported for stack-passed pointer call slots
+pointer return values from parameters and pointer-returning direct calls reuse
+the same generic GPR return path as i64
 f32/f64 direct-call operands use the independent SSE register order
 up to eighteen scalar i32 stack-passed direct/indirect call arguments are supported, including constants and named incoming stack/register parameters; selected block-local computed i32/i64 stack arguments remain covered by the smaller existing rows
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call

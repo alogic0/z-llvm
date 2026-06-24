@@ -294,6 +294,7 @@ const lowerGenericCfgSingleBlockEffectBarrier = x86_64_generic_cfg.lowerGenericC
 const lowerGenericCfgSingleBlockFp = x86_64_generic_cfg.lowerGenericCfgSingleBlockFp;
 const lowerGenericCfgSingleBlockI64 = x86_64_generic_cfg.lowerGenericCfgSingleBlockI64;
 const lowerGenericCfgSingleBlockPackedBits = x86_64_generic_cfg.lowerGenericCfgSingleBlockPackedBits;
+const lowerGenericCfgSingleBlockPtr = x86_64_generic_cfg.lowerGenericCfgSingleBlockPtr;
 const lowerGenericCfgSingleBlockScalar = x86_64_generic_cfg.lowerGenericCfgSingleBlockScalar;
 const lowerGenericCfgSingleBlockUpdateGetMain = x86_64_generic_cfg.lowerGenericCfgSingleBlockUpdateGetMain;
 const lowerGenericCfgSingleBlockVoid = x86_64_generic_cfg.lowerGenericCfgSingleBlockVoid;
@@ -869,6 +870,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerGenericCfgSingleBlockI64(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerGenericCfgSingleBlockPtr(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
