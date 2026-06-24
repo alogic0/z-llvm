@@ -492,6 +492,97 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
     return true;
 }
 
+pub fn lowerGenericCfgFpCallResultAcrossVoidCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or
+        !ret.ty.eql(function.ret_ty) or block.instructions.items.len != 3) return false;
+
+    const first_call_inst = block.instructions.items[0];
+    const second_call_inst = block.instructions.items[1];
+    const add_inst = block.instructions.items[2];
+    if (first_call_inst.removed or second_call_inst.removed or add_inst.removed) return false;
+
+    const first_result = first_call_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!first_call.ret_ty.eql(function.ret_ty) or first_call.inline_asm != null) return false;
+    if (first_call.callee_value != null) return error.UnsupportedLiveAcrossCall;
+    if (!callIsFastcc(first_call.calling_conv)) validateDefaultCallConv(first_call.calling_conv) catch return false;
+    if (first_call.ret_attrs != null or first_call.attrs != null) return error.UnsupportedCodegenAbi;
+    if (sysvScalarCallNeedsStackArgs(first_call)) return error.UnsupportedLiveAcrossCall;
+
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    try validateFpVoidCall(second_call);
+    if (second_call.args.items.len != 0) return error.UnsupportedLiveAcrossCall;
+
+    const fp_param_index = fpBinaryOtherParamIndex(function, add_inst, function.ret_ty, first_result, .fadd) catch return false;
+    if (fp_param_index >= 6) return error.UnsupportedLiveAcrossCall;
+
+    const second_target = try fpVoidCallTarget(function, second_call);
+    const preserved_callee: ?ArgReg = switch (second_target) {
+        .direct => null,
+        .indirect_from_reg => |reg| reg,
+    };
+
+    const frame_bytes: u8 = if (function.ret_ty.eql(.float)) 24 else 40;
+    const live_addend_slot: FrameIndex = .slot0;
+    const call_result_slot: FrameIndex = if (function.ret_ty.eql(.float)) .slot2 else .slot4;
+    const callee_slot: FrameIndex = if (function.ret_ty.eql(.float)) .slot4 else .slot8;
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    const fp_param_reg = try XmmReg.fromIndex(fp_param_index);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = fp_param_reg, .frame_index = live_addend_slot } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = fp_param_reg, .frame_index = live_addend_slot } });
+    }
+    if (preserved_callee) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = callee_slot } });
+    }
+
+    const first_stack_args = try appendSysVScalarCallArgs(allocator, machine, function, first_call);
+    if (first_stack_args != 0) return error.UnsupportedLiveAcrossCall;
+    try appendSysVCallTarget(allocator, machine, .{ .direct = first_call.callee }, first_call.ret_ty);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = call_result_slot } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = call_result_slot } });
+    }
+
+    if (preserved_callee) |reg| {
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = callee_slot } });
+    }
+    try setupSysVCallTarget(allocator, machine, second_target);
+    _ = try appendSysVScalarCallArgs(allocator, machine, function, second_call);
+    try appendSysVCallTarget(allocator, machine, second_target, second_call.ret_ty);
+
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = call_result_slot } });
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = live_addend_slot } });
+        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    } else {
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = call_result_slot } });
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = live_addend_slot } });
+        try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+    }
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn leadingFpVoidCallCount(block: ir.BasicBlock) !usize {
     var count: usize = 0;
     while (count < block.instructions.items.len) : (count += 1) {
