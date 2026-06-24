@@ -1,36 +1,38 @@
-const impl = @import("core_impl.zig");
+const shared = @import("core_shared.zig");
 const diagnostics = @import("core_diagnostics.zig");
 const checked = @import("core_checked.zig");
+const core_value_support = @import("core_value_support.zig");
 const loop_rows = @import("core_loop_rows.zig");
+const multi_block_rows = @import("core_multi_block_rows.zig");
 const single_block_rows = @import("core_single_block_rows.zig");
-const std = impl.std;
-const ir = impl.ir;
+const std = shared.std;
+const ir = shared.ir;
 
-pub const GenericCfgLoopSumPlan = impl.GenericCfgLoopSumPlan;
+pub const GenericCfgLoopSumPlan = loop_rows.GenericCfgLoopSumPlan;
 
-pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *impl.MachineFunction, function: ir.Function) !bool {
-    if (try impl.lowerGenericCfgGuardedDynamicPointerLoadReturn(allocator, machine, function)) {
+pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.MachineFunction, function: ir.Function) !bool {
+    if (try multi_block_rows.lowerGenericCfgGuardedDynamicPointerLoadReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (try impl.lowerGenericCfgOptionalPointerReturn(allocator, machine, function)) {
+    if (try multi_block_rows.lowerGenericCfgOptionalPointerReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (try impl.lowerGenericCfgStructBranchUpdateReturn(allocator, machine, function)) {
+    if (try multi_block_rows.lowerGenericCfgStructBranchUpdateReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (try impl.lowerGenericCfgGuardedOptionalPointerBranchReturn(allocator, machine, function)) {
+    if (try multi_block_rows.lowerGenericCfgGuardedOptionalPointerBranchReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (try impl.lowerGenericCfgBranchMergeReturn(allocator, machine, function)) {
+    if (try multi_block_rows.lowerGenericCfgBranchMergeReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
     if (genericCfgLoopSumPlan(function)) |plan| {
-        try impl.emitGenericCfgLoopSum(allocator, machine, function, plan);
+        try multi_block_rows.emitGenericCfgLoopSum(allocator, machine, function, plan);
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -38,7 +40,7 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *impl.Mach
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (try impl.lowerGenericCfgGuardedGlobalAddReturn(allocator, machine, function)) {
+    if (try multi_block_rows.lowerGenericCfgGuardedGlobalAddReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -46,7 +48,7 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *impl.Mach
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (impl.genericCfgSupportsCheckedGuard(function)) {
+    if (core_value_support.genericCfgSupportsCheckedGuard(function)) {
         if (try checked.lowerCheckedIntFromFloat(allocator, machine, function)) {
             machine.codegen_path = .generic_cfg;
             return true;
@@ -68,7 +70,7 @@ pub fn genericCfgLoopSumPlan(function: ir.Function) ?GenericCfgLoopSumPlan {
         !loop_rows.matchesCheckedUnrolledAccumulatorLoop(function) and
         !loop_rows.matchesGuardedDoWhileAccumulatorLoop(function) and
         !loop_rows.matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return null;
-    if (!impl.genericCfgSupportsLoopSum(function)) return null;
+    if (!core_value_support.genericCfgSupportsLoopSum(function)) return null;
     return .{ .checked = diagnostics.functionHasCall(function, "llvm.sadd.with.overflow.i32") };
 }
 pub const lowerGenericCfgMultiBlockCallGlobalCheckMain = single_block_rows.lowerGenericCfgMultiBlockCallGlobalCheckMain;
