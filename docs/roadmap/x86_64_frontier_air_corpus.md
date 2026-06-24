@@ -236,7 +236,8 @@ Closed in the current memory/aggregate frontier slice:
   `i32` parameters are spilled/reloaded around a direct helper call while more
   than six stack-passed `i32` parameters are read from the restored incoming
   stack argument area for the post-call add-tree return; current executable
-  rows prove seven, eight, and twelve stack-passed live `i32` values within
+  rows prove seven, eight, twelve, thirteen, fourteen, and eighteen
+  stack-passed live `i32` values within
   the backend's disp8-safe stack offset model
 - six stack-passed scalar `i32` call arguments in `frontier_sysv_abi.zig`:
   `frontier_six_stack_arg_call` calls a C helper with 12 scalar arguments. The

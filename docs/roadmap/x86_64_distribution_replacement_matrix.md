@@ -454,7 +454,8 @@ two-FP-argument, three-FP-argument, and five-FP-argument
 helper call that consumes the second live
 value as its first FP argument.
 The SysV scalar stack frontier now also proves up to eighteen stack-passed
-`i32` call arguments with immediate `%rsp` cleanup, seven/eight/twelve
+`i32` call arguments with immediate `%rsp` cleanup,
+seven/eight/twelve/thirteen/fourteen/eighteen
 stack-passed live `i32` values within the current disp8-safe incoming stack
 offset model, named stack-parameter forwarding into outgoing stack argument
 slots and outgoing GPR argument registers, typed AIR v2 pointer-callee indirect
