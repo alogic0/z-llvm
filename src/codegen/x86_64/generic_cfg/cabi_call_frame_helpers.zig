@@ -1,10 +1,15 @@
 const impl = @import("cabi_impl.zig");
-const std = impl.std;
-const MachineFunction = impl.MachineFunction;
-const ArgReg = impl.ArgReg;
-const XmmReg = impl.XmmReg;
-const appendMoveImm32ToXmm = impl.appendMoveImm32ToXmm;
-const appendMoveImm64ToXmm = impl.appendMoveImm64ToXmm;
+const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
+const std = @import("std");
+const x86_64_types = @import("../types.zig");
+const x86_64_emit = @import("../emit.zig");
+const x86_64_machine = @import("../machine.zig");
+
+const MachineFunction = x86_64_machine.MachineFunction;
+const ArgReg = x86_64_types.ArgReg;
+const XmmReg = x86_64_types.XmmReg;
+const appendMoveImm32ToXmm = x86_64_emit.appendMoveImm32ToXmm;
+const appendMoveImm64ToXmm = x86_64_emit.appendMoveImm64ToXmm;
 
 pub fn appendCompareArg32Imm32(
     allocator: std.mem.Allocator,
@@ -160,14 +165,14 @@ pub const collectI32AddValue = impl.collectI32AddValue;
 pub const emitI32ValueIntoEax = impl.emitI32ValueIntoEax;
 pub const lowerReturnValueAfterCalls = impl.lowerReturnValueAfterCalls;
 pub const appendI32AddTermToEax = impl.appendI32AddTermToEax;
-pub const paramValueReg = impl.paramValueReg;
-pub const paramReg = impl.paramReg;
-pub const sysvIntegerParamReg = impl.sysvIntegerParamReg;
-pub const sysvIntegerParamRegOrNull = impl.sysvIntegerParamRegOrNull;
-pub const paramRegOrNull = impl.paramRegOrNull;
-pub const paramRegWithInitialGpr = impl.paramRegWithInitialGpr;
-pub const paramRegOrNullWithInitialGpr = impl.paramRegOrNullWithInitialGpr;
-pub const stackParamDisp8OrNull = impl.stackParamDisp8OrNull;
+pub const paramValueReg = cabi_abi_helpers.paramValueReg;
+pub const paramReg = cabi_abi_helpers.paramReg;
+pub const sysvIntegerParamReg = cabi_abi_helpers.sysvIntegerParamReg;
+pub const sysvIntegerParamRegOrNull = cabi_abi_helpers.sysvIntegerParamRegOrNull;
+pub const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;
+pub const paramRegWithInitialGpr = cabi_abi_helpers.paramRegWithInitialGpr;
+pub const paramRegOrNullWithInitialGpr = cabi_abi_helpers.paramRegOrNullWithInitialGpr;
+pub const stackParamDisp8OrNull = cabi_abi_helpers.stackParamDisp8OrNull;
 pub const emitI32ParamOrStackIntoEax = impl.emitI32ParamOrStackIntoEax;
 pub const lowerGenericCfgI64ParamReturn = impl.lowerGenericCfgI64ParamReturn;
 pub const lowerGenericCfgI64DirectCallReturn = impl.lowerGenericCfgI64DirectCallReturn;
@@ -209,7 +214,7 @@ pub const sysvAggregateFieldLocation = impl.sysvAggregateFieldLocation;
 pub const sysvAggregateFieldLocationByOffset = impl.sysvAggregateFieldLocationByOffset;
 pub const sysvAggregateRegisterNeeds = impl.sysvAggregateRegisterNeeds;
 pub const sysvAggregateRegisterNeedsBefore = impl.sysvAggregateRegisterNeedsBefore;
-pub const advanceSysVParamCursors = impl.advanceSysVParamCursors;
+pub const advanceSysVParamCursors = cabi_abi_helpers.advanceSysVParamCursors;
 pub const lowerRegisterAggregateDirectCallReturn = impl.lowerRegisterAggregateDirectCallReturn;
 pub const lowerAggregatePairAbiFamilyReturn = impl.lowerAggregatePairAbiFamilyReturn;
 pub const lowerStructSumReturn = impl.lowerStructSumReturn;
