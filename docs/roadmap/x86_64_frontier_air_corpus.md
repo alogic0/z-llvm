@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=277
-structured_functions=277
-generic_codegen_functions=277
-generic_cfg_functions=277
+discovered_functions=279
+structured_functions=279
+generic_codegen_functions=279
+generic_cfg_functions=279
 structural_matcher_functions=0
-structured_air_v2_functions=277
-typed_air_operand_functions=277
+structured_air_v2_functions=279
+typed_air_operand_functions=279
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=277
+generic_lowering_functions=279
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=277
+object_emitted_functions=279
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -422,11 +422,13 @@ Closed in the current memory/aggregate frontier slice:
   the same generic SysV call-target and frame spill/reload path.
 - selected FP call-result live-across-later-call frames in
   `frontier_sysv_abi.zig`:
-  `frontier_f64_result_live_across_void_call` and
-  `frontier_f64_result_live_across_indirect_void_call` spill a direct C ABI
-  `double` call result from `%xmm0`, preserve the live `double` addend, emit a
-  later direct or pointer-callee side-effecting `void` call, then reload both
-  XMM frame slots for the final post-call `fadd` return.
+  `frontier_f64_result_live_across_void_call`,
+  `frontier_f64_result_live_across_indirect_void_call`,
+  `frontier_indirect_f64_result_live_across_void_call`, and
+  `frontier_indirect_f64_result_live_across_indirect_void_call` spill a direct
+  or pointer-callee C ABI `double` call result from `%xmm0`, preserve the live
+  `double` addend, emit a later direct or pointer-callee side-effecting `void`
+  call, then reload both XMM frame slots for the final post-call `fadd` return.
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded

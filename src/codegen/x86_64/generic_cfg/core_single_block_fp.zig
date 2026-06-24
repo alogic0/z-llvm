@@ -516,10 +516,16 @@ pub fn lowerGenericCfgFpCallResultAcrossVoidCallReturn(
         else => return false,
     };
     if (!first_call.ret_ty.eql(function.ret_ty) or first_call.inline_asm != null) return false;
-    if (first_call.callee_value != null) return error.UnsupportedLiveAcrossCall;
     if (!callIsFastcc(first_call.calling_conv)) validateDefaultCallConv(first_call.calling_conv) catch return false;
     if (first_call.ret_attrs != null or first_call.attrs != null) return error.UnsupportedCodegenAbi;
     if (sysvScalarCallNeedsStackArgs(first_call)) return error.UnsupportedLiveAcrossCall;
+    const first_target: SysVCallTarget = if (first_call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = first_call.callee };
 
     const second_call = switch (second_call_inst.kind) {
         .call => |call| call,
@@ -555,7 +561,8 @@ pub fn lowerGenericCfgFpCallResultAcrossVoidCallReturn(
 
     const first_stack_args = try appendSysVScalarCallArgs(allocator, machine, function, first_call);
     if (first_stack_args != 0) return error.UnsupportedLiveAcrossCall;
-    try appendSysVCallTarget(allocator, machine, .{ .direct = first_call.callee }, first_call.ret_ty);
+    try setupSysVCallTarget(allocator, machine, first_target);
+    try appendSysVCallTarget(allocator, machine, first_target, first_call.ret_ty);
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = call_result_slot } });
     } else {

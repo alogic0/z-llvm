@@ -238,9 +238,9 @@ accepted frontier:
   selected indirect-first ordered i32 result variant where the first call target
   is a function pointer and the later result/void-call sequence is preserved
   through the same frame path
-  selected f64 call-result live-across-later-call frames where a direct C ABI
-  double result and live double addend survive a later direct or pointer-callee
-  side-effecting void call before the final fadd
+  selected f64 call-result live-across-later-call frames where a direct or
+  pointer-callee C ABI double result and live double addend survive a later
+  direct or pointer-callee side-effecting void call before the final fadd
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results
