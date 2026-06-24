@@ -7,6 +7,7 @@ const x86_64_types = @import("../types.zig");
 const x86_64_machine = @import("../machine.zig");
 const core_impl = @import("core_impl.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
+const core_cfg_emit = @import("core_cfg_emit.zig");
 
 const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 const ArgReg = x86_64_types.ArgReg;
@@ -63,11 +64,11 @@ const genericCfgSupportsSingleBlockI32Value = core_impl.genericCfgSupportsSingle
 const genericCfgSupportsI64Value = core_impl.genericCfgSupportsI64Value;
 const emitGenericCfgI32ValueIntoEax = core_impl.emitGenericCfgI32ValueIntoEax;
 const emitGenericCfgI64ValueIntoRax = core_impl.emitGenericCfgI64ValueIntoRax;
-const GenericCfgBranchKind = core_impl.GenericCfgBranchKind;
-const appendGenericCfgBlockLabel = core_impl.appendGenericCfgBlockLabel;
-const appendGenericCfgConditionalBranch = core_impl.appendGenericCfgConditionalBranch;
-const appendGenericCfgCompareParamZero = core_impl.appendGenericCfgCompareParamZero;
-const appendGenericCfgCompareLocalImm = core_impl.appendGenericCfgCompareLocalImm;
+const GenericCfgBranchKind = core_cfg_emit.GenericCfgBranchKind;
+const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
+const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
+const appendGenericCfgCompareParamZero = core_cfg_emit.appendGenericCfgCompareParamZero;
+const appendGenericCfgCompareLocalImm = core_cfg_emit.appendGenericCfgCompareLocalImm;
 
 fn sysvAggregateRegisterNeeds(classification: SysVAggregateClassification) SysVRegisterNeeds {
     return sysv_abi.aggregateRegisterNeeds(classification);

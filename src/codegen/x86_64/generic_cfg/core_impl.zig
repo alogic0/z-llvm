@@ -100,6 +100,16 @@ pub const validateBinaryNamedImm = core_misc_rows.validateBinaryNamedImm;
 pub const validateSaturatingCall = core_misc_rows.validateSaturatingCall;
 
 pub const GenericCfgLoopSumPlan = core_loop_rows.GenericCfgLoopSumPlan;
+pub const GenericCfgLocalReg = core_cfg_emit.GenericCfgLocalReg;
+pub const GenericCfgBranchKind = core_cfg_emit.GenericCfgBranchKind;
+pub const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
+pub const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
+pub const appendGenericCfgI32Zero = core_cfg_emit.appendGenericCfgI32Zero;
+pub const appendGenericCfgAccumulatorAdd = core_cfg_emit.appendGenericCfgAccumulatorAdd;
+pub const appendGenericCfgAccumulatorIncrement = core_cfg_emit.appendGenericCfgAccumulatorIncrement;
+pub const appendGenericCfgCompareParamZero = core_cfg_emit.appendGenericCfgCompareParamZero;
+pub const appendGenericCfgCompareLocalImm = core_cfg_emit.appendGenericCfgCompareLocalImm;
+pub const appendGenericCfgCompareLocalParam = core_cfg_emit.appendGenericCfgCompareLocalParam;
 
 fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
     for (function.blocks.items) |block| {
@@ -2263,80 +2273,7 @@ pub fn emitGenericCfgLoopSum(
     }
 }
 
-pub const GenericCfgLocalReg = enum {
-    eax,
-    ecx,
-};
-
-pub const GenericCfgBranchKind = enum {
-    je,
-    jne,
-    jo,
-    js,
-    jae,
-};
-
-pub fn appendGenericCfgBlockLabel(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8) !void {
-    try machine.instructions.append(allocator, .{ .label = label });
-}
-
-pub fn appendGenericCfgConditionalBranch(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    kind: GenericCfgBranchKind,
-    label: []const u8,
-) !void {
-    try machine.instructions.append(allocator, switch (kind) {
-        .je => .{ .je = label },
-        .jne => .{ .jne = label },
-        .jo => .{ .jo = label },
-        .js => .{ .js = label },
-        .jae => .{ .jae = label },
-    });
-}
-
 pub const appendGenericCfgReturn = core_cfg_emit.appendGenericCfgReturn;
-
-pub fn appendGenericCfgI32Zero(allocator: std.mem.Allocator, machine: *MachineFunction, reg: GenericCfgLocalReg) !void {
-    try machine.instructions.append(allocator, switch (reg) {
-        .eax => .{ .mov_imm_eax = 0 },
-        .ecx => .xor_ecx_ecx,
-    });
-}
-
-pub fn appendGenericCfgAccumulatorAdd(allocator: std.mem.Allocator, machine: *MachineFunction) !void {
-    try machine.instructions.append(allocator, .add_ecx_eax);
-}
-
-pub fn appendGenericCfgAccumulatorIncrement(allocator: std.mem.Allocator, machine: *MachineFunction) !void {
-    try machine.instructions.append(allocator, .inc_rcx);
-}
-
-pub fn appendGenericCfgCompareParamZero(allocator: std.mem.Allocator, machine: *MachineFunction, reg: ArgReg) !void {
-    try machine.instructions.append(allocator, .{ .test_arg32 = reg });
-}
-
-pub fn appendGenericCfgCompareLocalImm(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: GenericCfgLocalReg,
-    imm: i32,
-) !void {
-    try machine.instructions.append(allocator, switch (reg) {
-        .ecx => .{ .cmp_ecx_imm32 = imm },
-        .eax => .{ .cmp_eax_imm32 = imm },
-    });
-}
-
-pub fn appendGenericCfgCompareLocalParam(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: GenericCfgLocalReg,
-    param: ArgReg,
-) !void {
-    if (reg != .ecx) return error.UnsupportedCodegenInstruction;
-    try machine.instructions.append(allocator, .{ .cmp_ecx_arg32 = param });
-}
 
 pub const hasSingleBlockInstructionCount = core_validation.hasSingleBlockInstructionCount;
 pub const typeIsI128 = core_validation.typeIsI128;
