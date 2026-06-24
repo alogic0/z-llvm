@@ -18,6 +18,8 @@ const ReverseMixed = extern struct {
     a: f64,
     b: i64,
 };
+const ReverseMixedFloatFn = *const fn (ReverseMixed) callconv(.c) f64;
+const ReverseMixedMakeFn = *const fn (f64, i64) callconv(.c) ReverseMixed;
 
 const Pair32 = extern struct {
     a: i32,
@@ -174,6 +176,14 @@ noinline fn helperReverseMixedFloat(value: ReverseMixed) f64 {
 export fn frontier_shifted_reverse_mixed_call_float(prefix: f64, value: ReverseMixed) f64 {
     _ = prefix;
     return helperReverseMixedFloat(value);
+}
+
+export fn frontier_indirect_reverse_mixed_call_float(func: ReverseMixedFloatFn, value: ReverseMixed) f64 {
+    return func(value);
+}
+
+export fn frontier_indirect_reverse_mixed_make(func: ReverseMixedMakeFn, a: f64, b: i64) ReverseMixed {
+    return func(a, b);
 }
 
 export fn frontier_nested_pair_sum(value: NestedPair) i32 {

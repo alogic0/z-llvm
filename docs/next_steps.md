@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=222`,
-`generic_codegen_functions=222`, `generic_cfg_functions=222`,
+frontier gate reports `source_rows=13`, `discovered_functions=224`,
+`generic_codegen_functions=224`, `generic_cfg_functions=224`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=222`, `object_failures=0`,
+`object_emitted_functions=224`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -474,7 +474,9 @@ outgoing XMM aggregate slots. The reversed mixed aggregate frontier row adds
 `{ double, i64 }`, selected `{ double, i32 }`, and selected
 `{ double, i32, i32 }` SSE/INTEGER field reads plus register aggregate returns
 in `%xmm0`/`%rax`, including high-lane `i32` extraction and adjacent `i32` lane
-packing into `%rax`. The nested mixed aggregate row adds
+packing into `%rax`. The indirect reversed mixed follow-up routes the same
+SSE/INTEGER aggregate argument and return classes through pointer-callee SysV
+call planning with executable proof. The nested mixed aggregate row adds
 `{ { i32, i32 }, double }` typed AIR v2 field pointers with `align(...)`
 qualifiers, lowers integer and floating fields through layout-backed offsets
 from independent INTEGER/SSE classes, and constructs the aggregate in

@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=222
-structured_functions=222
-generic_codegen_functions=222
-generic_cfg_functions=222
+discovered_functions=224
+structured_functions=224
+generic_codegen_functions=224
+generic_cfg_functions=224
 structural_matcher_functions=0
-structured_air_v2_functions=222
-typed_air_operand_functions=222
+structured_air_v2_functions=224
+typed_air_operand_functions=224
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=222
+generic_lowering_functions=224
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=222
+object_emitted_functions=224
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -194,7 +194,11 @@ Closed in the current memory/aggregate frontier slice:
   `%xmm0`/`%rax`, and the packed reversed construction row packs adjacent
   low/high `i32` fields into `%rax`; `frontier_shifted_reverse_mixed_call_float`
   proves shifted in-register SSE aggregate pass-through by moving `%xmm1` to
-  `%xmm0` with the generic XMM move helper before a private helper call
+  `%xmm0` with the generic XMM move helper before a private helper call.
+  `frontier_indirect_reverse_mixed_call_float` and
+  `frontier_indirect_reverse_mixed_make` prove the same SSE/INTEGER aggregate
+  argument and return classes through pointer-callee SysV call planning with
+  executable C ABI checks
 - first nested INTEGER aggregate add-chain row in
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed

@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=222`,
-`generic_codegen_functions=222`, `generic_cfg_functions=222`,
+three release modes at `source_rows=13`, `discovered_functions=224`,
+`generic_codegen_functions=224`, `generic_cfg_functions=224`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=222`, `object_failures=0`,
+`object_emitted_functions=224`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -429,7 +429,8 @@ The reversed mixed aggregate frontier row adds `{ double, i64 }`, selected
 `{ double, i32 }`, and selected `{ double, i32, i32 }` SSE/INTEGER field reads
 plus register aggregate returns in `%xmm0`/`%rax` from the independent SSE/GPR
 streams with executable proof, including adjacent `i32` lane packing into
-`%rax`.
+`%rax`. The indirect reversed mixed follow-up proves the same SSE/INTEGER
+aggregate argument/return classes through pointer-callee SysV call planning.
 The nested INTEGER helper-call frontier row passes `{ { i32, i32 },
 { i32, i32 } }` through the SysV GPR pair to a private helper and returns the
 helper's scalar result with executable proof; the nested construction row
