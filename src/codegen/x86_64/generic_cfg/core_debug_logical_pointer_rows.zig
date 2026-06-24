@@ -1,21 +1,24 @@
-const impl = @import("core_impl.zig");
-const std = impl.std;
-const ir = impl.ir;
-const MachineFunction = impl.MachineFunction;
+const shared = @import("core_shared.zig");
+const validation = @import("core_validation.zig");
+const boundary_rows = @import("cabi_boundary_rows.zig");
 
-const hasSingleBlockInstructionCount = impl.hasSingleBlockInstructionCount;
-const isNamed = impl.isNamed;
-const singleRetVoidBlock = impl.singleRetVoidBlock;
-const validateAllocaNamed = impl.validateAllocaNamed;
-const validateAssumeTrue = impl.validateAssumeTrue;
-const validateBr = impl.validateBr;
-const validateCondbr = impl.validateCondbr;
-const validateMemset = impl.validateMemset;
-const validateNamedLoad = impl.validateNamedLoad;
-const validateRetVoid = impl.validateRetVoid;
-const validateStore = impl.validateStore;
-const validateVoidCall = impl.validateVoidCall;
-const validateZeroArrayGep = impl.validateZeroArrayGep;
+const std = shared.std;
+const ir = shared.ir;
+const MachineFunction = shared.MachineFunction;
+
+const hasSingleBlockInstructionCount = validation.hasSingleBlockInstructionCount;
+const isNamed = shared.isNamed;
+const singleRetVoidBlock = validation.singleRetVoidBlock;
+const validateAllocaNamed = validation.validateAllocaNamed;
+const validateAssumeTrue = boundary_rows.validateAssumeTrue;
+const validateBr = boundary_rows.validateBr;
+const validateCondbr = boundary_rows.validateCondbr;
+const validateMemset = validation.validateMemset;
+const validateNamedLoad = validation.validateNamedLoad;
+const validateRetVoid = validation.validateRetVoid;
+const validateStore = validation.validateStore;
+const validateVoidCall = boundary_rows.validateVoidCall;
+const validateZeroArrayGep = validation.validateZeroArrayGep;
 
 pub fn lowerDebugLogicalPointerCompileError(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.startsWith(u8, function.name, "illegal_operation_on_logical_ptr.")) return false;
