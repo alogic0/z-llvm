@@ -174,7 +174,7 @@ pub fn appendSysVScalarCallArgsWithBlock(
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
     if (plan.counts.stack_args > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
-    try validateSequentialGprArgMoves(function, call, plan);
+    const gpr_copy_plan = try analyzeGprArgCopyPlan(function, call, plan);
 
     var stack_args: [max_sysv_stack_call_args]StackScalarCallArg = undefined;
     var stack_arg_count: usize = 0;
@@ -249,6 +249,10 @@ pub fn appendSysVScalarCallArgsWithBlock(
     }
     const incoming_stack_adjust = reserved_stack_bytes;
 
+    if (gpr_copy_plan.parallel) {
+        try appendParallelGprArgCopies(allocator, machine, gpr_copy_plan);
+    }
+
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
         switch (assignment) {
@@ -265,7 +269,10 @@ pub fn appendSysVScalarCallArgsWithBlock(
                             error.UnsupportedCodegenAbi => null,
                             else => return err,
                         }) |src| {
-                            if (src != dst) {
+                            if (gpr_copy_plan.parallel) {
+                                if (src == dst) continue;
+                                if (!gprCopyPlanContains(gpr_copy_plan, dst, src)) return error.UnsupportedCodegenAbi;
+                            } else if (src != dst) {
                                 try machine.instructions.append(allocator, if (arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr)
                                     .{ .mov_arg64_arg = .{ .dst = dst, .src = src } }
                                 else
@@ -325,8 +332,23 @@ pub fn appendSysVScalarCallArgsWithBlock(
     return stack_arg_count;
 }
 
-fn validateSequentialGprArgMoves(function: ir.Function, call: ir.CallInst, plan: SysVCallPlan) !void {
+const max_gpr_parallel_copies = 6;
+
+const GprArgCopy = struct {
+    dst: ArgReg,
+    src: ArgReg,
+};
+
+const GprArgCopyPlan = struct {
+    parallel: bool = false,
+    copies: [max_gpr_parallel_copies]GprArgCopy = undefined,
+    count: usize = 0,
+};
+
+fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCallPlan) !GprArgCopyPlan {
     var overwritten = [_]bool{false} ** 6;
+    var copy_plan = GprArgCopyPlan{};
+    var needs_parallel = false;
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
@@ -344,14 +366,47 @@ fn validateSequentialGprArgMoves(function: ir.Function, call: ir.CallInst, plan:
                 };
                 if (src) |reg| {
                     const src_index = @intFromEnum(reg);
-                    if (overwritten[src_index]) return error.UnsupportedCodegenAbi;
+                    if (overwritten[src_index]) needs_parallel = true;
+                    if (reg != dst and (arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr)) {
+                        if (copy_plan.count >= copy_plan.copies.len) return error.UnsupportedCodegenAbi;
+                        copy_plan.copies[copy_plan.count] = .{ .dst = dst, .src = reg };
+                        copy_plan.count += 1;
+                    } else if (reg != dst) {
+                        if (overwritten[src_index]) return error.UnsupportedCodegenAbi;
+                    }
                     break :writes reg != dst;
                 }
+                if (needs_parallel) return error.UnsupportedCodegenAbi;
                 break :writes true;
             },
             .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => false,
         };
         if (writes_dst) overwritten[@intFromEnum(dst)] = true;
+    }
+    if (needs_parallel and copy_plan.count == 0) return error.UnsupportedCodegenAbi;
+    copy_plan.parallel = needs_parallel;
+    return copy_plan;
+}
+
+fn gprCopyPlanContains(copy_plan: GprArgCopyPlan, dst: ArgReg, src: ArgReg) bool {
+    for (copy_plan.copies[0..copy_plan.count]) |copy| {
+        if (copy.dst == dst and copy.src == src) return true;
+    }
+    return false;
+}
+
+fn appendParallelGprArgCopies(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    copy_plan: GprArgCopyPlan,
+) !void {
+    for (copy_plan.copies[0..copy_plan.count]) |copy| {
+        try machine.instructions.append(allocator, .{ .push_arg = copy.src });
+    }
+    var index = copy_plan.count;
+    while (index > 0) {
+        index -= 1;
+        try machine.instructions.append(allocator, .{ .pop_arg = copy_plan.copies[index].dst });
     }
 }
 

@@ -267,6 +267,43 @@ test "x86_64 generic CFG rejects cyclic GPR arg register shuffle" {
     );
 }
 
+test "x86_64 generic CFG lowers cyclic i64 GPR arg register shuffle with parallel copy" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @callee(i64, i64)
+        \\
+        \\define i64 @caller(i64 %a, i64 %b) {
+        \\entry:
+        \\  %r = call i64 @callee(i64 %b, i64 %a)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .push_arg = .rsi });
+    try expectMachineInstruction(machine.instructions.items, .{ .push_arg = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .pop_arg = .rsi });
+    try expectMachineInstruction(machine.instructions.items, .{ .pop_arg = .rdi });
+    var saw_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.{ .int = 64 }));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_call);
+}
+
 test "x86_64 generic CFG lowers indirect pointer call args through planner" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

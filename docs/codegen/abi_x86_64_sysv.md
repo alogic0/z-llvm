@@ -294,8 +294,9 @@ supported-leaf MEMORY aggregate byval-to-sret forms, tail calls, or unsupported
 non-default call conventions
 no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32/i64, computed stack-passed i32/i64, one- through six-live f32/f64 no-argument-call shapes, selected direct two-/three-/six-live FP-argument call shapes, selected pointer-callee FP call shapes through six live values and five FP helper arguments, selected two-call six-live i32 GPR frame, selected two-call two-live f32/f64 direct and pointer-callee void-call frames, and selected mixed one-GPR/one-SSE live one-/two-call direct/pointer-callee void-call frames
 stack-passed live integer pressure beyond the current disp8-safe incoming stack offset model is rejected explicitly rather than guessed
-general cyclic GPR argument shuffles are rejected explicitly until a real
-temporary-register or parallel-copy scheduler is implemented
+64-bit integer and pointer cyclic GPR argument shuffles use a generic push/pop
+parallel-copy path; 32-bit/mixed source cyclic shuffles remain explicitly
+rejected until their high-bit semantics are modeled
 ```
 
 ## Remaining Blocker Table
