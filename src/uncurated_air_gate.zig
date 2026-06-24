@@ -1670,6 +1670,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big20 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; long long i; long long j; long long k; long long l; long long m; long long n; long long o; long long p; long long q; long long r; long long s; long long t; };
     \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\struct BigMixed { long long a; int b; long long c; int d; };
+    \\struct NarrowInner { unsigned short b; int c; };
+    \\struct BigNarrow { unsigned char a; struct NarrowInner inner; long long d; };
     \\struct BigArray { long long values[5]; };
     \\struct BigDouble { double a; double b; double c; };
     \\struct BigFloat { float a; float b; float c; float d; float e; };
@@ -1715,6 +1717,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigMixed z_frontier_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_big_mixed_copy");
     \\extern struct BigMixed z_frontier_direct_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_direct_big_mixed_copy");
     \\extern struct BigMixed z_frontier_indirect_big_mixed_copy(struct BigMixed (*)(struct BigMixed), struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_mixed_copy");
+    \\extern struct BigNarrow z_frontier_big_narrow_copy(struct BigNarrow) __asm__("frontier_sysv_sret_byval.frontier_big_narrow_copy");
+    \\extern struct BigNarrow z_frontier_direct_big_narrow_copy(struct BigNarrow) __asm__("frontier_sysv_sret_byval.frontier_direct_big_narrow_copy");
+    \\extern struct BigNarrow z_frontier_indirect_big_narrow_copy(struct BigNarrow (*)(struct BigNarrow), struct BigNarrow) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_narrow_copy");
     \\extern struct BigArray z_frontier_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_copy");
     \\extern struct BigArray z_frontier_direct_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_direct_big_array_copy");
     \\extern struct BigArray z_frontier_indirect_big_array_copy(struct BigArray (*)(struct BigArray), struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_array_copy");
@@ -1809,6 +1814,13 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (direct_mixed.a != 211 || direct_mixed.b != 223 || direct_mixed.c != 227 || direct_mixed.d != 229) return 64;
     \\    struct BigMixed indirect_mixed = z_frontier_indirect_big_mixed_copy(z_frontier_big_mixed_copy, mixed);
     \\    if (indirect_mixed.a != 211 || indirect_mixed.b != 223 || indirect_mixed.c != 227 || indirect_mixed.d != 229) return 65;
+    \\    struct BigNarrow narrow = { .a = 7, .inner = { .b = 4091, .c = 8191 }, .d = 922337203685477LL };
+    \\    struct BigNarrow copied_narrow = z_frontier_big_narrow_copy(narrow);
+    \\    if (copied_narrow.a != 7 || copied_narrow.inner.b != 4091 || copied_narrow.inner.c != 8191 || copied_narrow.d != 922337203685477LL) return 70;
+    \\    struct BigNarrow direct_narrow = z_frontier_direct_big_narrow_copy(narrow);
+    \\    if (direct_narrow.a != 7 || direct_narrow.inner.b != 4091 || direct_narrow.inner.c != 8191 || direct_narrow.d != 922337203685477LL) return 71;
+    \\    struct BigNarrow indirect_narrow = z_frontier_indirect_big_narrow_copy(z_frontier_big_narrow_copy, narrow);
+    \\    if (indirect_narrow.a != 7 || indirect_narrow.inner.b != 4091 || indirect_narrow.inner.c != 8191 || indirect_narrow.d != 922337203685477LL) return 72;
     \\    struct BigArray array = { .values = { 233, 239, 241, 251, 257 } };
     \\    struct BigArray copied_array = z_frontier_big_array_copy(array);
     \\    if (copied_array.values[0] != 233 || copied_array.values[1] != 239 || copied_array.values[2] != 241 || copied_array.values[3] != 251 || copied_array.values[4] != 257) return 23;

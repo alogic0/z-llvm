@@ -131,6 +131,7 @@ frontier_sysv_sret_byval.Big3 through Big20 lower as selected normal MEMORY clas
   by-value stack aggregate field reads and byval-to-sret copies use layout-derived stack offsets for all scalar integer leaves in these selected normal MEMORY forms
   `{ { i64, i64, i64 }, { i64, i64, i64 } }` proves recursive leaf byte-offset reads and copies for nested normal MEMORY aggregates
   `{ i64, i32, i64, i32 }` proves mixed-width MEMORY copies with narrow stores for `i32` leaves
+  `{ i8, { i16, i32 }, i64 }` proves nested narrow MEMORY copies with width-correct byte/word loads and stores
   nested `{ i8, { i16, i32 }, i64 }` proves layout-derived byte/word leaf copies use width-correct `%al`/`%ax` stores instead of widening the destination writes
   `{ [5 x i64] }` proves array-backed MEMORY copies and by-value edge field reads use the same integer-leaf byte-offset paths
   the flat `BigN` source type parser now covers larger normal integer-leaf MEMORY aggregates, with `Big20` proving construction, field-read, and byval-to-sret copy rows

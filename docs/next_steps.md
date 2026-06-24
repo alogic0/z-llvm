@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=213`,
-`generic_codegen_functions=213`, `generic_cfg_functions=213`,
+frontier gate reports `source_rows=13`, `discovered_functions=216`,
+`generic_codegen_functions=216`, `generic_cfg_functions=216`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=213`, `object_failures=0`,
+`object_emitted_functions=216`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -420,9 +420,11 @@ follow-up adds the first double-leaf byval-to-sret MEMORY aggregate copy row,
 and `BigPtrDouble` proves the same layout-derived copy path for pointer,
 `double`, and `i64` leaves in one MEMORY aggregate. `BigFloat` adds five-`f32`
 MEMORY aggregate copy proof through dedicated `movss` stack loads and
-hidden-sret stores. Direct and indirect MEMORY aggregate calls are now proven
-for Big3, Big4, Big5, BigDouble, BigFloat, BigPtrDouble, BigNested, BigMixed,
-and BigArray by preserving the hidden sret pointer, forwarding pointer callees
+hidden-sret stores. `BigNarrow` proves nested `i8`/`i16`/`i32`/`i64`
+supported-leaf copies use width-correct byte/word stack loads and hidden-sret
+stores through the same layout-derived path. Direct and indirect MEMORY
+aggregate calls are now proven for Big3, Big4, Big5, BigDouble, BigFloat,
+BigPtrDouble, BigNested, BigMixed, BigNarrow, and BigArray by preserving the hidden sret pointer, forwarding pointer callees
 through `%rax`, and copying incoming by-value stack slots to outgoing stack
 slots before the call.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value

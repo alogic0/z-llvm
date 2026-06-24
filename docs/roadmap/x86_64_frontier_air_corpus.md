@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=213
-structured_functions=213
-generic_codegen_functions=213
-generic_cfg_functions=213
+discovered_functions=216
+structured_functions=216
+generic_codegen_functions=216
+generic_cfg_functions=216
 structural_matcher_functions=0
-structured_air_v2_functions=213
-typed_air_operand_functions=213
+structured_air_v2_functions=216
+typed_air_operand_functions=216
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=213
+generic_lowering_functions=216
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=213
+object_emitted_functions=216
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -131,7 +131,8 @@ Closed in the current memory/aggregate frontier slice:
   { i64, i64, i64 } }` copy/read row and the mixed-width
   `{ i64, i32, i64, i32 }` copy row; the nested
   `{ i8, { i16, i32 }, i64 }` copy row proves byte/word leaves use
-  width-correct `%al`/`%ax` stores in the same layout-derived copy path; the
+  width-correct stack loads and `%al`/`%ax` stores in the same layout-derived
+  copy path; the
   array-backed `{ [5 x i64] }` rows prove the same byte-offset copy and
   by-value field-read paths for integer array leaves inside a normal MEMORY
   aggregate; the flat `BigN` typed parser
@@ -146,7 +147,8 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_indirect_big_double_copy`, `frontier_direct_big_float_copy`,
   `frontier_indirect_big_float_copy`,
   `frontier_direct_big_ptr_double_copy`, and
-  `frontier_indirect_big_ptr_double_copy` prove normal supported-leaf MEMORY
+  `frontier_indirect_big_ptr_double_copy`, `frontier_direct_big_narrow_copy`,
+  and `frontier_indirect_big_narrow_copy` prove normal supported-leaf MEMORY
   aggregates with integer, pure FP, pointer, and mixed pointer/FP/integer
   leaves can flow through direct and indirect calls by preserving the hidden
   sret pointer, forwarding pointer callees through `%rax` when needed, and

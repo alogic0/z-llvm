@@ -118,6 +118,17 @@ const BigMixed = extern struct {
     d: i32,
 };
 
+const NarrowInner = extern struct {
+    b: u16,
+    c: i32,
+};
+
+const BigNarrow = extern struct {
+    a: u8,
+    inner: NarrowInner,
+    d: i64,
+};
+
 const BigArray = extern struct {
     values: [5]i64,
 };
@@ -147,6 +158,7 @@ const Big4CopyFn = *const fn (Big4) callconv(.c) Big4;
 const Big5CopyFn = *const fn (Big5) callconv(.c) Big5;
 const BigNestedCopyFn = *const fn (BigNested) callconv(.c) BigNested;
 const BigMixedCopyFn = *const fn (BigMixed) callconv(.c) BigMixed;
+const BigNarrowCopyFn = *const fn (BigNarrow) callconv(.c) BigNarrow;
 const BigArrayCopyFn = *const fn (BigArray) callconv(.c) BigArray;
 const BigDoubleCopyFn = *const fn (BigDouble) callconv(.c) BigDouble;
 const BigFloatCopyFn = *const fn (BigFloat) callconv(.c) BigFloat;
@@ -313,6 +325,18 @@ export fn frontier_direct_big_mixed_copy(value: BigMixed) BigMixed {
 }
 
 export fn frontier_indirect_big_mixed_copy(func: BigMixedCopyFn, value: BigMixed) BigMixed {
+    return func(value);
+}
+
+export fn frontier_big_narrow_copy(value: BigNarrow) BigNarrow {
+    return value;
+}
+
+export fn frontier_direct_big_narrow_copy(value: BigNarrow) BigNarrow {
+    return frontier_big_narrow_copy(value);
+}
+
+export fn frontier_indirect_big_narrow_copy(func: BigNarrowCopyFn, value: BigNarrow) BigNarrow {
     return func(value);
 }
 

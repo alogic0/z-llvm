@@ -1163,7 +1163,8 @@ fn supportedAggregateCopyLeafCount(ty: ir.Type) ?usize {
 }
 
 fn supportedAggregateCopyLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
+    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
+        ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
 }
 
 fn isAggregateIrType(ty: ir.Type) bool {
@@ -5154,6 +5155,12 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, i32, i64, i32 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.NarrowInner")) {
+        return .{ .ir_type = .{ .aggregate = "{ i16, i32 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigNarrow")) {
+        return .{ .ir_type = .{ .aggregate = "{ i8, { i16, i32 }, i64 }" } };
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigArray")) {
         return .{ .ir_type = .{ .aggregate = "{ [5 x i64] }" } };
