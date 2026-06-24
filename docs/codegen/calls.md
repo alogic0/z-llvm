@@ -406,6 +406,7 @@ selected shifted in-register reversed mixed aggregate pass-through calls
 selected shifted nested mixed aggregate pass-through calls that move both GPR and SSE halves
 selected pointer-callee reversed mixed SSE/INTEGER aggregate pass-through calls
 selected up-to-six-live-i32 spill/reload call frame
+selected live i32 GPR preservation across direct and pointer-callee f64-argument calls
 selected two-call six-live-i32 spill/reload call frame
 selected disp8-safe stack-passed live i32 post-call add-tree rows
 selected one-live f32/f64 SSE spill/reload call frame

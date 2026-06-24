@@ -629,7 +629,7 @@ pub fn appendAlignedCallPreservingI32Params(
 ) !void {
     switch (live_params.count) {
         0 => {
-            _ = try appendI32CallArgs(allocator, machine, function, call);
+            _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
             try appendAlignedSysVCallTarget(allocator, machine, call_target, call.ret_ty);
         },
         1 => {
@@ -639,7 +639,7 @@ pub fn appendAlignedCallPreservingI32Params(
                 .reg = live_params.regs[0],
             } });
             try setupSysVCallTarget(allocator, machine, call_target);
-            _ = try appendI32CallArgs(allocator, machine, function, call);
+            _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
             try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
             try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
                 .reg = live_params.regs[0],
@@ -658,7 +658,7 @@ pub fn appendAlignedCallPreservingI32Params(
                 } });
             }
             try setupSysVCallTarget(allocator, machine, call_target);
-            _ = try appendI32CallArgs(allocator, machine, function, call);
+            _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
             try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
             index = 0;
             while (index < live_params.count) : (index += 1) {

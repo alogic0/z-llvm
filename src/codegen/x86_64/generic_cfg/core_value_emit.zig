@@ -26,10 +26,10 @@ const appendSysVScalarCallArgsWithBlock = cabi_call_lowering.appendSysVScalarCal
 const emitI32ParamOrStackIntoEax = cabi_call_lowering.emitI32ParamOrStackIntoEax;
 const findInstruction = cabi_call_lowering.findInstruction;
 const findInstructionIndex = cabi_call_lowering.findInstructionIndex;
-const i32CallStackArgCount = cabi_call_lowering.i32CallStackArgCount;
 const liveParamsAfter = cabi_call_lowering.liveParamsAfter;
 const lowerGenericCfgSelectReturnValue = cabi_call_lowering.lowerGenericCfgSelectReturnValue;
 const machineBinaryOp = cabi_call_lowering.machineBinaryOp;
+const sysvScalarCallNeedsStackArgs = cabi_call_lowering.sysvScalarCallNeedsStackArgs;
 
 const genericCfgSupportsSingleBlockI32Value = support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsSminIntrinsicCall = support.genericCfgSupportsSminIntrinsicCall;
@@ -263,8 +263,7 @@ pub fn emitGenericCfgI32CallIntoEax(
         const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
         try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
     } else {
-        const stack_arg_count = try i32CallStackArgCount(call);
-        if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+        if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
         if (call.callee_value) |callee_value| {
             const callee_name = switch (callee_value) {
                 .named => |name| name,
@@ -305,8 +304,7 @@ pub fn emitGenericCfgVoidCall(
         try appendDirectCallWithStackArgs(allocator, machine, call.callee, .void, stack_arg_count);
         return;
     }
-    const stack_arg_count = try i32CallStackArgCount(call);
-    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
     if (call.callee_value) |callee_value| {
         const callee_name = switch (callee_value) {
             .named => |name| name,

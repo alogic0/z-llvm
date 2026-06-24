@@ -304,6 +304,11 @@ export fn frontier_two_f64_live_sum_after_arg_call(a: f64, b: f64) f64 {
     return a + b;
 }
 
+export fn frontier_i32_live_across_f64_arg_call(a: i32, b: f64, c: i32) i32 {
+    frontier_touch_f64(b);
+    return a + c;
+}
+
 export fn frontier_indirect_two_f32_live_sum_after_arg_call(func: TouchF32Fn, a: f32, b: f32) f32 {
     func(b);
     return a + b;
@@ -312,6 +317,11 @@ export fn frontier_indirect_two_f32_live_sum_after_arg_call(func: TouchF32Fn, a:
 export fn frontier_indirect_two_f64_live_sum_after_arg_call(func: TouchF64Fn, a: f64, b: f64) f64 {
     func(b);
     return a + b;
+}
+
+export fn frontier_i32_live_across_indirect_f64_arg_call(func: TouchF64Fn, a: i32, b: f64, c: i32) i32 {
+    func(b);
+    return a + c;
 }
 
 export fn frontier_indirect_three_f32_live_sum_after_two_arg_call(func: Touch2F32Fn, a: f32, b: f32, c: f32) f32 {

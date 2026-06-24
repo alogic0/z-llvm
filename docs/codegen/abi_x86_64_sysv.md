@@ -236,6 +236,8 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   one live f32/f64 value is spilled from %xmm0 to an aligned frame slot
   another f32/f64 value is passed to an external C ABI void helper
   the saved value is reloaded to %xmm0 for return
+  live i32 GPR parameters can be preserved across direct and pointer-callee
+  f64-argument void calls through the shared scalar call planner
   two live f32/f64 values can also be spilled from %xmm0/%xmm1 across a
   no-argument external C ABI void helper and reloaded for a post-call fadd
   return
@@ -247,6 +249,8 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   three-, four-, and five-step post-call fadd returns
   two live f32/f64 values can also be spilled across a direct void helper call
   that consumes the second live value as its first FP argument
+  live i32 GPR parameters can also be preserved across direct and pointer-callee
+  void helper calls that consume a named f64 argument
   two live f32/f64 values can also be spilled across a no-argument
   pointer-callee void helper call and reloaded for a post-call fadd return
   five named f32/f64 arguments can be forwarded to external C ABI helpers

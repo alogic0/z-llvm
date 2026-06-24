@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=232`,
-`generic_codegen_functions=232`, `generic_cfg_functions=232`,
+frontier gate reports `source_rows=13`, `discovered_functions=234`,
+`generic_codegen_functions=234`, `generic_cfg_functions=234`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=232`, `object_failures=0`,
+`object_emitted_functions=234`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -502,7 +502,9 @@ return, selected two-live one-FP-argument pointer-callee spill/reload frames,
 selected three-/four-/six-live two-/three-/five-FP-argument pointer-callee
 spill/reload frames,
 and selected two-live `f32`/`f64` spill/reload across a helper call that
-consumes the second live value as its first FP argument. The FP argument
+consumes the second live value as its first FP argument. The same shared scalar
+planner now preserves live `i32` GPR parameters across direct and pointer-callee
+`f64`-argument `void` calls before the post-call integer add. The FP argument
 frontier now also proves selected
 named `f32`/`f64` external-call pass-through through `%xmm0..%xmm4`; immediate
 FP constant materialization now uses generic XMM loads through `%xmm0..%xmm7`.

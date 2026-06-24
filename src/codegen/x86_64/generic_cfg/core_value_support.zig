@@ -1,6 +1,7 @@
 const shared = @import("core_shared.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_tls_global_lowering = @import("cabi_tls_global_lowering.zig");
+const sysv_abi = @import("../sysv_abi.zig");
 
 const std = shared.std;
 const ir = shared.ir;
@@ -259,18 +260,53 @@ pub fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicB
         if (paramRegOrNull(function, callee_name, .ptr) catch null == null) return false;
     }
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
-    for (call.args.items, 0..) |arg, index| {
-        if (!arg.ty.eql(.{ .int = 32 })) return false;
-        if (index >= 6) {
-            switch (arg.value) {
-                .int => {},
-                .named => if (!genericCfgSupportsSingleBlockI32Value(function, block, arg.value)) return false,
-                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-            }
-        } else if (!genericCfgSupportsSingleBlockI32Value(function, block, arg.value)) return false;
+    sysv_abi.rejectUnsupportedCallEnvelope(call) catch return false;
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    for (call.args.items) |arg| {
+        if (!genericCfgSupportsScalarCallArg(function, block, arg, &gpr_index, &sse_index)) return false;
     }
     if (result) |name| return genericCfgSingleBlockResultIsUsed(block, name);
     return call.ret_ty == .void;
+}
+
+fn genericCfgSupportsScalarCallArg(
+    function: ir.Function,
+    block: ir.BasicBlock,
+    arg: ir.CallArg,
+    gpr_index: *usize,
+    sse_index: *usize,
+) bool {
+    if (arg.attrs != null) return false;
+    if (arg.ty.eql(.{ .int = 32 })) {
+        defer gpr_index.* += 1;
+        return switch (arg.value) {
+            .int => true,
+            .named => |name| if (gpr_index.* >= 6)
+                genericCfgSupportsSingleBlockI32Value(function, block, arg.value)
+            else
+                genericCfgSupportsI32Param(function, name),
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        };
+    }
+    if (arg.ty.eql(.{ .int = 64 })) {
+        defer gpr_index.* += 1;
+        return switch (arg.value) {
+            .int => true,
+            .named => |name| genericCfgSupportsTypedParam(function, name, .{ .int = 64 }),
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        };
+    }
+    if (arg.ty.eql(.float) or arg.ty.eql(.double)) {
+        if (sse_index.* >= 8) return false;
+        defer sse_index.* += 1;
+        return switch (arg.value) {
+            .fp => true,
+            .named => |name| genericCfgSupportsTypedParam(function, name, arg.ty),
+            .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        };
+    }
+    return false;
 }
 
 pub fn genericCfgSupportsSminIntrinsicCall(function: ir.Function, call: ir.CallInst) bool {
@@ -325,6 +361,13 @@ pub fn genericCfgValueReferencesName(block: ir.BasicBlock, value: ir.Value, name
 pub fn genericCfgSupportsI32Param(function: ir.Function, name: []const u8) bool {
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, name)) return param.ty.eql(.{ .int = 32 });
+    }
+    return false;
+}
+
+fn genericCfgSupportsTypedParam(function: ir.Function, name: []const u8, ty: ir.Type) bool {
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) return param.ty.eql(ty);
     }
     return false;
 }
