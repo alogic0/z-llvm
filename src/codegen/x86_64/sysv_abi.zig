@@ -405,18 +405,14 @@ pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {
     if (call.tail_kind != null) return error.UnsupportedTailCallAbi;
     if (call.inline_asm != null) return error.UnsupportedCallAttributeAbi;
     if (call.ret_attrs) |attrs| {
-        if (attrsContainPackedAbiPayload(attrs, "sret") or attrsContainPackedAbiPayload(attrs, "byval")) {
-            return error.UnsupportedPackedAggregateAbi;
-        }
+        try rejectUnsupportedAbiAttrPayload(attrs);
         if (attrsContainAbiPayload(attrs, "sret") or attrsContainAbiPayload(attrs, "byval")) {
             return error.UnsupportedSretByvalAbi;
         }
         return error.UnsupportedCallAttributeAbi;
     }
     if (call.attrs) |attrs| {
-        if (attrsContainPackedAbiPayload(attrs, "sret") or attrsContainPackedAbiPayload(attrs, "byval")) {
-            return error.UnsupportedPackedAggregateAbi;
-        }
+        try rejectUnsupportedAbiAttrPayload(attrs);
         if (attrsContainAbiPayload(attrs, "sret") or attrsContainAbiPayload(attrs, "byval")) {
             return error.UnsupportedSretByvalAbi;
         }
@@ -425,11 +421,23 @@ pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {
     if (call.operand_bundle != null) return error.UnsupportedCallAttributeAbi;
 }
 
+fn rejectUnsupportedAbiAttrPayload(attrs: []const u8) !void {
+    inline for (.{ "sret", "byval" }) |name| {
+        if (attrsContainPackedAbiPayload(attrs, name)) {
+            return error.UnsupportedPackedAggregateAbi;
+        }
+        if (attrsContainVectorAbiPayload(attrs, name)) {
+            return error.UnsupportedVectorAbi;
+        }
+        if (attrsContainLongDoubleAbiPayload(attrs, name)) {
+            return error.UnsupportedLongDoubleAbi;
+        }
+    }
+}
+
 pub fn rejectUnsupportedCallArgAttrs(attrs: ?[]const u8) !void {
     const text = attrs orelse return;
-    if (attrsContainPackedAbiPayload(text, "sret") or attrsContainPackedAbiPayload(text, "byval")) {
-        return error.UnsupportedPackedAggregateAbi;
-    }
+    try rejectUnsupportedAbiAttrPayload(text);
     if (attrsContainAbiPayload(text, "sret") or attrsContainAbiPayload(text, "byval")) {
         return error.UnsupportedSretByvalAbi;
     }
@@ -447,16 +455,31 @@ fn attrsContainAbiPayload(attrs: []const u8, name: []const u8) bool {
 }
 
 fn attrsContainPackedAbiPayload(attrs: []const u8, name: []const u8) bool {
+    const payload = abiAttrPayload(attrs, name) orelse return false;
+    return std.mem.startsWith(u8, payload, "<{");
+}
+
+fn attrsContainVectorAbiPayload(attrs: []const u8, name: []const u8) bool {
+    const payload = abiAttrPayload(attrs, name) orelse return false;
+    return std.mem.indexOfScalar(u8, payload, '<') != null;
+}
+
+fn attrsContainLongDoubleAbiPayload(attrs: []const u8, name: []const u8) bool {
+    const payload = abiAttrPayload(attrs, name) orelse return false;
+    return std.mem.indexOf(u8, payload, "x86_fp80") != null or std.mem.indexOf(u8, payload, "fp128") != null;
+}
+
+fn abiAttrPayload(attrs: []const u8, name: []const u8) ?[]const u8 {
     var index: usize = 0;
     while (std.mem.indexOfPos(u8, attrs, index, name)) |found| {
         const after = found + name.len;
         if (after < attrs.len and attrs[after] == '(') {
             const payload = std.mem.trim(u8, attrs[after + 1 ..], " \t");
-            if (std.mem.startsWith(u8, payload, "<{")) return true;
+            return payload;
         }
         index = after;
     }
-    return false;
+    return null;
 }
 
 pub fn rejectUnsupportedAbiType(ty: ir.Type) !void {
