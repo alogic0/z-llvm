@@ -1,5 +1,4 @@
 const rows = @import("cabi_return_rows.zig");
-const impl = @import("cabi_impl.zig");
 pub const lowerCAbiAssertPDReturnCode = rows.lowerCAbiAssertPDReturnCode;
 pub const lowerCAbiRetPD = rows.lowerCAbiRetPD;
 pub const lowerCAbiRetCFF = rows.lowerCAbiRetCFF;
@@ -26,5 +25,5 @@ pub const lowerCAbiI32 = rows.lowerCAbiI32;
 pub const lowerCAbiI16 = rows.lowerCAbiI16;
 pub const lowerCAbiI8 = rows.lowerCAbiI8;
 pub const lowerCAbiFiveIntegers = rows.lowerCAbiFiveIntegers;
-pub const lowerCAbiPanic = impl.lowerCAbiPanic;
-pub const lowerCAbiAssertCFFReturnCode = impl.lowerCAbiAssertCFFReturnCode;
+pub const lowerCAbiPanic = rows.lowerCAbiPanic;
+pub const lowerCAbiAssertCFFReturnCode = rows.lowerCAbiAssertCFFReturnCode;

@@ -396,21 +396,6 @@ pub fn appendCompareArg32Imm32(
     try machine.instructions.append(allocator, .{ .jne = fail });
 }
 
-pub fn lowerCAbiPanic(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "main.zig_panic")) return false;
-    if (function.ret_ty != .void) return false;
-    if (function.params.items.len != 0) return false;
-    if (function.blocks.items.len != 1) return error.UnsupportedCodegenControlFlow;
-    if (function.blocks.items[0].instructions.items.len == 3) {
-        try validateDebugPanicUnreachableBlock(function.blocks.items[0]);
-    } else {
-        try validatePanicUnreachableBlock(function.blocks.items[0]);
-    }
-
-    try machine.instructions.append(allocator, .ud2);
-    return true;
-}
-
 pub fn lowerStartTrampoline(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "start._start")) return false;
     if (function.ret_ty != .void) return false;
@@ -936,40 +921,6 @@ pub fn appendCompareArg64Imm64(
 ) !void {
     try machine.instructions.append(allocator, .{ .cmp_arg64_imm64 = .{ .reg = reg, .imm = expected } });
     try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
-pub fn lowerCAbiAssertCFFReturnCode(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "main.zig_assert_CFF")) return false;
-    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
-    if (function.params.items.len != 2) return false;
-    if (!function.params.items[0].ty.eql(.{ .int = 64 }) or !function.params.items[1].ty.eql(.float)) return false;
-    const packed_reg = try paramReg(function, function.params.items[0].name, .{ .int = 64 });
-    if (packed_reg != .rdi) return error.UnsupportedCodegenAbi;
-    try validateAssertCFFShape(function);
-
-    const fail_low = "assert_cff_low";
-    const fail_payload = "assert_cff_payload";
-    const fail_float = "assert_cff_float";
-    try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x3f80_0000 });
-    try machine.instructions.append(allocator, .ucomiss_xmm1_xmm0);
-    try machine.instructions.append(allocator, .{ .jp = fail_float });
-    try machine.instructions.append(allocator, .{ .jne = fail_float });
-    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = .rdi, .imm = 39 } });
-    try machine.instructions.append(allocator, .{ .jne = fail_low });
-    try machine.instructions.append(allocator, .{ .cmp_rdi_imm64 = 0x3f60_0000_0000_0027 });
-    try machine.instructions.append(allocator, .{ .jne = fail_payload });
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
-    try machine.instructions.append(allocator, .ret);
-    try machine.instructions.append(allocator, .{ .label = fail_float });
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 3 });
-    try machine.instructions.append(allocator, .ret);
-    try machine.instructions.append(allocator, .{ .label = fail_payload });
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 2 });
-    try machine.instructions.append(allocator, .ret);
-    try machine.instructions.append(allocator, .{ .label = fail_low });
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
-    try machine.instructions.append(allocator, .ret);
-    return true;
 }
 
 pub fn validateAssertDCShape(function: ir.Function) !void {
