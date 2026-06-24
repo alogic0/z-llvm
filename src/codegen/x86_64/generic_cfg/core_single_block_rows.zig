@@ -899,16 +899,19 @@ fn lowerGenericCfgTwoI64CallResultsAcrossVoidCall(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 4) return false;
+    if (!ret.ty.eql(.{ .int = 64 }) or (block.instructions.items.len != 4 and block.instructions.items.len != 5)) return false;
     const first_call_inst = block.instructions.items[0];
     const second_call_inst = block.instructions.items[1];
     const third_call_inst = block.instructions.items[2];
     const add_inst = block.instructions.items[3];
+    const final_add_inst: ?ir.Instruction = if (block.instructions.items.len == 5) block.instructions.items[4] else null;
     if (first_call_inst.removed or second_call_inst.removed or third_call_inst.removed or add_inst.removed) return false;
+    if (final_add_inst) |inst| if (inst.removed) return false;
     const first_result = first_call_inst.result orelse return false;
     const second_result = second_call_inst.result orelse return false;
     const add_result = add_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+    const ret_value = ret.value orelse return error.InvalidRet;
+    if (final_add_inst == null and !isNamed(ret_value, add_result)) return false;
 
     const first_call = switch (first_call_inst.kind) {
         .call => |call| call,
@@ -960,10 +963,41 @@ fn lowerGenericCfgTwoI64CallResultsAcrossVoidCall(
         else => return false,
     };
     if (!add.ty.eql(.{ .int = 64 }) or add.op != .add) return false;
-    const add_uses_results =
-        (isNamed(add.lhs, first_result) and isNamed(add.rhs, second_result)) or
-        (isNamed(add.lhs, second_result) and isNamed(add.rhs, first_result));
-    if (!add_uses_results) return false;
+    var extra_value: ?ir.Value = null;
+    if (final_add_inst) |inst| {
+        const final_add_result = inst.result orelse return false;
+        if (!isNamed(ret_value, final_add_result)) return false;
+        const final_add = switch (inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (!final_add.ty.eql(.{ .int = 64 }) or final_add.op != .add) return false;
+        var leaves: [3]ir.Value = undefined;
+        var leaf_count: usize = 0;
+        try collectTwoAddLeaves(add_result, add, final_add, &leaves, &leaf_count);
+        var has_first = false;
+        var has_second = false;
+        for (leaves[0..leaf_count]) |leaf| {
+            if (isNamed(leaf, first_result)) {
+                if (has_first) return false;
+                has_first = true;
+            } else if (isNamed(leaf, second_result)) {
+                if (has_second) return false;
+                has_second = true;
+            } else if (extra_value == null) {
+                extra_value = leaf;
+            } else {
+                return false;
+            }
+        }
+        if (!has_first or !has_second or extra_value == null) return false;
+        if (secondCallUsesValue(second_call, extra_value.?)) return false;
+    } else {
+        const add_uses_results =
+            (isNamed(add.lhs, first_result) and isNamed(add.rhs, second_result)) or
+            (isNamed(add.lhs, second_result) and isNamed(add.rhs, first_result));
+        if (!add_uses_results) return false;
+    }
 
     const third_callee_reg: ?ArgReg = switch (third_call_target) {
         .direct => null,
@@ -973,7 +1007,12 @@ fn lowerGenericCfgTwoI64CallResultsAcrossVoidCall(
         .direct => null,
         .indirect_from_reg => |reg| reg,
     };
-    const frame_bytes: u8 = if (second_callee_reg != null or third_callee_reg != null) 40 else 24;
+    const extra_param_reg: ?ArgReg = if (extra_value) |value| switch (value) {
+        .named => |name| try paramReg(function, name, .{ .int = 64 }),
+        .int => null,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    } else null;
+    const frame_bytes: u8 = if (extra_param_reg != null) 56 else if (second_callee_reg != null or third_callee_reg != null) 40 else 24;
 
     try appendStackFrame(allocator, machine, frame_bytes);
     if (second_arg_live_reg) |reg| {
@@ -984,6 +1023,9 @@ fn lowerGenericCfgTwoI64CallResultsAcrossVoidCall(
     }
     if (third_callee_reg) |reg| {
         try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = reg } });
+    }
+    if (extra_param_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot10, .reg = reg } });
     }
     try setupSysVCallTarget(allocator, machine, first_call_target);
     const first_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, first_call);
@@ -1008,6 +1050,14 @@ fn lowerGenericCfgTwoI64CallResultsAcrossVoidCall(
     try appendSysVCallTarget(allocator, machine, third_call_target, .void);
     try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
     try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = 8 });
+    if (extra_value) |value| switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .add_rax_imm8 = @intCast(try i64Value(int)) }),
+        .named => {
+            if (extra_param_reg == null) return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = 40 });
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
+    };
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
     return true;
