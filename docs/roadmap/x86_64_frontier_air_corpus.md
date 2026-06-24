@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=221
-structured_functions=221
-generic_codegen_functions=221
-generic_cfg_functions=221
+discovered_functions=222
+structured_functions=222
+generic_codegen_functions=222
+generic_cfg_functions=222
 structural_matcher_functions=0
-structured_air_v2_functions=221
-typed_air_operand_functions=221
+structured_air_v2_functions=222
+typed_air_operand_functions=222
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=221
+generic_lowering_functions=222
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=221
+object_emitted_functions=222
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -344,6 +344,12 @@ Closed in the current memory/aggregate frontier slice:
   `void` pointer callee across both ordered `i32` calls in a 64-bit frame slot,
   reloads it before `callq *%rax`, then reloads both saved `i32` results for
   the final add tree.
+- selected indirect-first two-result live-across-later-call frame in
+  `frontier_sysv_abi.zig`:
+  `frontier_indirect_first_i32_result_live_across_void_call` routes the first
+  ordered `i32` call through a function pointer target, then preserves the
+  second ordered result and later side-effecting `void` call sequence through
+  the same generic SysV call-target and frame spill/reload path.
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded
@@ -397,8 +403,8 @@ Remaining measured frontier blockers kept out of accepted rows:
 - private helper call graphs with stack-passed live values beyond the current
   disp8-safe selected model, live SSE values beyond the selected no-argument-call spill shapes and
   two-live FP-argument call shape, and arbitrary mixed/non-void live values
-  across multiple calls beyond the selected direct/indirect/later-void and
-  indirect-later-void ordered `i32` result rows
+  across multiple calls beyond the selected direct/indirect/later-void,
+  indirect-later-void, and indirect-first ordered `i32` result rows
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond planner-owned register aggregate and

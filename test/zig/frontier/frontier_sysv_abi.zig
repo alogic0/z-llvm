@@ -123,6 +123,13 @@ export fn frontier_two_i32_results_live_across_indirect_void_call(func: VoidFn, 
     return first + second + a;
 }
 
+export fn frontier_indirect_first_i32_result_live_across_void_call(func: IdI32Fn, a: i32, b: i32) i32 {
+    const first = func(a);
+    const second = frontier_ordered2_i32(b);
+    frontier_touch_ordered_after_two();
+    return first + second + a;
+}
+
 export fn frontier_six_stack_arg_call() i32 {
     return frontier_sum12_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 }

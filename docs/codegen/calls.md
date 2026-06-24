@@ -227,6 +227,9 @@ accepted frontier:
   results are reloaded after a side-effecting void call
   selected indirect later-void variant where the final void call target is
   preserved across both i32 calls and reloaded before `callq *%rax`
+  selected indirect-first ordered i32 result variant where the first call target
+  is a function pointer and the later result/void-call sequence is preserved
+  through the same frame path
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results

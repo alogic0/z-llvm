@@ -1515,6 +1515,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_two_i32_results_across_indirect_call(int (*)(int), int, int) __asm__("frontier_sysv_abi.frontier_two_i32_results_across_indirect_call");
     \\extern int z_frontier_two_i32_results_live_across_void_call(int, int) __asm__("frontier_sysv_abi.frontier_two_i32_results_live_across_void_call");
     \\extern int z_frontier_two_i32_results_live_across_indirect_void_call(void (*)(void), int, int) __asm__("frontier_sysv_abi.frontier_two_i32_results_live_across_indirect_void_call");
+    \\extern int z_frontier_indirect_first_i32_result_live_across_void_call(int (*)(int), int, int) __asm__("frontier_sysv_abi.frontier_indirect_first_i32_result_live_across_void_call");
     \\extern int z_frontier_six_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_six_stack_arg_call");
     \\extern int z_frontier_eight_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_eight_stack_arg_call");
     \\extern int z_frontier_twelve_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_twelve_stack_arg_call");
@@ -1619,6 +1620,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_two_i32_results_live_across_void_call(23, 29) != 87 || frontier_order_step != 3) return 83;
     \\    frontier_order_step = 0;
     \\    if (z_frontier_two_i32_results_live_across_indirect_void_call(frontier_touch_ordered_after_two, 31, 37) != 111 || frontier_order_step != 3) return 84;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_indirect_first_i32_result_live_across_void_call(frontier_ordered_i32, 41, 43) != 137 || frontier_order_step != 3) return 85;
     \\    if (z_frontier_six_stack_arg_call() != 78) return 35;
     \\    if (z_frontier_eight_stack_arg_call() != 105) return 46;
     \\    if (z_frontier_twelve_stack_arg_call() != 171) return 47;

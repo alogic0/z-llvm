@@ -430,8 +430,15 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
         .call => |call| call,
         else => return false,
     };
-    if (!first_call.ret_ty.eql(.{ .int = 32 }) or first_call.callee_value != null or first_call.inline_asm != null) return false;
+    if (!first_call.ret_ty.eql(.{ .int = 32 }) or first_call.inline_asm != null) return false;
     if (!callIsFastcc(first_call.calling_conv)) try validateDefaultCallConv(first_call.calling_conv);
+    const first_call_target: SysVCallTarget = if (first_call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = first_call.callee };
 
     const second_call = switch (second_call_inst.kind) {
         .call => |call| call,
@@ -501,7 +508,11 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
         .direct => null,
         .indirect_from_reg => |reg| reg,
     };
-    const frame_bytes: u8 = if (third_callee_reg != null) 40 else 24;
+    const first_callee_reg: ?shared.ArgReg = switch (first_call_target) {
+        .direct => null,
+        .indirect_from_reg => |reg| reg,
+    };
+    const frame_bytes: u8 = if (third_callee_reg != null or first_callee_reg != null) 40 else 24;
 
     try appendStackFrame(allocator, machine, frame_bytes);
     if (extra_param_reg) |reg| {
@@ -513,10 +524,17 @@ fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
     if (third_callee_reg) |reg| {
         try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = reg } });
     }
+    if (first_callee_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot7, .reg = reg } });
+        try setupSysVCallTarget(allocator, machine, first_call_target);
+    }
     const first_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, first_call);
     if (first_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
-    try appendDirectCall(allocator, machine, first_call.callee, first_call.ret_ty);
+    try appendSysVCallTarget(allocator, machine, first_call_target, first_call.ret_ty);
     try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot0 });
+    if (first_callee_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot7 } });
+    }
     if (second_arg_live_reg) |reg| {
         try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = reg, .frame_index = .slot4 } });
     }
