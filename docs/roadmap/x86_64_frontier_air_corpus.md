@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=229
-structured_functions=229
-generic_codegen_functions=229
-generic_cfg_functions=229
+discovered_functions=232
+structured_functions=232
+generic_codegen_functions=232
+generic_cfg_functions=232
 structural_matcher_functions=0
-structured_air_v2_functions=229
-typed_air_operand_functions=229
+structured_air_v2_functions=232
+typed_air_operand_functions=232
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=229
+generic_lowering_functions=232
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=229
+object_emitted_functions=232
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -143,7 +143,9 @@ Closed in the current memory/aggregate frontier slice:
   same layout-derived copy path for pointer, `double`, and `i64` leaves in one
   MEMORY aggregate, `BigFloat` proves five `f32` leaves through dedicated
   `movss` stack loads and hidden-sret stores, and `BigDoubleArray` proves an
-  array-of-double MEMORY aggregate through the same recursive copy path;
+  array-of-double MEMORY aggregate through the same recursive copy path; the
+  `BigArrayMixed` row combines array-contained `i32`, array-contained `f64`,
+  and pointer leaves in one byval-to-sret MEMORY aggregate;
   `frontier_direct_big5_copy`,
   `frontier_indirect_big5_copy`, `frontier_direct_big_double_copy`,
   `frontier_indirect_big_double_copy`, `frontier_direct_big_float_copy`,
