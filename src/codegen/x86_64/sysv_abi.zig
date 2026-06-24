@@ -2,6 +2,10 @@ const std = @import("std");
 const ir = @import("../../ir.zig");
 const target = @import("../../target.zig");
 const memory_location = @import("../../analysis/memory_location.zig");
+const types = @import("types.zig");
+
+const ArgReg = types.ArgReg;
+const XmmReg = types.XmmReg;
 
 pub const AggregateEightbyteClass = enum {
     integer,
@@ -193,4 +197,251 @@ pub fn classifySmallIntegerAggregate(ty: ir.Type) ?SmallIntegerAggregate {
     if (!classification.isIntegerOnly()) return null;
     if (classification.size_bytes > std.math.maxInt(u8)) return null;
     return .{ .eightbytes = classification.eightbyte_count, .size_bytes = @intCast(classification.size_bytes) };
+}
+
+pub const RegisterNeeds = struct {
+    gpr: usize = 0,
+    sse: usize = 0,
+};
+
+pub fn aggregateRegisterNeeds(classification: AggregateClassification) RegisterNeeds {
+    return aggregateRegisterNeedsBefore(classification, classification.eightbyte_count);
+}
+
+pub fn aggregateRegisterNeedsBefore(classification: AggregateClassification, limit: usize) RegisterNeeds {
+    var needs: RegisterNeeds = .{};
+    var index: usize = 0;
+    while (index < limit and index < classification.eightbyte_count) : (index += 1) {
+        switch (classification.eightbytes[index] orelse continue) {
+            .integer => needs.gpr += 1,
+            .sse => needs.sse += 1,
+        }
+    }
+    return needs;
+}
+
+pub fn advanceParamCursors(
+    ty: ir.Type,
+    gpr_index: *usize,
+    sse_index: *usize,
+    stack_eightbytes: *usize,
+) !void {
+    if (ty.eql(.{ .int = 1 }) or ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or
+        ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr))
+    {
+        if (gpr_index.* < 6) gpr_index.* += 1 else stack_eightbytes.* += 1;
+        return;
+    }
+    if (ty.eql(.float) or ty.eql(.double)) {
+        if (sse_index.* < 8) sse_index.* += 1 else stack_eightbytes.* += 1;
+        return;
+    }
+    const classification = classifyAggregate(ty) catch return;
+    if (classification.kind == .memory) {
+        stack_eightbytes.* += @intCast((classification.size_bytes + 7) / 8);
+        return;
+    }
+    const needs = aggregateRegisterNeeds(classification);
+    if (gpr_index.* + needs.gpr <= 6 and sse_index.* + needs.sse <= 8) {
+        gpr_index.* += needs.gpr;
+        sse_index.* += needs.sse;
+    } else {
+        stack_eightbytes.* += @intCast((classification.size_bytes + 7) / 8);
+    }
+}
+
+pub const CallPlanCounts = struct {
+    gpr_args: usize = 0,
+    sse_args: usize = 0,
+    stack_args: usize = 0,
+    register_aggregate_args: usize = 0,
+    gpr_returns: usize = 0,
+    sse_returns: usize = 0,
+    memory_return: bool = false,
+};
+
+pub const CallArgAssignment = union(enum) {
+    gpr: ArgReg,
+    sse: XmmReg,
+    stack_i32_const: i32,
+    stack_i32_param: []const u8,
+    aggregate_register_passthrough: RegisterAggregatePassThrough,
+    aggregate_stack_passthrough: RegisterAggregatePassThrough,
+};
+
+pub const AggregatePassDestination = union(enum) {
+    registers: struct {
+        gpr: usize,
+        sse: usize,
+    },
+    stack,
+};
+
+pub const RegisterAggregatePassThrough = struct {
+    classification: AggregateClassification,
+    source: ParamCursor,
+    dest: AggregatePassDestination,
+};
+
+pub const CallPlan = struct {
+    assignments: std.ArrayList(CallArgAssignment) = .empty,
+    counts: CallPlanCounts = .{},
+    has_non_i32_arg: bool = false,
+
+    pub fn deinit(self: *CallPlan, allocator: std.mem.Allocator) void {
+        self.assignments.deinit(allocator);
+    }
+};
+
+pub fn callPlanCountsForTest(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !CallPlanCounts {
+    var plan = try planCall(allocator, function, call);
+    defer plan.deinit(allocator);
+    return plan.counts;
+}
+
+pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !CallPlan {
+    if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
+    if (call.inline_asm != null) return error.UnsupportedCodegenAbi;
+    if (call.ret_attrs != null or call.attrs != null or call.operand_bundle != null) return error.UnsupportedCodegenAbi;
+    if (call.calling_conv) |calling_conv| {
+        if (!std.mem.eql(u8, calling_conv, "ccc") and !std.mem.eql(u8, calling_conv, "fastcc")) {
+            return error.UnsupportedCodegenAbi;
+        }
+    }
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+    }
+
+    var plan: CallPlan = .{};
+    errdefer plan.deinit(allocator);
+    plan.counts = try planReturn(call.ret_ty);
+
+    var int_arg_index: usize = 0;
+    var fp_arg_index: usize = 0;
+    for (call.args.items) |arg| {
+        if (arg.attrs != null) return error.UnsupportedCodegenAbi;
+        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
+            plan.has_non_i32_arg = plan.has_non_i32_arg or !arg.ty.eql(.{ .int = 32 });
+            if (int_arg_index >= 6) {
+                const assignment: CallArgAssignment = switch (arg.value) {
+                    .int => |int| .{ .stack_i32_const = try i32Value(int) },
+                    .named => |name| .{ .stack_i32_param = name },
+                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                };
+                try plan.assignments.append(allocator, assignment);
+                int_arg_index += 1;
+                plan.counts.stack_args += 1;
+                continue;
+            }
+            try plan.assignments.append(allocator, .{ .gpr = try ArgReg.fromIndex(int_arg_index) });
+            int_arg_index += 1;
+            plan.counts.gpr_args += 1;
+            continue;
+        }
+        if (arg.ty.eql(.float) or arg.ty.eql(.double)) {
+            plan.has_non_i32_arg = true;
+            if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
+            try plan.assignments.append(allocator, .{ .sse = try XmmReg.fromIndex(fp_arg_index) });
+            fp_arg_index += 1;
+            plan.counts.sse_args += 1;
+            continue;
+        }
+        if (isAggregateType(arg.ty)) {
+            plan.has_non_i32_arg = true;
+            const classification = try classifyAggregate(arg.ty);
+            const pass = try planAggregatePassThrough(function, arg, classification, &int_arg_index, &fp_arg_index);
+            switch (pass.dest) {
+                .registers => {
+                    plan.counts.register_aggregate_args += 1;
+                    try plan.assignments.append(allocator, .{ .aggregate_register_passthrough = pass });
+                },
+                .stack => {
+                    plan.counts.stack_args += @intCast(pass.classification.eightbyte_count);
+                    try plan.assignments.append(allocator, .{ .aggregate_stack_passthrough = pass });
+                },
+            }
+            continue;
+        }
+        return error.UnsupportedCodegenType;
+    }
+    return plan;
+}
+
+pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
+    if (ret_ty == .void) return .{};
+    if (ret_ty.eql(.{ .int = 1 }) or ret_ty.eql(.{ .int = 8 }) or ret_ty.eql(.{ .int = 16 }) or ret_ty.eql(.{ .int = 32 }) or ret_ty.eql(.{ .int = 64 }) or ret_ty == .ptr) {
+        return .{ .gpr_returns = 1 };
+    }
+    if (ret_ty == .float or ret_ty == .double) {
+        return .{ .sse_returns = 1 };
+    }
+    if (isAggregateType(ret_ty)) {
+        const classification = try classifyAggregate(ret_ty);
+        if (classification.kind == .memory) return .{ .memory_return = true };
+        const needs = aggregateRegisterNeeds(classification);
+        return .{ .gpr_returns = needs.gpr, .sse_returns = needs.sse };
+    }
+    return error.UnsupportedCodegenType;
+}
+
+fn planAggregatePassThrough(
+    function: ir.Function,
+    arg: ir.CallArg,
+    classification: AggregateClassification,
+    int_arg_index: *usize,
+    fp_arg_index: *usize,
+) !RegisterAggregatePassThrough {
+    if (classification.kind != .register) return error.UnsupportedCodegenAbi;
+    const needs = aggregateRegisterNeeds(classification);
+    const name = switch (arg.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const source = try paramCursorFor(function, name, arg.ty);
+    const dest: AggregatePassDestination = if (int_arg_index.* + needs.gpr <= 6 and fp_arg_index.* + needs.sse <= 8) dest: {
+        const dest_gpr = int_arg_index.*;
+        const dest_sse = fp_arg_index.*;
+        int_arg_index.* += needs.gpr;
+        fp_arg_index.* += needs.sse;
+        break :dest .{ .registers = .{ .gpr = dest_gpr, .sse = dest_sse } };
+    } else .stack;
+    return .{
+        .classification = classification,
+        .source = source,
+        .dest = dest,
+    };
+}
+
+pub const ParamCursor = struct {
+    gpr: usize,
+    sse: usize,
+    stack_eightbytes: usize,
+};
+
+fn paramCursorFor(function: ir.Function, name: []const u8, ty: ir.Type) !ParamCursor {
+    return try paramCursorForWithInitial(function, name, ty, .{ .gpr = 0, .sse = 0, .stack_eightbytes = 0 });
+}
+
+fn paramCursorForWithInitial(function: ir.Function, name: []const u8, ty: ir.Type, initial: ParamCursor) !ParamCursor {
+    var cursor: ParamCursor = initial;
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) {
+            if (!param.ty.eql(ty)) return error.UnsupportedCodegenType;
+            return cursor;
+        }
+        try advanceParamCursors(param.ty, &cursor.gpr, &cursor.sse, &cursor.stack_eightbytes);
+    }
+    return error.UnsupportedCodegenValue;
+}
+
+fn isAggregateType(ty: ir.Type) bool {
+    return switch (ty) {
+        .aggregate => true,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+    };
+}
+
+fn i32Value(value: i128) !i32 {
+    if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
 }

@@ -13,8 +13,13 @@ pub const CodegenPath = x86_64_types.CodegenPath;
 pub const SysVAggregateEightbyteClass = sysv_abi.AggregateEightbyteClass;
 pub const SysVAggregateKind = sysv_abi.AggregateKind;
 pub const SysVAggregateClassification = sysv_abi.AggregateClassification;
+pub const SysVCallPlanCounts = sysv_abi.CallPlanCounts;
 
 const SysVSmallIntegerAggregate = sysv_abi.SmallIntegerAggregate;
+const SysVRegisterNeeds = sysv_abi.RegisterNeeds;
+const SysVRegisterAggregatePassThrough = sysv_abi.RegisterAggregatePassThrough;
+const SysVCallPlan = sysv_abi.CallPlan;
+const SysVParamCursor = sysv_abi.ParamCursor;
 
 const x86_64_machine = @import("x86_64/machine.zig");
 
@@ -6573,25 +6578,12 @@ fn sysvAggregateFieldLocationByOffset(
     return error.UnsupportedCodegenValue;
 }
 
-const SysVRegisterNeeds = struct {
-    gpr: usize = 0,
-    sse: usize = 0,
-};
-
 fn sysvAggregateRegisterNeeds(classification: SysVAggregateClassification) SysVRegisterNeeds {
-    return sysvAggregateRegisterNeedsBefore(classification, classification.eightbyte_count);
+    return sysv_abi.aggregateRegisterNeeds(classification);
 }
 
 fn sysvAggregateRegisterNeedsBefore(classification: SysVAggregateClassification, limit: usize) SysVRegisterNeeds {
-    var needs: SysVRegisterNeeds = .{};
-    var index: usize = 0;
-    while (index < limit and index < classification.eightbyte_count) : (index += 1) {
-        switch (classification.eightbytes[index] orelse continue) {
-            .integer => needs.gpr += 1,
-            .sse => needs.sse += 1,
-        }
-    }
-    return needs;
+    return sysv_abi.aggregateRegisterNeedsBefore(classification, limit);
 }
 
 fn advanceSysVParamCursors(
@@ -6600,28 +6592,7 @@ fn advanceSysVParamCursors(
     sse_index: *usize,
     stack_eightbytes: *usize,
 ) !void {
-    if (ty.eql(.{ .int = 1 }) or ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or
-        ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr))
-    {
-        if (gpr_index.* < 6) gpr_index.* += 1 else stack_eightbytes.* += 1;
-        return;
-    }
-    if (ty.eql(.float) or ty.eql(.double)) {
-        if (sse_index.* < 8) sse_index.* += 1 else stack_eightbytes.* += 1;
-        return;
-    }
-    const classification = classifySysVAggregate(ty) catch return;
-    if (classification.kind == .memory) {
-        stack_eightbytes.* += @intCast((classification.size_bytes + 7) / 8);
-        return;
-    }
-    const needs = sysvAggregateRegisterNeeds(classification);
-    if (gpr_index.* + needs.gpr <= 6 and sse_index.* + needs.sse <= 8) {
-        gpr_index.* += needs.gpr;
-        sse_index.* += needs.sse;
-    } else {
-        stack_eightbytes.* += @intCast((classification.size_bytes + 7) / 8);
-    }
+    return sysv_abi.advanceParamCursors(ty, gpr_index, sse_index, stack_eightbytes);
 }
 
 fn lowerRegisterAggregateDirectCallReturn(
@@ -22479,173 +22450,13 @@ fn appendLoadStackDispArg64(
     }
 }
 
-pub const SysVCallPlanCounts = struct {
-    gpr_args: usize = 0,
-    sse_args: usize = 0,
-    stack_args: usize = 0,
-    register_aggregate_args: usize = 0,
-    gpr_returns: usize = 0,
-    sse_returns: usize = 0,
-    memory_return: bool = false,
-};
-
-const SysVCallArgAssignment = union(enum) {
-    gpr: ArgReg,
-    sse: XmmReg,
-    stack_i32_const: i32,
-    stack_i32_param: []const u8,
-    aggregate_register_passthrough: SysVRegisterAggregatePassThrough,
-    aggregate_stack_passthrough: SysVRegisterAggregatePassThrough,
-};
-
-const SysVAggregatePassDestination = union(enum) {
-    registers: struct {
-        gpr: usize,
-        sse: usize,
-    },
-    stack,
-};
-
-const SysVRegisterAggregatePassThrough = struct {
-    classification: SysVAggregateClassification,
-    source: SysVParamCursor,
-    dest: SysVAggregatePassDestination,
-};
-
-const SysVCallPlan = struct {
-    assignments: std.ArrayList(SysVCallArgAssignment) = .empty,
-    counts: SysVCallPlanCounts = .{},
-    has_non_i32_arg: bool = false,
-
-    fn deinit(self: *SysVCallPlan, allocator: std.mem.Allocator) void {
-        self.assignments.deinit(allocator);
-    }
-};
-
 pub fn sysvCallPlanCountsForTest(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !SysVCallPlanCounts {
-    var plan = try planSysVCall(allocator, function, call);
-    defer plan.deinit(allocator);
-    return plan.counts;
+    return try sysv_abi.callPlanCountsForTest(allocator, function, call);
 }
 
 fn planSysVCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !SysVCallPlan {
-    if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
-    if (call.inline_asm != null) return error.UnsupportedCodegenAbi;
-    if (call.ret_attrs != null or call.attrs != null or call.operand_bundle != null) return error.UnsupportedCodegenAbi;
-    if (call.calling_conv) |calling_conv| {
-        if (!std.mem.eql(u8, calling_conv, "ccc") and !std.mem.eql(u8, calling_conv, "fastcc")) {
-            return error.UnsupportedCodegenAbi;
-        }
-    }
-    if (call.callee_function_ty) |function_ty| {
-        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
-    }
-
-    var plan: SysVCallPlan = .{};
-    errdefer plan.deinit(allocator);
-    plan.counts = try planSysVReturn(call.ret_ty);
-
-    var int_arg_index: usize = 0;
-    var fp_arg_index: usize = 0;
-    for (call.args.items) |arg| {
-        if (arg.attrs != null) return error.UnsupportedCodegenAbi;
-        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
-            plan.has_non_i32_arg = plan.has_non_i32_arg or !arg.ty.eql(.{ .int = 32 });
-            if (int_arg_index >= 6) {
-                const assignment: SysVCallArgAssignment = switch (arg.value) {
-                    .int => |int| .{ .stack_i32_const = try i32Value(int) },
-                    .named => |name| .{ .stack_i32_param = name },
-                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-                };
-                try plan.assignments.append(allocator, assignment);
-                int_arg_index += 1;
-                plan.counts.stack_args += 1;
-                continue;
-            }
-            try plan.assignments.append(allocator, .{ .gpr = try ArgReg.fromIndex(int_arg_index) });
-            int_arg_index += 1;
-            plan.counts.gpr_args += 1;
-            continue;
-        }
-        if (arg.ty.eql(.float) or arg.ty.eql(.double)) {
-            plan.has_non_i32_arg = true;
-            if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
-            try plan.assignments.append(allocator, .{ .sse = try XmmReg.fromIndex(fp_arg_index) });
-            fp_arg_index += 1;
-            plan.counts.sse_args += 1;
-            continue;
-        }
-        if (isAggregateType(arg.ty)) {
-            plan.has_non_i32_arg = true;
-            const classification = try classifySysVAggregate(arg.ty);
-            const pass = try planSysVAggregatePassThrough(function, arg, classification, &int_arg_index, &fp_arg_index);
-            switch (pass.dest) {
-                .registers => {
-                    plan.counts.register_aggregate_args += 1;
-                    try plan.assignments.append(allocator, .{ .aggregate_register_passthrough = pass });
-                },
-                .stack => {
-                    plan.counts.stack_args += @intCast(pass.classification.eightbyte_count);
-                    try plan.assignments.append(allocator, .{ .aggregate_stack_passthrough = pass });
-                },
-            }
-            continue;
-        }
-        return error.UnsupportedCodegenType;
-    }
-    return plan;
+    return try sysv_abi.planCall(allocator, function, call);
 }
-
-fn planSysVReturn(ret_ty: ir.Type) !SysVCallPlanCounts {
-    if (ret_ty == .void) return .{};
-    if (ret_ty.eql(.{ .int = 1 }) or ret_ty.eql(.{ .int = 8 }) or ret_ty.eql(.{ .int = 16 }) or ret_ty.eql(.{ .int = 32 }) or ret_ty.eql(.{ .int = 64 }) or ret_ty == .ptr) {
-        return .{ .gpr_returns = 1 };
-    }
-    if (ret_ty == .float or ret_ty == .double) {
-        return .{ .sse_returns = 1 };
-    }
-    if (isAggregateType(ret_ty)) {
-        const classification = try classifySysVAggregate(ret_ty);
-        if (classification.kind == .memory) return .{ .memory_return = true };
-        const needs = sysvAggregateRegisterNeeds(classification);
-        return .{ .gpr_returns = needs.gpr, .sse_returns = needs.sse };
-    }
-    return error.UnsupportedCodegenType;
-}
-
-fn planSysVAggregatePassThrough(
-    function: ir.Function,
-    arg: ir.CallArg,
-    classification: SysVAggregateClassification,
-    int_arg_index: *usize,
-    fp_arg_index: *usize,
-) !SysVRegisterAggregatePassThrough {
-    if (classification.kind != .register) return error.UnsupportedCodegenAbi;
-    const needs = sysvAggregateRegisterNeeds(classification);
-    const name = switch (arg.value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    const source = try sysvParamCursorFor(function, name, arg.ty);
-    const dest: SysVAggregatePassDestination = if (int_arg_index.* + needs.gpr <= 6 and fp_arg_index.* + needs.sse <= 8) dest: {
-        const dest_gpr = int_arg_index.*;
-        const dest_sse = fp_arg_index.*;
-        int_arg_index.* += needs.gpr;
-        fp_arg_index.* += needs.sse;
-        break :dest .{ .registers = .{ .gpr = dest_gpr, .sse = dest_sse } };
-    } else .stack;
-    return .{
-        .classification = classification,
-        .source = source,
-        .dest = dest,
-    };
-}
-
-const SysVParamCursor = struct {
-    gpr: usize,
-    sse: usize,
-    stack_eightbytes: usize,
-};
 
 fn appendSysVRegisterAggregatePassThroughArg(
     allocator: std.mem.Allocator,
