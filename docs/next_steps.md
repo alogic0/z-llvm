@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=289`,
-`generic_codegen_functions=289`, `generic_cfg_functions=289`,
+frontier gate reports `source_rows=13`, `discovered_functions=293`,
+`generic_codegen_functions=293`, `generic_cfg_functions=293`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=289`, `object_failures=0`,
+`object_emitted_functions=293`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -542,6 +542,9 @@ post-call `fadd`.
 The two-result FP follow-up preserves a first direct or pointer-callee C ABI
 `f32`/`f64` call result across a second direct or pointer-callee FP result call,
 then reloads the saved XMM slot for the final `fadd`.
+The mixed-width follow-up preserves a first direct or pointer-callee `f32`
+result across a second direct or pointer-callee `f64` result call, reloads and
+extends it with `cvtss2sd`, then performs the final `f64` add.
 The mixed numeric frontier also lowers typed AIR v2 `sitofp` plus `fadd` or
 `fmul`/`fadd` pipelines for `i32` to `f32`/`f64`, including `mulss`/`mulsd`
 codegen and executable C ABI checks.

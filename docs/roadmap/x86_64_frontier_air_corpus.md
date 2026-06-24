@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=289
-structured_functions=289
-generic_codegen_functions=289
-generic_cfg_functions=289
+discovered_functions=293
+structured_functions=293
+generic_codegen_functions=293
+generic_cfg_functions=293
 structural_matcher_functions=0
-structured_air_v2_functions=289
-typed_air_operand_functions=289
+structured_air_v2_functions=293
+typed_air_operand_functions=293
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=289
+generic_lowering_functions=293
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=289
+object_emitted_functions=293
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -444,6 +444,14 @@ Closed in the current memory/aggregate frontier slice:
   `float` or `double` call result across a second direct or pointer-callee FP
   result call, preserve the second call's FP argument and pointer callee when
   needed, then reload the first result for the final `fadd`.
+- selected mixed-width FP call-result frames in `frontier_sysv_abi.zig`:
+  `frontier_mixed_f32_f64_results_across_calls`,
+  `frontier_mixed_indirect_first_f32_f64_results_across_calls`,
+  `frontier_mixed_indirect_second_f32_f64_results_across_calls`, and
+  `frontier_mixed_indirect_both_f32_f64_results_across_calls` spill the first
+  `float` call result, preserve the later `double` call argument and pointer
+  callee when needed, reload the first result, extend it with `cvtss2sd`, and
+  add it to the second `double` call result.
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded

@@ -583,20 +583,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=289
-structured_functions=289
-generic_codegen_functions=289
-generic_cfg_functions=289
+discovered_functions=293
+structured_functions=293
+generic_codegen_functions=293
+generic_cfg_functions=293
 structural_matcher_functions=0
-structured_air_v2_functions=289
-typed_air_operand_functions=289
+structured_air_v2_functions=293
+typed_air_operand_functions=293
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=289
+generic_lowering_functions=293
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=289
+object_emitted_functions=293
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -667,7 +667,7 @@ arbitrary non-selected sret/byval copies
 varargs
 vectors
 stack-passed live values beyond the current disp8-safe selected model
-broader SSE live-across-call helpers beyond selected no-argument-call shapes, selected repeated two-live direct/pointer-callee no-argument shapes, selected mixed one-GPR/one-SSE one-/two-call direct/pointer-callee shapes, selected direct two-/three-/six-live FP-argument shapes, pointer-callee shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, and selected two-result f32/f64 call frames
+broader SSE live-across-call helpers beyond selected no-argument-call shapes, selected repeated two-live direct/pointer-callee no-argument shapes, selected mixed one-GPR/one-SSE one-/two-call direct/pointer-callee shapes, selected direct two-/three-/six-live FP-argument shapes, pointer-callee shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width two-result f32/f64 call frames, and selected mixed f32-to-f64 two-result call frames
 alternate safety-guard control flow
 ```
 

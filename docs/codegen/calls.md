@@ -244,6 +244,9 @@ accepted frontier:
   selected two-result f32/f64 call frames where the first `float` or `double`
   result survives a second direct or pointer-callee FP-result call before the
   final fadd
+  selected mixed two-result FP call frames where the first `float` call result
+  is reloaded, extended to `double`, and added to a later direct or
+  pointer-callee `double` call result
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results
