@@ -583,20 +583,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=217
-structured_functions=217
-generic_codegen_functions=217
-generic_cfg_functions=217
+discovered_functions=218
+structured_functions=218
+generic_codegen_functions=218
+generic_cfg_functions=218
 structural_matcher_functions=0
-structured_air_v2_functions=217
-typed_air_operand_functions=217
+structured_air_v2_functions=218
+typed_air_operand_functions=218
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=217
+generic_lowering_functions=218
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=217
+object_emitted_functions=218
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -649,6 +649,7 @@ selected_up_to_six_stack_passed_live_i32=accepted
 selected_six_stack_passed_i32_call_args=accepted
 selected_two_call_six_live_i32_gpr_frame=accepted
 selected_ordered_i32_call_result_across_second_call=accepted
+selected_two_i32_call_results_across_calls=accepted
 selected_one_to_six_live_f32_f64_spills=accepted
 selected_two_live_f32_f64_arg_call_spills=accepted
 selected_xmm0_to_xmm4_call_args=accepted

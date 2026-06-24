@@ -172,6 +172,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgI32CallResultAcrossI32Call(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!genericCfgSupportsSingleBlockScalar(function)) return false;
     const ret = single_ret orelse return error.UnsupportedCodegenControlFlow;
@@ -268,6 +272,143 @@ fn lowerGenericCfgCallResultAcrossVoidCall(
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
     return true;
+}
+
+fn lowerGenericCfgI32CallResultAcrossI32Call(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 4) return false;
+    const first_call_inst = block.instructions.items[0];
+    const second_call_inst = block.instructions.items[1];
+    const first_add_inst = block.instructions.items[2];
+    const second_add_inst = block.instructions.items[3];
+    if (first_call_inst.removed or second_call_inst.removed or first_add_inst.removed or second_add_inst.removed) return false;
+    const first_result = first_call_inst.result orelse return false;
+    const second_result = second_call_inst.result orelse return false;
+    const first_add_result = first_add_inst.result orelse return false;
+    const second_add_result = second_add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, second_add_result)) return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!first_call.ret_ty.eql(.{ .int = 32 }) or first_call.inline_asm != null) return false;
+    if (!callIsFastcc(first_call.calling_conv)) try validateDefaultCallConv(first_call.calling_conv);
+
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!second_call.ret_ty.eql(.{ .int = 32 }) or second_call.callee_value != null or second_call.inline_asm != null) return false;
+    if (!callIsFastcc(second_call.calling_conv)) try validateDefaultCallConv(second_call.calling_conv);
+    if (sysvScalarCallNeedsStackArgs(second_call)) return false;
+
+    const first_add = switch (first_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    const second_add = switch (second_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (!first_add.ty.eql(.{ .int = 32 }) or first_add.op != .add) return false;
+    if (!second_add.ty.eql(.{ .int = 32 }) or second_add.op != .add) return false;
+    if (!valueReferencesAddResult(second_add.lhs, first_add_result) and !valueReferencesAddResult(second_add.rhs, first_add_result)) return false;
+
+    var leaves: [3]ir.Value = undefined;
+    var leaf_count: usize = 0;
+    try collectTwoAddLeaves(first_add_result, first_add, second_add, &leaves, &leaf_count);
+    var has_first = false;
+    var has_second = false;
+    var extra_value: ?ir.Value = null;
+    for (leaves[0..leaf_count]) |leaf| {
+        if (isNamed(leaf, first_result)) {
+            if (has_first) return false;
+            has_first = true;
+        } else if (isNamed(leaf, second_result)) {
+            if (has_second) return false;
+            has_second = true;
+        } else if (extra_value == null) {
+            extra_value = leaf;
+        } else {
+            return false;
+        }
+    }
+    if (!has_first or !has_second) return false;
+
+    const extra_param_reg = if (extra_value) |value| switch (value) {
+        .named => |name| try paramRegOrNull(function, name, .{ .int = 32 }),
+        .int => null,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    } else null;
+    const frame_bytes: u8 = if (extra_param_reg != null) 24 else 8;
+
+    try emitGenericCfgI32CallIntoEax(allocator, machine, function, block, 0, first_call);
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot0 });
+    if (extra_param_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = reg } });
+    }
+    const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, second_call);
+    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try appendDirectCall(allocator, machine, second_call.callee, second_call.ret_ty);
+    try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = 0 });
+    if (extra_value) |value| switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+        .named => {
+            if (extra_param_reg == null) return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = 4 });
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
+    };
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn valueReferencesAddResult(value: ir.Value, add_result: []const u8) bool {
+    return switch (value) {
+        .named => |name| std.mem.eql(u8, name, add_result),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn collectTwoAddLeaves(
+    first_add_result: []const u8,
+    first_add: ir.BinaryInst,
+    second_add: ir.BinaryInst,
+    leaves: *[3]ir.Value,
+    leaf_count: *usize,
+) !void {
+    try collectTwoAddLeaf(first_add_result, first_add, second_add.lhs, leaves, leaf_count);
+    try collectTwoAddLeaf(first_add_result, first_add, second_add.rhs, leaves, leaf_count);
+    if (leaf_count.* != 3) return error.UnsupportedCodegenValue;
+}
+
+fn collectTwoAddLeaf(
+    first_add_result: []const u8,
+    first_add: ir.BinaryInst,
+    value: ir.Value,
+    leaves: *[3]ir.Value,
+    leaf_count: *usize,
+) !void {
+    if (valueReferencesAddResult(value, first_add_result)) {
+        try appendTwoAddLeaf(first_add.lhs, leaves, leaf_count);
+        try appendTwoAddLeaf(first_add.rhs, leaves, leaf_count);
+        return;
+    }
+    try appendTwoAddLeaf(value, leaves, leaf_count);
+}
+
+fn appendTwoAddLeaf(value: ir.Value, leaves: *[3]ir.Value, leaf_count: *usize) !void {
+    if (leaf_count.* >= leaves.len) return error.UnsupportedCodegenValue;
+    leaves[leaf_count.*] = value;
+    leaf_count.* += 1;
 }
 
 pub fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

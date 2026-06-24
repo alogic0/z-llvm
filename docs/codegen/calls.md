@@ -100,6 +100,8 @@ one straight-line basic block or accepted generic CFG wrapper shape
 up to six live i32 caller arguments across one direct call
 selected first i32 call result plus live i32 caller argument across a later
   side-effecting void call
+selected first i32 call result plus live i32 caller argument across a later
+  i32-returning call with its own planned scalar argument
 one fixed i32 stack slot can feed the first direct-call argument
 ```
 
@@ -211,6 +213,8 @@ accepted frontier:
   selected two-call six-live i32 GPR spill/reload frames
   selected ordered i32 call-result spill/reload across a later side-effecting
   void C ABI call before the post-call add
+  selected two-result ordered i32 call frame where the first call result is
+  spilled while a second i32 call receives its own planned scalar argument
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results

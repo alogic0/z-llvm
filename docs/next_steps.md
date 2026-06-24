@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=217`,
-`generic_codegen_functions=217`, `generic_cfg_functions=217`,
+frontier gate reports `source_rows=13`, `discovered_functions=218`,
+`generic_codegen_functions=218`, `generic_cfg_functions=218`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=217`, `object_failures=0`,
+`object_emitted_functions=218`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -502,7 +502,10 @@ FP constant materialization now uses generic XMM loads through `%xmm0..%xmm7`.
 The ordered call-result frontier row spills a first `i32` C ABI call result and
 the live `i32` parameter across a later side-effecting `void` call before the
 post-call add; the executable harness uses helper state to prove source-order
-preservation.
+preservation. The follow-up two-result row keeps the first `i32` call result in
+a frame slot while a second `i32` call receives its own planned scalar argument,
+then combines both call results plus the saved live parameter after the second
+call.
 The mixed numeric frontier also lowers typed AIR v2 `sitofp` plus `fadd` or
 `fmul`/`fadd` pipelines for `i32` to `f32`/`f64`, including `mulss`/`mulsd`
 codegen and executable C ABI checks.
@@ -514,7 +517,7 @@ two-live no-argument and one-FP-argument pointer-callee shapes,
 three-/four-/six-live two-/three-/five-FP-argument pointer-callee shapes, and
 two-live FP-argument call shape,
 or arbitrary mixed/non-void live values across calls beyond the selected
-ordered `i32` result row,
+ordered `i32` result rows,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, nested mixed INTEGER/SSE field reads/construction,
