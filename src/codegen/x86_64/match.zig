@@ -49,6 +49,26 @@ pub fn isInt(value: ir.Value, expected: i128) bool {
     };
 }
 
+pub fn i32Value(value: i128) !i32 {
+    if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
+}
+
+pub fn u8Value(value: i128) !u8 {
+    if (value < 0 or value > std.math.maxInt(u8)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
+}
+
+pub fn i64Value(value: i128) !i64 {
+    if (value < std.math.minInt(i64) or value > std.math.maxInt(i64)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
+}
+
+pub fn u5Value(value: i128) !u5 {
+    if (value < 0 or value > std.math.maxInt(u5)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
+}
+
 pub fn isFpText(value: ir.Value, expected: []const u8) bool {
     return switch (value) {
         .fp => |text| std.mem.eql(u8, text, expected),

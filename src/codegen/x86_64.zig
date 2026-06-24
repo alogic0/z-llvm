@@ -51,6 +51,10 @@ const paramAttrsContain = x86_64_match.paramAttrsContain;
 const globalSymbolName = x86_64_match.globalSymbolName;
 const symbolName = x86_64_match.symbolName;
 const isInt = x86_64_match.isInt;
+const i32Value = x86_64_match.i32Value;
+const u8Value = x86_64_match.u8Value;
+const i64Value = x86_64_match.i64Value;
+const u5Value = x86_64_match.u5Value;
 const isFpText = x86_64_match.isFpText;
 const fp32TextBits = x86_64_match.fp32TextBits;
 const fp64TextBits = x86_64_match.fp64TextBits;
@@ -23302,26 +23306,6 @@ fn blockIndex(function: ir.Function, name: []const u8) ?usize {
         if (std.mem.eql(u8, block.name, name)) return index;
     }
     return null;
-}
-
-fn i32Value(value: i128) !i32 {
-    if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
-    return @intCast(value);
-}
-
-fn u8Value(value: i128) !u8 {
-    if (value < 0 or value > std.math.maxInt(u8)) return error.UnsupportedCodegenValue;
-    return @intCast(value);
-}
-
-fn i64Value(value: i128) !i64 {
-    if (value < std.math.minInt(i64) or value > std.math.maxInt(i64)) return error.UnsupportedCodegenValue;
-    return @intCast(value);
-}
-
-fn u5Value(value: i128) !u5 {
-    if (value < 0 or value > std.math.maxInt(u5)) return error.UnsupportedCodegenValue;
-    return @intCast(value);
 }
 
 pub fn verifyFunction(function: MachineFunction) !void {
