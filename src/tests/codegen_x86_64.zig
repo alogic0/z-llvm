@@ -38,12 +38,20 @@ const slp_vectorizer = codegen_x86_64_common.slp_vectorizer;
 const sroa = codegen_x86_64_common.sroa;
 const expectMachineInstruction = codegen_x86_64_common.expectMachineInstruction;
 
-const codegen_x86_64_slice_1 = @import("codegen_x86_64_slice_1.zig");
+const codegen_x86_64_slice_1_assembly = @import("codegen_x86_64_slice_1_assembly.zig");
+const codegen_x86_64_slice_1_encoding = @import("codegen_x86_64_slice_1_encoding.zig");
+const codegen_x86_64_slice_1_elf = @import("codegen_x86_64_slice_1_elf.zig");
+const codegen_x86_64_slice_1_aggregates = @import("codegen_x86_64_slice_1_aggregates.zig");
+const codegen_x86_64_slice_1_calls = @import("codegen_x86_64_slice_1_calls.zig");
 const codegen_x86_64_slice_2 = @import("codegen_x86_64_slice_2.zig");
 const codegen_x86_64_slice_3 = @import("codegen_x86_64_slice_3.zig");
 
 test {
-    _ = codegen_x86_64_slice_1;
+    _ = codegen_x86_64_slice_1_assembly;
+    _ = codegen_x86_64_slice_1_encoding;
+    _ = codegen_x86_64_slice_1_elf;
+    _ = codegen_x86_64_slice_1_aggregates;
+    _ = codegen_x86_64_slice_1_calls;
     _ = codegen_x86_64_slice_2;
     _ = codegen_x86_64_slice_3;
 }
