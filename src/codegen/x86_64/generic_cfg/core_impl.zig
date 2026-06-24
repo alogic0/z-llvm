@@ -1,5 +1,6 @@
 const shared = @import("core_shared.zig");
 const core_validation = @import("core_validation.zig");
+const core_cfg_emit = @import("core_cfg_emit.zig");
 
 pub const std = shared.std;
 pub const ir = shared.ir;
@@ -2259,9 +2260,7 @@ pub fn appendGenericCfgConditionalBranch(
     });
 }
 
-pub fn appendGenericCfgReturn(allocator: std.mem.Allocator, machine: *MachineFunction) !void {
-    try machine.instructions.append(allocator, .ret);
-}
+pub const appendGenericCfgReturn = core_cfg_emit.appendGenericCfgReturn;
 
 pub fn appendGenericCfgI32Zero(allocator: std.mem.Allocator, machine: *MachineFunction, reg: GenericCfgLocalReg) !void {
     try machine.instructions.append(allocator, switch (reg) {

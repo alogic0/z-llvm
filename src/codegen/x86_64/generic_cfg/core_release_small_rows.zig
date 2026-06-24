@@ -1,21 +1,25 @@
-const impl = @import("core_impl.zig");
-const std = impl.std;
-const ir = impl.ir;
-const MachineFunction = impl.MachineFunction;
+const shared = @import("core_shared.zig");
+const validation = @import("core_validation.zig");
+const cfg_emit = @import("core_cfg_emit.zig");
+const boundary_rows = @import("cabi_boundary_rows.zig");
+const call_lowering = @import("cabi_call_lowering.zig");
 
-const appendGenericCfgReturn = impl.appendGenericCfgReturn;
-const blockIndex = impl.blockIndex;
-const callHasPointerArg = impl.callHasPointerArg;
-const callIsFastcc = impl.callIsFastcc;
-const isCalleeName = impl.isCalleeName;
-const isNamed = impl.isNamed;
-const typeIsI128 = impl.typeIsI128;
-const validateAlloca = impl.validateAlloca;
-const validateGepOffsetResult = impl.validateGepOffsetResult;
-const validateGlobalPtrStore = impl.validateGlobalPtrStore;
-const validateStore = impl.validateStore;
-const validateVoidCall = impl.validateVoidCall;
-const valueReferencesGlobal = impl.valueReferencesGlobal;
+const std = shared.std;
+const ir = shared.ir;
+const MachineFunction = shared.MachineFunction;
+
+const appendGenericCfgReturn = cfg_emit.appendGenericCfgReturn;
+const callHasPointerArg = validation.callHasPointerArg;
+const callIsFastcc = shared.callIsFastcc;
+const isCalleeName = shared.isCalleeName;
+const isNamed = shared.isNamed;
+const typeIsI128 = validation.typeIsI128;
+const validateAlloca = validation.validateAlloca;
+const validateGepOffsetResult = validation.validateGepOffsetResult;
+const validateGlobalPtrStore = validation.validateGlobalPtrStore;
+const validateStore = validation.validateStore;
+const validateVoidCall = boundary_rows.validateVoidCall;
+const valueReferencesGlobal = call_lowering.valueReferencesGlobal;
 
 pub fn lowerReleaseSmallStrFromFloatHelp(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.strFromFloatHelp")) return false;
@@ -35,7 +39,7 @@ pub fn lowerReleaseSmallStrFromFloatHelp(allocator: std.mem.Allocator, machine: 
     }
 
     const condbr = switch (if (function.blocks.items.len == 4)
-        function.blocks.items[blockIndex(function, "check_special") orelse return error.InvalidBranchTarget].terminator orelse return error.BlockWithoutTerminator
+        function.blocks.items[function.blockIndex("check_special") orelse return error.InvalidBranchTarget].terminator orelse return error.BlockWithoutTerminator
     else
         entry.terminator orelse return error.BlockWithoutTerminator) {
         .condbr => |condbr| condbr,
@@ -134,14 +138,14 @@ pub fn validateReleaseSmallStrFromFloatSpecialBranch(function: ir.Function, entr
     };
     if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, cmp_name)) return error.UnsupportedCodegenControlFlow;
 
-    const special = function.blocks.items[blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget];
+    const special = function.blocks.items[function.blockIndex(condbr.then_target) orelse return error.InvalidBranchTarget];
     if (special.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
     switch (special.terminator orelse return error.BlockWithoutTerminator) {
         .@"unreachable" => {},
         else => return error.UnsupportedCodegenControlFlow,
     }
 
-    const normal = function.blocks.items[blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget];
+    const normal = function.blocks.items[function.blockIndex(condbr.else_target) orelse return error.InvalidBranchTarget];
     if (normal.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
     const ret = switch (normal.terminator orelse return error.BlockWithoutTerminator) {
         .ret => |ret| ret,
@@ -321,7 +325,7 @@ pub fn validateReleaseSmallStrFromFloatStackExponentSlice(function: ir.Function,
     if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, is_zero_name)) return error.UnsupportedCodegenControlFlow;
     if (!std.mem.eql(u8, condbr.then_target, "done") or !std.mem.eql(u8, condbr.else_target, "check_special")) return error.UnsupportedCodegenControlFlow;
 
-    const check_special = function.blocks.items[blockIndex(function, "check_special") orelse return error.InvalidBranchTarget];
+    const check_special = function.blocks.items[function.blockIndex("check_special") orelse return error.InvalidBranchTarget];
     if (check_special.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
     const special_cmp_name = check_special.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
     const special_cmp = switch (check_special.instructions.items[0].kind) {
@@ -336,14 +340,14 @@ pub fn validateReleaseSmallStrFromFloatStackExponentSlice(function: ir.Function,
     };
     if (!special_condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(special_condbr.cond, special_cmp_name)) return error.UnsupportedCodegenControlFlow;
 
-    const special = function.blocks.items[blockIndex(function, special_condbr.then_target) orelse return error.InvalidBranchTarget];
+    const special = function.blocks.items[function.blockIndex(special_condbr.then_target) orelse return error.InvalidBranchTarget];
     if (special.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
     switch (special.terminator orelse return error.BlockWithoutTerminator) {
         .@"unreachable" => {},
         else => return error.UnsupportedCodegenControlFlow,
     }
 
-    const normal = function.blocks.items[blockIndex(function, special_condbr.else_target) orelse return error.InvalidBranchTarget];
+    const normal = function.blocks.items[function.blockIndex(special_condbr.else_target) orelse return error.InvalidBranchTarget];
     if (normal.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
     const ret = switch (normal.terminator orelse return error.BlockWithoutTerminator) {
         .ret => |ret| ret,
