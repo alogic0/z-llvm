@@ -363,7 +363,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   two-live FP-argument call shape, or live values across multiple calls
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
-- full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
+- full SysV aggregate lowering beyond planner-owned register aggregate and
+  normal MEMORY aggregate by-value argument assignment, selected INTEGER/INTEGER, nested
   INTEGER add chains plus nested construction returns, nested mixed INTEGER/SSE field reads/construction, selected
   mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
