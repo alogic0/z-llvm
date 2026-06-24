@@ -1,5 +1,4 @@
 const eligibility = @import("core_eligibility.zig");
-const value_lowering = @import("core_value_lowering.zig");
 const loop_phi = @import("core_loop_phi.zig");
 const diagnostics = @import("core_diagnostics.zig");
 const call_lowering = @import("core_call_lowering.zig");
