@@ -129,7 +129,7 @@ fn base64FullTableInitializer() ![]const u8 {
     return bytes;
 }
 
-fn writeBase64FullStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64FullStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.constant("base64.full_input_man", "", .{ .text = "[4 x i8]" }, "c\"TWFu\"", "1");
     try module.constant("base64.full_input_ma", "", .{ .text = "[4 x i8]" }, "c\"TWE=\"", "1");
