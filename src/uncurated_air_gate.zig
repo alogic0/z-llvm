@@ -2040,8 +2040,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct ReverseMixed z_frontier_indirect_reverse_mixed_make(struct ReverseMixed (*)(double, long long), double, long long) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_reverse_mixed_make");
     \\extern int z_frontier_nested_pair_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_sum");
     \\extern int z_frontier_nested_pair_call_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_call_sum");
+    \\extern int z_frontier_indirect_nested_pair_sum(int (*)(struct NestedPair), struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_nested_pair_sum");
     \\extern struct NestedPair z_frontier_nested_pair_make(int, int, int, int) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_make");
     \\extern long long z_frontier_array_pair_sum(struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_sum");
+    \\extern long long z_frontier_indirect_array_pair_sum(long long (*)(struct ArrayPair), struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_array_pair_sum");
     \\extern struct ArrayPair z_frontier_array_pair_make(long long, long long) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_make");
     \\extern long long z_frontier_stack_array_pair_first(long long, long long, long long, long long, long long, long long, struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_pair_first");
     \\extern long long z_frontier_stack_array_pair_second(long long, long long, long long, long long, long long, long long, struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_pair_second");
@@ -2079,6 +2081,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\double frontier_sum_array_double(struct ArrayDouble value) { return value.values[0] + value.values[1]; }
     \\double frontier_reverse_mixed_float_c(struct ReverseMixed value) { return value.a; }
     \\struct ReverseMixed frontier_make_reverse_mixed(double a, long long b) { struct ReverseMixed result = { a, b }; return result; }
+    \\int frontier_sum_nested_pair(struct NestedPair value) { return value.left.a + value.left.b + value.right.a + value.right.b; }
+    \\long long frontier_sum_array_pair(struct ArrayPair value) { return value.values[0] + value.values[1]; }
     \\int main(void) {
     \\    struct Mixed value = { 123456789LL, 6.25 };
     \\    if (z_frontier_mixed_int(value) != 123456789LL) return 1;
@@ -2115,10 +2119,12 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct NestedPair nested = { { 1, 2 }, { 3, 4 } };
     \\    if (z_frontier_nested_pair_sum(nested) != 10) return 10;
     \\    if (z_frontier_nested_pair_call_sum(nested) != 10) return 15;
+    \\    if (z_frontier_indirect_nested_pair_sum(frontier_sum_nested_pair, nested) != 10) return 65;
     \\    struct NestedPair made_nested = z_frontier_nested_pair_make(5, 7, 11, 13);
     \\    if (made_nested.left.a != 5 || made_nested.left.b != 7 || made_nested.right.a != 11 || made_nested.right.b != 13) return 28;
     \\    struct ArrayPair array = { { 11, 31 } };
     \\    if (z_frontier_array_pair_sum(array) != 42) return 11;
+    \\    if (z_frontier_indirect_array_pair_sum(frontier_sum_array_pair, array) != 42) return 66;
     \\    struct ArrayPair made_array = z_frontier_array_pair_make(17, 19);
     \\    if (made_array.values[0] != 17 || made_array.values[1] != 19) return 29;
     \\    struct ArrayPair stack_array = { { 101, 103 } };

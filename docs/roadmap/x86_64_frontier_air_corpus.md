@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=273
-structured_functions=273
-generic_codegen_functions=273
-generic_cfg_functions=273
+discovered_functions=275
+structured_functions=275
+generic_codegen_functions=275
+generic_cfg_functions=275
 structural_matcher_functions=0
-structured_air_v2_functions=273
-typed_air_operand_functions=273
+structured_air_v2_functions=275
+typed_air_operand_functions=275
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=273
+generic_lowering_functions=275
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=273
+object_emitted_functions=275
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -315,7 +315,11 @@ Closed in the current memory/aggregate frontier slice:
 - selected indirect register aggregate rows in `frontier_sysv_abi.zig` and
   `frontier_sysv_aggregate_classes.zig`: `frontier_indirect_pair64_make` and
   `frontier_indirect_pair64_first` prove INTEGER/INTEGER aggregate return and
-  argument forwarding through function pointers, while
+  argument forwarding through function pointers,
+  `frontier_indirect_nested_pair_sum` and
+  `frontier_indirect_array_pair_sum` prove nested and array-in-struct
+  INTEGER/INTEGER aggregate argument forwarding through the same pointer-callee
+  planner path, while
   `frontier_indirect_array_double_make` and
   `frontier_indirect_array_double_sum` prove the same `%rax` indirect-call path
   for SSE/SSE `[2]f64` aggregate return and argument forwarding.

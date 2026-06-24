@@ -347,8 +347,10 @@ call slots, pointer arguments assigned by the central SysV planner, 12-argument
 forwarding through outgoing stack slots, selected
 `f32`/`f64` calls with five SSE arguments returning through `%xmm0`, selected
 `i64` register/stack argument forwarding, selected INTEGER/INTEGER aggregate
-arguments/returns through GPR pairs, and selected SSE/SSE `[2]f64` aggregate
-arguments/returns through XMM pairs. Normal supported-leaf MEMORY aggregate
+arguments/returns through GPR pairs, nested and array-in-struct INTEGER/INTEGER
+aggregate arguments through the same pointer-callee planner path, and selected
+SSE/SSE `[2]f64` aggregate arguments/returns through XMM pairs. Normal
+supported-leaf MEMORY aggregate
 byval-to-sret direct and indirect calls are also accepted: the backend preserves
 the hidden sret pointer, forwards pointer callees through `%rax` when needed,
 copies the incoming aggregate stack slots to outgoing stack slots, and emits
@@ -389,6 +391,8 @@ typed AIR v2 pointer-callee indirect call with SSE arguments and FP return
 typed AIR v2 pointer-callee indirect call with i64 register/stack arguments
 typed AIR v2 pointer-callee indirect call with INTEGER/INTEGER aggregate
   arguments and returns
+typed AIR v2 pointer-callee indirect call with nested/array INTEGER aggregate
+  arguments
 typed AIR v2 pointer-callee indirect call with SSE/SSE aggregate arguments and
   returns
 typed AIR v2 pointer-callee indirect call with single-eightbyte `{ f32, f32 }`

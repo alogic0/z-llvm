@@ -30,10 +30,12 @@ const NestedPair = extern struct {
     left: Pair32,
     right: Pair32,
 };
+const NestedPairSumFn = *const fn (NestedPair) callconv(.c) i32;
 
 const ArrayPair = extern struct {
     values: [2]i64,
 };
+const ArrayPairSumFn = *const fn (ArrayPair) callconv(.c) i64;
 
 const ArrayDouble = extern struct {
     values: [2]f64,
@@ -198,6 +200,10 @@ export fn frontier_nested_pair_call_sum(value: NestedPair) i32 {
     return helperNestedPairSum(value);
 }
 
+export fn frontier_indirect_nested_pair_sum(func: NestedPairSumFn, value: NestedPair) i32 {
+    return func(value);
+}
+
 noinline fn helperArrayPairSum(value: ArrayPair) i64 {
     return value.values[0] + value.values[1];
 }
@@ -218,6 +224,10 @@ export fn frontier_nested_pair_make(a: i32, b: i32, c: i32, d: i32) NestedPair {
 
 export fn frontier_array_pair_sum(value: ArrayPair) i64 {
     return value.values[0] + value.values[1];
+}
+
+export fn frontier_indirect_array_pair_sum(func: ArrayPairSumFn, value: ArrayPair) i64 {
+    return func(value);
 }
 
 export fn frontier_array_pair_make(a: i64, b: i64) ArrayPair {
