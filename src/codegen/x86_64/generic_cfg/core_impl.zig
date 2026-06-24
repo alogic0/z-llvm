@@ -1,6 +1,7 @@
 const shared = @import("core_shared.zig");
 const core_validation = @import("core_validation.zig");
 const core_cfg_emit = @import("core_cfg_emit.zig");
+const core_loop_rows = @import("core_loop_rows.zig");
 
 pub const std = shared.std;
 pub const ir = shared.ir;
@@ -69,9 +70,7 @@ pub const isCalleeName = shared.isCalleeName;
 pub const lowerSelectedRuntimeFloatCallCompareMainReturn = shared.lowerSelectedRuntimeFloatCallCompareMainReturn;
 pub const lowerRuntimeFloatLessMainReturn = shared.lowerRuntimeFloatLessMainReturn;
 
-pub const GenericCfgLoopSumPlan = struct {
-    checked: bool,
-};
+pub const GenericCfgLoopSumPlan = core_loop_rows.GenericCfgLoopSumPlan;
 
 pub fn lowerGenericCfgOptionalPointerReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 3) return false;

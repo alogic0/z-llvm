@@ -1,16 +1,22 @@
-const impl = @import("core_impl.zig");
+const shared = @import("core_shared.zig");
 const diagnostics = @import("core_diagnostics.zig");
-const std = impl.std;
-const ir = impl.ir;
-const MachineFunction = impl.MachineFunction;
+const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
+const call_lowering = @import("cabi_call_lowering.zig");
+const std = shared.std;
+const ir = shared.ir;
+const MachineFunction = shared.MachineFunction;
 
-const isNamed = impl.isNamed;
-const isInt = impl.isInt;
-const isCalleeName = impl.isCalleeName;
-const paramReg = impl.paramReg;
-const appendPanicCall = impl.appendPanicCall;
-const phiHasIncoming = impl.phiHasIncoming;
-const phiHasIncomingInt = impl.phiHasIncomingInt;
+const isNamed = shared.isNamed;
+const isInt = shared.isInt;
+const isCalleeName = shared.isCalleeName;
+const paramReg = cabi_abi_helpers.paramReg;
+const appendPanicCall = shared.appendPanicCall;
+const phiHasIncoming = call_lowering.phiHasIncoming;
+const phiHasIncomingInt = call_lowering.phiHasIncomingInt;
+
+pub const GenericCfgLoopSumPlan = struct {
+    checked: bool,
+};
 
 fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
     for (function.blocks.items) |block| {
@@ -23,7 +29,7 @@ fn functionHasCall(function: ir.Function, callee: []const u8) bool {
     return diagnostics.functionHasCall(function, callee);
 }
 
-pub fn genericCfgLoopSumPlan(function: ir.Function) ?impl.GenericCfgLoopSumPlan {
+pub fn genericCfgLoopSumPlan(function: ir.Function) ?GenericCfgLoopSumPlan {
     if (!function.ret_ty.eql(.{ .int = 32 })) return null;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return null;
     if (!matchesAccumulatorLoop(function) and
@@ -31,7 +37,6 @@ pub fn genericCfgLoopSumPlan(function: ir.Function) ?impl.GenericCfgLoopSumPlan 
         !matchesCheckedUnrolledAccumulatorLoop(function) and
         !matchesGuardedDoWhileAccumulatorLoop(function) and
         !matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return null;
-    if (!impl.genericCfgSupportsLoopSum(function)) return null;
     return .{ .checked = functionHasCall(function, "llvm.sadd.with.overflow.i32") };
 }
 
