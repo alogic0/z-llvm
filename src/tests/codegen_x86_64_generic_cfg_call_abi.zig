@@ -1043,6 +1043,50 @@ test "x86_64 SysV call planner rejects packed aggregate call args directly" {
     );
 }
 
+test "x86_64 SysV call planner rejects packed sret and byval attributes directly" {
+    const sret_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @callee(ptr sret(<{ i32, i32 }>))
+        \\
+        \\define void @caller(ptr %out) {
+        \\entry:
+        \\  call void @callee(ptr sret(<{ i32, i32 }>) %out)
+        \\  ret void
+        \\}
+        \\
+    ;
+    var sret_module = try ir.Module.parse(std.testing.allocator, sret_input);
+    defer sret_module.deinit();
+    try sret_module.verify();
+    const sret_call = sret_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedPackedAggregateAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, sret_module.functions.items[0], sret_call),
+    );
+
+    const byval_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr byval(<{ i32, i32 }>))
+        \\
+        \\define i32 @caller(ptr %arg) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr byval(<{ i32, i32 }>) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var byval_module = try ir.Module.parse(std.testing.allocator, byval_input);
+    defer byval_module.deinit();
+    try byval_module.verify();
+    const byval_call = byval_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedPackedAggregateAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, byval_module.functions.items[0], byval_call),
+    );
+}
+
 test "x86_64 SysV return planner rejects explicit ABI boundaries" {
     try std.testing.expectError(
         error.UnsupportedPackedAggregateAbi,

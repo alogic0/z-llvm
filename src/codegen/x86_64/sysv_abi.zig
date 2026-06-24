@@ -405,12 +405,18 @@ pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {
     if (call.tail_kind != null) return error.UnsupportedTailCallAbi;
     if (call.inline_asm != null) return error.UnsupportedCallAttributeAbi;
     if (call.ret_attrs) |attrs| {
+        if (attrsContainPackedAbiPayload(attrs, "sret") or attrsContainPackedAbiPayload(attrs, "byval")) {
+            return error.UnsupportedPackedAggregateAbi;
+        }
         if (attrsContainAbiPayload(attrs, "sret") or attrsContainAbiPayload(attrs, "byval")) {
             return error.UnsupportedSretByvalAbi;
         }
         return error.UnsupportedCallAttributeAbi;
     }
     if (call.attrs) |attrs| {
+        if (attrsContainPackedAbiPayload(attrs, "sret") or attrsContainPackedAbiPayload(attrs, "byval")) {
+            return error.UnsupportedPackedAggregateAbi;
+        }
         if (attrsContainAbiPayload(attrs, "sret") or attrsContainAbiPayload(attrs, "byval")) {
             return error.UnsupportedSretByvalAbi;
         }
@@ -421,6 +427,9 @@ pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {
 
 pub fn rejectUnsupportedCallArgAttrs(attrs: ?[]const u8) !void {
     const text = attrs orelse return;
+    if (attrsContainPackedAbiPayload(text, "sret") or attrsContainPackedAbiPayload(text, "byval")) {
+        return error.UnsupportedPackedAggregateAbi;
+    }
     if (attrsContainAbiPayload(text, "sret") or attrsContainAbiPayload(text, "byval")) {
         return error.UnsupportedSretByvalAbi;
     }
@@ -432,6 +441,19 @@ fn attrsContainAbiPayload(attrs: []const u8, name: []const u8) bool {
     while (std.mem.indexOfPos(u8, attrs, index, name)) |found| {
         const after = found + name.len;
         if (after < attrs.len and attrs[after] == '(') return true;
+        index = after;
+    }
+    return false;
+}
+
+fn attrsContainPackedAbiPayload(attrs: []const u8, name: []const u8) bool {
+    var index: usize = 0;
+    while (std.mem.indexOfPos(u8, attrs, index, name)) |found| {
+        const after = found + name.len;
+        if (after < attrs.len and attrs[after] == '(') {
+            const payload = std.mem.trim(u8, attrs[after + 1 ..], " \t");
+            if (std.mem.startsWith(u8, payload, "<{")) return true;
+        }
         index = after;
     }
     return false;

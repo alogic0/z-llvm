@@ -285,7 +285,8 @@ inline assembly calls
 direct and function-pointer varargs (`UnsupportedVarargsAbi`)
 vectors (`UnsupportedVectorAbi`)
 X87 / long double (`UnsupportedLongDoubleAbi`)
-packed aggregate ABI call/return forms, including direct planner inputs (`UnsupportedPackedAggregateAbi`)
+packed aggregate ABI call/return forms, including direct planner inputs and
+packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`)
 byval/sret lowering beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
 operand bundles
 invoke
