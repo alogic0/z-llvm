@@ -1,4 +1,5 @@
 const impl = @import("core_impl.zig");
+const base64 = @import("core_base64.zig");
 const std = impl.std;
 const ir = impl.ir;
 
@@ -30,9 +31,9 @@ pub fn validateTerminatorBr(block: ir.BasicBlock) ![]const u8 {
     };
 }
 
-pub const lowerBase64DecodeBase64FullBoundary = impl.lowerBase64DecodeBase64FullBoundary;
-pub const lowerBase64DecodeBase64FullMain = impl.lowerBase64DecodeBase64FullMain;
-pub const lowerBase64PaddingLoopStep = impl.lowerBase64PaddingLoopStep;
+pub const lowerBase64DecodeBase64FullBoundary = base64.lowerBase64DecodeBase64FullBoundary;
+pub const lowerBase64DecodeBase64FullMain = base64.lowerBase64DecodeBase64FullMain;
+pub const lowerBase64PaddingLoopStep = base64.lowerBase64PaddingLoopStep;
 pub const lowerCAbiAssertCFFReturnCode = impl.lowerCAbiAssertCFFReturnCode;
 pub const lowerCAbiAssertDCReturnCode = impl.lowerCAbiAssertDCReturnCode;
 pub const lowerCAbiAssertPDReturnCode = impl.lowerCAbiAssertPDReturnCode;
