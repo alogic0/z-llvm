@@ -241,6 +241,8 @@ accepted frontier:
   selected f64 call-result live-across-later-call frames where a direct or
   pointer-callee C ABI double result and live double addend survive a later
   direct or pointer-callee side-effecting void call before the final fadd
+  selected two-result f64 call frames where the first double result survives a
+  second direct or pointer-callee double-result call before the final fadd
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results

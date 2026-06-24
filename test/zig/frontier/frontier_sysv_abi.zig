@@ -60,6 +60,7 @@ extern fn frontier_touch_ordered_after_two() void;
 extern fn frontier_ordered_i32(value: i32) i32;
 extern fn frontier_ordered2_i32(value: i32) i32;
 extern fn frontier_ordered_f64(value: f64) f64;
+extern fn frontier_ordered2_f64(value: f64) f64;
 extern fn frontier_sum5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) f32;
 extern fn frontier_sum5_f64(a: f64, b: f64, c: f64, d: f64, e: f64) f64;
 extern fn frontier_sub_f32(a: f32, b: f32) f32;
@@ -175,6 +176,24 @@ export fn frontier_indirect_f64_result_live_across_indirect_void_call(func: IdF6
     const first = func(a);
     later();
     return first + b;
+}
+
+export fn frontier_two_f64_results_across_calls(a: f64, b: f64) f64 {
+    const first = frontier_ordered_f64(a);
+    const second = frontier_ordered2_f64(b);
+    return first + second;
+}
+
+export fn frontier_indirect_first_f64_results_across_calls(func: IdF64Fn, a: f64, b: f64) f64 {
+    const first = func(a);
+    const second = frontier_ordered2_f64(b);
+    return first + second;
+}
+
+export fn frontier_indirect_second_f64_results_across_calls(func: IdF64Fn, a: f64, b: f64) f64 {
+    const first = frontier_ordered_f64(a);
+    const second = func(b);
+    return first + second;
 }
 
 export fn frontier_six_stack_arg_call() i32 {

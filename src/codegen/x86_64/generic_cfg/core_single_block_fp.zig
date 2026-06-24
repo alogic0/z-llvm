@@ -590,6 +590,114 @@ pub fn lowerGenericCfgFpCallResultAcrossVoidCallReturn(
     return true;
 }
 
+pub fn lowerGenericCfgFpTwoCallResultsReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or
+        !ret.ty.eql(function.ret_ty) or block.instructions.items.len != 3) return false;
+
+    const first_call_inst = block.instructions.items[0];
+    const second_call_inst = block.instructions.items[1];
+    const add_inst = block.instructions.items[2];
+    if (first_call_inst.removed or second_call_inst.removed or add_inst.removed) return false;
+
+    const first_result = first_call_inst.result orelse return false;
+    const second_result = second_call_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!first_call.ret_ty.eql(function.ret_ty) or !second_call.ret_ty.eql(function.ret_ty)) return false;
+    if (first_call.inline_asm != null or second_call.inline_asm != null) return false;
+    if (!callIsFastcc(first_call.calling_conv)) validateDefaultCallConv(first_call.calling_conv) catch return false;
+    if (!callIsFastcc(second_call.calling_conv)) validateDefaultCallConv(second_call.calling_conv) catch return false;
+    if (first_call.ret_attrs != null or first_call.attrs != null or second_call.ret_attrs != null or second_call.attrs != null) return error.UnsupportedCodegenAbi;
+    if (sysvScalarCallNeedsStackArgs(first_call) or sysvScalarCallNeedsStackArgs(second_call)) return error.UnsupportedLiveAcrossCall;
+    if (first_call.args.items.len != 1 or second_call.args.items.len != 1) return false;
+    if (!first_call.args.items[0].ty.eql(function.ret_ty) or !second_call.args.items[0].ty.eql(function.ret_ty)) return false;
+    if ((try fpParamIndexFromValue(function, first_call.args.items[0].value, function.ret_ty)) != 0) return error.UnsupportedLiveAcrossCall;
+    const second_arg_index = try fpParamIndexFromValue(function, second_call.args.items[0].value, function.ret_ty);
+    if (second_arg_index >= 6) return error.UnsupportedLiveAcrossCall;
+
+    const binary = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (binary.op != .fadd or !binary.ty.eql(function.ret_ty)) return false;
+    const lhs_first = isNamed(binary.lhs, first_result);
+    const rhs_first = isNamed(binary.rhs, first_result);
+    const lhs_second = isNamed(binary.lhs, second_result);
+    const rhs_second = isNamed(binary.rhs, second_result);
+    if (!((lhs_first and rhs_second) or (rhs_first and lhs_second))) return false;
+
+    const first_target = try fpCallTarget(function, first_call);
+    const second_target = try fpCallTarget(function, second_call);
+    const second_callee: ?ArgReg = switch (second_target) {
+        .direct => null,
+        .indirect_from_reg => |reg| reg,
+    };
+
+    try appendStackFrame(allocator, machine, 24);
+    const second_arg_reg = try XmmReg.fromIndex(second_arg_index);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = second_arg_reg, .frame_index = .slot0 } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = second_arg_reg, .frame_index = .slot0 } });
+    }
+    if (second_callee) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+    }
+
+    try setupSysVCallTarget(allocator, machine, first_target);
+    const first_stack_args = try appendSysVScalarCallArgs(allocator, machine, function, first_call);
+    if (first_stack_args != 0) return error.UnsupportedLiveAcrossCall;
+    try appendSysVCallTarget(allocator, machine, first_target, first_call.ret_ty);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    }
+    if (second_callee) |reg| {
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+    }
+    try setupSysVCallTarget(allocator, machine, second_target);
+    try appendSysVCallTarget(allocator, machine, second_target, second_call.ret_ty);
+
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    } else {
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+        try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+    }
+    try appendStackFrameEnd(allocator, machine, 24);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn fpCallTarget(function: ir.Function, call: ir.CallInst) !SysVCallTarget {
+    return if (call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = call.callee };
+}
+
 fn leadingFpVoidCallCount(block: ir.BasicBlock) !usize {
     var count: usize = 0;
     while (count < block.instructions.items.len) : (count += 1) {
