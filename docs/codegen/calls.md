@@ -49,8 +49,9 @@ selected backend subset:
   selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and
     `double` argument-field reads are accepted through the reusable aggregate
     classifier
-  selected SSE/SSE aggregate argument-field reads and register returns are
-    accepted through the reusable aggregate classifier
+  selected SSE aggregate argument-field reads and register returns are accepted
+    through the reusable aggregate classifier, including single-eightbyte
+    `{ f32, f32 }` and SSE/SSE `double` aggregate rows
 ```
 
 ## Accepted IR Contract
@@ -233,8 +234,9 @@ BigNested, BigMixed, and BigArray
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax
-selected SSE/SSE aggregate returns, including `[2]f64` array-in-struct and
-nested `{ { double }, { double } }`, are lowered in %xmm0/%xmm1
+selected SSE aggregate returns, including single-eightbyte `{ f32, f32 }`,
+`[2]f64` array-in-struct, and nested `{ { double }, { double } }`, are lowered
+in %xmm0 or %xmm0/%xmm1 according to their classified eightbytes
 selected stack-passed INTEGER aggregate parameters are loaded from the caller
 stack into outgoing GPR aggregate slots before helper calls
 selected stack-passed INTEGER/INTEGER aggregate parameters are also pushed into

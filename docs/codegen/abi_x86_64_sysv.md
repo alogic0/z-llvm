@@ -164,6 +164,15 @@ frontier_sysv_aggregate_classes.DoublePair proves the first SSE/SSE aggregate
 argument field reads and register aggregate return:
   both `double` fields are read from the SysV SSE argument stream
   `{ double, double }` construction returns through %xmm0/%xmm1
+
+frontier_sysv_aggregate_classes.FloatPair proves a single-eightbyte SSE
+aggregate:
+  `{ float, float }` is classified into one SSE eightbyte
+  low/high f32 lane field reads return through %xmm0, with the high lane
+    shuffled down before return
+  construction packs the two f32 parameters into %xmm0 through the generic
+    register aggregate return path
+
 frontier_sysv_aggregate_classes.ArrayDouble proves array-in-struct SSE/SSE
 aggregate reads and register aggregate return:
   `[2]f64` typed AIR field and pointer-element GEPs lower through the generic
@@ -253,7 +262,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one- through six-live f32/f64 SSE spill shapes, selected two-live FP-argument call shape, and selected pointer-callee FP call shapes through six live values and five FP helper arguments
 no varargs
 no vectors
-no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE field reads/construction, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
+no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, single-eightbyte `{ f32, f32 }` SSE construction returns, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE field reads/construction, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal supported-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering outside supported `i32`/`i64`/pointer/`f64` leaves
 no broad indirect calls beyond selected scalar, register-aggregate, and normal
@@ -276,7 +285,7 @@ falling into a generic unsupported bucket.
 | Vectors | Fail-closed boundary | Vector IR parse/verify coverage exists; x86_64 call/return codegen rejects vector ABI forms. Next implementation is either a fixed SSE-register subset or a permanent explicit boundary for release replacement rows. |
 | Arbitrary sret | Partially implemented | Normal supported-leaf MEMORY aggregate sret rows are proven for flat, nested, mixed-width, array-backed, `f32`, `double`, and pointer/`double`/integer selected forms, including selected direct and indirect byval-to-sret calls for flat, nested, mixed-width, array-backed, pure-FP, and mixed pointer/FP/integer aggregates. The current layout-derived copy path supports `i32`, `i64`, pointer, `f32`, and `f64` leaves. Next implementation is broader arbitrary MEMORY aggregate copy/storage for packed, unaligned, X87, vector, and other unsupported leaves. |
 | Arbitrary byval | Partially implemented | Normal supported-leaf byval reads/copies are layout-derived for selected MEMORY aggregates, including `f32`, pointer, and `double` leaves; selected direct and indirect MEMORY aggregate calls copy by-value stack slots into outgoing stack slots before call. Next implementation is a general byval placement/copy path for unsupported layouts and alignments. |
-| Broader aggregate classes | Partially implemented | The reusable classifier handles INTEGER, SSE, mixed INTEGER/SSE, and MEMORY decisions for <=16-byte aggregates; backend lowering accepts selected register and MEMORY forms, including stack-sourced INTEGER aggregate forwarding into GPR aggregate helper calls, stack-sourced SSE/SSE aggregate forwarding into XMM aggregate helper calls, shifted in-register mixed aggregate GPR movement, and shifted in-register reversed mixed aggregate SSE movement. Next implementation is a central call planner that assigns all supported classified aggregate args/returns. |
+| Broader aggregate classes | Partially implemented | The reusable classifier handles INTEGER, SSE, mixed INTEGER/SSE, and MEMORY decisions for <=16-byte aggregates; backend lowering accepts selected register and MEMORY forms, including single-eightbyte `{ f32, f32 }` SSE aggregate field reads/returns, stack-sourced INTEGER aggregate forwarding into GPR aggregate helper calls, stack-sourced SSE/SSE aggregate forwarding into XMM aggregate helper calls, shifted in-register mixed aggregate GPR movement, and shifted in-register reversed mixed aggregate SSE movement. Next implementation is a central call planner that assigns all supported classified aggregate args/returns. |
 | Packed/unaligned aggregates | Fail-closed boundary | Packed/unaligned aggregate ABI classes are classified as MEMORY/rejected unless represented by already selected scalar field paths. Next implementation requires layout-aware unaligned load/store/copy decisions. |
 | X87 / long double | Fail-closed boundary | `x86_fp80` and X87-like classes are not accepted by local codegen. Next implementation is deferred; rows must remain explicit runtime/ABI boundaries. |
 | Indirect calls | Partially implemented | Function-pointer calls are accepted when typed AIR v2 exposes operand 0 as a pointer callee and arguments/returns are supported by the SysV planner. The frontier proves `i32` returns with incoming stack `i32` parameters loaded into outgoing GPR call slots, 12-, 14-, and 24-argument `i32` forwarding through outgoing stack slots, selected `f32`/`f64` calls returning through `%xmm0` with five SSE arguments, selected `i64` register/stack forwarding, selected INTEGER/INTEGER aggregate arguments/returns in GPR pairs, selected SSE/SSE `[2]f64` aggregate arguments/returns in XMM pairs, normal supported-leaf MEMORY aggregate byval-to-sret indirect calls through the hidden sret pointer, selected live `i32` values preserved across an indirect call through the shared spill/reload frame, and selected live `f32`/`f64` values preserved across zero-, one-, two-, three-, or five-FP-argument indirect calls through the FP spill/reload frame. Varargs, tail calls, unsupported live-across-call mixes, unsupported MEMORY aggregate leaves/layouts, and unsupported aggregate classes remain fail-closed boundaries. |

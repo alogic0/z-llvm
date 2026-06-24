@@ -1836,6 +1836,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_sysv_aggregate_classes.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier mixed integer/SSE and nested INTEGER aggregate ABI", .c_body =
     \\struct Mixed { long long a; double b; };
     \\struct DoublePair { double a; double b; };
+    \\struct FloatPair { float a; float b; };
     \\struct ReverseMixed { double a; long long b; };
     \\struct Pair32 { int a; int b; };
     \\struct NestedPair { struct Pair32 left; struct Pair32 right; };
@@ -1857,6 +1858,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_double_pair_first(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_first");
     \\extern double z_frontier_double_pair_second(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_second");
     \\extern struct DoublePair z_frontier_double_pair_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_make");
+    \\extern float z_frontier_float_pair_first(struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_float_pair_first");
+    \\extern float z_frontier_float_pair_second(struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_float_pair_second");
+    \\extern struct FloatPair z_frontier_float_pair_make(float, float) __asm__("frontier_sysv_aggregate_classes.frontier_float_pair_make");
     \\extern double z_frontier_reverse_mixed_float(struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_float");
     \\extern long long z_frontier_reverse_mixed_int(struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_int");
     \\extern struct ReverseMixed z_frontier_reverse_mixed_make(double, long long) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_make");
@@ -1913,6 +1917,11 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_double_pair_second(doubles) != 7.5) return 5;
     \\    struct DoublePair made_doubles = z_frontier_double_pair_make(3.5, 11.25);
     \\    if (made_doubles.a != 3.5 || made_doubles.b != 11.25) return 6;
+    \\    struct FloatPair floats = { 12.5f, 14.75f };
+    \\    if (z_frontier_float_pair_first(floats) != 12.5f) return 56;
+    \\    if (z_frontier_float_pair_second(floats) != 14.75f) return 57;
+    \\    struct FloatPair made_floats = z_frontier_float_pair_make(16.5f, 18.25f);
+    \\    if (made_floats.a != 16.5f || made_floats.b != 18.25f) return 58;
     \\    struct ReverseMixed reverse = { 2.75, 987654321LL };
     \\    if (z_frontier_reverse_mixed_float(reverse) != 2.75) return 7;
     \\    if (z_frontier_reverse_mixed_int(reverse) != 987654321LL) return 8;

@@ -8,6 +8,11 @@ const DoublePair = extern struct {
     b: f64,
 };
 
+const FloatPair = extern struct {
+    a: f32,
+    b: f32,
+};
+
 const ReverseMixed = extern struct {
     a: f64,
     b: i64,
@@ -117,6 +122,18 @@ export fn frontier_double_pair_second(value: DoublePair) f64 {
 }
 
 export fn frontier_double_pair_make(a: f64, b: f64) DoublePair {
+    return .{ .a = a, .b = b };
+}
+
+export fn frontier_float_pair_first(value: FloatPair) f32 {
+    return value.a;
+}
+
+export fn frontier_float_pair_second(value: FloatPair) f32 {
+    return value.b;
+}
+
+export fn frontier_float_pair_make(a: f32, b: f32) FloatPair {
     return .{ .a = a, .b = b };
 }
 

@@ -3496,7 +3496,8 @@ fn lowerRegisterAggregateMake(
     var leaf_paths: [8][]const u8 = undefined;
     if (!typedV2RegisterAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths)) return error.UnsupportedAir;
     for (function_type.params) |param| {
-        if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and !param.ir_type.eql(.double)) return error.UnsupportedAir;
+        if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and
+            !param.ir_type.eql(.float) and !param.ir_type.eql(.double)) return error.UnsupportedAir;
     }
     var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
     errdefer function.deinit(allocator);
@@ -5054,6 +5055,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.DoublePair")) {
         return .{ .ir_type = .{ .aggregate = "{ double, double }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.FloatPair")) {
+        return .{ .ir_type = .{ .aggregate = "{ float, float }" } };
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.ReverseMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ double, i64 }" } };

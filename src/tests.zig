@@ -557,6 +557,12 @@ test "x86_64 SysV aggregate classifier covers register and memory classes" {
     try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), sse_pair.eightbytes[0]);
     try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), sse_pair.eightbytes[1]);
 
+    const f32_pair = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ float, float }" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, f32_pair.kind);
+    try std.testing.expectEqual(@as(u2, 1), f32_pair.eightbyte_count);
+    try std.testing.expect(f32_pair.isSseOnly());
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), f32_pair.eightbytes[0]);
+
     const array = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "[2 x i64]" });
     try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, array.kind);
     try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), array.eightbytes[0]);

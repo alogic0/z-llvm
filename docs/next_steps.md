@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=202`,
-`generic_codegen_functions=202`, `generic_cfg_functions=202`,
+frontier gate reports `source_rows=13`, `discovered_functions=205`,
+`generic_codegen_functions=205`, `generic_cfg_functions=205`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=202`, `object_failures=0`,
+`object_emitted_functions=205`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -462,7 +462,9 @@ including adjacent `i32` lane packing into `%rax`; a noinline helper-call row
 returns the same register aggregate directly from a private helper. The SSE aggregate frontier row
 adds `{ double, double }`, `[2]f64` array-in-struct, and nested
 `{ { double }, { double } }` SSE/SSE field reads plus register aggregate
-return in `%xmm0`/`%xmm1`, and forwards a stack-passed `[2]f64` SSE/SSE
+return in `%xmm0`/`%xmm1`; the single-eightbyte `{ f32, f32 }` row extracts
+low/high f32 lanes from `%xmm0` and constructs the packed return with the
+generic SSE aggregate return path. It also forwards a stack-passed `[2]f64` SSE/SSE
 aggregate into a private helper by loading incoming stack eightbytes into
 outgoing XMM aggregate slots. The reversed mixed aggregate frontier row adds
 `{ double, i64 }`, selected `{ double, i32 }`, and selected
@@ -508,8 +510,9 @@ selected INTEGER/INTEGER, nested mixed INTEGER/SSE field reads/construction,
 selected nested/array INTEGER construction returns,
 selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
 field reads plus selected packed mixed construction returns, SSE/SSE field
-reads including `[2]f64` array-in-struct and nested `{ { double }, { double }
-}`, selected stack-passed register aggregate field reads, and generated normal
+reads including single-eightbyte `{ f32, f32 }`, `[2]f64` array-in-struct,
+and nested `{ { double }, { double } }`, selected stack-passed register
+aggregate field reads, and generated normal
 MEMORY integer-leaf field/copy forms currently proven through twenty flat
 fields, a nested two-Big3 aggregate, a mixed-width
 `{ i64, i32, i64, i32 }` copy, and array-backed `{ [5 x i64] }` copy/read rows,

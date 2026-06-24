@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=202`,
-`generic_codegen_functions=202`, `generic_cfg_functions=202`,
+three release modes at `source_rows=13`, `discovered_functions=205`,
+`generic_codegen_functions=205`, `generic_cfg_functions=205`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=202`, `object_failures=0`,
+`object_emitted_functions=205`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -485,7 +485,7 @@ nested mixed INTEGER/SSE field reads/construction, selected nested/array
 INTEGER construction returns, selected mixed INTEGER/SSE
 and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/return forms
 plus selected packed mixed construction returns, SSE/SSE field-read/return including
-`[2]f64` array-in-struct and nested `{ { double }, { double } }`,
+single-eightbyte `{ f32, f32 }`, `[2]f64` array-in-struct and nested `{ { double }, { double } }`,
 selected stack-passed register aggregate field reads,
 selected stack-sourced INTEGER aggregate forwarding into outgoing register
 aggregate helper calls, selected stack-sourced SSE/SSE aggregate forwarding

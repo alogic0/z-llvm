@@ -77,6 +77,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .divsd_xmm1_xmm0 => try writer.writeAll("\tdivsd %xmm1, %xmm0\n"),
             .movapd_xmm1_xmm0 => try writer.writeAll("\tmovapd %xmm1, %xmm0\n"),
             .movapd_xmm => |mov| try writer.print("\tmovapd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
+            .unpcklps_xmm => |mov| try writer.print("\tunpcklps {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
+            .shufps_high_f32_to_low => |reg| try writer.print("\tshufps $85, {s}, {s}\n", .{ reg.name(), reg.name() }),
             .cvtsi2ss_edi_xmm0 => try writer.writeAll("\tcvtsi2ssl %edi, %xmm0\n"),
             .cvtsi2sd_edi_xmm0 => try writer.writeAll("\tcvtsi2sdl %edi, %xmm0\n"),
             .cvtsi2ss_rdi_xmm0 => try writer.writeAll("\tcvtsi2ssq %rdi, %xmm0\n"),
