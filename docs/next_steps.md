@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=242`,
-`generic_codegen_functions=242`, `generic_cfg_functions=242`,
+frontier gate reports `source_rows=13`, `discovered_functions=244`,
+`generic_codegen_functions=244`, `generic_cfg_functions=244`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=242`, `object_failures=0`,
+`object_emitted_functions=244`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -525,7 +525,9 @@ preserves that later `void` call target across both earlier calls, reloads it
 through the 64-bit frame spill/reload path before `callq *%rax`, then reloads
 both saved `i32` results. The FP multi-call follow-up keeps two live
 `f32`/`f64` parameters across two direct no-argument `void` calls before the
-post-call `fadd` return.
+post-call `fadd` return. The repeated pointer-callee FP follow-up preserves the
+callee pointer in the frame and reloads it before each indirect `callq *%rax`
+while keeping the same two live FP values across both calls.
 The indirect-first follow-up routes the first ordered `i32` result call through
 a function pointer while preserving the later ordered result and side-effecting
 `void` call sequence through the same generic SysV call-target and frame
@@ -562,7 +564,8 @@ selected model, and
 broader SSE live-across-call frames beyond the selected one-live through
 six-live `f32`/`f64` no-argument-call shapes, selected direct
 two-/three-/six-live FP-argument call shapes,
-selected two-live no-argument and one-FP-argument pointer-callee call shapes,
+selected two-live repeated no-argument direct and pointer-callee call shapes,
+selected one-FP-argument pointer-callee call shapes,
 and selected three-/four-/six-live two-/three-/five-FP-argument pointer-callee
 call shapes. The accepted frontier rows use typed
 structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,

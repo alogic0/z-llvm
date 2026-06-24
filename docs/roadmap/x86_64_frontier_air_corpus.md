@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=242
-structured_functions=242
-generic_codegen_functions=242
-generic_cfg_functions=242
+discovered_functions=244
+structured_functions=244
+generic_codegen_functions=244
+generic_cfg_functions=244
 structural_matcher_functions=0
-structured_air_v2_functions=242
-typed_air_operand_functions=242
+structured_air_v2_functions=244
+typed_air_operand_functions=244
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=242
+generic_lowering_functions=244
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=242
+object_emitted_functions=244
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -329,7 +329,10 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_two_void_calls_two_f32_live_sum` and
   `frontier_two_void_calls_two_f64_live_sum` keep two live FP values across two
   direct no-argument `void` calls through the same FP live-addend frame helper
-  used by the single-call rows.
+  used by the single-call rows; `frontier_two_indirect_void_calls_two_f32_live_sum`
+  and `frontier_two_indirect_void_calls_two_f64_live_sum` prove the same shape
+  for repeated function-pointer calls by preserving and reloading the pointer
+  callee from the frame before each `callq *%rax`.
 - selected ordered call-result live frame in `frontier_sysv_abi.zig`:
   `frontier_call_result_live_across_second_call` spills the first C ABI
   `i32` call result from `%eax`, preserves the live `i32` parameter in a frame
@@ -443,7 +446,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   arbitrary non-selected sret/byval copies, varargs, vectors, more than six
   stack-passed live values, and broader SSE live-across-call frames beyond the
   selected one-live through six-live `f32`/`f64` no-argument-call shapes,
-  selected direct two-/three-/six-live FP-argument call shapes, selected two-live no-argument and
+  selected direct two-/three-/six-live FP-argument call shapes, selected
+  two-live repeated no-argument direct and pointer-callee call shapes, selected
   one-FP-argument pointer-callee call shapes, selected three-/four-/six-live
   two-/three-/five-FP-argument pointer-callee call shapes, and selected named
   `%xmm0..%xmm4` pass-through calls

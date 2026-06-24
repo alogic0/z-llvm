@@ -361,7 +361,8 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
     const addend_count = try collectFpVoidCallFaddParamChain(function, block, call_count, ret.value orelse return error.InvalidRet);
     if (addend_count < 2 or addend_count > 6) return error.UnsupportedLiveAcrossCall;
 
-    const frame_bytes = try fpLiveAddendFrameBytes(function.ret_ty, addend_count);
+    const preserved_callee = try repeatedFpVoidCallPreservedCallee(function, block, call_count);
+    const frame_bytes = try fpLiveAddendFrameBytes(function.ret_ty, addend_count, preserved_callee != null);
     try appendStackFrame(allocator, machine, frame_bytes);
     var index: usize = 0;
     while (index < addend_count) : (index += 1) {
@@ -373,10 +374,18 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
             try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = reg, .frame_index = frame_index } });
         }
     }
+    if (preserved_callee) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = try frameIndexForFpPreservedCallee(function.ret_ty, addend_count) } });
+    }
     index = 0;
     while (index < call_count) : (index += 1) {
         const call = block.instructions.items[index].kind.call;
         const call_target = try fpVoidCallTarget(function, call);
+        if (preserved_callee) |reg| {
+            if (call_target == .indirect_from_reg) {
+                try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = try frameIndexForFpPreservedCallee(function.ret_ty, addend_count) } });
+            }
+        }
         try setupSysVCallTarget(allocator, machine, call_target);
         _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
         try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
@@ -435,6 +444,27 @@ fn fpVoidCallTarget(function: ir.Function, call: ir.CallInst) !SysVCallTarget {
         };
         break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
     } else .{ .direct = call.callee };
+}
+
+fn repeatedFpVoidCallPreservedCallee(function: ir.Function, block: ir.BasicBlock, call_count: usize) !?shared.ArgReg {
+    if (call_count < 2) return null;
+    var preserved: ?shared.ArgReg = null;
+    for (block.instructions.items[0..call_count], 0..) |instruction, index| {
+        const call = instruction.kind.call;
+        const target = try fpVoidCallTarget(function, call);
+        switch (target) {
+            .direct => {},
+            .indirect_from_reg => |reg| {
+                if (index == 0 and call_count == 1) return null;
+                if (preserved) |existing| {
+                    if (existing != reg) return error.UnsupportedLiveAcrossCall;
+                } else {
+                    preserved = reg;
+                }
+            },
+        }
+    }
+    return preserved;
 }
 
 pub fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, first_binary_index: usize, ret_value: ir.Value) !usize {
@@ -496,13 +526,36 @@ pub fn noteFpAddendIndex(function: ir.Function, name: []const u8, seen: *[6]bool
     count.* += 1;
 }
 
-pub fn fpLiveAddendFrameBytes(ty: ir.Type, addend_count: usize) !u8 {
+pub fn fpLiveAddendFrameBytes(ty: ir.Type, addend_count: usize, preserve_callee: bool) !u8 {
     if (addend_count < 2 or addend_count > 6) return error.UnsupportedLiveAcrossCall;
     if (ty.eql(.float)) {
-        return if (addend_count == 2) 8 else if (addend_count <= 4) 24 else 40;
+        const base: u8 = if (addend_count == 2) 8 else if (addend_count <= 4) 24 else 40;
+        if (!preserve_callee) return base;
+        return if (base < 24) 24 else base;
     }
     if (ty.eql(.double)) {
-        return if (addend_count == 2) 24 else if (addend_count <= 4) 40 else 56;
+        const base: u8 = if (addend_count == 2) 24 else if (addend_count <= 4) 40 else 56;
+        if (!preserve_callee) return base;
+        return if (base < 40) 40 else base;
+    }
+    return error.UnsupportedCodegenType;
+}
+
+fn frameIndexForFpPreservedCallee(ty: ir.Type, addend_count: usize) !FrameIndex {
+    if (ty.eql(.float)) {
+        return switch (addend_count) {
+            2 => .slot2,
+            3, 4 => .slot4,
+            5, 6 => .slot6,
+            else => error.UnsupportedLiveAcrossCall,
+        };
+    }
+    if (ty.eql(.double)) {
+        return switch (addend_count) {
+            2 => .slot4,
+            3, 4 => .slot8,
+            else => error.UnsupportedLiveAcrossCall,
+        };
     }
     return error.UnsupportedCodegenType;
 }

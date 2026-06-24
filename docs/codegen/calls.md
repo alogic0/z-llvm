@@ -410,7 +410,7 @@ selected pointer-callee reversed mixed SSE/INTEGER aggregate pass-through calls
 selected up-to-six-live-i32 spill/reload call frame
 selected live i32 GPR preservation across direct and pointer-callee f64-argument calls
 selected two-call six-live-i32 spill/reload call frame
-selected two-call two-live f32/f64 spill/reload call frame
+selected two-call two-live f32/f64 direct and pointer-callee spill/reload call frames
 selected disp8-safe stack-passed live i32 post-call add-tree rows
 selected one-live f32/f64 SSE spill/reload call frame
 selected two-/three-live f32/f64 no-argument-call spill/reload frames
