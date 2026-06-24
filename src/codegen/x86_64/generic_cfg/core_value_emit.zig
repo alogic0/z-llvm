@@ -285,6 +285,7 @@ pub fn emitGenericCfgVoidCall(
     instruction_index: usize,
     call: ir.CallInst,
 ) !void {
+    if (call.isDebugVariableLocation()) return;
     if (call.ret_ty != .void or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     const live_params = try liveParamsAfter(function, block, instruction_index);

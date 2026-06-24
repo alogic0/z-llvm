@@ -90,6 +90,10 @@ pub fn lowerCall(
     result: ?[]const u8,
     call: ir.CallInst,
 ) !void {
+    if (call.isDebugVariableLocation()) {
+        if (result != null) return error.VoidCallHasResult;
+        return;
+    }
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (call.tail_kind != null) return error.UnsupportedTailCallAbi;
     if (call.operand_bundle != null) return error.UnsupportedCallAttributeAbi;

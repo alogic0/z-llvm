@@ -244,6 +244,7 @@ pub fn genericCfgSupportsSingleBlockStore(function: ir.Function, block: ir.Basic
 }
 
 pub fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock, result: ?[]const u8, call: ir.CallInst) bool {
+    if (call.isDebugVariableLocation()) return result == null and call.ret_ty == .void;
     if (genericCfgSupportsSminIntrinsicCall(function, call)) return result != null;
     if (call.ret_ty == .void) {
         if (result != null) return false;
@@ -480,6 +481,7 @@ pub fn genericCfgSupportsLoad(function: ir.Function, load: ir.LoadInst) bool {
 }
 
 pub fn genericCfgSupportsCall(function: ir.Function, call: ir.CallInst) bool {
+    if (call.isDebugVariableLocation()) return call.ret_ty == .void;
     if (call.callee_value != null or call.inline_asm != null) return false;
     if (std.mem.eql(u8, call.callee, "llvm.assume")) {
         return call.ret_ty == .void and call.args.items.len == 1 and genericCfgSupportsI1Value(function, call.args.items[0].value);
