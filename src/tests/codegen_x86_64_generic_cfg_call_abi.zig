@@ -318,6 +318,82 @@ test "x86_64 generic CFG lowers cyclic i64 GPR arg register shuffle with paralle
     try std.testing.expect(saw_call);
 }
 
+test "x86_64 generic CFG lowers cyclic f32 XMM arg register shuffle with temporary stack copy" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare float @callee(float, float)
+        \\
+        \\define float @caller(float %a, float %b) {
+        \\entry:
+        \\  %r = call float @callee(float %b, float %a)
+        \\  ret float %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .push_xmm64 = .xmm1 });
+    try expectMachineInstruction(machine.instructions.items, .{ .push_xmm64 = .xmm0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .load_stack_disp8_xmm = .{ .reg = .xmm0, .disp = 8 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .load_stack_disp8_xmm = .{ .reg = .xmm1, .disp = 0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 16 });
+    var saw_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.float));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_call);
+}
+
+test "x86_64 generic CFG lowers cyclic f64 XMM arg register shuffle with temporary stack copy" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare double @callee(double, double)
+        \\
+        \\define double @caller(double %a, double %b) {
+        \\entry:
+        \\  %r = call double @callee(double %b, double %a)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .push_xmm64 = .xmm1 });
+    try expectMachineInstruction(machine.instructions.items, .{ .push_xmm64 = .xmm0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .load_stack_disp8_xmm = .{ .reg = .xmm0, .disp = 8 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .load_stack_disp8_xmm = .{ .reg = .xmm1, .disp = 0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 16 });
+    var saw_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.double));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_call);
+}
+
 test "x86_64 generic CFG lowers indirect pointer call args through planner" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

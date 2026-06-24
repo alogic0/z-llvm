@@ -175,6 +175,7 @@ pub fn appendSysVScalarCallArgsWithBlock(
     defer plan.deinit(allocator);
     if (plan.counts.stack_args > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
     const gpr_copy_plan = try analyzeGprArgCopyPlan(function, call, plan);
+    const xmm_copy_plan = try analyzeXmmArgCopyPlan(function, call, plan);
 
     var stack_args: [max_sysv_stack_call_args]StackScalarCallArg = undefined;
     var stack_arg_count: usize = 0;
@@ -252,6 +253,9 @@ pub fn appendSysVScalarCallArgsWithBlock(
     if (gpr_copy_plan.parallel) {
         try appendParallelGprArgCopies(allocator, machine, gpr_copy_plan);
     }
+    if (xmm_copy_plan.parallel) {
+        try appendParallelXmmArgCopies(allocator, machine, xmm_copy_plan);
+    }
 
     for (call.args.items, 0..) |arg, index| {
         const assignment = plan.assignments.items[index];
@@ -304,6 +308,10 @@ pub fn appendSysVScalarCallArgsWithBlock(
                         }) |src_index| {
                             const dst_index: usize = @intFromEnum(dst);
                             if (src_index != dst_index) {
+                                if (xmm_copy_plan.parallel) {
+                                    if (!xmmCopyPlanContains(xmm_copy_plan, dst, try XmmReg.fromIndex(src_index))) return error.UnsupportedCodegenAbi;
+                                    continue;
+                                }
                                 try machine.instructions.append(allocator, .{ .movapd_xmm = .{
                                     .dst = dst,
                                     .src = try XmmReg.fromIndex(src_index),
@@ -333,6 +341,7 @@ pub fn appendSysVScalarCallArgsWithBlock(
 }
 
 const max_gpr_parallel_copies = 6;
+const max_xmm_parallel_copies = 8;
 
 const GprArgCopy = struct {
     dst: ArgReg,
@@ -407,6 +416,97 @@ fn appendParallelGprArgCopies(
     while (index > 0) {
         index -= 1;
         try machine.instructions.append(allocator, .{ .pop_arg = copy_plan.copies[index].dst });
+    }
+}
+
+const XmmArgCopy = struct {
+    dst: XmmReg,
+    src: XmmReg,
+};
+
+const XmmArgCopyPlan = struct {
+    parallel: bool = false,
+    copies: [max_xmm_parallel_copies]XmmArgCopy = undefined,
+    count: usize = 0,
+};
+
+fn analyzeXmmArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCallPlan) !XmmArgCopyPlan {
+    var overwritten = [_]bool{false} ** max_xmm_parallel_copies;
+    var copy_plan = XmmArgCopyPlan{};
+    var needs_parallel = false;
+    for (call.args.items, 0..) |arg, index| {
+        const assignment = plan.assignments.items[index];
+        const dst = switch (assignment) {
+            .sse => |dst| dst,
+            .gpr, .stack_i32_const, .stack_i32_param, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
+        };
+
+        const writes_dst = switch (arg.value) {
+            .fp => true,
+            .named => |name| writes: {
+                const src_index = (if (arg.ty.eql(.float))
+                    fpParamIndex(function, name, .float)
+                else if (arg.ty.eql(.double))
+                    fpParamIndex(function, name, .double)
+                else
+                    return error.UnsupportedCodegenType) catch |err| switch (err) {
+                    error.UnsupportedCodegenAbi => null,
+                    else => return err,
+                };
+                if (src_index) |index_value| {
+                    if (index_value >= max_xmm_parallel_copies) return error.UnsupportedCodegenAbi;
+                    if (overwritten[index_value]) needs_parallel = true;
+                    const src = try XmmReg.fromIndex(index_value);
+                    if (src != dst) {
+                        if (copy_plan.count >= copy_plan.copies.len) return error.UnsupportedCodegenAbi;
+                        copy_plan.copies[copy_plan.count] = .{ .dst = dst, .src = src };
+                        copy_plan.count += 1;
+                    }
+                    break :writes src != dst;
+                }
+                if (needs_parallel) return error.UnsupportedCodegenAbi;
+                break :writes true;
+            },
+            .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        };
+        if (writes_dst) overwritten[@intFromEnum(dst)] = true;
+    }
+    if (needs_parallel and copy_plan.count == 0) return error.UnsupportedCodegenAbi;
+    copy_plan.parallel = needs_parallel;
+    return copy_plan;
+}
+
+fn xmmCopyPlanContains(copy_plan: XmmArgCopyPlan, dst: XmmReg, src: XmmReg) bool {
+    for (copy_plan.copies[0..copy_plan.count]) |copy| {
+        if (copy.dst == dst and copy.src == src) return true;
+    }
+    return false;
+}
+
+fn appendParallelXmmArgCopies(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    copy_plan: XmmArgCopyPlan,
+) !void {
+    if (copy_plan.count == 0) return;
+    for (copy_plan.copies[0..copy_plan.count]) |copy| {
+        try machine.instructions.append(allocator, .{ .push_xmm64 = copy.src });
+    }
+    for (copy_plan.copies[0..copy_plan.count], 0..) |copy, index| {
+        const stack_offset = (copy_plan.count - 1 - index) * 8;
+        if (stack_offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+        if (stack_offset <= std.math.maxInt(u8)) {
+            try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm = .{ .reg = copy.dst, .disp = @intCast(stack_offset) } });
+        } else {
+            try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm = .{ .reg = copy.dst, .disp = @intCast(stack_offset) } });
+        }
+    }
+    const restore_bytes = copy_plan.count * 8;
+    if (restore_bytes > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+    if (restore_bytes <= std.math.maxInt(u8)) {
+        try machine.instructions.append(allocator, .{ .add_rsp_imm8 = @intCast(restore_bytes) });
+    } else {
+        try machine.instructions.append(allocator, .{ .add_rsp_imm32 = @intCast(restore_bytes) });
     }
 }
 

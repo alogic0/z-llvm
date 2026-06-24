@@ -58,6 +58,8 @@ extern fn frontier_ordered_i32(value: i32) i32;
 extern fn frontier_ordered2_i32(value: i32) i32;
 extern fn frontier_sum5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) f32;
 extern fn frontier_sum5_f64(a: f64, b: f64, c: f64, d: f64, e: f64) f64;
+extern fn frontier_sub_f32(a: f32, b: f32) f32;
+extern fn frontier_sub_f64(a: f64, b: f64) f64;
 extern fn frontier_sum6_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32;
 extern fn frontier_sum12_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32;
 extern fn frontier_sum14_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32) i32;
@@ -230,6 +232,14 @@ export fn frontier_i64_swapped_direct_call(a: i64, b: i64) i64 {
 
 export fn frontier_ptr_swapped_direct_call(a: *const i32, b: *const i32, tag: i32) *const i32 {
     return frontier_choose_ptr(b, a, tag);
+}
+
+export fn frontier_f32_swapped_direct_call(a: f32, b: f32) f32 {
+    return frontier_sub_f32(b, a);
+}
+
+export fn frontier_f64_swapped_direct_call(a: f64, b: f64) f64 {
+    return frontier_sub_f64(b, a);
 }
 
 export fn frontier_i32_three_cycle_direct_call(a: i32, b: i32, c: i32) i32 {

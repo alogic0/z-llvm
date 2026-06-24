@@ -1534,6 +1534,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_i32_swapped_direct_call(int, int) __asm__("frontier_sysv_abi.frontier_i32_swapped_direct_call");
     \\extern long long z_frontier_i64_swapped_direct_call(long long, long long) __asm__("frontier_sysv_abi.frontier_i64_swapped_direct_call");
     \\extern const int *z_frontier_ptr_swapped_direct_call(const int *, const int *, int) __asm__("frontier_sysv_abi.frontier_ptr_swapped_direct_call");
+    \\extern float z_frontier_f32_swapped_direct_call(float, float) __asm__("frontier_sysv_abi.frontier_f32_swapped_direct_call");
+    \\extern double z_frontier_f64_swapped_direct_call(double, double) __asm__("frontier_sysv_abi.frontier_f64_swapped_direct_call");
     \\extern int z_frontier_i32_three_cycle_direct_call(int, int, int) __asm__("frontier_sysv_abi.frontier_i32_three_cycle_direct_call");
     \\extern long long z_frontier_i64_three_cycle_direct_call(long long, long long, long long) __asm__("frontier_sysv_abi.frontier_i64_three_cycle_direct_call");
     \\extern int z_frontier_i32_six_cycle_direct_call(int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_i32_six_cycle_direct_call");
@@ -1622,6 +1624,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\int frontier_ordered2_i32(int value) { if (frontier_order_step != 1) return -2000; frontier_order_step = 2; return value + 7; }
     \\float frontier_sum5_f32(float a, float b, float c, float d, float e) { return a + b + c + d + e; }
     \\double frontier_sum5_f64(double a, double b, double c, double d, double e) { return a + b + c + d + e; }
+    \\float frontier_sub_f32(float a, float b) { return a - b; }
+    \\double frontier_sub_f64(double a, double b) { return a - b; }
     \\int frontier_sum6_i32(int a, int b, int c, int d, int e, int f) { return a + b + c + d + e + f; }
     \\int frontier_sum12_i32(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l) { return a + b + c + d + e + f + g + h + i + j + k + l; }
     \\int frontier_sum14_i32(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n) { return a + b + c + d + e + f + g + h + i + j + k + l + m + n; }
@@ -1683,6 +1687,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_i64_swapped_direct_call(11, 47) != 36) return 112;
     \\    if (z_frontier_ptr_swapped_direct_call(&ptr_values[1], &ptr_values[6], 0) != &ptr_values[6]) return 113;
     \\    if (z_frontier_ptr_swapped_direct_call(&ptr_values[1], &ptr_values[6], 1) != &ptr_values[1]) return 114;
+    \\    if (z_frontier_f32_swapped_direct_call(11.0f, 47.0f) != 36.0f) return 122;
+    \\    if (z_frontier_f64_swapped_direct_call(11.0, 47.0) != 36.0) return 123;
     \\    if (z_frontier_i32_three_cycle_direct_call(3, 5, 7) != 573) return 115;
     \\    if (z_frontier_i64_three_cycle_direct_call(3, 5, 7) != 573) return 116;
     \\    if (z_frontier_i32_six_cycle_direct_call(1, 2, 3, 4, 5, 6) != 234561) return 117;

@@ -432,6 +432,9 @@ unsupported broader stack-passed and broader SSE live-across-call pressure diagn
 integer and pointer cyclic GPR argument shuffles through the push/pop
 parallel-copy scheduler; mixed non-register source cycles still reject with the
 targeted unsupported shuffle diagnostic
+f32/f64 cyclic XMM argument shuffles through temporary stack-copy reloads before
+the call; mixed non-register source XMM cycles remain outside the selected
+planner subset
 tested callee-saved policy: the selected allocator does not allocate callee-saved GPRs
 unsupported varargs/vector/X87/packed aggregate/sret/byval/larger aggregate ABI diagnostics use targeted boundary errors
 ```
