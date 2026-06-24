@@ -37,12 +37,12 @@ const simplifycfg = ir_common.simplifycfg;
 const slp_vectorizer = ir_common.slp_vectorizer;
 const sroa = ir_common.sroa;
 
-const ir_slice_1 = @import("ir_slice_1.zig");
-const ir_slice_2 = @import("ir_slice_2.zig");
-const ir_slice_3 = @import("ir_slice_3.zig");
+const ir_parser_pipeline = @import("ir_parser_pipeline.zig");
+const ir_parser_frontend = @import("ir_parser_frontend.zig");
+const ir_parser_analyses = @import("ir_parser_analyses.zig");
 
 test {
-    _ = ir_slice_1;
-    _ = ir_slice_2;
-    _ = ir_slice_3;
+    _ = ir_parser_pipeline;
+    _ = ir_parser_frontend;
+    _ = ir_parser_analyses;
 }

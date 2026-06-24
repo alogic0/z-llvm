@@ -37,10 +37,10 @@ const simplifycfg = air_lowering_common.simplifycfg;
 const slp_vectorizer = air_lowering_common.slp_vectorizer;
 const sroa = air_lowering_common.sroa;
 
-const air_lowering_slice_1 = @import("air_lowering_slice_1.zig");
-const air_lowering_slice_2 = @import("air_lowering_slice_2.zig");
+const air_bridge_basics = @import("air_bridge_basics.zig");
+const air_bridge_loops = @import("air_bridge_loops.zig");
 
 test {
-    _ = air_lowering_slice_1;
-    _ = air_lowering_slice_2;
+    _ = air_bridge_basics;
+    _ = air_bridge_loops;
 }
