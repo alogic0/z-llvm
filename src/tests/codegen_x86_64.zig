@@ -46,10 +46,10 @@ const codegen_x86_64_calls = @import("codegen_x86_64_calls.zig");
 const codegen_x86_64_generic_cfg_call_abi = @import("codegen_x86_64_generic_cfg_call_abi.zig");
 const codegen_x86_64_generic_cfg_aggregate_and_preserves = @import("codegen_x86_64_generic_cfg_aggregate_and_preserves.zig");
 const codegen_x86_64_generic_cfg_routes_and_loops = @import("codegen_x86_64_generic_cfg_routes_and_loops.zig");
-const codegen_x86_64_parser_and_optimization_cfg_routes = @import("codegen_x86_64_parser_and_optimization_cfg_routes.zig");
-const codegen_x86_64_parser_and_optimization_optimizer_and_normalization = @import("codegen_x86_64_parser_and_optimization_optimizer_and_normalization.zig");
-const codegen_x86_64_parser_and_optimization_parser_and_atomics = @import("codegen_x86_64_parser_and_optimization_parser_and_atomics.zig");
-const codegen_x86_64_parser_and_optimization_main_wrapper_routes = @import("codegen_x86_64_parser_and_optimization_main_wrapper_routes.zig");
+const codegen_x86_64_parser_cfg_routes = @import("codegen_x86_64_parser_cfg_routes.zig");
+const codegen_x86_64_opt_and_normalization = @import("codegen_x86_64_opt_and_normalization.zig");
+const codegen_x86_64_parser_atomics = @import("codegen_x86_64_parser_atomics.zig");
+const codegen_x86_64_main_wrapper_routes = @import("codegen_x86_64_main_wrapper_routes.zig");
 
 test {
     _ = codegen_x86_64_assembly;
@@ -60,8 +60,8 @@ test {
     _ = codegen_x86_64_generic_cfg_call_abi;
     _ = codegen_x86_64_generic_cfg_aggregate_and_preserves;
     _ = codegen_x86_64_generic_cfg_routes_and_loops;
-    _ = codegen_x86_64_parser_and_optimization_cfg_routes;
-    _ = codegen_x86_64_parser_and_optimization_optimizer_and_normalization;
-    _ = codegen_x86_64_parser_and_optimization_parser_and_atomics;
-    _ = codegen_x86_64_parser_and_optimization_main_wrapper_routes;
+    _ = codegen_x86_64_parser_cfg_routes;
+    _ = codegen_x86_64_opt_and_normalization;
+    _ = codegen_x86_64_parser_atomics;
+    _ = codegen_x86_64_main_wrapper_routes;
 }
