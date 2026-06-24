@@ -37,6 +37,34 @@ const simplifycfg = codegen_x86_64_common.simplifycfg;
 const slp_vectorizer = codegen_x86_64_common.slp_vectorizer;
 const sroa = codegen_x86_64_common.sroa;
 const expectMachineInstruction = codegen_x86_64_common.expectMachineInstruction;
+test "x86_64 generic cfg stores arbitrary two-i32 sret aggregate fields" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define fastcc void @make_pair_generic(ptr sret({ i32, i32 }) %out, i32 %a, i32 %b) {
+        \\entry:
+        \\  store i32 %a, ptr %out
+        \\  %field1 = getelementptr i8, ptr %out, i64 4
+        \\  store i32 %b, ptr %field1
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rsi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 0 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdx }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 4 } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
+}
+
 test "x86_64 codegen stores selected sret i64 aggregate fields" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

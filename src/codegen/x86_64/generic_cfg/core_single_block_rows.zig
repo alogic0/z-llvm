@@ -1432,6 +1432,7 @@ pub fn lowerGenericCfgSelectedSretStores(
     block: ir.BasicBlock,
 ) !bool {
     if (try lowerGenericCfgSretCopy(allocator, machine, function, block)) return true;
+    if (try lowerGenericCfgI32SretParamStores(allocator, machine, function, block)) return true;
     if (function.params.items.len < 4) return false;
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
     const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
@@ -1470,6 +1471,73 @@ pub fn lowerGenericCfgSelectedSretStores(
             try appendStoreRaxArgPtrDisp(allocator, machine, .rdi, offset);
         }
     }
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+pub fn lowerGenericCfgI32SretParamStores(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !bool {
+    if (function.params.items.len < 2) return false;
+    const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
+    const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
+    if (field_count == 0 or function.params.items.len != field_count + 1) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    if (sret_reg != .rdi) return error.UnsupportedCodegenAbi;
+
+    var instruction_index: usize = 0;
+    var field_index: usize = 0;
+    while (field_index < field_count) : (field_index += 1) {
+        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return false;
+        if (!field_ty.eql(.{ .int = 32 }) or !function.params.items[field_index + 1].ty.eql(.{ .int = 32 })) return false;
+        const offset = try aggregateFieldOffset(aggregate_ty, field_index);
+        const store_ptr = if (offset == 0 and instruction_index < block.instructions.items.len) ptr: {
+            const maybe_store = switch (block.instructions.items[instruction_index].kind) {
+                .store => |store| store,
+                else => break :ptr null,
+            };
+            if (maybe_store.ty.eql(.{ .int = 32 }) and !maybe_store.attrs.isBarrier() and
+                isNamed(maybe_store.ptr, function.params.items[0].name))
+            {
+                break :ptr function.params.items[0].name;
+            }
+            break :ptr null;
+        } else null;
+        const ptr_name = store_ptr orelse ptr: {
+            if (instruction_index >= block.instructions.items.len) return false;
+            const gep_inst = block.instructions.items[instruction_index];
+            if (gep_inst.removed) return false;
+            const gep_name = gep_inst.result orelse return false;
+            const gep = switch (gep_inst.kind) {
+                .gep => |gep| gep,
+                else => return false,
+            };
+            if (!gep.source_ty.eql(.{ .int = 8 }) or !isNamed(gep.ptr, function.params.items[0].name)) return false;
+            if (gep.indices.items.len != 1 or !gep.indices.items[0].ty.eql(.{ .int = 64 }) or
+                !isInt(gep.indices.items[0].value, offset)) return false;
+            instruction_index += 1;
+            break :ptr gep_name;
+        };
+
+        if (instruction_index >= block.instructions.items.len) return false;
+        const store_inst = block.instructions.items[instruction_index];
+        if (store_inst.removed) return false;
+        const store = switch (store_inst.kind) {
+            .store => |store| store,
+            else => return false,
+        };
+        if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
+        if (!isNamed(store.ptr, ptr_name) or !isNamed(store.value, function.params.items[field_index + 1].name)) return false;
+        instruction_index += 1;
+
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
+        try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
+    }
+    if (instruction_index != block.instructions.items.len) return false;
     try appendGenericCfgReturn(allocator, machine);
     return true;
 }

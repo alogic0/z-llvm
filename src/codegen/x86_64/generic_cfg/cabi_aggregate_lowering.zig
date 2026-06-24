@@ -1653,7 +1653,6 @@ pub fn lowerAggregatePairAbiFamilyReturn(
     ret: anytype,
 ) !bool {
     if (try lowerRuntimeAggregatePairMainReturn(allocator, machine, function, block, ret)) return true;
-    if (try lowerRuntimeAggregatePairMakePairReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRuntimeAggregatePairPairFirstReturn(allocator, machine, function, block, ret)) return true;
     return false;
 }

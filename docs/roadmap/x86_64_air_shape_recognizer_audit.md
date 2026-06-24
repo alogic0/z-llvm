@@ -158,7 +158,9 @@ inventory groups as follows:
   `expanded_records_memory.expanded_make_pair`,
   `runtime_aggregate_pair_main.makePair`, and
   `runtime_aggregate_pair_main.pairFirst` now route through generic CFG as
-  small aggregate pair ABI pack/unpack helpers. The aggregate wrapper
+  small aggregate pair ABI pack/unpack helpers. The sret store path for
+  two-`i32` aggregates is shape-validated and no longer depends on the
+  `runtime_aggregate_pair_main.makePair` symbol name. The aggregate wrapper
   `runtime_aggregate_pair_main.main` now routes through a generic two-call
   chain admission that passes the first helper's i64 return to the second
   helper.
