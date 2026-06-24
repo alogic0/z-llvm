@@ -466,6 +466,7 @@ pub fn rejectUnsupportedAbiType(ty: ir.Type) !void {
         .aggregate => |text| {
             const trimmed = std.mem.trim(u8, text, " \t");
             if (std.mem.startsWith(u8, trimmed, "<{")) return error.UnsupportedPackedAggregateAbi;
+            if (std.mem.indexOfScalar(u8, trimmed, '<') != null) return error.UnsupportedVectorAbi;
             var field_index: usize = 0;
             while (memory_location.aggregateFieldType(ty, field_index)) |field_ty| : (field_index += 1) {
                 try rejectUnsupportedAbiType(field_ty);

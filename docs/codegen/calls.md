@@ -283,7 +283,7 @@ The first slice rejects:
 ```text
 inline assembly calls
 direct and function-pointer varargs (`UnsupportedVarargsAbi`)
-vectors (`UnsupportedVectorAbi`)
+vectors, including vector-containing aggregate ABI forms (`UnsupportedVectorAbi`)
 X87 / long double (`UnsupportedLongDoubleAbi`)
 packed aggregate ABI call/return forms, including direct planner inputs and
 packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`)

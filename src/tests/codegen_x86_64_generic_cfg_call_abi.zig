@@ -978,6 +978,35 @@ test "x86_64 SysV call planner rejects vector return ABI boundary" {
     );
 }
 
+test "x86_64 SysV call planner rejects vector-containing aggregate ABI boundary" {
+    var args: std.ArrayList(ir.CallArg) = .empty;
+    defer args.deinit(std.testing.allocator);
+    try args.append(std.testing.allocator, .{
+        .ty = .{ .aggregate = "{ <2 x i32>, i32 }" },
+        .value = .undef,
+    });
+
+    const call: ir.CallInst = .{
+        .ret_ty = .{ .int = 32 },
+        .callee = "callee",
+        .args = args,
+    };
+    const function: ir.Function = .{
+        .name = "caller",
+        .ret_ty = .{ .int = 32 },
+        .blocks = .empty,
+        .params = .empty,
+    };
+    try std.testing.expectError(
+        error.UnsupportedVectorAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, function, call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedVectorAbi,
+        codegen.x86_64.sysvReturnPlanCountsForTest(.{ .aggregate = "{ <2 x i32>, i32 }" }),
+    );
+}
+
 test "x86_64 SysV call planner rejects X87 ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
