@@ -242,7 +242,9 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try appendU32(&bytes, allocator, value);
             },
             .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
+            .spill_arg64_rsp => |spill| try encodeReg64ToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
             .reload_arg_rsp => |reload| try encodeFrameSlotToReg(&bytes, allocator, 0x8b, reload.reg, reload.frame_index),
+            .reload_arg64_rsp => |reload| try encodeFrameSlotToReg64(&bytes, allocator, 0x8b, reload.reg, reload.frame_index),
             .spill_xmm32_rsp => |spill| try encodeXmmFrameSlot(&bytes, allocator, 0xf3, 0x11, spill.reg, spill.frame_index),
             .reload_xmm32_rsp => |reload| try encodeXmmFrameSlot(&bytes, allocator, 0xf3, 0x10, reload.reg, reload.frame_index),
             .spill_xmm64_rsp => |spill| try encodeXmmFrameSlot(&bytes, allocator, 0xf2, 0x11, spill.reg, spill.frame_index),
@@ -531,7 +533,9 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .sub_rsp_24, .add_rsp_24, .sub_rsp_40, .add_rsp_40, .sub_rsp_56, .add_rsp_56, .add_rsp_imm8 => 4,
         .add_rsp_imm32 => 7,
         .spill_arg_rsp => |spill| frameSlotInstructionSize(spill.reg, spill.frame_index),
+        .spill_arg64_rsp => |spill| frameSlotInstructionSize64(spill.reg, spill.frame_index),
         .reload_arg_rsp => |reload| frameSlotInstructionSize(reload.reg, reload.frame_index),
+        .reload_arg64_rsp => |reload| frameSlotInstructionSize64(reload.reg, reload.frame_index),
         .spill_xmm32_rsp, .reload_xmm32_rsp, .spill_xmm64_rsp, .reload_xmm64_rsp => 6,
         .spill_rdi_rsi_rsp24 => 10,
         .reload_rdi_rsp24, .reload_rsi_rsp24 => 5,
@@ -721,8 +725,26 @@ fn encodeRegToFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator,
     if (disp != 0) try bytes.append(allocator, disp);
 }
 
+fn encodeReg64ToFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {
+    try bytes.append(allocator, 0x48 | if (reg.rexR()) @as(u8, 0x04) else 0);
+    try bytes.append(allocator, opcode);
+    const disp = frameSlotDisp(frame_index);
+    try bytes.append(allocator, (if (disp == 0) @as(u8, 0x04) else @as(u8, 0x44)) | (@as(u8, reg.lowCode()) << 3));
+    try bytes.append(allocator, 0x24);
+    if (disp != 0) try bytes.append(allocator, disp);
+}
+
 fn encodeFrameSlotToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {
     if (reg.rexR()) try bytes.append(allocator, 0x44);
+    try bytes.append(allocator, opcode);
+    const disp = frameSlotDisp(frame_index);
+    try bytes.append(allocator, (if (disp == 0) @as(u8, 0x04) else @as(u8, 0x44)) | (@as(u8, reg.lowCode()) << 3));
+    try bytes.append(allocator, 0x24);
+    if (disp != 0) try bytes.append(allocator, disp);
+}
+
+fn encodeFrameSlotToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {
+    try bytes.append(allocator, 0x48 | if (reg.rexR()) @as(u8, 0x04) else 0);
     try bytes.append(allocator, opcode);
     const disp = frameSlotDisp(frame_index);
     try bytes.append(allocator, (if (disp == 0) @as(u8, 0x04) else @as(u8, 0x44)) | (@as(u8, reg.lowCode()) << 3));
@@ -826,6 +848,11 @@ fn frameSlotDisp(frame_index: x86_64.FrameIndex) u8 {
 
 fn frameSlotInstructionSize(reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) u32 {
     return (if (reg.rexR()) @as(u32, 1) else 0) + 3 + if (frameSlotDisp(frame_index) == 0) @as(u32, 0) else 1;
+}
+
+fn frameSlotInstructionSize64(reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) u32 {
+    _ = reg;
+    return 4 + if (frameSlotDisp(frame_index) == 0) @as(u32, 0) else 1;
 }
 
 fn eaxFrameSlotInstructionSize(frame_index: x86_64.FrameIndex) u32 {

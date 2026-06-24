@@ -154,7 +154,15 @@ pub const Instruction = union(enum) {
         frame_index: FrameIndex,
         reg: ArgReg,
     },
+    spill_arg64_rsp: struct {
+        frame_index: FrameIndex,
+        reg: ArgReg,
+    },
     reload_arg_rsp: struct {
+        reg: ArgReg,
+        frame_index: FrameIndex,
+    },
+    reload_arg64_rsp: struct {
         reg: ArgReg,
         frame_index: FrameIndex,
     },

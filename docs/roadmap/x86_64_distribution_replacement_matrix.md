@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=218`,
-`generic_codegen_functions=218`, `generic_cfg_functions=218`,
+three release modes at `source_rows=13`, `discovered_functions=219`,
+`generic_codegen_functions=219`, `generic_cfg_functions=219`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=218`, `object_failures=0`,
+`object_emitted_functions=219`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -472,6 +472,10 @@ later side-effecting `void` call before the post-call add. The two-result
 follow-up preserves the first `i32` call result across a second `i32` call with
 its own planned scalar argument, then combines both call results and the saved
 live parameter after the second call.
+The indirect follow-up preserves the second call target and argument across the
+first ordered `i32` call, reloads the pointer callee through the shared 64-bit
+frame spill/reload path, and reuses the SysV planner for the second
+`callq *%rax` result.
 The FP argument frontier also proves selected named `f32`/`f64` external-call
 pass-through through `%xmm0..%xmm4`; backend unit/object tests materialize
 immediate FP constants through `%xmm0..%xmm7`.
@@ -486,7 +490,7 @@ two-live no-argument and one-FP-argument pointer-callee shapes,
 three-/four-/six-live two-/three-/five-FP-argument pointer-callee shapes, and
 two-live FP-argument call shape,
 or arbitrary mixed/non-void live values across calls beyond the selected
-ordered `i32` result rows,
+direct/indirect ordered `i32` result rows,
 alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,

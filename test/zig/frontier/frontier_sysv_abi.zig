@@ -102,6 +102,12 @@ export fn frontier_two_i32_results_across_calls(a: i32, b: i32) i32 {
     return first + second + a;
 }
 
+export fn frontier_two_i32_results_across_indirect_call(func: IdI32Fn, a: i32, b: i32) i32 {
+    const first = frontier_ordered_i32(a);
+    const second = func(b);
+    return first + second + a;
+}
+
 export fn frontier_six_stack_arg_call() i32 {
     return frontier_sum12_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 }

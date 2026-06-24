@@ -102,6 +102,8 @@ selected first i32 call result plus live i32 caller argument across a later
   side-effecting void call
 selected first i32 call result plus live i32 caller argument across a later
   i32-returning call with its own planned scalar argument
+selected pointer-callee variant of that i32-returning call using 64-bit
+  frame spill/reload for the second call target
 one fixed i32 stack slot can feed the first direct-call argument
 ```
 
@@ -215,6 +217,9 @@ accepted frontier:
   void C ABI call before the post-call add
   selected two-result ordered i32 call frame where the first call result is
   spilled while a second i32 call receives its own planned scalar argument
+  selected indirect two-result ordered i32 call frame where the second call
+  target and argument are preserved across the first call and reloaded before
+  `callq *%rax`
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results
