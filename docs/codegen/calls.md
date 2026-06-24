@@ -250,6 +250,9 @@ accepted frontier:
   selected direct/pointer-callee i64 result live-across-later-void frames where
   the live addend and later pointer callee are preserved in aligned frame slots
   before the result is reloaded into `%rax` for the final add
+  selected two-result i64 live-across-later-void frames where the second call's
+  live argument, both `%rax` results, and the later pointer callee are preserved
+  through aligned frame slots
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results

@@ -111,7 +111,8 @@ live values beyond the selected one- through six-live f32/f64 no-argument-call
 shapes plus selected direct two-/three-/six-live FP-argument call shapes, and
 live values across multiple calls beyond selected i32, direct/pointer-callee
 two-result i64, selected direct/pointer-callee i64 result live-across-later-void,
-and two-live f32/f64 two-void-call shapes fail
+selected two-result i64 live-across-later-void, and two-live f32/f64
+two-void-call shapes fail
 closed.
 ```
 
@@ -300,7 +301,7 @@ Known gaps:
 
 ```text
 no callee-saved register saves
-no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one- through six-live f32/f64 SSE spill shapes, selected f32/f64 register-source argument permutations, selected direct two-/three-/six-live FP-argument call shapes, selected pointer-callee FP call shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width two-result f32/f64 call frames, selected mixed f32/f64 two-result call frames, and selected direct/pointer-callee i64 result live-across-later-void frames
+no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one- through six-live f32/f64 SSE spill shapes, selected f32/f64 register-source argument permutations, selected direct two-/three-/six-live FP-argument call shapes, selected pointer-callee FP call shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width two-result f32/f64 call frames, selected mixed f32/f64 two-result call frames, selected direct/pointer-callee i64 result live-across-later-void frames, and selected two-result i64 live-across-later-void frames
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, single-eightbyte `{ f32, f32 }` SSE construction returns and helper-call pass-through, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE field reads/construction, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
@@ -309,7 +310,7 @@ no arbitrary non-selected sret/byval copy lowering outside supported `i8`/`i16`/
 no broad indirect calls beyond selected scalar, register-aggregate, and normal
 supported-leaf MEMORY aggregate byval-to-sret forms, tail calls, or unsupported
 non-default call conventions
-no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32/i64, computed stack-passed i32/i64, one- through six-live f32/f64 no-argument-call shapes, selected f32/f64 register-source argument permutations, selected direct two-/three-/six-live FP-argument call shapes, selected pointer-callee FP call shapes through six live values and five FP helper arguments, selected two-call six-live i32 GPR frame, selected two-call two-live f32/f64 direct and pointer-callee void-call frames, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width and mixed f32/f64 two-result call frames, selected direct/pointer-callee i64 result live-across-later-void frames, and selected mixed one-GPR/one-SSE live one-/two-call direct/pointer-callee void-call frames
+no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected disp8-safe stack-passed i32/i64, computed stack-passed i32/i64, one- through six-live f32/f64 no-argument-call shapes, selected f32/f64 register-source argument permutations, selected direct two-/three-/six-live FP-argument call shapes, selected pointer-callee FP call shapes through six live values and five FP helper arguments, selected two-call six-live i32 GPR frame, selected two-call two-live f32/f64 direct and pointer-callee void-call frames, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width and mixed f32/f64 two-result call frames, selected direct/pointer-callee i64 result live-across-later-void frames, selected two-result i64 live-across-later-void frames, and selected mixed one-GPR/one-SSE live one-/two-call direct/pointer-callee void-call frames
 stack-passed live integer pressure beyond the current disp8-safe incoming stack offset model is rejected explicitly rather than guessed
 integer and pointer cyclic GPR argument shuffles use a generic push/pop
 parallel-copy path for register-source call arguments; mixed non-register

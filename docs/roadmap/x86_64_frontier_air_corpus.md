@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=305
-structured_functions=305
-generic_codegen_functions=305
-generic_cfg_functions=305
+discovered_functions=307
+structured_functions=307
+generic_codegen_functions=307
+generic_cfg_functions=307
 structural_matcher_functions=0
-structured_air_v2_functions=305
-typed_air_operand_functions=305
+structured_air_v2_functions=307
+typed_air_operand_functions=307
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=305
+generic_lowering_functions=307
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=305
+object_emitted_functions=307
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -460,6 +460,13 @@ Closed in the current memory/aggregate frontier slice:
   `i64` addend and any later pointer callee before the first result call,
   reload the saved `%rax` result after the side-effecting `void` call, and
   finish the add through the same SysV target/planner path.
+- selected two-result i64 live-across-later-void frames in
+  `frontier_sysv_abi.zig`:
+  `frontier_two_i64_results_live_across_void_call` and
+  `frontier_two_i64_results_live_across_indirect_void_call` spill the second
+  call's live argument before the first call, save both `i64` results in
+  aligned frame slots, then reload and add those saved `%rax` results after a
+  later direct or pointer-callee `void` call.
 - selected mixed-width FP call-result frames in `frontier_sysv_abi.zig`:
   `frontier_mixed_f32_f64_results_across_calls`,
   `frontier_mixed_indirect_first_f32_f64_results_across_calls`,

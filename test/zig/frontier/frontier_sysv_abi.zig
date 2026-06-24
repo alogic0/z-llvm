@@ -187,6 +187,20 @@ export fn frontier_indirect_i64_result_live_across_indirect_void_call(func: IdI6
     return first + b;
 }
 
+export fn frontier_two_i64_results_live_across_void_call(a: i64, b: i64) i64 {
+    const first = frontier_ordered_i64(a);
+    const second = frontier_ordered2_i64(b);
+    frontier_touch_ordered_after_two();
+    return first + second;
+}
+
+export fn frontier_two_i64_results_live_across_indirect_void_call(func: VoidFn, a: i64, b: i64) i64 {
+    const first = frontier_ordered_i64(a);
+    const second = frontier_ordered2_i64(b);
+    func();
+    return first + second;
+}
+
 export fn frontier_two_i32_results_live_across_void_call(a: i32, b: i32) i32 {
     const first = frontier_ordered_i32(a);
     const second = frontier_ordered2_i32(b);

@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=305`,
-`generic_codegen_functions=305`, `generic_cfg_functions=305`,
+frontier gate reports `source_rows=13`, `discovered_functions=307`,
+`generic_codegen_functions=307`, `generic_cfg_functions=307`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=305`, `object_failures=0`,
+`object_emitted_functions=307`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -550,6 +550,9 @@ The i64 live-across-void follow-up preserves a direct or pointer-callee C ABI
 `i64` result plus a live `i64` addend across a later direct or pointer-callee
 side-effecting `void` call, then reloads `%rax` from the frame for the final
 add.
+The two-result i64/later-void follow-up preserves the second call's live
+argument before the first call, stores both `%rax` results in aligned frame
+slots, and reloads them after a later direct or pointer-callee `void` call.
 The mixed-width follow-up preserves direct or pointer-callee `f32`/`f64` result
 pairs in either order, reloads and extends the `f32` result with `cvtss2sd`,
 then performs the final `f64` add.
