@@ -1201,6 +1201,7 @@ pub fn lowerStraightLineReturn(
                 try machine.instructions.append(allocator, .ret);
                 return;
             }
+            try sysv_abi.rejectUnsupportedAbiType(ret.ty);
             if (!ret.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
             try lowerReturnValue(allocator, machine, function, block, ret.value orelse return error.InvalidRet);
             try machine.instructions.append(allocator, .ret);

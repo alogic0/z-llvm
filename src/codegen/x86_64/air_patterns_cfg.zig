@@ -2,6 +2,7 @@ const std = @import("std");
 const ir = @import("../../ir.zig");
 
 const x86_64_types = @import("types.zig");
+const sysv_abi = @import("sysv_abi.zig");
 const x86_64_emit = @import("emit.zig");
 const x86_64_match = @import("match.zig");
 const x86_64_generic_cfg = @import("generic_cfg.zig");
@@ -90,11 +91,14 @@ pub fn lowerCall(
     call: ir.CallInst,
 ) !void {
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    if (call.tail_kind != null) return error.UnsupportedTailCallAbi;
+    if (call.operand_bundle != null) return error.UnsupportedCallAttributeAbi;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     if (call.callee_function_ty) |function_ty| {
-        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedVarargsAbi;
     }
-    if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
+    try sysv_abi.rejectUnsupportedAbiType(call.ret_ty);
+    if (call.ret_attrs != null or call.attrs != null) try sysv_abi.rejectUnsupportedCallEnvelope(call);
     if (call.ret_ty != .void and !call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
     if (call.callee_value) |callee_value| {
         const callee_name = switch (callee_value) {
@@ -113,7 +117,8 @@ pub fn lowerCall(
     if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
 
     for (call.args.items, 0..) |arg, index| {
-        if (arg.attrs != null) return error.UnsupportedCodegenAbi;
+        try sysv_abi.rejectUnsupportedCallArgAttrs(arg.attrs);
+        try sysv_abi.rejectUnsupportedAbiType(arg.ty);
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
         const dst = try ArgReg.fromIndex(index);
         const src = try x86_64_generic_cfg.paramValueReg(function, arg.value, arg.ty);

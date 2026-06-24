@@ -548,7 +548,7 @@ test "x86_64 SysV call planner rejects varargs explicitly" {
 
     const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
+        error.UnsupportedVarargsAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
     );
 }
@@ -589,7 +589,7 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
     try tail_module.verify();
     const tail_call = tail_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
+        error.UnsupportedTailCallAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, tail_module.functions.items[0], tail_call),
     );
 
@@ -610,7 +610,7 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
     try callconv_module.verify();
     const callconv_call = callconv_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
+        error.UnsupportedCallConvAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, callconv_module.functions.items[0], callconv_call),
     );
 }
@@ -880,7 +880,7 @@ test "x86_64 SysV call planner rejects vector argument ABI boundary" {
 
     const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expectError(
-        error.UnsupportedCodegenType,
+        error.UnsupportedVectorAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
     );
 }
@@ -904,7 +904,7 @@ test "x86_64 SysV call planner rejects vector return ABI boundary" {
 
     const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expectError(
-        error.UnsupportedCodegenType,
+        error.UnsupportedVectorAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
     );
 }
@@ -928,7 +928,7 @@ test "x86_64 SysV call planner rejects X87 ABI boundary" {
 
     const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expectError(
-        error.UnsupportedCodegenType,
+        error.UnsupportedLongDoubleAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
     );
 }
@@ -949,6 +949,25 @@ test "parser rejects packed aggregate ABI signatures before x86_64 codegen" {
     try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, input));
 }
 
+test "x86_64 SysV return planner rejects explicit ABI boundaries" {
+    try std.testing.expectError(
+        error.UnsupportedPackedAggregateAbi,
+        codegen.x86_64.sysvReturnPlanCountsForTest(.{ .aggregate = "<{ i8, i64 }" }),
+    );
+    try std.testing.expectError(
+        error.UnsupportedVectorAbi,
+        codegen.x86_64.sysvReturnPlanCountsForTest(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } }),
+    );
+    try std.testing.expectError(
+        error.UnsupportedLongDoubleAbi,
+        codegen.x86_64.sysvReturnPlanCountsForTest(.x86_fp80),
+    );
+    try std.testing.expectError(
+        error.UnsupportedLongDoubleAbi,
+        codegen.x86_64.sysvReturnPlanCountsForTest(.fp128),
+    );
+}
+
 test "x86_64 codegen rejects vector call ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -967,7 +986,7 @@ test "x86_64 codegen rejects vector call ABI boundary" {
     try module.verify();
 
     try std.testing.expectError(
-        error.UnsupportedCodegenType,
+        error.UnsupportedVectorAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
     );
 }
@@ -990,7 +1009,7 @@ test "x86_64 codegen rejects varargs call ABI boundary" {
     try module.verify();
 
     try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
+        error.UnsupportedVarargsAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
     );
 }
@@ -1012,7 +1031,7 @@ test "x86_64 codegen rejects sret and byval call ABI boundaries" {
     defer sret_module.deinit();
     try sret_module.verify();
     try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
+        error.UnsupportedSretByvalAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]),
     );
 
@@ -1032,7 +1051,7 @@ test "x86_64 codegen rejects sret and byval call ABI boundaries" {
     defer byval_module.deinit();
     try byval_module.verify();
     try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
+        error.UnsupportedSretByvalAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, byval_module.target_triple.?, byval_module.functions.items[0]),
     );
 }
@@ -1074,7 +1093,7 @@ test "x86_64 codegen rejects larger aggregate call and vector return ABI boundar
     defer vector_return_module.deinit();
     try vector_return_module.verify();
     try std.testing.expectError(
-        error.UnsupportedCodegenType,
+        error.UnsupportedVectorAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, vector_return_module.target_triple.?, vector_return_module.functions.items[0]),
     );
 }
@@ -1094,7 +1113,7 @@ test "x86_64 codegen rejects X87 return ABI boundary" {
     try module.verify();
 
     try std.testing.expectError(
-        error.UnsupportedCodegenType,
+        error.UnsupportedLongDoubleAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
     );
 }

@@ -186,7 +186,7 @@ test "x86_64 codegen rejects unsupported call ABI shapes" {
     defer tail_call_module.deinit();
     try tail_call_module.verify();
     try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
+        error.UnsupportedTailCallAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, tail_call_module.target_triple.?, tail_call_module.functions.items[0]),
     );
 }

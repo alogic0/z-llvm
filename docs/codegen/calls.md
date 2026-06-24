@@ -282,14 +282,17 @@ The first slice rejects:
 
 ```text
 inline assembly calls
-varargs
-byval/sret lowering beyond the generated selected normal MEMORY aggregate frontier
+varargs (`UnsupportedVarargsAbi`)
+vectors (`UnsupportedVectorAbi`)
+X87 / long double (`UnsupportedLongDoubleAbi`)
+packed aggregate ABI call/return forms (`UnsupportedPackedAggregateAbi`)
+byval/sret lowering beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
 operand bundles
 invoke
 callbr
-tail, musttail, and notail markers
+tail, musttail, and notail markers (`UnsupportedTailCallAbi`)
 unsupported call attributes
-unsupported calling conventions
+unsupported calling conventions (`UnsupportedCallConvAbi`)
 ```
 
 Narrow indirect calls are no longer part of the rejected surface: typed AIR v2
@@ -377,7 +380,7 @@ selected four-live f32/f64 three-FP-argument pointer-callee spill/reload frames
 selected six-live f32/f64 five-FP-argument pointer-callee spill/reload frames
 unsupported broader stack-passed and broader SSE live-across-call pressure diagnostic
 tested callee-saved policy: the selected allocator does not allocate callee-saved GPRs
-unsupported varargs/vector/X87/packed aggregate/sret/byval/larger aggregate ABI diagnostics
+unsupported varargs/vector/X87/packed aggregate/sret/byval/larger aggregate ABI diagnostics use targeted boundary errors
 ```
 
 Object relocation fixtures cover the current direct external call subset with

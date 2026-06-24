@@ -293,6 +293,21 @@ pub const CallPlan = struct {
     }
 };
 
+pub fn isBoundaryError(err: anyerror) bool {
+    return switch (err) {
+        error.UnsupportedVarargsAbi,
+        error.UnsupportedVectorAbi,
+        error.UnsupportedLongDoubleAbi,
+        error.UnsupportedPackedAggregateAbi,
+        error.UnsupportedTailCallAbi,
+        error.UnsupportedCallConvAbi,
+        error.UnsupportedCallAttributeAbi,
+        error.UnsupportedSretByvalAbi,
+        => true,
+        else => false,
+    };
+}
+
 pub fn callPlanCountsForTest(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !CallPlanCounts {
     var plan = try planCall(allocator, function, call);
     defer plan.deinit(allocator);
@@ -300,16 +315,16 @@ pub fn callPlanCountsForTest(allocator: std.mem.Allocator, function: ir.Function
 }
 
 pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !CallPlan {
-    if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
-    if (call.inline_asm != null) return error.UnsupportedCodegenAbi;
-    if (call.ret_attrs != null or call.attrs != null or call.operand_bundle != null) return error.UnsupportedCodegenAbi;
+    try rejectUnsupportedCallEnvelope(call);
+    try rejectUnsupportedAbiType(call.ret_ty);
+
     if (call.calling_conv) |calling_conv| {
         if (!std.mem.eql(u8, calling_conv, "ccc") and !std.mem.eql(u8, calling_conv, "fastcc")) {
-            return error.UnsupportedCodegenAbi;
+            return error.UnsupportedCallConvAbi;
         }
     }
     if (call.callee_function_ty) |function_ty| {
-        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedVarargsAbi;
     }
 
     var plan: CallPlan = .{};
@@ -319,7 +334,8 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
     var int_arg_index: usize = 0;
     var fp_arg_index: usize = 0;
     for (call.args.items) |arg| {
-        if (arg.attrs != null) return error.UnsupportedCodegenAbi;
+        try rejectUnsupportedCallArgAttrs(arg.attrs);
+        try rejectUnsupportedAbiType(arg.ty);
         if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
             plan.has_non_i32_arg = plan.has_non_i32_arg or !arg.ty.eql(.{ .int = 32 });
             if (int_arg_index >= 6) {
@@ -368,6 +384,7 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
 }
 
 pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
+    try rejectUnsupportedAbiType(ret_ty);
     if (ret_ty == .void) return .{};
     if (ret_ty.eql(.{ .int = 1 }) or ret_ty.eql(.{ .int = 8 }) or ret_ty.eql(.{ .int = 16 }) or ret_ty.eql(.{ .int = 32 }) or ret_ty.eql(.{ .int = 64 }) or ret_ty == .ptr) {
         return .{ .gpr_returns = 1 };
@@ -382,6 +399,58 @@ pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
         return .{ .gpr_returns = needs.gpr, .sse_returns = needs.sse };
     }
     return error.UnsupportedCodegenType;
+}
+
+pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {
+    if (call.tail_kind != null) return error.UnsupportedTailCallAbi;
+    if (call.inline_asm != null) return error.UnsupportedCallAttributeAbi;
+    if (call.ret_attrs) |attrs| {
+        if (attrsContainAbiPayload(attrs, "sret") or attrsContainAbiPayload(attrs, "byval")) {
+            return error.UnsupportedSretByvalAbi;
+        }
+        return error.UnsupportedCallAttributeAbi;
+    }
+    if (call.attrs) |attrs| {
+        if (attrsContainAbiPayload(attrs, "sret") or attrsContainAbiPayload(attrs, "byval")) {
+            return error.UnsupportedSretByvalAbi;
+        }
+        return error.UnsupportedCallAttributeAbi;
+    }
+    if (call.operand_bundle != null) return error.UnsupportedCallAttributeAbi;
+}
+
+pub fn rejectUnsupportedCallArgAttrs(attrs: ?[]const u8) !void {
+    const text = attrs orelse return;
+    if (attrsContainAbiPayload(text, "sret") or attrsContainAbiPayload(text, "byval")) {
+        return error.UnsupportedSretByvalAbi;
+    }
+    return error.UnsupportedCallAttributeAbi;
+}
+
+fn attrsContainAbiPayload(attrs: []const u8, name: []const u8) bool {
+    var index: usize = 0;
+    while (std.mem.indexOfPos(u8, attrs, index, name)) |found| {
+        const after = found + name.len;
+        if (after < attrs.len and attrs[after] == '(') return true;
+        index = after;
+    }
+    return false;
+}
+
+pub fn rejectUnsupportedAbiType(ty: ir.Type) !void {
+    switch (ty) {
+        .vector => return error.UnsupportedVectorAbi,
+        .x86_fp80, .fp128 => return error.UnsupportedLongDoubleAbi,
+        .aggregate => |text| {
+            const trimmed = std.mem.trim(u8, text, " \t");
+            if (std.mem.startsWith(u8, trimmed, "<{")) return error.UnsupportedPackedAggregateAbi;
+            var field_index: usize = 0;
+            while (memory_location.aggregateFieldType(ty, field_index)) |field_ty| : (field_index += 1) {
+                try rejectUnsupportedAbiType(field_ty);
+            }
+        },
+        .void, .int, .float, .double, .metadata, .ptr => {},
+    }
 }
 
 pub fn aggregateReturnHasNoGpr(ret_ty: ir.Type) bool {
