@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=254
-structured_functions=254
-generic_codegen_functions=254
-generic_cfg_functions=254
+discovered_functions=257
+structured_functions=257
+generic_codegen_functions=257
+generic_cfg_functions=257
 structural_matcher_functions=0
-structured_air_v2_functions=254
-typed_air_operand_functions=254
+structured_air_v2_functions=257
+typed_air_operand_functions=257
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=254
+generic_lowering_functions=257
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=254
+object_emitted_functions=257
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -326,6 +326,11 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_indirect_ptr_stack_arg_forward` pass eight pointer arguments through
   direct and function-pointer calls, proving pointer GPR assignment plus
   stack-passed pointer slots through executable C ABI checks.
+- selected pointer return rows in `frontier_sysv_abi.zig`:
+  `frontier_ptr_return_param`, `frontier_ptr_return_direct_call`, and
+  `frontier_ptr_return_indirect_call` return pointer values through `%rax`
+  from a parameter, a direct C ABI helper, and a function-pointer C ABI helper
+  using the generic SysV GPR return path.
 - selected multi-call live-value frame in `frontier_sysv_abi.zig`:
   `frontier_two_void_calls_six_live` keeps six live GPR `i32` values across two
   void C ABI calls through the generic CFG live-param spill/reload helper;

@@ -9,6 +9,7 @@ const Sum14Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32
 const Sum24Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 const Sum8I64Fn = *const fn (i64, i64, i64, i64, i64, i64, i64, i64) callconv(.c) i64;
 const Sum8PtrFn = *const fn (*const i32, *const i32, *const i32, *const i32, *const i32, *const i32, *const i32, *const i32) callconv(.c) i32;
+const ChoosePtrFn = *const fn (*const i32, *const i32, i32) callconv(.c) *const i32;
 const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
 const TouchF32Fn = *const fn (f32) callconv(.c) void;
@@ -63,6 +64,7 @@ extern fn frontier_sum24_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: 
 extern fn frontier_sum6_i64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64) i64;
 extern fn frontier_sum8_i64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64) i64;
 extern fn frontier_sum8_ptr(a: *const i32, b: *const i32, c: *const i32, d: *const i32, e: *const i32, f: *const i32, g: *const i32, h: *const i32) i32;
+extern fn frontier_choose_ptr(a: *const i32, b: *const i32, tag: i32) *const i32;
 
 export fn frontier_two_live_after_call(a: i32, b: i32, c: i32) i32 {
     return a + b + frontier_id_i32(c);
@@ -196,6 +198,19 @@ export fn frontier_ptr_stack_arg_forward(a: *const i32, b: *const i32, c: *const
 
 export fn frontier_indirect_ptr_stack_arg_forward(func: Sum8PtrFn, a: *const i32, b: *const i32, c: *const i32, d: *const i32, e: *const i32, f: *const i32, g: *const i32, h: *const i32) i32 {
     return func(a, b, c, d, e, f, g, h);
+}
+
+export fn frontier_ptr_return_param(a: *const i32, b: *const i32) *const i32 {
+    _ = a;
+    return b;
+}
+
+export fn frontier_ptr_return_direct_call(a: *const i32, b: *const i32, tag: i32) *const i32 {
+    return frontier_choose_ptr(a, b, tag);
+}
+
+export fn frontier_ptr_return_indirect_call(func: ChoosePtrFn, a: *const i32, b: *const i32, tag: i32) *const i32 {
+    return func(a, b, tag);
 }
 
 export fn frontier_indirect_two_live_after_call(func: IdI32Fn, a: i32, b: i32, c: i32) i32 {
