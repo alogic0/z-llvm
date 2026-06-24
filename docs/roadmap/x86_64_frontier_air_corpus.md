@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=351
-structured_functions=351
-generic_codegen_functions=351
-generic_cfg_functions=351
+discovered_functions=355
+structured_functions=355
+generic_codegen_functions=355
+generic_cfg_functions=355
 structural_matcher_functions=0
-structured_air_v2_functions=351
-typed_air_operand_functions=351
+structured_air_v2_functions=355
+typed_air_operand_functions=355
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=351
+generic_lowering_functions=355
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=351
+object_emitted_functions=355
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -513,6 +513,13 @@ Closed in the current memory/aggregate frontier slice:
   `double` argument and optional second pointer callee across the first `i64`
   result call, save `%rax`, run the later `double` result call, convert the
   saved integer result with `sitofp`, and return the mixed `double` sum.
+  `frontier_mixed_f64_i64_results_across_calls`,
+  `frontier_mixed_indirect_first_f64_i64_results_across_calls`,
+  `frontier_mixed_indirect_second_f64_i64_results_across_calls`, and
+  `frontier_mixed_indirect_both_f64_i64_results_across_calls` prove the
+  mirrored order: save the first `double` result, preserve the later `i64`
+  argument and optional second pointer callee, run the `i64` result call,
+  convert `%rax` with `sitofp`, and add it to the saved `double`.
 - selected mixed-width FP call-result frames in `frontier_sysv_abi.zig`:
   `frontier_mixed_f32_f64_results_across_calls`,
   `frontier_mixed_indirect_first_f32_f64_results_across_calls`,
