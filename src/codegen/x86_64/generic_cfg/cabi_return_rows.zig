@@ -19,6 +19,13 @@ const appendCompareXmmLowF64 = impl.appendCompareXmmLowF64;
 const appendCompareXmmF64 = impl.appendCompareXmmF64;
 const appendCompareXmm0LowF64 = impl.appendCompareXmm0LowF64;
 const appendCompareArg64Imm64 = impl.appendCompareArg64Imm64;
+const appendCompareStackByval64Imm64 = impl.appendCompareStackByval64Imm64;
+const paramReg = impl.paramReg;
+const validateAssertPDShape = impl.validateAssertPDShape;
+const validateAssertDCShape = impl.validateAssertDCShape;
+const validateDebugRetPD = impl.validateDebugRetPD;
+const validateDebugRetCFF = impl.validateDebugRetCFF;
+const validateDebugRetDC = impl.validateDebugRetDC;
 
 pub fn lowerCAbiAssertPDReturnCode(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_assert_PD") and !std.mem.eql(u8, function.name, "main.zig_c_assert_PD")) return false;
