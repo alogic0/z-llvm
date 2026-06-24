@@ -244,6 +244,29 @@ test "x86_64 generic CFG lowers direct pointer call args through planner" {
     try std.testing.expect(saw_call);
 }
 
+test "x86_64 generic CFG rejects cyclic GPR arg register shuffle" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32, i32)
+        \\
+        \\define i32 @caller(i32 %a, i32 %b) {
+        \\entry:
+        \\  %r = call i32 @callee(i32 %b, i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
 test "x86_64 generic CFG lowers indirect pointer call args through planner" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -174,6 +174,7 @@ pub fn appendSysVScalarCallArgsWithBlock(
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
     if (plan.counts.stack_args > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
+    try validateSequentialGprArgMoves(function, call, plan);
 
     var stack_args: [max_sysv_stack_call_args]StackScalarCallArg = undefined;
     var stack_arg_count: usize = 0;
@@ -322,6 +323,36 @@ pub fn appendSysVScalarCallArgsWithBlock(
         }
     }
     return stack_arg_count;
+}
+
+fn validateSequentialGprArgMoves(function: ir.Function, call: ir.CallInst, plan: SysVCallPlan) !void {
+    var overwritten = [_]bool{false} ** 6;
+    for (call.args.items, 0..) |arg, index| {
+        const assignment = plan.assignments.items[index];
+        const dst = switch (assignment) {
+            .gpr => |dst| dst,
+            .sse, .stack_i32_const, .stack_i32_param, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
+        };
+
+        const writes_dst = switch (arg.value) {
+            .int => true,
+            .null_value => arg.ty == .ptr,
+            .named => |name| writes: {
+                const src = sysvIntegerParamRegOrNull(function, name, arg.ty) catch |err| switch (err) {
+                    error.UnsupportedCodegenAbi => null,
+                    else => return err,
+                };
+                if (src) |reg| {
+                    const src_index = @intFromEnum(reg);
+                    if (overwritten[src_index]) return error.UnsupportedCodegenAbi;
+                    break :writes reg != dst;
+                }
+                break :writes true;
+            },
+            .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => false,
+        };
+        if (writes_dst) overwritten[@intFromEnum(dst)] = true;
+    }
 }
 
 pub fn adjustedIncomingStackDisp8(base_offset: u8, incoming_stack_adjust: usize) !u8 {
