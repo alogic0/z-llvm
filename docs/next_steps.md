@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=282`,
-`generic_codegen_functions=282`, `generic_cfg_functions=282`,
+frontier gate reports `source_rows=13`, `discovered_functions=285`,
+`generic_codegen_functions=285`, `generic_cfg_functions=285`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=282`, `object_failures=0`,
+`object_emitted_functions=285`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -540,7 +540,7 @@ result plus a live `f64` addend across a later direct or pointer-callee
 side-effecting `void` call, then reloads both XMM frame slots for the final
 post-call `fadd`.
 The two-result FP follow-up preserves a first direct or pointer-callee C ABI
-`f64` call result across a second direct or pointer-callee `f64` result call,
+`f32`/`f64` call result across a second direct or pointer-callee FP result call,
 then reloads the saved XMM slot for the final `fadd`.
 The mixed numeric frontier also lowers typed AIR v2 `sitofp` plus `fadd` or
 `fmul`/`fadd` pipelines for `i32` to `f32`/`f64`, including `mulss`/`mulsd`
@@ -1354,8 +1354,8 @@ to i12`, `%notmask.i = shl nsw i12 -1, %199`, `%200 = xor i12 %notmask.i,
 `%brmerge.i`, and is now covered by
 `releasesmall_runtime_base64_residual_final_mask_step`. The next selected
 slice is the residual final padding loop around
-`%203 = getelementptr [1 x i8], ptr %2, i64 %.sroa.0282.0.i`,
-`%204 = sub nuw i64 %3, %.sroa.0282.0.i`,
+`%203 = getelementptr [1 x i8], ptr %2, i64 %.sroa.0285.0.i`,
+`%204 = sub nuw i64 %3, %.sroa.0285.0.i`,
 `%exitcond348.not.i = icmp eq i64 %.0301.i, %204`,
 `%207 = getelementptr [1 x i8], ptr %203, i64 %.0301.i`,
 `%208 = load i8, ptr %207`, `%.not318.i = icmp eq i8 %208, 61`,

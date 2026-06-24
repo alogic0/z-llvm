@@ -25,6 +25,7 @@ const Touch3F64Fn = *const fn (f64, f64, f64) callconv(.c) void;
 const Touch5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) void;
 const Touch5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) void;
 const IdI32Fn = *const fn (i32) callconv(.c) i32;
+const IdF32Fn = *const fn (f32) callconv(.c) f32;
 const IdF64Fn = *const fn (f64) callconv(.c) f64;
 const VoidFn = *const fn () callconv(.c) void;
 const MakePair64Fn = *const fn (i64, i64) callconv(.c) Pair64;
@@ -59,6 +60,8 @@ extern fn frontier_touch_ordered() void;
 extern fn frontier_touch_ordered_after_two() void;
 extern fn frontier_ordered_i32(value: i32) i32;
 extern fn frontier_ordered2_i32(value: i32) i32;
+extern fn frontier_ordered_f32(value: f32) f32;
+extern fn frontier_ordered2_f32(value: f32) f32;
 extern fn frontier_ordered_f64(value: f64) f64;
 extern fn frontier_ordered2_f64(value: f64) f64;
 extern fn frontier_sum5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) f32;
@@ -184,14 +187,32 @@ export fn frontier_two_f64_results_across_calls(a: f64, b: f64) f64 {
     return first + second;
 }
 
+export fn frontier_two_f32_results_across_calls(a: f32, b: f32) f32 {
+    const first = frontier_ordered_f32(a);
+    const second = frontier_ordered2_f32(b);
+    return first + second;
+}
+
 export fn frontier_indirect_first_f64_results_across_calls(func: IdF64Fn, a: f64, b: f64) f64 {
     const first = func(a);
     const second = frontier_ordered2_f64(b);
     return first + second;
 }
 
+export fn frontier_indirect_first_f32_results_across_calls(func: IdF32Fn, a: f32, b: f32) f32 {
+    const first = func(a);
+    const second = frontier_ordered2_f32(b);
+    return first + second;
+}
+
 export fn frontier_indirect_second_f64_results_across_calls(func: IdF64Fn, a: f64, b: f64) f64 {
     const first = frontier_ordered_f64(a);
+    const second = func(b);
+    return first + second;
+}
+
+export fn frontier_indirect_second_f32_results_across_calls(func: IdF32Fn, a: f32, b: f32) f32 {
+    const first = frontier_ordered_f32(a);
     const second = func(b);
     return first + second;
 }

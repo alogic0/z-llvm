@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=282
-structured_functions=282
-generic_codegen_functions=282
-generic_cfg_functions=282
+discovered_functions=285
+structured_functions=285
+generic_codegen_functions=285
+generic_cfg_functions=285
 structural_matcher_functions=0
-structured_air_v2_functions=282
-typed_air_operand_functions=282
+structured_air_v2_functions=285
+typed_air_operand_functions=285
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=282
+generic_lowering_functions=285
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=282
+object_emitted_functions=285
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -431,9 +431,12 @@ Closed in the current memory/aggregate frontier slice:
   call, then reload both XMM frame slots for the final post-call `fadd` return.
 - selected two-result FP call frames in `frontier_sysv_abi.zig`:
   `frontier_two_f64_results_across_calls`,
-  `frontier_indirect_first_f64_results_across_calls`, and
-  `frontier_indirect_second_f64_results_across_calls` spill the first C ABI
-  `double` call result across a second direct or pointer-callee `double`
+  `frontier_two_f32_results_across_calls`,
+  `frontier_indirect_first_f64_results_across_calls`,
+  `frontier_indirect_first_f32_results_across_calls`,
+  `frontier_indirect_second_f64_results_across_calls`, and
+  `frontier_indirect_second_f32_results_across_calls` spill the first C ABI
+  `float` or `double` call result across a second direct or pointer-callee FP
   result call, preserve the second call's FP argument and pointer callee when
   needed, then reload the first result for the final `fadd`.
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
