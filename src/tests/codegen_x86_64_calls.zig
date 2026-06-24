@@ -166,7 +166,7 @@ test "x86_64 codegen rejects unsupported call ABI shapes" {
     defer unsupported_cc_module.deinit();
     try unsupported_cc_module.verify();
     try std.testing.expectError(
-        error.UnsupportedCodegenCallingConvention,
+        error.UnsupportedCallConvAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, unsupported_cc_module.target_triple.?, unsupported_cc_module.functions.items[0]),
     );
 

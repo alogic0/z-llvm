@@ -22,7 +22,6 @@ const isInt = x86_64_match.isInt;
 const isFpText = x86_64_match.isFpText;
 const u5Value = x86_64_match.u5Value;
 const callIsFastcc = x86_64_match.callIsFastcc;
-const validateDefaultCallConv = x86_64_match.validateDefaultCallConv;
 
 const appendAlignedDirectCallPreservingI32Param = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Param;
 const appendIndirectCallRaxWithStackArgs = x86_64_emit.appendIndirectCallRaxWithStackArgs;
@@ -97,7 +96,11 @@ pub fn lowerCall(
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (call.tail_kind != null) return error.UnsupportedTailCallAbi;
     if (call.operand_bundle != null) return error.UnsupportedCallAttributeAbi;
-    if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
+    if (!callIsFastcc(call.calling_conv)) {
+        if (call.calling_conv) |calling_conv| {
+            if (!std.mem.eql(u8, calling_conv, "ccc")) return error.UnsupportedCallConvAbi;
+        }
+    }
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedVarargsAbi;
     }

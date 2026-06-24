@@ -620,6 +620,30 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, tail_module.functions.items[0], tail_call),
     );
 
+    const indirect_tail_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, i32 %a) {
+        \\entry:
+        \\  %r = tail call i32 %fn(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_tail_module = try ir.Module.parse(std.testing.allocator, indirect_tail_input);
+    defer indirect_tail_module.deinit();
+    try indirect_tail_module.verify();
+    const indirect_tail_call = indirect_tail_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(indirect_tail_call.callee_value != null);
+    try std.testing.expectError(
+        error.UnsupportedTailCallAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_tail_module.functions.items[0], indirect_tail_call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedTailCallAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_tail_module.target_triple.?, indirect_tail_module.functions.items[0]),
+    );
+
     const callconv_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -639,6 +663,30 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
     try std.testing.expectError(
         error.UnsupportedCallConvAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, callconv_module.functions.items[0], callconv_call),
+    );
+
+    const indirect_callconv_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, i32 %a) {
+        \\entry:
+        \\  %r = call coldcc i32 %fn(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_callconv_module = try ir.Module.parse(std.testing.allocator, indirect_callconv_input);
+    defer indirect_callconv_module.deinit();
+    try indirect_callconv_module.verify();
+    const indirect_callconv_call = indirect_callconv_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(indirect_callconv_call.callee_value != null);
+    try std.testing.expectError(
+        error.UnsupportedCallConvAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_callconv_module.functions.items[0], indirect_callconv_call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedCallConvAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_callconv_module.target_triple.?, indirect_callconv_module.functions.items[0]),
     );
 }
 
