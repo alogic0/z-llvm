@@ -5,6 +5,7 @@ const memory_location = @import("../analysis/memory_location.zig");
 const x86_64_types = @import("x86_64/types.zig");
 const sysv_abi = @import("x86_64/sysv_abi.zig");
 const x86_64_verify = @import("x86_64/verify.zig");
+const x86_64_emit = @import("x86_64/emit.zig");
 
 pub const ArgReg = x86_64_types.ArgReg;
 pub const XmmReg = x86_64_types.XmmReg;
@@ -21,6 +22,25 @@ const SysVRegisterNeeds = sysv_abi.RegisterNeeds;
 const SysVRegisterAggregatePassThrough = sysv_abi.RegisterAggregatePassThrough;
 const SysVCallPlan = sysv_abi.CallPlan;
 const SysVParamCursor = sysv_abi.ParamCursor;
+const SysVCallTarget = x86_64_emit.SysVCallTarget;
+const max_sysv_stack_call_args = x86_64_emit.max_sysv_stack_call_args;
+const appendIntegerOverflowCall = x86_64_emit.appendIntegerOverflowCall;
+const appendStackFrame = x86_64_emit.appendStackFrame;
+const appendStackFrameEnd = x86_64_emit.appendStackFrameEnd;
+const appendDirectCall = x86_64_emit.appendDirectCall;
+const appendAlignedDirectCall = x86_64_emit.appendAlignedDirectCall;
+const appendDirectCallWithStackArgs = x86_64_emit.appendDirectCallWithStackArgs;
+const appendIndirectCallRaxWithStackArgs = x86_64_emit.appendIndirectCallRaxWithStackArgs;
+const appendLoadStackDispArg32 = x86_64_emit.appendLoadStackDispArg32;
+const appendLoadStackDispArg64 = x86_64_emit.appendLoadStackDispArg64;
+const appendMoveImmToArgReg = x86_64_emit.appendMoveImmToArgReg;
+const appendMoveImm32ToXmm = x86_64_emit.appendMoveImm32ToXmm;
+const appendMoveImm64ToXmm = x86_64_emit.appendMoveImm64ToXmm;
+const setupSysVCallTarget = x86_64_emit.setupSysVCallTarget;
+const appendSysVCallTarget = x86_64_emit.appendSysVCallTarget;
+const appendAlignedSysVCallTarget = x86_64_emit.appendAlignedSysVCallTarget;
+const appendSysVCallTargetWithStackArgs = x86_64_emit.appendSysVCallTargetWithStackArgs;
+const appendPanicCall = x86_64_emit.appendPanicCall;
 
 const x86_64_machine = @import("x86_64/machine.zig");
 
@@ -22088,96 +22108,6 @@ fn functionHasOverflowPanicEdge(function: ir.Function) bool {
     return sliceSumHasOverflowCheck(function);
 }
 
-fn appendIntegerOverflowCall(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8) !void {
-    try appendPanicCall(allocator, machine, label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
-}
-
-fn appendStackFrame(allocator: std.mem.Allocator, machine: *MachineFunction, bytes: u8) !void {
-    switch (bytes) {
-        8 => try machine.instructions.append(allocator, .sub_rsp_8),
-        24 => try machine.instructions.append(allocator, .sub_rsp_24),
-        40 => try machine.instructions.append(allocator, .sub_rsp_40),
-        56 => try machine.instructions.append(allocator, .sub_rsp_56),
-        else => return error.UnsupportedCodegenAbi,
-    }
-}
-
-fn appendStackFrameEnd(allocator: std.mem.Allocator, machine: *MachineFunction, bytes: u8) !void {
-    switch (bytes) {
-        8 => try machine.instructions.append(allocator, .add_rsp_8),
-        24 => try machine.instructions.append(allocator, .add_rsp_24),
-        40 => try machine.instructions.append(allocator, .add_rsp_40),
-        56 => try machine.instructions.append(allocator, .add_rsp_56),
-        else => return error.UnsupportedCodegenAbi,
-    }
-}
-
-fn appendDirectCall(allocator: std.mem.Allocator, machine: *MachineFunction, symbol: []const u8, ret_ty: ir.Type) !void {
-    try machine.instructions.append(allocator, .{ .direct_call = .{
-        .symbol = symbol,
-        .ret_ty = ret_ty,
-    } });
-}
-
-fn appendIndirectCallRax(allocator: std.mem.Allocator, machine: *MachineFunction, ret_ty: ir.Type) !void {
-    try machine.instructions.append(allocator, .{ .indirect_call_rax = ret_ty });
-}
-
-fn appendAlignedDirectCall(allocator: std.mem.Allocator, machine: *MachineFunction, symbol: []const u8, ret_ty: ir.Type) !void {
-    try appendStackFrame(allocator, machine, 8);
-    try appendDirectCall(allocator, machine, symbol, ret_ty);
-    try appendStackFrameEnd(allocator, machine, 8);
-}
-
-fn appendAlignedIndirectCallRax(allocator: std.mem.Allocator, machine: *MachineFunction, ret_ty: ir.Type) !void {
-    try appendStackFrame(allocator, machine, 8);
-    try appendIndirectCallRax(allocator, machine, ret_ty);
-    try appendStackFrameEnd(allocator, machine, 8);
-}
-
-fn appendDirectCallWithStackArgs(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    symbol: []const u8,
-    ret_ty: ir.Type,
-    stack_arg_count: usize,
-) !void {
-    if (stack_arg_count == 0) return appendAlignedDirectCall(allocator, machine, symbol, ret_ty);
-    try appendDirectCall(allocator, machine, symbol, ret_ty);
-    try appendStackArgCallCleanup(allocator, machine, stack_arg_count);
-}
-
-fn appendIndirectCallRaxWithStackArgs(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    ret_ty: ir.Type,
-    stack_arg_count: usize,
-) !void {
-    if (stack_arg_count == 0) return appendAlignedIndirectCallRax(allocator, machine, ret_ty);
-    try appendIndirectCallRax(allocator, machine, ret_ty);
-    try appendStackArgCallCleanup(allocator, machine, stack_arg_count);
-}
-
-fn appendStackArgCallCleanup(allocator: std.mem.Allocator, machine: *MachineFunction, stack_arg_count: usize) !void {
-    if (stack_arg_count == 0 or stack_arg_count > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
-    const cleanup_bytes = stack_arg_count * 8 + if (stack_arg_count % 2 == 0) @as(usize, 8) else 0;
-    switch (cleanup_bytes) {
-        8 => try machine.instructions.append(allocator, .add_rsp_8),
-        24 => try machine.instructions.append(allocator, .add_rsp_24),
-        40 => try machine.instructions.append(allocator, .add_rsp_40),
-        56 => try machine.instructions.append(allocator, .add_rsp_56),
-        else => {
-            if (cleanup_bytes <= std.math.maxInt(i8)) {
-                try machine.instructions.append(allocator, .{ .add_rsp_imm8 = @intCast(cleanup_bytes) });
-            } else if (cleanup_bytes <= std.math.maxInt(u32)) {
-                try machine.instructions.append(allocator, .{ .add_rsp_imm32 = @intCast(cleanup_bytes) });
-            } else {
-                return error.UnsupportedCodegenAbi;
-            }
-        },
-    }
-}
-
 fn appendI32CallArgs(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -22421,36 +22351,6 @@ fn adjustedIncomingStackDisp8(base_offset: u8, incoming_stack_adjust: usize) !u8
     return @intCast(adjusted);
 }
 
-fn appendLoadStackDispArg32(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: ArgReg,
-    offset: usize,
-) !void {
-    if (offset <= std.math.maxInt(i8)) {
-        try machine.instructions.append(allocator, .{ .load_stack_disp8_arg32 = .{ .reg = reg, .disp = @intCast(offset) } });
-    } else if (offset <= std.math.maxInt(u32)) {
-        try machine.instructions.append(allocator, .{ .load_stack_disp32_arg32 = .{ .reg = reg, .disp = @intCast(offset) } });
-    } else {
-        return error.UnsupportedCodegenAbi;
-    }
-}
-
-fn appendLoadStackDispArg64(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: ArgReg,
-    offset: usize,
-) !void {
-    if (offset <= std.math.maxInt(i8)) {
-        try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{ .reg = reg, .disp = @intCast(offset) } });
-    } else if (offset <= std.math.maxInt(u32)) {
-        try machine.instructions.append(allocator, .{ .load_stack_disp32_arg64 = .{ .reg = reg, .disp = @intCast(offset) } });
-    } else {
-        return error.UnsupportedCodegenAbi;
-    }
-}
-
 pub fn sysvCallPlanCountsForTest(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !SysVCallPlanCounts {
     return try sysv_abi.callPlanCountsForTest(allocator, function, call);
 }
@@ -22655,40 +22555,6 @@ fn sysvScalarCallNeedsStackArgs(call: ir.CallInst) bool {
     return false;
 }
 
-fn appendMoveImmToArgReg(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: ArgReg,
-    value: i64,
-) !void {
-    switch (reg) {
-        .rdi => try machine.instructions.append(allocator, .{ .mov_imm_rdi = value }),
-        .rsi => try machine.instructions.append(allocator, .{ .mov_imm_rsi = value }),
-        .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = value }),
-        .rcx => try machine.instructions.append(allocator, .{ .mov_imm_rcx = value }),
-        .r8 => try machine.instructions.append(allocator, .{ .mov_imm_r8 = value }),
-        .r9 => try machine.instructions.append(allocator, .{ .mov_imm_r9 = value }),
-    }
-}
-
-fn appendMoveImm32ToXmm(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: XmmReg,
-    bits: u32,
-) !void {
-    try machine.instructions.append(allocator, .{ .mov_imm32_xmm = .{ .reg = reg, .bits = bits } });
-}
-
-fn appendMoveImm64ToXmm(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: XmmReg,
-    bits: u64,
-) !void {
-    try machine.instructions.append(allocator, .{ .mov_imm64_xmm = .{ .reg = reg, .bits = bits } });
-}
-
 const StackScalarCallArg = union(enum) {
     imm: i32,
     stack_disp: u8,
@@ -22698,8 +22564,6 @@ const StackScalarCallArg = union(enum) {
     computed_i64: ir.Value,
     precomputed_rax,
 };
-
-const max_sysv_stack_call_args = 24;
 
 fn appendStackScalarCallArg(
     allocator: std.mem.Allocator,
@@ -22767,11 +22631,6 @@ fn appendAlignedDirectCallPreservingI32Params(
     try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
 }
 
-const SysVCallTarget = union(enum) {
-    direct: []const u8,
-    indirect_from_reg: ArgReg,
-};
-
 fn appendAlignedCallPreservingI32Params(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -22826,53 +22685,6 @@ fn appendAlignedCallPreservingI32Params(
     }
 }
 
-fn setupSysVCallTarget(allocator: std.mem.Allocator, machine: *MachineFunction, call_target: SysVCallTarget) !void {
-    switch (call_target) {
-        .direct => {},
-        .indirect_from_reg => |reg| try machine.instructions.append(allocator, .{ .mov_arg_rax = reg }),
-    }
-}
-
-fn appendSysVCallTarget(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    call_target: SysVCallTarget,
-    ret_ty: ir.Type,
-) !void {
-    switch (call_target) {
-        .direct => |symbol| try appendDirectCall(allocator, machine, symbol, ret_ty),
-        .indirect_from_reg => try appendIndirectCallRax(allocator, machine, ret_ty),
-    }
-}
-
-fn appendAlignedSysVCallTarget(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    call_target: SysVCallTarget,
-    ret_ty: ir.Type,
-) !void {
-    switch (call_target) {
-        .direct => |symbol| try appendAlignedDirectCall(allocator, machine, symbol, ret_ty),
-        .indirect_from_reg => {
-            try setupSysVCallTarget(allocator, machine, call_target);
-            try appendAlignedIndirectCallRax(allocator, machine, ret_ty);
-        },
-    }
-}
-
-fn appendSysVCallTargetWithStackArgs(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    call_target: SysVCallTarget,
-    ret_ty: ir.Type,
-    stack_arg_count: usize,
-) !void {
-    switch (call_target) {
-        .direct => |symbol| try appendDirectCallWithStackArgs(allocator, machine, symbol, ret_ty, stack_arg_count),
-        .indirect_from_reg => try appendIndirectCallRaxWithStackArgs(allocator, machine, ret_ty, stack_arg_count),
-    }
-}
-
 fn frameIndexForLiveParam(index: usize) FrameIndex {
     return switch (index) {
         0 => .slot0,
@@ -22883,13 +22695,6 @@ fn frameIndexForLiveParam(index: usize) FrameIndex {
         5 => .slot5,
         else => unreachable,
     };
-}
-
-fn appendPanicCall(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8, symbol: []const u8) !void {
-    try machine.instructions.append(allocator, .{ .label = label });
-    try appendAlignedDirectCall(allocator, machine, symbol, .void);
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
-    try machine.instructions.append(allocator, .ret);
 }
 
 fn lowerReturnTerminator(
