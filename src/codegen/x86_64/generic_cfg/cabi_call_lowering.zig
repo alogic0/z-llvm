@@ -367,7 +367,7 @@ fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
                 if (src) |reg| {
                     const src_index = @intFromEnum(reg);
                     if (overwritten[src_index]) needs_parallel = true;
-                    if (reg != dst and (arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr)) {
+                    if (reg != dst and (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr)) {
                         if (copy_plan.count >= copy_plan.copies.len) return error.UnsupportedCodegenAbi;
                         copy_plan.copies[copy_plan.count] = .{ .dst = dst, .src = reg };
                         copy_plan.count += 1;

@@ -244,7 +244,7 @@ test "x86_64 generic CFG lowers direct pointer call args through planner" {
     try std.testing.expect(saw_call);
 }
 
-test "x86_64 generic CFG rejects cyclic GPR arg register shuffle" {
+test "x86_64 generic CFG lowers cyclic i32 GPR arg register shuffle with parallel copy" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -261,10 +261,24 @@ test "x86_64 generic CFG rejects cyclic GPR arg register shuffle" {
     defer module.deinit();
     try module.verify();
 
-    try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
-        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
-    );
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .push_arg = .rsi });
+    try expectMachineInstruction(machine.instructions.items, .{ .push_arg = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .pop_arg = .rsi });
+    try expectMachineInstruction(machine.instructions.items, .{ .pop_arg = .rdi });
+    var saw_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.{ .int = 32 }));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_call);
 }
 
 test "x86_64 generic CFG lowers cyclic i64 GPR arg register shuffle with parallel copy" {
