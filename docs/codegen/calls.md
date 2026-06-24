@@ -210,9 +210,10 @@ accepted frontier:
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results
 out of scope:
-  varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected
-  sret/byval copies, broad indirect calls, tail calls, unwind, and debug-info
-  call-site handling
+  varargs, vectors, packed/unaligned aggregates, X87/long double, unsupported
+  aggregate leaves/layouts, arbitrary non-selected sret/byval copies, broad
+  indirect calls outside planner-owned shapes, tail calls, unwind, and
+  debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
 
@@ -282,11 +283,15 @@ The first slice rejects:
 
 ```text
 inline assembly calls
-direct and function-pointer varargs (`UnsupportedVarargsAbi`)
-vectors, including vector-containing aggregate ABI forms and vector `sret`/`byval` payloads (`UnsupportedVectorAbi`)
-X87 / long double, including aggregate-contained long-double leaves and long-double `sret`/`byval` payloads (`UnsupportedLongDoubleAbi`)
+direct and function-pointer varargs (`UnsupportedVarargsAbi`); excluded from
+  the current release claim until a SysV varargs `%al`/register-save-area
+  policy is implemented
+vectors, including vector-containing aggregate ABI forms and vector
+  `sret`/`byval` payloads (`UnsupportedVectorAbi`)
+X87 / long double, including aggregate-contained long-double leaves and
+  long-double `sret`/`byval` payloads (`UnsupportedLongDoubleAbi`)
 packed aggregate ABI call/return forms, including direct planner inputs and
-packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`)
+  packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`)
 byval/sret lowering beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
 operand bundles
 invoke
