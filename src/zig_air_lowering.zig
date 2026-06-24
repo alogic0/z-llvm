@@ -5168,6 +5168,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigDouble")) {
         return .{ .ir_type = .{ .aggregate = "{ double, double, double }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigDoubleArray")) {
+        return .{ .ir_type = .{ .aggregate = "{ [3 x double] }" } };
+    }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigFloat")) {
         return .{ .ir_type = .{ .aggregate = "{ float, float, float, float, float }" } };
     }
@@ -5182,9 +5185,7 @@ fn parseZigType(text: []const u8) ?ZigType {
         const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
         return .{ .ir_type = .{ .int = bits }, .signed = trimmed[0] == 'i' };
     }
-    if (std.mem.eql(u8, trimmed, "[2]i64")) return .{ .ir_type = .{ .aggregate = "[2 x i64]" } };
-    if (std.mem.eql(u8, trimmed, "[5]i64")) return .{ .ir_type = .{ .aggregate = "[5 x i64]" } };
-    if (std.mem.eql(u8, trimmed, "[2]f64")) return .{ .ir_type = .{ .aggregate = "[2 x double]" } };
+    if (parseZigArrayType(trimmed)) |array_ty| return array_ty;
     if (isPointerType(trimmed)) {
         const child_text = pointerChildText(trimmed) orelse return null;
         const child = parseZigType(child_text);
@@ -5195,6 +5196,40 @@ fn parseZigType(text: []const u8) ?ZigType {
         };
     }
     return null;
+}
+
+fn parseZigArrayType(trimmed: []const u8) ?ZigType {
+    if (trimmed.len < 4 or trimmed[0] != '[') return null;
+    const close_index = std.mem.indexOfScalar(u8, trimmed, ']') orelse return null;
+    if (close_index + 1 >= trimmed.len) return null;
+    const count = std.fmt.parseInt(u16, trimmed[1..close_index], 10) catch return null;
+    if (count == 0) return null;
+    const elem_text = trimmed[close_index + 1 ..];
+    const elem_ir: []const u8 = if (std.mem.eql(u8, elem_text, "i8"))
+        "i8"
+    else if (std.mem.eql(u8, elem_text, "u8"))
+        "i8"
+    else if (std.mem.eql(u8, elem_text, "i16"))
+        "i16"
+    else if (std.mem.eql(u8, elem_text, "u16"))
+        "i16"
+    else if (std.mem.eql(u8, elem_text, "i32"))
+        "i32"
+    else if (std.mem.eql(u8, elem_text, "u32"))
+        "i32"
+    else if (std.mem.eql(u8, elem_text, "i64"))
+        "i64"
+    else if (std.mem.eql(u8, elem_text, "u64"))
+        "i64"
+    else if (std.mem.eql(u8, elem_text, "f32"))
+        "float"
+    else if (std.mem.eql(u8, elem_text, "f64"))
+        "double"
+    else
+        return null;
+
+    const aggregate_text = std.fmt.allocPrint(std.heap.page_allocator, "[{d} x {s}]", .{ count, elem_ir }) catch return null;
+    return .{ .ir_type = .{ .aggregate = aggregate_text } };
 }
 
 fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ZigType {

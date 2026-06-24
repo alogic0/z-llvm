@@ -139,6 +139,10 @@ const BigDouble = extern struct {
     c: f64,
 };
 
+const BigDoubleArray = extern struct {
+    values: [3]f64,
+};
+
 const BigFloat = extern struct {
     a: f32,
     b: f32,
@@ -161,6 +165,7 @@ const BigMixedCopyFn = *const fn (BigMixed) callconv(.c) BigMixed;
 const BigNarrowCopyFn = *const fn (BigNarrow) callconv(.c) BigNarrow;
 const BigArrayCopyFn = *const fn (BigArray) callconv(.c) BigArray;
 const BigDoubleCopyFn = *const fn (BigDouble) callconv(.c) BigDouble;
+const BigDoubleArrayCopyFn = *const fn (BigDoubleArray) callconv(.c) BigDoubleArray;
 const BigFloatCopyFn = *const fn (BigFloat) callconv(.c) BigFloat;
 const BigPtrDoubleCopyFn = *const fn (BigPtrDouble) callconv(.c) BigPtrDouble;
 
@@ -365,6 +370,18 @@ export fn frontier_direct_big_double_copy(value: BigDouble) BigDouble {
 }
 
 export fn frontier_indirect_big_double_copy(func: BigDoubleCopyFn, value: BigDouble) BigDouble {
+    return func(value);
+}
+
+export fn frontier_big_double_array_copy(value: BigDoubleArray) BigDoubleArray {
+    return value;
+}
+
+export fn frontier_direct_big_double_array_copy(value: BigDoubleArray) BigDoubleArray {
+    return frontier_big_double_array_copy(value);
+}
+
+export fn frontier_indirect_big_double_array_copy(func: BigDoubleArrayCopyFn, value: BigDoubleArray) BigDoubleArray {
     return func(value);
 }
 

@@ -254,10 +254,11 @@ mixed-width integer leaves, multiple stack-passed user fields after the hidden
 sret pointer, array-backed integer copy/read leaves through `{ [5 x i64] }`,
 larger flat normal integer-leaf copies through `Big20`, nested `i8`/`i16`
 width-correct byval-to-sret copies, the first
-double-leaf copy through `BigDouble`, f32-leaf copy through `BigFloat`, and
+double-leaf copy through `BigDouble`, array-contained `double` copy through
+`BigDoubleArray`, f32-leaf copy through `BigFloat`, and
 pointer/`double`/integer copy through `BigPtrDouble`. Direct and indirect
 MEMORY aggregate calls prove the same by-value stack-copy and hidden-sret
-forwarding path for Big3, Big4, Big5, BigDouble, BigFloat, BigPtrDouble,
+forwarding path for Big3, Big4, Big5, BigDouble, BigDoubleArray, BigFloat, BigPtrDouble,
 BigNested, BigMixed, and BigArray
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx

@@ -1697,6 +1697,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct BigNarrow { unsigned char a; struct NarrowInner inner; long long d; };
     \\struct BigArray { long long values[5]; };
     \\struct BigDouble { double a; double b; double c; };
+    \\struct BigDoubleArray { double values[3]; };
     \\struct BigFloat { float a; float b; float c; float d; float e; };
     \\struct BigPtrDouble { const long long *ptr; double value; long long tag; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
@@ -1750,6 +1751,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigDouble z_frontier_big_double_copy(struct BigDouble) __asm__("frontier_sysv_sret_byval.frontier_big_double_copy");
     \\extern struct BigDouble z_frontier_direct_big_double_copy(struct BigDouble) __asm__("frontier_sysv_sret_byval.frontier_direct_big_double_copy");
     \\extern struct BigDouble z_frontier_indirect_big_double_copy(struct BigDouble (*)(struct BigDouble), struct BigDouble) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_double_copy");
+    \\extern struct BigDoubleArray z_frontier_big_double_array_copy(struct BigDoubleArray) __asm__("frontier_sysv_sret_byval.frontier_big_double_array_copy");
+    \\extern struct BigDoubleArray z_frontier_direct_big_double_array_copy(struct BigDoubleArray) __asm__("frontier_sysv_sret_byval.frontier_direct_big_double_array_copy");
+    \\extern struct BigDoubleArray z_frontier_indirect_big_double_array_copy(struct BigDoubleArray (*)(struct BigDoubleArray), struct BigDoubleArray) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_double_array_copy");
     \\extern struct BigFloat z_frontier_big_float_copy(struct BigFloat) __asm__("frontier_sysv_sret_byval.frontier_big_float_copy");
     \\extern struct BigFloat z_frontier_direct_big_float_copy(struct BigFloat) __asm__("frontier_sysv_sret_byval.frontier_direct_big_float_copy");
     \\extern struct BigFloat z_frontier_indirect_big_float_copy(struct BigFloat (*)(struct BigFloat), struct BigFloat) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_float_copy");
@@ -1859,6 +1863,13 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (direct_big_double.a != 1.5 || direct_big_double.b != 2.25 || direct_big_double.c != 3.75) return 56;
     \\    struct BigDouble indirect_big_double = z_frontier_indirect_big_double_copy(z_frontier_big_double_copy, big_double);
     \\    if (indirect_big_double.a != 1.5 || indirect_big_double.b != 2.25 || indirect_big_double.c != 3.75) return 57;
+    \\    struct BigDoubleArray big_double_array = { .values = { 7.5, 8.25, 9.75 } };
+    \\    struct BigDoubleArray copied_big_double_array = z_frontier_big_double_array_copy(big_double_array);
+    \\    if (copied_big_double_array.values[0] != 7.5 || copied_big_double_array.values[1] != 8.25 || copied_big_double_array.values[2] != 9.75) return 73;
+    \\    struct BigDoubleArray direct_big_double_array = z_frontier_direct_big_double_array_copy(big_double_array);
+    \\    if (direct_big_double_array.values[0] != 7.5 || direct_big_double_array.values[1] != 8.25 || direct_big_double_array.values[2] != 9.75) return 74;
+    \\    struct BigDoubleArray indirect_big_double_array = z_frontier_indirect_big_double_array_copy(z_frontier_big_double_array_copy, big_double_array);
+    \\    if (indirect_big_double_array.values[0] != 7.5 || indirect_big_double_array.values[1] != 8.25 || indirect_big_double_array.values[2] != 9.75) return 75;
     \\    struct BigFloat big_float = { .a = 1.25f, .b = 2.5f, .c = 3.75f, .d = 4.5f, .e = 5.25f };
     \\    struct BigFloat copied_big_float = z_frontier_big_float_copy(big_float);
     \\    if (copied_big_float.a != 1.25f || copied_big_float.b != 2.5f || copied_big_float.c != 3.75f || copied_big_float.d != 4.5f || copied_big_float.e != 5.25f) return 36;

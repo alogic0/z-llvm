@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=226
-structured_functions=226
-generic_codegen_functions=226
-generic_cfg_functions=226
+discovered_functions=229
+structured_functions=229
+generic_codegen_functions=229
+generic_cfg_functions=229
 structural_matcher_functions=0
-structured_air_v2_functions=226
-typed_air_operand_functions=226
+structured_air_v2_functions=229
+typed_air_operand_functions=229
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=226
+generic_lowering_functions=229
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=226
+object_emitted_functions=229
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -141,11 +141,14 @@ Closed in the current memory/aggregate frontier slice:
   adds the first double-leaf MEMORY byval-to-sret copy proof through XMM
   `movsd` stack loads and hidden-sret stores, the `BigPtrDouble` row proves the
   same layout-derived copy path for pointer, `double`, and `i64` leaves in one
-  MEMORY aggregate, and `BigFloat` proves five `f32` leaves through dedicated
-  `movss` stack loads and hidden-sret stores; `frontier_direct_big5_copy`,
+  MEMORY aggregate, `BigFloat` proves five `f32` leaves through dedicated
+  `movss` stack loads and hidden-sret stores, and `BigDoubleArray` proves an
+  array-of-double MEMORY aggregate through the same recursive copy path;
+  `frontier_direct_big5_copy`,
   `frontier_indirect_big5_copy`, `frontier_direct_big_double_copy`,
   `frontier_indirect_big_double_copy`, `frontier_direct_big_float_copy`,
-  `frontier_indirect_big_float_copy`,
+  `frontier_indirect_big_float_copy`, `frontier_direct_big_double_array_copy`,
+  `frontier_indirect_big_double_array_copy`,
   `frontier_direct_big_ptr_double_copy`, and
   `frontier_indirect_big_ptr_double_copy`, `frontier_direct_big_narrow_copy`,
   and `frontier_indirect_big_narrow_copy` prove normal supported-leaf MEMORY
