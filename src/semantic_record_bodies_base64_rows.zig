@@ -299,7 +299,7 @@ fn writeBase64OutputStoreStructured(entry: *sib.Block, ptr_name: []const u8, out
     try entry.store(sib.local(ty, value), sib.local(.ptr, ptr_ref), "1");
 }
 
-fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -309,7 +309,7 @@ fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
     };
 }
 
-fn writeReleaseSmallRuntimeBase64DecodeBase64FullTextualIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64DecodeBase64FullTextualIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -526,7 +526,7 @@ fn writeReleaseSmallRuntimeBase64DecodeBase64FullTextualIrWriterBody(
     };
 }
 
-fn writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -536,7 +536,7 @@ fn writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(
     };
 }
 
-fn writeBase64DecodeStepStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64DecodeStepStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.decode_step_table", "private unnamed_addr", .{ .text = "[16 x i32]" }, "[i32 0, i32 248, i32 -16777216, i32 252, i32 0, i32 4096, i32 -16777216, i32 61443, i32 0, i32 8192, i32 -16777216, i32 12586752, i32 0, i32 196608, i32 -16777216, i32 4128768]", "4");
     try writer.writeAll("\n");
@@ -559,7 +559,7 @@ fn writeBase64DecodeStepStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64StoreStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64StoreStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -569,7 +569,7 @@ fn writeReleaseSmallRuntimeBase64StoreStepIrWriterBody(
     };
 }
 
-fn writeBase64StoreStepStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64StoreStepStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.decode_output", "private unnamed_addr", .i32, "0", "4");
     try writer.writeAll("\n");
@@ -584,7 +584,7 @@ fn writeBase64StoreStepStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -594,7 +594,7 @@ fn writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualByteStepStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualByteStepStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_output", "private unnamed_addr", .i32, "0", "4");
     try writer.writeAll("\n");
@@ -609,7 +609,7 @@ fn writeBase64ResidualByteStepStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -619,7 +619,7 @@ fn writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody(
     };
 }
 
-fn writeBase64PaddingTailStepStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64PaddingTailStepStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.padding_tail", "private unnamed_addr", .i32, "61", "4");
     try writer.writeAll("\n");
@@ -633,7 +633,7 @@ fn writeBase64PaddingTailStepStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -643,7 +643,7 @@ fn writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(
     };
 }
 
-fn writeBase64PaddingLoopStepStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64PaddingLoopStepStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.padding_loop", "private unnamed_addr", .i32, "61", "4");
     try writer.writeAll("\n");
@@ -671,7 +671,7 @@ fn writeBase64PaddingLoopStepStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -681,7 +681,7 @@ fn writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(
     };
 }
 
-fn writeBase64PaddingLengthStepStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64PaddingLengthStepStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.padding_length_tail", "private unnamed_addr", .i32, "15677", "4");
     try writer.writeAll("\n");
@@ -704,7 +704,7 @@ fn writeBase64PaddingLengthStepStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -714,7 +714,7 @@ fn writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(
     };
 }
 
-fn writeBase64ChunkGuardStepStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ChunkGuardStepStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
     var entry = try function.block("entry");
@@ -728,7 +728,7 @@ fn writeBase64ChunkGuardStepStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -738,7 +738,7 @@ fn writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(
     };
 }
 
-fn writeBase64SourceStrideStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64SourceStrideStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.source_stride_input", "private unnamed_addr", .i32, "0", "4");
     try module.global("base64.source_stride_table", "private unnamed_addr", .{ .text = "[8 x i32]" }, "[i32 42, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0]", "4");
@@ -756,7 +756,7 @@ fn writeBase64SourceStrideStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -766,7 +766,7 @@ fn writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(
     };
 }
 
-fn writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -776,7 +776,7 @@ fn writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(
     };
 }
 
-fn writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -786,7 +786,7 @@ fn writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(
     };
 }
 
-fn writeBase64SourceBundleStructuredModule(writer: *std.Io.Writer, prefix: []const u8, input_symbol: []const u8, first_offset: []const u8) !void {
+pub fn writeBase64SourceBundleStructuredModule(writer: *std.Io.Writer, prefix: []const u8, input_symbol: []const u8, first_offset: []const u8) !void {
     var module = sib.Module.init(writer);
     try module.global(input_symbol, "private unnamed_addr", .i32, "0", "4");
     const suffixes = [_][]const u8{ "0", "1", "2", "3" };
@@ -837,7 +837,7 @@ fn writeBase64BundleTableLoad(entry: *sib.Block, result_prefix: []const u8, pref
     _ = try entry.load(word, .i32, sib.local(.ptr, entry_ref), "4");
 }
 
-fn writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -847,7 +847,7 @@ fn writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody(
     };
 }
 
-fn writeBase64BitBufferStoreStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64BitBufferStoreStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.bit_buffer_word0", "private unnamed_addr", .i32, "1", "4");
     try module.global("base64.bit_buffer_word1", "private unnamed_addr", .i32, "2", "4");
@@ -877,7 +877,7 @@ fn writeBase64BitBufferStoreStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -887,7 +887,7 @@ fn writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody(
     };
 }
 
-fn writeBase64LoopAdvanceStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64LoopAdvanceStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.loop_advance_output", "private unnamed_addr", .i64, "0", "8");
     try module.global("base64.loop_advance_source", "private unnamed_addr", .i64, "16", "8");
@@ -913,7 +913,7 @@ fn writeBase64LoopAdvanceStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -923,7 +923,7 @@ fn writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualGuardStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualGuardStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_guard_source_index", "private unnamed_addr", .i64, "0", "8");
     try module.global("base64.residual_guard_output_index", "private unnamed_addr", .i64, "0", "8");
@@ -956,7 +956,7 @@ fn writeBase64ResidualGuardStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -966,7 +966,7 @@ fn writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(
     };
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -976,7 +976,7 @@ fn writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualStoreStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualStoreStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_store_output", "private unnamed_addr", .i32, "0", "4");
     try module.global("base64.residual_store_word", "private unnamed_addr", .i32, "2105344", "4");
@@ -998,7 +998,7 @@ fn writeBase64ResidualStoreStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -1008,7 +1008,7 @@ fn writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualLengthStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualLengthStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_length_total", "private unnamed_addr", .i64, "8", "8");
     try module.global("base64.residual_length_index", "private unnamed_addr", .i64, "4", "8");
@@ -1024,7 +1024,7 @@ fn writeBase64ResidualLengthStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -1034,7 +1034,7 @@ fn writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualTableCheckStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualTableCheckStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_table_check_input", "private unnamed_addr", .{ .text = "[1 x i8]" }, "c\"\\00\"", "1");
     try module.global("base64.residual_table_check_table", "private unnamed_addr", .{ .text = "[1 x i8]" }, "c\"\\00\"", "1");
@@ -1052,7 +1052,7 @@ fn writeBase64ResidualTableCheckStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualAccumulatorStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualAccumulatorStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -1062,7 +1062,7 @@ fn writeReleaseSmallRuntimeBase64ResidualAccumulatorStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualAccumulatorStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualAccumulatorStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_accumulator_bits", "private unnamed_addr", .i16, "1", "2");
     try module.global("base64.residual_accumulator_entry", "private unnamed_addr", .i8, "2", "1");
@@ -1087,7 +1087,7 @@ fn writeBase64ResidualAccumulatorStructuredModule(writer: *std.Io.Writer) !void 
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualLoopAdvanceStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualLoopAdvanceStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -1097,7 +1097,7 @@ fn writeReleaseSmallRuntimeBase64ResidualLoopAdvanceStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualLoopAdvanceStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualLoopAdvanceStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_loop_index", "private unnamed_addr", .i64, "0", "8");
     try writer.writeAll("\n");
@@ -1111,7 +1111,7 @@ fn writeBase64ResidualLoopAdvanceStructuredModule(writer: *std.Io.Writer) !void 
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualPaddingCheckStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualPaddingCheckStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -1121,7 +1121,7 @@ fn writeReleaseSmallRuntimeBase64ResidualPaddingCheckStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualPaddingCheckStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualPaddingCheckStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_padding_index", "private unnamed_addr", .i64, "1", "8");
     try module.global("base64.residual_padding_base", "private unnamed_addr", .i64, "3", "8");
@@ -1141,7 +1141,7 @@ fn writeBase64ResidualPaddingCheckStructuredModule(writer: *std.Io.Writer) !void
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -1151,7 +1151,7 @@ fn writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualFinalMaskStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualFinalMaskStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_final_index", "private unnamed_addr", .i64, "0", "8");
     try module.global("base64.residual_final_remaining", "private unnamed_addr", .i64, "1", "8");
@@ -1178,7 +1178,7 @@ fn writeBase64ResidualFinalMaskStructuredModule(writer: *std.Io.Writer) !void {
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -1188,7 +1188,7 @@ fn writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody(
     };
 }
 
-fn writeBase64ResidualPaddingLoopStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64ResidualPaddingLoopStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.residual_padding_loop_source", "private unnamed_addr", .{ .text = "[1 x i8]" }, "c\"=\"", "1");
     try module.global("base64.residual_padding_loop_start", "private unnamed_addr", .i64, "0", "8");
@@ -1214,7 +1214,7 @@ fn writeBase64ResidualPaddingLoopStructuredModule(writer: *std.Io.Writer) !void 
     try function.end();
 }
 
-fn writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody(
+pub fn writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
@@ -1224,7 +1224,7 @@ fn writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody(
     };
 }
 
-fn writeBase64DecodeExitStructuredModule(writer: *std.Io.Writer) !void {
+pub fn writeBase64DecodeExitStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
     try module.global("base64.decode_exit_bits", "private unnamed_addr", .i16, "0", "2");
     try module.global("base64.decode_exit_count", "private unnamed_addr", .i8, "0", "1");
