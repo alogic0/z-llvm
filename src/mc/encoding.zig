@@ -255,6 +255,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .reload_rsi_rsp24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x74, 0x24, 0x10 }),
             .spill_eax_rsp => |frame_index| try encodeEaxToFrameSlot(&bytes, allocator, frame_index),
             .reload_rsp_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x04, 0x24 }),
+            .spill_rax_rsp => |frame_index| try encodeRaxToFrameSlot(&bytes, allocator, frame_index),
+            .reload_rsp_rax => |frame_index| try encodeFrameSlotToRax(&bytes, allocator, frame_index),
             .load_stack_disp8_rax => |disp| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x44, 0x24 });
                 try bytes.append(allocator, disp);
@@ -543,6 +545,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .reload_rdi_rsp24, .reload_rsi_rsp24 => 5,
         .spill_eax_rsp => |frame_index| eaxFrameSlotInstructionSize(frame_index),
         .reload_rsp_eax => 3,
+        .spill_rax_rsp, .reload_rsp_rax => |frame_index| raxFrameSlotInstructionSize(frame_index),
         .load_stack_disp8_rax => 5,
         .load_stack_disp32_rax => 8,
         .load_stack_disp8_u8_eax, .load_stack_disp8_u16_eax => 5,
@@ -767,6 +770,22 @@ fn encodeEaxToFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator,
     if (disp != 0) try bytes.append(allocator, disp);
 }
 
+fn encodeRaxToFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, frame_index: x86_64.FrameIndex) !void {
+    try bytes.appendSlice(allocator, &.{ 0x48, 0x89 });
+    const disp = frameSlotDisp(frame_index);
+    try bytes.append(allocator, if (disp == 0) @as(u8, 0x04) else @as(u8, 0x44));
+    try bytes.append(allocator, 0x24);
+    if (disp != 0) try bytes.append(allocator, disp);
+}
+
+fn encodeFrameSlotToRax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, frame_index: x86_64.FrameIndex) !void {
+    try bytes.appendSlice(allocator, &.{ 0x48, 0x8b });
+    const disp = frameSlotDisp(frame_index);
+    try bytes.append(allocator, if (disp == 0) @as(u8, 0x04) else @as(u8, 0x44));
+    try bytes.append(allocator, 0x24);
+    if (disp != 0) try bytes.append(allocator, disp);
+}
+
 fn encodeStackDisp8ToArg32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, disp: u8) !void {
     if (reg.rexR()) try bytes.append(allocator, 0x44);
     try bytes.append(allocator, 0x8b);
@@ -864,6 +883,10 @@ fn frameSlotInstructionSize64(reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex
 
 fn eaxFrameSlotInstructionSize(frame_index: x86_64.FrameIndex) u32 {
     return 3 + if (frameSlotDisp(frame_index) == 0) @as(u32, 0) else 1;
+}
+
+fn raxFrameSlotInstructionSize(frame_index: x86_64.FrameIndex) u32 {
+    return 4 + if (frameSlotDisp(frame_index) == 0) @as(u32, 0) else 1;
 }
 
 fn encodeArgPtrToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {

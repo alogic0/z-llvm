@@ -777,7 +777,93 @@ test "x86_64 codegen preserves two i64 call results across calls" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try expectMachineInstruction(machine.instructions.items, .push_rax);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 0 });
+}
+
+test "x86_64 codegen preserves i64 call result across pointer-callee i64 call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @first(i64)
+        \\
+        \\define i64 @caller(ptr %second, i64 %a, i64 %b) {
+        \\entry:
+        \\  %first = call i64 @first(i64 %a)
+        \\  %next = call i64 %second(i64 %b)
+        \\  %sum = add i64 %first, %next
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rdi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 0 });
+}
+
+test "x86_64 codegen preserves pointer-callee i64 result across direct i64 call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @second(i64)
+        \\
+        \\define i64 @caller(ptr %first, i64 %a, i64 %b) {
+        \\entry:
+        \\  %first_result = call i64 %first(i64 %a)
+        \\  %second_result = call i64 @second(i64 %b)
+        \\  %sum = add i64 %first_result, %second_result
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 0 });
+}
+
+test "x86_64 codegen preserves two pointer-callee i64 results across calls" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @caller(ptr %first, ptr %second, i64 %a, i64 %b) {
+        \\entry:
+        \\  %first_result = call i64 %first(i64 %a)
+        \\  %second_result = call i64 %second(i64 %b)
+        \\  %sum = add i64 %first_result, %second_result
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rsi });
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 0 });
 }
 

@@ -109,8 +109,8 @@ ABI void call are accepted for the selected post-call add-return shape.
 Stack-passed live i32 values beyond the current disp8-safe selected model, SSE
 live values beyond the selected one- through six-live f32/f64 no-argument-call
 shapes plus selected direct two-/three-/six-live FP-argument call shapes, and
-live values across multiple calls beyond selected i32, direct two-result i64,
-and two-live f32/f64 two-void-call shapes fail
+live values across multiple calls beyond selected i32, direct/pointer-callee
+two-result i64, and two-live f32/f64 two-void-call shapes fail
 closed.
 ```
 

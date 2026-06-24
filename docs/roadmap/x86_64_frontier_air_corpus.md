@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=298
-structured_functions=298
-generic_codegen_functions=298
-generic_cfg_functions=298
+discovered_functions=301
+structured_functions=301
+generic_codegen_functions=301
+generic_cfg_functions=301
 structural_matcher_functions=0
-structured_air_v2_functions=298
-typed_air_operand_functions=298
+structured_air_v2_functions=301
+typed_air_operand_functions=301
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=298
+generic_lowering_functions=301
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=298
+object_emitted_functions=301
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -444,11 +444,14 @@ Closed in the current memory/aggregate frontier slice:
   `float` or `double` call result across a second direct or pointer-callee FP
   result call, preserve the second call's FP argument and pointer callee when
   needed, then reload the first result for the final `fadd`.
-- selected direct two-result `i64` call frame in `frontier_sysv_abi.zig`:
-  `frontier_two_i64_results_across_calls` spills the first C ABI `i64` result
-  with a call-aligned stack push, lowers the second call through the SysV scalar
-  planner, adds the saved stack value back into `%rax`, and returns the
-  combined `i64` result.
+- selected two-result `i64` call frames in `frontier_sysv_abi.zig`:
+  `frontier_two_i64_results_across_calls`,
+  `frontier_indirect_first_i64_results_across_calls`,
+  `frontier_indirect_second_i64_results_across_calls`, and
+  `frontier_indirect_both_i64_results_across_calls` spill the first C ABI
+  `i64` result to a frame slot, preserve a later pointer callee when needed,
+  lower both calls through the SysV scalar planner, add the saved stack value
+  back into `%rax`, and return the combined `i64` result.
 - selected mixed-width FP call-result frames in `frontier_sysv_abi.zig`:
   `frontier_mixed_f32_f64_results_across_calls`,
   `frontier_mixed_indirect_first_f32_f64_results_across_calls`,

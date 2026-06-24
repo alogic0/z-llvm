@@ -128,6 +128,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .reload_rsi_rsp24 => try writer.writeAll("\tmovq 16(%rsp), %rsi\n"),
             .spill_eax_rsp => |frame_index| try writer.print("\tmovl %eax, {s}\n", .{frameAddress(frame_index)}),
             .reload_rsp_eax => try writer.writeAll("\tmovl (%rsp), %eax\n"),
+            .spill_rax_rsp => |frame_index| try writer.print("\tmovq %rax, {s}\n", .{frameAddress(frame_index)}),
+            .reload_rsp_rax => |frame_index| try writer.print("\tmovq {s}, %rax\n", .{frameAddress(frame_index)}),
             .load_stack_disp8_rax => |offset| try writer.print("\tmovq {}(%rsp), %rax\n", .{offset}),
             .load_stack_disp32_rax => |offset| try writer.print("\tmovq {}(%rsp), %rax\n", .{offset}),
             .load_stack_disp8_u8_eax => |offset| try writer.print("\tmovzbl {}(%rsp), %eax\n", .{offset}),

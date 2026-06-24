@@ -127,6 +127,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsi_rsp24,
         .spill_eax_rsp,
         .reload_rsp_eax,
+        .spill_rax_rsp,
+        .reload_rsp_rax,
         .load_stack_disp8_rax,
         .load_stack_disp32_rax,
         .load_stack_disp8_u8_eax,
@@ -222,7 +224,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             if (load.reg == .xmm0) eax_defined = true;
         },
         .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64 => {},
-        .reload_rsp_eax => {
+        .reload_rsp_eax, .reload_rsp_rax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
         },
@@ -251,7 +253,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .spill_eax_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+        .spill_eax_rsp, .spill_rax_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .and_rsp_neg16 => rsp_mod16 = 0,
         .noreturn_direct_call => {
             if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
@@ -403,6 +405,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsi_rsp24,
         .spill_eax_rsp,
         .reload_rsp_eax,
+        .spill_rax_rsp,
+        .reload_rsp_rax,
         .load_stack_disp8_rax,
         .load_stack_disp32_rax,
         .load_stack_disp8_u8_eax,

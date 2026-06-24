@@ -25,6 +25,7 @@ const Touch3F64Fn = *const fn (f64, f64, f64) callconv(.c) void;
 const Touch5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) void;
 const Touch5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) void;
 const IdI32Fn = *const fn (i32) callconv(.c) i32;
+const IdI64Fn = *const fn (i64) callconv(.c) i64;
 const IdF32Fn = *const fn (f32) callconv(.c) f32;
 const IdF64Fn = *const fn (f64) callconv(.c) f64;
 const VoidFn = *const fn () callconv(.c) void;
@@ -141,6 +142,24 @@ export fn frontier_two_i32_results_across_indirect_call(func: IdI32Fn, a: i32, b
 export fn frontier_two_i64_results_across_calls(a: i64, b: i64) i64 {
     const first = frontier_ordered_i64(a);
     const second = frontier_ordered2_i64(b);
+    return first + second;
+}
+
+export fn frontier_indirect_first_i64_results_across_calls(func: IdI64Fn, a: i64, b: i64) i64 {
+    const first = func(a);
+    const second = frontier_ordered2_i64(b);
+    return first + second;
+}
+
+export fn frontier_indirect_second_i64_results_across_calls(func: IdI64Fn, a: i64, b: i64) i64 {
+    const first = frontier_ordered_i64(a);
+    const second = func(b);
+    return first + second;
+}
+
+export fn frontier_indirect_both_i64_results_across_calls(first_func: IdI64Fn, second_func: IdI64Fn, a: i64, b: i64) i64 {
+    const first = first_func(a);
+    const second = second_func(b);
     return first + second;
 }
 
