@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=260
-structured_functions=260
-generic_codegen_functions=260
-generic_cfg_functions=260
+discovered_functions=263
+structured_functions=263
+generic_codegen_functions=263
+generic_cfg_functions=263
 structural_matcher_functions=0
-structured_air_v2_functions=260
-typed_air_operand_functions=260
+structured_air_v2_functions=263
+typed_air_operand_functions=263
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=260
+generic_lowering_functions=263
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=260
+object_emitted_functions=263
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -332,10 +332,13 @@ Closed in the current memory/aggregate frontier slice:
   from a parameter, a direct C ABI helper, and a function-pointer C ABI helper
   using the generic SysV GPR return path.
 - selected full-width GPR argument shuffle rows in `frontier_sysv_abi.zig`:
-  `frontier_i32_swapped_direct_call`, `frontier_i64_swapped_direct_call`, and
-  `frontier_ptr_swapped_direct_call` prove the generic push/pop parallel-copy
-  scheduler for integer and pointer register-source call arguments with
-  executable C ABI checks.
+  `frontier_i32_swapped_direct_call`, `frontier_i64_swapped_direct_call`,
+  `frontier_ptr_swapped_direct_call`, `frontier_i32_swapped_indirect_call`,
+  `frontier_i64_swapped_indirect_call`, and
+  `frontier_ptr_swapped_indirect_call` prove the generic push/pop
+  parallel-copy scheduler for integer and pointer register-source call
+  arguments across direct and function-pointer C ABI calls with executable
+  checks.
 - selected multi-call live-value frame in `frontier_sysv_abi.zig`:
   `frontier_two_void_calls_six_live` keeps six live GPR `i32` values across two
   void C ABI calls through the generic CFG live-param spill/reload helper;
