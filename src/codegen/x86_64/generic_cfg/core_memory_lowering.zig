@@ -2,12 +2,14 @@ const shared = @import("core_shared.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
 const tls_global = @import("cabi_tls_global_lowering.zig");
+const core_cfg_emit = @import("core_cfg_emit.zig");
 
 const std = shared.std;
 const ir = shared.ir;
 const MachineFunction = shared.MachineFunction;
 const ArgReg = shared.ArgReg;
 
+const appendGenericCfgReturn = core_cfg_emit.appendGenericCfgReturn;
 const findInstruction = cabi_call_lowering.findInstruction;
 const globalSymbolName = shared.globalSymbolName;
 const isNamed = shared.isNamed;
@@ -15,6 +17,7 @@ const knownLocalExecTlsSymbol = tls_global.knownLocalExecTlsSymbol;
 const paramReg = cabi_abi_helpers.paramReg;
 const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;
 const tlsSymbolFromFunctionAttrs = tls_global.tlsSymbolFromFunctionAttrs;
+const u8Value = shared.u8Value;
 
 fn genericCfgSupportsPointerParam(function: ir.Function, name: []const u8) bool {
     return (paramRegOrNull(function, name, .ptr) catch null) != null;
@@ -129,6 +132,42 @@ pub fn genericCfgDynamicI32LoadValueAddress(function: ir.Function, block: ir.Bas
         else => return null,
     };
     return genericCfgDynamicI32LoadAddress(function, block, load);
+}
+
+pub fn lowerGenericCfgDynamicPointerLoadReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 64 })) return false;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        else => return false,
+    };
+    const ret_instruction = findInstruction(block, ret_name) orelse return false;
+    switch (ret_instruction.kind) {
+        .load => |load| {
+            const address = genericCfgDynamicI32LoadAddress(function, block, load) orelse return false;
+            try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
+        },
+        .binary => |binary| {
+            if (binary.op != .add or !binary.ty.eql(.{ .int = 32 })) return false;
+            const lhs = genericCfgDynamicI32LoadValueAddress(function, block, binary.lhs) orelse return false;
+            const rhs = genericCfgDynamicI32LoadValueAddress(function, block, binary.rhs) orelse return false;
+            try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, lhs);
+            try emitGenericCfgDynamicI32AddIntoEax(allocator, machine, rhs);
+        },
+        else => return false,
+    }
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
 }
 
 pub fn genericCfgDynamicI32LoadAddress(function: ir.Function, block: ir.BasicBlock, load: ir.LoadInst) ?GenericCfgDynamicI32Address {
@@ -249,4 +288,112 @@ pub fn emitGenericCfgStoreEax(
         .global => |symbol| try machine.instructions.append(allocator, .{ .store_eax_global_i32 = symbol }),
         .tls => |symbol| try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = symbol }),
     }
+}
+
+pub const GenericCfgPointerSlotParam = struct {
+    slot_name: []const u8,
+    param_name: []const u8,
+    param_reg: ArgReg,
+};
+
+pub fn genericCfgPointerSlotParam(
+    function: ir.Function,
+    alloca_instruction: ir.Instruction,
+    store_instruction: ir.Instruction,
+) ?GenericCfgPointerSlotParam {
+    if (alloca_instruction.removed or store_instruction.removed) return null;
+    const slot_name = alloca_instruction.result orelse return null;
+    const alloca = switch (alloca_instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return null,
+    };
+    if (!alloca.allocated_ty.eql(.ptr) or alloca.allocated_ty_addrspace != null) return null;
+    const store = switch (store_instruction.kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!store.ty.eql(.ptr) or store.ty_addrspace != null or store.ptr_addrspace != null or store.attrs.isBarrier()) return null;
+    if (!isNamed(store.ptr, slot_name)) return null;
+    const param_name = switch (store.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const param_reg = paramRegOrNull(function, param_name, .ptr) catch return null;
+    return .{ .slot_name = slot_name, .param_name = param_name, .param_reg = param_reg orelse return null };
+}
+
+pub fn genericCfgLoadPtrFromSlot(instruction: ir.Instruction, slot_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const load_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.ptr) or load.ty_addrspace != null or load.ptr_addrspace != null or load.attrs.isBarrier()) return null;
+    if (!isNamed(load.ptr, slot_name)) return null;
+    return load_name;
+}
+
+pub const GenericCfgFieldLoadPtr = struct {
+    name: []const u8,
+    offset: i128,
+};
+
+pub fn genericCfgI8GepOffset(gep: ir.GepInst, ptr_name: []const u8, offset: i128) bool {
+    return (genericCfgI8GepOffsetValue(gep, ptr_name) orelse return false) == offset;
+}
+
+pub fn genericCfgI8GepOffsetValue(gep: ir.GepInst, ptr_name: []const u8) ?i128 {
+    if (!gep.source_ty.eql(.{ .int = 8 }) or !isNamed(gep.ptr, ptr_name)) return null;
+    if (gep.indices.items.len != 1) return null;
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 })) return null;
+    return switch (index.value) {
+        .int => |int| if (int == 0 or int == 4 or int == 8) int else null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+    };
+}
+
+pub fn lowerGenericCfgStructFieldLoadReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (block.instructions.items.len != 4 and block.instructions.items.len != 5) return false;
+    const slot = genericCfgPointerSlotParam(function, block.instructions.items[0], block.instructions.items[1]) orelse return false;
+    const loaded_ptr = genericCfgLoadPtrFromSlot(block.instructions.items[2], slot.slot_name) orelse return false;
+
+    const load_index: usize = if (block.instructions.items.len == 4) 3 else 4;
+    const load_ptr = if (block.instructions.items.len == 4) GenericCfgFieldLoadPtr{ .name = loaded_ptr, .offset = 0 } else blk: {
+        const gep_name = block.instructions.items[3].result orelse return false;
+        const gep = switch (block.instructions.items[3].kind) {
+            .gep => |gep| gep,
+            else => return false,
+        };
+        const offset = genericCfgI8GepOffsetValue(gep, loaded_ptr) orelse return false;
+        break :blk GenericCfgFieldLoadPtr{ .name = gep_name, .offset = offset };
+    };
+
+    const load_name = block.instructions.items[load_index].result orelse return false;
+    const load = switch (block.instructions.items[load_index].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, load_ptr.name)) return false;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+
+    if (load_ptr.offset == 0) {
+        try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = slot.param_reg });
+    } else {
+        try machine.instructions.append(allocator, .{ .mov_arg_rax = slot.param_reg });
+        try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = try u8Value(load_ptr.offset) });
+    }
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
 }

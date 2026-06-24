@@ -252,7 +252,7 @@ pub const knownLocalExecTlsSymbol = cabi_tls_global_lowering.knownLocalExecTlsSy
 pub const matchGlobalRead = cabi_tls_global_lowering.matchGlobalRead;
 
 pub fn x86_64SysVDataLayout() !target.DataLayout {
-    return target.DataLayout.parse(std.heap.page_allocator, "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    return target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
 }
 
 pub fn validateCondbr(block: ir.BasicBlock, cond_name: []const u8, true_block: []const u8, false_block: []const u8) !void {
