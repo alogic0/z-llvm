@@ -261,7 +261,9 @@ selected forms; the current frontier proves this through eight i64 fields,
 mixed-width integer leaves, multiple stack-passed user fields after the hidden
 sret pointer, array-backed integer copy/read leaves through `{ [5 x i64] }`,
 larger flat normal integer-leaf copies through `Big20`, nested `i8`/`i16`
-width-correct byval-to-sret copies, the first
+width-correct byval-to-sret copies, the `ScalarMixed` direct scalar-param
+hidden-sret construction row for `i8`/`i16`/`i32`/`i64`/pointer/`f32`/`f64`
+fields, the first
 double-leaf copy through `BigDouble`, array-contained `double` copy through
 `BigDoubleArray`, mixed array/pointer copy through `BigArrayMixed`, f32-leaf copy through `BigFloat`, and
 pointer/`double`/integer copy through `BigPtrDouble`. Direct and indirect

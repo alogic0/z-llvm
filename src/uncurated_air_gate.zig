@@ -1789,6 +1789,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct BigFloat { float a; float b; float c; float d; float e; };
     \\struct BigPtrDouble { const long long *ptr; double value; long long tag; };
     \\struct BigArrayMixed { int ints[2]; double doubles[2]; const long long *ptr; };
+    \\struct ScalarMixed { unsigned char a; unsigned short b; int c; long long d; const long long *ptr; float f; double g; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
     \\extern struct Big3 z_frontier_big3_copy(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_copy");
@@ -1852,6 +1853,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigArrayMixed z_frontier_big_array_mixed_copy(struct BigArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_big_array_mixed_copy");
     \\extern struct BigArrayMixed z_frontier_direct_big_array_mixed_copy(struct BigArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_direct_big_array_mixed_copy");
     \\extern struct BigArrayMixed z_frontier_indirect_big_array_mixed_copy(struct BigArrayMixed (*)(struct BigArrayMixed), struct BigArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_array_mixed_copy");
+    \\extern struct ScalarMixed z_frontier_scalar_mixed_make(unsigned char, unsigned short, int, long long, const long long *, float, double) __asm__("frontier_sysv_sret_byval.frontier_scalar_mixed_make");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -1984,6 +1986,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (direct_array_mixed.ints[0] != 101 || direct_array_mixed.ints[1] != 103 || direct_array_mixed.doubles[0] != 10.5 || direct_array_mixed.doubles[1] != 11.25 || direct_array_mixed.ptr != &pointed || *direct_array_mixed.ptr != 987654321LL) return 77;
     \\    struct BigArrayMixed indirect_array_mixed = z_frontier_indirect_big_array_mixed_copy(z_frontier_big_array_mixed_copy, array_mixed);
     \\    if (indirect_array_mixed.ints[0] != 101 || indirect_array_mixed.ints[1] != 103 || indirect_array_mixed.doubles[0] != 10.5 || indirect_array_mixed.doubles[1] != 11.25 || indirect_array_mixed.ptr != &pointed || *indirect_array_mixed.ptr != 987654321LL) return 78;
+    \\    struct ScalarMixed scalar_mixed = z_frontier_scalar_mixed_make(7, 4091, -12345, 987654321LL, &pointed, 1.25f, 6.5);
+    \\    if (scalar_mixed.a != 7 || scalar_mixed.b != 4091 || scalar_mixed.c != -12345 || scalar_mixed.d != 987654321LL || scalar_mixed.ptr != &pointed || *scalar_mixed.ptr != 987654321LL || scalar_mixed.f != 1.25f || scalar_mixed.g != 6.5) return 79;
     \\    return 0;
     \\}
     \\

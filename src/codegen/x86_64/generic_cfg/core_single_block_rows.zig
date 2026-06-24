@@ -1489,6 +1489,7 @@ pub fn lowerGenericCfgScalarSretParamStores(
     if (!function.params.items[0].ty.eql(.ptr)) return false;
     const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
     if (sret_reg != .rdi) return error.UnsupportedCodegenAbi;
+    const layout = x86_64SysVDataLayout() catch return error.UnsupportedCodegenAbi;
 
     var instruction_index: usize = 0;
     var field_index: usize = 0;
@@ -1517,9 +1518,9 @@ pub fn lowerGenericCfgScalarSretParamStores(
                 .gep => |gep| gep,
                 else => return false,
             };
-            if (!gep.source_ty.eql(.{ .int = 8 }) or !isNamed(gep.ptr, function.params.items[0].name)) return false;
-            if (gep.indices.items.len != 1 or !gep.indices.items[0].ty.eql(.{ .int = 64 }) or
-                !isInt(gep.indices.items[0].value, offset)) return false;
+            if (!isNamed(gep.ptr, function.params.items[0].name)) return false;
+            const gep_offset = aggregateGepByteOffset(layout, aggregate_ty, gep) orelse return false;
+            if (gep_offset != offset) return false;
             instruction_index += 1;
             break :ptr gep_name;
         };
@@ -1565,21 +1566,33 @@ fn emitGenericCfgScalarSretParamStore(
         try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
         try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
     } else if (ty.eql(.{ .int = 64 }) or ty.eql(.ptr)) {
-        if (try paramRegOrNull(function, name, ty)) |reg| {
+        const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi => null,
+            else => return err,
+        };
+        if (maybe_reg) |reg| {
             try appendStoreArg64ArgPtrDisp(allocator, machine, sret_reg, reg, offset);
         } else {
             try appendLoadStackDispRax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
             try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, offset);
         }
     } else if (ty.eql(.{ .int = 16 })) {
-        if (try paramRegOrNull(function, name, ty)) |reg| {
+        const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi => null,
+            else => return err,
+        };
+        if (maybe_reg) |reg| {
             try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
         } else {
             try appendLoadStackDispU16Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
         }
         try appendStoreAxArgPtrDisp(allocator, machine, sret_reg, offset);
     } else if (ty.eql(.{ .int = 8 })) {
-        if (try paramRegOrNull(function, name, ty)) |reg| {
+        const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi => null,
+            else => return err,
+        };
+        if (maybe_reg) |reg| {
             try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
         } else {
             try appendLoadStackDispU8Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));

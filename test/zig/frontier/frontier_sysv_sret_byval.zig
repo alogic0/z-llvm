@@ -163,6 +163,16 @@ const BigArrayMixed = extern struct {
     ptr: *const i64,
 };
 
+const ScalarMixed = extern struct {
+    a: u8,
+    b: u16,
+    c: i32,
+    d: i64,
+    ptr: *const i64,
+    f: f32,
+    g: f64,
+};
+
 const Big3CopyFn = *const fn (Big3) callconv(.c) Big3;
 const Big4CopyFn = *const fn (Big4) callconv(.c) Big4;
 const Big5CopyFn = *const fn (Big5) callconv(.c) Big5;
@@ -426,4 +436,8 @@ export fn frontier_direct_big_array_mixed_copy(value: BigArrayMixed) BigArrayMix
 
 export fn frontier_indirect_big_array_mixed_copy(func: BigArrayMixedCopyFn, value: BigArrayMixed) BigArrayMixed {
     return func(value);
+}
+
+export fn frontier_scalar_mixed_make(a: u8, b: u16, c: i32, d: i64, ptr: *const i64, f: f32, g: f64) ScalarMixed {
+    return .{ .a = a, .b = b, .c = c, .d = d, .ptr = ptr, .f = f, .g = g };
 }
