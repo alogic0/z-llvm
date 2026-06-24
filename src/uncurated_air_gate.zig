@@ -1542,6 +1542,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_indirect_first_i64_results_across_calls(long long (*)(long long), long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_first_i64_results_across_calls");
     \\extern long long z_frontier_indirect_second_i64_results_across_calls(long long (*)(long long), long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_second_i64_results_across_calls");
     \\extern long long z_frontier_indirect_both_i64_results_across_calls(long long (*)(long long), long long (*)(long long), long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_both_i64_results_across_calls");
+    \\extern long long z_frontier_i64_result_live_across_void_call(long long, long long) __asm__("frontier_sysv_abi.frontier_i64_result_live_across_void_call");
+    \\extern long long z_frontier_i64_result_live_across_indirect_void_call(void (*)(void), long long, long long) __asm__("frontier_sysv_abi.frontier_i64_result_live_across_indirect_void_call");
+    \\extern long long z_frontier_indirect_i64_result_live_across_void_call(long long (*)(long long), long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_i64_result_live_across_void_call");
+    \\extern long long z_frontier_indirect_i64_result_live_across_indirect_void_call(long long (*)(long long), void (*)(void), long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_i64_result_live_across_indirect_void_call");
     \\extern int z_frontier_six_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_six_stack_arg_call");
     \\extern int z_frontier_eight_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_eight_stack_arg_call");
     \\extern int z_frontier_twelve_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_twelve_stack_arg_call");
@@ -1776,6 +1780,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_indirect_first_i64_results_across_calls(frontier_ordered_i64, 30, 40) != 98) return 149;
     \\    if (z_frontier_indirect_second_i64_results_across_calls(frontier_ordered2_i64, 50, 60) != 138) return 150;
     \\    if (z_frontier_indirect_both_i64_results_across_calls(frontier_ordered_i64, frontier_ordered2_i64, 70, 80) != 178) return 151;
+    \\    if (z_frontier_i64_result_live_across_void_call(90, 100) != 201) return 152;
+    \\    if (z_frontier_i64_result_live_across_indirect_void_call(frontier_touch_ordered, 110, 120) != 241) return 153;
+    \\    if (z_frontier_indirect_i64_result_live_across_void_call(frontier_ordered2_i64, 130, 140) != 287) return 154;
+    \\    if (z_frontier_indirect_i64_result_live_across_indirect_void_call(frontier_ordered_i64, frontier_touch_ordered, 150, 160) != 321) return 155;
     \\    if (z_frontier_ptr_swapped_indirect_call(&ptr_values[2], &ptr_values[7], 0, frontier_choose_ptr) != &ptr_values[7]) return 120;
     \\    if (z_frontier_ptr_swapped_indirect_call(&ptr_values[2], &ptr_values[7], 1, frontier_choose_ptr) != &ptr_values[2]) return 121;
     \\    if (z_frontier_f32_swapped_indirect_call(13.0f, 53.0f, frontier_sub_f32) != 40.0f) return 124;

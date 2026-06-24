@@ -867,6 +867,67 @@ test "x86_64 codegen preserves two pointer-callee i64 results across calls" {
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 0 });
 }
 
+test "x86_64 codegen preserves i64 call result across later void call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @first(i64)
+        \\declare void @touch()
+        \\
+        \\define i64 @caller(i64 %a, i64 %b) {
+        \\entry:
+        \\  %first_result = call i64 @first(i64 %a)
+        \\  call void @touch()
+        \\  %sum = add i64 %first_result, %b
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_rsp_rax = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 8 });
+}
+
+test "x86_64 codegen preserves i64 pointer-callee result across later pointer-callee void call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @caller(ptr %first, ptr %touch, i64 %a, i64 %b) {
+        \\entry:
+        \\  %first_result = call i64 %first(i64 %a)
+        \\  call void %touch()
+        \\  %sum = add i64 %first_result, %b
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rcx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot4, .reg = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rsi });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_rsp_rax = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 8 });
+}
+
 test "x86_64 codegen preserves three live f32 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

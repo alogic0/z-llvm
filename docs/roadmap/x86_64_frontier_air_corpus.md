@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=301
-structured_functions=301
-generic_codegen_functions=301
-generic_cfg_functions=301
+discovered_functions=305
+structured_functions=305
+generic_codegen_functions=305
+generic_cfg_functions=305
 structural_matcher_functions=0
-structured_air_v2_functions=301
-typed_air_operand_functions=301
+structured_air_v2_functions=305
+typed_air_operand_functions=305
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=301
+generic_lowering_functions=305
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=301
+object_emitted_functions=305
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -452,6 +452,14 @@ Closed in the current memory/aggregate frontier slice:
   `i64` result to a frame slot, preserve a later pointer callee when needed,
   lower both calls through the SysV scalar planner, add the saved stack value
   back into `%rax`, and return the combined `i64` result.
+- selected i64 result live-across-void frames in `frontier_sysv_abi.zig`:
+  `frontier_i64_result_live_across_void_call`,
+  `frontier_i64_result_live_across_indirect_void_call`,
+  `frontier_indirect_i64_result_live_across_void_call`, and
+  `frontier_indirect_i64_result_live_across_indirect_void_call` spill the live
+  `i64` addend and any later pointer callee before the first result call,
+  reload the saved `%rax` result after the side-effecting `void` call, and
+  finish the add through the same SysV target/planner path.
 - selected mixed-width FP call-result frames in `frontier_sysv_abi.zig`:
   `frontier_mixed_f32_f64_results_across_calls`,
   `frontier_mixed_indirect_first_f32_f64_results_across_calls`,
