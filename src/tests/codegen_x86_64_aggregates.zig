@@ -65,6 +65,44 @@ test "x86_64 generic cfg stores arbitrary two-i32 sret aggregate fields" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
 }
 
+test "x86_64 generic cfg stores mixed scalar sret aggregate fields" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @make_scalar(ptr sret({ i8, i16, i32, i64, ptr }) %out, i8 %a, i16 %b, i32 %c, i64 %d, ptr %e) {
+        \\entry:
+        \\  store i8 %a, ptr %out
+        \\  %field1 = getelementptr i8, ptr %out, i64 2
+        \\  store i16 %b, ptr %field1
+        \\  %field2 = getelementptr i8, ptr %out, i64 4
+        \\  store i32 %c, ptr %field2
+        \\  %field3 = getelementptr i8, ptr %out, i64 8
+        \\  store i64 %d, ptr %field3
+        \\  %field4 = getelementptr i8, ptr %out, i64 16
+        \\  store ptr %e, ptr %field4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_al_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 0 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdx }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_ax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 2 } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rcx }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 4 } }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_arg64_arg_ptr_disp8 = .{ .ptr_reg = .rdi, .src_reg = .r8, .offset = 8 } }, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_arg64_arg_ptr_disp8 = .{ .ptr_reg = .rdi, .src_reg = .r9, .offset = 16 } }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[8]);
+}
+
 test "x86_64 codegen stores selected sret i64 aggregate fields" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

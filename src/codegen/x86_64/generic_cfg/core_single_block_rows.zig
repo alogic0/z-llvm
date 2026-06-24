@@ -17,6 +17,7 @@ const target = shared.target;
 const memory_location = shared.memory_location;
 const MachineFunction = shared.MachineFunction;
 const FrameIndex = shared.FrameIndex;
+const ArgReg = shared.ArgReg;
 const XmmReg = shared.XmmReg;
 const SysVCallTarget = shared.SysVCallTarget;
 
@@ -1432,7 +1433,7 @@ pub fn lowerGenericCfgSelectedSretStores(
     block: ir.BasicBlock,
 ) !bool {
     if (try lowerGenericCfgSretCopy(allocator, machine, function, block)) return true;
-    if (try lowerGenericCfgI32SretParamStores(allocator, machine, function, block)) return true;
+    if (try lowerGenericCfgScalarSretParamStores(allocator, machine, function, block)) return true;
     if (function.params.items.len < 4) return false;
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
     const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
@@ -1475,7 +1476,7 @@ pub fn lowerGenericCfgSelectedSretStores(
     return true;
 }
 
-pub fn lowerGenericCfgI32SretParamStores(
+pub fn lowerGenericCfgScalarSretParamStores(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -1493,14 +1494,14 @@ pub fn lowerGenericCfgI32SretParamStores(
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return false;
-        if (!field_ty.eql(.{ .int = 32 }) or !function.params.items[field_index + 1].ty.eql(.{ .int = 32 })) return false;
+        if (!supportedSretParamStoreLeaf(field_ty) or !function.params.items[field_index + 1].ty.eql(field_ty)) return false;
         const offset = try aggregateFieldOffset(aggregate_ty, field_index);
         const store_ptr = if (offset == 0 and instruction_index < block.instructions.items.len) ptr: {
             const maybe_store = switch (block.instructions.items[instruction_index].kind) {
                 .store => |store| store,
                 else => break :ptr null,
             };
-            if (maybe_store.ty.eql(.{ .int = 32 }) and !maybe_store.attrs.isBarrier() and
+            if (maybe_store.ty.eql(field_ty) and !maybe_store.attrs.isBarrier() and
                 isNamed(maybe_store.ptr, function.params.items[0].name))
             {
                 break :ptr function.params.items[0].name;
@@ -1530,16 +1531,63 @@ pub fn lowerGenericCfgI32SretParamStores(
             .store => |store| store,
             else => return false,
         };
-        if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
+        if (!store.ty.eql(field_ty) or store.attrs.isBarrier()) return false;
         if (!isNamed(store.ptr, ptr_name) or !isNamed(store.value, function.params.items[field_index + 1].name)) return false;
         instruction_index += 1;
 
-        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
-        try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
+        try emitGenericCfgScalarSretParamStore(allocator, machine, function, block, store.value, field_ty, sret_reg, offset);
     }
     if (instruction_index != block.instructions.items.len) return false;
     try appendGenericCfgReturn(allocator, machine);
     return true;
+}
+
+fn supportedSretParamStoreLeaf(ty: ir.Type) bool {
+    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
+        ty.eql(.{ .int = 64 }) or ty.eql(.ptr);
+}
+
+fn emitGenericCfgScalarSretParamStore(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+    ty: ir.Type,
+    sret_reg: ArgReg,
+    offset: u32,
+) !void {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (ty.eql(.{ .int = 32 })) {
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
+        try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
+    } else if (ty.eql(.{ .int = 64 }) or ty.eql(.ptr)) {
+        if (try paramRegOrNull(function, name, ty)) |reg| {
+            try appendStoreArg64ArgPtrDisp(allocator, machine, sret_reg, reg, offset);
+        } else {
+            try appendLoadStackDispRax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+            try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, offset);
+        }
+    } else if (ty.eql(.{ .int = 16 })) {
+        if (try paramRegOrNull(function, name, ty)) |reg| {
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+        } else {
+            try appendLoadStackDispU16Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+        }
+        try appendStoreAxArgPtrDisp(allocator, machine, sret_reg, offset);
+    } else if (ty.eql(.{ .int = 8 })) {
+        if (try paramRegOrNull(function, name, ty)) |reg| {
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+        } else {
+            try appendLoadStackDispU8Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+        }
+        try appendStoreAlArgPtrDisp(allocator, machine, sret_reg, offset);
+    } else {
+        return error.UnsupportedCodegenType;
+    }
 }
 
 pub fn lowerGenericCfgSretCopy(
