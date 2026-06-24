@@ -181,6 +181,18 @@ export fn frontier_two_i64_results_with_live_across_calls(a: i64, b: i64) i64 {
     return first + second + a;
 }
 
+export fn frontier_indirect_first_i64_results_with_live_across_calls(func: IdI64Fn, a: i64, b: i64) i64 {
+    const first = func(a);
+    const second = frontier_ordered2_i64(b);
+    return first + second + a;
+}
+
+export fn frontier_indirect_second_i64_results_with_live_across_calls(func: IdI64Fn, a: i64, b: i64) i64 {
+    const first = frontier_ordered_i64(a);
+    const second = func(b);
+    return first + second + a;
+}
+
 export fn frontier_indirect_both_i64_results_with_live_across_calls(first_func: IdI64Fn, second_func: IdI64Fn, a: i64, b: i64) i64 {
     const first = first_func(a);
     const second = second_func(b);

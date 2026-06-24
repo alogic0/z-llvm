@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=316
-structured_functions=316
-generic_codegen_functions=316
-generic_cfg_functions=316
+discovered_functions=318
+structured_functions=318
+generic_codegen_functions=318
+generic_cfg_functions=318
 structural_matcher_functions=0
-structured_air_v2_functions=316
-typed_air_operand_functions=316
+structured_air_v2_functions=318
+typed_air_operand_functions=318
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=316
+generic_lowering_functions=318
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=316
+object_emitted_functions=318
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -459,8 +459,10 @@ Closed in the current memory/aggregate frontier slice:
   lower both calls through the SysV scalar planner, add the saved stack value
   back into `%rax`, and return the combined `i64` result.
 - selected two-result `i64` call frames with live addend in
-  `frontier_sysv_abi.zig`: `frontier_two_i64_results_with_live_across_calls`
-  and `frontier_indirect_both_i64_results_with_live_across_calls` preserve the
+  `frontier_sysv_abi.zig`: `frontier_two_i64_results_with_live_across_calls`,
+  `frontier_indirect_first_i64_results_with_live_across_calls`,
+  `frontier_indirect_second_i64_results_with_live_across_calls`, and
+  `frontier_indirect_both_i64_results_with_live_across_calls` preserve the
   first `%rax` result, the second call's live argument, the second pointer
   callee when needed, and an independent live `i64` addend across both
   non-void calls before returning the three-value sum.
