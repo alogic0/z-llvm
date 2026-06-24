@@ -1,19 +1,22 @@
-const impl = @import("core_impl.zig");
+const shared = @import("core_shared.zig");
+const validation = @import("core_validation.zig");
 const diagnostics = @import("core_diagnostics.zig");
-const std = impl.std;
-const ir = impl.ir;
-const MachineFunction = impl.MachineFunction;
-const ArgReg = impl.ArgReg;
+const call_lowering = @import("cabi_call_lowering.zig");
+
+const std = shared.std;
+const ir = shared.ir;
+const MachineFunction = shared.MachineFunction;
+const ArgReg = shared.ArgReg;
 const blockByName = diagnostics.blockByName;
 const validateTerminatorBr = diagnostics.validateTerminatorBr;
-const findInstruction = impl.findInstruction;
-const isNamed = impl.isNamed;
-const isInt = impl.isInt;
-const isCalleeName = impl.isCalleeName;
-const validateDefaultCallConv = impl.validateDefaultCallConv;
-const appendAlignedDirectCall = impl.appendAlignedDirectCall;
-const globalSymbolName = impl.globalSymbolName;
-const typeIsI128 = impl.typeIsI128;
+const findInstruction = call_lowering.findInstruction;
+const isNamed = shared.isNamed;
+const isInt = shared.isInt;
+const isCalleeName = shared.isCalleeName;
+const validateDefaultCallConv = shared.validateDefaultCallConv;
+const appendAlignedDirectCall = shared.appendAlignedDirectCall;
+const globalSymbolName = shared.globalSymbolName;
+const typeIsI128 = validation.typeIsI128;
 
 pub fn lowerBase64DecodeBase64FullBoundary(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "base64.decode_base_64")) return false;
