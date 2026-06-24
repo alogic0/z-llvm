@@ -308,6 +308,13 @@ fn lowerGenericCfgI32CallResultAcrossI32Call(
     };
     if (!first_call.ret_ty.eql(.{ .int = 32 }) or first_call.inline_asm != null) return false;
     if (!callIsFastcc(first_call.calling_conv)) try validateDefaultCallConv(first_call.calling_conv);
+    const first_call_target: SysVCallTarget = if (first_call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = first_call.callee };
 
     const second_call = switch (second_call_inst.kind) {
         .call => |call| call,
@@ -382,9 +389,10 @@ fn lowerGenericCfgI32CallResultAcrossI32Call(
     if (second_arg_live_reg) |reg| {
         try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot4, .reg = reg } });
     }
+    try setupSysVCallTarget(allocator, machine, first_call_target);
     const first_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, first_call);
     if (first_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
-    try appendDirectCall(allocator, machine, first_call.callee, first_call.ret_ty);
+    try appendSysVCallTarget(allocator, machine, first_call_target, first_call.ret_ty);
     try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot0 });
     if (second_callee_reg) |reg| {
         try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot2 } });

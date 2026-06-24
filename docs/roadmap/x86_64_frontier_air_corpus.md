@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=312
-structured_functions=312
-generic_codegen_functions=312
-generic_cfg_functions=312
+discovered_functions=314
+structured_functions=314
+generic_codegen_functions=314
+generic_cfg_functions=314
 structural_matcher_functions=0
-structured_air_v2_functions=312
-typed_air_operand_functions=312
+structured_air_v2_functions=314
+typed_air_operand_functions=314
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=312
+generic_lowering_functions=314
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=312
+object_emitted_functions=314
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -398,11 +398,14 @@ Closed in the current memory/aggregate frontier slice:
   uses ordered helpers to prove both calls execute in source order and both
   call results are used.
 - selected indirect two-result ordered call frame in `frontier_sysv_abi.zig`:
-  `frontier_two_i32_results_across_indirect_call` preserves the pointer callee
-  and its `i32` argument across the first ordered `i32` call, reloads the
-  pointer callee through the shared 64-bit frame spill/reload path, and uses the
-  SysV planner for the second `callq *%rax` argument/return before combining
-  both call results with the saved live parameter.
+  `frontier_two_i32_results_across_indirect_call`,
+  `frontier_indirect_first_two_i32_results_across_calls`, and
+  `frontier_indirect_both_two_i32_results_across_calls` route the first ordered
+  call, second ordered call, or both ordered calls through function pointer
+  targets, preserve the second pointer callee and its `i32` argument across the
+  first ordered `i32` call when needed, and use the SysV planner for `callq
+  *%rax` argument/return before combining both call results with the saved live
+  parameter.
 - selected two-result live-across-later-call frame in `frontier_sysv_abi.zig`:
   `frontier_two_i32_results_live_across_void_call` preserves two ordered C ABI
   `i32` call results and the live `i32` parameter across a later side-effecting

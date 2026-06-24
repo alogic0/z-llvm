@@ -139,6 +139,18 @@ export fn frontier_two_i32_results_across_indirect_call(func: IdI32Fn, a: i32, b
     return first + second + a;
 }
 
+export fn frontier_indirect_first_two_i32_results_across_calls(func: IdI32Fn, a: i32, b: i32) i32 {
+    const first = func(a);
+    const second = frontier_ordered2_i32(b);
+    return first + second + a;
+}
+
+export fn frontier_indirect_both_two_i32_results_across_calls(first_func: IdI32Fn, second_func: IdI32Fn, a: i32, b: i32) i32 {
+    const first = first_func(a);
+    const second = second_func(b);
+    return first + second + a;
+}
+
 export fn frontier_two_i64_results_across_calls(a: i64, b: i64) i64 {
     const first = frontier_ordered_i64(a);
     const second = frontier_ordered2_i64(b);
