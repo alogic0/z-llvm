@@ -2,17 +2,18 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_match = @import("../match.zig");
 const x86_64_machine = @import("../machine.zig");
-const core_impl = @import("core_impl.zig");
+const core_validation = @import("core_validation.zig");
+const core_misc_rows = @import("core_misc_rows.zig");
 const f128_debug_rows = @import("cabi_f128_debug_rows.zig");
 
 const MachineFunction = x86_64_machine.MachineFunction;
 const isNamed = x86_64_match.isNamed;
 const isCalleeName = x86_64_match.isCalleeName;
-const validateAllocaNamed = core_impl.validateAllocaNamed;
-const validateStore = core_impl.validateStore;
-const singleRetVoidBlock = core_impl.singleRetVoidBlock;
-const hasSingleBlockInstructionCount = core_impl.hasSingleBlockInstructionCount;
-const validateIcmpNamedImm = core_impl.validateIcmpNamedImm;
+const validateAllocaNamed = core_validation.validateAllocaNamed;
+const validateStore = core_validation.validateStore;
+const singleRetVoidBlock = core_validation.singleRetVoidBlock;
+const hasSingleBlockInstructionCount = core_validation.hasSingleBlockInstructionCount;
+const validateIcmpNamedImm = core_misc_rows.validateIcmpNamedImm;
 const validateNamedLoad = f128_debug_rows.validateNamedLoad;
 const validateI8GepOffset = f128_debug_rows.validateI8GepOffset;
 

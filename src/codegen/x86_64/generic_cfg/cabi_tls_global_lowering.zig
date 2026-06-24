@@ -3,7 +3,7 @@ const ir = @import("../../../ir.zig");
 const x86_64_match = @import("../match.zig");
 const x86_64_machine = @import("../machine.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
-const core_impl = @import("core_impl.zig");
+const core_validation = @import("core_validation.zig");
 
 const MachineFunction = x86_64_machine.MachineFunction;
 
@@ -11,7 +11,7 @@ const globalSymbolName = x86_64_match.globalSymbolName;
 const i32Value = x86_64_match.i32Value;
 const isNamed = x86_64_match.isNamed;
 
-const matchGlobalUpdate = core_impl.matchGlobalUpdate;
+const matchGlobalUpdate = core_validation.matchGlobalUpdate;
 const paramValueReg = cabi_abi_helpers.paramValueReg;
 
 pub fn lowerInlineAsmBarrierReturn(
