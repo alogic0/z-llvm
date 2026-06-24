@@ -37,6 +37,17 @@ const simplifycfg = codegen_x86_64_common.simplifycfg;
 const slp_vectorizer = codegen_x86_64_common.slp_vectorizer;
 const sroa = codegen_x86_64_common.sroa;
 const expectMachineInstruction = codegen_x86_64_common.expectMachineInstruction;
+
+test "x86_64 codegen argument register model excludes callee-saved GPRs" {
+    try std.testing.expectEqual(codegen.x86_64.ArgReg.rdi, try codegen.x86_64.ArgReg.fromIndex(0));
+    try std.testing.expectEqual(codegen.x86_64.ArgReg.rsi, try codegen.x86_64.ArgReg.fromIndex(1));
+    try std.testing.expectEqual(codegen.x86_64.ArgReg.rdx, try codegen.x86_64.ArgReg.fromIndex(2));
+    try std.testing.expectEqual(codegen.x86_64.ArgReg.rcx, try codegen.x86_64.ArgReg.fromIndex(3));
+    try std.testing.expectEqual(codegen.x86_64.ArgReg.r8, try codegen.x86_64.ArgReg.fromIndex(4));
+    try std.testing.expectEqual(codegen.x86_64.ArgReg.r9, try codegen.x86_64.ArgReg.fromIndex(5));
+    try std.testing.expectError(error.UnsupportedCodegenAbi, codegen.x86_64.ArgReg.fromIndex(6));
+}
+
 test "x86_64 codegen rejects unsupported control flow" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
