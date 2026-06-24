@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=194`,
-`generic_codegen_functions=194`, `generic_cfg_functions=194`,
+three release modes at `source_rows=13`, `discovered_functions=196`,
+`generic_codegen_functions=196`, `generic_cfg_functions=196`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=194`, `object_failures=0`,
+`object_emitted_functions=196`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -447,9 +447,10 @@ by loading incoming stack eightbytes into `%xmm0`/`%xmm1`.
 The SSE live-across-call frontier rows add selected one-live `f32`/`f64`
 spill/reload around an external C ABI `void` helper call, two- through
 six-live `f32`/`f64` spill/reload frames across no-argument helper calls
-before post-call `fadd` returns, selected two-live no-argument pointer-callee
-`f32`/`f64` spill/reload frames across `callq *%rax`, and selected two-live
-`f32`/`f64` spill/reload across a helper call that consumes the second live
+before post-call `fadd` returns, selected two-live pointer-callee
+`f32`/`f64` spill/reload frames across no-argument and one-FP-argument
+`callq *%rax` shapes, and selected two-live `f32`/`f64` spill/reload across a
+helper call that consumes the second live
 value as its first FP argument.
 The SysV scalar stack frontier now also proves up to eighteen stack-passed
 `i32` call arguments with immediate `%rsp` cleanup, seven/eight/twelve

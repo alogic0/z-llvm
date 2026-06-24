@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=194
-structured_functions=194
-generic_codegen_functions=194
-generic_cfg_functions=194
+discovered_functions=196
+structured_functions=196
+generic_codegen_functions=196
+generic_cfg_functions=196
 structural_matcher_functions=0
-structured_air_v2_functions=194
-typed_air_operand_functions=194
+structured_air_v2_functions=196
+typed_air_operand_functions=196
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=194
+generic_lowering_functions=196
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=194
+object_emitted_functions=196
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -328,8 +328,9 @@ Closed in the current memory/aggregate frontier slice:
   post-call `fadd` return
 - selected indirect SSE live-across-call rows in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled, the pointer callee is moved to
-  `%rax`, `callq *%rax` is emitted, and both live values are reloaded for the
-  post-call `fadd` return
+  `%rax`, `callq *%rax` is emitted for both no-argument and one-FP-argument
+  helper shapes, and both live values are reloaded for the post-call `fadd`
+  return
 - selected named FP argument pass-through rows in `frontier_sysv_abi.zig`:
   five `f32` and five `f64` parameters are forwarded to external C ABI helpers
   through `%xmm0..%xmm4`; backend unit/object tests materialize immediate FP

@@ -1534,6 +1534,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_indirect_two_f64_live_sum_after_call(void (*)(void), double, double) __asm__("frontier_sysv_abi.frontier_indirect_two_f64_live_sum_after_call");
     \\extern float z_frontier_two_f32_live_sum_after_arg_call(float, float) __asm__("frontier_sysv_abi.frontier_two_f32_live_sum_after_arg_call");
     \\extern double z_frontier_two_f64_live_sum_after_arg_call(double, double) __asm__("frontier_sysv_abi.frontier_two_f64_live_sum_after_arg_call");
+    \\extern float z_frontier_indirect_two_f32_live_sum_after_arg_call(void (*)(float), float, float) __asm__("frontier_sysv_abi.frontier_indirect_two_f32_live_sum_after_arg_call");
+    \\extern double z_frontier_indirect_two_f64_live_sum_after_arg_call(void (*)(double), double, double) __asm__("frontier_sysv_abi.frontier_indirect_two_f64_live_sum_after_arg_call");
     \\extern float z_frontier_three_f32_live_sum_after_call(float, float, float) __asm__("frontier_sysv_abi.frontier_three_f32_live_sum_after_call");
     \\extern float z_frontier_four_f32_live_sum_after_call(float, float, float, float) __asm__("frontier_sysv_abi.frontier_four_f32_live_sum_after_call");
     \\extern float z_frontier_five_f32_live_sum_after_call(float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_five_f32_live_sum_after_call");
@@ -1610,6 +1612,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_indirect_two_f64_live_sum_after_call(frontier_touch_none, 1.25, 2.5) != 3.75) return 57;
     \\    if (z_frontier_two_f32_live_sum_after_arg_call(1.5f, 2.75f) != 4.25f || frontier_seen_f32 != 2.75f) return 29;
     \\    if (z_frontier_two_f64_live_sum_after_arg_call(1.25, 2.5) != 3.75 || frontier_seen_f64 != 2.5) return 30;
+    \\    if (z_frontier_indirect_two_f32_live_sum_after_arg_call(frontier_touch_f32, 1.5f, 2.75f) != 4.25f || frontier_seen_f32 != 2.75f) return 72;
+    \\    if (z_frontier_indirect_two_f64_live_sum_after_arg_call(frontier_touch_f64, 1.25, 2.5) != 3.75 || frontier_seen_f64 != 2.5) return 73;
     \\    if (z_frontier_three_f32_live_sum_after_call(1.5f, 2.75f, 3.25f) != 7.5f) return 13;
     \\    if (z_frontier_three_f64_live_sum_after_call(1.25, 2.5, 3.75) != 7.5) return 14;
     \\    if (z_frontier_four_f32_live_sum_after_call(1.5f, 2.75f, 3.25f, 4.5f) != 12.0f) return 15;

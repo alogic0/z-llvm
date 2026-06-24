@@ -14677,7 +14677,6 @@ fn lowerGenericCfgFpVoidCallParamReturn(
     }
     if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
     const call_target: SysVCallTarget = if (call.callee_value) |callee_value| blk: {
-        if (call.args.items.len != 0) return error.UnsupportedLiveAcrossCall;
         const callee_name = switch (callee_value) {
             .named => |name| name,
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -14729,7 +14728,6 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     }
     if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
     const call_target: SysVCallTarget = if (call.callee_value) |callee_value| blk: {
-        if (call.args.items.len != 0) return error.UnsupportedLiveAcrossCall;
         const callee_name = switch (callee_value) {
             .named => |name| name,
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
