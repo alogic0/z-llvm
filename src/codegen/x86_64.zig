@@ -22985,7 +22985,7 @@ fn sysvScalarCallNeedsStackArgs(call: ir.CallInst) bool {
             if (int_arg_index >= 6) return true;
             int_arg_index += 1;
         } else if (arg.ty.eql(.float) or arg.ty.eql(.double)) {
-            if (fp_arg_index >= 2) return true;
+            if (fp_arg_index >= 8) return true;
             fp_arg_index += 1;
         } else {
             return true;

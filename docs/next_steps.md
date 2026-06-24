@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=198`,
-`generic_codegen_functions=198`, `generic_cfg_functions=198`,
+frontier gate reports `source_rows=13`, `discovered_functions=200`,
+`generic_codegen_functions=200`, `generic_cfg_functions=200`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=198`, `object_failures=0`,
+`object_emitted_functions=200`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -486,7 +486,8 @@ two- through six-live `f32`/`f64` spill/reload frames across no-argument helper
 calls before post-call `fadd` returns, selected two-live no-argument
 pointer-callee `f32`/`f64` spill/reload frames before a post-call `fadd`
 return, selected two-live one-FP-argument pointer-callee spill/reload frames,
-selected three-live two-FP-argument pointer-callee spill/reload frames,
+selected three-/four-live two-/three-FP-argument pointer-callee spill/reload
+frames,
 and selected two-live `f32`/`f64` spill/reload across a helper call that
 consumes the second live value as its first FP argument. The FP argument
 frontier now also proves selected
@@ -497,8 +498,9 @@ remaining frontier backlog is mixed int-to-float multiply/add pipelines,
 private helper graphs with stack-passed live values beyond the current
 disp8-safe selected model, broader live SSE values
 beyond the selected one- through six-live `f32`/`f64` no-argument-call shapes,
-two-live no-argument and one-FP-argument pointer-callee shapes, three-live
-two-FP-argument pointer-callee shape, and two-live FP-argument call shape,
+two-live no-argument and one-FP-argument pointer-callee shapes,
+three-/four-live two-/three-FP-argument pointer-callee shapes, and two-live
+FP-argument call shape,
 or live values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
@@ -517,7 +519,8 @@ selected model, and
 broader SSE live-across-call frames beyond the selected one-live through
 six-live `f32`/`f64` no-argument-call shapes, two-live FP-argument call shape,
 selected two-live no-argument and one-FP-argument pointer-callee call shapes,
-and selected three-live two-FP-argument pointer-callee call shape. The accepted frontier rows use typed
+and selected three-/four-live two-/three-FP-argument pointer-callee call
+shapes. The accepted frontier rows use typed
 structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,
 legacy AIR text lowering, shape recognizers, structural matcher fallback, LLVM
 optimizer, LLVM TargetMachine, or LLD are involved.
