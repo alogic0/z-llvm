@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=323
-structured_functions=323
-generic_codegen_functions=323
-generic_cfg_functions=323
+discovered_functions=327
+structured_functions=327
+generic_codegen_functions=327
+generic_cfg_functions=327
 structural_matcher_functions=0
-structured_air_v2_functions=323
-typed_air_operand_functions=323
+structured_air_v2_functions=327
+typed_air_operand_functions=327
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=323
+generic_lowering_functions=327
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=323
+object_emitted_functions=327
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -378,7 +378,12 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_indirect_mixed_i32_f64_live_sum_after_call` spill an integer GPR
   and one SSE parameter across direct and pointer-callee `void` calls, reload
   the integer through `%edi`, convert it with `sitofp`, and add the preserved
-  FP value. `frontier_two_void_calls_mixed_i32_f32_live_sum`,
+  FP value. `frontier_mixed_i64_f32_live_sum_after_call`,
+  `frontier_mixed_i64_f64_live_sum_after_call`,
+  `frontier_indirect_mixed_i64_f32_live_sum_after_call`, and
+  `frontier_indirect_mixed_i64_f64_live_sum_after_call` use the same frame with
+  64-bit GPR spill/reload and `%rdi` int-to-FP conversion.
+  `frontier_two_void_calls_mixed_i32_f32_live_sum`,
   `frontier_two_void_calls_mixed_i32_f64_live_sum`,
   `frontier_two_indirect_void_calls_mixed_i32_f32_live_sum`, and
   `frontier_two_indirect_void_calls_mixed_i32_f64_live_sum` extend that same

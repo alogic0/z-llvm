@@ -1109,6 +1109,37 @@ test "x86_64 codegen preserves two i64 call results and live addend across later
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 40 });
 }
 
+test "x86_64 codegen preserves i64 and f64 live values across void call before fp add" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @touch()
+        \\
+        \\define double @caller(i64 %a, double %b) {
+        \\entry:
+        \\  call void @touch()
+        \\  %cast = sitofp i64 %a to double
+        \\  %sum = fadd double %cast, %b
+        \\  ret double %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rdi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .frame_index = .slot2, .reg = .xmm0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .cvtsi2sd_rdi_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .addsd_xmm1_xmm0);
+}
+
 test "x86_64 codegen preserves indirect two i64 call results across later pointer-callee void call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -1620,8 +1620,12 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_two_indirect_void_calls_two_f64_live_sum(void (*)(void), double, double) __asm__("frontier_sysv_abi.frontier_two_indirect_void_calls_two_f64_live_sum");
     \\extern float z_frontier_mixed_i32_f32_live_sum_after_call(int, float) __asm__("frontier_sysv_abi.frontier_mixed_i32_f32_live_sum_after_call");
     \\extern double z_frontier_mixed_i32_f64_live_sum_after_call(int, double) __asm__("frontier_sysv_abi.frontier_mixed_i32_f64_live_sum_after_call");
+    \\extern float z_frontier_mixed_i64_f32_live_sum_after_call(long long, float) __asm__("frontier_sysv_abi.frontier_mixed_i64_f32_live_sum_after_call");
+    \\extern double z_frontier_mixed_i64_f64_live_sum_after_call(long long, double) __asm__("frontier_sysv_abi.frontier_mixed_i64_f64_live_sum_after_call");
     \\extern float z_frontier_indirect_mixed_i32_f32_live_sum_after_call(void (*)(void), int, float) __asm__("frontier_sysv_abi.frontier_indirect_mixed_i32_f32_live_sum_after_call");
     \\extern double z_frontier_indirect_mixed_i32_f64_live_sum_after_call(void (*)(void), int, double) __asm__("frontier_sysv_abi.frontier_indirect_mixed_i32_f64_live_sum_after_call");
+    \\extern float z_frontier_indirect_mixed_i64_f32_live_sum_after_call(void (*)(void), long long, float) __asm__("frontier_sysv_abi.frontier_indirect_mixed_i64_f32_live_sum_after_call");
+    \\extern double z_frontier_indirect_mixed_i64_f64_live_sum_after_call(void (*)(void), long long, double) __asm__("frontier_sysv_abi.frontier_indirect_mixed_i64_f64_live_sum_after_call");
     \\extern float z_frontier_two_void_calls_mixed_i32_f32_live_sum(int, float) __asm__("frontier_sysv_abi.frontier_two_void_calls_mixed_i32_f32_live_sum");
     \\extern double z_frontier_two_void_calls_mixed_i32_f64_live_sum(int, double) __asm__("frontier_sysv_abi.frontier_two_void_calls_mixed_i32_f64_live_sum");
     \\extern float z_frontier_two_indirect_void_calls_mixed_i32_f32_live_sum(void (*)(void), int, float) __asm__("frontier_sysv_abi.frontier_two_indirect_void_calls_mixed_i32_f32_live_sum");
@@ -1857,8 +1861,12 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_two_indirect_void_calls_two_f64_live_sum(frontier_touch_none, 1.25, 2.5) != 3.75) return 97;
     \\    if (z_frontier_mixed_i32_f32_live_sum_after_call(7, 2.5f) != 9.5f) return 98;
     \\    if (z_frontier_mixed_i32_f64_live_sum_after_call(7, 2.5) != 9.5) return 99;
+    \\    if (z_frontier_mixed_i64_f32_live_sum_after_call(17, 2.5f) != 19.5f) return 170;
+    \\    if (z_frontier_mixed_i64_f64_live_sum_after_call(19, 2.5) != 21.5) return 171;
     \\    if (z_frontier_indirect_mixed_i32_f32_live_sum_after_call(frontier_touch_none, 7, 2.5f) != 9.5f) return 100;
     \\    if (z_frontier_indirect_mixed_i32_f64_live_sum_after_call(frontier_touch_none, 7, 2.5) != 9.5) return 101;
+    \\    if (z_frontier_indirect_mixed_i64_f32_live_sum_after_call(frontier_touch_none, 23, 2.5f) != 25.5f) return 172;
+    \\    if (z_frontier_indirect_mixed_i64_f64_live_sum_after_call(frontier_touch_none, 29, 2.5) != 31.5) return 173;
     \\    if (z_frontier_two_void_calls_mixed_i32_f32_live_sum(7, 2.5f) != 9.5f) return 102;
     \\    if (z_frontier_two_void_calls_mixed_i32_f64_live_sum(7, 2.5) != 9.5) return 103;
     \\    if (z_frontier_two_indirect_void_calls_mixed_i32_f32_live_sum(frontier_touch_none, 7, 2.5f) != 9.5f) return 104;

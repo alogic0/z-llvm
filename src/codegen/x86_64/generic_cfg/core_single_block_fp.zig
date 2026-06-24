@@ -169,6 +169,14 @@ pub fn emitFirstGprI32ToFpXmm0(allocator: std.mem.Allocator, machine: *MachineFu
     } else return error.UnsupportedCodegenType;
 }
 
+pub fn emitFirstGprI64ToFpXmm0(allocator: std.mem.Allocator, machine: *MachineFunction, ty: ir.Type) !void {
+    if (ty.eql(.float)) {
+        try machine.instructions.append(allocator, .cvtsi2ss_rdi_xmm0);
+    } else if (ty.eql(.double)) {
+        try machine.instructions.append(allocator, .cvtsi2sd_rdi_xmm0);
+    } else return error.UnsupportedCodegenType;
+}
+
 pub fn appendFpAddXmm1Xmm0(allocator: std.mem.Allocator, machine: *MachineFunction, ty: ir.Type) !void {
     if (ty.eql(.float)) {
         try machine.instructions.append(allocator, .addss_xmm1_xmm0);
@@ -367,7 +375,7 @@ pub fn lowerGenericCfgFpVoidCallIntToFpAddReturn(
     const cast_inst = block.instructions.items[call_count];
     if (cast_inst.removed) return false;
     const cast_result = cast_inst.result orelse return false;
-    const int_param = fpVoidCallSitofpI32Param(function, cast_inst, function.ret_ty) catch return false;
+    const int_param = fpVoidCallSitofpGprParam(function, cast_inst, function.ret_ty) catch return false;
 
     const add_inst = block.instructions.items[call_count + 1];
     if (add_inst.removed) return false;
@@ -378,7 +386,11 @@ pub fn lowerGenericCfgFpVoidCallIntToFpAddReturn(
 
     const preserved_callee = try repeatedFpVoidCallPreservedCallee(function, block, call_count);
     try appendStackFrame(allocator, machine, 24);
-    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .reg = int_param, .frame_index = .slot0 } });
+    if (int_param.ty.eql(.{ .int = 64 })) {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = int_param.reg, .frame_index = .slot0 } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .reg = int_param.reg, .frame_index = .slot0 } });
+    }
     const fp_reg = try XmmReg.fromIndex(fp_param_index);
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = fp_reg, .frame_index = .slot2 } });
@@ -401,8 +413,13 @@ pub fn lowerGenericCfgFpVoidCallIntToFpAddReturn(
         _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
         try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
     }
-    try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
-    try emitFirstGprI32ToFpXmm0(allocator, machine, function.ret_ty);
+    if (int_param.ty.eql(.{ .int = 64 })) {
+        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+        try emitFirstGprI64ToFpXmm0(allocator, machine, function.ret_ty);
+    } else {
+        try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+        try emitFirstGprI32ToFpXmm0(allocator, machine, function.ret_ty);
+    }
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
         try machine.instructions.append(allocator, .addss_xmm1_xmm0);
@@ -415,17 +432,27 @@ pub fn lowerGenericCfgFpVoidCallIntToFpAddReturn(
     return true;
 }
 
-fn fpVoidCallSitofpI32Param(function: ir.Function, instruction: ir.Instruction, to_ty: ir.Type) !ArgReg {
+const FpVoidCallIntParam = struct {
+    reg: ArgReg,
+    ty: ir.Type,
+};
+
+fn fpVoidCallSitofpGprParam(function: ir.Function, instruction: ir.Instruction, to_ty: ir.Type) !FpVoidCallIntParam {
     const cast = switch (instruction.kind) {
         .cast => |cast| cast,
         else => return error.UnsupportedCodegenInstruction,
     };
-    if (cast.op != .sitofp or !cast.from_ty.eql(.{ .int = 32 }) or !cast.to_ty.eql(to_ty)) return error.UnsupportedCodegenInstruction;
+    if (cast.op != .sitofp or
+        (!cast.from_ty.eql(.{ .int = 32 }) and !cast.from_ty.eql(.{ .int = 64 })) or
+        !cast.to_ty.eql(to_ty)) return error.UnsupportedCodegenInstruction;
     const source_name = switch (cast.value) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
-    return paramReg(function, source_name, .{ .int = 32 });
+    return .{
+        .reg = try paramReg(function, source_name, cast.from_ty),
+        .ty = cast.from_ty,
+    };
 }
 
 pub fn lowerGenericCfgFpVoidCallBinaryReturn(

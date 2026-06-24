@@ -731,12 +731,32 @@ export fn frontier_mixed_i32_f64_live_sum_after_call(a: i32, b: f64) f64 {
     return @as(f64, @floatFromInt(a)) + b;
 }
 
+export fn frontier_mixed_i64_f32_live_sum_after_call(a: i64, b: f32) f32 {
+    frontier_touch_none();
+    return @as(f32, @floatFromInt(a)) + b;
+}
+
+export fn frontier_mixed_i64_f64_live_sum_after_call(a: i64, b: f64) f64 {
+    frontier_touch_none();
+    return @as(f64, @floatFromInt(a)) + b;
+}
+
 export fn frontier_indirect_mixed_i32_f32_live_sum_after_call(func: VoidFn, a: i32, b: f32) f32 {
     func();
     return @as(f32, @floatFromInt(a)) + b;
 }
 
 export fn frontier_indirect_mixed_i32_f64_live_sum_after_call(func: VoidFn, a: i32, b: f64) f64 {
+    func();
+    return @as(f64, @floatFromInt(a)) + b;
+}
+
+export fn frontier_indirect_mixed_i64_f32_live_sum_after_call(func: VoidFn, a: i64, b: f32) f32 {
+    func();
+    return @as(f32, @floatFromInt(a)) + b;
+}
+
+export fn frontier_indirect_mixed_i64_f64_live_sum_after_call(func: VoidFn, a: i64, b: f64) f64 {
     func();
     return @as(f64, @floatFromInt(a)) + b;
 }
