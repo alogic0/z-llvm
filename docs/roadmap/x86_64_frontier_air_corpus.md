@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=347
-structured_functions=347
-generic_codegen_functions=347
-generic_cfg_functions=347
+discovered_functions=351
+structured_functions=351
+generic_codegen_functions=351
+generic_cfg_functions=351
 structural_matcher_functions=0
-structured_air_v2_functions=347
-typed_air_operand_functions=347
+structured_air_v2_functions=351
+typed_air_operand_functions=351
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=347
+generic_lowering_functions=351
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=347
+object_emitted_functions=351
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -505,6 +505,14 @@ Closed in the current memory/aggregate frontier slice:
   reuse the same two-result/later-void lowering path while also spilling an
   independent live `i64` addend across both non-void calls and the final direct
   or pointer-callee `void` call before producing the three-value sum.
+- selected mixed integer/FP non-void result frames in `frontier_sysv_abi.zig`:
+  `frontier_mixed_i64_f64_results_across_calls`,
+  `frontier_mixed_indirect_first_i64_f64_results_across_calls`,
+  `frontier_mixed_indirect_second_i64_f64_results_across_calls`, and
+  `frontier_mixed_indirect_both_i64_f64_results_across_calls` preserve a later
+  `double` argument and optional second pointer callee across the first `i64`
+  result call, save `%rax`, run the later `double` result call, convert the
+  saved integer result with `sitofp`, and return the mixed `double` sum.
 - selected mixed-width FP call-result frames in `frontier_sysv_abi.zig`:
   `frontier_mixed_f32_f64_results_across_calls`,
   `frontier_mixed_indirect_first_f32_f64_results_across_calls`,

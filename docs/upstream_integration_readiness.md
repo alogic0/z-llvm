@@ -583,20 +583,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=347
-structured_functions=347
-generic_codegen_functions=347
-generic_cfg_functions=347
+discovered_functions=351
+structured_functions=351
+generic_codegen_functions=351
+generic_cfg_functions=351
 structural_matcher_functions=0
-structured_air_v2_functions=347
-typed_air_operand_functions=347
+structured_air_v2_functions=351
+typed_air_operand_functions=351
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=347
+generic_lowering_functions=351
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=347
+object_emitted_functions=351
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -670,7 +670,7 @@ arbitrary non-selected sret/byval copies
 varargs
 vectors
 stack-passed live values beyond the current disp8-safe selected model
-broader SSE live-across-call helpers beyond selected no-argument-call shapes, selected repeated two-live direct/pointer-callee no-argument shapes, selected mixed one-GPR/one-SSE i32/i64 one-/two-call direct/pointer-callee shapes, selected direct two-/three-/six-live FP-argument shapes, pointer-callee shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width two-result f32/f64 call frames, selected mixed f32/f64 two-result call frames, selected mixed f32/f64 two-result frames with one live double or i64 addend, selected direct/pointer-callee i64 result live-across-later-void frames, and selected direct/pointer-callee two-result i64 live-across-later-void frames
+broader SSE live-across-call helpers beyond selected no-argument-call shapes, selected repeated two-live direct/pointer-callee no-argument shapes, selected mixed one-GPR/one-SSE i32/i64 one-/two-call direct/pointer-callee shapes, selected direct two-/three-/six-live FP-argument shapes, pointer-callee shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width two-result f32/f64 call frames, selected mixed f32/f64 two-result call frames, selected mixed f32/f64 two-result frames with one live double or i64 addend, selected mixed i64/f64 two-result frames, selected direct/pointer-callee i64 result live-across-later-void frames, and selected direct/pointer-callee two-result i64 live-across-later-void frames
 alternate safety-guard control flow
 ```
 
