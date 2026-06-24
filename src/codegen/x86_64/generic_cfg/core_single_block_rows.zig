@@ -172,6 +172,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgTwoI32CallResultsAcrossVoidCall(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
         if (try lowerGenericCfgI32CallResultAcrossI32Call(allocator, machine, function, block, ret)) {
             machine.codegen_path = .generic_cfg;
             return true;
@@ -398,6 +402,125 @@ fn lowerGenericCfgI32CallResultAcrossI32Call(
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
     };
     try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn lowerGenericCfgTwoI32CallResultsAcrossVoidCall(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 5) return false;
+    const first_call_inst = block.instructions.items[0];
+    const second_call_inst = block.instructions.items[1];
+    const third_call_inst = block.instructions.items[2];
+    const first_add_inst = block.instructions.items[3];
+    const second_add_inst = block.instructions.items[4];
+    if (first_call_inst.removed or second_call_inst.removed or third_call_inst.removed or first_add_inst.removed or second_add_inst.removed) return false;
+    const first_result = first_call_inst.result orelse return false;
+    const second_result = second_call_inst.result orelse return false;
+    const first_add_result = first_add_inst.result orelse return false;
+    const second_add_result = second_add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, second_add_result)) return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!first_call.ret_ty.eql(.{ .int = 32 }) or first_call.callee_value != null or first_call.inline_asm != null) return false;
+    if (!callIsFastcc(first_call.calling_conv)) try validateDefaultCallConv(first_call.calling_conv);
+
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!second_call.ret_ty.eql(.{ .int = 32 }) or second_call.callee_value != null or second_call.inline_asm != null) return false;
+    if (!callIsFastcc(second_call.calling_conv)) try validateDefaultCallConv(second_call.calling_conv);
+    if (sysvScalarCallNeedsStackArgs(second_call)) return false;
+
+    const third_call = switch (third_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (third_call.ret_ty != .void or third_call.args.items.len != 0 or third_call.callee_value != null or third_call.inline_asm != null) return false;
+    if (!callIsFastcc(third_call.calling_conv)) try validateDefaultCallConv(third_call.calling_conv);
+
+    const first_add = switch (first_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    const second_add = switch (second_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (!first_add.ty.eql(.{ .int = 32 }) or first_add.op != .add) return false;
+    if (!second_add.ty.eql(.{ .int = 32 }) or second_add.op != .add) return false;
+    if (!valueReferencesAddResult(second_add.lhs, first_add_result) and !valueReferencesAddResult(second_add.rhs, first_add_result)) return false;
+
+    var leaves: [3]ir.Value = undefined;
+    var leaf_count: usize = 0;
+    try collectTwoAddLeaves(first_add_result, first_add, second_add, &leaves, &leaf_count);
+    var has_first = false;
+    var has_second = false;
+    var extra_value: ?ir.Value = null;
+    for (leaves[0..leaf_count]) |leaf| {
+        if (isNamed(leaf, first_result)) {
+            if (has_first) return false;
+            has_first = true;
+        } else if (isNamed(leaf, second_result)) {
+            if (has_second) return false;
+            has_second = true;
+        } else if (extra_value == null) {
+            extra_value = leaf;
+        } else {
+            return false;
+        }
+    }
+    if (!has_first or !has_second) return false;
+
+    const extra_param_reg = if (extra_value) |value| switch (value) {
+        .named => |name| try paramRegOrNull(function, name, .{ .int = 32 }),
+        .int => null,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    } else null;
+    const second_arg_live_reg = try secondCallSingleI32ParamArgReg(function, second_call);
+    if (extra_value) |value| {
+        if (secondCallUsesValue(second_call, value)) return false;
+    }
+
+    try appendStackFrame(allocator, machine, 24);
+    if (extra_param_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = reg } });
+    }
+    if (second_arg_live_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot4, .reg = reg } });
+    }
+    const first_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, first_call);
+    if (first_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try appendDirectCall(allocator, machine, first_call.callee, first_call.ret_ty);
+    try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot0 });
+    if (second_arg_live_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+    }
+    const second_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, second_call);
+    if (second_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try appendDirectCall(allocator, machine, second_call.callee, second_call.ret_ty);
+    try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot2 });
+    try appendDirectCall(allocator, machine, third_call.callee, .void);
+    try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+    try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = 8 });
+    if (extra_value) |value| switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+        .named => {
+            if (extra_param_reg == null) return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = 4 });
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
+    };
+    try appendStackFrameEnd(allocator, machine, 24);
     try appendGenericCfgReturn(allocator, machine);
     return true;
 }

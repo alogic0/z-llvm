@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=219`,
-`generic_codegen_functions=219`, `generic_cfg_functions=219`,
+frontier gate reports `source_rows=13`, `discovered_functions=220`,
+`generic_codegen_functions=220`, `generic_cfg_functions=220`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=219`, `object_failures=0`,
+`object_emitted_functions=220`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -508,7 +508,9 @@ then combines both call results plus the saved live parameter after the second
 call. The pointer-callee follow-up preserves the second call target and
 argument across the first call, reloads the callee through the shared 64-bit
 frame spill/reload path, and uses the same SysV planner for the indirect `i32`
-call.
+call. The later-void follow-up preserves both ordered `i32` call results and
+the live parameter across a subsequent side-effecting `void` call, then reloads
+both frame slots for the final add tree.
 The mixed numeric frontier also lowers typed AIR v2 `sitofp` plus `fadd` or
 `fmul`/`fadd` pipelines for `i32` to `f32`/`f64`, including `mulss`/`mulsd`
 codegen and executable C ABI checks.
@@ -520,7 +522,7 @@ two-live no-argument and one-FP-argument pointer-callee shapes,
 three-/four-/six-live two-/three-/five-FP-argument pointer-callee shapes, and
 two-live FP-argument call shape,
 or arbitrary mixed/non-void live values across calls beyond the selected
-direct/indirect ordered `i32` result rows,
+direct/indirect/later-void ordered `i32` result rows,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, nested mixed INTEGER/SSE field reads/construction,
