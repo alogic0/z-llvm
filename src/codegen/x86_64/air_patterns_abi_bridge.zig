@@ -1951,6 +1951,13 @@ fn lowerRuntimeAggregatePairMakePairReturn(
     if (!second_store.ty.eql(.{ .int = 32 }) or second_store.attrs.isBarrier()) return false;
     if (!isNamed(second_store.ptr, gep_name) or !isNamed(second_store.value, function.params.items[2].name)) return false;
 
+    const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const first_reg = try paramReg(function, function.params.items[1].name, .{ .int = 32 });
+    const second_reg = try paramReg(function, function.params.items[2].name, .{ .int = 32 });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = first_reg });
+    try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, 0);
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = second_reg });
+    try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, 4);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
