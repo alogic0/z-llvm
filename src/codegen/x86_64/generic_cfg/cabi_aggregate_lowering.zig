@@ -1597,7 +1597,7 @@ pub fn lowerRegisterAggregateDirectCallReturn(
         try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
         const stack_arg_count = appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
             error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
-            else => return err,
+            else => if (sysv_abi.isBoundaryError(err)) return false else return err,
         };
         try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
         try machine.instructions.append(allocator, .ret);
@@ -1605,7 +1605,7 @@ pub fn lowerRegisterAggregateDirectCallReturn(
     }
     const stack_arg_count = appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
         error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
-        else => return err,
+        else => if (sysv_abi.isBoundaryError(err)) return false else return err,
     };
     try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
     try machine.instructions.append(allocator, .ret);
