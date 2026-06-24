@@ -252,27 +252,31 @@ pub fn appendSysVScalarCallArgsWithBlock(
         const assignment = plan.assignments.items[index];
         switch (assignment) {
             .gpr => |dst| {
-                if (!arg.ty.eql(.{ .int = 32 }) and !arg.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+                if (!arg.ty.eql(.{ .int = 32 }) and !arg.ty.eql(.{ .int = 64 }) and arg.ty != .ptr) return error.UnsupportedCodegenType;
                 switch (arg.value) {
                     .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
+                    .null_value => if (arg.ty == .ptr)
+                        try appendMoveImmToArgReg(allocator, machine, dst, 0)
+                    else
+                        return error.UnsupportedCodegenValue,
                     .named => |name| {
                         if (sysvIntegerParamRegOrNull(function, name, arg.ty) catch |err| switch (err) {
                             error.UnsupportedCodegenAbi => null,
                             else => return err,
                         }) |src| {
                             if (src != dst) {
-                                try machine.instructions.append(allocator, if (arg.ty.eql(.{ .int = 64 }))
+                                try machine.instructions.append(allocator, if (arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr)
                                     .{ .mov_arg64_arg = .{ .dst = dst, .src = src } }
                                 else
                                     .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
                             }
                         } else if (arg.ty.eql(.{ .int = 32 })) {
                             try appendLoadStackDispArg32(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, .{ .int = 32 })) + incoming_stack_adjust);
-                        } else if (arg.ty.eql(.{ .int = 64 })) {
-                            try appendLoadStackDispArg64(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, .{ .int = 64 })) + incoming_stack_adjust);
+                        } else if (arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr) {
+                            try appendLoadStackDispArg64(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, arg.ty)) + incoming_stack_adjust);
                         }
                     },
-                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                    .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                 }
             },
             .sse => |dst| {

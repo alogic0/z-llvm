@@ -336,13 +336,14 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
     for (call.args.items) |arg| {
         try rejectUnsupportedCallArgAttrs(arg.attrs);
         try rejectUnsupportedAbiType(arg.ty);
-        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
+        if (isGprScalarType(arg.ty)) {
             plan.has_non_i32_arg = plan.has_non_i32_arg or !arg.ty.eql(.{ .int = 32 });
             if (int_arg_index >= 6) {
                 const assignment: CallArgAssignment = switch (arg.value) {
                     .int => |int| .{ .stack_i32_const = try i32Value(int) },
                     .named => |name| .{ .stack_i32_param = name },
-                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                    .null_value => if (arg.ty == .ptr) .{ .stack_i32_const = 0 } else return error.UnsupportedCodegenValue,
+                    .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                 };
                 try plan.assignments.append(allocator, assignment);
                 int_arg_index += 1;
@@ -572,6 +573,10 @@ fn isAggregateType(ty: ir.Type) bool {
         .aggregate => true,
         .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
     };
+}
+
+fn isGprScalarType(ty: ir.Type) bool {
+    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty == .ptr;
 }
 
 fn i32Value(value: i128) !i32 {

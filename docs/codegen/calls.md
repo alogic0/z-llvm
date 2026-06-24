@@ -89,6 +89,8 @@ Accepted call-codegen shape:
 ```text
 x86_64-linux SysV only
 i32/i64/pointer direct call arguments in the SysV integer stream
+pointer call arguments are assigned by the central SysV call planner and
+  emitted as 64-bit GPR moves for direct and function-pointer calls
 f32/f64 direct call arguments in the independent SysV SSE stream
 i32 return in %eax, i64/pointer return in %rax, f32/f64 return in %xmm0
 planner-level return accounting for scalar, register aggregate, and direct
@@ -334,7 +336,8 @@ unsupported calling conventions (`UnsupportedCallConvAbi`)
 Narrow indirect calls are no longer part of the rejected surface: typed AIR v2
 resolves operand 0 as a function pointer callee for planner-supported calls,
 including `i32` returns with incoming stack parameters loaded into outgoing GPR
-call slots, 12-argument forwarding through outgoing stack slots, selected
+call slots, pointer arguments assigned by the central SysV planner, 12-argument
+forwarding through outgoing stack slots, selected
 `f32`/`f64` calls with five SSE arguments returning through `%xmm0`, selected
 `i64` register/stack argument forwarding, selected INTEGER/INTEGER aggregate
 arguments/returns through GPR pairs, and selected SSE/SSE `[2]f64` aggregate

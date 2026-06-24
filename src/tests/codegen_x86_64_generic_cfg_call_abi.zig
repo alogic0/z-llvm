@@ -185,6 +185,98 @@ test "x86_64 SysV call planner counts independent GPR SSE and stack streams" {
     try std.testing.expect(!counts.memory_return);
 }
 
+test "x86_64 SysV call planner assigns pointer args through GPR stream" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr, i64, ptr)
+        \\
+        \\define i32 @caller(ptr %a, i64 %b, ptr %c) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr %a, i64 %b, ptr %c)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call);
+    try std.testing.expectEqual(@as(usize, 3), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 0), counts.sse_args);
+    try std.testing.expectEqual(@as(usize, 0), counts.stack_args);
+    try std.testing.expectEqual(@as(usize, 1), counts.gpr_returns);
+}
+
+test "x86_64 generic CFG lowers direct pointer call args through planner" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr)
+        \\
+        \\define i32 @caller(ptr %a, ptr %b) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr %b)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rsi } });
+    var saw_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.{ .int = 32 }));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_call);
+}
+
+test "x86_64 generic CFG lowers indirect pointer call args through planner" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, ptr %a, ptr %b) {
+        \\entry:
+        \\  %r = call i32 %fn(ptr %a, ptr %b)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .rsi, .src = .rdx } });
+    var saw_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .indirect_call_rax => |ret_ty| {
+            saw_call = true;
+            try std.testing.expect(ret_ty.eql(.{ .int = 32 }));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_call);
+}
+
 test "x86_64 SysV call planner classifies scalar aggregate and memory returns" {
     const scalar_input =
         \\target triple = "x86_64-unknown-linux-gnu"
