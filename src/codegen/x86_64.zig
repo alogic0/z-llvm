@@ -6,6 +6,7 @@ const x86_64_types = @import("x86_64/types.zig");
 const sysv_abi = @import("x86_64/sysv_abi.zig");
 const x86_64_verify = @import("x86_64/verify.zig");
 const x86_64_emit = @import("x86_64/emit.zig");
+const x86_64_match = @import("x86_64/match.zig");
 
 pub const ArgReg = x86_64_types.ArgReg;
 pub const XmmReg = x86_64_types.XmmReg;
@@ -41,6 +42,18 @@ const appendSysVCallTarget = x86_64_emit.appendSysVCallTarget;
 const appendAlignedSysVCallTarget = x86_64_emit.appendAlignedSysVCallTarget;
 const appendSysVCallTargetWithStackArgs = x86_64_emit.appendSysVCallTargetWithStackArgs;
 const appendPanicCall = x86_64_emit.appendPanicCall;
+const validateDefaultCallConv = x86_64_match.validateDefaultCallConv;
+const isNamed = x86_64_match.isNamed;
+const callIsFastcc = x86_64_match.callIsFastcc;
+const callArgAttrsContain = x86_64_match.callArgAttrsContain;
+const paramAttrsContain = x86_64_match.paramAttrsContain;
+const globalSymbolName = x86_64_match.globalSymbolName;
+const symbolName = x86_64_match.symbolName;
+const isInt = x86_64_match.isInt;
+const isFpText = x86_64_match.isFpText;
+const fp32TextBits = x86_64_match.fp32TextBits;
+const fp64TextBits = x86_64_match.fp64TextBits;
+const isCalleeName = x86_64_match.isCalleeName;
 
 const x86_64_machine = @import("x86_64/machine.zig");
 
@@ -4759,44 +4772,6 @@ fn matchesFpBinaryReturn(
     if (binary.op != op or !binary.ty.eql(ty)) return false;
     if (!isNamed(binary.lhs, function.params.items[0].name) or !isNamed(binary.rhs, function.params.items[1].name)) return false;
     return true;
-}
-
-fn isFpText(value: ir.Value, expected: []const u8) bool {
-    return switch (value) {
-        .fp => |text| std.mem.eql(u8, text, expected),
-        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    };
-}
-
-fn fp32TextBits(value: ir.Value) !u32 {
-    const text = switch (value) {
-        .fp => |text| text,
-        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    // LLVM prints float constants as raw double bit patterns (0x...), not
-    // C99 hex-float literals, so raw-hex spellings must be bit-decoded.
-    if (rawHexFpBits(text)) |bits| {
-        const wide: f64 = @bitCast(bits);
-        const narrow: f32 = @floatCast(wide);
-        return @bitCast(narrow);
-    }
-    const parsed = std.fmt.parseFloat(f32, text) catch return error.UnsupportedCodegenValue;
-    return @bitCast(parsed);
-}
-
-fn rawHexFpBits(text: []const u8) ?u64 {
-    if (!std.mem.startsWith(u8, text, "0x") or text.len != 18) return null;
-    return std.fmt.parseInt(u64, text[2..], 16) catch null;
-}
-
-fn fp64TextBits(value: ir.Value) !u64 {
-    const text = switch (value) {
-        .fp => |text| text,
-        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    if (rawHexFpBits(text)) |bits| return bits;
-    const parsed = std.fmt.parseFloat(f64, text) catch return error.UnsupportedCodegenValue;
-    return @bitCast(parsed);
 }
 
 fn lowerFloatSelectReturn(
@@ -23147,12 +23122,6 @@ fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
     };
 }
 
-fn validateDefaultCallConv(calling_conv: ?[]const u8) !void {
-    if (calling_conv) |cc| {
-        if (!std.mem.eql(u8, cc, "ccc")) return error.UnsupportedCodegenCallingConvention;
-    }
-}
-
 fn singleLiveParamAfter(function: ir.Function, block: ir.BasicBlock, instruction_index: usize) !?ArgReg {
     var live: ?ArgReg = null;
     for (block.instructions.items[instruction_index + 1 ..]) |instruction| {
@@ -23337,13 +23306,6 @@ fn noteLiveValue(function: ir.Function, value: ir.Value, live: *?ArgReg) !void {
     }
 }
 
-fn isNamed(value: ir.Value, name: []const u8) bool {
-    return switch (value) {
-        .named => |value_name| std.mem.eql(u8, value_name, name),
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    };
-}
-
 fn identityCastFrom(instruction: ir.Instruction, value_name: []const u8, from_ty: ir.Type, to_ty: ir.Type) ?[]const u8 {
     const result = instruction.result orelse return null;
     const cast = switch (instruction.kind) {
@@ -23401,47 +23363,6 @@ fn phiHasIncomingInt(phi: ir.PhiInst, value: i128, block_name: []const u8) bool 
         if (std.mem.eql(u8, incoming.block, block_name) and isInt(incoming.value, value)) return true;
     }
     return false;
-}
-
-fn isCalleeName(actual: []const u8, expected: []const u8) bool {
-    const actual_name = symbolName(actual);
-    if (std.mem.eql(u8, actual_name, expected)) return true;
-    return false;
-}
-
-fn callIsFastcc(calling_conv: ?[]const u8) bool {
-    const cc = calling_conv orelse return false;
-    return std.mem.eql(u8, cc, "fastcc");
-}
-
-fn callArgAttrsContain(arg: ir.CallArg, needle: []const u8) bool {
-    const attrs = arg.attrs orelse return false;
-    return std.mem.indexOf(u8, attrs, needle) != null;
-}
-
-fn paramAttrsContain(param: ir.Param, needle: []const u8) bool {
-    const attrs = param.attrs orelse return false;
-    return std.mem.indexOf(u8, attrs, needle) != null;
-}
-
-fn globalSymbolName(name: []const u8) ![]const u8 {
-    if (!std.mem.startsWith(u8, name, "@") or name.len == 1) return error.UnsupportedCodegenValue;
-    return symbolName(name);
-}
-
-fn symbolName(name: []const u8) []const u8 {
-    const without_at = if (std.mem.startsWith(u8, name, "@")) name[1..] else name;
-    if (without_at.len >= 2 and without_at[0] == '"' and without_at[without_at.len - 1] == '"') {
-        return without_at[1 .. without_at.len - 1];
-    }
-    return without_at;
-}
-
-fn isInt(value: ir.Value, expected: i128) bool {
-    return switch (value) {
-        .int => |actual| actual == expected,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    };
 }
 
 fn matchIcmpEqParamImm(instruction: ir.Instruction, param_name: []const u8, ty: ir.Type, imm: i128) bool {
