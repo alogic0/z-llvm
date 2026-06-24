@@ -1544,7 +1544,7 @@ pub fn lowerGenericCfgScalarSretParamStores(
 
 fn supportedSretParamStoreLeaf(ty: ir.Type) bool {
     return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
-        ty.eql(.{ .int = 64 }) or ty.eql(.ptr);
+        ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
 }
 
 fn emitGenericCfgScalarSretParamStore(
@@ -1585,6 +1585,26 @@ fn emitGenericCfgScalarSretParamStore(
             try appendLoadStackDispU8Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
         }
         try appendStoreAlArgPtrDisp(allocator, machine, sret_reg, offset);
+    } else if (ty.eql(.float) or ty.eql(.double)) {
+        const source_index = fpParamIndex(function, name, ty) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi => null,
+            else => return err,
+        };
+        if (source_index) |index| {
+            const source = try XmmReg.fromIndex(index);
+            if (source != .xmm0) {
+                try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = source } });
+            }
+        } else if (ty.eql(.float)) {
+            try appendLoadStackDispXmm0F32(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+        } else {
+            try appendLoadStackDispXmm0(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+        }
+        if (ty.eql(.float)) {
+            try appendStoreXmm0F32ArgPtrDisp(allocator, machine, sret_reg, offset);
+        } else {
+            try appendStoreXmm0ArgPtrDisp(allocator, machine, sret_reg, offset);
+        }
     } else {
         return error.UnsupportedCodegenType;
     }

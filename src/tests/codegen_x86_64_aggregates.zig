@@ -103,6 +103,37 @@ test "x86_64 generic cfg stores mixed scalar sret aggregate fields" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[8]);
 }
 
+test "x86_64 generic cfg stores floating scalar sret aggregate fields" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @make_fp_scalar(ptr sret({ float, double, i32 }) %out, float %a, double %b, i32 %c) {
+        \\entry:
+        \\  store float %a, ptr %out
+        \\  %field1 = getelementptr i8, ptr %out, i64 8
+        \\  store double %b, ptr %field1
+        \\  %field2 = getelementptr i8, ptr %out, i64 16
+        \\  store i32 %c, ptr %field2
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 0 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm0, .src = .xmm1 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_xmm0_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 8 } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rsi }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 16 } }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+}
+
 test "x86_64 codegen stores selected sret i64 aggregate fields" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
