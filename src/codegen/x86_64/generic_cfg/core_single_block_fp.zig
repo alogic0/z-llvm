@@ -355,30 +355,28 @@ pub fn lowerGenericCfgFpVoidCallIntToFpAddReturn(
     ret: anytype,
 ) !bool {
     if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty)) return false;
-    if (block.instructions.items.len != 3) return false;
+    if (block.instructions.items.len < 3 or block.instructions.items.len > 4) return false;
+    const call_count = try leadingFpVoidCallCount(block);
+    if (call_count == 0 or block.instructions.items.len != call_count + 2) return false;
 
-    const call_inst = block.instructions.items[0];
-    if (call_inst.removed or call_inst.result != null) return false;
-    const call = switch (call_inst.kind) {
-        .call => |call| call,
-        else => return false,
-    };
-    validateFpVoidCall(call) catch return false;
-    if (call.args.items.len != 0) return false;
+    for (block.instructions.items[0..call_count]) |call_inst| {
+        const call = call_inst.kind.call;
+        if (call.args.items.len != 0) return false;
+    }
 
-    const cast_inst = block.instructions.items[1];
+    const cast_inst = block.instructions.items[call_count];
     if (cast_inst.removed) return false;
     const cast_result = cast_inst.result orelse return false;
     const int_param = fpVoidCallSitofpI32Param(function, cast_inst, function.ret_ty) catch return false;
 
-    const add_inst = block.instructions.items[2];
+    const add_inst = block.instructions.items[call_count + 1];
     if (add_inst.removed) return false;
     const add_result = add_inst.result orelse return false;
     if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
     const fp_param_index = fpBinaryOtherParamIndex(function, add_inst, function.ret_ty, cast_result, .fadd) catch return false;
     if (fp_param_index >= 6) return error.UnsupportedLiveAcrossCall;
 
-    const call_target = try fpVoidCallTarget(function, call);
+    const preserved_callee = try repeatedFpVoidCallPreservedCallee(function, block, call_count);
     try appendStackFrame(allocator, machine, 24);
     try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .reg = int_param, .frame_index = .slot0 } });
     const fp_reg = try XmmReg.fromIndex(fp_param_index);
@@ -387,9 +385,22 @@ pub fn lowerGenericCfgFpVoidCallIntToFpAddReturn(
     } else {
         try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = fp_reg, .frame_index = .slot2 } });
     }
-    try setupSysVCallTarget(allocator, machine, call_target);
-    _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
-    try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+    if (preserved_callee) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+    }
+    var index: usize = 0;
+    while (index < call_count) : (index += 1) {
+        const call = block.instructions.items[index].kind.call;
+        const call_target = try fpVoidCallTarget(function, call);
+        if (preserved_callee) |reg| {
+            if (call_target == .indirect_from_reg) {
+                try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+            }
+        }
+        try setupSysVCallTarget(allocator, machine, call_target);
+        _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+    }
     try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
     try emitFirstGprI32ToFpXmm0(allocator, machine, function.ret_ty);
     if (function.ret_ty.eql(.float)) {
