@@ -129,9 +129,12 @@ Closed in the current memory/aggregate frontier slice:
   using layout-derived byte offsets, including the flat twenty-field BigN row,
   the nested `{ { i64, i64, i64 },
   { i64, i64, i64 } }` copy/read row and the mixed-width
-  `{ i64, i32, i64, i32 }` copy row; the array-backed `{ [5 x i64] }` rows
-  prove the same byte-offset copy and by-value field-read paths for integer
-  array leaves inside a normal MEMORY aggregate; the flat `BigN` typed parser
+  `{ i64, i32, i64, i32 }` copy row; the nested
+  `{ i8, { i16, i32 }, i64 }` copy row proves byte/word leaves use
+  width-correct `%al`/`%ax` stores in the same layout-derived copy path; the
+  array-backed `{ [5 x i64] }` rows prove the same byte-offset copy and
+  by-value field-read paths for integer array leaves inside a normal MEMORY
+  aggregate; the flat `BigN` typed parser
   now covers larger normal integer-leaf MEMORY aggregates through `Big20`
   construction, field-read, and byval-to-sret copy rows; the `BigDouble` row
   adds the first double-leaf MEMORY byval-to-sret copy proof through XMM
@@ -373,8 +376,9 @@ Remaining measured frontier blockers kept out of accepted rows:
   array-in-struct, and nested `{ { double }, { double } }`, selected
   stack-passed register aggregate field reads, and generated
   normal MEMORY aggregate sret/byval field/copy forms currently proven
-  through twenty flat fields, a nested two-Big3 aggregate, a mixed-width
-  `{ i64, i32, i64, i32 }` copy, array-backed `{ [5 x i64] }` copy/read rows,
+  through twenty flat fields, a nested two-Big3 aggregate, mixed-width
+  `{ i64, i32, i64, i32 }` and `{ i8, { i16, i32 }, i64 }` copies,
+  array-backed `{ [5 x i64] }` copy/read rows,
   a `double`-leaf copy, and a mixed pointer/`double`/`i64` copy; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, more than six

@@ -1033,6 +1033,22 @@ pub fn appendLoadStackDispRax(allocator: std.mem.Allocator, machine: *MachineFun
     }
 }
 
+pub fn appendLoadStackDispU8Eax(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_u8_eax = @intCast(offset) });
+    } else {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_u8_eax = offset });
+    }
+}
+
+pub fn appendLoadStackDispU16Eax(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_u16_eax = @intCast(offset) });
+    } else {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_u16_eax = offset });
+    }
+}
+
 pub fn appendLoadStackDispXmm0(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
     if (offset <= 127) {
         try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm0 = @intCast(offset) });
@@ -1109,6 +1125,22 @@ pub fn appendStoreEaxArgPtrDisp(allocator: std.mem.Allocator, machine: *MachineF
         try machine.instructions.append(allocator, .{ .store_eax_arg_ptr_disp8 = .{ .reg = reg, .offset = @intCast(offset) } });
     } else {
         try machine.instructions.append(allocator, .{ .store_eax_arg_ptr_disp32 = .{ .reg = reg, .offset = offset } });
+    }
+}
+
+pub fn appendStoreAlArgPtrDisp(allocator: std.mem.Allocator, machine: *MachineFunction, reg: ArgReg, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .store_al_arg_ptr_disp8 = .{ .reg = reg, .offset = @intCast(offset) } });
+    } else {
+        try machine.instructions.append(allocator, .{ .store_al_arg_ptr_disp32 = .{ .reg = reg, .offset = offset } });
+    }
+}
+
+pub fn appendStoreAxArgPtrDisp(allocator: std.mem.Allocator, machine: *MachineFunction, reg: ArgReg, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .store_ax_arg_ptr_disp8 = .{ .reg = reg, .offset = @intCast(offset) } });
+    } else {
+        try machine.instructions.append(allocator, .{ .store_ax_arg_ptr_disp32 = .{ .reg = reg, .offset = offset } });
     }
 }
 
@@ -1301,7 +1333,8 @@ pub fn isSupportedAggregateCopyLeafAggregate(aggregate_ty: ir.Type) bool {
 }
 
 pub fn supportedAggregateCopyLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
+    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
+        ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
 }
 
 pub fn aggregateFieldIndexFromGep(instruction: ir.Instruction, aggregate_ty: ir.Type, base_name: []const u8) ?usize {

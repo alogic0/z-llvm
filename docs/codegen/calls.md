@@ -193,7 +193,8 @@ accepted frontier:
   generated normal integer-leaf MEMORY aggregate hidden-sret return storage and
   byval-to-sret copies currently proven through twenty flat fields, a nested
   two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and
-  array-backed `{ [5 x i64] }` copy/read rows, plus the first
+  nested `i8`/`i16`/`i32`/`i64` leaf copy, and array-backed `{ [5 x i64] }`
+  copy/read rows, plus the first
   `{ double, double, double }` double-leaf byval-to-sret copy row,
   `{ float, float, float, float, float }` f32-leaf byval-to-sret copy row, and
   `{ ptr, double, i64 }` pointer/`double`/integer byval-to-sret copy row
@@ -211,7 +212,8 @@ accepted frontier:
   selected f32/f64 SSE arguments/results
 out of scope:
   varargs, vectors, packed/unaligned aggregates, X87/long double, unsupported
-  aggregate leaves/layouts, arbitrary non-selected sret/byval copies, broad
+  aggregate leaves/layouts outside supported `i8`/`i16`/`i32`/`i64`/pointer/FP
+  forms, arbitrary non-selected sret/byval copies, broad
   indirect calls outside planner-owned shapes, tail calls, unwind, and
   debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
@@ -227,7 +229,8 @@ aggregate field-read shape, and byval-to-sret copies for all fields in those
 selected forms; the current frontier proves this through eight i64 fields,
 mixed-width integer leaves, multiple stack-passed user fields after the hidden
 sret pointer, array-backed integer copy/read leaves through `{ [5 x i64] }`,
-larger flat normal integer-leaf copies through `Big20`, the first
+larger flat normal integer-leaf copies through `Big20`, nested `i8`/`i16`
+width-correct byval-to-sret copies, the first
 double-leaf copy through `BigDouble`, f32-leaf copy through `BigFloat`, and
 pointer/`double`/integer copy through `BigPtrDouble`. Direct and indirect
 MEMORY aggregate calls prove the same by-value stack-copy and hidden-sret

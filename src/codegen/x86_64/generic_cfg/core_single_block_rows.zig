@@ -101,6 +101,10 @@ const lowerRuntimeStructSumPreoptHelper = cabi_aggregate_lowering.lowerRuntimeSt
 const lowerScalarFpCastReturn = cabi_boundary_rows.lowerScalarFpCastReturn;
 const lowerSelectedI64ConstReturn = cabi_call_lowering.lowerSelectedI64ConstReturn;
 const lowerStructSumReturn = cabi_aggregate_lowering.lowerStructSumReturn;
+const appendLoadStackDispU8Eax = cabi_aggregate_lowering.appendLoadStackDispU8Eax;
+const appendLoadStackDispU16Eax = cabi_aggregate_lowering.appendLoadStackDispU16Eax;
+const appendStoreAlArgPtrDisp = cabi_aggregate_lowering.appendStoreAlArgPtrDisp;
+const appendStoreAxArgPtrDisp = cabi_aggregate_lowering.appendStoreAxArgPtrDisp;
 const isI64Aggregate = cabi_aggregate_lowering.isI64Aggregate;
 const isAggregateType = cabi_aggregate_lowering.isAggregateType;
 const isSupportedAggregateCopyLeafAggregate = cabi_aggregate_lowering.isSupportedAggregateCopyLeafAggregate;
@@ -1076,6 +1080,12 @@ pub fn lowerGenericCfgSretCopy(
         } else if (load.ty.eql(.{ .int = 32 })) {
             try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
             try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
+        } else if (load.ty.eql(.{ .int = 16 })) {
+            try appendLoadStackDispU16Eax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendStoreAxArgPtrDisp(allocator, machine, sret_reg, offset);
+        } else if (load.ty.eql(.{ .int = 8 })) {
+            try appendLoadStackDispU8Eax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendStoreAlArgPtrDisp(allocator, machine, sret_reg, offset);
         } else {
             return error.UnsupportedCodegenType;
         }
