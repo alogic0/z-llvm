@@ -1,11 +1,12 @@
-const impl = @import("core_impl.zig");
+const shared = @import("core_shared.zig");
+const misc_rows = @import("core_misc_rows.zig");
 const base64 = @import("core_base64.zig");
 const checked = @import("core_checked.zig");
 const debug_logical_pointer_rows = @import("core_debug_logical_pointer_rows.zig");
 const loop_rows = @import("core_loop_rows.zig");
 const release_small_rows = @import("core_release_small_rows.zig");
-const std = impl.std;
-const ir = impl.ir;
+const std = shared.std;
+const ir = shared.ir;
 
 pub fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
     for (function.blocks.items) |block| {
@@ -54,16 +55,16 @@ pub const lowerCheckedTableLookup = checked.lowerCheckedTableLookup;
 pub const lowerCheckedTinyAdd = checked.lowerCheckedTinyAdd;
 pub const lowerCheckedTlsBump = checked.lowerCheckedTlsBump;
 pub const lowerDebugLogicalPointerCompileError = debug_logical_pointer_rows.lowerDebugLogicalPointerCompileError;
-pub const lowerDebugSpirvMergeLogicalPointers = impl.lowerDebugSpirvMergeLogicalPointers;
+pub const lowerDebugSpirvMergeLogicalPointers = misc_rows.lowerDebugSpirvMergeLogicalPointers;
 pub const lowerDescriptorTableLoopMain = checked.lowerDescriptorTableLoopMain;
 pub const lowerFpExponentRuntimeBoundaryMain = checked.lowerFpExponentRuntimeBoundaryMain;
-pub const lowerI64PassThroughFunctionFamily = impl.lowerI64PassThroughFunctionFamily;
-pub const lowerI64SaturatingHelperFunctionFamily = impl.lowerI64SaturatingHelperFunctionFamily;
-pub const lowerIntegerShiftMixReturn = impl.lowerIntegerShiftMixReturn;
-pub const lowerMulConstReturn = impl.lowerMulConstReturn;
+pub const lowerI64PassThroughFunctionFamily = misc_rows.lowerI64PassThroughFunctionFamily;
+pub const lowerI64SaturatingHelperFunctionFamily = misc_rows.lowerI64SaturatingHelperFunctionFamily;
+pub const lowerIntegerShiftMixReturn = misc_rows.lowerIntegerShiftMixReturn;
+pub const lowerMulConstReturn = misc_rows.lowerMulConstReturn;
 pub const lowerReleaseSmallStrFromFloatHelp = release_small_rows.lowerReleaseSmallStrFromFloatHelp;
 pub const lowerReleaseSmallStrFromFloatSupportFunction = release_small_rows.lowerReleaseSmallStrFromFloatSupportFunction;
 pub const lowerRuntimeSliceSumPreoptHelper = loop_rows.lowerRuntimeSliceSumPreoptHelper;
 pub const lowerSliceSumLoop = loop_rows.lowerSliceSumLoop;
-pub const lowerUnreachableStub = impl.lowerUnreachableStub;
-pub const lowerVolatileAbsoluteStore = impl.lowerVolatileAbsoluteStore;
+pub const lowerUnreachableStub = misc_rows.lowerUnreachableStub;
+pub const lowerVolatileAbsoluteStore = misc_rows.lowerVolatileAbsoluteStore;
