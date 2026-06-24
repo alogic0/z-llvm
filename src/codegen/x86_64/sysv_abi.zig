@@ -384,6 +384,11 @@ pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
     return error.UnsupportedCodegenType;
 }
 
+pub fn aggregateReturnHasNoGpr(ret_ty: ir.Type) bool {
+    const classification = classifyAggregate(ret_ty) catch return false;
+    return classification.isSseOnly();
+}
+
 fn planAggregatePassThrough(
     function: ir.Function,
     arg: ir.CallArg,
