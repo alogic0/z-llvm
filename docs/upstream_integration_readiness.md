@@ -583,20 +583,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=200
-structured_functions=200
-generic_codegen_functions=200
-generic_cfg_functions=200
+discovered_functions=202
+structured_functions=202
+generic_codegen_functions=202
+generic_cfg_functions=202
 structural_matcher_functions=0
-structured_air_v2_functions=200
-typed_air_operand_functions=200
+structured_air_v2_functions=202
+typed_air_operand_functions=202
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=200
+generic_lowering_functions=202
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=200
+object_emitted_functions=202
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -662,7 +662,7 @@ varargs
 vectors
 mixed int/float multiply-add pipelines
 stack-passed live values beyond the current disp8-safe selected model
-broader SSE live-across-call helpers beyond selected no-argument-call shapes, pointer-callee shapes through four live values and three FP helper arguments, and two-live FP-argument call shape
+broader SSE live-across-call helpers beyond selected no-argument-call shapes, pointer-callee shapes through six live values and five FP helper arguments, and two-live FP-argument call shape
 alternate safety-guard control flow
 ```
 

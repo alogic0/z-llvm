@@ -367,6 +367,7 @@ selected two-live f32/f64 no-argument pointer-callee spill/reload frames
 selected two-live f32/f64 one-FP-argument pointer-callee spill/reload frames
 selected three-live f32/f64 two-FP-argument pointer-callee spill/reload frames
 selected four-live f32/f64 three-FP-argument pointer-callee spill/reload frames
+selected six-live f32/f64 five-FP-argument pointer-callee spill/reload frames
 unsupported broader stack-passed and broader SSE live-across-call pressure diagnostic
 tested callee-saved policy: the selected allocator does not allocate callee-saved GPRs
 unsupported varargs/vector/X87/packed aggregate/sret/byval/larger aggregate ABI diagnostics
