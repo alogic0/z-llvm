@@ -1526,6 +1526,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_indirect_stack_arg_forward(int (*)(int, int, int, int, int, int, int, int, int, int, int, int), int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_indirect_stack_arg_forward");
     \\extern int z_frontier_indirect_eight_stack_arg_forward(int (*)(int, int, int, int, int, int, int, int, int, int, int, int, int, int), int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_indirect_eight_stack_arg_forward");
     \\extern int z_frontier_indirect_eighteen_stack_arg_forward(int (*)(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_indirect_eighteen_stack_arg_forward");
+    \\extern int z_frontier_ptr_stack_arg_forward(const int *, const int *, const int *, const int *, const int *, const int *, const int *, const int *) __asm__("frontier_sysv_abi.frontier_ptr_stack_arg_forward");
+    \\extern int z_frontier_indirect_ptr_stack_arg_forward(int (*)(const int *, const int *, const int *, const int *, const int *, const int *, const int *, const int *), const int *, const int *, const int *, const int *, const int *, const int *, const int *, const int *) __asm__("frontier_sysv_abi.frontier_indirect_ptr_stack_arg_forward");
     \\extern int z_frontier_computed_stack_arg_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_computed_stack_arg_call");
     \\extern long long z_frontier_i64_stack_arg_to_registers(long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_i64_stack_arg_to_registers");
     \\extern long long z_frontier_indirect_i64_stack_arg_forward(long long (*)(long long, long long, long long, long long, long long, long long, long long, long long), long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_i64_stack_arg_forward");
@@ -1615,6 +1617,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\int frontier_sum24_i32(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t, int u, int v, int w, int x) { return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r + s + t + u + v + w + x; }
     \\long long frontier_sum6_i64(long long a, long long b, long long c, long long d, long long e, long long f) { return a + b + c + d + e + f; }
     \\long long frontier_sum8_i64(long long a, long long b, long long c, long long d, long long e, long long f, long long g, long long h) { return a + b + c + d + e + f + g + h; }
+    \\int frontier_sum8_ptr(const int *a, const int *b, const int *c, const int *d, const int *e, const int *f, const int *g, const int *h) { return *a + *b + *c + *d + *e + *f + *g + *h; }
     \\int frontier_id_c_i32(int value) { return value; }
     \\struct Pair64 frontier_make_pair64(long long a, long long b) { struct Pair64 result = { a, b }; return result; }
     \\long long frontier_pair64_first(struct Pair64 value) { return value.a; }
@@ -1652,6 +1655,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_indirect_stack_arg_forward(frontier_sum12_i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 78) return 39;
     \\    if (z_frontier_indirect_eight_stack_arg_forward(frontier_sum14_i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14) != 105) return 48;
     \\    if (z_frontier_indirect_eighteen_stack_arg_forward(frontier_sum24_i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) != 300) return 71;
+    \\    int ptr_values[8] = { 3, 5, 7, 11, 13, 17, 19, 23 };
+    \\    if (z_frontier_ptr_stack_arg_forward(&ptr_values[0], &ptr_values[1], &ptr_values[2], &ptr_values[3], &ptr_values[4], &ptr_values[5], &ptr_values[6], &ptr_values[7]) != 98) return 106;
+    \\    if (z_frontier_indirect_ptr_stack_arg_forward(frontier_sum8_ptr, &ptr_values[0], &ptr_values[1], &ptr_values[2], &ptr_values[3], &ptr_values[4], &ptr_values[5], &ptr_values[6], &ptr_values[7]) != 98) return 107;
     \\    if (z_frontier_computed_stack_arg_call(1, 2, 3, 4, 5, 6, 7) != 79) return 44;
     \\    if (z_frontier_i64_stack_arg_to_registers(1, 2, 3, 4, 5, 6, 7000000000LL, 8000000000LL, 9000000000LL, 10000000000LL, 11000000000LL, 12000000000LL) != 57000000000LL) return 42;
     \\    if (z_frontier_indirect_i64_stack_arg_forward(frontier_sum8_i64, 1000000000LL, 2000000000LL, 3000000000LL, 4000000000LL, 5000000000LL, 6000000000LL, 7000000000LL, 8000000000LL) != 36000000000LL) return 43;
