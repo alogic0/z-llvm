@@ -1542,6 +1542,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_i32_swapped_indirect_call(int, int, int (*)(int, int)) __asm__("frontier_sysv_abi.frontier_i32_swapped_indirect_call");
     \\extern long long z_frontier_i64_swapped_indirect_call(long long, long long, long long (*)(long long, long long)) __asm__("frontier_sysv_abi.frontier_i64_swapped_indirect_call");
     \\extern const int *z_frontier_ptr_swapped_indirect_call(const int *, const int *, int, const int *(*)(const int *, const int *, int)) __asm__("frontier_sysv_abi.frontier_ptr_swapped_indirect_call");
+    \\extern float z_frontier_f32_swapped_indirect_call(float, float, float (*)(float, float)) __asm__("frontier_sysv_abi.frontier_f32_swapped_indirect_call");
+    \\extern double z_frontier_f64_swapped_indirect_call(double, double, double (*)(double, double)) __asm__("frontier_sysv_abi.frontier_f64_swapped_indirect_call");
     \\extern int z_frontier_computed_stack_arg_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_computed_stack_arg_call");
     \\extern long long z_frontier_i64_stack_arg_to_registers(long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_i64_stack_arg_to_registers");
     \\extern long long z_frontier_indirect_i64_stack_arg_forward(long long (*)(long long, long long, long long, long long, long long, long long, long long, long long), long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_indirect_i64_stack_arg_forward");
@@ -1696,6 +1698,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_i64_swapped_indirect_call(13, 53, frontier_sub_i64) != 40) return 119;
     \\    if (z_frontier_ptr_swapped_indirect_call(&ptr_values[2], &ptr_values[7], 0, frontier_choose_ptr) != &ptr_values[7]) return 120;
     \\    if (z_frontier_ptr_swapped_indirect_call(&ptr_values[2], &ptr_values[7], 1, frontier_choose_ptr) != &ptr_values[2]) return 121;
+    \\    if (z_frontier_f32_swapped_indirect_call(13.0f, 53.0f, frontier_sub_f32) != 40.0f) return 124;
+    \\    if (z_frontier_f64_swapped_indirect_call(13.0, 53.0, frontier_sub_f64) != 40.0) return 125;
     \\    if (z_frontier_computed_stack_arg_call(1, 2, 3, 4, 5, 6, 7) != 79) return 44;
     \\    if (z_frontier_i64_stack_arg_to_registers(1, 2, 3, 4, 5, 6, 7000000000LL, 8000000000LL, 9000000000LL, 10000000000LL, 11000000000LL, 12000000000LL) != 57000000000LL) return 42;
     \\    if (z_frontier_indirect_i64_stack_arg_forward(frontier_sum8_i64, 1000000000LL, 2000000000LL, 3000000000LL, 4000000000LL, 5000000000LL, 6000000000LL, 7000000000LL, 8000000000LL) != 36000000000LL) return 43;

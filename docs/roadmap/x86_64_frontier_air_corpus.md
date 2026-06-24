@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=268
-structured_functions=268
-generic_codegen_functions=268
-generic_cfg_functions=268
+discovered_functions=270
+structured_functions=270
+generic_codegen_functions=270
+generic_cfg_functions=270
 structural_matcher_functions=0
-structured_air_v2_functions=268
-typed_air_operand_functions=268
+structured_air_v2_functions=270
+typed_air_operand_functions=270
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=268
+generic_lowering_functions=270
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=268
+object_emitted_functions=270
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -344,9 +344,11 @@ Closed in the current memory/aggregate frontier slice:
   arguments across direct and function-pointer C ABI calls with executable
   checks.
 - selected XMM call-argument permutations in `frontier_sysv_abi.zig`:
-  `frontier_f32_swapped_direct_call` and `frontier_f64_swapped_direct_call`
-  snapshot source XMM registers to temporary stack slots, reload the outgoing
-  SSE argument registers, and restore `%rsp` before the call through the shared
+  `frontier_f32_swapped_direct_call`, `frontier_f64_swapped_direct_call`,
+  `frontier_f32_swapped_indirect_call`, and
+  `frontier_f64_swapped_indirect_call` snapshot source XMM registers to
+  temporary stack slots, reload the outgoing SSE argument registers, and
+  restore `%rsp` before direct or function-pointer calls through the shared
   SysV scalar call planner.
 - selected multi-call live-value frame in `frontier_sysv_abi.zig`:
   `frontier_two_void_calls_six_live` keeps six live GPR `i32` values across two

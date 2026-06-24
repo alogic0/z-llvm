@@ -9,6 +9,8 @@ const Sum14Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32
 const Sum24Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 const SubI32Fn = *const fn (i32, i32) callconv(.c) i32;
 const SubI64Fn = *const fn (i64, i64) callconv(.c) i64;
+const SubF32Fn = *const fn (f32, f32) callconv(.c) f32;
+const SubF64Fn = *const fn (f64, f64) callconv(.c) f64;
 const Sum8I64Fn = *const fn (i64, i64, i64, i64, i64, i64, i64, i64) callconv(.c) i64;
 const Sum8PtrFn = *const fn (*const i32, *const i32, *const i32, *const i32, *const i32, *const i32, *const i32, *const i32) callconv(.c) i32;
 const ChoosePtrFn = *const fn (*const i32, *const i32, i32) callconv(.c) *const i32;
@@ -264,6 +266,14 @@ export fn frontier_i64_swapped_indirect_call(a: i64, b: i64, func: SubI64Fn) i64
 
 export fn frontier_ptr_swapped_indirect_call(a: *const i32, b: *const i32, tag: i32, func: ChoosePtrFn) *const i32 {
     return func(b, a, tag);
+}
+
+export fn frontier_f32_swapped_indirect_call(a: f32, b: f32, func: SubF32Fn) f32 {
+    return func(b, a);
+}
+
+export fn frontier_f64_swapped_indirect_call(a: f64, b: f64, func: SubF64Fn) f64 {
+    return func(b, a);
 }
 
 export fn frontier_indirect_two_live_after_call(func: IdI32Fn, a: i32, b: i32, c: i32) i32 {
