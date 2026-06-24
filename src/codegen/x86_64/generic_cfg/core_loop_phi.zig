@@ -1,10 +1,15 @@
-const impl = @import("core_impl.zig");
+const shared = @import("core_shared.zig");
 const diagnostics = @import("core_diagnostics.zig");
 const loop_rows = @import("core_loop_rows.zig");
-const std = impl.std;
-const ir = impl.ir;
+const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
+const std = shared.std;
+const ir = shared.ir;
+const MachineFunction = shared.MachineFunction;
 
-pub fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *impl.MachineFunction, function: ir.Function) !bool {
+const appendPanicCall = shared.appendPanicCall;
+const paramReg = cabi_abi_helpers.paramReg;
+
+pub fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
     if (!loop_rows.matchesAccumulatorLoop(function) and
@@ -12,7 +17,7 @@ pub fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *impl.Mach
         !loop_rows.matchesCheckedUnrolledAccumulatorLoop(function) and
         !loop_rows.matchesGuardedDoWhileAccumulatorLoop(function) and
         !loop_rows.matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return false;
-    const count_reg = try impl.paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    const count_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
     if (count_reg != .rdi) return error.UnsupportedCodegenAbi;
 
     const loop_label = "loop_sum_loop";
@@ -40,7 +45,7 @@ pub fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *impl.Mach
     try machine.instructions.append(allocator, .{ .label = zero_label });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
-    if (has_overflow_check) try impl.appendPanicCall(allocator, machine, overflow_label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
-    if (has_out_of_bounds_check) try impl.appendPanicCall(allocator, machine, out_of_bounds_label, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds");
+    if (has_overflow_check) try appendPanicCall(allocator, machine, overflow_label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
+    if (has_out_of_bounds_check) try appendPanicCall(allocator, machine, out_of_bounds_label, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds");
     return true;
 }

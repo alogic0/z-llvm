@@ -1,8 +1,24 @@
-const impl = @import("core_impl.zig");
-const std = impl.std;
-const ir = impl.ir;
-const MachineFunction = impl.MachineFunction;
-const ArgReg = impl.ArgReg;
+const shared = @import("core_shared.zig");
+const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
+const cabi_call_lowering = @import("cabi_call_lowering.zig");
+const tls_global = @import("cabi_tls_global_lowering.zig");
+
+const std = shared.std;
+const ir = shared.ir;
+const MachineFunction = shared.MachineFunction;
+const ArgReg = shared.ArgReg;
+
+const findInstruction = cabi_call_lowering.findInstruction;
+const globalSymbolName = shared.globalSymbolName;
+const isNamed = shared.isNamed;
+const knownLocalExecTlsSymbol = tls_global.knownLocalExecTlsSymbol;
+const paramReg = cabi_abi_helpers.paramReg;
+const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;
+const tlsSymbolFromFunctionAttrs = tls_global.tlsSymbolFromFunctionAttrs;
+
+fn genericCfgSupportsPointerParam(function: ir.Function, name: []const u8) bool {
+    return (paramRegOrNull(function, name, .ptr) catch null) != null;
+}
 
 pub const GenericCfgDynamicI32Address = struct {
     base_reg: ArgReg,
@@ -30,7 +46,7 @@ pub fn genericCfgDynamicI32LoadReturnAddress(
         .named => |name| name,
         else => return null,
     };
-    const ret_instruction = impl.findInstruction(block, ret_name) orelse return null;
+    const ret_instruction = findInstruction(block, ret_name) orelse return null;
     const load = switch (ret_instruction.kind) {
         .load => |load| load,
         else => return null,
@@ -49,10 +65,10 @@ pub fn genericCfgDynamicI32AddressAcrossBlocks(
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    if (impl.paramRegOrNull(function, name, .ptr) catch null) |reg| {
+    if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
         return .{ .base_reg = reg, .index_reg = .rsi, .offset_elems = 0 };
     }
-    const instruction = impl.findInstruction(block, name) orelse impl.findInstruction(entry, name) orelse return null;
+    const instruction = findInstruction(block, name) orelse findInstruction(entry, name) orelse return null;
     switch (instruction.kind) {
         .gep => |gep| {
             if (!gep.source_ty.eql(.{ .int = 32 }) or gep.indices.items.len != 1) return null;
@@ -92,8 +108,8 @@ pub fn genericCfgI64ParamRegThroughIdentityCast(function: ir.Function, block: ir
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    if (impl.paramRegOrNull(function, name, .{ .int = 64 }) catch null) |reg| return reg;
-    const instruction = impl.findInstruction(block, name) orelse return null;
+    if (paramRegOrNull(function, name, .{ .int = 64 }) catch null) |reg| return reg;
+    const instruction = findInstruction(block, name) orelse return null;
     const cast = switch (instruction.kind) {
         .cast => |cast| cast,
         else => return null,
@@ -107,7 +123,7 @@ pub fn genericCfgDynamicI32LoadValueAddress(function: ir.Function, block: ir.Bas
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    const instruction = impl.findInstruction(block, name) orelse return null;
+    const instruction = findInstruction(block, name) orelse return null;
     const load = switch (instruction.kind) {
         .load => |load| load,
         else => return null,
@@ -125,10 +141,10 @@ pub fn genericCfgDynamicI32Address(function: ir.Function, block: ir.BasicBlock, 
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    if (impl.paramRegOrNull(function, name, .ptr) catch null) |reg| {
+    if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
         return .{ .base_reg = reg, .index_reg = .rsi, .offset_elems = 0 };
     }
-    const instruction = impl.findInstruction(block, name) orelse return null;
+    const instruction = findInstruction(block, name) orelse return null;
     switch (instruction.kind) {
         .gep => |gep| {
             if (!gep.source_ty.eql(.{ .int = 32 }) or gep.indices.items.len != 1) return null;
@@ -139,7 +155,7 @@ pub fn genericCfgDynamicI32Address(function: ir.Function, block: ir.BasicBlock, 
                 .int => |int| address.offset_elems += int,
                 .named => |index_name| {
                     if (address.offset_elems != 0) return null;
-                    const index_reg = impl.paramRegOrNull(function, index_name, .{ .int = 64 }) catch null;
+                    const index_reg = paramRegOrNull(function, index_name, .{ .int = 64 }) catch null;
                     address.index_reg = index_reg orelse return null;
                 },
                 .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
@@ -166,7 +182,7 @@ pub fn genericCfgStoredPointerValue(block: ir.BasicBlock, slot_name: []const u8)
             .store => |store| store,
             else => continue,
         };
-        if (!store.ty.eql(.ptr) or store.attrs.isBarrier() or !impl.isNamed(store.ptr, slot_name)) continue;
+        if (!store.ty.eql(.ptr) or store.attrs.isBarrier() or !isNamed(store.ptr, slot_name)) continue;
         return store.value;
     }
     return null;
@@ -199,13 +215,13 @@ pub fn genericCfgI32Address(function: ir.Function, ptr: ir.Value) ?GenericCfgAdd
         .named => |name| name,
         else => return null,
     };
-    if (impl.genericCfgSupportsPointerParam(function, name)) return .{ .param = name };
+    if (genericCfgSupportsPointerParam(function, name)) return .{ .param = name };
     if (name.len == 0 or name[0] != '@') return null;
-    const symbol = impl.globalSymbolName(name) catch return null;
-    if (impl.tlsSymbolFromFunctionAttrs(function)) |tls_symbol| {
+    const symbol = globalSymbolName(name) catch return null;
+    if (tlsSymbolFromFunctionAttrs(function)) |tls_symbol| {
         if (std.mem.eql(u8, tls_symbol, symbol)) return .{ .tls = symbol };
     }
-    if (impl.knownLocalExecTlsSymbol(symbol)) return .{ .tls = symbol };
+    if (knownLocalExecTlsSymbol(symbol)) return .{ .tls = symbol };
     return .{ .global = symbol };
 }
 
@@ -216,7 +232,7 @@ pub fn emitGenericCfgLoadI32IntoEax(
     ptr: ir.Value,
 ) !void {
     switch (genericCfgI32Address(function, ptr) orelse return error.UnsupportedCodegenValue) {
-        .param => |name| try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = try impl.paramReg(function, name, .ptr) }),
+        .param => |name| try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = try paramReg(function, name, .ptr) }),
         .global => |symbol| try machine.instructions.append(allocator, .{ .load_global_i32_eax = symbol }),
         .tls => |symbol| try machine.instructions.append(allocator, .{ .load_tls_i32_eax = symbol }),
     }
@@ -229,7 +245,7 @@ pub fn emitGenericCfgStoreEax(
     ptr: ir.Value,
 ) !void {
     switch (genericCfgI32Address(function, ptr) orelse return error.UnsupportedCodegenValue) {
-        .param => |name| try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = try impl.paramReg(function, name, .ptr) }),
+        .param => |name| try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = try paramReg(function, name, .ptr) }),
         .global => |symbol| try machine.instructions.append(allocator, .{ .store_eax_global_i32 = symbol }),
         .tls => |symbol| try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = symbol }),
     }
