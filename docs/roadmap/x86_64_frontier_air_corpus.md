@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=355
-structured_functions=355
-generic_codegen_functions=355
-generic_cfg_functions=355
+discovered_functions=359
+structured_functions=359
+generic_codegen_functions=359
+generic_cfg_functions=359
 structural_matcher_functions=0
-structured_air_v2_functions=355
-typed_air_operand_functions=355
+structured_air_v2_functions=359
+typed_air_operand_functions=359
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=355
+generic_lowering_functions=359
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=355
+object_emitted_functions=359
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -520,6 +520,12 @@ Closed in the current memory/aggregate frontier slice:
   mirrored order: save the first `double` result, preserve the later `i64`
   argument and optional second pointer callee, run the `i64` result call,
   convert `%rax` with `sitofp`, and add it to the saved `double`.
+  `frontier_mixed_f32_i64_results_across_calls`,
+  `frontier_mixed_indirect_first_f32_i64_results_across_calls`,
+  `frontier_mixed_indirect_second_f32_i64_results_across_calls`, and
+  `frontier_mixed_indirect_both_f32_i64_results_across_calls` cover the same
+  later `i64` result shape when the first FP result is `float` and must be
+  extended before the final `double` add.
 - selected mixed-width FP call-result frames in `frontier_sysv_abi.zig`:
   `frontier_mixed_f32_f64_results_across_calls`,
   `frontier_mixed_indirect_first_f32_f64_results_across_calls`,

@@ -1012,17 +1012,21 @@ pub fn lowerGenericCfgFpAndI64TwoCallResultsReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!function.ret_ty.eql(.double) or !ret.ty.eql(.double) or block.instructions.items.len != 4) return false;
+    if (!function.ret_ty.eql(.double) or !ret.ty.eql(.double) or
+        (block.instructions.items.len != 4 and block.instructions.items.len != 5)) return false;
 
     const first_call_inst = block.instructions.items[0];
     const second_call_inst = block.instructions.items[1];
-    const cast_inst = block.instructions.items[2];
-    const add_inst = block.instructions.items[3];
-    if (first_call_inst.removed or second_call_inst.removed or cast_inst.removed or add_inst.removed) return false;
+    const first_cast_inst = if (block.instructions.items.len == 5) block.instructions.items[2] else null;
+    const int_cast_inst = block.instructions.items[block.instructions.items.len - 2];
+    const add_inst = block.instructions.items[block.instructions.items.len - 1];
+    if (first_call_inst.removed or second_call_inst.removed or int_cast_inst.removed or add_inst.removed) return false;
+    if (first_cast_inst) |instruction| if (instruction.removed) return false;
 
     const first_result = first_call_inst.result orelse return false;
     const second_result = second_call_inst.result orelse return false;
-    const cast_result = cast_inst.result orelse return false;
+    const first_addend_result = if (first_cast_inst) |instruction| instruction.result orelse return false else first_result;
+    const int_cast_result = int_cast_inst.result orelse return false;
     const add_result = add_inst.result orelse return false;
     if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
 
@@ -1034,21 +1038,30 @@ pub fn lowerGenericCfgFpAndI64TwoCallResultsReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!first_call.ret_ty.eql(.double) or !second_call.ret_ty.eql(.{ .int = 64 })) return false;
+    const first_ty: ir.Type = if (first_cast_inst == null) .double else .float;
+    if (!first_call.ret_ty.eql(first_ty) or !second_call.ret_ty.eql(.{ .int = 64 })) return false;
     if (first_call.inline_asm != null or second_call.inline_asm != null) return false;
     if (!callIsFastcc(first_call.calling_conv)) validateDefaultCallConv(first_call.calling_conv) catch return false;
     if (!callIsFastcc(second_call.calling_conv)) validateDefaultCallConv(second_call.calling_conv) catch return false;
     if (first_call.ret_attrs != null or first_call.attrs != null or second_call.ret_attrs != null or second_call.attrs != null) return error.UnsupportedCodegenAbi;
     if (sysvScalarCallNeedsStackArgs(first_call) or sysvScalarCallNeedsStackArgs(second_call)) return error.UnsupportedLiveAcrossCall;
     if (first_call.args.items.len != 1 or second_call.args.items.len != 1) return false;
-    if (!first_call.args.items[0].ty.eql(.double) or !second_call.args.items[0].ty.eql(.{ .int = 64 })) return false;
-    if ((try fpParamIndexFromValue(function, first_call.args.items[0].value, .double)) != 0) return error.UnsupportedLiveAcrossCall;
+    if (!first_call.args.items[0].ty.eql(first_ty) or !second_call.args.items[0].ty.eql(.{ .int = 64 })) return false;
+    if ((try fpParamIndexFromValue(function, first_call.args.items[0].value, first_ty)) != 0) return error.UnsupportedLiveAcrossCall;
     const second_arg_reg = switch (second_call.args.items[0].value) {
         .named => |name| try paramReg(function, name, .{ .int = 64 }),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
 
-    const cast = switch (cast_inst.kind) {
+    if (first_cast_inst) |instruction| {
+        const first_cast = switch (instruction.kind) {
+            .cast => |cast| cast,
+            else => return false,
+        };
+        if (first_cast.op != .fpext or !first_cast.from_ty.eql(.float) or !first_cast.to_ty.eql(.double) or !isNamed(first_cast.value, first_result)) return false;
+    }
+
+    const cast = switch (int_cast_inst.kind) {
         .cast => |cast| cast,
         else => return false,
     };
@@ -1059,10 +1072,10 @@ pub fn lowerGenericCfgFpAndI64TwoCallResultsReturn(
         else => return false,
     };
     if (binary.op != .fadd or !binary.ty.eql(.double)) return false;
-    const lhs_first = isNamed(binary.lhs, first_result);
-    const rhs_first = isNamed(binary.rhs, first_result);
-    const lhs_cast = isNamed(binary.lhs, cast_result);
-    const rhs_cast = isNamed(binary.rhs, cast_result);
+    const lhs_first = isNamed(binary.lhs, first_addend_result);
+    const rhs_first = isNamed(binary.rhs, first_addend_result);
+    const lhs_cast = isNamed(binary.lhs, int_cast_result);
+    const rhs_cast = isNamed(binary.rhs, int_cast_result);
     if (!((lhs_first and rhs_cast) or (rhs_first and lhs_cast))) return false;
 
     const first_target = try fpCallTarget(function, first_call);
@@ -1083,7 +1096,11 @@ pub fn lowerGenericCfgFpAndI64TwoCallResultsReturn(
     const first_stack_args = try appendSysVScalarCallArgs(allocator, machine, function, first_call);
     if (first_stack_args != 0) return error.UnsupportedLiveAcrossCall;
     try appendSysVCallTarget(allocator, machine, first_target, first_call.ret_ty);
-    try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    if (first_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    }
 
     if (second_callee) |reg| {
         try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
@@ -1096,7 +1113,13 @@ pub fn lowerGenericCfgFpAndI64TwoCallResultsReturn(
 
     try machine.instructions.append(allocator, .mov_rax_rdi);
     try machine.instructions.append(allocator, .cvtsi2sd_rdi_xmm0);
-    try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot0 } });
+    if (first_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } });
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        try machine.instructions.append(allocator, .cvtss2sd_xmm0_xmm0);
+    } else {
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot0 } });
+    }
     try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try machine.instructions.append(allocator, .ret);
