@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=327
-structured_functions=327
-generic_codegen_functions=327
-generic_cfg_functions=327
+discovered_functions=331
+structured_functions=331
+generic_codegen_functions=331
+generic_cfg_functions=331
 structural_matcher_functions=0
-structured_air_v2_functions=327
-typed_air_operand_functions=327
+structured_air_v2_functions=331
+typed_air_operand_functions=331
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=327
+generic_lowering_functions=331
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=327
+object_emitted_functions=331
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -385,9 +385,14 @@ Closed in the current memory/aggregate frontier slice:
   64-bit GPR spill/reload and `%rdi` int-to-FP conversion.
   `frontier_two_void_calls_mixed_i32_f32_live_sum`,
   `frontier_two_void_calls_mixed_i32_f64_live_sum`,
+  `frontier_two_void_calls_mixed_i64_f32_live_sum`,
+  `frontier_two_void_calls_mixed_i64_f64_live_sum`,
   `frontier_two_indirect_void_calls_mixed_i32_f32_live_sum`, and
-  `frontier_two_indirect_void_calls_mixed_i32_f64_live_sum` extend that same
-  mixed GPR/SSE frame to two direct or pointer-callee `void` calls.
+  `frontier_two_indirect_void_calls_mixed_i32_f64_live_sum`,
+  `frontier_two_indirect_void_calls_mixed_i64_f32_live_sum`, and
+  `frontier_two_indirect_void_calls_mixed_i64_f64_live_sum` extend that same
+  mixed GPR/SSE frame to two direct or pointer-callee `void` calls with 32-bit
+  and 64-bit integer live values.
 - selected ordered call-result live frame in `frontier_sysv_abi.zig`:
   `frontier_call_result_live_across_second_call` spills the first C ABI
   `i32` call result from `%eax`, preserves the live `i32` parameter in a frame

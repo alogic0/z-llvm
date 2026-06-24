@@ -773,6 +773,18 @@ export fn frontier_two_void_calls_mixed_i32_f64_live_sum(a: i32, b: f64) f64 {
     return @as(f64, @floatFromInt(a)) + b;
 }
 
+export fn frontier_two_void_calls_mixed_i64_f32_live_sum(a: i64, b: f32) f32 {
+    frontier_touch_none();
+    frontier_touch_none();
+    return @as(f32, @floatFromInt(a)) + b;
+}
+
+export fn frontier_two_void_calls_mixed_i64_f64_live_sum(a: i64, b: f64) f64 {
+    frontier_touch_none();
+    frontier_touch_none();
+    return @as(f64, @floatFromInt(a)) + b;
+}
+
 export fn frontier_two_indirect_void_calls_mixed_i32_f32_live_sum(func: VoidFn, a: i32, b: f32) f32 {
     func();
     func();
@@ -780,6 +792,18 @@ export fn frontier_two_indirect_void_calls_mixed_i32_f32_live_sum(func: VoidFn, 
 }
 
 export fn frontier_two_indirect_void_calls_mixed_i32_f64_live_sum(func: VoidFn, a: i32, b: f64) f64 {
+    func();
+    func();
+    return @as(f64, @floatFromInt(a)) + b;
+}
+
+export fn frontier_two_indirect_void_calls_mixed_i64_f32_live_sum(func: VoidFn, a: i64, b: f32) f32 {
+    func();
+    func();
+    return @as(f32, @floatFromInt(a)) + b;
+}
+
+export fn frontier_two_indirect_void_calls_mixed_i64_f64_live_sum(func: VoidFn, a: i64, b: f64) f64 {
     func();
     func();
     return @as(f64, @floatFromInt(a)) + b;
