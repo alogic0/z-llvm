@@ -1624,6 +1624,27 @@ test "x86_64 codegen rejects vector call ABI boundary" {
     );
 }
 
+test "x86_64 codegen rejects indirect vector call ABI boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, <2 x i32> %value) {
+        \\entry:
+        \\  %r = call i32 %fn(<2 x i32> %value)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedVectorAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
 test "x86_64 codegen rejects varargs call ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1748,6 +1769,27 @@ test "x86_64 codegen rejects X87 return ABI boundary" {
         \\define x86_fp80 @caller(x86_fp80 %value) {
         \\entry:
         \\  ret x86_fp80 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedLongDoubleAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
+test "x86_64 codegen rejects indirect X87 call ABI boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, x86_fp80 %value) {
+        \\entry:
+        \\  %r = call i32 %fn(x86_fp80 %value)
+        \\  ret i32 %r
         \\}
         \\
     ;
