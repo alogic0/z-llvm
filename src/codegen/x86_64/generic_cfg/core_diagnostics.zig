@@ -1,7 +1,35 @@
 const impl = @import("core_impl.zig");
+const std = impl.std;
+const ir = impl.ir;
 
-pub const blockByName = impl.blockByName;
-pub const functionHasCall = impl.functionHasCall;
+pub fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
+    for (function.blocks.items) |block| {
+        if (std.mem.eql(u8, block.name, name)) return block;
+    }
+    return null;
+}
+
+pub fn functionHasCall(function: ir.Function, callee: []const u8) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const call = switch (instruction.kind) {
+                .call => |call| call,
+                else => continue,
+            };
+            if (std.mem.eql(u8, call.callee, callee)) return true;
+        }
+    }
+    return false;
+}
+
+pub fn validateTerminatorBr(block: ir.BasicBlock) ![]const u8 {
+    return switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br.target,
+        else => error.UnsupportedCodegenControlFlow,
+    };
+}
+
 pub const lowerBase64DecodeBase64FullBoundary = impl.lowerBase64DecodeBase64FullBoundary;
 pub const lowerBase64DecodeBase64FullMain = impl.lowerBase64DecodeBase64FullMain;
 pub const lowerBase64PaddingLoopStep = impl.lowerBase64PaddingLoopStep;
@@ -119,4 +147,3 @@ pub const lowerSliceSumLoop = impl.lowerSliceSumLoop;
 pub const lowerStartTrampoline = impl.lowerStartTrampoline;
 pub const lowerUnreachableStub = impl.lowerUnreachableStub;
 pub const lowerVolatileAbsoluteStore = impl.lowerVolatileAbsoluteStore;
-pub const validateTerminatorBr = impl.validateTerminatorBr;

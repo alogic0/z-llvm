@@ -68,7 +68,7 @@ pub const GenericCfgLoopSumPlan = struct {
     checked: bool,
 };
 
-pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (try lowerGenericCfgGuardedDynamicPointerLoadReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -1074,7 +1074,7 @@ pub const GenericCfgDynamicI32Address = struct {
     offset_elems: i128,
 };
 
-pub fn genericCfgDynamicI32LoadValueAddress(function: ir.Function, block: ir.BasicBlock, value: ir.Value) ?GenericCfgDynamicI32Address {
+fn genericCfgDynamicI32LoadValueAddress(function: ir.Function, block: ir.BasicBlock, value: ir.Value) ?GenericCfgDynamicI32Address {
     const name = switch (value) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
@@ -1087,12 +1087,12 @@ pub fn genericCfgDynamicI32LoadValueAddress(function: ir.Function, block: ir.Bas
     return genericCfgDynamicI32LoadAddress(function, block, load);
 }
 
-pub fn genericCfgDynamicI32LoadAddress(function: ir.Function, block: ir.BasicBlock, load: ir.LoadInst) ?GenericCfgDynamicI32Address {
+fn genericCfgDynamicI32LoadAddress(function: ir.Function, block: ir.BasicBlock, load: ir.LoadInst) ?GenericCfgDynamicI32Address {
     if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return null;
     return genericCfgDynamicI32Address(function, block, load.ptr);
 }
 
-pub fn genericCfgDynamicI32Address(function: ir.Function, block: ir.BasicBlock, ptr: ir.Value) ?GenericCfgDynamicI32Address {
+fn genericCfgDynamicI32Address(function: ir.Function, block: ir.BasicBlock, ptr: ir.Value) ?GenericCfgDynamicI32Address {
     const name = switch (ptr) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
@@ -1131,7 +1131,7 @@ pub fn genericCfgDynamicI32Address(function: ir.Function, block: ir.BasicBlock, 
     }
 }
 
-pub fn genericCfgStoredPointerValue(block: ir.BasicBlock, slot_name: []const u8) ?ir.Value {
+fn genericCfgStoredPointerValue(block: ir.BasicBlock, slot_name: []const u8) ?ir.Value {
     for (block.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const store = switch (instruction.kind) {
@@ -1144,7 +1144,7 @@ pub fn genericCfgStoredPointerValue(block: ir.BasicBlock, slot_name: []const u8)
     return null;
 }
 
-pub fn emitGenericCfgDynamicI32LoadIntoEax(
+fn emitGenericCfgDynamicI32LoadIntoEax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     address: GenericCfgDynamicI32Address,
@@ -1153,7 +1153,7 @@ pub fn emitGenericCfgDynamicI32LoadIntoEax(
     try emitGenericCfgDynamicI32AddIntoEax(allocator, machine, address);
 }
 
-pub fn emitGenericCfgDynamicI32AddIntoEax(
+fn emitGenericCfgDynamicI32AddIntoEax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     address: GenericCfgDynamicI32Address,
@@ -1477,7 +1477,7 @@ pub fn genericCfgI32Address(function: ir.Function, ptr: ir.Value) ?GenericCfgAdd
     return .{ .global = symbol };
 }
 
-pub fn emitGenericCfgLoadI32IntoEax(
+fn emitGenericCfgLoadI32IntoEax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -1490,7 +1490,7 @@ pub fn emitGenericCfgLoadI32IntoEax(
     }
 }
 
-pub fn emitGenericCfgStoreEax(
+fn emitGenericCfgStoreEax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -3760,7 +3760,7 @@ pub fn genericCfgSupportsSelectedI32Value(function: ir.Function, value: ir.Value
     };
 }
 
-pub fn genericCfgLoopSumPlan(function: ir.Function) ?GenericCfgLoopSumPlan {
+fn genericCfgLoopSumPlan(function: ir.Function) ?GenericCfgLoopSumPlan {
     if (!function.ret_ty.eql(.{ .int = 32 })) return null;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return null;
     if (!matchesAccumulatorLoop(function) and
@@ -4095,7 +4095,7 @@ pub fn appendGenericCfgCompareLocalParam(
     try machine.instructions.append(allocator, .{ .cmp_ecx_arg32 = param });
 }
 
-pub fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
     if (!matchesAccumulatorLoop(function) and
@@ -5511,7 +5511,7 @@ pub fn sliceSumHasOverflowCheck(function: ir.Function) bool {
     return functionHasCall(function, "llvm.sadd.with.overflow.i32");
 }
 
-pub fn functionHasCall(function: ir.Function, callee: []const u8) bool {
+fn functionHasCall(function: ir.Function, callee: []const u8) bool {
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
@@ -7806,7 +7806,7 @@ pub fn validateIcmpNamedImm(instruction: ir.Instruction, predicate: ir.IcmpPredi
     return name;
 }
 
-pub fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
+fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
     for (function.blocks.items) |block| {
         if (std.mem.eql(u8, block.name, name)) return block;
     }
@@ -11178,7 +11178,7 @@ pub fn validateEmptyBr(block: ir.BasicBlock) ![]const u8 {
     return validateTerminatorBr(block);
 }
 
-pub fn validateTerminatorBr(block: ir.BasicBlock) ![]const u8 {
+fn validateTerminatorBr(block: ir.BasicBlock) ![]const u8 {
     return switch (block.terminator orelse return error.BlockWithoutTerminator) {
         .br => |br| br.target,
         else => error.UnsupportedCodegenControlFlow,
@@ -11353,7 +11353,7 @@ pub fn functionHasOverflowPanicEdge(function: ir.Function) bool {
     return sliceSumHasOverflowCheck(function);
 }
 
-pub fn appendI32CallArgs(
+fn appendI32CallArgs(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -11425,7 +11425,7 @@ pub fn i32CallStackArgCount(call: ir.CallInst) !usize {
     return stack_arg_count;
 }
 
-pub fn appendSysVScalarCallArgs(
+fn appendSysVScalarCallArgs(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -11434,7 +11434,7 @@ pub fn appendSysVScalarCallArgs(
     return try appendSysVScalarCallArgsWithBlock(allocator, machine, function, null, call);
 }
 
-pub fn appendSysVScalarCallArgsWithBlock(
+fn appendSysVScalarCallArgsWithBlock(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -11846,7 +11846,7 @@ pub fn appendStackScalarCallArg(
     }
 }
 
-pub fn appendAlignedDirectCallPreservingI32Param(
+fn appendAlignedDirectCallPreservingI32Param(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     symbol: []const u8,
@@ -11942,7 +11942,7 @@ pub fn frameIndexForLiveParam(index: usize) FrameIndex {
     };
 }
 
-pub fn lowerReturnTerminator(
+fn lowerReturnTerminator(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -11962,7 +11962,7 @@ pub fn lowerReturnTerminator(
     try machine.instructions.append(allocator, .ret);
 }
 
-pub fn lowerReturnValue(
+fn lowerReturnValue(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
@@ -12270,7 +12270,7 @@ pub fn emitI32ValueIntoEax(
     }
 }
 
-pub fn lowerReturnValueAfterCalls(
+fn lowerReturnValueAfterCalls(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
