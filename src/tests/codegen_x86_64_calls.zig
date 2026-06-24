@@ -1078,6 +1078,83 @@ test "x86_64 codegen preserves indirect i64 and f64 call results across calls" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "x86_64 codegen preserves i64 and f32 call results across calls" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @first(i64)
+        \\declare float @second(float)
+        \\
+        \\define double @caller(i64 %a, float %b) {
+        \\entry:
+        \\  %first = call i64 @first(i64 %a)
+        \\  %second = call float @second(float %b)
+        \\  %wide_first = sitofp i64 %first to double
+        \\  %wide_second = fpext float %second to double
+        \\  %sum = fadd double %wide_first, %wide_second
+        \\  ret double %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_24);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .cvtss2sd_xmm0_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .cvtsi2sd_rdi_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .addsd_xmm1_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .add_rsp_24);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "x86_64 codegen preserves indirect i64 and f32 call results across calls" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define double @caller(ptr %first, ptr %second, i64 %a, float %b) {
+        \\entry:
+        \\  %first_result = call i64 %first(i64 %a)
+        \\  %second_result = call float %second(float %b)
+        \\  %wide_first = sitofp i64 %first_result to double
+        \\  %wide_second = fpext float %second_result to double
+        \\  %sum = fadd double %wide_first, %wide_second
+        \\  ret double %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_40);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .cvtss2sd_xmm0_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .cvtsi2sd_rdi_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .addsd_xmm1_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .add_rsp_40);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "x86_64 codegen preserves f64 and i64 call results across calls" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

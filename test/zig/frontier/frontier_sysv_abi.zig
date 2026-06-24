@@ -199,6 +199,30 @@ export fn frontier_mixed_indirect_both_i64_f64_results_across_calls(first_func: 
     return @as(f64, @floatFromInt(first)) + second;
 }
 
+export fn frontier_mixed_i64_f32_results_across_calls(a: i64, b: f32) f64 {
+    const first = frontier_ordered_i64(a);
+    const second = frontier_ordered_f32(b);
+    return @as(f64, @floatFromInt(first)) + @as(f64, second);
+}
+
+export fn frontier_mixed_indirect_first_i64_f32_results_across_calls(func: IdI64Fn, a: i64, b: f32) f64 {
+    const first = func(a);
+    const second = frontier_ordered_f32(b);
+    return @as(f64, @floatFromInt(first)) + @as(f64, second);
+}
+
+export fn frontier_mixed_indirect_second_i64_f32_results_across_calls(func: IdF32Fn, a: i64, b: f32) f64 {
+    const first = frontier_ordered_i64(a);
+    const second = func(b);
+    return @as(f64, @floatFromInt(first)) + @as(f64, second);
+}
+
+export fn frontier_mixed_indirect_both_i64_f32_results_across_calls(first_func: IdI64Fn, second_func: IdF32Fn, a: i64, b: f32) f64 {
+    const first = first_func(a);
+    const second = second_func(b);
+    return @as(f64, @floatFromInt(first)) + @as(f64, second);
+}
+
 export fn frontier_mixed_f64_i64_results_across_calls(a: f64, b: i64) f64 {
     const first = frontier_ordered_f64(a);
     const second = frontier_ordered_i64(b);

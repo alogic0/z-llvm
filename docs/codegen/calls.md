@@ -250,7 +250,7 @@ accepted frontier:
   selected mixed two-result FP call frames with one live `double` or `i64`
   addend preserved across both non-void calls and added after the mixed-width
   result sum
-  selected mixed i64/f64, f64/i64, and f32/i64 two-result frames where `%rax`, the FP
+  selected mixed i64/f64, i64/f32, f64/i64, and f32/i64 two-result frames where `%rax`, the FP
   result or argument, and any second pointer callee are preserved across both
   non-void calls before the integer result is converted and added to the
   `double` result
