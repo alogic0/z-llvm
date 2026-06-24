@@ -7,3 +7,8 @@ export fn frontier_bounds_guard(value: *const i32, len: usize, index: usize) i32
     _ = index;
     return value.*;
 }
+
+export fn frontier_guard_return_else(values: [*]const i32, len: usize, index: usize) i32 {
+    if (index >= len) return -1;
+    return values[index];
+}

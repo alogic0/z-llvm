@@ -12087,6 +12087,10 @@ const GenericCfgLoopSumPlan = struct {
 };
 
 fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try lowerGenericCfgGuardedDynamicPointerLoadReturn(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgOptionalPointerReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -12180,6 +12184,178 @@ fn lowerGenericCfgOptionalPointerReturn(allocator: std.mem.Allocator, machine: *
         try appendGenericCfgReturn(allocator, machine);
     }
     return true;
+}
+
+fn lowerGenericCfgGuardedDynamicPointerLoadReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 3) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or
+        !function.params.items[1].ty.eql(.{ .int = 64 }) or
+        !function.params.items[2].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return false;
+    const cond_name = switch (condbr.cond) {
+        .named => |name| name,
+        else => return false,
+    };
+    const cond_instruction = findInstruction(entry, cond_name) orelse return false;
+    const icmp = switch (cond_instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .uge or !icmp.operand_ty.eql(.{ .int = 64 })) return false;
+
+    const true_block = blockByName(function, condbr.then_target) orelse return false;
+    const false_block = blockByName(function, condbr.else_target) orelse return false;
+    const true_const = genericCfgConstantI32Return(true_block);
+    const false_const = genericCfgConstantI32Return(false_block);
+    if ((true_const == null) == (false_const == null)) return false;
+    const const_block = if (true_const != null) true_block else false_block;
+    const load_block = if (true_const != null) false_block else true_block;
+    const const_value = true_const orelse false_const orelse return false;
+
+    const address = genericCfgDynamicI32LoadReturnAddress(function, entry, load_block) orelse return false;
+    const lhs_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, icmp.lhs) orelse return false;
+    const rhs_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, icmp.rhs) orelse return false;
+    if (address.index_reg != lhs_reg) return false;
+
+    try emitGenericCfgUgeI64ParamCondition(allocator, machine, lhs_reg, rhs_reg);
+    const branch_to_const = true_const != null;
+    if (branch_to_const) {
+        try appendGenericCfgConditionalBranch(allocator, machine, .jae, const_block.name);
+        try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
+        try appendGenericCfgReturn(allocator, machine);
+        try appendGenericCfgBlockLabel(allocator, machine, const_block.name);
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = const_value });
+        try appendGenericCfgReturn(allocator, machine);
+    } else {
+        try appendGenericCfgConditionalBranch(allocator, machine, .jae, load_block.name);
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = const_value });
+        try appendGenericCfgReturn(allocator, machine);
+        try appendGenericCfgBlockLabel(allocator, machine, load_block.name);
+        try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
+        try appendGenericCfgReturn(allocator, machine);
+    }
+    return true;
+}
+
+fn genericCfgConstantI32Return(block: ir.BasicBlock) ?i32 {
+    if (block.instructions.items.len != 0) return null;
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    return switch (ret.value orelse return null) {
+        .int => |int| i32Value(int) catch null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+    };
+}
+
+fn genericCfgDynamicI32LoadReturnAddress(
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    block: ir.BasicBlock,
+) ?GenericCfgDynamicI32Address {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const ret_name = switch (ret.value orelse return null) {
+        .named => |name| name,
+        else => return null,
+    };
+    const ret_instruction = findInstruction(block, ret_name) orelse return null;
+    const load = switch (ret_instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return null;
+    return genericCfgDynamicI32AddressAcrossBlocks(function, entry, block, load.ptr);
+}
+
+fn genericCfgDynamicI32AddressAcrossBlocks(
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    block: ir.BasicBlock,
+    ptr: ir.Value,
+) ?GenericCfgDynamicI32Address {
+    const name = switch (ptr) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
+        return .{ .base_reg = reg, .index_reg = .rsi, .offset_elems = 0 };
+    }
+    const instruction = findInstruction(block, name) orelse findInstruction(entry, name) orelse return null;
+    switch (instruction.kind) {
+        .gep => |gep| {
+            if (!gep.source_ty.eql(.{ .int = 32 }) or gep.indices.items.len != 1) return null;
+            var address = genericCfgDynamicI32AddressAcrossBlocks(function, entry, block, gep.ptr) orelse return null;
+            const index = gep.indices.items[0];
+            if (!index.ty.eql(.{ .int = 64 })) return null;
+            switch (index.value) {
+                .int => |int| address.offset_elems += int,
+                .named => |index_name| {
+                    if (address.offset_elems != 0) return null;
+                    address.index_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, .{ .named = index_name }) orelse return null;
+                },
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+            }
+            return address;
+        },
+        .load => |load| {
+            if (!load.ty.eql(.ptr) or load.attrs.isBarrier()) return null;
+            const slot_name = switch (load.ptr) {
+                .named => |slot| slot,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+            };
+            const stored = genericCfgStoredPointerValue(block, slot_name) orelse
+                genericCfgStoredPointerValue(entry, slot_name) orelse return null;
+            return genericCfgDynamicI32AddressAcrossBlocks(function, entry, block, stored);
+        },
+        .cast => |cast| {
+            if (cast.op != .bitcast or !cast.to_ty.eql(.ptr)) return null;
+            return genericCfgDynamicI32AddressAcrossBlocks(function, entry, block, cast.value);
+        },
+        else => return null,
+    }
+}
+
+fn genericCfgI64ParamRegThroughIdentityCast(function: ir.Function, block: ir.BasicBlock, value: ir.Value) ?ArgReg {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (paramRegOrNull(function, name, .{ .int = 64 }) catch null) |reg| return reg;
+    const instruction = findInstruction(block, name) orelse return null;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (cast.op != .bitcast or !cast.from_ty.eql(.{ .int = 64 }) or !cast.to_ty.eql(.{ .int = 64 })) return null;
+    return genericCfgI64ParamRegThroughIdentityCast(function, block, cast.value);
+}
+
+fn emitGenericCfgUgeI64ParamCondition(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    lhs_reg: ArgReg,
+    rhs_reg: ArgReg,
+) !void {
+    if (lhs_reg == .rcx) return error.UnsupportedCodegenAbi;
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = rhs_reg } });
+    try machine.instructions.append(allocator, .{ .cmp_rcx_arg64 = lhs_reg });
 }
 
 fn genericCfgOptionalPointerMergeValue(block: ir.BasicBlock, entry_name: []const u8) ?ir.Value {
@@ -13000,9 +13176,9 @@ fn emitGenericCfgDynamicI32AddIntoEax(
     machine: *MachineFunction,
     address: GenericCfgDynamicI32Address,
 ) !void {
-    if (address.base_reg != .rdi or address.index_reg != .rsi) return error.UnsupportedCodegenAbi;
+    if (address.base_reg != .rdi) return error.UnsupportedCodegenAbi;
     if (address.offset_elems < 0 or address.offset_elems > 1) return error.UnsupportedCodegenValue;
-    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } });
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.index_reg } });
     if (address.offset_elems == 1) try machine.instructions.append(allocator, .inc_rcx);
     try machine.instructions.append(allocator, .load_rdi_rcx4_ptr_r8d);
     try machine.instructions.append(allocator, .add_r8d_eax);
@@ -15870,6 +16046,7 @@ const GenericCfgBranchKind = enum {
     jne,
     jo,
     js,
+    jae,
 };
 
 fn appendGenericCfgBlockLabel(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8) !void {
@@ -15887,6 +16064,7 @@ fn appendGenericCfgConditionalBranch(
         .jne => .{ .jne = label },
         .jo => .{ .jo = label },
         .js => .{ .js = label },
+        .jae => .{ .jae = label },
     });
 }
 

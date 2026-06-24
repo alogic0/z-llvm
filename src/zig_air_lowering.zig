@@ -4060,6 +4060,9 @@ const LoweringContext = struct {
             try self.lowerTypedVoidGuard(instruction, cond, panic_body, panic_is_then);
             return;
         }
+        if (try self.lowerTypedBranchReturnContinueBlock(instruction, cond, then_body, else_body)) {
+            return;
+        }
         if (self.typedBlockBranchValue(structured_air_v2, instruction.index, then_body)) |true_value| {
             if (self.typedBlockBranchValue(structured_air_v2, instruction.index, else_body)) |false_value| {
                 if (!true_value.ty.ir_type.eql(false_value.ty.ir_type)) return error.UnsupportedAir;
@@ -4084,6 +4087,50 @@ const LoweringContext = struct {
         } else |_| {}
 
         try self.lowerTypedBranchMergeBlock(instruction, cond, then_body, else_body);
+    }
+
+    fn lowerTypedBranchReturnContinueBlock(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+        cond: TypedValue,
+        then_body: air_export.StructuredBody,
+        else_body: air_export.StructuredBody,
+    ) LowerError!bool {
+        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        const then_returns = typedBodyReturns(structured_air_v2, then_body);
+        const else_returns = typedBodyReturns(structured_air_v2, else_body);
+        if (then_returns == else_returns) return false;
+
+        const continue_body = if (then_returns) else_body else then_body;
+        if (!typedVoidBranchBody(structured_air_v2, continue_body, instruction.index)) return false;
+
+        const return_body = if (then_returns) then_body else else_body;
+        const return_label = try ownPrint(self.module, "block{}_return", .{instruction.index});
+        const cont_label = try ownPrint(self.module, "block{}_cont", .{instruction.index});
+
+        var finished = self.block.*;
+        finished.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = cond.value,
+            .then_target = if (then_returns) return_label else cont_label,
+            .else_target = if (then_returns) cont_label else return_label,
+        } };
+        self.block.* = ir.BasicBlock.init(return_label);
+        try self.function.blocks.append(self.allocator, finished);
+
+        for (return_body.instructions) |return_index| {
+            const child = typedInstructionByIndex(structured_air_v2, return_index) orelse return error.UnsupportedAir;
+            if (isIgnoredOpcode(child.opcode)) continue;
+            try self.lowerTypedInstruction(child);
+            if (self.block.terminator != null and !std.mem.eql(u8, child.opcode, "ret") and !std.mem.eql(u8, child.opcode, "ret_safe")) {
+                return error.UnsupportedAir;
+            }
+        }
+        if (self.block.terminator == null) return error.UnsupportedAir;
+        const return_block = self.block.*;
+        self.block.* = ir.BasicBlock.init(cont_label);
+        try self.function.blocks.append(self.allocator, return_block);
+        return true;
     }
 
     // Lowers a ReleaseSafe void guard block into real control flow: the
@@ -4239,6 +4286,12 @@ const LoweringContext = struct {
             return null;
         }
         return try self.resolveTypedOperand(instruction, operand_index);
+    }
+
+    fn typedBodyReturns(structured_air_v2: air_export.StructuredAirV2, body: air_export.StructuredBody) bool {
+        const return_index = singleNonDebugInstruction(structured_air_v2, body) orelse return false;
+        const return_instruction = typedInstructionByIndex(structured_air_v2, return_index) orelse return false;
+        return std.mem.eql(u8, return_instruction.opcode, "ret") or std.mem.eql(u8, return_instruction.opcode, "ret_safe");
     }
 
     fn lowerTypedBlockBodyUntilCond(
@@ -5350,6 +5403,16 @@ fn singleNonDebugInstruction(
     return result;
 }
 
+fn typedReturnBody(
+    structured_air_v2: air_export.StructuredAirV2,
+    body: air_export.StructuredBody,
+) bool {
+    const return_index = singleNonDebugInstruction(structured_air_v2, body) orelse return false;
+    const return_instruction = typedInstructionByIndex(structured_air_v2, return_index) orelse return false;
+    return std.mem.eql(u8, return_instruction.opcode, "ret") or
+        std.mem.eql(u8, return_instruction.opcode, "ret_safe");
+}
+
 fn typedVoidGuardBlock(
     structured_air_v2: air_export.StructuredAirV2,
     target_block: u32,
@@ -5406,6 +5469,7 @@ fn isGenericTypedCfgBranchBody(
     body: air_export.StructuredBody,
 ) bool {
     const structured_air_v2 = function.structured_air_v2 orelse return false;
+    if (typedReturnBody(structured_air_v2, body)) return true;
     var saw_branch = false;
     for (body.instructions) |instruction_index| {
         const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
@@ -5663,20 +5727,20 @@ fn binaryOp(opcode: []const u8, ty: ZigType) ?ir.BinaryOp {
 fn intPredicate(opcode: []const u8, signed: bool) ?ir.IcmpPredicate {
     if (std.mem.startsWith(u8, opcode, "cmp_eq")) return .eq;
     if (std.mem.startsWith(u8, opcode, "cmp_neq")) return .ne;
-    if (std.mem.startsWith(u8, opcode, "cmp_lt")) return if (signed) .slt else .ult;
     if (std.mem.startsWith(u8, opcode, "cmp_lte")) return if (signed) .sle else .ule;
-    if (std.mem.startsWith(u8, opcode, "cmp_gt")) return if (signed) .sgt else .ugt;
+    if (std.mem.startsWith(u8, opcode, "cmp_lt")) return if (signed) .slt else .ult;
     if (std.mem.startsWith(u8, opcode, "cmp_gte")) return if (signed) .sge else .uge;
+    if (std.mem.startsWith(u8, opcode, "cmp_gt")) return if (signed) .sgt else .ugt;
     return null;
 }
 
 fn fpPredicate(opcode: []const u8) ?ir.FcmpPredicate {
     if (std.mem.startsWith(u8, opcode, "cmp_eq")) return .oeq;
     if (std.mem.startsWith(u8, opcode, "cmp_neq")) return .one;
-    if (std.mem.startsWith(u8, opcode, "cmp_lt")) return .olt;
     if (std.mem.startsWith(u8, opcode, "cmp_lte")) return .ole;
-    if (std.mem.startsWith(u8, opcode, "cmp_gt")) return .ogt;
+    if (std.mem.startsWith(u8, opcode, "cmp_lt")) return .olt;
     if (std.mem.startsWith(u8, opcode, "cmp_gte")) return .oge;
+    if (std.mem.startsWith(u8, opcode, "cmp_gt")) return .ogt;
     return null;
 }
 

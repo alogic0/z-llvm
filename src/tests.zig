@@ -9657,6 +9657,36 @@ test "x86_64 codegen routes pointer load branch through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes guarded dynamic pointer load through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @guarded_dynamic_load(ptr %values, i64 %len, i64 %index) {
+        \\entry:
+        \\  %cmp = icmp uge i64 %index, %len
+        \\  br i1 %cmp, label %fail, label %ok
+        \\fail:
+        \\  ret i32 -1
+        \\ok:
+        \\  %element = getelementptr i32, ptr %values, i64 %index
+        \\  %loaded = load i32, ptr %element
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes branch phi immediate add through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

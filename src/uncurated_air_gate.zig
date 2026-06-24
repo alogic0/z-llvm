@@ -1486,10 +1486,14 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_safety_edges.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier safety-edge-adjacent values", .c_body =
     \\extern int z_frontier_checked_add(int) __asm__("frontier_safety_edges.frontier_checked_add");
     \\extern int z_frontier_bounds_guard(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_guard");
+    \\extern int z_frontier_guard_return_else(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_guard_return_else");
     \\int main(void) {
     \\    int value = 41;
+    \\    int values[3] = { 11, 41, 77 };
     \\    if (z_frontier_checked_add(5) != 16) return 1;
     \\    if (z_frontier_bounds_guard(&value, 1, 0) != 41) return 2;
+    \\    if (z_frontier_guard_return_else(values, 3, 1) != 41) return 3;
+    \\    if (z_frontier_guard_return_else(values, 3, 3) != -1) return 4;
     \\    return 0;
     \\}
     \\

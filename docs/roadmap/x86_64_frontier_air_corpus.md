@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=212
-structured_functions=212
-generic_codegen_functions=212
-generic_cfg_functions=212
+discovered_functions=213
+structured_functions=213
+generic_codegen_functions=213
+generic_cfg_functions=213
 structural_matcher_functions=0
-structured_air_v2_functions=212
-typed_air_operand_functions=212
+structured_air_v2_functions=213
+typed_air_operand_functions=213
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=212
+generic_lowering_functions=213
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=212
+object_emitted_functions=213
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -350,14 +350,17 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_i32_to_f64_mul_add` lower typed AIR v2 `sitofp` plus `fadd` or
   `fmul`/`fadd` pipelines through the generic CFG FP path, including `mulss`
   and `mulsd` codegen, and executable probes validate the exact C ABI results
+- guard-return safety-edge rows in `frontier_safety_edges.zig`:
+  `frontier_guard_return_else` lowers typed AIR v2 branch-return/continue CFG
+  directly through generic CFG codegen, using a strict unsigned i64 guard and
+  the dynamic pointer indexed-load path; executable probes validate both the
+  loaded result and equality/out-of-bounds `-1` return path
 
 Remaining measured frontier blockers kept out of accepted rows:
 
 - private helper call graphs with stack-passed live values beyond the current
   disp8-safe selected model, live SSE values beyond the selected no-argument-call spill shapes and
   two-live FP-argument call shape, or live values across multiple calls
-- branch safety guards that return from the failure side rather than the
-  current checked-runtime boundary shape
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
