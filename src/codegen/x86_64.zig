@@ -255,6 +255,7 @@ pub const Instruction = union(enum) {
     test_rax_rax,
     test_rdx_rdx,
     mulsd_xmm1_xmm0,
+    mulss_xmm1_xmm0,
     addsd_xmm1_xmm0,
     addss_xmm1_xmm0,
     subss_xmm1_xmm0,
@@ -13642,6 +13643,10 @@ fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *MachineF
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgFpCastBinaryPipelineReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgFpCompareReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -14744,9 +14749,10 @@ fn lowerGenericCfgFpBinaryReturn(
     if (binary.ty.eql(.float)) {
         switch (binary.op) {
             .fadd => try machine.instructions.append(allocator, .addss_xmm1_xmm0),
+            .fmul => try machine.instructions.append(allocator, .mulss_xmm1_xmm0),
             .fsub => try machine.instructions.append(allocator, .subss_xmm1_xmm0),
             .frem => try appendAlignedDirectCall(allocator, machine, "fmodf", .float),
-            .fmul, .fdiv, .add, .sub, .mul, .shl, .lshr, .ashr, .@"and", .@"or", .xor, .udiv, .sdiv, .urem, .srem => return false,
+            .fdiv, .add, .sub, .mul, .shl, .lshr, .ashr, .@"and", .@"or", .xor, .udiv, .sdiv, .urem, .srem => return false,
         }
     } else if (binary.ty.eql(.double)) {
         switch (binary.op) {
@@ -14759,6 +14765,114 @@ fn lowerGenericCfgFpBinaryReturn(
     }
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerGenericCfgFpCastBinaryPipelineReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len < 2) return false;
+    if (block.instructions.items.len != 2 and block.instructions.items.len != 3) return false;
+
+    const cast_inst = block.instructions.items[0];
+    if (cast_inst.removed) return false;
+    const cast_result = fpSitofpFirstGprI32Result(function, cast_inst, function.ret_ty) catch return false;
+
+    if (block.instructions.items.len == 2) {
+        const add_inst = block.instructions.items[1];
+        if (add_inst.removed) return false;
+        const add_result = add_inst.result orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+        const fp_param = fpBinaryOtherParamIndex(function, add_inst, function.ret_ty, cast_result, .fadd) catch return false;
+        if (fp_param != 0) return error.UnsupportedCodegenAbi;
+
+        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } });
+        try emitFirstGprI32ToFpXmm0(allocator, machine, function.ret_ty);
+        try appendFpAddXmm1Xmm0(allocator, machine, function.ret_ty);
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+
+    const mul_inst = block.instructions.items[1];
+    const add_inst = block.instructions.items[2];
+    if (mul_inst.removed or add_inst.removed) return false;
+    const mul_result = mul_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+    const mul_param = fpBinaryOtherParamIndex(function, mul_inst, function.ret_ty, cast_result, .fmul) catch return false;
+    const add_param = fpBinaryOtherParamIndex(function, add_inst, function.ret_ty, mul_result, .fadd) catch return false;
+    if (mul_param != 0 or add_param != 1) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm2, .src = .xmm1 } });
+    try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } });
+    try emitFirstGprI32ToFpXmm0(allocator, machine, function.ret_ty);
+    try appendFpMulXmm1Xmm0(allocator, machine, function.ret_ty);
+    try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm2 } });
+    try appendFpAddXmm1Xmm0(allocator, machine, function.ret_ty);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn fpSitofpFirstGprI32Result(function: ir.Function, instruction: ir.Instruction, to_ty: ir.Type) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (cast.op != .sitofp or !cast.from_ty.eql(.{ .int = 32 }) or !cast.to_ty.eql(to_ty)) return error.UnsupportedCodegenInstruction;
+    const source_name = switch (cast.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if ((try paramReg(function, source_name, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+    return result;
+}
+
+fn fpBinaryOtherParamIndex(
+    function: ir.Function,
+    instruction: ir.Instruction,
+    ty: ir.Type,
+    fixed_name: []const u8,
+    op: ir.BinaryOp,
+) !usize {
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != op or !binary.ty.eql(ty)) return error.UnsupportedCodegenInstruction;
+    const lhs_fixed = isNamed(binary.lhs, fixed_name);
+    const rhs_fixed = isNamed(binary.rhs, fixed_name);
+    if (lhs_fixed == rhs_fixed) return error.UnsupportedCodegenInstruction;
+    const other = if (lhs_fixed) binary.rhs else binary.lhs;
+    return fpParamIndexFromValue(function, other, ty);
+}
+
+fn emitFirstGprI32ToFpXmm0(allocator: std.mem.Allocator, machine: *MachineFunction, ty: ir.Type) !void {
+    if (ty.eql(.float)) {
+        try machine.instructions.append(allocator, .cvtsi2ss_edi_xmm0);
+    } else if (ty.eql(.double)) {
+        try machine.instructions.append(allocator, .cvtsi2sd_edi_xmm0);
+    } else return error.UnsupportedCodegenType;
+}
+
+fn appendFpAddXmm1Xmm0(allocator: std.mem.Allocator, machine: *MachineFunction, ty: ir.Type) !void {
+    if (ty.eql(.float)) {
+        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    } else if (ty.eql(.double)) {
+        try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+    } else return error.UnsupportedCodegenType;
+}
+
+fn appendFpMulXmm1Xmm0(allocator: std.mem.Allocator, machine: *MachineFunction, ty: ir.Type) !void {
+    if (ty.eql(.float)) {
+        try machine.instructions.append(allocator, .mulss_xmm1_xmm0);
+    } else if (ty.eql(.double)) {
+        try machine.instructions.append(allocator, .mulsd_xmm1_xmm0);
+    } else return error.UnsupportedCodegenType;
 }
 
 fn genericCfgSupportsUnusedScalarParam(ty: ir.Type) bool {
@@ -24450,6 +24564,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .test_rax_rax,
         .test_rdx_rdx,
         .mulsd_xmm1_xmm0,
+        .mulss_xmm1_xmm0,
         .addsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
         .subss_xmm1_xmm0,
@@ -24583,7 +24698,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 eax_defined = function.ret_ty == .void or sysvAggregateReturnHasNoGpr(function.ret_ty);
             }
         },
-        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .movapd_xmm, .unpcklps_xmm, .shufps_high_f32_to_low, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .mulss_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .movapd_xmm, .unpcklps_xmm, .shufps_high_f32_to_low, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm64_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
@@ -24717,6 +24832,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .test_rax_rax,
         .test_rdx_rdx,
         .mulsd_xmm1_xmm0,
+        .mulss_xmm1_xmm0,
         .addsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
         .subss_xmm1_xmm0,

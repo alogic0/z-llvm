@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=209`,
-`generic_codegen_functions=209`, `generic_cfg_functions=209`,
+three release modes at `source_rows=13`, `discovered_functions=212`,
+`generic_codegen_functions=212`, `generic_cfg_functions=212`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=209`, `object_failures=0`,
+`object_emitted_functions=212`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -470,8 +470,11 @@ calls through the generic CFG call path.
 The FP argument frontier also proves selected named `f32`/`f64` external-call
 pass-through through `%xmm0..%xmm4`; backend unit/object tests materialize
 immediate FP constants through `%xmm0..%xmm7`.
+The mixed numeric frontier now lowers typed AIR v2 `sitofp` plus `fadd` or
+`fmul`/`fadd` pipelines for `i32` to `f32`/`f64`, including `mulss`/`mulsd`
+codegen and executable C ABI checks.
 Remaining non-accepted
-blockers are mixed int-to-float multiply/add pipelines, helper graphs with
+blockers are helper graphs with
 stack-passed live values beyond the current disp8-safe selected model, broader
 live SSE values beyond the selected no-argument-call shapes,
 two-live no-argument and one-FP-argument pointer-callee shapes,

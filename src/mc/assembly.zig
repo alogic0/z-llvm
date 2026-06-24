@@ -72,6 +72,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .test_rax_rax => try writer.writeAll("\ttestq %rax, %rax\n"),
             .test_rdx_rdx => try writer.writeAll("\ttestq %rdx, %rdx\n"),
             .mulsd_xmm1_xmm0 => try writer.writeAll("\tmulsd %xmm1, %xmm0\n"),
+            .mulss_xmm1_xmm0 => try writer.writeAll("\tmulss %xmm1, %xmm0\n"),
             .addss_xmm1_xmm0 => try writer.writeAll("\taddss %xmm1, %xmm0\n"),
             .subss_xmm1_xmm0 => try writer.writeAll("\tsubss %xmm1, %xmm0\n"),
             .divsd_xmm1_xmm0 => try writer.writeAll("\tdivsd %xmm1, %xmm0\n"),

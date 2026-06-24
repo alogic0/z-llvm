@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=209
-structured_functions=209
-generic_codegen_functions=209
-generic_cfg_functions=209
+discovered_functions=212
+structured_functions=212
+generic_codegen_functions=212
+generic_cfg_functions=212
 structural_matcher_functions=0
-structured_air_v2_functions=209
-typed_air_operand_functions=209
+structured_air_v2_functions=212
+typed_air_operand_functions=212
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=209
+generic_lowering_functions=212
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=209
+object_emitted_functions=212
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -345,11 +345,14 @@ Closed in the current memory/aggregate frontier slice:
   five `f32` and five `f64` parameters are forwarded to external C ABI helpers
   through `%xmm0..%xmm4`; backend unit/object tests materialize immediate FP
   constants through `%xmm0..%xmm7`
+- mixed integer-to-FP arithmetic rows in `frontier_mixed_numeric.zig`:
+  `frontier_i32_to_f32_add`, `frontier_i32_to_f32_mul_add`, and
+  `frontier_i32_to_f64_mul_add` lower typed AIR v2 `sitofp` plus `fadd` or
+  `fmul`/`fadd` pipelines through the generic CFG FP path, including `mulss`
+  and `mulsd` codegen, and executable probes validate the exact C ABI results
 
 Remaining measured frontier blockers kept out of accepted rows:
 
-- mixed int-to-float plus multiply/add pipelines beyond the current selected
-  FP binary subset
 - private helper call graphs with stack-passed live values beyond the current
   disp8-safe selected model, live SSE values beyond the selected no-argument-call spill shapes and
   two-live FP-argument call shape, or live values across multiple calls

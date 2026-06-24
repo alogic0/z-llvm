@@ -6208,6 +6208,69 @@ test "x86_64 codegen sums f32 fields from single-eightbyte SSE aggregate" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
 }
 
+test "x86_64 codegen lowers mixed integer to FP arithmetic pipelines" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define float @f32_add(i32 %value, float %addend) {
+        \\entry:
+        \\  %cast = sitofp i32 %value to float
+        \\  %sum = fadd float %cast, %addend
+        \\  ret float %sum
+        \\}
+        \\
+        \\define float @f32_mul_add(i32 %value, float %scale, float %addend) {
+        \\entry:
+        \\  %cast = sitofp i32 %value to float
+        \\  %product = fmul float %cast, %scale
+        \\  %sum = fadd float %product, %addend
+        \\  ret float %sum
+        \\}
+        \\
+        \\define double @f64_mul_add(i32 %value, double %scale, double %addend) {
+        \\entry:
+        \\  %cast = sitofp i32 %value to double
+        \\  %product = fmul double %cast, %scale
+        \\  %sum = fadd double %product, %addend
+        \\  ret double %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var f32_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer f32_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, f32_machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } }, f32_machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.cvtsi2ss_edi_xmm0, f32_machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.addss_xmm1_xmm0, f32_machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, f32_machine.instructions.items[3]);
+
+    var f32_mul_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer f32_mul_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, f32_mul_machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm2, .src = .xmm1 } }, f32_mul_machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } }, f32_mul_machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.cvtsi2ss_edi_xmm0, f32_mul_machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.mulss_xmm1_xmm0, f32_mul_machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm2 } }, f32_mul_machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.addss_xmm1_xmm0, f32_mul_machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, f32_mul_machine.instructions.items[6]);
+
+    var f64_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[2]);
+    defer f64_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, f64_machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm2, .src = .xmm1 } }, f64_machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } }, f64_machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.cvtsi2sd_edi_xmm0, f64_machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.mulsd_xmm1_xmm0, f64_machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm2 } }, f64_machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.addsd_xmm1_xmm0, f64_machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, f64_machine.instructions.items[6]);
+}
+
 test "x86_64 codegen returns i32 fields from mixed SysV aggregate classes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
