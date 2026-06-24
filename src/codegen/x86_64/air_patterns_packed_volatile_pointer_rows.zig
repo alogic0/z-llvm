@@ -1,0 +1,17 @@
+const impl = @import("air_patterns_impl.zig");
+
+pub const lowerPackedReplaceLowReturn = impl.lowerPackedReplaceLowReturn;
+pub const lowerRuntimePackedReplaceLowPreoptHelper = impl.lowerRuntimePackedReplaceLowPreoptHelper;
+pub const lowerRuntimePackedReplaceLowMainReturn = impl.lowerRuntimePackedReplaceLowMainReturn;
+pub const lowerPackedReadFlagReturn = impl.lowerPackedReadFlagReturn;
+pub const lowerRuntimePackedReadFlagPreoptHelper = impl.lowerRuntimePackedReadFlagPreoptHelper;
+pub const lowerRuntimePackedReadFlagMainReturn = impl.lowerRuntimePackedReadFlagMainReturn;
+pub const lowerPointerVolatileRoundtripReturn = impl.lowerPointerVolatileRoundtripReturn;
+pub const lowerRuntimeVolatileRoundtripMainReturn = impl.lowerRuntimeVolatileRoundtripMainReturn;
+pub const lowerRuntimeVolatileRoundtripPreoptMainReturn = impl.lowerRuntimeVolatileRoundtripPreoptMainReturn;
+pub const isO0ParamStoreToAlloca = impl.isO0ParamStoreToAlloca;
+pub const lowerPointerLoadStoreReturn = impl.lowerPointerLoadStoreReturn;
+pub const lowerRuntimePointerLoadStorePreoptMain = impl.lowerRuntimePointerLoadStorePreoptMain;
+pub const lowerRuntimePointerLoadStorePreoptSafeOptimizedMain = impl.lowerRuntimePointerLoadStorePreoptSafeOptimizedMain;
+pub const lowerRuntimePointerLoadStorePreoptSafeMain = impl.lowerRuntimePointerLoadStorePreoptSafeMain;
+pub const lowerRuntimePointerLoadStoreMainReturn = impl.lowerRuntimePointerLoadStoreMainReturn;
