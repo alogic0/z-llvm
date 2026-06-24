@@ -43,7 +43,9 @@ const codegen_x86_64_encoding = @import("codegen_x86_64_encoding.zig");
 const codegen_x86_64_elf = @import("codegen_x86_64_elf.zig");
 const codegen_x86_64_aggregates = @import("codegen_x86_64_aggregates.zig");
 const codegen_x86_64_calls = @import("codegen_x86_64_calls.zig");
-const codegen_x86_64_generic_cfg = @import("codegen_x86_64_generic_cfg.zig");
+const codegen_x86_64_generic_cfg_call_abi = @import("codegen_x86_64_generic_cfg_call_abi.zig");
+const codegen_x86_64_generic_cfg_aggregate_and_preserves = @import("codegen_x86_64_generic_cfg_aggregate_and_preserves.zig");
+const codegen_x86_64_generic_cfg_routes_and_loops = @import("codegen_x86_64_generic_cfg_routes_and_loops.zig");
 const codegen_x86_64_parser_and_optimization = @import("codegen_x86_64_parser_and_optimization.zig");
 
 test {
@@ -52,6 +54,8 @@ test {
     _ = codegen_x86_64_elf;
     _ = codegen_x86_64_aggregates;
     _ = codegen_x86_64_calls;
-    _ = codegen_x86_64_generic_cfg;
+    _ = codegen_x86_64_generic_cfg_call_abi;
+    _ = codegen_x86_64_generic_cfg_aggregate_and_preserves;
+    _ = codegen_x86_64_generic_cfg_routes_and_loops;
     _ = codegen_x86_64_parser_and_optimization;
 }
