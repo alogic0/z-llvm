@@ -63,6 +63,7 @@ extern fn frontier_sum18_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: 
 extern fn frontier_sum24_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32, o: i32, p: i32, q: i32, r: i32, s: i32, t: i32, u: i32, v: i32, w: i32, x: i32) i32;
 extern fn frontier_sum6_i64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64) i64;
 extern fn frontier_sum8_i64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64) i64;
+extern fn frontier_sub_i64(a: i64, b: i64) i64;
 extern fn frontier_sum8_ptr(a: *const i32, b: *const i32, c: *const i32, d: *const i32, e: *const i32, f: *const i32, g: *const i32, h: *const i32) i32;
 extern fn frontier_choose_ptr(a: *const i32, b: *const i32, tag: i32) *const i32;
 
@@ -211,6 +212,14 @@ export fn frontier_ptr_return_direct_call(a: *const i32, b: *const i32, tag: i32
 
 export fn frontier_ptr_return_indirect_call(func: ChoosePtrFn, a: *const i32, b: *const i32, tag: i32) *const i32 {
     return func(a, b, tag);
+}
+
+export fn frontier_i64_swapped_direct_call(a: i64, b: i64) i64 {
+    return frontier_sub_i64(b, a);
+}
+
+export fn frontier_ptr_swapped_direct_call(a: *const i32, b: *const i32, tag: i32) *const i32 {
+    return frontier_choose_ptr(b, a, tag);
 }
 
 export fn frontier_indirect_two_live_after_call(func: IdI32Fn, a: i32, b: i32, c: i32) i32 {
