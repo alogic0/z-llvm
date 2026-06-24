@@ -354,30 +354,11 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
     ret: anytype,
 ) !bool {
     if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty) or
-        block.instructions.items.len < 2 or block.instructions.items.len > 6) return false;
-    const call_inst = block.instructions.items[0];
-    if (call_inst.removed) return false;
+        block.instructions.items.len < 2 or block.instructions.items.len > 8) return false;
+    const call_count = try leadingFpVoidCallCount(block);
+    if (call_count == 0) return false;
 
-    const call = switch (call_inst.kind) {
-        .call => |call| call,
-        else => return false,
-    };
-    if (call.ret_ty != .void or call.inline_asm != null) return false;
-    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
-    if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
-    if (call.callee_function_ty) |function_ty| {
-        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
-    }
-    if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
-    const call_target: SysVCallTarget = if (call.callee_value) |callee_value| blk: {
-        const callee_name = switch (callee_value) {
-            .named => |name| name,
-            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-        };
-        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
-    } else .{ .direct = call.callee };
-
-    const addend_count = try collectFpVoidCallFaddParamChain(function, block, ret.value orelse return error.InvalidRet);
+    const addend_count = try collectFpVoidCallFaddParamChain(function, block, call_count, ret.value orelse return error.InvalidRet);
     if (addend_count < 2 or addend_count > 6) return error.UnsupportedLiveAcrossCall;
 
     const frame_bytes = try fpLiveAddendFrameBytes(function.ret_ty, addend_count);
@@ -392,9 +373,14 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
             try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = reg, .frame_index = frame_index } });
         }
     }
-    try setupSysVCallTarget(allocator, machine, call_target);
-    _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
-    try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+    index = 0;
+    while (index < call_count) : (index += 1) {
+        const call = block.instructions.items[index].kind.call;
+        const call_target = try fpVoidCallTarget(function, call);
+        try setupSysVCallTarget(allocator, machine, call_target);
+        _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
+        try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+    }
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, 0) } });
         index = 1;
@@ -415,15 +401,52 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
     return true;
 }
 
-pub fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, ret_value: ir.Value) !usize {
-    const binary_count = block.instructions.items.len - 1;
+fn leadingFpVoidCallCount(block: ir.BasicBlock) !usize {
+    var count: usize = 0;
+    while (count < block.instructions.items.len) : (count += 1) {
+        const instruction = block.instructions.items[count];
+        if (instruction.removed or instruction.result != null) break;
+        const call = switch (instruction.kind) {
+            .call => |call| call,
+            else => break,
+        };
+        try validateFpVoidCall(call);
+        if (count > 0 and call.args.items.len != 0) return error.UnsupportedLiveAcrossCall;
+        if (count == 2) return error.UnsupportedLiveAcrossCall;
+    }
+    return count;
+}
+
+fn validateFpVoidCall(call: ir.CallInst) !void {
+    if (call.ret_ty != .void or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return error.UnsupportedCodegenAbi;
+    if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+    }
+    if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
+}
+
+fn fpVoidCallTarget(function: ir.Function, call: ir.CallInst) !SysVCallTarget {
+    return if (call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = call.callee };
+}
+
+pub fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, first_binary_index: usize, ret_value: ir.Value) !usize {
+    if (first_binary_index >= block.instructions.items.len) return error.UnsupportedCodegenInstruction;
+    const binary_count = block.instructions.items.len - first_binary_index;
     if (binary_count < 1 or binary_count > 5) return error.UnsupportedCodegenInstruction;
 
     var addend_seen = [_]bool{false} ** 6;
     var addend_count: usize = 0;
     var previous_name: ?[]const u8 = null;
 
-    for (block.instructions.items[1..], 0..) |instruction, index| {
+    for (block.instructions.items[first_binary_index..], 0..) |instruction, index| {
         if (instruction.removed) return error.UnsupportedCodegenInstruction;
         const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
         if (index == binary_count - 1 and !isNamed(ret_value, result_name)) return error.UnsupportedCodegenInstruction;

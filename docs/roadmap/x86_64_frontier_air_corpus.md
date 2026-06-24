@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=240
-structured_functions=240
-generic_codegen_functions=240
-generic_cfg_functions=240
+discovered_functions=242
+structured_functions=242
+generic_codegen_functions=242
+generic_cfg_functions=242
 structural_matcher_functions=0
-structured_air_v2_functions=240
-typed_air_operand_functions=240
+structured_air_v2_functions=242
+typed_air_operand_functions=242
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=240
+generic_lowering_functions=242
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=240
+object_emitted_functions=242
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -326,6 +326,10 @@ Closed in the current memory/aggregate frontier slice:
   void C ABI calls through the generic CFG live-param spill/reload helper;
   `frontier_two_indirect_void_calls_six_live` proves the same frame path around
   two pointer-callee `callq *%rax` calls.
+  `frontier_two_void_calls_two_f32_live_sum` and
+  `frontier_two_void_calls_two_f64_live_sum` keep two live FP values across two
+  direct no-argument `void` calls through the same FP live-addend frame helper
+  used by the single-call rows.
 - selected ordered call-result live frame in `frontier_sysv_abi.zig`:
   `frontier_call_result_live_across_second_call` spills the first C ABI
   `i32` call result from `%eax`, preserves the live `i32` parameter in a frame
