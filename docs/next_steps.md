@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=224`,
-`generic_codegen_functions=224`, `generic_cfg_functions=224`,
+frontier gate reports `source_rows=13`, `discovered_functions=226`,
+`generic_codegen_functions=226`, `generic_cfg_functions=226`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=224`, `object_failures=0`,
+`object_emitted_functions=226`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -480,7 +480,9 @@ call planning with executable proof. The nested mixed aggregate row adds
 `{ { i32, i32 }, double }` typed AIR v2 field pointers with `align(...)`
 qualifiers, lowers integer and floating fields through layout-backed offsets
 from independent INTEGER/SSE classes, and constructs the aggregate in
-`%rax`/`%xmm0`.
+`%rax`/`%xmm0`. The shifted nested mixed helper-call row proves both GPR and
+SSE halves of an INTEGER/SSE aggregate can move into a private helper call
+through the same register aggregate pass-through helper.
 The nested INTEGER helper-call row passes `{ { i32, i32 }, { i32, i32 } }`
 through the SysV GPR pair to a private helper and returns the helper's scalar
 result without aggregate-specific wrapper dispatch; the nested construction

@@ -401,6 +401,7 @@ selected reversed mixed SSE/INTEGER aggregate argument-field reads
 selected SSE/SSE aggregate argument-field reads and register returns
 selected shifted in-register mixed aggregate pass-through calls
 selected shifted in-register reversed mixed aggregate pass-through calls
+selected shifted nested mixed aggregate pass-through calls that move both GPR and SSE halves
 selected pointer-callee reversed mixed SSE/INTEGER aggregate pass-through calls
 selected up-to-six-live-i32 spill/reload call frame
 selected two-call six-live-i32 spill/reload call frame

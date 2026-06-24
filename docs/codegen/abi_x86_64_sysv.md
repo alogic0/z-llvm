@@ -50,6 +50,7 @@ small INTEGER/INTEGER aggregates up to the selected 16-byte `{ i64, i64 }` class
 selected small INTEGER/INTEGER aggregate argument field reads use the SysV integer register pair or stack field locations
 the reusable aggregate classifier now distinguishes INTEGER, SSE, mixed INTEGER/SSE, and MEMORY classes for <=16-byte aggregates, with packed/unaligned and too-large aggregates classified as MEMORY
 selected nested mixed INTEGER/SSE aggregate field reads and construction returns use layout-backed byte offsets and the independent SysV GPR/SSE streams
+selected shifted nested mixed INTEGER/SSE helper calls move both GPR and SSE aggregate halves through the shared register aggregate pass-through helper
 selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV GPR/SSE streams
 selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV SSE/GPR streams
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream
@@ -218,6 +219,8 @@ aggregate field reads and construction:
   nested mixed `{ { i32, i32 }, double }` row
   the nested mixed row reads INTEGER and SSE fields from independent streams and
   returns construction results through %rax/%xmm0
+  shifted nested mixed helper calls move both INTEGER and SSE eightbytes before
+  a private helper call
 frontier_sysv_aggregate_classes.ArrayPair proves array-in-struct INTEGER
 aggregate sums:
   `[2]i64` pointer-element GEPs are lowered from typed AIR v2

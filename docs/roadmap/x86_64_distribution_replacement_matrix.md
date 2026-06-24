@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=224`,
-`generic_codegen_functions=224`, `generic_cfg_functions=224`,
+three release modes at `source_rows=13`, `discovered_functions=226`,
+`generic_codegen_functions=226`, `generic_cfg_functions=226`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=224`, `object_failures=0`,
+`object_emitted_functions=226`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -437,7 +437,10 @@ helper's scalar result with executable proof; the nested construction row
 builds the same register aggregate from four scalar `i32` leaves by tracing
 typed AIR v2 field paths and packing both INTEGER eightbytes. The array
 construction row similarly traces `[2]i64` pointer-element stores and returns
-the elements in `%rax`/`%rdx`. The `[2]f64` array-in-struct frontier row uses
+the elements in `%rax`/`%rdx`. The shifted nested mixed helper-call row proves
+both GPR and SSE halves of an
+INTEGER/SSE aggregate can move into a private helper call through the same
+register aggregate pass-through helper. The `[2]f64` array-in-struct frontier row uses
 the same typed AIR v2 field/pointer-element path for SSE elements, reads them
 from the independent SysV SSE argument stream, and returns construction results
 in `%xmm0`/`%xmm1`. The nested `{ { double }, { double } }` frontier row uses

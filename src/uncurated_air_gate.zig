@@ -1938,6 +1938,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_nested_mixed_int_sum(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_int_sum");
     \\extern double z_frontier_nested_mixed_float(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_float");
     \\extern struct NestedMixed z_frontier_nested_mixed_make(int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_make");
+    \\extern int z_frontier_shifted_nested_mixed_call_int(long long, double, struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_nested_mixed_call_int");
     \\extern int z_frontier_small_mixed_int(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_int");
     \\extern double z_frontier_small_mixed_float(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_float");
     \\extern double z_frontier_small_reverse_mixed_float(struct SmallReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_reverse_mixed_float");
@@ -2023,6 +2024,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_nested_mixed_float(nested_mixed) != 59.0) return 36;
     \\    struct NestedMixed made_nested_mixed = z_frontier_nested_mixed_make(89, 97, 101.5);
     \\    if (made_nested_mixed.ints.a != 89 || made_nested_mixed.ints.b != 97 || made_nested_mixed.value != 101.5) return 37;
+    \\    if (z_frontier_shifted_nested_mixed_call_int(123, 456.5, nested_mixed) != 100) return 64;
     \\    struct SmallMixed small_mixed = { 17, 23.5 };
     \\    if (z_frontier_small_mixed_int(small_mixed) != 17) return 16;
     \\    if (z_frontier_small_mixed_float(small_mixed) != 23.5) return 17;

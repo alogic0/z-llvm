@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=224
-structured_functions=224
-generic_codegen_functions=224
-generic_cfg_functions=224
+discovered_functions=226
+structured_functions=226
+generic_codegen_functions=226
+generic_cfg_functions=226
 structural_matcher_functions=0
-structured_air_v2_functions=224
-typed_air_operand_functions=224
+structured_air_v2_functions=226
+typed_air_operand_functions=226
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=224
+generic_lowering_functions=226
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=224
+object_emitted_functions=226
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -207,6 +207,10 @@ Closed in the current memory/aggregate frontier slice:
   to a private helper, and the construction-return row builds the nested
   aggregate from four scalar `i32` leaves by tracing typed AIR v2 field paths
   and packing both INTEGER eightbytes into `%rax`/`%rdx`
+- shifted nested mixed aggregate helper-call row in
+  `frontier_sysv_aggregate_classes.zig`: `frontier_shifted_nested_mixed_call_int`
+  proves an INTEGER/SSE aggregate can shift both the GPR and SSE streams before
+  a private helper call using the same register aggregate pass-through helper
 - first nested mixed aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `{ { i32, i32 }, double }` field
   pointers carry `align(...)` qualifiers from typed AIR v2, lower through
