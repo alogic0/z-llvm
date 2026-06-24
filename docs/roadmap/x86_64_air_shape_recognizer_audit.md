@@ -160,7 +160,10 @@ inventory groups as follows:
   `runtime_aggregate_pair_main.pairFirst` now route through generic CFG as
   small aggregate pair ABI pack/unpack helpers. The sret store path for
   two-`i32` aggregates is shape-validated and no longer depends on the
-  `runtime_aggregate_pair_main.makePair` symbol name. The aggregate wrapper
+  `runtime_aggregate_pair_main.makePair` symbol name, and the first-field
+  pointer load path is owned by the ordinary generic CFG pointer-load return
+  lowering rather than the `runtime_aggregate_pair_main.pairFirst` symbol name.
+  The aggregate wrapper
   `runtime_aggregate_pair_main.main` now routes through a generic two-call
   chain admission that passes the first helper's i64 return to the second
   helper.
