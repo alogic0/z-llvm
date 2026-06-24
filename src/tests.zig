@@ -6178,6 +6178,36 @@ test "x86_64 codegen sums array-in-struct INTEGER aggregate fields from SysV GPR
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
+test "x86_64 codegen sums f32 fields from single-eightbyte SSE aggregate" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define float @sum({ float, float } %value) {
+        \\entry:
+        \\  %slot = alloca { float, float }
+        \\  store { float, float } %value, ptr %slot
+        \\  %a = load float, ptr %slot
+        \\  %b_ptr = getelementptr i8, ptr %slot, i64 4
+        \\  %b = load float, ptr %b_ptr
+        \\  %sum = fadd float %a, %b
+        \\  ret float %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shufps_high_f32_to_low = .xmm1 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.addss_xmm1_xmm0, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
+}
+
 test "x86_64 codegen returns i32 fields from mixed SysV aggregate classes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
