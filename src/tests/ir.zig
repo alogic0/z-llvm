@@ -43,7 +43,9 @@ const ir_parser_pipeline_metadata_and_misc = @import("ir_parser_pipeline_metadat
 const ir_parser_frontend_metadata_and_verifier = @import("ir_parser_frontend_metadata_and_verifier.zig");
 const ir_parser_frontend_globals_and_casts = @import("ir_parser_frontend_globals_and_casts.zig");
 const ir_parser_frontend_misc = @import("ir_parser_frontend_misc.zig");
-const ir_parser_analyses = @import("ir_parser_analyses.zig");
+const ir_parser_analyses_memory_and_control_cfg = @import("ir_parser_analyses_memory_and_control_cfg.zig");
+const ir_parser_analyses_loops_and_transforms = @import("ir_parser_analyses_loops_and_transforms.zig");
+const ir_parser_analyses_advanced_optimizations = @import("ir_parser_analyses_advanced_optimizations.zig");
 
 test {
     _ = ir_parser_pipeline_pass_and_target;
@@ -52,5 +54,7 @@ test {
     _ = ir_parser_frontend_metadata_and_verifier;
     _ = ir_parser_frontend_globals_and_casts;
     _ = ir_parser_frontend_misc;
-    _ = ir_parser_analyses;
+    _ = ir_parser_analyses_memory_and_control_cfg;
+    _ = ir_parser_analyses_loops_and_transforms;
+    _ = ir_parser_analyses_advanced_optimizations;
 }
