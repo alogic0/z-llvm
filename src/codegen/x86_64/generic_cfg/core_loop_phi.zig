@@ -1,16 +1,17 @@
 const impl = @import("core_impl.zig");
 const diagnostics = @import("core_diagnostics.zig");
+const loop_rows = @import("core_loop_rows.zig");
 const std = impl.std;
 const ir = impl.ir;
 
 pub fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *impl.MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
-    if (!impl.matchesAccumulatorLoop(function) and
-        !impl.matchesUnrolledAccumulatorLoop(function) and
-        !impl.matchesCheckedUnrolledAccumulatorLoop(function) and
-        !impl.matchesGuardedDoWhileAccumulatorLoop(function) and
-        !impl.matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return false;
+    if (!loop_rows.matchesAccumulatorLoop(function) and
+        !loop_rows.matchesUnrolledAccumulatorLoop(function) and
+        !loop_rows.matchesCheckedUnrolledAccumulatorLoop(function) and
+        !loop_rows.matchesGuardedDoWhileAccumulatorLoop(function) and
+        !loop_rows.matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return false;
     const count_reg = try impl.paramReg(function, function.params.items[0].name, .{ .int = 32 });
     if (count_reg != .rdi) return error.UnsupportedCodegenAbi;
 

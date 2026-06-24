@@ -1,6 +1,7 @@
 const impl = @import("core_impl.zig");
 const diagnostics = @import("core_diagnostics.zig");
 const checked = @import("core_checked.zig");
+const loop_rows = @import("core_loop_rows.zig");
 const std = impl.std;
 const ir = impl.ir;
 
@@ -32,7 +33,7 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *impl.Mach
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (try impl.lowerGenericCfgConditionalSliceSumLoop(allocator, machine, function)) {
+    if (try loop_rows.lowerGenericCfgConditionalSliceSumLoop(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -40,7 +41,7 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *impl.Mach
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (try impl.lowerSliceSumLoop(allocator, machine, function)) {
+    if (try loop_rows.lowerSliceSumLoop(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -61,11 +62,11 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *impl.Mach
 pub fn genericCfgLoopSumPlan(function: ir.Function) ?GenericCfgLoopSumPlan {
     if (!function.ret_ty.eql(.{ .int = 32 })) return null;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return null;
-    if (!impl.matchesAccumulatorLoop(function) and
-        !impl.matchesUnrolledAccumulatorLoop(function) and
-        !impl.matchesCheckedUnrolledAccumulatorLoop(function) and
-        !impl.matchesGuardedDoWhileAccumulatorLoop(function) and
-        !impl.matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return null;
+    if (!loop_rows.matchesAccumulatorLoop(function) and
+        !loop_rows.matchesUnrolledAccumulatorLoop(function) and
+        !loop_rows.matchesCheckedUnrolledAccumulatorLoop(function) and
+        !loop_rows.matchesGuardedDoWhileAccumulatorLoop(function) and
+        !loop_rows.matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return null;
     if (!impl.genericCfgSupportsLoopSum(function)) return null;
     return .{ .checked = diagnostics.functionHasCall(function, "llvm.sadd.with.overflow.i32") };
 }

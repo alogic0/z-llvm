@@ -1,5 +1,6 @@
 const impl = @import("core_impl.zig");
 const diagnostics = @import("core_diagnostics.zig");
+const loop_rows = @import("core_loop_rows.zig");
 const std = impl.std;
 const ir = impl.ir;
 const MachineFunction = impl.MachineFunction;
@@ -22,7 +23,7 @@ const paramValueReg = impl.paramValueReg;
 const appendIntegerOverflowCall = impl.appendIntegerOverflowCall;
 const appendPanicCall = impl.appendPanicCall;
 const appendAlignedDirectCall = impl.appendAlignedDirectCall;
-const lowerRuntimeSliceSumPreoptHelper = impl.lowerRuntimeSliceSumPreoptHelper;
+const lowerRuntimeSliceSumPreoptHelper = loop_rows.lowerRuntimeSliceSumPreoptHelper;
 const validateAssumeColdCall = impl.validateAssumeColdCall;
 const validateIntegerOverflowPanicCall = impl.validateIntegerOverflowPanicCall;
 const isSelectI1ToI32ExpectedOne = impl.isSelectI1ToI32ExpectedOne;

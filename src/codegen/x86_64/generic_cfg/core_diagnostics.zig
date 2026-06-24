@@ -1,6 +1,7 @@
 const impl = @import("core_impl.zig");
 const base64 = @import("core_base64.zig");
 const checked = @import("core_checked.zig");
+const loop_rows = @import("core_loop_rows.zig");
 const std = impl.std;
 const ir = impl.ir;
 
@@ -60,7 +61,7 @@ pub const lowerIntegerShiftMixReturn = impl.lowerIntegerShiftMixReturn;
 pub const lowerMulConstReturn = impl.lowerMulConstReturn;
 pub const lowerReleaseSmallStrFromFloatHelp = impl.lowerReleaseSmallStrFromFloatHelp;
 pub const lowerReleaseSmallStrFromFloatSupportFunction = impl.lowerReleaseSmallStrFromFloatSupportFunction;
-pub const lowerRuntimeSliceSumPreoptHelper = impl.lowerRuntimeSliceSumPreoptHelper;
-pub const lowerSliceSumLoop = impl.lowerSliceSumLoop;
+pub const lowerRuntimeSliceSumPreoptHelper = loop_rows.lowerRuntimeSliceSumPreoptHelper;
+pub const lowerSliceSumLoop = loop_rows.lowerSliceSumLoop;
 pub const lowerUnreachableStub = impl.lowerUnreachableStub;
 pub const lowerVolatileAbsoluteStore = impl.lowerVolatileAbsoluteStore;
