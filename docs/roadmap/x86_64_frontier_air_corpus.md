@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=205
-structured_functions=205
-generic_codegen_functions=205
-generic_cfg_functions=205
+discovered_functions=209
+structured_functions=209
+generic_codegen_functions=209
+generic_cfg_functions=209
 structural_matcher_functions=0
-structured_air_v2_functions=205
-typed_air_operand_functions=205
+structured_air_v2_functions=209
+typed_air_operand_functions=209
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=205
+generic_lowering_functions=209
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=205
+object_emitted_functions=209
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -175,7 +175,10 @@ Closed in the current memory/aggregate frontier slice:
   construction returns the aggregate in `%xmm0`/`%xmm1`; `{ f32, f32 }` is
   classified as one SSE eightbyte, returns low/high f32 lanes from `%xmm0`, and
   constructs the packed f32 pair return through the same generic aggregate
-  return path. The `frontier_stack_array_double_call_sum` row forwards a stack-passed SSE/SSE
+  return path. The f32 pair follow-up forwards the same single-eightbyte SSE
+  aggregate through direct, shifted, and pointer-callee helper calls, and the
+  helper body adds both f32 fields through generic aggregate field-add
+  lowering. The `frontier_stack_array_double_call_sum` row forwards a stack-passed SSE/SSE
   `[2]f64` aggregate into a private helper by loading the source stack
   eightbytes into outgoing XMM aggregate slots
 - first reversed mixed aggregate class row in
@@ -358,7 +361,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   INTEGER add chains plus nested construction returns, nested mixed INTEGER/SSE field reads/construction, selected
   mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
-  reads/returns including single-eightbyte `{ f32, f32 }`, `[2]f64`
+  reads/returns including single-eightbyte `{ f32, f32 }` direct/shifted/indirect
+  call pass-through, `[2]f64`
   array-in-struct, and nested `{ { double }, { double } }`, selected
   stack-passed register aggregate field reads, and generated
   normal MEMORY aggregate sret/byval field/copy forms currently proven

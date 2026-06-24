@@ -179,7 +179,8 @@ accepted frontier:
   `double` argument field reads and register return including packed adjacent
   `i32` construction returns
   selected SSE/SSE aggregate argument field reads and register return including
-  `[2]f64` array-in-struct and nested `{ { double }, { double } }`
+  single-eightbyte `{ f32, f32 }`, `[2]f64` array-in-struct, and nested
+  `{ { double }, { double } }`
   selected stack-sourced INTEGER aggregate forwarding into outgoing GPR
   aggregate helper calls and selected stack-sourced SSE/SSE aggregate
   forwarding into outgoing XMM aggregate helper calls
@@ -267,7 +268,9 @@ INTEGER/SSE, and MEMORY decisions; lowering currently accepts selected
 INTEGER/INTEGER, nested mixed INTEGER/SSE field reads/construction,
 selected nested/array INTEGER construction-return forms,
 mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field-read forms plus selected
-packed mixed construction-return forms
+packed mixed construction-return forms; the single-eightbyte `{ f32, f32 }`
+SSE row also proves direct, shifted, and pointer-callee helper-call pass-through
+with a generic f32 aggregate field-add helper body
 arbitrary hidden sret storage, arbitrary non-selected stack-passed byval copies,
 complete aggregate lowering for every classified shape, and multi-target ABI
 parity are not implemented
@@ -337,6 +340,8 @@ typed AIR v2 pointer-callee indirect call with INTEGER/INTEGER aggregate
   arguments and returns
 typed AIR v2 pointer-callee indirect call with SSE/SSE aggregate arguments and
   returns
+typed AIR v2 pointer-callee indirect call with single-eightbyte `{ f32, f32 }`
+  aggregate arguments and f32 return
 tail-call marker rejection
 invoke rejection
 call_no_args assembly fixture

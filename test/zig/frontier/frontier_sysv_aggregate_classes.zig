@@ -12,6 +12,7 @@ const FloatPair = extern struct {
     a: f32,
     b: f32,
 };
+const FloatPairSumFn = *const fn (FloatPair) callconv(.c) f32;
 
 const ReverseMixed = extern struct {
     a: f64,
@@ -135,6 +136,23 @@ export fn frontier_float_pair_second(value: FloatPair) f32 {
 
 export fn frontier_float_pair_make(a: f32, b: f32) FloatPair {
     return .{ .a = a, .b = b };
+}
+
+noinline fn helperFloatPairSum(value: FloatPair) f32 {
+    return value.a + value.b;
+}
+
+export fn frontier_float_pair_call_sum(value: FloatPair) f32 {
+    return helperFloatPairSum(value);
+}
+
+export fn frontier_shifted_float_pair_call_sum(prefix: f64, value: FloatPair) f32 {
+    _ = prefix;
+    return helperFloatPairSum(value);
+}
+
+export fn frontier_indirect_float_pair_sum(func: FloatPairSumFn, value: FloatPair) f32 {
+    return func(value);
 }
 
 export fn frontier_reverse_mixed_float(value: ReverseMixed) f64 {

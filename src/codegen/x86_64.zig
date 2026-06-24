@@ -5568,6 +5568,7 @@ fn lowerAggregateAbiReturn(
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSysVAggregateFieldReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateIntegerFieldAddReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerRegisterAggregateFloatFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateDoubleFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMemoryIntegerAggregateFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerTruncI64ArgReturn(allocator, machine, function, block, ret)) return true;
@@ -6181,6 +6182,14 @@ const AggregateDoubleAddTerm = struct {
     offset: u64,
 };
 
+const AggregateFloatFieldLoad = struct {
+    offset: u64,
+};
+
+const AggregateFloatAddTerm = struct {
+    offset: u64,
+};
+
 fn lowerRegisterAggregateIntegerFieldAddReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -6260,6 +6269,90 @@ fn lowerRegisterAggregateIntegerFieldAddReturn(
     for (terms[1..term_count]) |term| {
         try emitAggregateIntegerTerm(allocator, machine, function, param_name, aggregate_ty, term, ret.ty, false);
     }
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRegisterAggregateFloatFieldAddReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.float) or !function.ret_ty.eql(.float)) return false;
+    if (block.instructions.items.len < 5) return false;
+
+    const alloca_inst = block.instructions.items[0];
+    const store_inst = block.instructions.items[1];
+    if (alloca_inst.removed or store_inst.removed) return false;
+    const alloca_name = alloca_inst.result orelse return false;
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    const aggregate_ty = alloca.allocated_ty;
+    const classification = classifySysVAggregate(aggregate_ty) catch return false;
+    if (classification.kind != .register) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name)) return false;
+    const param_name = switch (store.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    var pointer_offsets = std.StringHashMap(u64).init(allocator);
+    defer pointer_offsets.deinit();
+    try pointer_offsets.put(alloca_name, 0);
+
+    var field_loads = std.StringHashMap(AggregateFloatFieldLoad).init(allocator);
+    defer field_loads.deinit();
+
+    const layout = try x86_64SysVDataLayout();
+    for (block.instructions.items[2..]) |instruction| {
+        if (instruction.removed) return false;
+        switch (instruction.kind) {
+            .gep => |gep| {
+                const result = instruction.result orelse return false;
+                const base_name = switch (gep.ptr) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                const base_offset = pointer_offsets.get(base_name) orelse return false;
+                const offset = aggregateGepByteOffset(layout, aggregate_ty, gep) orelse return false;
+                try pointer_offsets.put(result, base_offset + offset);
+            },
+            .load => |load| {
+                const result = instruction.result orelse return false;
+                if (!load.ty.eql(.float) or load.attrs.isBarrier()) return false;
+                const ptr_name = switch (load.ptr) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                const offset = pointer_offsets.get(ptr_name) orelse return false;
+                _ = aggregateFieldIndexAtOffset(aggregate_ty, offset, load.ty) orelse return false;
+                try field_loads.put(result, .{ .offset = offset });
+            },
+            .binary => |binary| {
+                if (binary.op != .fadd or !binary.ty.eql(.float)) return false;
+            },
+            .phi, .fcmp, .icmp, .select, .cast, .freeze, .alloca, .store, .call, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+        }
+    }
+
+    var terms: [2]AggregateFloatAddTerm = undefined;
+    var term_count: usize = 0;
+    if (!try collectAggregateFloatAddTerms(block, ret.value orelse return error.InvalidRet, field_loads, &terms, &term_count)) return false;
+    if (term_count != 2) return false;
+    if (terms[0].offset > terms[1].offset) std.mem.swap(AggregateFloatAddTerm, &terms[0], &terms[1]);
+
+    try emitAggregateFloatTerm(allocator, machine, function, param_name, aggregate_ty, terms[0], .xmm0);
+    try emitAggregateFloatTerm(allocator, machine, function, param_name, aggregate_ty, terms[1], .xmm1);
+    try machine.instructions.append(allocator, .addss_xmm1_xmm0);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -6345,6 +6438,33 @@ fn lowerRegisterAggregateDoubleFieldAddReturn(
     try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn collectAggregateFloatAddTerms(
+    block: ir.BasicBlock,
+    value: ir.Value,
+    field_loads: std.StringHashMap(AggregateFloatFieldLoad),
+    terms: *[2]AggregateFloatAddTerm,
+    term_count: *usize,
+) !bool {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (field_loads.get(name)) |load| {
+        if (term_count.* >= terms.len) return error.UnsupportedCodegenAbi;
+        terms[term_count.*] = .{ .offset = load.offset };
+        term_count.* += 1;
+        return true;
+    }
+    const instruction = findInstruction(block, name) orelse return false;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (binary.op != .fadd or !binary.ty.eql(.float)) return false;
+    if (!try collectAggregateFloatAddTerms(block, binary.lhs, field_loads, terms, term_count)) return false;
+    return try collectAggregateFloatAddTerms(block, binary.rhs, field_loads, terms, term_count);
 }
 
 fn collectAggregateDoubleAddTerms(
@@ -6547,6 +6667,35 @@ fn emitAggregateDoubleTerm(
             return error.UnsupportedCodegenAbi;
         },
         .stack => |offset| try appendLoadStackDispXmm(allocator, machine, dest, offset),
+        .gpr => return error.UnsupportedCodegenAbi,
+    }
+}
+
+fn emitAggregateFloatTerm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    param_name: []const u8,
+    aggregate_ty: ir.Type,
+    term: AggregateFloatAddTerm,
+    dest: XmmReg,
+) !void {
+    const location = try sysvAggregateFieldLocationByOffset(function, param_name, aggregate_ty, term.offset, .float);
+    switch (location) {
+        .sse => |reg| {
+            if (reg != dest) {
+                try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dest, .src = reg } });
+            }
+            if (term.offset % 8 == 4) {
+                try machine.instructions.append(allocator, .{ .shufps_high_f32_to_low = dest });
+            } else if (term.offset % 8 != 0) {
+                return error.UnsupportedCodegenAbi;
+            }
+        },
+        .stack => |offset| {
+            if (dest != .xmm0) return error.UnsupportedCodegenAbi;
+            try appendLoadStackDispXmm0F32(allocator, machine, offset);
+        },
         .gpr => return error.UnsupportedCodegenAbi,
     }
 }
