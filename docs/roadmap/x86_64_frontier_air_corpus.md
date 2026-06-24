@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=244
-structured_functions=244
-generic_codegen_functions=244
-generic_cfg_functions=244
+discovered_functions=248
+structured_functions=248
+generic_codegen_functions=248
+generic_cfg_functions=248
 structural_matcher_functions=0
-structured_air_v2_functions=244
-typed_air_operand_functions=244
+structured_air_v2_functions=248
+typed_air_operand_functions=248
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=244
+generic_lowering_functions=248
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=244
+object_emitted_functions=248
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -333,6 +333,13 @@ Closed in the current memory/aggregate frontier slice:
   and `frontier_two_indirect_void_calls_two_f64_live_sum` prove the same shape
   for repeated function-pointer calls by preserving and reloading the pointer
   callee from the frame before each `callq *%rax`.
+  `frontier_mixed_i32_f32_live_sum_after_call`,
+  `frontier_mixed_i32_f64_live_sum_after_call`,
+  `frontier_indirect_mixed_i32_f32_live_sum_after_call`, and
+  `frontier_indirect_mixed_i32_f64_live_sum_after_call` spill an integer GPR
+  and one SSE parameter across direct and pointer-callee `void` calls, reload
+  the integer through `%edi`, convert it with `sitofp`, and add the preserved
+  FP value.
 - selected ordered call-result live frame in `frontier_sysv_abi.zig`:
   `frontier_call_result_live_across_second_call` spills the first C ABI
   `i32` call result from `%eax`, preserves the live `i32` parameter in a frame
@@ -448,6 +455,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   selected one-live through six-live `f32`/`f64` no-argument-call shapes,
   selected direct two-/three-/six-live FP-argument call shapes, selected
   two-live repeated no-argument direct and pointer-callee call shapes, selected
+  mixed one-GPR/one-SSE live direct and pointer-callee call shapes, selected
   one-FP-argument pointer-callee call shapes, selected three-/four-/six-live
   two-/three-/five-FP-argument pointer-callee call shapes, and selected named
   `%xmm0..%xmm4` pass-through calls

@@ -6,6 +6,7 @@ const cabi_aggregate_lowering = @import("cabi_aggregate_lowering.zig");
 const std = shared.std;
 const ir = shared.ir;
 const MachineFunction = shared.MachineFunction;
+const ArgReg = shared.ArgReg;
 const FrameIndex = shared.FrameIndex;
 const XmmReg = shared.XmmReg;
 const SysVCallTarget = shared.SysVCallTarget;
@@ -344,6 +345,76 @@ pub fn lowerGenericCfgFpVoidCallParamReturn(
     try appendStackFrameEnd(allocator, machine, 8);
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+pub fn lowerGenericCfgFpVoidCallIntToFpAddReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty)) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed or call_inst.result != null) return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    validateFpVoidCall(call) catch return false;
+    if (call.args.items.len != 0) return false;
+
+    const cast_inst = block.instructions.items[1];
+    if (cast_inst.removed) return false;
+    const cast_result = cast_inst.result orelse return false;
+    const int_param = fpVoidCallSitofpI32Param(function, cast_inst, function.ret_ty) catch return false;
+
+    const add_inst = block.instructions.items[2];
+    if (add_inst.removed) return false;
+    const add_result = add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+    const fp_param_index = fpBinaryOtherParamIndex(function, add_inst, function.ret_ty, cast_result, .fadd) catch return false;
+    if (fp_param_index >= 6) return error.UnsupportedLiveAcrossCall;
+
+    const call_target = try fpVoidCallTarget(function, call);
+    try appendStackFrame(allocator, machine, 24);
+    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .reg = int_param, .frame_index = .slot0 } });
+    const fp_reg = try XmmReg.fromIndex(fp_param_index);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = fp_reg, .frame_index = .slot2 } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = fp_reg, .frame_index = .slot2 } });
+    }
+    try setupSysVCallTarget(allocator, machine, call_target);
+    _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
+    try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+    try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+    try emitFirstGprI32ToFpXmm0(allocator, machine, function.ret_ty);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    } else {
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+        try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+    }
+    try appendStackFrameEnd(allocator, machine, 24);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn fpVoidCallSitofpI32Param(function: ir.Function, instruction: ir.Instruction, to_ty: ir.Type) !ArgReg {
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (cast.op != .sitofp or !cast.from_ty.eql(.{ .int = 32 }) or !cast.to_ty.eql(to_ty)) return error.UnsupportedCodegenInstruction;
+    const source_name = switch (cast.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    return paramReg(function, source_name, .{ .int = 32 });
 }
 
 pub fn lowerGenericCfgFpVoidCallBinaryReturn(

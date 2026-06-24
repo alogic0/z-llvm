@@ -644,6 +644,10 @@ pub fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *Mach
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try fp_rows.lowerGenericCfgFpVoidCallIntToFpAddReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try fp_rows.lowerGenericCfgFpVoidCallBinaryReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
