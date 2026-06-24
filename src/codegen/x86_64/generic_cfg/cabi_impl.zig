@@ -384,18 +384,6 @@ pub fn validateSaturatingCall(instruction: ir.Instruction, callee: []const u8, l
     return name;
 }
 
-pub fn appendCompareArg32Imm32(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: ArgReg,
-    expected: i32,
-    fail: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
-    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = expected });
-    try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
 pub fn lowerStartTrampoline(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "start._start")) return false;
     if (function.ret_ty != .void) return false;
@@ -807,120 +795,6 @@ pub fn validateGetauxvalShape(function: ir.Function) !void {
         }
     }
     if (!saw_global_load or !saw_tag_load or !saw_value_load) return error.UnsupportedCodegenControlFlow;
-}
-
-pub fn appendCompareStackByval64Imm64(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    stack_offset: u8,
-    field_offset: u8,
-    expected: i64,
-    fail: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = stack_offset });
-    try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = field_offset });
-    try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected });
-    try machine.instructions.append(allocator, .cmp_rax_rdx);
-    try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
-pub fn appendCompareStack64Imm64(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    stack_offset: u8,
-    expected: i64,
-    fail: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = stack_offset });
-    try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected });
-    try machine.instructions.append(allocator, .cmp_rax_rdx);
-    try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
-pub fn appendCompareMem64Imm64(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: ArgReg,
-    offset: u8,
-    expected: i64,
-    fail: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = reg, .offset = offset } });
-    try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected });
-    try machine.instructions.append(allocator, .cmp_rax_rdx);
-    try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
-pub fn appendComparePackedFloatPair(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: XmmReg,
-    expected_bits: u64,
-    fail: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .movq_xmm_rax = reg });
-    try machine.instructions.append(allocator, .{ .mov_imm_rdx = @bitCast(expected_bits) });
-    try machine.instructions.append(allocator, .cmp_rax_rdx);
-    try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
-pub fn appendCompareXmmLowF32(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: XmmReg,
-    expected_bits: u32,
-    fail: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .movq_xmm_rax = reg });
-    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = @bitCast(expected_bits) });
-    try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
-pub fn appendCompareXmmLowF64(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    expected_bits: u64,
-    fail: []const u8,
-) !void {
-    try appendCompareXmmF64(allocator, machine, .xmm0, .xmm1, expected_bits, fail);
-}
-
-pub fn appendCompareXmmF64(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    arg_reg: XmmReg,
-    scratch_reg: XmmReg,
-    expected_bits: u64,
-    fail: []const u8,
-) !void {
-    if (arg_reg == scratch_reg) return error.UnsupportedCodegenAbi;
-    try appendMoveImm64ToXmm(allocator, machine, scratch_reg, expected_bits);
-    try machine.instructions.append(allocator, .{ .ucomisd = .{ .src = scratch_reg, .dst = arg_reg } });
-    try machine.instructions.append(allocator, .{ .jp = fail });
-    try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
-pub fn appendCompareXmm0LowF64(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    expected_bits: u64,
-    fail: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = expected_bits });
-    try machine.instructions.append(allocator, .ucomisd_xmm1_xmm0);
-    try machine.instructions.append(allocator, .{ .jp = fail });
-    try machine.instructions.append(allocator, .{ .jne = fail });
-}
-
-pub fn appendCompareArg64Imm64(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    reg: ArgReg,
-    expected: i64,
-    fail: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .cmp_arg64_imm64 = .{ .reg = reg, .imm = expected } });
-    try machine.instructions.append(allocator, .{ .jne = fail });
 }
 
 pub fn validateAssertDCShape(function: ir.Function) !void {

@@ -196,4 +196,4 @@ pub fn appendCAbiF128ScalarReturnMachine(allocator: std.mem.Allocator, machine: 
     try machine.instructions.append(allocator, .ud2);
 }
 
-pub const appendCompareStackByval64Imm64 = impl.appendCompareStackByval64Imm64;
+pub const appendCompareStackByval64Imm64 = @import("cabi_call_frame_helpers.zig").appendCompareStackByval64Imm64;
