@@ -723,20 +723,32 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
     ret: anytype,
 ) !bool {
     if (!function.ret_ty.eql(.double) or !ret.ty.eql(.double) or
-        (block.instructions.items.len != 4 and block.instructions.items.len != 5)) return false;
+        (block.instructions.items.len != 4 and block.instructions.items.len != 5 and block.instructions.items.len != 6)) return false;
+
+    const LiveAddend = union(enum) {
+        double_param: usize,
+        i64_param: ArgReg,
+    };
 
     const first_call_inst = block.instructions.items[0];
     const second_call_inst = block.instructions.items[1];
     const cast_inst = block.instructions.items[2];
     const add_inst = block.instructions.items[3];
-    const final_add_inst = if (block.instructions.items.len == 5) block.instructions.items[4] else null;
+    const int_cast_inst = if (block.instructions.items.len == 6) block.instructions.items[4] else null;
+    const final_add_inst = switch (block.instructions.items.len) {
+        5 => block.instructions.items[4],
+        6 => block.instructions.items[5],
+        else => null,
+    };
     if (first_call_inst.removed or second_call_inst.removed or cast_inst.removed or add_inst.removed) return false;
+    if (int_cast_inst) |instruction| if (instruction.removed) return false;
     if (final_add_inst) |instruction| if (instruction.removed) return false;
 
     const first_result = first_call_inst.result orelse return false;
     const second_result = second_call_inst.result orelse return false;
     const cast_result = cast_inst.result orelse return false;
     const add_result = add_inst.result orelse return false;
+    const int_cast_result = if (int_cast_inst) |instruction| instruction.result orelse return false else null;
     const ret_value = ret.value orelse return error.InvalidRet;
     if (final_add_inst == null and !isNamed(ret_value, add_result)) return false;
 
@@ -788,7 +800,7 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
         if (!((lhs_first and rhs_cast) or (rhs_first and lhs_cast))) return false;
     }
 
-    const live_addend_index: ?usize = if (final_add_inst) |instruction| blk: {
+    const live_addend: ?LiveAddend = if (final_add_inst) |instruction| blk: {
         const final_add_result = instruction.result orelse return false;
         if (!isNamed(ret_value, final_add_result)) return false;
         const final_binary = switch (instruction.kind) {
@@ -800,9 +812,24 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
         const rhs_sum = isNamed(final_binary.rhs, add_result);
         if (lhs_sum == rhs_sum) return false;
         const addend = if (lhs_sum) final_binary.rhs else final_binary.lhs;
-        const index = try fpParamIndexFromValue(function, addend, .double);
-        if (index >= 6) return error.UnsupportedLiveAcrossCall;
-        break :blk index;
+        if (int_cast_inst) |instruction_cast| {
+            const cast_result_value = int_cast_result orelse return false;
+            if (!isNamed(addend, cast_result_value)) return false;
+            const int_cast = switch (instruction_cast.kind) {
+                .cast => |int_cast| int_cast,
+                else => return false,
+            };
+            if (int_cast.op != .sitofp or !int_cast.from_ty.eql(.{ .int = 64 }) or !int_cast.to_ty.eql(.double)) return false;
+            const param_name = switch (int_cast.value) {
+                .named => |name| name,
+                else => return false,
+            };
+            break :blk .{ .i64_param = try paramReg(function, param_name, .{ .int = 64 }) };
+        } else {
+            const index = try fpParamIndexFromValue(function, addend, .double);
+            if (index >= 6) return error.UnsupportedLiveAcrossCall;
+            break :blk .{ .double_param = index };
+        }
     } else null;
 
     const first_target = try fpCallTarget(function, first_call);
@@ -812,7 +839,7 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
         .indirect_from_reg => |reg| reg,
     };
 
-    const frame_bytes: u8 = if (live_addend_index != null) 40 else 24;
+    const frame_bytes: u8 = if (live_addend != null) 40 else 24;
     const live_addend_slot: FrameIndex = .slot6;
 
     try appendStackFrame(allocator, machine, frame_bytes);
@@ -822,8 +849,11 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
     } else {
         try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = second_arg_reg, .frame_index = .slot0 } });
     }
-    if (live_addend_index) |index| {
-        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = try XmmReg.fromIndex(index), .frame_index = live_addend_slot } });
+    if (live_addend) |addend| {
+        switch (addend) {
+            .double_param => |index| try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = try XmmReg.fromIndex(index), .frame_index = live_addend_slot } }),
+            .i64_param => |reg| try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = live_addend_slot } }),
+        }
     }
     if (second_callee) |reg| {
         try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
@@ -861,9 +891,19 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
         try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot0 } });
     }
     try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
-    if (live_addend_index != null) {
-        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = live_addend_slot } });
-        try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+    if (live_addend) |addend| {
+        switch (addend) {
+            .double_param => {
+                try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = live_addend_slot } });
+                try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+            },
+            .i64_param => {
+                try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } });
+                try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = live_addend_slot } });
+                try machine.instructions.append(allocator, .cvtsi2sd_rdi_xmm0);
+                try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+            },
+        }
     }
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try machine.instructions.append(allocator, .ret);

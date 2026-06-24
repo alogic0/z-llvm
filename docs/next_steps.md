@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=339`,
-`generic_codegen_functions=339`, `generic_cfg_functions=339`,
+frontier gate reports `source_rows=13`, `discovered_functions=343`,
+`generic_codegen_functions=343`, `generic_cfg_functions=343`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=339`, `object_failures=0`,
+`object_emitted_functions=343`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -544,7 +544,7 @@ The two-result FP follow-up preserves a first direct or pointer-callee C ABI
 then reloads the saved XMM slot for the final `fadd`.
 The mixed-width FP live-addend follow-up preserves the later FP argument, the
 first FP result, any second pointer callee, and one independent live `double`
-addend across both non-void calls before the final `double` add.
+or `i64` addend across both non-void calls before the final `double` add.
 The `i64` two-result follow-up preserves a first C ABI `i64` call result in a
 frame slot, preserves later pointer callees when present, lowers both direct
 and pointer-callee `i64` calls through the shared SysV scalar planner, and adds
