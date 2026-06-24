@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=271
-structured_functions=271
-generic_codegen_functions=271
-generic_cfg_functions=271
+discovered_functions=272
+structured_functions=272
+generic_codegen_functions=272
+generic_cfg_functions=272
 structural_matcher_functions=0
-structured_air_v2_functions=271
-typed_air_operand_functions=271
+structured_air_v2_functions=272
+typed_air_operand_functions=272
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=271
+generic_lowering_functions=272
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=271
+object_emitted_functions=272
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -139,8 +139,9 @@ Closed in the current memory/aggregate frontier slice:
   now covers larger normal integer-leaf MEMORY aggregates through `Big20`
   construction, field-read, and byval-to-sret copy rows, and `ScalarMixed`
   proves a direct scalar-parameter hidden-sret make row for top-level `i8`,
-  `i16`, `i32`, `i64`, pointer, `f32`, and `f64` fields through typed-v2
-  aggregate field GEPs and stack/register scalar sources; the `BigDouble` row
+  `i16`, `i32`, `i64`, pointer, `f32`, and `f64` fields; `ScalarNested`
+  proves recursive supported-leaf scalar-parameter hidden-sret construction
+  through layout-derived byte-offset stores; the `BigDouble` row
   adds the first double-leaf MEMORY byval-to-sret copy proof through XMM
   `movsd` stack loads and hidden-sret stores, the `BigPtrDouble` row proves the
   same layout-derived copy path for pointer, `double`, and `i64` leaves in one
@@ -485,7 +486,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   `{ i64, i32, i64, i32 }` and `{ i8, { i16, i32 }, i64 }` copies,
   array-backed `{ [5 x i64] }` copy/read rows,
   a `double`-leaf copy, a mixed pointer/`double`/`i64` copy, and the
-  `ScalarMixed` direct scalar-param sret make row; X87,
+  `ScalarMixed`/`ScalarNested` direct scalar-param sret make rows; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, more than six
   stack-passed live values, and broader SSE live-across-call frames beyond the

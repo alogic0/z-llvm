@@ -1110,16 +1110,11 @@ fn typedV2SretIntegerAggregateRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    const field_count = supportedScalarAggregateFieldCount(function_type.return_type.ir_type) orelse return false;
-    if (field_count < 3 or function_type.params.len != field_count) return false;
-    for (function_type.params, 0..) |param, field_index| {
-        const field_ty = memory_location.aggregateFieldType(function_type.return_type.ir_type, field_index) orelse return false;
-        if (!param.ir_type.eql(field_ty)) return false;
-        if (typedFieldPtrIndexCount(structured_air_v2, field_index) != 1) return false;
-    }
-    return typedOpcodeCount(structured_air_v2, "arg") == field_count and
+    const leaf_count = supportedScalarAggregateLeafParamCount(function_type.return_type.ir_type, function_type.params) orelse return false;
+    if (leaf_count < 3) return false;
+    return typedOpcodeCount(structured_air_v2, "arg") == leaf_count and
         typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
-        typedStoreOpcodeCount(structured_air_v2) == field_count and
+        typedStoreOpcodeCount(structured_air_v2) == leaf_count and
         typedOpcodeCount(structured_air_v2, "ret_load") == 1;
 }
 
@@ -1134,15 +1129,31 @@ fn typedV2SretIntegerAggregateCopyRecords(
         typedHasReturnOpcode(structured_air_v2);
 }
 
-fn supportedScalarAggregateFieldCount(ty: ir.Type) ?usize {
+fn supportedScalarAggregateLeafParamCount(ty: ir.Type, params: []const ZigType) ?usize {
+    var param_index: usize = 0;
+    const leaf_count = supportedScalarAggregateLeafParamCountInner(ty, params, &param_index) orelse return null;
+    if (param_index != params.len) return null;
+    return leaf_count;
+}
+
+fn supportedScalarAggregateLeafParamCountInner(ty: ir.Type, params: []const ZigType, param_index: *usize) ?usize {
     const field_count = aggregateFieldCount(ty) orelse return null;
     if (field_count == 0) return null;
+    var leaf_count: usize = 0;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         const field_ty = memory_location.aggregateFieldType(ty, field_index) orelse return null;
-        if (!supportedAggregateCopyLeaf(field_ty)) return null;
+        if (supportedAggregateCopyLeaf(field_ty)) {
+            if (param_index.* >= params.len or !params[param_index.*].ir_type.eql(field_ty)) return null;
+            param_index.* += 1;
+            leaf_count += 1;
+        } else if (isAggregateIrType(field_ty)) {
+            leaf_count += supportedScalarAggregateLeafParamCountInner(field_ty, params, param_index) orelse return null;
+        } else {
+            return null;
+        }
     }
-    return field_count;
+    return leaf_count;
 }
 
 fn supportedAggregateCopyLeafCount(ty: ir.Type) ?usize {
@@ -1224,31 +1235,28 @@ fn lowerSretIntegerAggregateMake(
     errdefer function.deinit(allocator);
     function.linkage = .default;
     function.calling_conv = null;
-    const field_count = supportedScalarAggregateFieldCount(aggregate_ty) orelse return error.UnsupportedAir;
-    if (field_count < 3) return error.UnsupportedAir;
+    const leaves = try collectAggregateCopyLeaves(allocator, aggregate_ty);
+    defer allocator.free(leaves);
     try function.params.append(allocator, .{ .ty = .ptr, .attrs = try sretAttrsForAggregate(module, aggregate_ty), .name = "sret" });
     var param_index: usize = 0;
-    while (param_index < field_count) : (param_index += 1) {
+    while (param_index < leaves.len) : (param_index += 1) {
         const arg_name = try ownPrint(module, "arg{}", .{param_index});
-        const field_ty = memory_location.aggregateFieldType(aggregate_ty, param_index) orelse return error.UnsupportedAir;
-        try function.params.append(allocator, .{ .ty = field_ty, .name = arg_name });
+        try function.params.append(allocator, .{ .ty = leaves[param_index].ty, .name = arg_name });
     }
 
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_name = try ownPrint(module, "field{}", .{field_index});
-        const arg_name = function.params.items[field_index + 1].name;
-        var gep: ir.GepInst = .{ .source_ty = aggregate_ty, .ptr = .{ .named = "sret" }, .indices = .empty };
+    for (leaves, 0..) |leaf, leaf_index| {
+        const field_name = try ownPrint(module, "leaf{}", .{leaf_index});
+        const arg_name = function.params.items[leaf_index + 1].name;
+        var gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
         errdefer gep.deinit(allocator);
-        try gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
-        try gep.indices.append(allocator, .{ .ty = .{ .int = 32 }, .value = .{ .int = @intCast(field_index) } });
+        try gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(leaf.offset) } });
         try block.instructions.append(allocator, .{ .result = field_name, .kind = .{ .gep = gep } });
         try block.instructions.append(allocator, .{
             .result = null,
             .kind = .{ .store = .{
-                .ty = function.params.items[field_index + 1].ty,
+                .ty = function.params.items[leaf_index + 1].ty,
                 .value = .{ .named = arg_name },
                 .ptr = .{ .named = field_name },
             } },
@@ -5184,6 +5192,12 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ i8, i16, i32, i64, ptr, float, double }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarNestedInner")) {
+        return .{ .ir_type = .{ .aggregate = "{ i8, i16 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarNested")) {
+        return .{ .ir_type = .{ .aggregate = "{ { i8, i16 }, i32, double, ptr }" } };
     }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };

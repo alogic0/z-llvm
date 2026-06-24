@@ -1484,19 +1484,24 @@ pub fn lowerGenericCfgScalarSretParamStores(
 ) !bool {
     if (function.params.items.len < 2) return false;
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
-    const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
-    if (field_count == 0 or function.params.items.len != field_count + 1) return false;
+    if (!isSupportedAggregateCopyLeafAggregate(aggregate_ty)) return false;
+    var leaves: [64]ScalarSretLeaf = undefined;
+    var leaf_count: usize = 0;
+    const layout = x86_64SysVDataLayout() catch return error.UnsupportedCodegenAbi;
+    try collectScalarSretLeaves(layout, aggregate_ty, 0, &leaves, &leaf_count);
+    if (leaf_count == 0 or function.params.items.len != leaf_count + 1) return false;
     if (!function.params.items[0].ty.eql(.ptr)) return false;
     const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
     if (sret_reg != .rdi) return error.UnsupportedCodegenAbi;
-    const layout = x86_64SysVDataLayout() catch return error.UnsupportedCodegenAbi;
 
     var instruction_index: usize = 0;
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return false;
-        if (!supportedSretParamStoreLeaf(field_ty) or !function.params.items[field_index + 1].ty.eql(field_ty)) return false;
-        const offset = try aggregateFieldOffset(aggregate_ty, field_index);
+    var leaf_index: usize = 0;
+    while (leaf_index < leaf_count) : (leaf_index += 1) {
+        const leaf = leaves[leaf_index];
+        const field_ty = leaf.ty;
+        if (!function.params.items[leaf_index + 1].ty.eql(field_ty)) return false;
+        if (leaf.offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+        const offset: u32 = @intCast(leaf.offset);
         const store_ptr = if (offset == 0 and instruction_index < block.instructions.items.len) ptr: {
             const maybe_store = switch (block.instructions.items[instruction_index].kind) {
                 .store => |store| store,
@@ -1533,7 +1538,7 @@ pub fn lowerGenericCfgScalarSretParamStores(
             else => return false,
         };
         if (!store.ty.eql(field_ty) or store.attrs.isBarrier()) return false;
-        if (!isNamed(store.ptr, ptr_name) or !isNamed(store.value, function.params.items[field_index + 1].name)) return false;
+        if (!isNamed(store.ptr, ptr_name) or !isNamed(store.value, function.params.items[leaf_index + 1].name)) return false;
         instruction_index += 1;
 
         try emitGenericCfgScalarSretParamStore(allocator, machine, function, block, store.value, field_ty, sret_reg, offset);
@@ -1541,6 +1546,37 @@ pub fn lowerGenericCfgScalarSretParamStores(
     if (instruction_index != block.instructions.items.len) return false;
     try appendGenericCfgReturn(allocator, machine);
     return true;
+}
+
+const ScalarSretLeaf = struct {
+    offset: u64,
+    ty: ir.Type,
+};
+
+fn collectScalarSretLeaves(
+    layout: target.DataLayout,
+    aggregate_ty: ir.Type,
+    base_offset: u64,
+    leaves: *[64]ScalarSretLeaf,
+    leaf_count: *usize,
+) !void {
+    const field_count = aggregateFieldCount(aggregate_ty) orelse return error.UnsupportedCodegenAbi;
+    var field_index: usize = 0;
+    while (field_index < field_count) : (field_index += 1) {
+        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi;
+        const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi;
+        if (offset_i < 0) return error.UnsupportedCodegenAbi;
+        const field_offset = base_offset + @as(u64, @intCast(offset_i));
+        if (supportedSretParamStoreLeaf(field_ty)) {
+            if (leaf_count.* >= leaves.len) return error.UnsupportedCodegenAbi;
+            leaves[leaf_count.*] = .{ .offset = field_offset, .ty = field_ty };
+            leaf_count.* += 1;
+        } else if (isAggregateType(field_ty)) {
+            try collectScalarSretLeaves(layout, field_ty, field_offset, leaves, leaf_count);
+        } else {
+            return error.UnsupportedCodegenAbi;
+        }
+    }
 }
 
 fn supportedSretParamStoreLeaf(ty: ir.Type) bool {
