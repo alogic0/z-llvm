@@ -185,6 +185,12 @@ const ScalarNested = extern struct {
     ptr: *const i64,
 };
 
+const ScalarArray = extern struct {
+    ints: [3]i32,
+    doubles: [2]f64,
+    ptr: *const i64,
+};
+
 const Big3CopyFn = *const fn (Big3) callconv(.c) Big3;
 const Big4CopyFn = *const fn (Big4) callconv(.c) Big4;
 const Big5CopyFn = *const fn (Big5) callconv(.c) Big5;
@@ -456,4 +462,8 @@ export fn frontier_scalar_mixed_make(a: u8, b: u16, c: i32, d: i64, ptr: *const 
 
 export fn frontier_scalar_nested_make(a: u8, b: u16, c: i32, d: f64, ptr: *const i64) ScalarNested {
     return .{ .inner = .{ .a = a, .b = b }, .c = c, .d = d, .ptr = ptr };
+}
+
+export fn frontier_scalar_array_make(a: i32, b: i32, c: i32, d: f64, e: f64, ptr: *const i64) ScalarArray {
+    return .{ .ints = .{ a, b, c }, .doubles = .{ d, e }, .ptr = ptr };
 }

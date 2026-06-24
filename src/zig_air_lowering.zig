@@ -5199,6 +5199,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarNested")) {
         return .{ .ir_type = .{ .aggregate = "{ { i8, i16 }, i32, double, ptr }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarArray")) {
+        return .{ .ir_type = .{ .aggregate = "{ [3 x i32], [2 x double], ptr }" } };
+    }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
         return .{ .ir_type = .{ .int = 16 } };
