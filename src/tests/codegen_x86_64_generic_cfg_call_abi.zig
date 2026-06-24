@@ -317,6 +317,45 @@ test "x86_64 generic CFG lowers stack-passed pointer call args through planner" 
     try std.testing.expect(saw_call);
 }
 
+test "x86_64 generic CFG lowers null pointer call args through planner" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr, ptr, ptr, ptr, ptr, ptr, ptr)
+        \\
+        \\define i32 @caller(ptr %a, ptr %b, ptr %c, ptr %d, ptr %e, ptr %f) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr %a, ptr %b, ptr %c, ptr %d, ptr %e, ptr %f, ptr null)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call_inst = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call_inst);
+    try std.testing.expectEqual(@as(usize, 6), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), counts.stack_args);
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .push_imm32 = 0 });
+    var saw_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty.eql(.{ .int = 32 }));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_call);
+}
+
 test "x86_64 SysV call planner classifies scalar aggregate and memory returns" {
     const scalar_input =
         \\target triple = "x86_64-unknown-linux-gnu"

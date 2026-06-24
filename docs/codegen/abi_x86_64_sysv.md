@@ -34,7 +34,8 @@ i1 branch conditions use the matching low 8-bit argument registers
 i32/i64/pointer direct-call operands use the first-six integer argument register order
 the central SysV call planner assigns pointer call arguments through the same
 scalar path as i64: register pointer arguments use 64-bit GPR moves, and
-stack-passed pointer arguments reuse the outgoing stack-slot helper
+stack-passed pointer arguments reuse the outgoing stack-slot helper; null
+pointer constants are supported for stack-passed pointer call slots
 f32/f64 direct-call operands use the independent SSE register order
 up to eighteen scalar i32 stack-passed direct/indirect call arguments are supported, including constants and named incoming stack/register parameters; selected block-local computed i32/i64 stack arguments remain covered by the smaller existing rows
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call
