@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=285`,
-`generic_codegen_functions=285`, `generic_cfg_functions=285`,
+three release modes at `source_rows=13`, `discovered_functions=289`,
+`generic_codegen_functions=289`, `generic_cfg_functions=289`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=285`, `object_failures=0`,
+`object_emitted_functions=289`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -492,8 +492,8 @@ The indirect-first follow-up routes the first ordered `i32` result call through
 a pointer callee while preserving the later ordered result and side-effecting
 `void` call sequence through the same generic SysV call-target and frame
 spill/reload path.
-The FP result follow-up preserves a direct or pointer-callee C ABI `f64` call
-result plus a live `f64` addend across a later direct or pointer-callee
+The FP result follow-up preserves a direct or pointer-callee C ABI `f32`/`f64`
+call result plus a live FP addend across a later direct or pointer-callee
 side-effecting `void` call, then reloads both XMM frame slots for the final
 post-call `fadd`.
 The two-result FP follow-up preserves a first direct or pointer-callee C ABI

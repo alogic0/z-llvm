@@ -1520,6 +1520,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_f64_result_live_across_indirect_void_call(void (*)(void), double, double) __asm__("frontier_sysv_abi.frontier_f64_result_live_across_indirect_void_call");
     \\extern double z_frontier_indirect_f64_result_live_across_void_call(double (*)(double), double, double) __asm__("frontier_sysv_abi.frontier_indirect_f64_result_live_across_void_call");
     \\extern double z_frontier_indirect_f64_result_live_across_indirect_void_call(double (*)(double), void (*)(void), double, double) __asm__("frontier_sysv_abi.frontier_indirect_f64_result_live_across_indirect_void_call");
+    \\extern float z_frontier_f32_result_live_across_void_call(float, float) __asm__("frontier_sysv_abi.frontier_f32_result_live_across_void_call");
+    \\extern float z_frontier_f32_result_live_across_indirect_void_call(void (*)(void), float, float) __asm__("frontier_sysv_abi.frontier_f32_result_live_across_indirect_void_call");
+    \\extern float z_frontier_indirect_f32_result_live_across_void_call(float (*)(float), float, float) __asm__("frontier_sysv_abi.frontier_indirect_f32_result_live_across_void_call");
+    \\extern float z_frontier_indirect_f32_result_live_across_indirect_void_call(float (*)(float), void (*)(void), float, float) __asm__("frontier_sysv_abi.frontier_indirect_f32_result_live_across_indirect_void_call");
     \\extern double z_frontier_two_f64_results_across_calls(double, double) __asm__("frontier_sysv_abi.frontier_two_f64_results_across_calls");
     \\extern double z_frontier_indirect_first_f64_results_across_calls(double (*)(double), double, double) __asm__("frontier_sysv_abi.frontier_indirect_first_f64_results_across_calls");
     \\extern double z_frontier_indirect_second_f64_results_across_calls(double (*)(double), double, double) __asm__("frontier_sysv_abi.frontier_indirect_second_f64_results_across_calls");
@@ -1685,6 +1689,14 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_indirect_f64_result_live_across_void_call(frontier_ordered_f64, 4.25, 6.5) != 12.25 || frontier_order_step != 2) return 128;
     \\    frontier_order_step = 0;
     \\    if (z_frontier_indirect_f64_result_live_across_indirect_void_call(frontier_ordered_f64, frontier_touch_ordered, 5.5, 7.25) != 14.25 || frontier_order_step != 2) return 129;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_f32_result_live_across_void_call(2.25f, 4.75f) != 8.5f || frontier_order_step != 2) return 136;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_f32_result_live_across_indirect_void_call(frontier_touch_ordered, 3.5f, 5.0f) != 10.0f || frontier_order_step != 2) return 137;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_indirect_f32_result_live_across_void_call(frontier_ordered_f32, 4.25f, 6.5f) != 12.25f || frontier_order_step != 2) return 138;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_indirect_f32_result_live_across_indirect_void_call(frontier_ordered_f32, frontier_touch_ordered, 5.5f, 7.25f) != 14.25f || frontier_order_step != 2) return 139;
     \\    frontier_order_step = 0;
     \\    if (z_frontier_two_f64_results_across_calls(2.0, 3.0) != 9.0 || frontier_order_step != 2) return 130;
     \\    frontier_order_step = 0;

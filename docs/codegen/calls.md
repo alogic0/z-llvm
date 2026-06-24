@@ -238,8 +238,8 @@ accepted frontier:
   selected indirect-first ordered i32 result variant where the first call target
   is a function pointer and the later result/void-call sequence is preserved
   through the same frame path
-  selected f64 call-result live-across-later-call frames where a direct or
-  pointer-callee C ABI double result and live double addend survive a later
+  selected f32/f64 call-result live-across-later-call frames where a direct or
+  pointer-callee C ABI FP result and live FP addend survive a later
   direct or pointer-callee side-effecting void call before the final fadd
   selected two-result f32/f64 call frames where the first `float` or `double`
   result survives a second direct or pointer-callee FP-result call before the

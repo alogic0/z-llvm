@@ -163,8 +163,20 @@ export fn frontier_f64_result_live_across_void_call(a: f64, b: f64) f64 {
     return first + b;
 }
 
+export fn frontier_f32_result_live_across_void_call(a: f32, b: f32) f32 {
+    const first = frontier_ordered_f32(a);
+    frontier_touch_ordered();
+    return first + b;
+}
+
 export fn frontier_f64_result_live_across_indirect_void_call(func: VoidFn, a: f64, b: f64) f64 {
     const first = frontier_ordered_f64(a);
+    func();
+    return first + b;
+}
+
+export fn frontier_f32_result_live_across_indirect_void_call(func: VoidFn, a: f32, b: f32) f32 {
+    const first = frontier_ordered_f32(a);
     func();
     return first + b;
 }
@@ -175,7 +187,19 @@ export fn frontier_indirect_f64_result_live_across_void_call(func: IdF64Fn, a: f
     return first + b;
 }
 
+export fn frontier_indirect_f32_result_live_across_void_call(func: IdF32Fn, a: f32, b: f32) f32 {
+    const first = func(a);
+    frontier_touch_ordered();
+    return first + b;
+}
+
 export fn frontier_indirect_f64_result_live_across_indirect_void_call(func: IdF64Fn, later: VoidFn, a: f64, b: f64) f64 {
+    const first = func(a);
+    later();
+    return first + b;
+}
+
+export fn frontier_indirect_f32_result_live_across_indirect_void_call(func: IdF32Fn, later: VoidFn, a: f32, b: f32) f32 {
     const first = func(a);
     later();
     return first + b;

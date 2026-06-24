@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=285
-structured_functions=285
-generic_codegen_functions=285
-generic_cfg_functions=285
+discovered_functions=289
+structured_functions=289
+generic_codegen_functions=289
+generic_cfg_functions=289
 structural_matcher_functions=0
-structured_air_v2_functions=285
-typed_air_operand_functions=285
+structured_air_v2_functions=289
+typed_air_operand_functions=289
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=285
+generic_lowering_functions=289
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=285
+object_emitted_functions=289
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -424,11 +424,16 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_abi.zig`:
   `frontier_f64_result_live_across_void_call`,
   `frontier_f64_result_live_across_indirect_void_call`,
-  `frontier_indirect_f64_result_live_across_void_call`, and
-  `frontier_indirect_f64_result_live_across_indirect_void_call` spill a direct
-  or pointer-callee C ABI `double` call result from `%xmm0`, preserve the live
-  `double` addend, emit a later direct or pointer-callee side-effecting `void`
-  call, then reload both XMM frame slots for the final post-call `fadd` return.
+  `frontier_indirect_f64_result_live_across_void_call`,
+  `frontier_indirect_f64_result_live_across_indirect_void_call`,
+  `frontier_f32_result_live_across_void_call`,
+  `frontier_f32_result_live_across_indirect_void_call`,
+  `frontier_indirect_f32_result_live_across_void_call`, and
+  `frontier_indirect_f32_result_live_across_indirect_void_call` spill a direct
+  or pointer-callee C ABI `float` or `double` call result from `%xmm0`,
+  preserve the live FP addend, emit a later direct or pointer-callee
+  side-effecting `void` call, then reload both XMM frame slots for the final
+  post-call `fadd` return.
 - selected two-result FP call frames in `frontier_sysv_abi.zig`:
   `frontier_two_f64_results_across_calls`,
   `frontier_two_f32_results_across_calls`,
