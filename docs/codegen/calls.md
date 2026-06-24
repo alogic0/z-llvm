@@ -282,10 +282,10 @@ The first slice rejects:
 
 ```text
 inline assembly calls
-varargs (`UnsupportedVarargsAbi`)
+direct and function-pointer varargs (`UnsupportedVarargsAbi`)
 vectors (`UnsupportedVectorAbi`)
 X87 / long double (`UnsupportedLongDoubleAbi`)
-packed aggregate ABI call/return forms (`UnsupportedPackedAggregateAbi`)
+packed aggregate ABI call/return forms, including direct planner inputs (`UnsupportedPackedAggregateAbi`)
 byval/sret lowering beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
 operand bundles
 invoke

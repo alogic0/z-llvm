@@ -553,6 +553,33 @@ test "x86_64 SysV call planner rejects varargs explicitly" {
     );
 }
 
+test "x86_64 SysV call planner rejects indirect varargs explicitly" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, ptr %fmt) {
+        \\entry:
+        \\  %r = call i32 (ptr, ...) %fn(ptr %fmt, i32 7)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(call.callee_value != null);
+    try std.testing.expectError(
+        error.UnsupportedVarargsAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedVarargsAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
 test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail callconv boundaries" {
     const indirect_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -947,6 +974,31 @@ test "parser rejects packed aggregate ABI signatures before x86_64 codegen" {
         \\
     ;
     try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, input));
+}
+
+test "x86_64 SysV call planner rejects packed aggregate call args directly" {
+    var args: std.ArrayList(ir.CallArg) = .empty;
+    defer args.deinit(std.testing.allocator);
+    try args.append(std.testing.allocator, .{
+        .ty = .{ .aggregate = "<{ i8, i64 }>" },
+        .value = .undef,
+    });
+
+    const call: ir.CallInst = .{
+        .ret_ty = .{ .int = 32 },
+        .callee = "callee",
+        .args = args,
+    };
+    const function: ir.Function = .{
+        .name = "caller",
+        .ret_ty = .{ .int = 32 },
+        .blocks = .empty,
+        .params = .empty,
+    };
+    try std.testing.expectError(
+        error.UnsupportedPackedAggregateAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, function, call),
+    );
 }
 
 test "x86_64 SysV return planner rejects explicit ABI boundaries" {
