@@ -1,21 +1,22 @@
 const impl = @import("cabi_impl.zig");
+const f128_debug_rows = @import("cabi_f128_debug_rows.zig");
 const std = impl.std;
 const ir = impl.ir;
 const MachineFunction = impl.MachineFunction;
 const paramReg = impl.paramReg;
 const blockIndex = impl.blockIndex;
 const isNamed = impl.isNamed;
-const validateDebugF128Sret = impl.validateDebugF128Sret;
-const validateF128EntryEqBranch = impl.validateF128EntryEqBranch;
-const validateF128SecondEqBranch = impl.validateF128SecondEqBranch;
-const validateF128SretSuccess = impl.validateF128SretSuccess;
-const validatePanicUnreachableBlock = impl.validatePanicUnreachableBlock;
-const validateDebugF128AggregateReturn = impl.validateDebugF128AggregateReturn;
-const validateF128AggregateRet = impl.validateF128AggregateRet;
-const validateDebugF128ScalarReturn = impl.validateDebugF128ScalarReturn;
-const validateF128ScalarRet = impl.validateF128ScalarRet;
-const validateF128EqCall = impl.validateF128EqCall;
-const validateEqZeroIcmp = impl.validateEqZeroIcmp;
+const validateDebugF128Sret = f128_debug_rows.validateDebugF128Sret;
+const validateF128EntryEqBranch = f128_debug_rows.validateF128EntryEqBranch;
+const validateF128SecondEqBranch = f128_debug_rows.validateF128SecondEqBranch;
+const validateF128SretSuccess = f128_debug_rows.validateF128SretSuccess;
+const validatePanicUnreachableBlock = f128_debug_rows.validatePanicUnreachableBlock;
+const validateDebugF128AggregateReturn = f128_debug_rows.validateDebugF128AggregateReturn;
+const validateF128AggregateRet = f128_debug_rows.validateF128AggregateRet;
+const validateDebugF128ScalarReturn = f128_debug_rows.validateDebugF128ScalarReturn;
+const validateF128ScalarRet = f128_debug_rows.validateF128ScalarRet;
+const validateF128EqCall = f128_debug_rows.validateF128EqCall;
+const validateEqZeroIcmp = f128_debug_rows.validateEqZeroIcmp;
 
 pub fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_f128_f128_struct")) return false;

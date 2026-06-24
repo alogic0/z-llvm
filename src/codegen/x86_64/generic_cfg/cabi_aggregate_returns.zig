@@ -1,14 +1,15 @@
 const impl = @import("cabi_impl.zig");
+const f128_debug_rows = @import("cabi_f128_debug_rows.zig");
 const std = impl.std;
 const ir = impl.ir;
 const MachineFunction = impl.MachineFunction;
 const isNamed = impl.isNamed;
 const isInt = impl.isInt;
-const validateDebugStackLoadReturn = impl.validateDebugStackLoadReturn;
-const validatePanicUnreachableBlock = impl.validatePanicUnreachableBlock;
-const validateDebugPanicUnreachableBlock = impl.validateDebugPanicUnreachableBlock;
-const validateF128EqCall = impl.validateF128EqCall;
-const validateEqZeroIcmp = impl.validateEqZeroIcmp;
+const validateDebugStackLoadReturn = f128_debug_rows.validateDebugStackLoadReturn;
+const validatePanicUnreachableBlock = f128_debug_rows.validatePanicUnreachableBlock;
+const validateDebugPanicUnreachableBlock = f128_debug_rows.validateDebugPanicUnreachableBlock;
+const validateF128EqCall = f128_debug_rows.validateF128EqCall;
+const validateEqZeroIcmp = f128_debug_rows.validateEqZeroIcmp;
 const blockIndex = impl.blockIndex;
 const call_frame_helpers = @import("cabi_call_frame_helpers.zig");
 const appendCompareArg32Imm32 = call_frame_helpers.appendCompareArg32Imm32;
@@ -25,9 +26,9 @@ const paramReg = impl.paramReg;
 const validateAssertPDShape = impl.validateAssertPDShape;
 const validateAssertDCShape = impl.validateAssertDCShape;
 const validateAssertCFFShape = impl.validateAssertCFFShape;
-const validateDebugRetPD = impl.validateDebugRetPD;
-const validateDebugRetCFF = impl.validateDebugRetCFF;
-const validateDebugRetDC = impl.validateDebugRetDC;
+const validateDebugRetPD = f128_debug_rows.validateDebugRetPD;
+const validateDebugRetCFF = f128_debug_rows.validateDebugRetCFF;
+const validateDebugRetDC = f128_debug_rows.validateDebugRetDC;
 
 pub fn lowerCAbiRetSplitStructMixed(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_ret_split_struct_mixed")) return false;
