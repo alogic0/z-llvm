@@ -753,6 +753,34 @@ test "x86_64 codegen preserves mixed f64 f32 call results across calls" {
     try expectMachineInstruction(machine.instructions.items, .addsd_xmm1_xmm0);
 }
 
+test "x86_64 codegen preserves two i64 call results across calls" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @first(i64)
+        \\declare i64 @second(i64)
+        \\
+        \\define i64 @caller(i64 %a, i64 %b) {
+        \\entry:
+        \\  %first = call i64 @first(i64 %a)
+        \\  %second = call i64 @second(i64 %b)
+        \\  %sum = add i64 %first, %second
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .push_rax);
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_rax = 0 });
+}
+
 test "x86_64 codegen preserves three live f32 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

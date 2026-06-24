@@ -741,6 +741,10 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgTwoI64CallResultsReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgI64DirectCallReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -750,6 +754,60 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         return true;
     }
     return false;
+}
+
+fn lowerGenericCfgTwoI64CallResultsReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 3) return false;
+    const first_call_inst = block.instructions.items[0];
+    const second_call_inst = block.instructions.items[1];
+    const add_inst = block.instructions.items[2];
+    if (first_call_inst.removed or second_call_inst.removed or add_inst.removed) return false;
+    const first_result = first_call_inst.result orelse return false;
+    const second_result = second_call_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!first_call.ret_ty.eql(.{ .int = 64 }) or first_call.callee_value != null or first_call.inline_asm != null) return false;
+    if (!callIsFastcc(first_call.calling_conv)) try validateDefaultCallConv(first_call.calling_conv);
+
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!second_call.ret_ty.eql(.{ .int = 64 }) or second_call.callee_value != null or second_call.inline_asm != null) return false;
+    if (!callIsFastcc(second_call.calling_conv)) try validateDefaultCallConv(second_call.calling_conv);
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (!add.ty.eql(.{ .int = 64 }) or add.op != .add) return false;
+    const add_uses_results =
+        (isNamed(add.lhs, first_result) and isNamed(add.rhs, second_result)) or
+        (isNamed(add.lhs, second_result) and isNamed(add.rhs, first_result));
+    if (!add_uses_results) return false;
+
+    const first_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, first_call);
+    if (first_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try appendAlignedDirectCall(allocator, machine, first_call.callee, first_call.ret_ty);
+    try machine.instructions.append(allocator, .push_rax);
+    const second_stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, second_call);
+    if (second_stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try appendDirectCall(allocator, machine, second_call.callee, second_call.ret_ty);
+    try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = 0 });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
 }
 
 pub fn lowerGenericCfgSingleBlockPtr(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
