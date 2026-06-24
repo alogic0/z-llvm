@@ -177,6 +177,7 @@ pub const Instruction = union(enum) {
     spill_rdi_rsi_rsp24,
     reload_rdi_rsp24,
     reload_rsi_rsp24,
+    spill_eax_rsp: FrameIndex,
     reload_rsp_eax: FrameIndex,
     load_stack_disp8_rax: u8,
     load_stack_disp32_rax: u32,

@@ -65,6 +65,7 @@ test "x86_64 encoding sizes nonzero frame spill slots" {
     var machine = codegen.x86_64.MachineFunction.init("frame_slots", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
     try machine.instructions.append(std.testing.allocator, .sub_rsp_40);
+    try machine.instructions.append(std.testing.allocator, .{ .spill_eax_rsp = .slot0 });
     try machine.instructions.append(std.testing.allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } });
     try machine.instructions.append(std.testing.allocator, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } });
     try machine.instructions.append(std.testing.allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot5, .reg = .r9 } });
@@ -73,6 +74,7 @@ test "x86_64 encoding sizes nonzero frame spill slots" {
     try machine.instructions.append(std.testing.allocator, .add_rsp_40);
     try machine.instructions.append(std.testing.allocator, .ret);
 
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .spill_eax_rsp = .slot0 }));
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } }));
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } }));
     try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .spill_arg_rsp = .{ .frame_index = .slot5, .reg = .r9 } }));
@@ -81,13 +83,14 @@ test "x86_64 encoding sizes nonzero frame spill slots" {
     defer std.testing.allocator.free(bytes);
     try std.testing.expectEqualSlices(u8, &.{
         0x48, 0x83, 0xec, 0x28,
-        0x89, 0x74, 0x24, 0x04,
-        0x8b, 0x54, 0x24, 0x08,
-        0x44, 0x89, 0x4c, 0x24,
-        0x14, 0x44, 0x8b, 0x44,
-        0x24, 0x10, 0xb8, 0x00,
-        0x00, 0x00, 0x00, 0x48,
-        0x83, 0xc4, 0x28, 0xc3,
+        0x89, 0x04, 0x24, 0x89,
+        0x74, 0x24, 0x04, 0x8b,
+        0x54, 0x24, 0x08, 0x44,
+        0x89, 0x4c, 0x24, 0x14,
+        0x44, 0x8b, 0x44, 0x24,
+        0x10, 0xb8, 0x00, 0x00,
+        0x00, 0x00, 0x48, 0x83,
+        0xc4, 0x28, 0xc3,
     }, bytes);
 }
 

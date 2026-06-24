@@ -123,6 +123,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .spill_rdi_rsi_rsp24 => try writer.writeAll("\tmovq %rdi, 8(%rsp)\n\tmovq %rsi, 16(%rsp)\n"),
             .reload_rdi_rsp24 => try writer.writeAll("\tmovq 8(%rsp), %rdi\n"),
             .reload_rsi_rsp24 => try writer.writeAll("\tmovq 16(%rsp), %rsi\n"),
+            .spill_eax_rsp => |frame_index| try writer.print("\tmovl %eax, {s}\n", .{frameAddress(frame_index)}),
             .reload_rsp_eax => try writer.writeAll("\tmovl (%rsp), %eax\n"),
             .load_stack_disp8_rax => |offset| try writer.print("\tmovq {}(%rsp), %rax\n", .{offset}),
             .load_stack_disp32_rax => |offset| try writer.print("\tmovq {}(%rsp), %rax\n", .{offset}),

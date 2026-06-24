@@ -122,6 +122,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24,
         .reload_rdi_rsp24,
         .reload_rsi_rsp24,
+        .spill_eax_rsp,
         .reload_rsp_eax,
         .load_stack_disp8_rax,
         .load_stack_disp32_rax,
@@ -247,6 +248,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
+        .spill_eax_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .and_rsp_neg16 => rsp_mod16 = 0,
         .noreturn_direct_call => {
             if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
@@ -393,6 +395,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .spill_rdi_rsi_rsp24,
         .reload_rdi_rsp24,
         .reload_rsi_rsp24,
+        .spill_eax_rsp,
         .reload_rsp_eax,
         .load_stack_disp8_rax,
         .load_stack_disp32_rax,

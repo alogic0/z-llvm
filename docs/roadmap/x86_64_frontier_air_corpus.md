@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=216
-structured_functions=216
-generic_codegen_functions=216
-generic_cfg_functions=216
+discovered_functions=217
+structured_functions=217
+generic_codegen_functions=217
+generic_cfg_functions=217
 structural_matcher_functions=0
-structured_air_v2_functions=216
-typed_air_operand_functions=216
+structured_air_v2_functions=217
+typed_air_operand_functions=217
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=216
+generic_lowering_functions=217
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=216
+object_emitted_functions=217
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -313,6 +313,13 @@ Closed in the current memory/aggregate frontier slice:
   void C ABI calls through the generic CFG live-param spill/reload helper;
   `frontier_two_indirect_void_calls_six_live` proves the same frame path around
   two pointer-callee `callq *%rax` calls.
+- selected ordered call-result live frame in `frontier_sysv_abi.zig`:
+  `frontier_call_result_live_across_second_call` spills the first C ABI
+  `i32` call result from `%eax`, preserves the live `i32` parameter in a frame
+  slot, emits a later side-effecting `void` C ABI call in source order, reloads
+  the first result, and returns the post-call add. The executable harness uses
+  an order-sensitive helper state to prove the first call is not moved after
+  the second call.
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded
@@ -365,7 +372,8 @@ Remaining measured frontier blockers kept out of accepted rows:
 
 - private helper call graphs with stack-passed live values beyond the current
   disp8-safe selected model, live SSE values beyond the selected no-argument-call spill shapes and
-  two-live FP-argument call shape, or live values across multiple calls
+  two-live FP-argument call shape, and arbitrary mixed/non-void live values
+  across multiple calls beyond the selected ordered `i32` result row
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond planner-owned register aggregate and

@@ -23,6 +23,7 @@ const SysVCallTarget = shared.SysVCallTarget;
 const max_sysv_stack_call_args = shared.max_sysv_stack_call_args;
 
 const appendAlignedDirectCall = shared.appendAlignedDirectCall;
+const appendDirectCall = shared.appendDirectCall;
 const appendDirectCallWithStackArgs = shared.appendDirectCallWithStackArgs;
 const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
 const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
@@ -43,6 +44,7 @@ const appendSysVScalarCallArgs = cabi_call_lowering.appendSysVScalarCallArgs;
 const appendSysVScalarCallArgsWithBlock = cabi_call_lowering.appendSysVScalarCallArgsWithBlock;
 const appendSysVCallTarget = shared.appendSysVCallTarget;
 const callIsFastcc = shared.callIsFastcc;
+const emitGenericCfgI32CallIntoEax = core_value_emit.emitGenericCfgI32CallIntoEax;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
 const emitGenericCfgI64ValueIntoRax = core_value_emit.emitGenericCfgI64ValueIntoRax;
 const emitGenericCfgIcmpCondition = cabi_call_lowering.emitGenericCfgIcmpCondition;
@@ -166,6 +168,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgCallResultAcrossVoidCall(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!genericCfgSupportsSingleBlockScalar(function)) return false;
     const ret = single_ret orelse return error.UnsupportedCodegenControlFlow;
@@ -192,6 +198,75 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
     }
     try appendGenericCfgReturn(allocator, machine);
     machine.codegen_path = .generic_cfg;
+    return true;
+}
+
+fn lowerGenericCfgCallResultAcrossVoidCall(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 3) return false;
+    const first_call_inst = block.instructions.items[0];
+    const second_call_inst = block.instructions.items[1];
+    const add_inst = block.instructions.items[2];
+    if (first_call_inst.removed or second_call_inst.removed or add_inst.removed) return false;
+    const first_result = first_call_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!first_call.ret_ty.eql(.{ .int = 32 }) or first_call.inline_asm != null) return false;
+    if (!callIsFastcc(first_call.calling_conv)) try validateDefaultCallConv(first_call.calling_conv);
+
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (second_call.ret_ty != .void or second_call.args.items.len != 0 or second_call.callee_value != null or second_call.inline_asm != null) return false;
+    if (!callIsFastcc(second_call.calling_conv)) try validateDefaultCallConv(second_call.calling_conv);
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (!add.ty.eql(.{ .int = 32 }) or add.op != .add) return false;
+    const other_value = if (isNamed(add.lhs, first_result))
+        add.rhs
+    else if (isNamed(add.rhs, first_result))
+        add.lhs
+    else
+        return false;
+
+    try emitGenericCfgI32CallIntoEax(allocator, machine, function, block, 0, first_call);
+    const other_param_reg = switch (other_value) {
+        .named => |name| try paramRegOrNull(function, name, .{ .int = 32 }),
+        .int => null,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const frame_bytes: u8 = if (other_param_reg != null) 24 else 8;
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot0 });
+    if (other_param_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = reg } });
+    }
+    try appendDirectCall(allocator, machine, second_call.callee, .void);
+    try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+    switch (other_value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+        .named => {
+            if (other_param_reg == null) return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = 4 });
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
+    }
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
     return true;
 }
 

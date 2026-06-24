@@ -1510,6 +1510,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_six_live_after_call(int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_six_live_after_call");
     \\extern int z_frontier_two_void_calls_six_live(int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_two_void_calls_six_live");
     \\extern int z_frontier_two_indirect_void_calls_six_live(void (*)(void), int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_two_indirect_void_calls_six_live");
+    \\extern int z_frontier_call_result_live_across_second_call(int) __asm__("frontier_sysv_abi.frontier_call_result_live_across_second_call");
     \\extern int z_frontier_six_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_six_stack_arg_call");
     \\extern int z_frontier_eight_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_eight_stack_arg_call");
     \\extern int z_frontier_twelve_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_twelve_stack_arg_call");
@@ -1566,6 +1567,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_indirect_five_f64_external_call(double (*)(double, double, double, double, double), double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_indirect_five_f64_external_call");
     \\volatile float frontier_seen_f32 = 0.0f;
     \\volatile double frontier_seen_f64 = 0.0;
+    \\volatile int frontier_order_step = 0;
     \\void frontier_touch_f32(float value) { frontier_seen_f32 = value; }
     \\void frontier_touch_f64(double value) { frontier_seen_f64 = value; }
     \\void frontier_touch2_f32(float a, float b) { frontier_seen_f32 = a + b; }
@@ -1575,6 +1577,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\void frontier_touch5_f32(float a, float b, float c, float d, float e) { frontier_seen_f32 = a + b + c + d + e; }
     \\void frontier_touch5_f64(double a, double b, double c, double d, double e) { frontier_seen_f64 = a + b + c + d + e; }
     \\void frontier_touch_none(void) {}
+    \\void frontier_touch_ordered(void) { frontier_order_step = frontier_order_step == 1 ? 2 : -100; }
+    \\int frontier_ordered_i32(int value) { if (frontier_order_step != 0) return -1000; frontier_order_step = 1; return value + 5; }
     \\float frontier_sum5_f32(float a, float b, float c, float d, float e) { return a + b + c + d + e; }
     \\double frontier_sum5_f64(double a, double b, double c, double d, double e) { return a + b + c + d + e; }
     \\int frontier_sum6_i32(int a, int b, int c, int d, int e, int f) { return a + b + c + d + e + f; }
@@ -1599,6 +1603,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_six_live_after_call(2, 3, 5, 7, 11, 13) != 54) return 8;
     \\    if (z_frontier_two_void_calls_six_live(2, 3, 5, 7, 11, 13) != 41) return 34;
     \\    if (z_frontier_two_indirect_void_calls_six_live(frontier_touch_none, 2, 3, 5, 7, 11, 13) != 41) return 52;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_call_result_live_across_second_call(37) != 79 || frontier_order_step != 2) return 80;
     \\    if (z_frontier_six_stack_arg_call() != 78) return 35;
     \\    if (z_frontier_eight_stack_arg_call() != 105) return 46;
     \\    if (z_frontier_twelve_stack_arg_call() != 171) return 47;

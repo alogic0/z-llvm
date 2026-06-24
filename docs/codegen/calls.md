@@ -98,6 +98,8 @@ selected SSE/SSE aggregate return in %xmm0/%xmm1
 void calls with no result
 one straight-line basic block or accepted generic CFG wrapper shape
 up to six live i32 caller arguments across one direct call
+selected first i32 call result plus live i32 caller argument across a later
+  side-effecting void call
 one fixed i32 stack slot can feed the first direct-call argument
 ```
 
@@ -207,6 +209,8 @@ accepted frontier:
   disp8-safe stack-passed live i32 post-call add-tree rows after local
   call-frame restoration
   selected two-call six-live i32 GPR spill/reload frames
+  selected ordered i32 call-result spill/reload across a later side-effecting
+  void C ABI call before the post-call add
   narrow scalar function-pointer calls through `callq *%rax` when the callee is
   a pointer parameter and the call has planner-supported i32/i64 GPR, stack, and
   selected f32/f64 SSE arguments/results
