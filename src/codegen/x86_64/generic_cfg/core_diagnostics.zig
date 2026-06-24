@@ -1,6 +1,7 @@
 const impl = @import("core_impl.zig");
 const base64 = @import("core_base64.zig");
 const checked = @import("core_checked.zig");
+const debug_logical_pointer_rows = @import("core_debug_logical_pointer_rows.zig");
 const loop_rows = @import("core_loop_rows.zig");
 const release_small_rows = @import("core_release_small_rows.zig");
 const std = impl.std;
@@ -52,7 +53,7 @@ pub const lowerCheckedStructSum = checked.lowerCheckedStructSum;
 pub const lowerCheckedTableLookup = checked.lowerCheckedTableLookup;
 pub const lowerCheckedTinyAdd = checked.lowerCheckedTinyAdd;
 pub const lowerCheckedTlsBump = checked.lowerCheckedTlsBump;
-pub const lowerDebugLogicalPointerCompileError = impl.lowerDebugLogicalPointerCompileError;
+pub const lowerDebugLogicalPointerCompileError = debug_logical_pointer_rows.lowerDebugLogicalPointerCompileError;
 pub const lowerDebugSpirvMergeLogicalPointers = impl.lowerDebugSpirvMergeLogicalPointers;
 pub const lowerDescriptorTableLoopMain = checked.lowerDescriptorTableLoopMain;
 pub const lowerFpExponentRuntimeBoundaryMain = checked.lowerFpExponentRuntimeBoundaryMain;
