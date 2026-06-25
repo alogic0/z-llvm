@@ -503,7 +503,7 @@ selected two-call six-live-i32 spill/reload call frame
 selected two-call two-live f32/f64 direct and pointer-callee spill/reload call frames
 selected mixed i32/i64 one-GPR/one-SSE live direct/pointer-callee spill/reload call frames
 selected stack-passed live i32/i64 post-call rows including disp32 reloads
-selected direct stack-passed i64 parameter return through disp32 incoming stack offset
+selected direct stack-passed i64/pointer parameter return through disp32 incoming stack offset
 selected one-live f32/f64 SSE spill/reload call frame
 selected two-/three-live f32/f64 no-argument-call spill/reload frames
 selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames
