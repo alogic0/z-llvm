@@ -512,7 +512,8 @@ selected two-/three-live f32/f64 no-argument-call spill/reload frames
 selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames
 selected stack-passed f32/f64 post-call reload through disp32 incoming stack offset
 selected direct stack-passed f32/f64 parameter return through disp32 incoming stack offset
-selected ninth-argument f32/f64 stack slots for direct and pointer-callee calls
+selected ninth-argument f32/f64 stack slots for direct, pointer-callee, and
+constant-argument calls
 selected two-live f32/f64 no-argument pointer-callee spill/reload frames
 selected two-live f32/f64 one-FP-argument pointer-callee spill/reload frames
 selected three-live f32/f64 two-FP-argument pointer-callee spill/reload frames

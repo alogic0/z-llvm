@@ -241,6 +241,43 @@ test "x86_64 SysV call planner assigns ninth f32 arg to stack" {
     try std.testing.expect(!counts.memory_return);
 }
 
+test "x86_64 SysV call planner assigns ninth FP constants to stack" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare float @callee_f32(float, float, float, float, float, float, float, float, float)
+        \\declare double @callee_f64(double, double, double, double, double, double, double, double, double)
+        \\
+        \\define float @caller_f32() {
+        \\entry:
+        \\  %r = call float @callee_f32(float 1.000000e+00, float 2.000000e+00, float 3.000000e+00, float 4.000000e+00, float 5.000000e+00, float 6.000000e+00, float 7.000000e+00, float 8.000000e+00, float 9.000000e+00)
+        \\  ret float %r
+        \\}
+        \\
+        \\define double @caller_f64() {
+        \\entry:
+        \\  %r = call double @callee_f64(double 1.000000e+00, double 2.000000e+00, double 3.000000e+00, double 4.000000e+00, double 5.000000e+00, double 6.000000e+00, double 7.000000e+00, double 8.000000e+00, double 9.000000e+00)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    inline for (.{ 0, 1 }) |function_index| {
+        const call = module.functions.items[function_index].blocks.items[0].instructions.items[0].kind.call;
+        const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[function_index], call);
+        try std.testing.expectEqual(@as(usize, 0), counts.gpr_args);
+        try std.testing.expectEqual(@as(usize, 8), counts.sse_args);
+        try std.testing.expectEqual(@as(usize, 1), counts.stack_args);
+        try std.testing.expectEqual(@as(usize, 0), counts.register_aggregate_args);
+        try std.testing.expectEqual(@as(usize, 0), counts.gpr_returns);
+        try std.testing.expectEqual(@as(usize, 1), counts.sse_returns);
+        try std.testing.expect(!counts.memory_return);
+    }
+}
+
 test "x86_64 SysV call planner assigns pointer args through GPR stream" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

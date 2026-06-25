@@ -5357,6 +5357,9 @@ fn canonicalFpLiteral(text: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, text, "5")) return "5.000000e+00";
     if (std.mem.eql(u8, text, "5.5")) return "5.500000e+00";
     if (std.mem.eql(u8, text, "6")) return "6.000000e+00";
+    if (std.mem.eql(u8, text, "7")) return "7.000000e+00";
+    if (std.mem.eql(u8, text, "8")) return "8.000000e+00";
+    if (std.mem.eql(u8, text, "9")) return "9.000000e+00";
     return null;
 }
 

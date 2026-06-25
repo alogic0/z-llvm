@@ -2092,6 +2092,10 @@ export fn frontier_indirect_nine_f32_stack_arg_call(
     return func(a0, a1, a2, a3, a4, a5, a6, a7, a8);
 }
 
+export fn frontier_nine_f32_const_stack_arg_call() f32 {
+    return frontier_sum9_f32(1, 2, 3, 4, 5, 6, 7, 8, 9);
+}
+
 export fn frontier_nine_f64_stack_arg_call(
     a0: f64,
     a1: f64,
@@ -2119,6 +2123,10 @@ export fn frontier_indirect_nine_f64_stack_arg_call(
     a8: f64,
 ) f64 {
     return func(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+}
+
+export fn frontier_nine_f64_const_stack_arg_call() f64 {
+    return frontier_sum9_f64(1, 2, 3, 4, 5, 6, 7, 8, 9);
 }
 
 export fn frontier_indirect_five_f64_external_call(func: Sum5F64Fn, a: f64, b: f64, c: f64, d: f64, e: f64) f64 {

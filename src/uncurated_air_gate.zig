@@ -1713,8 +1713,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_indirect_f64_stack_arg_to_registers(double (*)(double, double, double, double, double), double, double, double, double, double, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_indirect_f64_stack_arg_to_registers");
     \\extern float z_frontier_nine_f32_stack_arg_call(float, float, float, float, float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_nine_f32_stack_arg_call");
     \\extern float z_frontier_indirect_nine_f32_stack_arg_call(float (*)(float, float, float, float, float, float, float, float, float), float, float, float, float, float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_indirect_nine_f32_stack_arg_call");
+    \\extern float z_frontier_nine_f32_const_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_nine_f32_const_stack_arg_call");
     \\extern double z_frontier_nine_f64_stack_arg_call(double, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_nine_f64_stack_arg_call");
     \\extern double z_frontier_indirect_nine_f64_stack_arg_call(double (*)(double, double, double, double, double, double, double, double, double), double, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_indirect_nine_f64_stack_arg_call");
+    \\extern double z_frontier_nine_f64_const_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_nine_f64_const_stack_arg_call");
     \\volatile float frontier_seen_f32 = 0.0f;
     \\volatile double frontier_seen_f64 = 0.0;
     \\volatile int frontier_order_step = 0;
@@ -2046,8 +2048,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_indirect_f64_stack_arg_to_registers(frontier_sum5_f64, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0) != 55.0) return 154;
     \\    if (z_frontier_nine_f32_stack_arg_call(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f) != 45.0f) return 157;
     \\    if (z_frontier_indirect_nine_f32_stack_arg_call(frontier_sum9_f32, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f) != 45.0f) return 158;
+    \\    if (z_frontier_nine_f32_const_stack_arg_call() != 45.0f) return 159;
     \\    if (z_frontier_nine_f64_stack_arg_call(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0) != 45.0) return 155;
     \\    if (z_frontier_indirect_nine_f64_stack_arg_call(frontier_sum9_f64, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0) != 45.0) return 156;
+    \\    if (z_frontier_nine_f64_const_stack_arg_call() != 45.0) return 160;
     \\    return 0;
     \\}
     \\

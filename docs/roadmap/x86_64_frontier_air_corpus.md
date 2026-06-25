@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=420
-structured_functions=420
-generic_codegen_functions=420
-generic_cfg_functions=420
+discovered_functions=422
+structured_functions=422
+generic_codegen_functions=422
+generic_cfg_functions=422
 structural_matcher_functions=0
-structured_air_v2_functions=420
-typed_air_operand_functions=420
+structured_air_v2_functions=422
+typed_air_operand_functions=422
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=420
+generic_lowering_functions=422
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=420
+object_emitted_functions=422
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -313,7 +313,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_abi.zig`: `frontier_nine_f32_stack_arg_call`,
   `frontier_indirect_nine_f32_stack_arg_call`, and the matching `f64` rows
   pass a ninth FP argument through the SysV stack slot for direct and
-  pointer-callee helper calls
+  pointer-callee helper calls; `frontier_nine_f32_const_stack_arg_call` and
+  `frontier_nine_f64_const_stack_arg_call` prove the same outgoing stack-slot
+  path for immediate FP constants
 - stack-passed live i32 rows in `frontier_sysv_abi.zig`: all six SysV GPR
   `i32` parameters are spilled/reloaded around a direct helper call while more
   than six stack-passed `i32` parameters are read from the restored incoming

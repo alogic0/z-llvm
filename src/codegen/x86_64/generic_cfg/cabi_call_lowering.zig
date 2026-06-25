@@ -129,7 +129,7 @@ pub fn appendI32CallArgs(
                 stack_args[stack_arg_count] = .{ .stack_disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }) };
                 stack_arg_count += 1;
             },
-            .sse, .stack_f32_param, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return error.UnsupportedCodegenType,
+            .sse, .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return error.UnsupportedCodegenType,
         }
     }
 
@@ -240,6 +240,10 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
                 }
                 stack_arg_count += 1;
             },
+            .stack_f32_const => |text| {
+                stack_args[stack_arg_count] = .{ .xmm_imm32 = try fp32TextBits(.{ .fp = text }) };
+                stack_arg_count += 1;
+            },
             .stack_f32_param, .stack_f64_param => |name| {
                 const ty: ir.Type = if (std.meta.activeTag(assignment) == .stack_f32_param) .float else .double;
                 if ((fpParamIndex(function, name, ty) catch |err| switch (err) {
@@ -250,6 +254,10 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
                 } else {
                     stack_args[stack_arg_count] = .{ .stack_disp = try scalarParamStackDisp8(function, name, ty) };
                 }
+                stack_arg_count += 1;
+            },
+            .stack_f64_const => |text| {
+                stack_args[stack_arg_count] = .{ .xmm_imm64 = try fp64TextBits(.{ .fp = text }) };
                 stack_arg_count += 1;
             },
             .aggregate_stack_passthrough => |aggregate| {
@@ -382,7 +390,7 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
             .aggregate_register_passthrough => |aggregate| {
                 try appendSysVRegisterAggregatePassThroughArg(allocator, machine, aggregate, incoming_stack_adjust);
             },
-            .stack_i32_const, .stack_i32_param, .stack_f32_param, .stack_f64_param, .byval_stack_copy, .aggregate_stack_passthrough => {},
+            .stack_i32_const, .stack_i32_param, .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param, .byval_stack_copy, .aggregate_stack_passthrough => {},
         }
     }
     return .{
@@ -413,7 +421,7 @@ fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
             .gpr => |dst| dst,
-            .sse, .stack_i32_const, .stack_i32_param, .stack_f32_param, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
+            .sse, .stack_i32_const, .stack_i32_param, .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
         };
 
         const writes_dst = switch (arg.value) {
@@ -489,7 +497,7 @@ fn analyzeXmmArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
             .sse => |dst| dst,
-            .gpr, .stack_i32_const, .stack_i32_param, .stack_f32_param, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
+            .gpr, .stack_i32_const, .stack_i32_param, .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
         };
 
         const writes_dst = switch (arg.value) {
@@ -831,6 +839,8 @@ pub const StackScalarCallArg = union(enum) {
     stack_disp: u32,
     arg_reg: ArgReg,
     xmm_reg: XmmReg,
+    xmm_imm32: u32,
+    xmm_imm64: u64,
     byval_ptr_disp: struct {
         reg: ArgReg,
         offset: u8,
@@ -868,6 +878,14 @@ pub fn appendStackScalarCallArg(
         .imm => |value| try machine.instructions.append(allocator, .{ .push_imm32 = value }),
         .arg_reg => |reg| try machine.instructions.append(allocator, .{ .push_arg = reg }),
         .xmm_reg => |reg| try machine.instructions.append(allocator, .{ .push_xmm64 = reg }),
+        .xmm_imm32 => |bits| {
+            try appendMoveImm32ToXmm(allocator, machine, .xmm0, bits);
+            try machine.instructions.append(allocator, .{ .push_xmm64 = .xmm0 });
+        },
+        .xmm_imm64 => |bits| {
+            try appendMoveImm64ToXmm(allocator, machine, .xmm0, bits);
+            try machine.instructions.append(allocator, .{ .push_xmm64 = .xmm0 });
+        },
         .byval_ptr_disp => |source| {
             switch (source.chunk) {
                 .qword => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = source.offset } }),
