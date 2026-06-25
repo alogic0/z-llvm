@@ -2360,8 +2360,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_register_array_pair_call_sum_after_six(struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_register_array_pair_call_sum_after_six");
     \\extern double z_frontier_array_double_first(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_first");
     \\extern double z_frontier_array_double_second(struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_second");
+    \\extern double z_frontier_shifted_array_double_second(double, struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_array_double_second");
     \\extern struct ArrayDouble z_frontier_array_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_array_double_make");
     \\extern double z_frontier_stack_array_double_call_sum(double, double, double, double, double, double, double, double, struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_double_call_sum");
+    \\extern double z_frontier_shifted_array_double_call_sum(double, struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_array_double_call_sum");
     \\extern double z_frontier_register_array_double_call_sum_after_eight(struct ArrayDouble, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_aggregate_classes.frontier_register_array_double_call_sum_after_eight");
     \\extern struct ArrayDouble z_frontier_indirect_array_double_make(struct ArrayDouble (*)(double, double), double, double) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_array_double_make");
     \\extern double z_frontier_indirect_array_double_sum(double (*)(struct ArrayDouble), struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_array_double_sum");
@@ -2463,9 +2465,11 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct ArrayDouble array_double = { { 2.5, 4.75 } };
     \\    if (z_frontier_array_double_first(array_double) != 2.5) return 30;
     \\    if (z_frontier_array_double_second(array_double) != 4.75) return 31;
+    \\    if (z_frontier_shifted_array_double_second(1.0, array_double) != 4.75) return 82;
     \\    struct ArrayDouble made_array_double = z_frontier_array_double_make(6.5, 8.25);
     \\    if (made_array_double.values[0] != 6.5 || made_array_double.values[1] != 8.25) return 32;
     \\    if (z_frontier_stack_array_double_call_sum(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, array_double) != 7.25) return 41;
+    \\    if (z_frontier_shifted_array_double_call_sum(1.0, array_double) != 7.25) return 83;
     \\    if (z_frontier_register_array_double_call_sum_after_eight(array_double, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0) != 7.25) return 53;
     \\    struct ArrayDouble indirect_array_double = z_frontier_indirect_array_double_make(frontier_make_array_double, 9.25, 10.5);
     \\    if (indirect_array_double.values[0] != 9.25 || indirect_array_double.values[1] != 10.5) return 54;

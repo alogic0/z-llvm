@@ -1067,11 +1067,7 @@ pub fn emitAggregateDoubleTerm(
     switch (location) {
         .sse => |reg| {
             if (reg == dest) return;
-            if (dest == .xmm0 and reg == .xmm1) {
-                try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
-                return;
-            }
-            return error.UnsupportedCodegenAbi;
+            try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dest, .src = reg } });
         },
         .stack => |offset| try appendLoadStackDispXmm(allocator, machine, dest, offset),
         .gpr => return error.UnsupportedCodegenAbi,
@@ -1587,7 +1583,7 @@ pub fn emitSysVAggregateFieldLocationReturn(
             switch (reg) {
                 .xmm0 => {},
                 .xmm1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
-                .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => return error.UnsupportedCodegenAbi,
+                .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = reg } }),
             }
         },
         .stack => |offset| {

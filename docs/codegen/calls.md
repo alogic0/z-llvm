@@ -200,6 +200,8 @@ accepted frontier:
   selected SSE/SSE aggregate argument field reads and register return including
   single-eightbyte `{ f32, f32 }`, `[2]f64` array-in-struct, and nested
   `{ { double }, { double } }`, plus `[4]f32` array-in-struct lanes
+  selected shifted SSE/SSE `[2]f64` aggregate field reads and helper calls
+  using generic XMM moves from higher argument registers
   selected stack-passed `[4]f32` aggregate helper calls with generic
   stack-to-XMM `movss` reloads
   selected stack-sourced INTEGER aggregate forwarding into outgoing GPR

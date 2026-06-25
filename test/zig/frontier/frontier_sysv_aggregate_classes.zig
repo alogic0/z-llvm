@@ -406,6 +406,11 @@ export fn frontier_array_double_second(value: ArrayDouble) f64 {
     return value.values[1];
 }
 
+export fn frontier_shifted_array_double_second(prefix: f64, value: ArrayDouble) f64 {
+    _ = prefix;
+    return value.values[1];
+}
+
 export fn frontier_array_double_make(a: f64, b: f64) ArrayDouble {
     return .{ .values = .{ a, b } };
 }
@@ -419,6 +424,11 @@ export fn frontier_stack_array_double_call_sum(a0: f64, a1: f64, a2: f64, a3: f6
     _ = a5;
     _ = a6;
     _ = a7;
+    return helperArrayDoubleSum(value);
+}
+
+export fn frontier_shifted_array_double_call_sum(prefix: f64, value: ArrayDouble) f64 {
+    _ = prefix;
     return helperArrayDoubleSum(value);
 }
 

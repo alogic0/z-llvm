@@ -64,6 +64,7 @@ selected stack-passed nested mixed INTEGER/SSE aggregate helper calls read neste
 selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV GPR/SSE streams
 selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV SSE/GPR streams
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream, including `[2]f64`, nested double leaves, and `[4]f32` split across two SSE eightbytes
+selected shifted SSE/SSE aggregate field reads and helper calls move `double` fields from higher XMM argument registers through the generic XMM move path
 selected stack-passed SSE/SSE aggregate helper calls load `[4]f32` fields from the caller and callee stack into arbitrary XMM temporaries with `movss`
 leaf functions only
 no stack frame for register-only leaf functions

@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=397`,
-`generic_codegen_functions=397`, `generic_cfg_functions=397`,
+frontier gate reports `source_rows=13`, `discovered_functions=399`,
+`generic_codegen_functions=399`, `generic_cfg_functions=399`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=397`, `object_failures=0`,
+`object_emitted_functions=399`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -447,7 +447,9 @@ helper. The nested mixed stack follow-up extends the same path to
 `{ { i32, i32 }, double }`, using the generic stack-to-`%eax` field load for
 layout-derived `i32` aggregate fields. The stack f32 aggregate follow-up adds
 generic stack-to-XMM `movss` loads for `[4]f32` SSE/SSE aggregate helper calls
-after the SSE argument stream is exhausted.
+after the SSE argument stream is exhausted. The shifted `[2]f64` follow-up
+removes the `%xmm0`/`%xmm1` field-return assumption by moving higher XMM
+argument registers through the generic XMM move path.
 The shifted mixed aggregate follow-up removes the exact-register-slot
 requirement for the GPR half of selected in-register aggregate pass-through
 calls: `{ i64, double }` can now move its INTEGER eightbyte from `%rsi` to
