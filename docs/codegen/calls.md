@@ -286,7 +286,8 @@ the call does not need outgoing stack arguments; live values across sret calls
 with outgoing stack arguments remain a targeted `UnsupportedLiveAcrossCall`
 boundary. Explicit `ptr byval(aggregate)` call arguments now have a first
 planner-owned subset: supported aggregate payloads are copied from the source
-pointer to outgoing stack eightbytes for direct and function-pointer calls.
+pointer to outgoing stack eightbytes for direct and function-pointer calls, with
+unit proof for one- and two-eightbyte payloads.
 Unsupported layouts and non-eightbyte tail copies remain targeted boundaries.
 The frontier additionally lowers the selected
 source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by-value
