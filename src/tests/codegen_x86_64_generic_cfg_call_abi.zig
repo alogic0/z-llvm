@@ -950,6 +950,51 @@ test "x86_64 generic CFG forwards stack-sourced mixed aggregate to registers" {
     try std.testing.expect((load_sse_index orelse return error.TestExpectedEqual) < (call_index orelse return error.TestExpectedEqual));
 }
 
+test "x86_64 generic CFG forwards stack-sourced mixed aggregate through pointer callee" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @caller(ptr %fn, i64 %i0, i64 %i1, i64 %i2, i64 %i3, i64 %i4, double %f0, double %f1, double %f2, double %f3, double %f4, double %f5, double %f6, double %f7, { i64, double } %value) {
+        \\entry:
+        \\  %r = call i64 %fn({ i64, double } %value)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    var target_setup_index: ?usize = null;
+    var load_gpr_index: ?usize = null;
+    var load_sse_index: ?usize = null;
+    var call_index: ?usize = null;
+    for (machine.instructions.items, 0..) |instruction, index| {
+        switch (instruction) {
+            .mov_arg_rax => |reg| {
+                if (reg == .rdi) target_setup_index = index;
+            },
+            .load_stack_disp8_arg64 => |load| {
+                if (load.reg == .rdi and load.disp == 8) load_gpr_index = index;
+            },
+            .load_stack_disp8_xmm => |load| {
+                if (load.reg == .xmm0 and load.disp == 16) load_sse_index = index;
+            },
+            .indirect_call_rax => |ret_ty| {
+                if (ret_ty.eql(.{ .int = 64 })) call_index = index;
+            },
+            else => {},
+        }
+    }
+    try std.testing.expect((target_setup_index orelse return error.TestExpectedEqual) < (load_gpr_index orelse return error.TestExpectedEqual));
+    try std.testing.expect((load_gpr_index orelse return error.TestExpectedEqual) < (call_index orelse return error.TestExpectedEqual));
+    try std.testing.expect((load_sse_index orelse return error.TestExpectedEqual) < (call_index orelse return error.TestExpectedEqual));
+}
+
 test "x86_64 SysV call planner rejects varargs explicitly" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
