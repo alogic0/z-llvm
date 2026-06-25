@@ -5,6 +5,7 @@ const call_lowering = @import("core_call_lowering.zig");
 const memory_lowering = @import("core_memory_lowering.zig");
 
 pub const appendAlignedDirectCallPreservingI32Param = call_lowering.appendAlignedDirectCallPreservingI32Param;
+pub const appendAlignedDirectCallPreservingI32Params = call_lowering.appendAlignedDirectCallPreservingI32Params;
 pub const appendI32CallArgs = call_lowering.appendI32CallArgs;
 pub const appendSysVMemoryAggregateStackPassThroughArgs = call_lowering.appendSysVMemoryAggregateStackPassThroughArgs;
 pub const appendSysVScalarCallArgs = call_lowering.appendSysVScalarCallArgs;
@@ -76,6 +77,7 @@ pub const paramRegWithInitialGpr = call_lowering.paramRegWithInitialGpr;
 pub const paramValueReg = call_lowering.paramValueReg;
 pub const phiHasIncoming = call_lowering.phiHasIncoming;
 pub const phiHasIncomingInt = call_lowering.phiHasIncomingInt;
+pub const liveParamsAfter = call_lowering.liveParamsAfter;
 pub const singleLiveParamAfter = call_lowering.singleLiveParamAfter;
 pub const sysvCallPlanCountsForTest = call_lowering.sysvCallPlanCountsForTest;
 pub const sysvIntegerParamReg = call_lowering.sysvIntegerParamReg;

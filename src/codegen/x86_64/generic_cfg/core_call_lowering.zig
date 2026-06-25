@@ -2,6 +2,7 @@ const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
 
 pub const appendAlignedDirectCallPreservingI32Param = cabi_call_lowering.appendAlignedDirectCallPreservingI32Param;
+pub const appendAlignedDirectCallPreservingI32Params = cabi_call_lowering.appendAlignedDirectCallPreservingI32Params;
 pub const appendI32AddTermToEax = cabi_call_lowering.appendI32AddTermToEax;
 pub const appendI32CallArgs = cabi_call_lowering.appendI32CallArgs;
 pub const appendSysVMemoryAggregateStackPassThroughArgs = cabi_call_lowering.appendSysVMemoryAggregateStackPassThroughArgs;
@@ -18,6 +19,7 @@ pub const lowerI32AddTreeReturn = cabi_call_lowering.lowerI32AddTreeReturn;
 pub const lowerReturnTerminator = cabi_call_lowering.lowerReturnTerminator;
 pub const lowerReturnValue = cabi_call_lowering.lowerReturnValue;
 pub const lowerReturnValueAfterCalls = cabi_call_lowering.lowerReturnValueAfterCalls;
+pub const liveParamsAfter = cabi_call_lowering.liveParamsAfter;
 pub const matchIcmpEqParamImm = cabi_call_lowering.matchIcmpEqParamImm;
 pub const paramReg = cabi_abi_helpers.paramReg;
 pub const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;

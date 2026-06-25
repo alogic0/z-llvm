@@ -24,6 +24,7 @@ const u5Value = x86_64_match.u5Value;
 const callIsFastcc = x86_64_match.callIsFastcc;
 
 const appendAlignedDirectCallPreservingI32Param = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Param;
+const appendAlignedDirectCallPreservingI32Params = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Params;
 const appendIndirectCallRaxWithStackArgs = x86_64_emit.appendIndirectCallRaxWithStackArgs;
 const appendSysVScalarCallArgs = x86_64_generic_cfg.appendSysVScalarCallArgs;
 const blockIndex = x86_64_generic_cfg.blockIndex;
@@ -34,6 +35,7 @@ const paramRegOrNull = x86_64_generic_cfg.paramRegOrNull;
 const paramValueReg = x86_64_generic_cfg.paramValueReg;
 const blockByName = x86_64_generic_cfg.blockByName;
 const findInstruction = x86_64_generic_cfg.findInstruction;
+const liveParamsAfter = x86_64_generic_cfg.liveParamsAfter;
 const singleLiveParamAfter = x86_64_generic_cfg.singleLiveParamAfter;
 const matchIcmpEqParamImm = x86_64_generic_cfg.matchIcmpEqParamImm;
 
@@ -123,8 +125,21 @@ pub fn lowerCall(
     }
     if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
 
+    if (callHasArgAttrs(call)) {
+        try appendAlignedDirectCallPreservingI32Params(
+            allocator,
+            machine,
+            function,
+            call,
+            try liveParamsAfter(function, block, instruction_index),
+        );
+        if (call.ret_ty == .void and result != null) return error.VoidCallHasResult;
+        if (call.ret_ty != .void and result == null) return error.InstructionNeedsResult;
+        return;
+    }
+
     for (call.args.items, 0..) |arg, index| {
-        try sysv_abi.rejectUnsupportedCallArgAttrs(arg.attrs);
+        try sysv_abi.rejectUnsupportedCallArgAttrs(arg);
         try sysv_abi.rejectUnsupportedAbiType(arg.ty);
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
         const dst = try ArgReg.fromIndex(index);
@@ -142,6 +157,13 @@ pub fn lowerCall(
 
     if (call.ret_ty == .void and result != null) return error.VoidCallHasResult;
     if (call.ret_ty != .void and result == null) return error.InstructionNeedsResult;
+}
+
+fn callHasArgAttrs(call: ir.CallInst) bool {
+    for (call.args.items) |arg| {
+        if (arg.attrs != null) return true;
+    }
+    return false;
 }
 
 pub fn lowerConditionalReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

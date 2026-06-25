@@ -334,7 +334,7 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
     var int_arg_index: usize = 0;
     var fp_arg_index: usize = 0;
     for (call.args.items) |arg| {
-        try rejectUnsupportedCallArgAttrs(arg.attrs);
+        try rejectUnsupportedCallArgAttrs(arg);
         try rejectUnsupportedAbiType(arg.ty);
         if (isGprScalarType(arg.ty)) {
             plan.has_non_i32_arg = plan.has_non_i32_arg or !arg.ty.eql(.{ .int = 32 });
@@ -436,11 +436,15 @@ fn rejectUnsupportedAbiAttrPayload(attrs: []const u8) !void {
     }
 }
 
-pub fn rejectUnsupportedCallArgAttrs(attrs: ?[]const u8) !void {
-    const text = attrs orelse return;
+pub fn rejectUnsupportedCallArgAttrs(arg: ir.CallArg) !void {
+    const text = arg.attrs orelse return;
     try rejectUnsupportedAbiAttrPayload(text);
-    if (attrsContainAbiPayload(text, "sret") or attrsContainAbiPayload(text, "byval")) {
+    if (attrsContainAbiPayload(text, "byval")) {
         return error.UnsupportedSretByvalAbi;
+    }
+    if (attrsContainAbiPayload(text, "sret")) {
+        if (arg.ty != .ptr) return error.UnsupportedSretByvalAbi;
+        return;
     }
     return error.UnsupportedCallAttributeAbi;
 }

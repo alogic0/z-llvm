@@ -230,11 +230,11 @@ pub fn verifyFunction(function: MachineFunction) !void {
         },
         .direct_call => |call| {
             if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
-            eax_defined = call.ret_ty != .void;
+            eax_defined = function.ret_ty == .void or call.ret_ty != .void;
         },
         .indirect_call_rax => |ret_ty| {
             if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
-            eax_defined = ret_ty != .void;
+            eax_defined = function.ret_ty == .void or ret_ty != .void;
         },
         .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .push_imm32, .push_stack_disp8, .push_stack_disp32, .push_arg, .pop_arg, .push_rax, .push_xmm64 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),

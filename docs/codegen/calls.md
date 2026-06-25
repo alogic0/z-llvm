@@ -276,7 +276,10 @@ ABI-shaped attributes:
 
 ```text
 byval(...) and sret(...) are preserved on pointer parameters and verified
-as pointer-only annotations; the frontier additionally lowers the selected
+as pointer-only annotations; supported `ptr sret(...)` call arguments are now
+assigned as hidden result pointers through the same GPR call planner path as
+ordinary pointer arguments, while `byval(...)` remains a targeted boundary
+outside the selected source-backed forms. The frontier additionally lowers the selected
 source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by-value
 aggregate field-read shape, and byval-to-sret copies for all fields in those
 selected forms; the current frontier proves this through eight i64 fields,
@@ -353,7 +356,7 @@ X87 / long double, including aggregate-contained long-double leaves and
   long-double `sret`/`byval` payloads (`UnsupportedLongDoubleAbi`)
 packed aggregate ABI call/return forms, including direct planner inputs and
   packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`)
-byval/sret lowering beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
+byval lowering and arbitrary sret copy/storage beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
 operand bundles
 invoke
 callbr

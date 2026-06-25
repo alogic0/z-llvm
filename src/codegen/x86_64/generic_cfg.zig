@@ -2,6 +2,7 @@ const impl = @import("generic_cfg/core.zig");
 const cabi = @import("generic_cfg/cabi.zig");
 
 pub const appendAlignedDirectCallPreservingI32Param = impl.appendAlignedDirectCallPreservingI32Param;
+pub const appendAlignedDirectCallPreservingI32Params = impl.appendAlignedDirectCallPreservingI32Params;
 pub const appendI32CallArgs = impl.appendI32CallArgs;
 pub const appendSysVMemoryAggregateStackPassThroughArgs = impl.appendSysVMemoryAggregateStackPassThroughArgs;
 pub const appendSysVScalarCallArgs = impl.appendSysVScalarCallArgs;
@@ -158,6 +159,7 @@ pub const paramRegWithInitialGpr = impl.paramRegWithInitialGpr;
 pub const paramValueReg = impl.paramValueReg;
 pub const phiHasIncoming = impl.phiHasIncoming;
 pub const phiHasIncomingInt = impl.phiHasIncomingInt;
+pub const liveParamsAfter = impl.liveParamsAfter;
 pub const singleLiveParamAfter = impl.singleLiveParamAfter;
 pub const sysvCallPlanCountsForTest = impl.sysvCallPlanCountsForTest;
 pub const sysvIntegerParamReg = impl.sysvIntegerParamReg;

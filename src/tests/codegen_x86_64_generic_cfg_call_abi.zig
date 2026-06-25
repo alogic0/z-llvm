@@ -1744,7 +1744,7 @@ test "x86_64 codegen rejects varargs call ABI boundary" {
     );
 }
 
-test "x86_64 codegen rejects sret and byval call ABI boundaries" {
+test "x86_64 codegen accepts supported sret pointer call argument" {
     const sret_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -1760,11 +1760,26 @@ test "x86_64 codegen rejects sret and byval call ABI boundaries" {
     var sret_module = try ir.Module.parse(std.testing.allocator, sret_input);
     defer sret_module.deinit();
     try sret_module.verify();
-    try std.testing.expectError(
-        error.UnsupportedSretByvalAbi,
-        codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]),
-    );
+    const sret_call = sret_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, sret_module.functions.items[0], sret_call);
+    try std.testing.expectEqual(@as(usize, 2), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 0), counts.stack_args);
 
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    var saw_direct_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            saw_direct_call = true;
+            try std.testing.expectEqualStrings("callee", call.symbol);
+            try std.testing.expect(call.ret_ty == .void);
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_direct_call);
+}
+
+test "x86_64 codegen rejects byval call ABI boundary" {
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
