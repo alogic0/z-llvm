@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=407
-structured_functions=407
-generic_codegen_functions=407
-generic_cfg_functions=407
+discovered_functions=408
+structured_functions=408
+generic_codegen_functions=408
+generic_cfg_functions=408
 structural_matcher_functions=0
-structured_air_v2_functions=407
-typed_air_operand_functions=407
+structured_air_v2_functions=408
+typed_air_operand_functions=408
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=407
+generic_lowering_functions=408
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=407
+object_emitted_functions=408
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -311,8 +311,9 @@ Closed in the current memory/aggregate frontier slice:
   stack-passed live `i32` values, and
   `frontier_deep_stack_live_after_call` proves post-call reload of a deep
   stack-passed `i32` parameter through a disp32 incoming stack offset, and
-  `frontier_deep_stack_i64_live_after_call` proves the same restored incoming
-  stack path for a deep `i64` value
+  `frontier_deep_stack_i64_return` proves direct return of a deep stack-passed
+  `i64`, while `frontier_deep_stack_i64_live_after_call` proves the same
+  restored incoming stack path after a void call
 - six stack-passed scalar `i32` call arguments in `frontier_sysv_abi.zig`:
   `frontier_six_stack_arg_call` calls a C helper with 12 scalar arguments. The
   backend reserves alignment padding before pushing stack arguments so arg 7 is

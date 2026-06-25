@@ -1839,8 +1839,17 @@ pub fn lowerGenericCfgGprParamReturn(
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    const reg = try sysvIntegerParamReg(function, name, ret.ty);
-    try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+    if (try registerParamRegOrNull(function, name, ret.ty)) |reg| {
+        try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+    } else if (try stackParamDisp8OrNull(function, name, ret.ty)) |offset| {
+        if (offset <= std.math.maxInt(u8)) {
+            try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(offset) });
+        } else {
+            try machine.instructions.append(allocator, .{ .load_stack_disp32_rax = offset });
+        }
+    } else {
+        return false;
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }
