@@ -31,7 +31,7 @@ const writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody = base64_rows.writeRe
 const writeBase64DecodeStepStructuredModule = base64_rows.writeBase64DecodeStepStructuredModule;
 const writeReleaseSmallRuntimeBase64StoreStepIrWriterBody = base64_rows.writeReleaseSmallRuntimeBase64StoreStepIrWriterBody;
 const writeBase64StoreStepStructuredModule = base64_rows.writeBase64StoreStepStructuredModule;
-const writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody = base64_rows.writeReleaseSmallRuntimeResidualByteStepIrWriterBody;
+const writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody = base64_rows.writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody;
 const writeBase64ResidualByteStepStructuredModule = base64_rows.writeBase64ResidualByteStepStructuredModule;
 const writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody = base64_rows.writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody;
 const writeBase64PaddingTailStepStructuredModule = base64_rows.writeBase64PaddingTailStepStructuredModule;
@@ -76,6 +76,22 @@ const writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody = base64_rows.wri
 const writeBase64DecodeExitStructuredModule = base64_rows.writeBase64DecodeExitStructuredModule;
 const writeBase64TableLookupIrWriterBody = base64_rows.writeBase64TableLookupIrWriterBody;
 const writeBase64TableLookupStructuredModule = base64_rows.writeBase64TableLookupStructuredModule;
+
+pub const Emit = enum {
+    ir,
+    @"asm",
+    obj,
+    ir_writer,
+    semantic_descriptor,
+};
+
+pub fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {
+    var stderr_buffer: [4096]u8 = undefined;
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
+    stderr_writer.interface.print(fmt, args) catch {};
+    stderr_writer.interface.flush() catch {};
+    std.process.exit(2);
+}
 
 const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
 const source_wrapper_dispatch_name = "source-wrapper";
@@ -417,7 +433,7 @@ fn sdv2BodyName(descriptor: sd.Descriptor) []const u8 {
     return @import("semantic_descriptor_v2.zig").bodyName(descriptor.v2.body);
 }
 
-fn emitCodegenModule(
+pub fn emitCodegenModule(
     allocator: std.mem.Allocator,
     io: std.Io,
     module: ir.Module,
@@ -460,6 +476,57 @@ fn emitCodegenModule(
         try mc.elf.writeObjectWithModuleData(allocator, machines.items, module.aliases.items, module.globals.items, stdout);
     }
     try stdout.flush();
+}
+
+fn shouldLowerCodegenFunction(module: ir.Module, function: ir.Function) bool {
+    if (isCodegenRuntimeBoundaryFunction(function.name)) return false;
+    if (isCodegenRootFunction(module, function)) return true;
+    if (function.linkage != .private and function.linkage != .internal) return false;
+    if (!isCodegenSelectedDirectPrivateHelper(function.name)) return false;
+    for (module.functions.items) |caller| {
+        if (std.mem.eql(u8, caller.name, function.name)) continue;
+        if (!isCodegenRootFunction(module, caller)) continue;
+        if (functionDirectlyCalls(caller, function.name)) return true;
+    }
+    return false;
+}
+
+fn isCodegenRootFunction(module: ir.Module, function: ir.Function) bool {
+    if (std.mem.eql(u8, function.name, "main.testOne")) return true;
+    if (module.aliases.items.len == 0) return true;
+    if (function.linkage != .private and function.linkage != .internal) return true;
+    for (module.aliases.items) |alias| {
+        if (std.mem.eql(u8, alias.target, function.name)) return true;
+    }
+    return false;
+}
+
+fn isCodegenRuntimeBoundaryFunction(name: []const u8) bool {
+    return std.mem.startsWith(u8, name, "debug.") or
+        std.mem.startsWith(u8, name, "\"debug.");
+}
+
+fn isCodegenSelectedDirectPrivateHelper(name: []const u8) bool {
+    return std.mem.eql(u8, name, "runtime_tls_bump_main.bumpTls") or
+        std.mem.eql(u8, name, "runtime_side_effect_free_main.sideEffectFree") or
+        std.mem.eql(u8, name, "runtime_hidden_access_main.getHidden") or
+        std.mem.eql(u8, name, "runtime_hidden_access_main.updateHidden") or
+        std.mem.eql(u8, name, "runtime_mix_c_add_zig_main.add_zig") or
+        std.mem.eql(u8, name, "runtime_mix_c_add_may_panic_main.add_may_panic");
+}
+
+fn functionDirectlyCalls(function: ir.Function, callee_name: []const u8) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const call = switch (instruction.kind) {
+                .call => |call| call,
+                else => continue,
+            };
+            if (std.mem.eql(u8, call.callee, callee_name)) return true;
+        }
+    }
+    return false;
 }
 
 pub fn buildStructuredDirectModule(
@@ -3360,3 +3427,15 @@ fn writeReleaseSafeRuntimeSideEffectFreeStructuredModule(writer: *std.Io.Writer)
 }
 
 fn writeMinimalIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    _ = io;
+    _ = ir_path;
+    var module = sib.Module.init(writer);
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    try entry.ret(sib.int(.i32, "0"));
+    try function.end();
+}

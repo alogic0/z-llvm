@@ -123,9 +123,79 @@ const splitTopLevel = lowering_parser.splitTopLevel;
 const typed_v2 = @import("zig_air_lowering_typed_v2.zig");
 const typed_v2_fallbacks = @import("zig_air_lowering_typed_v2_fallbacks.zig");
 const legacy = @import("zig_air_lowering_legacy.zig");
-usingnamespace typed_v2;
-usingnamespace typed_v2_fallbacks;
-usingnamespace legacy;
+
+const runtimeNavSymbol = legacy.runtimeNavSymbol;
+const typedBlockBranchValue = lowering_parser.typedBlockBranchValue;
+const ensureBase64LookupGlobal = typed_v2_fallbacks.ensureBase64LookupGlobal;
+
+const typedV2RegisterAggregateRecords = typed_v2.typedV2RegisterAggregateRecords;
+const typedV2SretIntegerAggregateRecords = typed_v2.typedV2SretIntegerAggregateRecords;
+const typedV2SretIntegerAggregateCopyRecords = typed_v2.typedV2SretIntegerAggregateCopyRecords;
+const typedV2ErrorUnionPayloadRecords = typed_v2.typedV2ErrorUnionPayloadRecords;
+const typedV2MaybeErrorRecords = typed_v2.typedV2MaybeErrorRecords;
+const typedV2OptionalPayloadRecords = typed_v2.typedV2OptionalPayloadRecords;
+const typedV2OptionalPointerRecords = typed_v2.typedV2OptionalPointerRecords;
+const typedV2PackedReadFlagRecords = typed_v2.typedV2PackedReadFlagRecords;
+const typedV2PackedReplaceLowRecords = typed_v2.typedV2PackedReplaceLowRecords;
+const typedV2SliceSumRecords = typed_v2.typedV2SliceSumRecords;
+const typedV2ConditionalSliceSumRecords = typed_v2.typedV2ConditionalSliceSumRecords;
+const typedV2AccumulatorLoopRecords = typed_v2.typedV2AccumulatorLoopRecords;
+const typedV2ConditionalSlotUpdateRecords = typed_v2.typedV2ConditionalSlotUpdateRecords;
+const typedV2DenseIntegerSwitchResults = typed_v2.typedV2DenseIntegerSwitchResults;
+const typedV2ErrorSwitchRecords = typed_v2.typedV2ErrorSwitchRecords;
+const typedV2ErrorClassifierRecords = typed_v2.typedV2ErrorClassifierRecords;
+const typedV2RuntimeOptionalPointerMainRecords = typed_v2.typedV2RuntimeOptionalPointerMainRecords;
+const typedV2RuntimePointerLoadStoreMainRecords = typed_v2.typedV2RuntimePointerLoadStoreMainRecords;
+const typedV2MixCAddMayPanicRecords = typed_v2.typedV2MixCAddMayPanicRecords;
+const typedV2CheckedIntFromFloatRecords = typed_v2.typedV2CheckedIntFromFloatRecords;
+const lowerTypedV2ArraySum = legacy.lowerTypedV2ArraySum;
+const lowerTypedV2AggregatePairAbi = legacy.lowerTypedV2AggregatePairAbi;
+const lowerTypedV2SmallIntegerAggregateAbi = typed_v2.lowerTypedV2SmallIntegerAggregateAbi;
+const lowerTypedV2SretIntegerAggregateAbi = typed_v2.lowerTypedV2SretIntegerAggregateAbi;
+const lowerTypedV2ErrorUnionPayload = typed_v2.lowerTypedV2ErrorUnionPayload;
+const lowerTypedV2MaybeError = typed_v2.lowerTypedV2MaybeError;
+const lowerTypedV2OptionalPayload = typed_v2.lowerTypedV2OptionalPayload;
+const lowerTypedV2OptionalPointer = typed_v2.lowerTypedV2OptionalPointer;
+const lowerTypedV2PackedBits = typed_v2.lowerTypedV2PackedBits;
+const lowerTypedV2ConditionalSliceSum = typed_v2.lowerTypedV2ConditionalSliceSum;
+const lowerTypedV2SliceSum = typed_v2.lowerTypedV2SliceSum;
+const lowerTypedV2InlineAsmBarrier = typed_v2.lowerTypedV2InlineAsmBarrier;
+const lowerTypedV2AtomicAdd = typed_v2.lowerTypedV2AtomicAdd;
+const lowerTypedV2AccumulatorLoop = typed_v2.lowerTypedV2AccumulatorLoop;
+const lowerTypedV2ConditionalSlotUpdate = typed_v2.lowerTypedV2ConditionalSlotUpdate;
+const lowerTypedV2DenseIntegerSwitch = typed_v2.lowerTypedV2DenseIntegerSwitch;
+const lowerTypedV2ErrorSwitch = typed_v2.lowerTypedV2ErrorSwitch;
+const lowerTypedV2ErrorClassifier = typed_v2.lowerTypedV2ErrorClassifier;
+const lowerTypedV2RuntimeOptionalPointerMain = typed_v2.lowerTypedV2RuntimeOptionalPointerMain;
+const lowerTypedV2RuntimePointerLoadStoreMain = typed_v2.lowerTypedV2RuntimePointerLoadStoreMain;
+const lowerTypedV2MixCAddMayPanic = typed_v2.lowerTypedV2MixCAddMayPanic;
+const lowerTypedV2CheckedIntFromFloat = typed_v2.lowerTypedV2CheckedIntFromFloat;
+
+const lowerErrorClassify = typed_v2_fallbacks.lowerErrorClassify;
+const lowerErrorSwitch = typed_v2_fallbacks.lowerErrorSwitch;
+const lowerMixCAddMayPanic = typed_v2_fallbacks.lowerMixCAddMayPanic;
+
+const accumulatorLoopShape = legacy.accumulatorLoopShape;
+const conditionalSlotUpdateShape = legacy.conditionalSlotUpdateShape;
+const errorClassifyShape = legacy.errorClassifyShape;
+const arraySumShape = legacy.arraySumShape;
+const base64TableLookupShape = legacy.base64TableLookupShape;
+const isIntegerSwitchBlock = legacy.isIntegerSwitchBlock;
+const structSumShape = legacy.structSumShape;
+const errorSwitchShape = legacy.errorSwitchShape;
+const runtimeOptionalPointerMainShape = legacy.runtimeOptionalPointerMainShape;
+const runtimePointerLoadStoreMainShape = legacy.runtimePointerLoadStoreMainShape;
+const mixCAddMayPanicShape = legacy.mixCAddMayPanicShape;
+const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
+const lowerConditionalSlotUpdate = legacy.lowerConditionalSlotUpdate;
+const lowerRuntimeOptionalPointerMain = legacy.lowerRuntimeOptionalPointerMain;
+const lowerRuntimePointerLoadStoreMain = legacy.lowerRuntimePointerLoadStoreMain;
+const lowerIntegerSwitch = legacy.lowerIntegerSwitch;
+const lowerArraySum = legacy.lowerArraySum;
+const lowerStructSum = legacy.lowerStructSum;
+const lowerBase64TableLookup = legacy.lowerBase64TableLookup;
+const typedV2AggregatePairFirstRecords = legacy.typedV2AggregatePairFirstRecords;
+const typedV2AggregateMakePairRecords = legacy.typedV2AggregateMakePairRecords;
 
 pub fn lowerCompatible(
     allocator: std.mem.Allocator,
@@ -152,8 +222,8 @@ pub fn lowerCompatible(
 
     var unsupported: std.ArrayList(Diagnostic) = .empty;
     errdefer unsupported.deinit(allocator);
-    var typed_v2_fallbacks: std.ArrayList(TypedV2Fallback) = .empty;
-    errdefer typed_v2_fallbacks.deinit(allocator);
+    var typed_v2_fallback_list: std.ArrayList(TypedV2Fallback) = .empty;
+    errdefer typed_v2_fallback_list.deinit(allocator);
 
     for (air_module.globals) |air_global| {
         if (air_global.is_constant) continue;
@@ -199,7 +269,7 @@ pub fn lowerCompatible(
             break :function lowerFunctionTypedV2(allocator, &module, air_function, &typed_v2_fallback) catch |typed_err| switch (typed_err) {
                 error.UnsupportedAir => {
                     lowered_from_typed_v2 = false;
-                    try typed_v2_fallbacks.append(allocator, typed_v2_fallback orelse firstTypedV2Fallback(air_function));
+                    try typed_v2_fallback_list.append(allocator, typed_v2_fallback orelse firstTypedV2Fallback(air_function));
                     break :function lowerFunction(allocator, &module, air_function) catch |legacy_err| switch (legacy_err) {
                         error.UnsupportedAir => {
                             try unsupported.append(allocator, .{
@@ -244,7 +314,7 @@ pub fn lowerCompatible(
         .generic_lowering_functions = generic_lowering_functions,
         .shape_recognizer_functions = shape_recognizer_functions,
         .unsupported = try unsupported.toOwnedSlice(allocator),
-        .typed_v2_fallbacks = try typed_v2_fallbacks.toOwnedSlice(allocator),
+        .typed_v2_fallbacks = try typed_v2_fallback_list.toOwnedSlice(allocator),
     };
 }
 

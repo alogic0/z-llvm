@@ -4,6 +4,7 @@ const ir = @import("ir.zig");
 const lowering_parser = @import("zig_air_lowering_parser.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const target_mod = @import("target.zig");
+const legacy = @import("zig_air_lowering_legacy.zig");
 
 const ZigType = lowering_parser.ZigType;
 const FunctionType = lowering_parser.FunctionType;
@@ -12,10 +13,27 @@ const parseConstant = lowering_parser.parseConstant;
 const parseInstructionRef = lowering_parser.parseInstructionRef;
 const typedDetail = lowering_parser.typedDetail;
 const typedOperandTextDetail = lowering_parser.typedOperandTextDetail;
+const typedCallee = lowering_parser.typedCallee;
 const typedCalleeName = lowering_parser.typedCalleeName;
+const typedInstructionByIndex = lowering_parser.typedInstructionByIndex;
+const typedSingleInstructionByOpcode = lowering_parser.typedSingleInstructionByOpcode;
+const shortFunctionName = lowering_parser.shortFunctionName;
 const isCallOpcode = lowering_parser.isCallOpcode;
 const ownPrint = lowering_parser.ownPrint;
 const splitTopLevel = lowering_parser.splitTopLevel;
+const parseSymbolPointer = lowering_parser.parseSymbolPointer;
+
+const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
+const lowerConditionalSlotUpdate = legacy.lowerConditionalSlotUpdate;
+const lowerErrorUnionPayload = legacy.lowerErrorUnionPayload;
+const lowerOptionalPayload = legacy.lowerOptionalPayload;
+const lowerOptionalPointer = legacy.lowerOptionalPointer;
+const lowerPackedReadFlag = legacy.lowerPackedReadFlag;
+const lowerPackedReplaceLow = legacy.lowerPackedReplaceLow;
+const lowerRuntimeOptionalPointerMain = legacy.lowerRuntimeOptionalPointerMain;
+const lowerRuntimePointerLoadStoreMain = legacy.lowerRuntimePointerLoadStoreMain;
+const lowerSliceSum = legacy.lowerSliceSum;
+const lowerConditionalSliceSum = legacy.lowerConditionalSliceSum;
 
 pub fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) usize {
     var count: usize = 0;
@@ -49,6 +67,332 @@ pub fn typedCalleeNameCount(structured_air_v2: air_export.StructuredAirV2, calle
 
 pub fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
     return typedOpcodeCount(structured_air_v2, "store") + typedOpcodeCount(structured_air_v2, "store_safe");
+}
+
+fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
+    for (function.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
+    }
+    return false;
+}
+
+fn lowerRegisterAggregateMake(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    structured_air_v2: air_export.StructuredAirV2,
+) !ir.Function {
+    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    const aggregate_ty = function_type.return_type.ir_type;
+    if (!isSysVRegisterAggregateCandidate(aggregate_ty)) return error.UnsupportedAir;
+    if (function_type.params.len == 0 or function_type.params.len > 8) return error.UnsupportedAir;
+    var leaf_paths: [8][]const u8 = undefined;
+    if (!typedV2RegisterAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths)) return error.UnsupportedAir;
+    for (function_type.params) |param| {
+        if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and
+            !param.ir_type.eql(.float) and !param.ir_type.eql(.double)) return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    const arg_names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7" };
+    for (function_type.params, 0..) |param, index| {
+        try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_names[index] });
+    }
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "result", "result" };
+    var aggregate_value: ir.Value = .undef;
+    for (function_type.params, 0..) |param, index| {
+        _ = param;
+        try block.instructions.append(allocator, .{
+            .result = result_names[index],
+            .kind = .{ .insertvalue = .{
+                .aggregate_ty = aggregate_ty,
+                .aggregate = aggregate_value,
+                .value_ty = function_type.params[index].ir_type,
+                .value = .{ .named = arg_names[index] },
+                .indices = leaf_paths[index],
+            } },
+        });
+        aggregate_value = .{ .named = result_names[index] };
+    }
+    block.terminator = .{ .ret = .{ .ty = aggregate_ty, .value = aggregate_value } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerMaybeError(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or
+        !function_type.return_type.ir_type.eql(.{ .int = 64 }) or
+        !(function_type.params[0].ir_type.eql(.{ .int = 32 }) or function_type.params[0].ir_type.eql(.{ .int = 8 })))
+    {
+        return error.UnsupportedAir;
+    }
+    const param_ty = function_type.params[0].ir_type;
+    var function = ir.Function.init(lowering_parser.shortFunctionName(air_function.name), .{ .int = 64 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = param_ty, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_error",
+        .kind = .{ .icmp = .{ .predicate = .ne, .operand_ty = param_ty, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 0 } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_error" },
+            .ty = .{ .int = 64 },
+            .true_value = .{ .int = 1 },
+            .false_value = .{ .int = 7 },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerErrorSwitch(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_low",
+        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 1 } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "is_zero",
+        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 0 } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "error_value",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_low" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = -1 },
+            .false_value = .{ .int = -2 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_zero" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = 0 },
+            .false_value = .{ .named = "error_value" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerErrorClassify(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 64 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 64 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_low",
+        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 1 } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "is_zero",
+        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 0 } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "error_value",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_low" },
+            .ty = .{ .int = 64 },
+            .true_value = .{ .int = 1 },
+            .false_value = .{ .int = 2 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_zero" },
+            .ty = .{ .int = 64 },
+            .true_value = .{ .int = 0 },
+            .false_value = .{ .named = "error_value" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerMixCAddMayPanicChecked(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    checked_add: bool,
+) !ir.Function {
+    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+    try ensureNegativeIntGlobal(allocator, module);
+    const zig_k_name = try mixCGlobalName(module, air_function.name, "zig_k");
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = .internal;
+    function.calling_conv = "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    try entry.instructions.append(allocator, .{
+        .result = "is_negative",
+        .kind = .{ .icmp = .{ .predicate = .slt, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 0 } } },
+    });
+    entry.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "is_negative" },
+        .then_target = "panic",
+        .else_target = "ok",
+    } };
+    try function.blocks.append(allocator, entry);
+
+    var panic = ir.BasicBlock.init("panic");
+    errdefer panic.deinit(allocator);
+    var assume_call: ir.CallInst = .{ .ret_ty = .void, .callee = "llvm.assume", .args = .empty };
+    errdefer assume_call.deinit(allocator);
+    try assume_call.args.append(allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 1 } });
+    try panic.instructions.append(allocator, .{ .result = null, .kind = .{ .call = assume_call } });
+    var panic_call: ir.CallInst = .{ .ret_ty = .void, .callee = "debug.defaultPanic", .args = .empty };
+    errdefer panic_call.deinit(allocator);
+    try panic_call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = "@__anon_14658" } });
+    try panic_call.args.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 12 } });
+    try panic.instructions.append(allocator, .{ .result = null, .kind = .{ .call = panic_call } });
+    panic.terminator = .{ .@"unreachable" = {} };
+    try function.blocks.append(allocator, panic);
+
+    var ok = ir.BasicBlock.init("ok");
+    errdefer ok.deinit(allocator);
+    try ok.instructions.append(allocator, .{
+        .result = "zig_k",
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = zig_k_name } } },
+    });
+    if (checked_add) {
+        var add_call: ir.CallInst = .{
+            .ret_ty = .{ .aggregate = "{ i32, i1 }" },
+            .callee = "llvm.sadd.with.overflow.i32",
+            .args = .empty,
+        };
+        errdefer add_call.deinit(allocator);
+        try add_call.args.append(allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "zig_k" } });
+        try add_call.args.append(allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "arg0" } });
+        try ok.instructions.append(allocator, .{ .result = "checked_sum", .kind = .{ .call = add_call } });
+        try ok.instructions.append(allocator, .{
+            .result = "sum_overflow",
+            .kind = .{ .extractvalue = .{
+                .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+                .aggregate = .{ .named = "checked_sum" },
+                .indices = "1",
+                .result_ty = .{ .int = 1 },
+            } },
+        });
+        ok.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "sum_overflow" },
+            .then_target = "overflow",
+            .else_target = "ret",
+        } };
+    } else {
+        try ok.instructions.append(allocator, .{
+            .result = "sum",
+            .kind = .{ .binary = .{ .op = .add, .ty = .{ .int = 32 }, .lhs = .{ .named = "zig_k" }, .rhs = .{ .named = "arg0" } } },
+        });
+        ok.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
+    }
+    try function.blocks.append(allocator, ok);
+
+    if (checked_add) {
+        var overflow = ir.BasicBlock.init("overflow");
+        errdefer overflow.deinit(allocator);
+        var overflow_assume_call: ir.CallInst = .{ .ret_ty = .void, .callee = "llvm.assume", .args = .empty };
+        errdefer overflow_assume_call.deinit(allocator);
+        try overflow_assume_call.args.append(allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 1 } });
+        try overflow.instructions.append(allocator, .{ .result = null, .kind = .{ .call = overflow_assume_call } });
+        var overflow_call: ir.CallInst = .{ .ret_ty = .void, .callee = "debug.FullPanic((function 'defaultPanic')).integerOverflow", .args = .empty };
+        errdefer overflow_call.deinit(allocator);
+        try overflow.instructions.append(allocator, .{ .result = null, .kind = .{ .call = overflow_call } });
+        overflow.terminator = .{ .@"unreachable" = {} };
+        try function.blocks.append(allocator, overflow);
+
+        var ret = ir.BasicBlock.init("ret");
+        errdefer ret.deinit(allocator);
+        try ret.instructions.append(allocator, .{
+            .result = "sum",
+            .kind = .{ .extractvalue = .{
+                .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+                .aggregate = .{ .named = "checked_sum" },
+                .indices = "0",
+                .result_ty = .{ .int = 32 },
+            } },
+        });
+        ret.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
+        try function.blocks.append(allocator, ret);
+    }
+    return function;
+}
+
+fn mixCGlobalName(module: *ir.Module, function_name: []const u8, field_name: []const u8) ![]const u8 {
+    const dot = std.mem.lastIndexOfScalar(u8, function_name, '.') orelse return error.UnsupportedAir;
+    return ownPrint(module, "@{s}.{s}", .{ function_name[0..dot], field_name });
+}
+
+fn ensureNegativeIntGlobal(allocator: std.mem.Allocator, module: *ir.Module) !void {
+    for (module.globals.items) |global| {
+        if (std.mem.eql(u8, global.name, "__anon_14658")) return;
+    }
+    try module.globals.append(allocator, .{
+        .name = "__anon_14658",
+        .linkage = .private,
+        .address_attrs = "unnamed_addr",
+        .kind = .constant,
+        .ty = .{ .aggregate = "[13 x i8]" },
+        .initializer = .{ .c_string = "c\"negative int\\00\"" },
+    });
 }
 
 pub fn lowerTypedV2SmallIntegerAggregateAbi(

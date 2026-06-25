@@ -18,6 +18,9 @@ const buildStructuredDirectModule = main_flow_writer.buildStructuredDirectModule
 const buildStructuredDirectModuleFromDescriptor = main_flow_writer.buildStructuredDirectModuleFromDescriptor;
 const runStructuredDirectAcceptedPipeline = main_flow_writer.runStructuredDirectAcceptedPipeline;
 const runStructuredDirectAcceptedPipelineForSurface = main_flow_writer.runStructuredDirectAcceptedPipelineForSurface;
+const emitCodegenModule = main_flow_writer.emitCodegenModule;
+const fatal = main_flow_writer.fatal;
+const Emit = main_flow_writer.Emit;
 
 const usage =
     \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
@@ -31,14 +34,6 @@ const usage =
 ;
 
 const default_input_limit = 1024 * 1024;
-
-const Emit = enum {
-    ir,
-    @"asm",
-    obj,
-    ir_writer,
-    semantic_descriptor,
-};
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -332,12 +327,4 @@ fn functionDirectlyCalls(function: ir.Function, callee_name: []const u8) bool {
         }
     }
     return false;
-}
-
-fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {
-    var stderr_buffer: [4096]u8 = undefined;
-    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
-    stderr_writer.interface.print(fmt, args) catch {};
-    stderr_writer.interface.flush() catch {};
-    std.process.exit(2);
 }

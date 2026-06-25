@@ -2,14 +2,35 @@ const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const ir = @import("ir.zig");
 const lowering_parser = @import("zig_air_lowering_parser.zig");
-const typed_v2 = @import("zig_air_lowering_typed_v2.zig");
-const typed_v2_fallbacks = @import("zig_air_lowering_typed_v2_fallbacks.zig");
 
-usingnamespace lowering_parser;
-usingnamespace typed_v2;
-usingnamespace typed_v2_fallbacks;
+const FunctionType = lowering_parser.FunctionType;
+const parseConstant = lowering_parser.parseConstant;
+const parseFunctionType = lowering_parser.parseFunctionType;
+const parseInstructionRef = lowering_parser.parseInstructionRef;
+const shortFunctionName = lowering_parser.shortFunctionName;
+const ownPrint = lowering_parser.ownPrint;
+const splitTopLevel = lowering_parser.splitTopLevel;
+const isIgnoredOpcode = lowering_parser.isIgnoredOpcode;
+const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
 
-fn lowerTypedV2ArraySum(
+fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) usize {
+    var count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, opcode)) count += 1;
+    }
+    return count;
+}
+
+fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
+    return typedOpcodeCount(structured_air_v2, "store") + typedOpcodeCount(structured_air_v2, "store_safe");
+}
+
+fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
+    return typedOpcodeCount(structured_air_v2, "ret") > 0 or
+        typedOpcodeCount(structured_air_v2, "ret_safe") > 0;
+}
+
+pub fn lowerTypedV2ArraySum(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
     function_type: FunctionType,
@@ -67,7 +88,7 @@ fn lowerTypedV2ArraySum(
     return function;
 }
 
-fn lowerTypedV2AggregatePairAbi(
+pub fn lowerTypedV2AggregatePairAbi(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
     function_type: FunctionType,
@@ -82,7 +103,7 @@ fn lowerTypedV2AggregatePairAbi(
     return null;
 }
 
-fn typedV2AggregatePairFirstRecords(
+pub fn typedV2AggregatePairFirstRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
@@ -101,7 +122,7 @@ fn typedV2AggregatePairFirstRecords(
         typedHasReturnOpcode(structured_air_v2);
 }
 
-fn typedV2AggregateMakePairRecords(
+pub fn typedV2AggregateMakePairRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
@@ -125,7 +146,7 @@ const AccumulatorLoopShape = struct {
     limit_arg: u32,
 };
 
-fn accumulatorLoopShape(function: air_export.Function) ?AccumulatorLoopShape {
+pub fn accumulatorLoopShape(function: air_export.Function) ?AccumulatorLoopShape {
     var limit_arg: ?u32 = null;
     var index_slot: ?u32 = null;
     var sum_slot: ?u32 = null;
@@ -327,7 +348,7 @@ fn airInstructionByIndex(function: air_export.Function, index: u32) ?air_export.
     return null;
 }
 
-fn runtimeNavSymbol(function: air_export.Function) ?[]const u8 {
+pub fn runtimeNavSymbol(function: air_export.Function) ?[]const u8 {
     for (function.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) continue;
         var fields = splitTopLevel(instruction.payload, ',');
@@ -343,7 +364,7 @@ fn runtimeNavSymbol(function: air_export.Function) ?[]const u8 {
     return null;
 }
 
-fn lowerAccumulatorLoop(
+pub fn lowerAccumulatorLoop(
     allocator: std.mem.Allocator,
     module: *ir.Module,
     air_function: air_export.Function,
@@ -443,7 +464,7 @@ const SwitchRange = struct {
     last: u8,
 };
 
-fn isIntegerSwitchBlock(function: air_export.Function) bool {
+pub fn isIntegerSwitchBlock(function: air_export.Function) bool {
     var switch_count: usize = 0;
     var block_count: usize = 0;
     var branch_count: usize = 0;
@@ -469,7 +490,7 @@ fn isIntegerSwitchBlock(function: air_export.Function) bool {
         std.mem.indexOf(u8, function.air_text, "else => {") != null;
 }
 
-fn lowerIntegerSwitch(
+pub fn lowerIntegerSwitch(
     allocator: std.mem.Allocator,
     module: *ir.Module,
     air_function: air_export.Function,
@@ -581,7 +602,7 @@ fn parseSwitchBranchResult(line: []const u8) ?i32 {
     return std.fmt.parseInt(i32, std.mem.trim(u8, line[value_start..value_end], " "), 10) catch null;
 }
 
-fn conditionalSlotUpdateShape(function: air_export.Function) bool {
+pub fn conditionalSlotUpdateShape(function: air_export.Function) bool {
     var slot: ?u32 = null;
     var first_arg: ?u32 = null;
     var second_arg: ?u32 = null;
@@ -640,7 +661,7 @@ fn findSlotBinaryUpdate(
     return null;
 }
 
-fn lowerConditionalSlotUpdate(
+pub fn lowerConditionalSlotUpdate(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
 ) !ir.Function {
@@ -698,7 +719,7 @@ fn lowerConditionalSlotUpdate(
     return function;
 }
 
-fn arraySumShape(function: air_export.Function) bool {
+pub fn arraySumShape(function: air_export.Function) bool {
     var aggregate_count: usize = 0;
     var elem_ptr_count: usize = 0;
     var load_count: usize = 0;
@@ -722,7 +743,7 @@ fn arraySumShape(function: air_export.Function) bool {
     return aggregate_count == 1 and elem_ptr_count == 3 and load_count == 3 and add_count == 2;
 }
 
-fn structSumShape(function: air_export.Function) bool {
+pub fn structSumShape(function: air_export.Function) bool {
     var field_zero = false;
     var field_one = false;
     var i32_loads: usize = 0;
@@ -803,7 +824,7 @@ fn maybeErrorShape(function: air_export.Function) bool {
         functionHasReturnOpcode(function);
 }
 
-fn errorSwitchShape(function: air_export.Function) bool {
+pub fn errorSwitchShape(function: air_export.Function) bool {
     return std.mem.eql(u8, function.name, "error_switch.error_switch") and
         functionHasOpcode(function, "call") and
         functionHasOpcode(function, "is_non_err") and
@@ -811,13 +832,13 @@ fn errorSwitchShape(function: air_export.Function) bool {
         functionHasOpcode(function, "switch_br");
 }
 
-fn errorClassifyShape(function: air_export.Function) bool {
+pub fn errorClassifyShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".classify") and
         functionHasOpcode(function, "switch_br") and
         functionHasReturnOpcode(function);
 }
 
-fn base64TableLookupShape(function: air_export.Function) bool {
+pub fn base64TableLookupShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".base64_table_lookup") and
         functionHasOpcode(function, "bit_and") and
         (functionHasOpcode(function, "intcast") or functionHasOpcode(function, "intcast_safe")) and
@@ -825,7 +846,7 @@ fn base64TableLookupShape(function: air_export.Function) bool {
         functionHasReturnOpcode(function);
 }
 
-fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
+pub fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
     return std.mem.eql(u8, function.name, "runtime_optional_pointer_main.main") and
         functionHasOpcode(function, "call") and
         functionHasOpcode(function, "cmp_eq") and
@@ -834,7 +855,7 @@ fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
         functionHasReturnOpcode(function);
 }
 
-fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
+pub fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
     return std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.main") and
         functionHasOpcode(function, "call") and
         functionHasOpcode(function, "load") and
@@ -844,7 +865,7 @@ fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
         functionHasReturnOpcode(function);
 }
 
-fn mixCAddMayPanicShape(function: air_export.Function) bool {
+pub fn mixCAddMayPanicShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".add_may_panic") and
         functionHasOpcode(function, "cmp_lt") and
         functionHasOpcode(function, "cond_br") and
@@ -870,7 +891,7 @@ fn functionHasStoreOpcode(function: air_export.Function) bool {
     return functionHasOpcode(function, "store") or functionHasOpcode(function, "store_safe");
 }
 
-fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 3 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
@@ -910,7 +931,7 @@ fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function
     return function;
 }
 
-fn lowerStructSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerStructSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or function_type.params[0].ir_type != .ptr or
@@ -956,7 +977,7 @@ fn lowerStructSum(allocator: std.mem.Allocator, air_function: air_export.Functio
     return function;
 }
 
-fn lowerBase64TableLookup(allocator: std.mem.Allocator, module: *ir.Module, air_function: air_export.Function) !ir.Function {
+pub fn lowerBase64TableLookup(allocator: std.mem.Allocator, module: *ir.Module, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
@@ -1004,7 +1025,7 @@ fn lowerBase64TableLookup(allocator: std.mem.Allocator, module: *ir.Module, air_
     return function;
 }
 
-fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
@@ -1063,7 +1084,7 @@ fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_function: a
     return function;
 }
 
-fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function, add_imm: i32) !ir.Function {
+pub fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function, add_imm: i32) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or function_type.params[0].ir_type != .ptr or
@@ -1130,7 +1151,7 @@ fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.F
     return function;
 }
 
-fn lowerRuntimePointerLoadStoreMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerRuntimePointerLoadStoreMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
@@ -1190,7 +1211,7 @@ fn lowerRuntimePointerLoadStoreMain(allocator: std.mem.Allocator, air_function: 
     return function;
 }
 
-fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_export.Function, fallback: i32) !ir.Function {
+pub fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_export.Function, fallback: i32) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 2 or
@@ -1232,7 +1253,7 @@ fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_export.F
     return function;
 }
 
-fn lowerErrorUnionPayload(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerErrorUnionPayload(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or
@@ -1272,7 +1293,7 @@ fn lowerErrorUnionPayload(allocator: std.mem.Allocator, air_function: air_export
     return function;
 }
 
-fn lowerSliceSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerSliceSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 2 or function_type.params[0].ir_type != .ptr or
@@ -1314,7 +1335,7 @@ fn lowerSliceSum(allocator: std.mem.Allocator, air_function: air_export.Function
     return function;
 }
 
-fn lowerConditionalSliceSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerConditionalSliceSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 3 or function_type.params[0].ir_type != .ptr or
@@ -1358,7 +1379,7 @@ fn lowerConditionalSliceSum(allocator: std.mem.Allocator, air_function: air_expo
     return function;
 }
 
-fn lowerPackedReadFlag(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerPackedReadFlag(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
@@ -1387,7 +1408,7 @@ fn lowerPackedReadFlag(allocator: std.mem.Allocator, air_function: air_export.Fu
     return function;
 }
 
-fn lowerPackedReplaceLow(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+pub fn lowerPackedReplaceLow(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 2 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or

@@ -1015,7 +1015,7 @@ pub const TopLevelSplit = struct {
     separator: u8,
     offset: usize = 0,
 
-    fn next(self: *TopLevelSplit) ?[]const u8 {
+    pub fn next(self: *TopLevelSplit) ?[]const u8 {
         if (self.offset > self.text.len) return null;
         const start = self.offset;
         var paren_depth: usize = 0;
