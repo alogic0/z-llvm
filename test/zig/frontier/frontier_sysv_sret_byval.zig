@@ -106,6 +106,41 @@ const Big20 = extern struct {
     t: i64,
 };
 
+const Big32 = extern struct {
+    a: i64,
+    b: i64,
+    c: i64,
+    d: i64,
+    e: i64,
+    f: i64,
+    g: i64,
+    h: i64,
+    i: i64,
+    j: i64,
+    k: i64,
+    l: i64,
+    m: i64,
+    n: i64,
+    o: i64,
+    p: i64,
+    q: i64,
+    r: i64,
+    s: i64,
+    t: i64,
+    u: i64,
+    v: i64,
+    w: i64,
+    x: i64,
+    y: i64,
+    z: i64,
+    aa: i64,
+    ab: i64,
+    ac: i64,
+    ad: i64,
+    ae: i64,
+    af: i64,
+};
+
 const BigNested = extern struct {
     left: Big3,
     right: Big3,
@@ -228,6 +263,7 @@ const BigByteTail5CopyFn = *const fn (BigByteTail5) callconv(.c) BigByteTail5;
 const BigByteTail6CopyFn = *const fn (BigByteTail6) callconv(.c) BigByteTail6;
 const BigByteTail7CopyFn = *const fn (BigByteTail7) callconv(.c) BigByteTail7;
 const BigWordTailCopyFn = *const fn (BigWordTail) callconv(.c) BigWordTail;
+const Big32CopyFn = *const fn (Big32) callconv(.c) Big32;
 
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
     return .{ .a = a, .b = b, .c = c };
@@ -363,6 +399,18 @@ export fn frontier_big20_inner(value: Big20) i64 {
 
 export fn frontier_big20_copy(value: Big20) Big20 {
     return value;
+}
+
+export fn frontier_big32_copy(value: Big32) Big32 {
+    return value;
+}
+
+export fn frontier_direct_big32_copy(value: Big32) Big32 {
+    return frontier_big32_copy(value);
+}
+
+export fn frontier_indirect_big32_copy(func: Big32CopyFn, value: Big32) Big32 {
+    return func(value);
 }
 
 export fn frontier_big_nested_copy(value: BigNested) BigNested {

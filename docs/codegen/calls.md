@@ -216,7 +216,7 @@ accepted frontier:
   SSE eightbyte moves between XMM argument slots and the INTEGER eightbyte
   already occupies the destination GPR slot
   generated normal integer-leaf MEMORY aggregate hidden-sret return storage and
-  byval-to-sret copies currently proven through twenty flat fields, a nested
+  byval-to-sret copies currently proven through thirty-two flat fields, a nested
   two-Big3 aggregate, a mixed-width `{ i64, i32, i64, i32 }` aggregate, and
   nested `i8`/`i16`/`i32`/`i64` leaf copy, and array-backed `{ [5 x i64] }`
   copy/read rows, plus the first
@@ -310,7 +310,7 @@ The source pointer may itself arrive in a register or an incoming stack slot, wi
 unit proof for one-, two-, array-backed three-, and nested three-eightbyte
 payloads, single-`i8`, single-`i16`, single-`i32`, `[3 x i32]`
 tail payloads, composite 3-/5-/6-/7-byte tails, and max-sized exact-eightbyte
-payloads through the current 24-stack-argument limit. Source-owned frontier
+payloads through the current 32-stack-argument limit. Source-owned frontier
 rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`, and
 `[9 x i16]` MEMORY byval-to-sret byte-/word-tail copies through direct and
 function-pointer calls.

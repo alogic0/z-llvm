@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=422`,
-`generic_codegen_functions=422`, `generic_cfg_functions=422`,
+frontier gate reports `source_rows=13`, `discovered_functions=425`,
+`generic_codegen_functions=425`, `generic_cfg_functions=425`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=422`, `object_failures=0`,
+`object_emitted_functions=425`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -604,7 +604,7 @@ reads including single-eightbyte `{ f32, f32 }` direct/shifted/indirect call
 pass-through, `[2]f64` array-in-struct,
 and nested `{ { double }, { double } }`, selected stack-passed register
 aggregate field reads, and generated normal
-MEMORY integer-leaf field/copy forms currently proven through twenty flat
+MEMORY integer-leaf field/copy forms currently proven through thirty-two flat
 fields, a nested two-Big3 aggregate, a mixed-width
 `{ i64, i32, i64, i32 }` copy, and array-backed `{ [5 x i64] }` copy/read rows,
 arbitrary non-selected sret/byval copies,

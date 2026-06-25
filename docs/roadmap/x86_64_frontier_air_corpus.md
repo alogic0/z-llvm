@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=422
-structured_functions=422
-generic_codegen_functions=422
-generic_cfg_functions=422
+discovered_functions=425
+structured_functions=425
+generic_codegen_functions=425
+generic_cfg_functions=425
 structural_matcher_functions=0
-structured_air_v2_functions=422
-typed_air_operand_functions=422
+structured_air_v2_functions=425
+typed_air_operand_functions=425
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=422
+generic_lowering_functions=425
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=422
+object_emitted_functions=425
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -126,7 +126,7 @@ Closed in the current memory/aggregate frontier slice:
   generates field names and ABI attrs instead of using a fixed field-count
   table, and the same selected normal MEMORY aggregates copy all scalar integer
   leaves from the stack-passed by-value argument to the hidden sret destination
-  using layout-derived byte offsets, including the flat twenty-field BigN row,
+  using layout-derived byte offsets, including the flat thirty-two-field BigN row,
   the nested `{ { i64, i64, i64 },
   { i64, i64, i64 } }` copy/read row and the mixed-width
   `{ i64, i32, i64, i32 }` copy row; the nested
@@ -151,7 +151,9 @@ Closed in the current memory/aggregate frontier slice:
   `movss` stack loads and hidden-sret stores, and `BigDoubleArray` proves an
   array-of-double MEMORY aggregate through the same recursive copy path; the
   `BigArrayMixed` row combines array-contained `i32`, array-contained `f64`,
-  and pointer leaves in one byval-to-sret MEMORY aggregate;
+  and pointer leaves in one byval-to-sret MEMORY aggregate; `Big32` raises the
+  same planner-owned byval-to-sret direct and pointer-callee copy path to the
+  safe 32-eightbyte stack-copy window;
   `frontier_direct_big5_copy`,
   `frontier_indirect_big5_copy`, `frontier_direct_big_double_copy`,
   `frontier_indirect_big_double_copy`, `frontier_direct_big_float_copy`,
@@ -702,7 +704,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   array-in-struct, and nested `{ { double }, { double } }`, selected
   stack-passed register aggregate field reads, and generated
   normal MEMORY aggregate sret/byval field/copy forms currently proven
-  through twenty flat fields, a nested two-Big3 aggregate, mixed-width
+  through thirty-two flat fields, a nested two-Big3 aggregate, mixed-width
   `{ i64, i32, i64, i32 }` and `{ i8, { i16, i32 }, i64 }` copies,
   array-backed `{ [5 x i64] }` copy/read rows,
   a `double`-leaf copy, a mixed pointer/`double`/`i64` copy, and the
