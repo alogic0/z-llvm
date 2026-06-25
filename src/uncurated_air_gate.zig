@@ -2337,6 +2337,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct FloatArray z_frontier_float_array_make(float, float, float, float) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_make");
     \\extern float z_frontier_float_array_call_sum(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_call_sum");
     \\extern float z_frontier_indirect_float_array_sum(float (*)(struct FloatArray), struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_float_array_sum");
+    \\extern float z_frontier_stack_float_array_call_sum_after_eight(double, double, double, double, double, double, double, double, struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_stack_float_array_call_sum_after_eight");
     \\extern struct FloatArray z_frontier_float_array_call_make(float, float, float, float) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_call_make");
     \\extern struct FloatArray z_frontier_indirect_float_array_make(struct FloatArray (*)(float, float, float, float), float, float, float, float) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_float_array_make");
     \\extern double z_frontier_reverse_mixed_float(struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_float");
@@ -2427,6 +2428,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (made_float_array.values[0] != 5.25f || made_float_array.values[1] != 6.5f || made_float_array.values[2] != 7.75f || made_float_array.values[3] != 8.25f) return 71;
     \\    if (z_frontier_float_array_call_sum(float_array) != 12.0f) return 72;
     \\    if (z_frontier_indirect_float_array_sum(frontier_sum_float_array, float_array) != 12.0f) return 73;
+    \\    if (z_frontier_stack_float_array_call_sum_after_eight(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, float_array) != 12.0f) return 79;
     \\    struct FloatArray call_made_float_array = z_frontier_float_array_call_make(9.0f, 10.25f, 11.5f, 12.75f);
     \\    if (call_made_float_array.values[0] != 9.0f || call_made_float_array.values[1] != 10.25f || call_made_float_array.values[2] != 11.5f || call_made_float_array.values[3] != 12.75f) return 74;
     \\    struct FloatArray indirect_made_float_array = z_frontier_indirect_float_array_make(frontier_make_float_array, 13.0f, 14.25f, 15.5f, 16.75f);

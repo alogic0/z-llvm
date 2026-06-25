@@ -1100,8 +1100,7 @@ pub fn emitAggregateFloatTerm(
             }
         },
         .stack => |offset| {
-            if (dest != .xmm0) return error.UnsupportedCodegenAbi;
-            try appendLoadStackDispXmm0F32(allocator, machine, offset);
+            try appendLoadStackDispXmmF32(allocator, machine, dest, offset);
         },
         .gpr => return error.UnsupportedCodegenAbi,
     }
@@ -1152,6 +1151,15 @@ pub fn appendLoadStackDispXmm0F32(allocator: std.mem.Allocator, machine: *Machin
         try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm0_f32 = @intCast(offset) });
     } else {
         try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm0_f32 = offset });
+    }
+}
+
+pub fn appendLoadStackDispXmmF32(allocator: std.mem.Allocator, machine: *MachineFunction, reg: XmmReg, offset: u32) !void {
+    if (reg == .xmm0) return appendLoadStackDispXmm0F32(allocator, machine, offset);
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm_f32 = .{ .reg = reg, .disp = @intCast(offset) } });
+    } else {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm_f32 = .{ .reg = reg, .disp = offset } });
     }
 }
 

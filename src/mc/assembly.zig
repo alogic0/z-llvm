@@ -158,6 +158,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .load_stack_disp32_xmm0_f32 => |offset| try writer.print("\tmovss {}(%rsp), %xmm0\n", .{offset}),
             .load_stack_disp8_xmm => |load| try writer.print("\tmovsd {}(%rsp), {s}\n", .{ load.disp, load.reg.name() }),
             .load_stack_disp32_xmm => |load| try writer.print("\tmovsd {}(%rsp), {s}\n", .{ load.disp, load.reg.name() }),
+            .load_stack_disp8_xmm_f32 => |load| try writer.print("\tmovss {}(%rsp), {s}\n", .{ load.disp, load.reg.name() }),
+            .load_stack_disp32_xmm_f32 => |load| try writer.print("\tmovss {}(%rsp), {s}\n", .{ load.disp, load.reg.name() }),
             .load_stack_disp8_arg32 => |load| try writer.print("\tmovl {}(%rsp), {s}\n", .{ load.disp, load.reg.name32() }),
             .load_stack_disp8_arg64 => |load| try writer.print("\tmovq {}(%rsp), {s}\n", .{ load.disp, load.reg.name64() }),
             .load_stack_disp32_arg32 => |load| try writer.print("\tmovl {}(%rsp), {s}\n", .{ load.disp, load.reg.name32() }),

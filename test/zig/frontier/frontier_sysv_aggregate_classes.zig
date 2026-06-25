@@ -233,6 +233,18 @@ noinline fn helperFloatArraySum(value: FloatArray) f32 {
     return value.values[0] + value.values[1] + value.values[2] + value.values[3];
 }
 
+noinline fn helperFloatArraySumAfterEight(a0: f64, a1: f64, a2: f64, a3: f64, a4: f64, a5: f64, a6: f64, a7: f64, value: FloatArray) f32 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    return value.values[0] + value.values[1] + value.values[2] + value.values[3];
+}
+
 noinline fn helperFloatArrayMake(a: f32, b: f32, c: f32, d: f32) FloatArray {
     return .{ .values = .{ a, b, c, d } };
 }
@@ -243,6 +255,10 @@ export fn frontier_float_array_call_sum(value: FloatArray) f32 {
 
 export fn frontier_indirect_float_array_sum(func: FloatArraySumFn, value: FloatArray) f32 {
     return func(value);
+}
+
+export fn frontier_stack_float_array_call_sum_after_eight(a0: f64, a1: f64, a2: f64, a3: f64, a4: f64, a5: f64, a6: f64, a7: f64, value: FloatArray) f32 {
+    return helperFloatArraySumAfterEight(a0, a1, a2, a3, a4, a5, a6, a7, value);
 }
 
 export fn frontier_float_array_call_make(a: f32, b: f32, c: f32, d: f32) FloatArray {

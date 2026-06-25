@@ -226,16 +226,23 @@ test "x86_64 encoding loads stack displacements into arbitrary xmm registers" {
     defer machine.deinit(std.testing.allocator);
     try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp8_xmm = .{ .reg = .xmm1, .disp = 16 } });
     try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp32_xmm = .{ .reg = .xmm2, .disp = 128 } });
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp8_xmm_f32 = .{ .reg = .xmm3, .disp = 24 } });
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp32_xmm_f32 = .{ .reg = .xmm4, .disp = 136 } });
     try machine.instructions.append(std.testing.allocator, .ret);
 
     try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .load_stack_disp8_xmm = .{ .reg = .xmm1, .disp = 16 } }));
     try std.testing.expectEqual(@as(u32, 9), mc.encoding.instructionSize(.{ .load_stack_disp32_xmm = .{ .reg = .xmm2, .disp = 128 } }));
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .load_stack_disp8_xmm_f32 = .{ .reg = .xmm3, .disp = 24 } }));
+    try std.testing.expectEqual(@as(u32, 9), mc.encoding.instructionSize(.{ .load_stack_disp32_xmm_f32 = .{ .reg = .xmm4, .disp = 136 } }));
     const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
     try std.testing.expectEqualSlices(u8, &.{
         0xf2, 0x0f, 0x10, 0x4c, 0x24, 0x10,
         0xf2, 0x0f, 0x10, 0x94, 0x24, 0x80,
-        0x00, 0x00, 0x00, 0xc3,
+        0x00, 0x00, 0x00, 0xf3, 0x0f, 0x10,
+        0x5c, 0x24, 0x18, 0xf3, 0x0f, 0x10,
+        0xa4, 0x24, 0x88, 0x00, 0x00, 0x00,
+        0xc3,
     }, bytes);
 }
 

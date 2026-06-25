@@ -220,6 +220,14 @@ pub const Instruction = union(enum) {
         reg: XmmReg,
         disp: u32,
     },
+    load_stack_disp8_xmm_f32: struct {
+        reg: XmmReg,
+        disp: u8,
+    },
+    load_stack_disp32_xmm_f32: struct {
+        reg: XmmReg,
+        disp: u32,
+    },
     load_stack_disp8_arg32: struct {
         reg: ArgReg,
         disp: u8,

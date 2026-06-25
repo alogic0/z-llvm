@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=395
-structured_functions=395
-generic_codegen_functions=395
-generic_cfg_functions=395
+discovered_functions=397
+structured_functions=397
+generic_codegen_functions=397
+generic_cfg_functions=397
 structural_matcher_functions=0
-structured_air_v2_functions=395
-typed_air_operand_functions=395
+structured_air_v2_functions=397
+typed_air_operand_functions=397
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=395
+generic_lowering_functions=397
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=395
+object_emitted_functions=397
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -273,6 +273,12 @@ Closed in the current memory/aggregate frontier slice:
   two f32 lanes into each SSE return register, and direct plus pointer-callee
   helper calls spill/reload the paired SSE eightbytes while lowering the
   helper's four-lane f32 add body generically
+- stack-passed `[4]f32` SSE/SSE aggregate row in
+  `frontier_sysv_aggregate_classes.zig`:
+  `frontier_stack_float_array_call_sum_after_eight` exhausts the SSE argument
+  stream before passing `[4]f32` through a private helper; the generic f32
+  aggregate term path now loads stack-resident float fields into arbitrary XMM
+  temporaries with `movss`
 - first SSE live-across-call row in `frontier_sysv_abi.zig`: one live
   `f32`/`f64` parameter is spilled from `%xmm0` to an aligned frame slot,
   another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
