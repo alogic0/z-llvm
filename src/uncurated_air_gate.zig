@@ -1645,6 +1645,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern float z_frontier_f32_live_after_call(float, float) __asm__("frontier_sysv_abi.frontier_f32_live_after_call");
     \\extern double z_frontier_f64_live_after_call(double, double) __asm__("frontier_sysv_abi.frontier_f64_live_after_call");
     \\extern double z_frontier_deep_stack_f64_live_after_call(double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_deep_stack_f64_live_after_call");
+    \\extern float z_frontier_deep_stack_f32_live_after_call(float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_deep_stack_f32_live_after_call");
     \\extern float z_frontier_two_f32_live_sum_after_call(float, float) __asm__("frontier_sysv_abi.frontier_two_f32_live_sum_after_call");
     \\extern double z_frontier_two_f64_live_sum_after_call(double, double) __asm__("frontier_sysv_abi.frontier_two_f64_live_sum_after_call");
     \\extern float z_frontier_indirect_two_f32_live_sum_after_call(void (*)(void), float, float) __asm__("frontier_sysv_abi.frontier_indirect_two_f32_live_sum_after_call");
@@ -1957,6 +1958,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_f32_live_after_call(4.5f, 2.25f) != 4.5f || frontier_seen_f32 != 2.25f) return 9;
     \\    if (z_frontier_f64_live_after_call(9.5, 3.25) != 9.5 || frontier_seen_f64 != 3.25) return 10;
     \\    if (z_frontier_deep_stack_f64_live_after_call(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.5) != 40.5) return 142;
+    \\    if (z_frontier_deep_stack_f32_live_after_call(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f, 19.0f, 20.0f, 21.0f, 22.0f, 23.0f, 24.0f, 25.0f, 26.0f, 27.0f, 28.0f, 29.0f, 30.0f, 31.0f, 32.0f, 33.0f, 34.0f, 35.0f, 36.0f, 37.0f, 38.0f, 39.0f, 40.5f) != 40.5f) return 143;
     \\    if (z_frontier_two_f32_live_sum_after_call(1.5f, 2.75f) != 4.25f) return 11;
     \\    if (z_frontier_two_f64_live_sum_after_call(1.25, 2.5) != 3.75) return 12;
     \\    if (z_frontier_indirect_two_f32_live_sum_after_call(frontier_touch_none, 1.5f, 2.75f) != 4.25f) return 56;

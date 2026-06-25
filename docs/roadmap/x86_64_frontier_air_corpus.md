@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=404
-structured_functions=404
-generic_codegen_functions=404
-generic_cfg_functions=404
+discovered_functions=405
+structured_functions=405
+generic_codegen_functions=405
+generic_cfg_functions=405
 structural_matcher_functions=0
-structured_air_v2_functions=404
-typed_air_operand_functions=404
+structured_air_v2_functions=405
+typed_air_operand_functions=405
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=404
+generic_lowering_functions=405
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=404
+object_emitted_functions=405
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -296,10 +296,11 @@ Closed in the current memory/aggregate frontier slice:
   `f32`/`f64` parameter is spilled from `%xmm0` to an aligned frame slot,
   another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
   and the saved value is reloaded to `%xmm0` for return
-- deep stack-resident `f64` parameter return in `frontier_sysv_abi.zig`:
-  `frontier_deep_stack_f64_live_after_call` exhausts the SSE argument stream
-  and proves the FP void-call return helper can restore `%rsp` and reload a
-  stack-passed double through a disp32 incoming stack offset
+- deep stack-resident `f32`/`f64` parameter returns in
+  `frontier_sysv_abi.zig`: `frontier_deep_stack_f32_live_after_call` and
+  `frontier_deep_stack_f64_live_after_call` exhaust the SSE argument stream
+  and prove the FP void-call return helper can restore `%rsp` and reload a
+  stack-passed float or double through a disp32 incoming stack offset
 - stack-passed live i32 rows in `frontier_sysv_abi.zig`: all six SysV GPR
   `i32` parameters are spilled/reloaded around a direct helper call while more
   than six stack-passed `i32` parameters are read from the restored incoming
