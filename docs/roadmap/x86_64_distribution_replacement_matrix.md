@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=369`,
-`generic_codegen_functions=369`, `generic_cfg_functions=369`,
+three release modes at `source_rows=13`, `discovered_functions=380`,
+`generic_codegen_functions=380`, `generic_cfg_functions=380`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=369`, `object_failures=0`,
+`object_emitted_functions=380`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -448,6 +448,10 @@ the same layout-backed field path for nested SSE leaves and returns through
 `%xmm0`/`%xmm1`. The stack-sourced SSE aggregate frontier row forwards a
 stack-passed `[2]f64` aggregate into an outgoing register aggregate helper call
 by loading incoming stack eightbytes into `%xmm0`/`%xmm1`.
+The `[4]f32` SSE/SSE aggregate frontier rows use typed AIR v2 array-element
+paths to read four float lanes from `%xmm0`/`%xmm1`, construct the paired SSE
+return registers, and pass the aggregate through direct and indirect helper
+calls while lowering the helper's four-lane f32 add body generically.
 The SSE live-across-call frontier rows add selected one-live `f32`/`f64`
 spill/reload around an external C ABI `void` helper call, two- through
 six-live `f32`/`f64` spill/reload frames across no-argument helper calls

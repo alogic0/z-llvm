@@ -2267,6 +2267,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Mixed { long long a; double b; };
     \\struct DoublePair { double a; double b; };
     \\struct FloatPair { float a; float b; };
+    \\struct FloatArray { float values[4]; };
     \\struct ReverseMixed { double a; long long b; };
     \\struct Pair32 { int a; int b; };
     \\struct NestedPair { struct Pair32 left; struct Pair32 right; };
@@ -2294,6 +2295,15 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern float z_frontier_float_pair_call_sum(struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_float_pair_call_sum");
     \\extern float z_frontier_shifted_float_pair_call_sum(double, struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_float_pair_call_sum");
     \\extern float z_frontier_indirect_float_pair_sum(float (*)(struct FloatPair), struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_float_pair_sum");
+    \\extern float z_frontier_float_array_first(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_first");
+    \\extern float z_frontier_float_array_second(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_second");
+    \\extern float z_frontier_float_array_third(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_third");
+    \\extern float z_frontier_float_array_fourth(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_fourth");
+    \\extern struct FloatArray z_frontier_float_array_make(float, float, float, float) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_make");
+    \\extern float z_frontier_float_array_call_sum(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_call_sum");
+    \\extern float z_frontier_indirect_float_array_sum(float (*)(struct FloatArray), struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_float_array_sum");
+    \\extern struct FloatArray z_frontier_float_array_call_make(float, float, float, float) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_call_make");
+    \\extern struct FloatArray z_frontier_indirect_float_array_make(struct FloatArray (*)(float, float, float, float), float, float, float, float) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_float_array_make");
     \\extern double z_frontier_reverse_mixed_float(struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_float");
     \\extern long long z_frontier_reverse_mixed_int(struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_int");
     \\extern struct ReverseMixed z_frontier_reverse_mixed_make(double, long long) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_make");
@@ -2341,6 +2351,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\float frontier_sum_float_pair(struct FloatPair value) { return value.a + value.b; }
     \\struct ArrayDouble frontier_make_array_double(double a, double b) { struct ArrayDouble result = { { a, b } }; return result; }
     \\double frontier_sum_array_double(struct ArrayDouble value) { return value.values[0] + value.values[1]; }
+    \\float frontier_sum_float_array(struct FloatArray value) { return value.values[0] + value.values[1] + value.values[2] + value.values[3]; }
+    \\struct FloatArray frontier_make_float_array(float a, float b, float c, float d) { struct FloatArray result = { { a, b, c, d } }; return result; }
     \\double frontier_reverse_mixed_float_c(struct ReverseMixed value) { return value.a; }
     \\struct ReverseMixed frontier_make_reverse_mixed(double a, long long b) { struct ReverseMixed result = { a, b }; return result; }
     \\int frontier_sum_nested_pair(struct NestedPair value) { return value.left.a + value.left.b + value.right.a + value.right.b; }
@@ -2368,6 +2380,19 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_float_pair_call_sum(floats) != 27.25f) return 59;
     \\    if (z_frontier_shifted_float_pair_call_sum(1.0, floats) != 27.25f) return 60;
     \\    if (z_frontier_indirect_float_pair_sum(frontier_sum_float_pair, floats) != 27.25f) return 61;
+    \\    struct FloatArray float_array = { { 1.25f, 2.5f, 3.75f, 4.5f } };
+    \\    if (z_frontier_float_array_first(float_array) != 1.25f) return 67;
+    \\    if (z_frontier_float_array_second(float_array) != 2.5f) return 68;
+    \\    if (z_frontier_float_array_third(float_array) != 3.75f) return 69;
+    \\    if (z_frontier_float_array_fourth(float_array) != 4.5f) return 70;
+    \\    struct FloatArray made_float_array = z_frontier_float_array_make(5.25f, 6.5f, 7.75f, 8.25f);
+    \\    if (made_float_array.values[0] != 5.25f || made_float_array.values[1] != 6.5f || made_float_array.values[2] != 7.75f || made_float_array.values[3] != 8.25f) return 71;
+    \\    if (z_frontier_float_array_call_sum(float_array) != 12.0f) return 72;
+    \\    if (z_frontier_indirect_float_array_sum(frontier_sum_float_array, float_array) != 12.0f) return 73;
+    \\    struct FloatArray call_made_float_array = z_frontier_float_array_call_make(9.0f, 10.25f, 11.5f, 12.75f);
+    \\    if (call_made_float_array.values[0] != 9.0f || call_made_float_array.values[1] != 10.25f || call_made_float_array.values[2] != 11.5f || call_made_float_array.values[3] != 12.75f) return 74;
+    \\    struct FloatArray indirect_made_float_array = z_frontier_indirect_float_array_make(frontier_make_float_array, 13.0f, 14.25f, 15.5f, 16.75f);
+    \\    if (indirect_made_float_array.values[0] != 13.0f || indirect_made_float_array.values[1] != 14.25f || indirect_made_float_array.values[2] != 15.5f || indirect_made_float_array.values[3] != 16.75f) return 75;
     \\    struct ReverseMixed reverse = { 2.75, 987654321LL };
     \\    if (z_frontier_reverse_mixed_float(reverse) != 2.75) return 7;
     \\    if (z_frontier_reverse_mixed_int(reverse) != 987654321LL) return 8;

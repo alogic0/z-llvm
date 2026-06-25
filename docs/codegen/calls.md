@@ -53,7 +53,7 @@ selected backend subset:
     classifier
   selected SSE aggregate argument-field reads and register returns are accepted
     through the reusable aggregate classifier, including single-eightbyte
-    `{ f32, f32 }` and SSE/SSE `double` aggregate rows
+    `{ f32, f32 }`, SSE/SSE `double`, and `[4]f32` aggregate rows
 ```
 
 ## Accepted IR Contract
@@ -197,7 +197,7 @@ accepted frontier:
   `i32` construction returns
   selected SSE/SSE aggregate argument field reads and register return including
   single-eightbyte `{ f32, f32 }`, `[2]f64` array-in-struct, and nested
-  `{ { double }, { double } }`
+  `{ { double }, { double } }`, plus `[4]f32` array-in-struct lanes
   selected stack-sourced INTEGER aggregate forwarding into outgoing GPR
   aggregate helper calls and selected stack-sourced SSE/SSE aggregate
   forwarding into outgoing XMM aggregate helper calls
@@ -361,7 +361,8 @@ selected nested/array INTEGER construction-return forms,
 mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field-read forms plus selected
 packed mixed construction-return forms; the single-eightbyte `{ f32, f32 }`
 SSE row also proves direct, shifted, and pointer-callee helper-call pass-through
-with a generic f32 aggregate field-add helper body
+with a generic f32 aggregate field-add helper body, and the `[4]f32` row proves
+the same helper body shape across two SSE eightbytes
 arbitrary hidden sret storage, arbitrary non-selected stack-passed byval copies,
 complete aggregate lowering for every classified shape, and multi-target ABI
 parity are not implemented
@@ -449,6 +450,8 @@ typed AIR v2 pointer-callee indirect call with SSE/SSE aggregate arguments and
   returns
 typed AIR v2 pointer-callee indirect call with single-eightbyte `{ f32, f32 }`
   aggregate arguments and f32 return
+typed AIR v2 pointer-callee indirect call with `[4]f32` SSE/SSE aggregate
+  arguments and returns
 tail-call marker rejection
 invoke rejection
 call_no_args assembly fixture

@@ -1049,6 +1049,9 @@ fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_inde
     const text = typedOperandTextDetail(instruction, operand_index) orelse return null;
     if (std.mem.eql(u8, text, "@.zero_usize")) return 0;
     if (std.mem.eql(u8, text, "@.one_usize")) return 1;
+    if (std.mem.startsWith(u8, text, "<usize, ") and std.mem.endsWith(u8, text, ">")) {
+        return std.fmt.parseInt(usize, text["<usize, ".len .. text.len - 1], 10) catch null;
+    }
     return null;
 }
 
@@ -1067,6 +1070,12 @@ fn aggregateIndexPathText(path: []const usize) ?[]const u8 {
     if (path.len == 2) {
         if (path[0] == 0 and path[1] == 0) return "0, 0";
         if (path[0] == 0 and path[1] == 1) return "0, 1";
+        if (path[0] == 0 and path[1] == 2) return "0, 2";
+        if (path[0] == 0 and path[1] == 3) return "0, 3";
+        if (path[0] == 0 and path[1] == 4) return "0, 4";
+        if (path[0] == 0 and path[1] == 5) return "0, 5";
+        if (path[0] == 0 and path[1] == 6) return "0, 6";
+        if (path[0] == 0 and path[1] == 7) return "0, 7";
         if (path[0] == 1 and path[1] == 0) return "1, 0";
         if (path[0] == 1 and path[1] == 1) return "1, 1";
     }
@@ -5122,6 +5131,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.FloatPair")) {
         return .{ .ir_type = .{ .aggregate = "{ float, float }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.FloatArray")) {
+        return .{ .ir_type = .{ .aggregate = "{ [4 x float] }" } };
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.ReverseMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ double, i64 }" } };

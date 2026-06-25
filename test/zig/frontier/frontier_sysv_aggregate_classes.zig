@@ -14,6 +14,12 @@ const FloatPair = extern struct {
 };
 const FloatPairSumFn = *const fn (FloatPair) callconv(.c) f32;
 
+const FloatArray = extern struct {
+    values: [4]f32,
+};
+const FloatArraySumFn = *const fn (FloatArray) callconv(.c) f32;
+const FloatArrayMakeFn = *const fn (f32, f32, f32, f32) callconv(.c) FloatArray;
+
 const ReverseMixed = extern struct {
     a: f64,
     b: i64,
@@ -157,6 +163,50 @@ export fn frontier_shifted_float_pair_call_sum(prefix: f64, value: FloatPair) f3
 
 export fn frontier_indirect_float_pair_sum(func: FloatPairSumFn, value: FloatPair) f32 {
     return func(value);
+}
+
+export fn frontier_float_array_first(value: FloatArray) f32 {
+    return value.values[0];
+}
+
+export fn frontier_float_array_second(value: FloatArray) f32 {
+    return value.values[1];
+}
+
+export fn frontier_float_array_third(value: FloatArray) f32 {
+    return value.values[2];
+}
+
+export fn frontier_float_array_fourth(value: FloatArray) f32 {
+    return value.values[3];
+}
+
+export fn frontier_float_array_make(a: f32, b: f32, c: f32, d: f32) FloatArray {
+    return .{ .values = .{ a, b, c, d } };
+}
+
+noinline fn helperFloatArraySum(value: FloatArray) f32 {
+    return value.values[0] + value.values[1] + value.values[2] + value.values[3];
+}
+
+noinline fn helperFloatArrayMake(a: f32, b: f32, c: f32, d: f32) FloatArray {
+    return .{ .values = .{ a, b, c, d } };
+}
+
+export fn frontier_float_array_call_sum(value: FloatArray) f32 {
+    return helperFloatArraySum(value);
+}
+
+export fn frontier_indirect_float_array_sum(func: FloatArraySumFn, value: FloatArray) f32 {
+    return func(value);
+}
+
+export fn frontier_float_array_call_make(a: f32, b: f32, c: f32, d: f32) FloatArray {
+    return helperFloatArrayMake(a, b, c, d);
+}
+
+export fn frontier_indirect_float_array_make(func: FloatArrayMakeFn, a: f32, b: f32, c: f32, d: f32) FloatArray {
+    return func(a, b, c, d);
 }
 
 export fn frontier_reverse_mixed_float(value: ReverseMixed) f64 {

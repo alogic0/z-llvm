@@ -464,17 +464,17 @@ fn lowerRegisterAggregateReturn(
                     leaves[leaf_index + 1].offset / 8 == leaf_eightbyte and
                     leaves[leaf_index + 1].offset % 8 == 4)
                 {
-                    if (sse_return_index != 0) return error.UnsupportedCodegenAbi;
+                    if (sse_return_index >= 2) return error.UnsupportedCodegenAbi;
                     const low_fp_index = try fpParamIndexFromValue(function, leaf.value, .float);
                     const high_fp_index = try fpParamIndexFromValue(function, leaves[leaf_index + 1].value, .float);
-                    if (high_fp_index == 0 and low_fp_index != 0) return error.UnsupportedCodegenAbi;
                     const low_reg = try XmmReg.fromIndex(low_fp_index);
                     const high_reg = try XmmReg.fromIndex(high_fp_index);
-                    if (low_reg != .xmm0) {
-                        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = low_reg } });
+                    const dst = try XmmReg.fromIndex(sse_return_index);
+                    if (low_reg != dst) {
+                        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = low_reg } });
                     }
-                    if (high_reg != .xmm0) {
-                        try machine.instructions.append(allocator, .{ .unpcklps_xmm = .{ .dst = .xmm0, .src = high_reg } });
+                    if (high_reg != dst) {
+                        try machine.instructions.append(allocator, .{ .unpcklps_xmm = .{ .dst = dst, .src = high_reg } });
                     }
                     sse_return_index += 1;
                     leaf_index += 1;
@@ -847,17 +847,29 @@ fn lowerRegisterAggregateFloatFieldAddReturn(
         }
     }
 
-    var terms: [2]AggregateFloatAddTerm = undefined;
+    var terms: [8]AggregateFloatAddTerm = undefined;
     var term_count: usize = 0;
     if (!try collectAggregateFloatAddTerms(block, ret.value orelse return error.InvalidRet, field_loads, &terms, &term_count)) return false;
-    if (term_count != 2) return false;
-    if (terms[0].offset > terms[1].offset) std.mem.swap(AggregateFloatAddTerm, &terms[0], &terms[1]);
+    if (term_count < 2) return false;
+    sortAggregateFloatTerms(terms[0..term_count]);
 
     try emitAggregateFloatTerm(allocator, machine, function, param_name, aggregate_ty, terms[0], .xmm0);
-    try emitAggregateFloatTerm(allocator, machine, function, param_name, aggregate_ty, terms[1], .xmm1);
-    try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    for (terms[1..term_count]) |term| {
+        try emitAggregateFloatTerm(allocator, machine, function, param_name, aggregate_ty, term, .xmm1);
+        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn sortAggregateFloatTerms(terms: []AggregateFloatAddTerm) void {
+    var index: usize = 1;
+    while (index < terms.len) : (index += 1) {
+        var cursor = index;
+        while (cursor > 0 and terms[cursor - 1].offset > terms[cursor].offset) : (cursor -= 1) {
+            std.mem.swap(AggregateFloatAddTerm, &terms[cursor - 1], &terms[cursor]);
+        }
+    }
 }
 
 fn lowerRegisterAggregateDoubleFieldAddReturn(
@@ -947,7 +959,7 @@ fn collectAggregateFloatAddTerms(
     block: ir.BasicBlock,
     value: ir.Value,
     field_loads: std.StringHashMap(AggregateFloatFieldLoad),
-    terms: *[2]AggregateFloatAddTerm,
+    terms: *[8]AggregateFloatAddTerm,
     term_count: *usize,
 ) !bool {
     const name = switch (value) {

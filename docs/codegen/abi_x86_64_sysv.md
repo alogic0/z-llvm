@@ -62,7 +62,7 @@ selected nested mixed INTEGER/SSE aggregate field reads and construction returns
 selected shifted nested mixed INTEGER/SSE helper calls move both GPR and SSE aggregate halves through the shared register aggregate pass-through helper
 selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV GPR/SSE streams
 selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV SSE/GPR streams
-selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream
+selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream, including `[2]f64`, nested double leaves, and `[4]f32` split across two SSE eightbytes
 leaf functions only
 no stack frame for register-only leaf functions
 ```
@@ -200,6 +200,15 @@ aggregate:
   direct, shifted, and pointer-callee helper calls pass the same f32 pair
     through the SysV SSE argument stream and lower the helper's f32 field-add
     body through generic aggregate field-add lowering
+
+frontier_sysv_aggregate_classes.FloatArray proves a two-eightbyte f32 SSE/SSE
+aggregate:
+  `[4]f32` typed AIR array-element paths lower through the same aggregate
+    field offset machinery
+  field reads extract all four f32 lanes from `%xmm0`/`%xmm1`
+  construction packs two f32 lanes into each SSE return register
+  direct and pointer-callee helper calls preserve the paired SSE eightbytes
+    while lowering the helper's four-lane f32 add body generically
 
 frontier_sysv_aggregate_classes.ArrayDouble proves array-in-struct SSE/SSE
 aggregate reads and register aggregate return:

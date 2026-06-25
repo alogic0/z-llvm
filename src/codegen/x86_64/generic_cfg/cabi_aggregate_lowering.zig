@@ -11,6 +11,7 @@ const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
 
 const ArgReg = x86_64_types.ArgReg;
+const FrameIndex = x86_64_types.FrameIndex;
 const XmmReg = x86_64_types.XmmReg;
 const MachineFunction = x86_64_machine.MachineFunction;
 const SysVAggregateClassification = sysv_abi.AggregateClassification;
@@ -286,17 +287,17 @@ pub fn lowerRegisterAggregateReturn(
                     leaves[leaf_index + 1].offset / 8 == leaf_eightbyte and
                     leaves[leaf_index + 1].offset % 8 == 4)
                 {
-                    if (sse_return_index != 0) return error.UnsupportedCodegenAbi;
+                    if (sse_return_index >= 2) return error.UnsupportedCodegenAbi;
                     const low_fp_index = try fpParamIndexFromValue(function, leaf.value, .float);
                     const high_fp_index = try fpParamIndexFromValue(function, leaves[leaf_index + 1].value, .float);
-                    if (high_fp_index == 0 and low_fp_index != 0) return error.UnsupportedCodegenAbi;
                     const low_reg = try XmmReg.fromIndex(low_fp_index);
                     const high_reg = try XmmReg.fromIndex(high_fp_index);
-                    if (low_reg != .xmm0) {
-                        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = low_reg } });
+                    const dst = try XmmReg.fromIndex(sse_return_index);
+                    if (low_reg != dst) {
+                        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = low_reg } });
                     }
-                    if (high_reg != .xmm0) {
-                        try machine.instructions.append(allocator, .{ .unpcklps_xmm = .{ .dst = .xmm0, .src = high_reg } });
+                    if (high_reg != dst) {
+                        try machine.instructions.append(allocator, .{ .unpcklps_xmm = .{ .dst = dst, .src = high_reg } });
                     }
                     sse_return_index += 1;
                     leaf_index += 1;
@@ -685,17 +686,79 @@ pub fn lowerRegisterAggregateFloatFieldAddReturn(
         }
     }
 
-    var terms: [2]AggregateFloatAddTerm = undefined;
+    var terms: [8]AggregateFloatAddTerm = undefined;
     var term_count: usize = 0;
     if (!try collectAggregateFloatAddTerms(block, ret.value orelse return error.InvalidRet, field_loads, &terms, &term_count)) return false;
-    if (term_count != 2) return false;
-    if (terms[0].offset > terms[1].offset) std.mem.swap(AggregateFloatAddTerm, &terms[0], &terms[1]);
+    if (term_count < 2) return false;
+    sortAggregateFloatTerms(terms[0..term_count]);
+
+    if (term_count > 2 and try lowerSseF32AggregateStackedSum(allocator, machine, function, param_name, aggregate_ty, terms[0..term_count])) {
+        return true;
+    }
 
     try emitAggregateFloatTerm(allocator, machine, function, param_name, aggregate_ty, terms[0], .xmm0);
-    try emitAggregateFloatTerm(allocator, machine, function, param_name, aggregate_ty, terms[1], .xmm1);
-    try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    for (terms[1..term_count]) |term| {
+        try emitAggregateFloatTerm(allocator, machine, function, param_name, aggregate_ty, term, .xmm1);
+        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerSseF32AggregateStackedSum(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    param_name: []const u8,
+    aggregate_ty: ir.Type,
+    terms: []const AggregateFloatAddTerm,
+) !bool {
+    if (function.params.items.len == 0 or !std.mem.eql(u8, function.params.items[0].name, param_name)) return false;
+    const classification = classifySysVAggregate(aggregate_ty) catch return false;
+    if (classification.kind != .register or classification.eightbyte_count != 2 or
+        classification.eightbytes[0] != .sse or classification.eightbytes[1] != .sse)
+    {
+        return false;
+    }
+    if (terms.len > 4) return error.UnsupportedCodegenAbi;
+
+    try appendStackFrame(allocator, machine, 24);
+    try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+    try reloadF32AggregateTerm(allocator, machine, terms[0], .xmm0);
+    for (terms[1..]) |term| {
+        try reloadF32AggregateTerm(allocator, machine, term, .xmm1);
+        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    }
+    try appendStackFrameEnd(allocator, machine, 24);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn reloadF32AggregateTerm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    term: AggregateFloatAddTerm,
+    reg: XmmReg,
+) !void {
+    const frame_index = switch (term.offset) {
+        0 => FrameIndex.slot0,
+        4 => FrameIndex.slot1,
+        8 => FrameIndex.slot2,
+        12 => FrameIndex.slot3,
+        else => return error.UnsupportedCodegenAbi,
+    };
+    try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = reg, .frame_index = frame_index } });
+}
+
+fn sortAggregateFloatTerms(terms: []AggregateFloatAddTerm) void {
+    var index: usize = 1;
+    while (index < terms.len) : (index += 1) {
+        var cursor = index;
+        while (cursor > 0 and terms[cursor - 1].offset > terms[cursor].offset) : (cursor -= 1) {
+            std.mem.swap(AggregateFloatAddTerm, &terms[cursor - 1], &terms[cursor]);
+        }
+    }
 }
 
 pub fn lowerRegisterAggregateDoubleFieldAddReturn(
@@ -785,7 +848,7 @@ pub fn collectAggregateFloatAddTerms(
     block: ir.BasicBlock,
     value: ir.Value,
     field_loads: std.StringHashMap(AggregateFloatFieldLoad),
-    terms: *[2]AggregateFloatAddTerm,
+    terms: *[8]AggregateFloatAddTerm,
     term_count: *usize,
 ) !bool {
     const name = switch (value) {

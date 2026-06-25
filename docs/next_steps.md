@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=369`,
-`generic_codegen_functions=369`, `generic_cfg_functions=369`,
+frontier gate reports `source_rows=13`, `discovered_functions=380`,
+`generic_codegen_functions=380`, `generic_cfg_functions=380`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=369`, `object_failures=0`,
+`object_emitted_functions=380`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -486,6 +486,12 @@ from independent INTEGER/SSE classes, and constructs the aggregate in
 `%rax`/`%xmm0`. The shifted nested mixed helper-call row proves both GPR and
 SSE halves of an INTEGER/SSE aggregate can move into a private helper call
 through the same register aggregate pass-through helper.
+The `[4]f32` array-in-struct frontier rows extend the same SSE/SSE class
+beyond double leaves: typed AIR v2 array-element field paths read all four
+`float` lanes from `%xmm0`/`%xmm1`, construction packs the low/high f32 lanes
+into both return registers, and direct plus pointer-callee helper calls spill
+and reload the paired SSE eightbytes while lowering the helper's four-field
+f32 sum body generically.
 The nested INTEGER helper-call row passes `{ { i32, i32 }, { i32, i32 } }`
 through the SysV GPR pair to a private helper and returns the helper's scalar
 result without aggregate-specific wrapper dispatch; the nested construction

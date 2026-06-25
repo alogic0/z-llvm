@@ -583,20 +583,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=369
-structured_functions=369
-generic_codegen_functions=369
-generic_cfg_functions=369
+discovered_functions=380
+structured_functions=380
+generic_codegen_functions=380
+generic_cfg_functions=380
 structural_matcher_functions=0
-structured_air_v2_functions=369
-typed_air_operand_functions=369
+structured_air_v2_functions=380
+typed_air_operand_functions=380
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=369
+generic_lowering_functions=380
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=369
+object_emitted_functions=380
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -644,6 +644,7 @@ selected_mixed_width_memory_aggregate=accepted
 selected_array_backed_memory_copy_read=accepted
 selected_mixed_integer_sse_and_sse_integer=accepted
 selected_sse_sse_aggregate=accepted
+selected_f32_array_aggregate=accepted
 selected_up_to_six_live_i32_spills=accepted
 selected_up_to_six_stack_passed_live_i32=accepted
 selected_six_stack_passed_i32_call_args=accepted

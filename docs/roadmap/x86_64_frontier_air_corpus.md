@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=369
-structured_functions=369
-generic_codegen_functions=369
-generic_cfg_functions=369
+discovered_functions=380
+structured_functions=380
+generic_codegen_functions=380
+generic_cfg_functions=380
 structural_matcher_functions=0
-structured_air_v2_functions=369
-typed_air_operand_functions=369
+structured_air_v2_functions=380
+typed_air_operand_functions=380
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=369
+generic_lowering_functions=380
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=369
+object_emitted_functions=380
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -257,6 +257,12 @@ Closed in the current memory/aggregate frontier slice:
   field GEPs lower through layout-backed byte offsets, read both `double`
   leaves from the independent SysV SSE argument stream, and return the nested
   aggregate in `%xmm0`/`%xmm1`
+- `[4]f32` SSE/SSE aggregate rows in
+  `frontier_sysv_aggregate_classes.zig`: typed AIR v2 array-element paths
+  extract four `float` lanes from `%xmm0`/`%xmm1`, construction returns pack
+  two f32 lanes into each SSE return register, and direct plus pointer-callee
+  helper calls spill/reload the paired SSE eightbytes while lowering the
+  helper's four-lane f32 add body generically
 - first SSE live-across-call row in `frontier_sysv_abi.zig`: one live
   `f32`/`f64` parameter is spilled from `%xmm0` to an aligned frame slot,
   another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
