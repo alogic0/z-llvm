@@ -265,6 +265,7 @@ pub const CallArgAssignment = union(enum) {
     sse: XmmReg,
     stack_i32_const: i32,
     stack_i32_param: []const u8,
+    stack_f64_param: []const u8,
     byval_stack_copy: ByvalStackCopy,
     aggregate_register_passthrough: RegisterAggregatePassThrough,
     aggregate_stack_passthrough: RegisterAggregatePassThrough,
@@ -392,7 +393,17 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
         }
         if (arg.ty.eql(.float) or arg.ty.eql(.double)) {
             plan.has_non_i32_arg = true;
-            if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
+            if (fp_arg_index >= 8) {
+                if (!arg.ty.eql(.double)) return error.UnsupportedCodegenAbi;
+                const name = switch (arg.value) {
+                    .named => |name| name,
+                    .fp, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                };
+                try plan.assignments.append(allocator, .{ .stack_f64_param = name });
+                fp_arg_index += 1;
+                plan.counts.stack_args += 1;
+                continue;
+            }
             try plan.assignments.append(allocator, .{ .sse = try XmmReg.fromIndex(fp_arg_index) });
             fp_arg_index += 1;
             plan.counts.sse_args += 1;

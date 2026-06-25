@@ -129,7 +129,7 @@ pub fn appendI32CallArgs(
                 stack_args[stack_arg_count] = .{ .stack_disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }) };
                 stack_arg_count += 1;
             },
-            .sse, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return error.UnsupportedCodegenType,
+            .sse, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return error.UnsupportedCodegenType,
         }
     }
 
@@ -237,6 +237,17 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
                     stack_args[stack_arg_count] = .{ .computed_i64 = .{ .named = name } };
                 } else {
                     return error.UnsupportedCodegenAbi;
+                }
+                stack_arg_count += 1;
+            },
+            .stack_f64_param => |name| {
+                if ((fpParamIndex(function, name, .double) catch |err| switch (err) {
+                    error.UnsupportedCodegenAbi => null,
+                    else => return err,
+                })) |src_index| {
+                    stack_args[stack_arg_count] = .{ .xmm_reg = try XmmReg.fromIndex(src_index) };
+                } else {
+                    stack_args[stack_arg_count] = .{ .stack_disp = try scalarParamStackDisp8(function, name, .double) };
                 }
                 stack_arg_count += 1;
             },
@@ -370,7 +381,7 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
             .aggregate_register_passthrough => |aggregate| {
                 try appendSysVRegisterAggregatePassThroughArg(allocator, machine, aggregate, incoming_stack_adjust);
             },
-            .stack_i32_const, .stack_i32_param, .byval_stack_copy, .aggregate_stack_passthrough => {},
+            .stack_i32_const, .stack_i32_param, .stack_f64_param, .byval_stack_copy, .aggregate_stack_passthrough => {},
         }
     }
     return .{
@@ -401,7 +412,7 @@ fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
             .gpr => |dst| dst,
-            .sse, .stack_i32_const, .stack_i32_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
+            .sse, .stack_i32_const, .stack_i32_param, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
         };
 
         const writes_dst = switch (arg.value) {
@@ -477,7 +488,7 @@ fn analyzeXmmArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
             .sse => |dst| dst,
-            .gpr, .stack_i32_const, .stack_i32_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
+            .gpr, .stack_i32_const, .stack_i32_param, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
         };
 
         const writes_dst = switch (arg.value) {
