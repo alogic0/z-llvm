@@ -643,9 +643,10 @@ Remaining measured frontier blockers kept out of accepted rows:
   array-backed `{ [5 x i64] }` copy/read rows,
   a `double`-leaf copy, a mixed pointer/`double`/`i64` copy, and the
   `ScalarMixed`/`ScalarNested`/`ScalarArray` direct scalar-param sret make
-  rows; explicit `ptr byval(...)` calls now include single-`i32` and
-  `[3 x i32]` 4-byte-tail stack-copy proof; supported `ptr sret(...)` call
-  arguments now use the normal GPR hidden-result-pointer planner path; X87,
+  rows; explicit `ptr byval(...)` calls now include single-`i8`, single-`i16`,
+  single-`i32`, and `[3 x i32]` tail stack-copy proof; supported
+  `ptr sret(...)` call arguments now use the normal GPR hidden-result-pointer
+  planner path; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, more than six
   stack-passed live values, and broader SSE live-across-call frames beyond the

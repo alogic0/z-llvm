@@ -2520,6 +2520,55 @@ test "x86_64 codegen accepts four-byte byval stack-copy tail" {
     try expectMachineInstruction(indirect_machine.instructions.items, .{ .indirect_call_rax = .{ .int = 32 } });
 }
 
+test "x86_64 codegen accepts byte and word byval stack-copy tails" {
+    const direct_byte_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr byval({ i8 }))
+        \\
+        \\define i32 @caller(ptr %arg) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr byval({ i8 }) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var direct_byte_module = try ir.Module.parse(std.testing.allocator, direct_byte_input);
+    defer direct_byte_module.deinit();
+    try direct_byte_module.verify();
+    const direct_byte_call = direct_byte_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const direct_byte_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, direct_byte_module.functions.items[0], direct_byte_call);
+    try std.testing.expectEqual(@as(usize, 0), direct_byte_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), direct_byte_counts.stack_args);
+    var direct_byte_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, direct_byte_module.target_triple.?, direct_byte_module.functions.items[0]);
+    defer direct_byte_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(direct_byte_machine.instructions.items, .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = .rdi, .offset = 0 } });
+    try expectMachineInstruction(direct_byte_machine.instructions.items, .push_rax);
+
+    const indirect_stack_word_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, ptr %a, ptr %b, ptr %c, ptr %d, ptr %e, ptr %arg) {
+        \\entry:
+        \\  %r = call i32 %fn(ptr byval({ i16 }) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_stack_word_module = try ir.Module.parse(std.testing.allocator, indirect_stack_word_input);
+    defer indirect_stack_word_module.deinit();
+    try indirect_stack_word_module.verify();
+    const indirect_stack_word_call = indirect_stack_word_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const indirect_stack_word_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_stack_word_module.functions.items[0], indirect_stack_word_call);
+    try std.testing.expectEqual(@as(usize, 0), indirect_stack_word_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), indirect_stack_word_counts.stack_args);
+    var indirect_stack_word_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, indirect_stack_word_module.target_triple.?, indirect_stack_word_module.functions.items[0]);
+    defer indirect_stack_word_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(indirect_stack_word_machine.instructions.items, .{ .load_stack_disp8_rax = 8 });
+    try expectMachineInstruction(indirect_stack_word_machine.instructions.items, .{ .load_rax_ptr_disp8_u16_eax = 0 });
+    try expectMachineInstruction(indirect_stack_word_machine.instructions.items, .{ .indirect_call_rax = .{ .int = 32 } });
+}
+
 test "x86_64 codegen accepts array byval stack-copy with four-byte tail" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -225,6 +225,8 @@ pub const Instruction = union(enum) {
         disp: u32,
     },
     load_rax_ptr_disp8_rax: u8,
+    load_rax_ptr_disp8_u8_eax: u8,
+    load_rax_ptr_disp8_u16_eax: u8,
     load_rax_ptr_disp8_eax: u8,
     load_rax_ptr_rdx,
     load_rax_ptr_eax,
@@ -238,6 +240,10 @@ pub const Instruction = union(enum) {
         offset: u8,
     },
     load_arg_ptr_disp8_u8_eax: struct {
+        reg: ArgReg,
+        offset: u8,
+    },
+    load_arg_ptr_disp8_u16_eax: struct {
         reg: ArgReg,
         offset: u8,
     },

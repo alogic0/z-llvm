@@ -723,6 +723,10 @@ pub fn appendSysVByvalStackCopyArgs(
             .qword
         else if (remaining == 4)
             .dword
+        else if (remaining == 2)
+            .word
+        else if (remaining == 1)
+            .byte
         else
             return error.UnsupportedSretByvalAbi;
         stack_args[stack_arg_count.*] = if (source_reg) |reg|
@@ -823,6 +827,8 @@ pub const StackScalarCallArg = union(enum) {
 const ByvalCopyChunk = enum {
     qword,
     dword,
+    word,
+    byte,
 };
 
 pub fn appendStackScalarCallArg(
@@ -841,6 +847,8 @@ pub fn appendStackScalarCallArg(
             switch (source.chunk) {
                 .qword => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = source.offset } }),
                 .dword => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = source.reg, .offset = source.offset } }),
+                .word => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_u16_eax = .{ .reg = source.reg, .offset = source.offset } }),
+                .byte => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = source.reg, .offset = source.offset } }),
             }
             try machine.instructions.append(allocator, .push_rax);
         },
@@ -856,6 +864,8 @@ pub fn appendStackScalarCallArg(
             switch (source.chunk) {
                 .qword => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = source.offset }),
                 .dword => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_eax = source.offset }),
+                .word => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_u16_eax = source.offset }),
+                .byte => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_u8_eax = source.offset }),
             }
             try machine.instructions.append(allocator, .push_rax);
         },
