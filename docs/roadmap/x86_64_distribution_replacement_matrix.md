@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=440`,
-`generic_codegen_functions=440`, `generic_cfg_functions=440`,
+three release modes at `source_rows=13`, `discovered_functions=442`,
+`generic_codegen_functions=442`, `generic_cfg_functions=442`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=440`, `object_failures=0`,
+`object_emitted_functions=442`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -448,8 +448,11 @@ is isolated to `test/zig/frontier`. The selected slice-panic runtime-call row
 inside this proof now uses the release generic CFG slice runtime-call helper
 subset, deriving supported direct integer, `{ ptr, i64 }` aggregate-constant,
 i64 parameter, loaded i64, and simple computed i64 add/sub lengths from IR.
-Phi-selected panic-slice lengths remain explicit future runtime/safety-edge
-work. The same frontier proof now includes child-process negative-path executable
+Selected multi-input length selection now lowers through typed AIR `select`
+values, and selected loaded payload pointer objects are materialized when the
+payload remains a `{ ptr, i64 }` panic slice. Arbitrary phi/control-flow length
+selection and computed payload pointers remain future runtime/safety-edge work.
+The same frontier proof now includes child-process negative-path executable
 checks for non-constant panic slices, explicit signed/unsigned checked-overflow
 panic rows, ReleaseSafe optional-pointer unwrap/null panic, checked
 int-from-float `integerPartOutOfBounds`, and direct bounds panic rows.

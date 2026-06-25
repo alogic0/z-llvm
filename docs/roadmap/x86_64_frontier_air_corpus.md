@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=440
-structured_functions=440
-generic_codegen_functions=440
-generic_cfg_functions=440
+discovered_functions=442
+structured_functions=442
+generic_codegen_functions=442
+generic_cfg_functions=442
 structural_matcher_functions=0
-structured_air_v2_functions=440
-typed_air_operand_functions=440
+structured_air_v2_functions=442
+typed_air_operand_functions=442
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=440
+generic_lowering_functions=442
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=440
+object_emitted_functions=442
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -107,6 +107,10 @@ Closed in the current runtime/safety-edge slice:
   derived from typed AIR values for direct constants, `{ ptr, i64 }` slice
   aggregates, i64 parameters, loaded i64 globals/parameter pointers, and simple
   i64 add/sub expressions
+- selected multi-input length selection is now lowered through typed AIR
+  `select` values before the noreturn runtime call
+- selected loaded payload pointer objects are materialized into `%rdi` when the
+  payload remains a `{ ptr, i64 }` panic slice
 - ReleaseSafe slice-panic guard CFGs with an ok return, bounds check block,
   cold `outOfBounds` edge, default panic continuation, and noreturn/unreachable
   runtime blocks now route through generic CFG
@@ -118,10 +122,10 @@ Closed in the current runtime/safety-edge slice:
 
 Remaining runtime/safety-edge debt:
 
-- phi-selected panic-slice lengths are still only supported when they collapse
-  to the current one-incoming helper form
-- arbitrary panic payload forms and loaded/computed payloads outside the current
-  slice-pointer plus i64-length subset remain future runtime-call work
+- arbitrary phi/control-flow length selection beyond the current typed AIR
+  `select` form remains future work
+- arbitrary panic payload forms and computed payload pointers outside the
+  current slice-pointer plus i64-length subset remain future runtime-call work
 
 Closed in the current memory/aggregate frontier slice:
 

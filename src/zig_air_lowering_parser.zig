@@ -882,7 +882,7 @@ pub fn isPlainFieldPointerChild(ty: ir.Type) bool {
 
 pub fn isSupportedTypedGepElementType(ty: ir.Type) bool {
     return switch (ty) {
-        .int => |bits| bits == 32 or bits == 64,
+        .int => |bits| bits == 8 or bits == 32 or bits == 64,
         .float, .double => true,
         .void, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
     };

@@ -1547,6 +1547,14 @@ const LoweringContext = struct {
         if (!isSupportedTypedGepElementType(element_type)) return error.UnsupportedAir;
         if (!genericTypedGepIndex(index.value)) return error.UnsupportedAir;
 
+        if (typedGepIndexIsZero(index.value)) {
+            self.values[instruction.index] = .{
+                .ty = result_type,
+                .value = base.value,
+            };
+            return;
+        }
+
         const result_name = try self.resultName(instruction.index);
         var gep: ir.GepInst = .{
             .source_ty = element_type,
@@ -1562,6 +1570,13 @@ const LoweringContext = struct {
         self.values[instruction.index] = .{
             .ty = result_type,
             .value = .{ .named = result_name },
+        };
+    }
+
+    fn typedGepIndexIsZero(value: ir.Value) bool {
+        return switch (value) {
+            .int => |int| int == 0,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         };
     }
 

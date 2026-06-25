@@ -1378,7 +1378,7 @@ pub fn emitGenericCfgNoreturnCallBlock(
 ) !void {
     if (block.instructions.items.len >= 4) {
         if (validateNoreturnSliceRuntimeCall(block)) |call| {
-            try emitSlicePointerIntoRdi(allocator, machine, block, call.args.items[0].value);
+            try emitSlicePointerIntoRdi(allocator, machine, function, block, call.args.items[0].value);
             try emitSliceLengthIntoRsi(allocator, machine, function, block, call.args.items[1].value);
             try appendAlignedDirectCall(allocator, machine, call.callee, .void);
             try machine.instructions.append(allocator, .ud2);
@@ -1413,7 +1413,7 @@ pub fn emitGenericCfgNoreturnCallBlock(
 
     if (call.args.items.len == 2) {
         try validateSliceRuntimeCallArgs(call);
-        try emitSlicePointerIntoRdi(allocator, machine, block, call.args.items[0].value);
+        try emitSlicePointerIntoRdi(allocator, machine, function, block, call.args.items[0].value);
         try emitSliceLengthIntoRsi(allocator, machine, function, block, call.args.items[1].value);
     } else if (call.args.items.len != 0) {
         return error.UnsupportedCodegenInstruction;
@@ -1452,25 +1452,30 @@ fn validateSliceRuntimeCallArgs(call: ir.CallInst) !void {
     if (!call.args.items[1].ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
 }
 
-pub fn resolveSlicePointerValue(block: ir.BasicBlock, value: ir.Value) ![]const u8 {
+pub const SlicePointerValue = union(enum) {
+    global: []const u8,
+    materialize: ir.Value,
+};
+
+pub fn resolveSlicePointerValue(block: ir.BasicBlock, value: ir.Value) !SlicePointerValue {
     switch (value) {
         .named => |name| {
-            if (std.mem.startsWith(u8, name, "@")) return try globalSymbolName(name);
+            if (std.mem.startsWith(u8, name, "@")) return .{ .global = try globalSymbolName(name) };
             const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
             const extract = switch (instruction.kind) {
                 .extractvalue => |extractvalue| extractvalue,
                 else => return error.UnsupportedCodegenInstruction,
             };
             if (!extract.result_ty.eql(.ptr) or !std.mem.eql(u8, extract.indices, "0")) return error.UnsupportedCodegenInstruction;
-            if (resolveSlicePointerFromInsertedAggregate(block, extract.aggregate)) |symbol| return symbol;
-            return try globalSymbolNameFromValue(extract.aggregate);
+            if (resolveSlicePointerFromInsertedAggregate(block, extract.aggregate)) |resolved| return resolved;
+            return .{ .global = try globalSymbolNameFromValue(extract.aggregate) };
         },
-        .constant_expr => return try globalSymbolNameFromValue(value),
+        .constant_expr => return .{ .global = try globalSymbolNameFromValue(value) },
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
     }
 }
 
-fn resolveSlicePointerFromInsertedAggregate(block: ir.BasicBlock, aggregate: ir.Value) ?[]const u8 {
+fn resolveSlicePointerFromInsertedAggregate(block: ir.BasicBlock, aggregate: ir.Value) ?SlicePointerValue {
     const aggregate_name = switch (aggregate) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
@@ -1492,7 +1497,11 @@ fn resolveSlicePointerFromInsertedAggregate(block: ir.BasicBlock, aggregate: ir.
         else => return null,
     };
     if (!std.mem.eql(u8, ptr_insertvalue.indices, "0") or !ptr_insertvalue.value_ty.eql(.ptr)) return null;
-    return globalSymbolNameFromValue(ptr_insertvalue.value) catch null;
+    if (globalSymbolNameFromValue(ptr_insertvalue.value)) |symbol| return .{ .global = symbol } else |_| {}
+    return switch (ptr_insertvalue.value) {
+        .named => .{ .materialize = ptr_insertvalue.value },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+    };
 }
 
 pub fn resolveSliceLengthValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value) anyerror!SliceLengthValue {
@@ -1542,10 +1551,14 @@ pub const SliceLengthValue = union(enum) {
 pub fn emitSlicePointerIntoRdi(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
+    function: ir.Function,
     block: ir.BasicBlock,
     value: ir.Value,
 ) !void {
-    try machine.instructions.append(allocator, .{ .lea_global_rdi = try resolveSlicePointerValue(block, value) });
+    switch (try resolveSlicePointerValue(block, value)) {
+        .global => |symbol| try machine.instructions.append(allocator, .{ .lea_global_rdi = symbol }),
+        .materialize => |materialized| try emitPointerValueIntoArgReg(allocator, machine, function, block, .rdi, materialized),
+    }
 }
 
 pub fn emitSliceLengthIntoRsi(
@@ -1607,6 +1620,10 @@ pub fn emitNamedI64ValueIntoArgReg(
             try emitComputedI64IntoArgReg(allocator, machine, function, block, dst, binary);
             return true;
         },
+        .select => |select| {
+            try emitSelectedI64IntoArgReg(allocator, machine, function, block, dst, name, select);
+            return true;
+        },
         .phi => |phi| {
             try emitPhiSelectedI64IntoArgReg(allocator, machine, function, block, dst, phi);
             return true;
@@ -1618,6 +1635,76 @@ pub fn emitNamedI64ValueIntoArgReg(
         },
         else => return error.UnsupportedCodegenInstruction,
     }
+}
+
+fn emitPointerValueIntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    dst: ArgReg,
+    value: ir.Value,
+) anyerror!void {
+    switch (value) {
+        .named => |name| {
+            if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
+                if (reg != dst) try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = reg } });
+                return;
+            }
+            const instruction = findInstructionInFunction(function, block, name) orelse return error.UnsupportedCodegenValue;
+            switch (instruction.kind) {
+                .load => |load| {
+                    try emitLoadedPointerIntoArgReg(allocator, machine, function, dst, load);
+                    return;
+                },
+                .cast => |cast| {
+                    if (cast.op != .bitcast or cast.to_ty != .ptr) return error.UnsupportedCodegenInstruction;
+                    try emitPointerValueIntoArgReg(allocator, machine, function, block, dst, cast.value);
+                    return;
+                },
+                .extractvalue => {
+                    switch (try resolveSlicePointerValue(block, value)) {
+                        .global => |symbol| {
+                            if (dst != .rdi) return error.UnsupportedCodegenAbi;
+                            try machine.instructions.append(allocator, .{ .lea_global_rdi = symbol });
+                        },
+                        .materialize => |materialized| try emitPointerValueIntoArgReg(allocator, machine, function, block, dst, materialized),
+                    }
+                    return;
+                },
+                else => return error.UnsupportedCodegenInstruction,
+            }
+        },
+        .constant_expr => {
+            if (dst != .rdi) return error.UnsupportedCodegenAbi;
+            try machine.instructions.append(allocator, .{ .lea_global_rdi = try globalSymbolNameFromValue(value) });
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitLoadedPointerIntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    dst: ArgReg,
+    load: ir.LoadInst,
+) anyerror!void {
+    if (load.ty != .ptr or load.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+    switch (load.ptr) {
+        .named => |name| {
+            if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
+                try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = reg, .offset = 0 } });
+            } else if (std.mem.startsWith(u8, name, "@")) {
+                try machine.instructions.append(allocator, .{ .load_global_ptr_rax = try globalSymbolName(name) });
+            } else {
+                return error.UnsupportedCodegenValue;
+            }
+        },
+        .constant_expr => try machine.instructions.append(allocator, .{ .load_global_ptr_rax = try globalSymbolNameFromValue(load.ptr) }),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    }
+    try emitRaxIntoArgReg(allocator, machine, dst);
 }
 
 pub fn emitLoadedI64IntoArgReg(
@@ -1642,6 +1729,29 @@ pub fn emitLoadedI64IntoArgReg(
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
     }
     try emitRaxIntoArgReg(allocator, machine, dst);
+}
+
+fn emitSelectedI64IntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    dst: ArgReg,
+    result_name: []const u8,
+    select: ir.SelectInst,
+) anyerror!void {
+    _ = result_name;
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+    const cond_reg = paramValueReg(function, select.cond, .{ .int = 1 }) catch return error.UnsupportedCodegenValue;
+    const true_label = "generic_cfg_i64_select_true";
+    const end_label = "generic_cfg_i64_select_end";
+    try machine.instructions.append(allocator, .{ .test_arg8 = cond_reg });
+    try appendGenericCfgConditionalBranch(allocator, machine, .jne, true_label);
+    try emitI64ValueIntoArgReg(allocator, machine, function, block, dst, select.false_value);
+    try machine.instructions.append(allocator, .{ .jmp = end_label });
+    try appendGenericCfgBlockLabel(allocator, machine, true_label);
+    try emitI64ValueIntoArgReg(allocator, machine, function, block, dst, select.true_value);
+    try appendGenericCfgBlockLabel(allocator, machine, end_label);
 }
 
 pub fn emitComputedI64IntoArgReg(

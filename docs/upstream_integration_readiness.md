@@ -626,20 +626,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=440
-structured_functions=440
-generic_codegen_functions=440
-generic_cfg_functions=440
+discovered_functions=442
+structured_functions=442
+generic_codegen_functions=442
+generic_cfg_functions=442
 structural_matcher_functions=0
-structured_air_v2_functions=440
-typed_air_operand_functions=440
+structured_air_v2_functions=442
+typed_air_operand_functions=442
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=440
+generic_lowering_functions=442
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=440
+object_emitted_functions=442
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -672,7 +672,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 440-function counters above plus `native_link_accepted_rows=13`,
+13-source / 442-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -680,8 +680,11 @@ The selected slice-panic runtime-call row now uses the release generic CFG
 slice runtime-call helper subset, which derives direct integer lengths and
 `{ ptr, i64 }` aggregate slice constant lengths, i64 parameter lengths, loaded
 i64 lengths, and simple computed i64 add/sub lengths from IR rather than using
-a selected message-length constant. Phi-selected lengths are still outside this
-slice unless they collapse to a currently supported one-incoming form.
+a selected message-length constant. Selected multi-input length selection now
+lowers through typed AIR `select` values, and selected loaded payload pointer
+objects are materialized when the payload remains a `{ ptr, i64 }` panic slice;
+arbitrary phi/control-flow length selection and computed payload pointers remain
+future work.
 The frontier safety-edge executable harnesses use child-process death checks for
 non-constant panic-slice calls, explicit signed/unsigned checked-overflow panic
 rows, and ReleaseSafe bounds/null/int-conversion panic rows. They also resolve the cold

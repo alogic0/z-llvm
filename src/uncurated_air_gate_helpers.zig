@@ -227,7 +227,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 440,
+            .functions = 442,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1056,7 +1056,11 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_panic_param_len(int, unsigned long) __asm__("frontier_safety_edges.frontier_panic_param_len");
     \\extern int z_frontier_panic_computed_len(int, unsigned long) __asm__("frontier_safety_edges.frontier_panic_computed_len");
     \\extern int z_frontier_panic_loaded_len(int) __asm__("frontier_safety_edges.frontier_panic_loaded_len");
+    \\extern int z_frontier_panic_phi_len(int, int, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_panic_phi_len");
+    \\extern int z_frontier_panic_loaded_ptr(int, unsigned long) __asm__("frontier_safety_edges.frontier_panic_loaded_ptr");
     \\unsigned long z_frontier_runtime_panic_len __asm__("frontier_safety_edges.frontier_runtime_panic_len") = 23;
+    \\static const unsigned char z_frontier_loaded_panic_payload[] = "frontier loaded pointer panic payload";
+    \\const unsigned char *z_frontier_runtime_panic_ptr __asm__("frontier_safety_edges.frontier_runtime_panic_ptr") = z_frontier_loaded_panic_payload;
     \\void z_frontier_safety_out_of_bounds(void) __asm__("frontier_safety_edges.outOfBounds");
     \\void z_frontier_safety_out_of_bounds(void) { __builtin_trap(); }
     \\void z_frontier_safety_int_part_oob(void) __asm__("frontier_safety_edges.integerPartOutOfBounds");
@@ -1079,6 +1083,9 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\static void death_panic_param(void) { (void)z_frontier_panic_param_len(0, 11); }
     \\static void death_panic_computed(void) { (void)z_frontier_panic_computed_len(0, 5); }
     \\static void death_panic_loaded(void) { (void)z_frontier_panic_loaded_len(0); }
+    \\static void death_panic_phi_left(void) { (void)z_frontier_panic_phi_len(0, 1, 13, 17); }
+    \\static void death_panic_phi_right(void) { (void)z_frontier_panic_phi_len(0, 0, 13, 17); }
+    \\static void death_panic_loaded_ptr(void) { (void)z_frontier_panic_loaded_ptr(0, 19); }
     \\static void death_explicit_sadd_overflow(void) { (void)z_frontier_explicit_sadd_overflow(2147483640); }
     \\static void death_explicit_uadd_overflow(void) { (void)z_frontier_explicit_uadd_overflow(4294967290u); }
     \\#ifdef ZLLVM_HARNESS_MODE_ReleaseSafe
@@ -1103,9 +1110,14 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_panic_param_len(1, 11) != 91) return 9;
     \\    if (z_frontier_panic_computed_len(1, 5) != 92) return 10;
     \\    if (z_frontier_panic_loaded_len(1) != 93) return 11;
+    \\    if (z_frontier_panic_phi_len(1, 1, 13, 17) != 94) return 23;
+    \\    if (z_frontier_panic_loaded_ptr(1, 19) != 95) return 24;
     \\    if (expect_death(death_panic_param) != 0) return 12;
     \\    if (expect_death(death_panic_computed) != 0) return 13;
     \\    if (expect_death(death_panic_loaded) != 0) return 14;
+    \\    if (expect_death(death_panic_phi_left) != 0) return 25;
+    \\    if (expect_death(death_panic_phi_right) != 0) return 26;
+    \\    if (expect_death(death_panic_loaded_ptr) != 0) return 27;
     \\    if (expect_death(death_explicit_sadd_overflow) != 0) return 15;
     \\    if (expect_death(death_explicit_uadd_overflow) != 0) return 16;
     \\#ifdef ZLLVM_HARNESS_MODE_ReleaseSafe
