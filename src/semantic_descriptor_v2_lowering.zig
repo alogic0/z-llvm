@@ -1,9 +1,39 @@
 const std = @import("std");
 const sib = @import("structured_ir_builder.zig");
 const sd = @import("semantic_descriptor_v2_types.zig");
-usingnamespace sd;
+const Source = sd.Source;
+const AddressSpace = sd.AddressSpace;
+const Type = sd.Type;
+const FloatKind = sd.FloatKind;
+const Vector = sd.Vector;
+const ValueRef = sd.ValueRef;
+const Constant = sd.Constant;
+const Local = sd.Local;
+const Param = sd.Param;
+const GlobalKind = sd.GlobalKind;
+const Global = sd.Global;
+const CallConv = sd.CallConv;
+const AtomicOrdering = sd.AtomicOrdering;
+const AbiShape = sd.AbiShape;
+const BinOp = sd.BinOp;
+const CompareOp = sd.CompareOp;
+const CastOp = sd.CastOp;
+const Instruction = sd.Instruction;
+const Call = sd.Call;
+const MemoryOp = sd.MemoryOp;
+const Phi = sd.Phi;
+const Incoming = sd.Incoming;
+const Terminator = sd.Terminator;
+const Block = sd.Block;
+const Function = sd.Function;
+const Body = sd.Body;
+const ProgramOrigin = sd.ProgramOrigin;
+const Program = sd.Program;
+const ReleaseCanonicalizationSummary = sd.ReleaseCanonicalizationSummary;
+const ReleaseCanonicalizationReport = sd.ReleaseCanonicalizationReport;
+const VerifyError = sd.VerifyError;
 
-fn lowerGlobal(module: *sib.Module, global: Global) !void {
+pub fn lowerGlobal(module: *sib.Module, global: Global) !void {
     const ty = if (global.llvm_type) |llvm_type| sib.Type{ .text = llvm_type } else try toSibType(global.ty);
     const init = global.initializer orelse initializerForType(global.ty);
     const alignment = alignText(global.alignment orelse typeAlignment(global.ty));
@@ -14,7 +44,7 @@ fn lowerGlobal(module: *sib.Module, global: Global) !void {
     }
 }
 
-fn lowerFunction(module: *sib.Module, function: Function) !void {
+pub fn lowerFunction(module: *sib.Module, function: Function) !void {
     const ret_ty = try toSibType(function.return_type);
     var params_buf: [1024]u8 = undefined;
     const params = try formatParams(&params_buf, function.params);
@@ -148,7 +178,7 @@ fn foldIntegerBinop(binop: anytype) ?Instruction {
     } };
 }
 
-fn canFoldIntegerBinop(binop: anytype) bool {
+pub fn canFoldIntegerBinop(binop: anytype) bool {
     if (binop.ty != .int) return false;
     _ = parseImmediateInt(binop.lhs.id) orelse return false;
     _ = parseImmediateInt(binop.rhs.id) orelse return false;
@@ -158,7 +188,7 @@ fn canFoldIntegerBinop(binop: anytype) bool {
     };
 }
 
-fn canFoldFpBinop(binop: anytype) bool {
+pub fn canFoldFpBinop(binop: anytype) bool {
     if (binop.ty != .float) return false;
     return isImmediate(binop.lhs.id) and isImmediate(binop.rhs.id) and switch (binop.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => true,
@@ -166,7 +196,33 @@ fn canFoldFpBinop(binop: anytype) bool {
     };
 }
 
-fn isNeutralLocalComputation(binop: anytype) bool {
+fn isImmediate(value: []const u8) bool {
+    if (value.len == 0) return false;
+    return value[0] != '%' and value[0] != '@';
+}
+
+fn typeEql(lhs: Type, rhs: Type) bool {
+    return switch (lhs) {
+        .void => rhs == .void,
+        .bool => rhs == .bool,
+        .int => |bits| switch (rhs) {
+            .int => |rhs_bits| bits == rhs_bits,
+            else => false,
+        },
+        .float => |kind| switch (rhs) {
+            .float => |rhs_kind| kind == rhs_kind,
+            else => false,
+        },
+        .pointer => |address_space| switch (rhs) {
+            .pointer => |rhs_address_space| address_space == rhs_address_space,
+            else => false,
+        },
+        .aggregate => false,
+        .vector => false,
+    };
+}
+
+pub fn isNeutralLocalComputation(binop: anytype) bool {
     return switch (binop.op) {
         .add, .@"or", .xor => std.mem.eql(u8, binop.rhs.id, "0") or std.mem.eql(u8, binop.lhs.id, "0"),
         .sub, .shl, .lshr, .ashr => std.mem.eql(u8, binop.rhs.id, "0"),
@@ -176,7 +232,7 @@ fn isNeutralLocalComputation(binop: anytype) bool {
     };
 }
 
-fn isBranchToReturnBlock(function: Function, block: Block) bool {
+pub fn isBranchToReturnBlock(function: Function, block: Block) bool {
     const target = switch (block.terminator) {
         .br => |target| target,
         else => return false,
@@ -188,7 +244,7 @@ fn isBranchToReturnBlock(function: Function, block: Block) bool {
     };
 }
 
-fn isFcmpSelectCanonical(function: Function, select: anytype) bool {
+pub fn isFcmpSelectCanonical(function: Function, select: anytype) bool {
     if (!typeEql(select.cond.ty, .bool)) return false;
     const cond_name = select.cond.id;
     if (!std.mem.startsWith(u8, cond_name, "%")) return false;
@@ -204,14 +260,14 @@ fn isFcmpSelectCanonical(function: Function, select: anytype) bool {
     return false;
 }
 
-fn blockByName(function: Function, name: []const u8) ?Block {
+pub fn blockByName(function: Function, name: []const u8) ?Block {
     for (function.blocks) |block| {
         if (std.mem.eql(u8, block.name, name)) return block;
     }
     return null;
 }
 
-fn parseImmediateInt(text: []const u8) ?i128 {
+pub fn parseImmediateInt(text: []const u8) ?i128 {
     if (!isImmediate(text)) return null;
     return std.fmt.parseInt(i128, text, 10) catch null;
 }
@@ -373,7 +429,7 @@ fn loadResultName(load: MemoryOp) []const u8 {
     return load.result orelse "load";
 }
 
-fn bodyForSurface(surface: []const u8) ?Body {
+pub fn bodyForSurface(surface: []const u8) ?Body {
     inline for (surface_body_map) |entry| {
         if (std.mem.eql(u8, surface, entry.surface)) return entry.body;
     }
@@ -484,131 +540,3 @@ const surface_body_map = [_]SurfaceBody{
     .{ .surface = "base64-decode-exit-step", .name = "base64-decode-exit-step", .body = .base64_decode_exit_step },
     .{ .surface = "table-indexed-load", .name = "table-indexed-load", .body = .table_indexed_load },
 };
-
-const empty_source: Source = .{ .wrapper = "test", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll", .tag = "tiny-scalar" };
-
-fn testProgramWithInstruction(instruction: Instruction) Program {
-    const allocator = std.heap.page_allocator;
-    const instructions = allocator.alloc(Instruction, 1) catch @panic("failed to allocate test instructions");
-    instructions[0] = instruction;
-    const blocks = allocator.alloc(Block, 1) catch @panic("failed to allocate test blocks");
-    blocks[0] = .{
-        .name = "entry",
-        .instructions = instructions,
-        .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } },
-    };
-    const functions = allocator.alloc(Function, 1) catch @panic("failed to allocate test functions");
-    functions[0] = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = blocks };
-    return .{ .id = "test", .source = empty_source, .body = .scalar_add_ret, .diagnostic_surface = "scalar-add-ret", .origin = .source_derived_descriptor, .functions = functions };
-}
-
-fn testProgramWithBody(body: Body, blocks: []const Block) Program {
-    const allocator = std.heap.page_allocator;
-    const functions = allocator.alloc(Function, 1) catch @panic("failed to allocate test functions");
-    functions[0] = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = blocks };
-    return .{ .id = "test", .source = empty_source, .body = body, .diagnostic_surface = bodyName(body), .origin = .source_derived_descriptor, .functions = functions };
-}
-
-fn testProgramWithGlobal(global: Global) Program {
-    const allocator = std.heap.page_allocator;
-    const blocks = allocator.alloc(Block, 1) catch @panic("failed to allocate test blocks");
-    blocks[0] = .{
-        .name = "entry",
-        .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } },
-    };
-    const functions = allocator.alloc(Function, 1) catch @panic("failed to allocate test functions");
-    functions[0] = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = blocks };
-    const globals = allocator.alloc(Global, 1) catch @panic("failed to allocate test globals");
-    globals[0] = global;
-    return .{ .id = "test", .source = empty_source, .body = .scalar_add_ret, .diagnostic_surface = "scalar-add-ret", .origin = .source_derived_descriptor, .functions = functions, .globals = globals };
-}
-
-test "descriptor v2 rejects unsupported vector type" {
-    const child: Type = .{ .int = 32 };
-    const program = testProgramWithInstruction(.{ .constant = .{ .name = "v", .ty = .{ .vector = .{ .len = 4, .child = &child } }, .value = "zeroinitializer" } });
-    try std.testing.expectError(error.UnsupportedTypeVector, verify(program));
-}
-
-test "descriptor v2 rejects varargs calls" {
-    const program = testProgramWithInstruction(.{ .call = .{ .callee = "callee", .calling_convention = .c, .ret_ty = .{ .int = 32 }, .args = &.{}, .varargs = true } });
-    try std.testing.expectError(error.UnsupportedVarargs, verify(program));
-}
-
-test "descriptor v2 rejects unsupported callconv" {
-    const program = testProgramWithInstruction(.{ .call = .{ .callee = "callee", .calling_convention = .unsupported, .ret_ty = .{ .int = 32 }, .args = &.{} } });
-    try std.testing.expectError(error.UnsupportedCallConv, verify(program));
-}
-
-test "descriptor v2 rejects unsupported atomic ordering" {
-    const program = testProgramWithInstruction(.{ .load = .{
-        .ptr = .{ .id = "@p", .ty = .{ .pointer = .generic } },
-        .ty = .{ .int = 32 },
-        .align_bytes = 4,
-        .ordering = .unsupported,
-    } });
-    try std.testing.expectError(error.UnsupportedAtomicOrdering, verify(program));
-}
-
-test "descriptor v2 rejects unsupported address space" {
-    const program = testProgramWithInstruction(.{ .load = .{
-        .ptr = .{ .id = "%p", .ty = .{ .pointer = .unsupported } },
-        .ty = .{ .int = 32 },
-        .align_bytes = 4,
-    } });
-    try std.testing.expectError(error.UnsupportedAddressSpace, verify(program));
-}
-
-test "descriptor v2 rejects wrong SysV aggregate classification" {
-    const aggregate_fields = [_]Type{ .{ .int = 64 }, .{ .int = 64 } };
-    const program = testProgramWithInstruction(.{ .call = .{
-        .result = "pair",
-        .callee = "make_pair",
-        .calling_convention = .c,
-        .ret_ty = .{ .aggregate = &aggregate_fields },
-        .args = &.{},
-        .abi = .direct,
-    } });
-    try std.testing.expectError(error.UnsupportedAbiShape, verify(program));
-}
-
-test "descriptor v2 rejects malformed sret and byval ABI shapes" {
-    const bad_sret = testProgramWithInstruction(.{ .call = .{
-        .callee = "make_pair",
-        .calling_convention = .c,
-        .ret_ty = .{ .int = 32 },
-        .args = &.{i32Ref("0")},
-        .abi = .sret,
-    } });
-    try std.testing.expectError(error.UnsupportedAbiShape, verify(bad_sret));
-
-    const bad_byval = testProgramWithInstruction(.{ .call = .{
-        .callee = "consume_pair",
-        .calling_convention = .c,
-        .ret_ty = .void,
-        .args = &.{i32Ref("0")},
-        .abi = .byval,
-    } });
-    try std.testing.expectError(error.UnsupportedAbiShape, verify(bad_byval));
-}
-
-test "descriptor v2 rejects TLS relocation shape mismatch" {
-    const tls_global = testProgramWithGlobal(.{ .name = "bad_tls", .kind = .tls, .ty = .{ .int = 32 }, .address_space = .generic, .initializer = "0" });
-    try std.testing.expectError(error.UnsupportedAddressSpace, verify(tls_global));
-
-    const local_exec_global = testProgramWithGlobal(.{ .name = "bad_global", .kind = .global, .ty = .{ .int = 32 }, .address_space = .local_exec_tls, .initializer = "0" });
-    try std.testing.expectError(error.UnsupportedAddressSpace, verify(local_exec_global));
-}
-
-test "descriptor v2 rejects ReleaseSafe check removal" {
-    const blocks = [_]Block{.{
-        .name = "entry",
-        .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } },
-    }};
-    const program = testProgramWithBody(.checked_add_imm_boundary, &blocks);
-    try std.testing.expectError(error.ReleaseSafeCheckRemoved, verify(program));
-}
-
-test "descriptor v2 unsupported debug metadata and EH are explicit" {
-    try std.testing.expectEqual(VerifyError.UnsupportedDebugMetadata, error.UnsupportedDebugMetadata);
-    try std.testing.expectEqual(VerifyError.UnsupportedExceptionHandling, error.UnsupportedExceptionHandling);
-}

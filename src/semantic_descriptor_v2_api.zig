@@ -1,9 +1,48 @@
 const std = @import("std");
 const sib = @import("structured_ir_builder.zig");
 const sd = @import("semantic_descriptor_v2_types.zig");
-usingnamespace sd;
+const Source = sd.Source;
+const AddressSpace = sd.AddressSpace;
+const Type = sd.Type;
+const FloatKind = sd.FloatKind;
+const Vector = sd.Vector;
+const ValueRef = sd.ValueRef;
+const Constant = sd.Constant;
+const Local = sd.Local;
+const Param = sd.Param;
+const GlobalKind = sd.GlobalKind;
+const Global = sd.Global;
+const CallConv = sd.CallConv;
+const AtomicOrdering = sd.AtomicOrdering;
+const AbiShape = sd.AbiShape;
+const BinOp = sd.BinOp;
+const CompareOp = sd.CompareOp;
+const CastOp = sd.CastOp;
+const Instruction = sd.Instruction;
+const Call = sd.Call;
+const MemoryOp = sd.MemoryOp;
+const Phi = sd.Phi;
+const Incoming = sd.Incoming;
+const Terminator = sd.Terminator;
+const Block = sd.Block;
+const Function = sd.Function;
+const Body = sd.Body;
+const ProgramOrigin = sd.ProgramOrigin;
+const Program = sd.Program;
+const ReleaseCanonicalizationSummary = sd.ReleaseCanonicalizationSummary;
+const ReleaseCanonicalizationReport = sd.ReleaseCanonicalizationReport;
+const VerifyError = sd.VerifyError;
 
 const lowering = @import("semantic_descriptor_v2_lowering.zig");
+const isBranchToReturnBlock = lowering.isBranchToReturnBlock;
+const blockByName = lowering.blockByName;
+const parseImmediateInt = lowering.parseImmediateInt;
+const canFoldIntegerBinop = lowering.canFoldIntegerBinop;
+const canFoldFpBinop = lowering.canFoldFpBinop;
+const isNeutralLocalComputation = lowering.isNeutralLocalComputation;
+const isFcmpSelectCanonical = lowering.isFcmpSelectCanonical;
+const bodyName = lowering.bodyName;
+const bodyForSurface = lowering.bodyForSurface;
 
 pub fn verify(program: Program) VerifyError!void {
     if (program.functions.len == 0) return error.EmptyProgram;
@@ -1826,4 +1865,3 @@ const base64_table_globals = [_]Global{
     .{ .name = "base64.full_table", .kind = .constant, .ty = .{ .int = 8 }, .initializer = "19" },
     .{ .name = "base64.output", .kind = .global, .ty = .{ .int = 8 }, .initializer = "0" },
 };
-
