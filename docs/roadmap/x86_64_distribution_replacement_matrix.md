@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=403`,
-`generic_codegen_functions=403`, `generic_cfg_functions=403`,
+three release modes at `source_rows=13`, `discovered_functions=404`,
+`generic_codegen_functions=404`, `generic_cfg_functions=404`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=403`, `object_failures=0`,
+`object_emitted_functions=404`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -478,7 +478,7 @@ The SysV scalar stack frontier now also proves up to eighteen stack-passed
 `i32` call arguments with immediate `%rsp` cleanup,
 seven/eight/twelve/thirteen/fourteen/eighteen
 stack-passed live `i32` values plus a deep post-call stack `i32` reload through
-a disp32 incoming stack offset for `i32`/`i64`, named stack-parameter forwarding into outgoing stack argument
+a disp32 incoming stack offset for `i32`/`i64`/`f64`, named stack-parameter forwarding into outgoing stack argument
 slots and outgoing GPR argument registers, typed AIR v2 pointer-callee indirect
 calls that load stack-passed
 parameters into outgoing GPR call slots or forward 12/14 `i32` arguments

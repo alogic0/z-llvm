@@ -26,6 +26,9 @@ const fpParamIndexFromValue = cabi_aggregate_lowering.fpParamIndexFromValue;
 const frameIndexForLiveParam = cabi_call_lowering.frameIndexForLiveParam;
 const isNamed = shared.isNamed;
 const paramReg = cabi_abi_helpers.paramReg;
+const scalarParamStackDisp8 = cabi_abi_helpers.scalarParamStackDisp8;
+const appendLoadStackDispXmm0 = cabi_aggregate_lowering.appendLoadStackDispXmm0;
+const appendLoadStackDispXmm0F32 = cabi_aggregate_lowering.appendLoadStackDispXmm0F32;
 const setupSysVCallTarget = shared.setupSysVCallTarget;
 const sysvScalarCallNeedsStackArgs = cabi_call_lowering.sysvScalarCallNeedsStackArgs;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
@@ -312,8 +315,20 @@ pub fn lowerGenericCfgFpVoidCallParamReturn(
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    const live_index = fpParamIndex(function, ret_name, function.ret_ty) catch return false;
-    if (live_index >= 2) return error.UnsupportedLiveAcrossCall;
+    const live_index = fpParamIndex(function, ret_name, function.ret_ty) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi => null,
+        error.UnsupportedCodegenValue => return false,
+    };
+    const stack_disp = if (live_index == null)
+        scalarParamStackDisp8(function, ret_name, function.ret_ty) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi, error.UnsupportedCodegenValue => return false,
+            else => return err,
+        }
+    else
+        null;
+    if (live_index) |index| {
+        if (index >= 2) return error.UnsupportedLiveAcrossCall;
+    }
     const instruction = block.instructions.items[0];
     if (instruction.removed or instruction.result != null) return false;
     const call = switch (instruction.kind) {
@@ -336,21 +351,32 @@ pub fn lowerGenericCfgFpVoidCallParamReturn(
     } else .{ .direct = call.callee };
 
     try appendStackFrame(allocator, machine, 8);
-    const live_reg = try XmmReg.fromIndex(live_index);
-    if (function.ret_ty.eql(.float)) {
-        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = live_reg, .frame_index = .slot0 } });
-    } else {
-        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = live_reg, .frame_index = .slot0 } });
+    if (live_index) |index| {
+        const live_reg = try XmmReg.fromIndex(index);
+        if (function.ret_ty.eql(.float)) {
+            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = live_reg, .frame_index = .slot0 } });
+        } else {
+            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = live_reg, .frame_index = .slot0 } });
+        }
     }
     try setupSysVCallTarget(allocator, machine, call_target);
     _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
     try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
-    if (function.ret_ty.eql(.float)) {
-        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    if (stack_disp) |offset| {
+        try appendStackFrameEnd(allocator, machine, 8);
+        if (function.ret_ty.eql(.float)) {
+            try appendLoadStackDispXmm0F32(allocator, machine, offset);
+        } else {
+            try appendLoadStackDispXmm0(allocator, machine, offset);
+        }
     } else {
-        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        if (function.ret_ty.eql(.float)) {
+            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        } else {
+            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        }
+        try appendStackFrameEnd(allocator, machine, 8);
     }
-    try appendStackFrameEnd(allocator, machine, 8);
     try machine.instructions.append(allocator, .ret);
     return true;
 }

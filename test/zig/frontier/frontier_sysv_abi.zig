@@ -1039,6 +1039,91 @@ export fn frontier_f64_live_after_call(a: f64, b: f64) f64 {
     return a;
 }
 
+export fn frontier_deep_stack_f64_live_after_call(
+    a0: f64,
+    a1: f64,
+    a2: f64,
+    a3: f64,
+    a4: f64,
+    a5: f64,
+    a6: f64,
+    a7: f64,
+    a8: f64,
+    a9: f64,
+    a10: f64,
+    a11: f64,
+    a12: f64,
+    a13: f64,
+    a14: f64,
+    a15: f64,
+    a16: f64,
+    a17: f64,
+    a18: f64,
+    a19: f64,
+    a20: f64,
+    a21: f64,
+    a22: f64,
+    a23: f64,
+    a24: f64,
+    a25: f64,
+    a26: f64,
+    a27: f64,
+    a28: f64,
+    a29: f64,
+    a30: f64,
+    a31: f64,
+    a32: f64,
+    a33: f64,
+    a34: f64,
+    a35: f64,
+    a36: f64,
+    a37: f64,
+    a38: f64,
+    a39: f64,
+) f64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    _ = a8;
+    _ = a9;
+    _ = a10;
+    _ = a11;
+    _ = a12;
+    _ = a13;
+    _ = a14;
+    _ = a15;
+    _ = a16;
+    _ = a17;
+    _ = a18;
+    _ = a19;
+    _ = a20;
+    _ = a21;
+    _ = a22;
+    _ = a23;
+    _ = a24;
+    _ = a25;
+    _ = a26;
+    _ = a27;
+    _ = a28;
+    _ = a29;
+    _ = a30;
+    _ = a31;
+    _ = a32;
+    _ = a33;
+    _ = a34;
+    _ = a35;
+    _ = a36;
+    _ = a37;
+    _ = a38;
+    frontier_touch_none();
+    return a39;
+}
+
 export fn frontier_two_f32_live_sum_after_call(a: f32, b: f32) f32 {
     frontier_touch_none();
     return a + b;
