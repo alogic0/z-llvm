@@ -381,6 +381,7 @@ These steps forward arguments after `--`.
 | --- | --- |
 | `zig build probe-distribution-objects -- <args>` | Run object-probe automation over an optimized-output directory. Use to produce stable ok/fail/excluded summaries and select the next measured object blocker. |
 | `zig build capture-zig-ir -- <args>` | Capture authoritative Zig-emitted LLVM IR from the configured stage4 Zig emitter. Use when refreshing checked Zig source-backed fixtures. |
+| `zig run tools/update_doc_counters.zig -- --gate=distribution-air-release-frontier --from-log=<log>` | Mechanically refresh the documented `distribution-air-release-frontier` counter snapshots from a saved gate log. The tool parses strict frontier summary lines, accepts incremental logs with one or more complete mode summaries, and updates only the established frontier doc sections. |
 
 Examples:
 
@@ -390,6 +391,10 @@ zig build probe-distribution-objects -- \
   --summary=tmp/zig_ir/release_small_object_probe.summary
 
 zig build capture-zig-ir -- test/zig/inputs/tiny_scalar.zig ReleaseFast
+
+zig run tools/update_doc_counters.zig -- \
+  --gate=distribution-air-release-frontier \
+  --from-log=tmp/frontier_counter_update.log
 ```
 
 ## Shell Scripts
