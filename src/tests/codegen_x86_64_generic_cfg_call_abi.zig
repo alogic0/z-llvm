@@ -1860,6 +1860,30 @@ test "x86_64 codegen rejects byval call ABI boundary" {
         error.UnsupportedSretByvalAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, byval_module.target_triple.?, byval_module.functions.items[0]),
     );
+
+    const indirect_byval_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, ptr %arg) {
+        \\entry:
+        \\  %r = call i32 %fn(ptr byval({ i32, i32 }) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_byval_module = try ir.Module.parse(std.testing.allocator, indirect_byval_input);
+    defer indirect_byval_module.deinit();
+    try indirect_byval_module.verify();
+    const indirect_byval_call = indirect_byval_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(indirect_byval_call.callee_value != null);
+    try std.testing.expectError(
+        error.UnsupportedSretByvalAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_byval_module.functions.items[0], indirect_byval_call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedSretByvalAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_byval_module.target_triple.?, indirect_byval_module.functions.items[0]),
+    );
 }
 
 test "x86_64 codegen accepts memory aggregate stack call and rejects vector return boundary" {
