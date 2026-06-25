@@ -311,7 +311,7 @@ source now proves eight, twelve, and eighteen stack-passed scalar `i32` call arg
 with immediate `%rsp` cleanup, plus forwarding of named incoming stack-passed
 `i32` parameters into outgoing stack-argument slots and outgoing GPR argument
 registers, seven/eight/twelve/thirteen/fourteen/eighteen stack-passed live `i32` values,
-and a deep post-call stack `i32` reload through a disp32 incoming stack offset. It also proves a selected
+and deep post-call stack `i32`/`i64` reloads through disp32 incoming stack offsets. It also proves a selected
 two-call/six-live GPR frame through the generic CFG void-call path. The follow-up
 `frontier_sysv_sret_byval.zig` row adds selected MEMORY aggregate ABI evidence:
 `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=402`,
-`generic_codegen_functions=402`, `generic_cfg_functions=402`,
+frontier gate reports `source_rows=13`, `discovered_functions=403`,
+`generic_codegen_functions=403`, `generic_cfg_functions=403`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=402`, `object_failures=0`,
+`object_emitted_functions=403`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,

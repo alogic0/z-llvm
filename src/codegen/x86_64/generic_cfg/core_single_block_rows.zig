@@ -774,6 +774,10 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgI64VoidCallStackParamReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerI64SaturatingHelperFamilyReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -803,6 +807,50 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         return true;
     }
     return false;
+}
+
+fn lowerGenericCfgI64VoidCallStackParamReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 1) return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const stack_disp = scalarParamStackDisp8(function, ret_name, .{ .int = 64 }) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi, error.UnsupportedCodegenValue => return false,
+        else => return err,
+    };
+    const instruction = block.instructions.items[0];
+    if (instruction.removed or instruction.result != null) return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.ret_ty != .void or call.args.items.len != 0 or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
+    if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+    }
+    const call_target: SysVCallTarget = if (call.callee_value) |callee_value| blk: {
+        const callee_name = switch (callee_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk .{ .indirect_from_reg = try paramReg(function, callee_name, .ptr) };
+    } else .{ .direct = call.callee };
+    try appendStackFrame(allocator, machine, 8);
+    try setupSysVCallTarget(allocator, machine, call_target);
+    try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+    try appendStackFrameEnd(allocator, machine, 8);
+    try appendLoadStackDispRax(allocator, machine, stack_disp);
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerGenericCfgI64CallResultAcrossVoidCall(

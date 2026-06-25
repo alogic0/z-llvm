@@ -1384,6 +1384,10 @@ pub fn lowerReturnValueAfterCalls(
     last_eax_value: ?[]const u8,
     call_count: usize,
 ) !void {
+    if (function.ret_ty.eql(.{ .int = 64 })) {
+        try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, value);
+        return;
+    }
     switch (value) {
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return lowerReturnValue(allocator, machine, function, block, value),
         .named => |name| {
