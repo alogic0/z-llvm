@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=412
-structured_functions=412
-generic_codegen_functions=412
-generic_cfg_functions=412
+discovered_functions=414
+structured_functions=414
+generic_codegen_functions=414
+generic_cfg_functions=414
 structural_matcher_functions=0
-structured_air_v2_functions=412
-typed_air_operand_functions=412
+structured_air_v2_functions=414
+typed_air_operand_functions=414
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=412
+generic_lowering_functions=414
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=412
+object_emitted_functions=414
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -303,6 +303,11 @@ Closed in the current memory/aggregate frontier slice:
   a disp32 incoming stack offset; `frontier_deep_stack_f32_live_after_call`
   and `frontier_deep_stack_f64_live_after_call` prove the same stack FP
   reload after a side-effecting void call restores `%rsp`
+- stack-passed `f32` call-argument reload rows in `frontier_sysv_abi.zig`:
+  `frontier_f32_stack_arg_to_registers` and
+  `frontier_indirect_f32_stack_arg_to_registers` exhaust the SSE argument
+  stream, then reload incoming stack-passed `f32` parameters into outgoing XMM
+  helper-call registers for direct and pointer-callee calls
 - stack-passed live i32 rows in `frontier_sysv_abi.zig`: all six SysV GPR
   `i32` parameters are spilled/reloaded around a direct helper call while more
   than six stack-passed `i32` parameters are read from the restored incoming

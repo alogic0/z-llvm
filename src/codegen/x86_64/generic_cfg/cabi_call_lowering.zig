@@ -83,6 +83,14 @@ fn appendLoadStackDispXmm(allocator: std.mem.Allocator, machine: *MachineFunctio
     }
 }
 
+fn appendLoadStackDispXmmF32(allocator: std.mem.Allocator, machine: *MachineFunction, reg: XmmReg, offset: u32) !void {
+    if (offset <= std.math.maxInt(i8)) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm_f32 = .{ .reg = reg, .disp = @intCast(offset) } });
+    } else {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm_f32 = .{ .reg = reg, .disp = offset } });
+    }
+}
+
 pub fn appendI32CallArgs(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -345,13 +353,13 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
                                     .src = try XmmReg.fromIndex(src_index),
                                 } });
                             }
-                        } else if (arg.ty.eql(.double)) {
-                            try appendLoadStackDispXmm(
-                                allocator,
-                                machine,
-                                dst,
-                                try adjustedIncomingStackDisp8(try scalarParamStackDisp8(function, name, .double), incoming_stack_adjust),
-                            );
+                        } else if (arg.ty.eql(.double) or arg.ty.eql(.float)) {
+                            const offset = try adjustedIncomingStackDisp8(try scalarParamStackDisp8(function, name, arg.ty), incoming_stack_adjust);
+                            if (arg.ty.eql(.float)) {
+                                try appendLoadStackDispXmmF32(allocator, machine, dst, offset);
+                            } else {
+                                try appendLoadStackDispXmm(allocator, machine, dst, offset);
+                            }
                         } else {
                             return error.UnsupportedCodegenAbi;
                         }

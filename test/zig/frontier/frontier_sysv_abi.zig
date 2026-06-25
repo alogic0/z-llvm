@@ -1953,6 +1953,59 @@ export fn frontier_indirect_five_f32_external_call(func: Sum5F32Fn, a: f32, b: f
     return func(a, b, c, d, e);
 }
 
+export fn frontier_f32_stack_arg_to_registers(
+    a0: f32,
+    a1: f32,
+    a2: f32,
+    a3: f32,
+    a4: f32,
+    a5: f32,
+    a6: f32,
+    a7: f32,
+    a8: f32,
+    a9: f32,
+    a10: f32,
+    a11: f32,
+    a12: f32,
+) f32 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    return frontier_sum5_f32(a8, a9, a10, a11, a12);
+}
+
+export fn frontier_indirect_f32_stack_arg_to_registers(
+    func: Sum5F32Fn,
+    a0: f32,
+    a1: f32,
+    a2: f32,
+    a3: f32,
+    a4: f32,
+    a5: f32,
+    a6: f32,
+    a7: f32,
+    a8: f32,
+    a9: f32,
+    a10: f32,
+    a11: f32,
+    a12: f32,
+) f32 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    return func(a8, a9, a10, a11, a12);
+}
+
 export fn frontier_indirect_five_f64_external_call(func: Sum5F64Fn, a: f64, b: f64, c: f64, d: f64, e: f64) f64 {
     return func(a, b, c, d, e);
 }

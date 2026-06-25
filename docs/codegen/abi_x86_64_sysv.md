@@ -55,6 +55,8 @@ one stack-passed live f32 or f64 caller argument can be reloaded from the
 restored incoming stack argument area after one direct C ABI void call
 direct f32/f64 parameter returns now load stack-passed FP parameters from the
 incoming stack argument area once the SSE register stream is exhausted
+stack-passed f32 helper-call arguments can be reloaded from the incoming stack
+argument area into outgoing XMM registers for direct and pointer-callee calls
 direct i64/pointer parameter returns now load stack-passed parameters
 from the incoming stack argument area once the GPR stream is exhausted
 two or three live f32/f64 caller arguments can be spilled from %xmm0/%xmm1
