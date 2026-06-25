@@ -46,6 +46,8 @@ selected backend subset:
   selected array-in-struct INTEGER aggregate sums are accepted
   selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double`
     argument-field reads are accepted through the reusable aggregate classifier
+  selected mixed INTEGER/SSE aggregate construction returns include single-f32
+    SSE eightbytes in `{ i64, float }` and `{ float, i64 }`
   selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and
     `double` argument-field reads are accepted through the reusable aggregate
     classifier
