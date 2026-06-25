@@ -49,7 +49,6 @@ pub const TypedV2Fallback = struct {
     reason: []const u8,
 };
 
-
 const lowering_parser = @import("zig_air_lowering_parser.zig");
 
 const ZigType = lowering_parser.ZigType;
@@ -863,7 +862,6 @@ fn lowerFunctionTypedV2(
     return function;
 }
 
-
 const LoweringContext = struct {
     allocator: std.mem.Allocator,
     module: *ir.Module,
@@ -909,6 +907,8 @@ const LoweringContext = struct {
             try self.lowerTypedBlock(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "is_non_null")) {
             try self.lowerTypedIsNonNull(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "wrap_optional")) {
+            try self.lowerTypedWrapOptional(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "optional_payload")) {
             try self.lowerTypedOptionalPayload(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ptr_add")) {
@@ -1408,13 +1408,28 @@ const LoweringContext = struct {
         };
     }
 
+    fn lowerTypedWrapOptional(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        if (!std.mem.startsWith(u8, instruction.result_type, "?")) return error.UnsupportedAir;
+        const optional_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        const payload = try self.resolveTypedOperand(instruction, 0);
+        if (!payload.ty.ir_type.eql(optional_type.ir_type)) return error.UnsupportedAir;
+        self.values[instruction.index] = .{
+            .ty = optional_type,
+            .value = payload.value,
+        };
+    }
+
     fn lowerTypedOptionalPayload(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
         if (instruction.operands.len != 1) return error.UnsupportedAir;
         const payload_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
-        if (payload_type.ir_type != .ptr) return error.UnsupportedAir;
         const optional = try self.resolveTypedOperand(instruction, 0);
-        if (optional.ty.ir_type != .ptr) return error.UnsupportedAir;
-        if (!std.mem.startsWith(u8, instruction.operands[0].type_text, "?*")) return error.UnsupportedAir;
+        if (!std.mem.startsWith(u8, instruction.operands[0].type_text, "?")) return error.UnsupportedAir;
+        if (payload_type.ir_type == .ptr) {
+            if (optional.ty.ir_type != .ptr) return error.UnsupportedAir;
+        } else {
+            if (!optional.ty.ir_type.eql(payload_type.ir_type)) return error.UnsupportedAir;
+        }
         self.values[instruction.index] = .{
             .ty = payload_type,
             .value = optional.value,

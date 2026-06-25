@@ -28,7 +28,6 @@ pub const TypedValue = struct {
 
 pub const LowerError = std.mem.Allocator.Error || error{UnsupportedAir};
 
-
 pub const TypedBranchMergeResult = struct {
     value: ?TypedValue,
     predecessor_label: []const u8,
@@ -226,6 +225,12 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
         return .{ .ir_type = .{ .int = 16 } };
     }
+    if (trimmed.len > 1 and trimmed[0] == '?') {
+        const child = parseZigType(trimmed[1..]) orelse return null;
+        if (child.ir_type == .int and (child.ir_type.int == 32 or child.ir_type.int == 64)) return child;
+        if (child.ir_type == .ptr) return child;
+        return null;
+    }
     if (trimmed.len > 1 and (trimmed[0] == 'u' or trimmed[0] == 'i')) {
         const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
         return .{ .ir_type = .{ .int = bits }, .signed = trimmed[0] == 'i' };
@@ -319,7 +324,10 @@ pub fn parseConstant(text: []const u8) ?TypedValue {
         const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
         if (fields.next() != null) return null;
         const ty = parseZigType(std.mem.trim(u8, type_text, " ")) orelse return null;
-        if (std.mem.eql(u8, value_text, "null")) return .{ .ty = ty, .value = .null_value };
+        if (std.mem.eql(u8, value_text, "null")) return .{
+            .ty = ty,
+            .value = if (ty.ir_type == .ptr) .null_value else .{ .int = 0 },
+        };
         if (isFpType(ty.ir_type)) return .{ .ty = ty, .value = .{ .fp = canonicalFpLiteral(value_text) orelse value_text } };
         const value = std.fmt.parseInt(i128, value_text, 10) catch return null;
         return .{ .ty = ty, .value = .{ .int = value } };
@@ -770,6 +778,7 @@ pub fn isStraightLineOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "is_non_null") or
+        std.mem.eql(u8, opcode, "wrap_optional") or
         std.mem.eql(u8, opcode, "optional_payload") or
         std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         std.mem.eql(u8, opcode, "atomic_rmw") or
@@ -796,6 +805,7 @@ pub fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "block") or
         std.mem.eql(u8, opcode, "is_non_null") or
+        std.mem.eql(u8, opcode, "wrap_optional") or
         std.mem.eql(u8, opcode, "optional_payload") or
         std.mem.eql(u8, opcode, "ptr_add") or
         std.mem.eql(u8, opcode, "ptr_elem_ptr") or

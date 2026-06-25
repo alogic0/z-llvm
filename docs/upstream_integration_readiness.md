@@ -458,6 +458,11 @@ llvm_targetmachine_rows=0
 local_fail=0
 ```
 
+The frontier safety-edge slice includes typed-v2/generic-CFG lowering for
+optional-pointer unwrap/null panic, checked int-from-float
+`integerPartOutOfBounds`, direct bounds loads, and checked unsigned add helper
+rows across ReleaseFast, ReleaseSafe, and ReleaseSmall.
+
 Object inspection:
 
 ```text
@@ -621,20 +626,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=430
-structured_functions=430
-generic_codegen_functions=430
-generic_cfg_functions=430
+discovered_functions=434
+structured_functions=434
+generic_codegen_functions=434
+generic_cfg_functions=434
 structural_matcher_functions=0
-structured_air_v2_functions=430
-typed_air_operand_functions=430
+structured_air_v2_functions=434
+typed_air_operand_functions=434
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=430
+generic_lowering_functions=434
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=430
+object_emitted_functions=434
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -667,13 +672,18 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 430-function counters above plus `native_link_accepted_rows=13`,
+13-source / 434-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
-One selected slice-panic runtime-call row still materializes the captured
-12-byte panic-message length directly; the strict gate proves that row, not a
-general panic-slice lowering policy.
+The selected slice-panic runtime-call row now uses the release generic CFG
+slice runtime-call helper subset, which derives direct integer lengths and
+`{ ptr, i64 }` aggregate slice constant lengths from IR rather than using a
+selected message-length constant.
+The frontier safety-edge executable harnesses resolve the cold
+`outOfBounds`, `integerPartOutOfBounds`, and `unwrapNull` symbols with local
+trap stubs so the stable non-panic C ABI probes link and run without turning
+those symbols into native-link runtime-boundary rows.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=430
-structured_functions=430
-generic_codegen_functions=430
-generic_cfg_functions=430
+discovered_functions=434
+structured_functions=434
+generic_codegen_functions=434
+generic_cfg_functions=434
 structural_matcher_functions=0
-structured_air_v2_functions=430
-typed_air_operand_functions=430
+structured_air_v2_functions=434
+typed_air_operand_functions=434
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=430
+generic_lowering_functions=434
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=430
+object_emitted_functions=434
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -76,8 +76,8 @@ Native-link progress is green for all three modes:
 
 ```text
 native_link_accepted_rows=13
-executable_ok_rows=0
-link_only_rows=13
+executable_ok_rows=13
+link_only_rows=0
 runtime_boundary_rows=0
 unsupported_zig_linker_feature_rows=0
 native_link_failures=0
@@ -687,6 +687,13 @@ Closed in the current memory/aggregate frontier slice:
   directly through generic CFG codegen, using a strict unsigned i64 guard and
   the dynamic pointer indexed-load path; executable probes validate both the
   loaded result and equality/out-of-bounds `-1` return path
+- runtime/safety-edge rows in `frontier_safety_edges.zig`:
+  `frontier_checked_uadd`, `frontier_bounds_direct`,
+  `frontier_optional_unwrap`, and `frontier_int_from_float_checked` now remain
+  typed-v2/generic-CFG owned across ReleaseFast, ReleaseSafe, and ReleaseSmall.
+  The optional unwrap row uses the generic optional-pointer null/panic edge;
+  the integer-conversion row uses the checked int-from-float guard plus
+  `integerPartOutOfBounds` noreturn call in safe modes.
 
 Remaining measured frontier blockers kept out of accepted rows:
 

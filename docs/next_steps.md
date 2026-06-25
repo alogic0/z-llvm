@@ -270,9 +270,9 @@ The last broad structural matcher fallback was
 CFG now owns this through guarded global-add lowering with an explicit
 ptr/length panic-call runtime boundary, and the selected mixed C/Zig helper is
 only a fallback after the generic router rejects unsupported variants.
-The current slice-panic call lowering still materializes the selected 12-byte
-panic-message length directly; this closes the strict frontier row but is not a
-general aggregate slice-length lowering implementation.
+The release generic CFG slice-panic call lowering now derives supported message
+lengths from the IR value: direct integer lengths and `{ ptr, i64 }` aggregate
+slice constants are materialized into `%rsi` without a selected length constant.
 
 The broad object progress gates now cover all three release modes without LLVM
 TargetMachine. ReleaseFast, ReleaseSafe, and ReleaseSmall each report
@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=430`,
-`generic_codegen_functions=430`, `generic_cfg_functions=430`,
+frontier gate reports `source_rows=13`, `discovered_functions=434`,
+`generic_codegen_functions=434`, `generic_cfg_functions=434`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=430`, `object_failures=0`,
+`object_emitted_functions=434`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,15 +483,18 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=430`,
-`generic_cfg_functions=430`, `structural_matcher_functions=0`,
-`object_emitted_functions=430`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=434`,
+`generic_cfg_functions=434`, `structural_matcher_functions=0`,
+`object_emitted_functions=434`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
-This proof includes the selected slice-panic runtime-call row; that row still
-uses a row-scoped 12-byte panic-message length rather than target-complete
-slice-panic lowering.
+This proof includes the selected slice-panic runtime-call row through the
+general slice runtime-call helper subset plus frontier safety-edge rows for
+checked unsigned add, bounds loads, optional-pointer unwrap/null panic, and
+checked int-from-float `integerPartOutOfBounds`. Arbitrary loaded/computed
+panic-slice lengths remain future work unless they match the currently
+supported constant or i64-parameter forms.
 
 Strict release baselines are now split by corpus topology: broad is cumulative
 `test/zig/inputs` + `test/zig/integrated`, expanded adds

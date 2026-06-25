@@ -152,7 +152,7 @@ test "x86_64 codegen routes guarded global add panic edges through generic cfg p
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\@message = private unnamed_addr constant [12 x i8] c"negative int"
+        \\@message = private unnamed_addr constant [9 x i8] c"bad arg!!"
         \\@global_value = global i32 3
         \\
         \\declare void @debug.defaultPanic(ptr, i64)
@@ -166,7 +166,7 @@ test "x86_64 codegen routes guarded global add panic edges through generic cfg p
         \\  br i1 %negative, label %panic, label %ok
         \\panic:
         \\  call void @llvm.assume(i1 1)
-        \\  call void @debug.defaultPanic(ptr @message, i64 12)
+        \\  call void @debug.defaultPanic(ptr @message, i64 9)
         \\  unreachable
         \\ok:
         \\  %loaded = load i32, ptr @global_value
@@ -180,7 +180,7 @@ test "x86_64 codegen routes guarded global add panic edges through generic cfg p
         \\  br i1 %negative, label %panic, label %ok
         \\panic:
         \\  call void @llvm.assume(i1 1)
-        \\  call void @debug.defaultPanic(ptr @message, i64 12)
+        \\  call void @debug.defaultPanic(ptr @message, i64 9)
         \\  unreachable
         \\ok:
         \\  %loaded = load i32, ptr @global_value
@@ -209,6 +209,7 @@ test "x86_64 codegen routes guarded global add panic edges through generic cfg p
     );
     defer unchecked.deinit(std.testing.allocator);
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, unchecked.codegen_path);
+    try expectMachineInstruction(unchecked.instructions.items, .{ .mov_imm_rsi = 9 });
 
     var checked = try codegen.x86_64.lowerFunction(
         std.testing.allocator,
@@ -217,6 +218,7 @@ test "x86_64 codegen routes guarded global add panic edges through generic cfg p
     );
     defer checked.deinit(std.testing.allocator);
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, checked.codegen_path);
+    try expectMachineInstruction(checked.instructions.items, .{ .mov_imm_rsi = 9 });
 }
 
 test "x86_64 codegen routes scalar numeric casts through generic cfg path" {

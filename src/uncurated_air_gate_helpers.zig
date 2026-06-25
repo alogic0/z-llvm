@@ -227,7 +227,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 430,
+            .functions = 434,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1041,15 +1041,29 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_safety_edges.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier safety-edge-adjacent values", .c_body =
     \\extern int z_frontier_checked_add(int) __asm__("frontier_safety_edges.frontier_checked_add");
+    \\extern unsigned z_frontier_checked_uadd(unsigned) __asm__("frontier_safety_edges.frontier_checked_uadd");
     \\extern int z_frontier_bounds_guard(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_guard");
+    \\extern int z_frontier_bounds_direct(const int *, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_direct");
     \\extern int z_frontier_guard_return_else(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_guard_return_else");
+    \\extern int z_frontier_optional_unwrap(int, const int *) __asm__("frontier_safety_edges.frontier_optional_unwrap");
+    \\extern int z_frontier_int_from_float_checked(float) __asm__("frontier_safety_edges.frontier_int_from_float_checked");
+    \\void z_frontier_safety_out_of_bounds(void) __asm__("frontier_safety_edges.outOfBounds");
+    \\void z_frontier_safety_out_of_bounds(void) { __builtin_trap(); }
+    \\void z_frontier_safety_int_part_oob(void) __asm__("frontier_safety_edges.integerPartOutOfBounds");
+    \\void z_frontier_safety_int_part_oob(void) { __builtin_trap(); }
+    \\void z_frontier_safety_unwrap_null(void) __asm__("frontier_safety_edges.unwrapNull");
+    \\void z_frontier_safety_unwrap_null(void) { __builtin_trap(); }
     \\int main(void) {
     \\    int value = 41;
     \\    int values[3] = { 11, 41, 77 };
     \\    if (z_frontier_checked_add(5) != 16) return 1;
-    \\    if (z_frontier_bounds_guard(&value, 1, 0) != 41) return 2;
-    \\    if (z_frontier_guard_return_else(values, 3, 1) != 41) return 3;
-    \\    if (z_frontier_guard_return_else(values, 3, 3) != -1) return 4;
+    \\    if (z_frontier_checked_uadd(5u) != 24u) return 2;
+    \\    if (z_frontier_bounds_guard(&value, 1, 0) != 41) return 3;
+    \\    if (z_frontier_bounds_direct(values, 2) != 77) return 4;
+    \\    if (z_frontier_guard_return_else(values, 3, 1) != 41) return 5;
+    \\    if (z_frontier_guard_return_else(values, 3, 3) != -1) return 6;
+    \\    if (z_frontier_optional_unwrap(1, &value) != 41) return 7;
+    \\    if (z_frontier_int_from_float_checked(12.0f) != 12) return 8;
     \\    return 0;
     \\}
     \\

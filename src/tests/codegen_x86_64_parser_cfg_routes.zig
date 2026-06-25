@@ -61,8 +61,8 @@ test "x86_64 codegen lowers mix C panic helper with slice panic block" {
         \\
         \\6:
         \\  call void @llvm.assume(i1 true) [ "cold"() ]
-        \\  %7 = extractvalue { ptr, i64 } { ptr getelementptr inbounds (i8, ptr @__anon_186, i64 0), i64 12 }, 0
-        \\  %8 = extractvalue { ptr, i64 } { ptr getelementptr inbounds (i8, ptr @__anon_186, i64 0), i64 12 }, 1
+        \\  %7 = extractvalue { ptr, i64 } { ptr getelementptr inbounds (i8, ptr @__anon_186, i64 0), i64 13 }, 0
+        \\  %8 = extractvalue { ptr, i64 } { ptr getelementptr inbounds (i8, ptr @__anon_186, i64 0), i64 13 }, 1
         \\  call fastcc void @debug.defaultPanic(ptr readonly nonnull %7, i64 %8, ptr align 8 readonly nonnull @__anon_310)
         \\  unreachable
         \\}
@@ -80,6 +80,7 @@ test "x86_64 codegen lowers mix C panic helper with slice panic block" {
     defer machine.deinit(std.testing.allocator);
 
     try expectMachineInstruction(machine.instructions.items, .{ .test_arg32 = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_imm_rsi = 13 });
     var saw_zig_k_load = false;
     var saw_panic_message = false;
     for (machine.instructions.items) |instruction| switch (instruction) {

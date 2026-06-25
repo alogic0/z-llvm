@@ -19,6 +19,7 @@ const isCalleeName = x86_64_match.isCalleeName;
 const isInt = x86_64_match.isInt;
 const isNamed = x86_64_match.isNamed;
 const i32Value = x86_64_match.i32Value;
+const i64Value = x86_64_match.i64Value;
 const validateDefaultCallConv = x86_64_match.validateDefaultCallConv;
 const appendAlignedDirectCallPreservingI32Param = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Param;
 const blockIndex = x86_64_generic_cfg.blockIndex;
@@ -643,8 +644,8 @@ pub fn lowerSelectedMixCFilesAddMayPanic(
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = condbr.then_target });
-    try machine.instructions.append(allocator, .{ .lea_global_rdi = negative_panic_message });
-    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = negative_panic_message.symbol });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = negative_panic_message.len });
     try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
     try machine.instructions.append(allocator, .ud2);
     return true;
@@ -656,7 +657,7 @@ pub fn lowerSelectedMixCFilesCheckedAddMayPanic(
     function: ir.Function,
     negative_condbr: anytype,
     ok: ir.BasicBlock,
-    negative_panic_message: []const u8,
+    negative_panic_message: PanicMessageSlice,
 ) !bool {
     if (ok.instructions.items.len != 3) return false;
     const load_result = ok.instructions.items[0].result orelse return false;
@@ -736,8 +737,8 @@ pub fn lowerSelectedMixCFilesCheckedAddMayPanic(
     try machine.instructions.append(allocator, .{ .jo = overflow_condbr.then_target });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = negative_condbr.then_target });
-    try machine.instructions.append(allocator, .{ .lea_global_rdi = negative_panic_message });
-    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = negative_panic_message.symbol });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = negative_panic_message.len });
     try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
     try machine.instructions.append(allocator, .ud2);
     try appendIntegerOverflowCall(allocator, machine, overflow_condbr.then_target);
@@ -802,6 +803,9 @@ pub fn lowerSelectedMixCFilesAddMayPanicDebugO0(allocator: std.mem.Allocator, ma
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = negative_label });
     try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_17177" });
+    // Debug/O0 selected fallback only. Release generic CFG panic-slice paths
+    // derive the length from IR; this legacy row remains outside the strict
+    // release frontier ownership claim.
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
     try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
     try machine.instructions.append(allocator, .ud2);
@@ -827,7 +831,12 @@ pub fn functionLoadsGlobal(function: ir.Function, global_name: []const u8) bool 
     return false;
 }
 
-pub fn mixCFilesNegativePanicMessage(block: ir.BasicBlock) ![]const u8 {
+const PanicMessageSlice = struct {
+    symbol: []const u8,
+    len: i64,
+};
+
+pub fn mixCFilesNegativePanicMessage(block: ir.BasicBlock) !PanicMessageSlice {
     if (block.instructions.items.len != 2 and block.instructions.items.len != 4) return error.UnsupportedCodegenInstruction;
     const assume = switch (block.instructions.items[0].kind) {
         .call => |call| call,
@@ -836,19 +845,23 @@ pub fn mixCFilesNegativePanicMessage(block: ir.BasicBlock) ![]const u8 {
     if (!std.mem.eql(u8, assume.callee, "llvm.assume") or assume.ret_ty != .void or assume.args.items.len != 1) return error.UnsupportedCodegenInstruction;
     if (!assume.args.items[0].ty.eql(.{ .int = 1 }) or !assume.args.items[0].value.eql(.{ .int = 1 })) return error.UnsupportedCodegenValue;
 
-    const message_symbol = if (block.instructions.items.len == 2) blk: {
+    const message = if (block.instructions.items.len == 2) blk: {
         const panic = switch (block.instructions.items[1].kind) {
             .call => |call| call,
             else => return error.UnsupportedCodegenInstruction,
         };
         if (!std.mem.eql(u8, panic.callee, "debug.defaultPanic") or panic.ret_ty != .void or panic.args.items.len != 2) return error.UnsupportedCodegenInstruction;
         if (panic.args.items[0].ty != .ptr) return error.UnsupportedCodegenValue;
-        if (!panic.args.items[1].ty.eql(.{ .int = 64 }) or !panic.args.items[1].value.eql(.{ .int = 12 })) return error.UnsupportedCodegenValue;
+        if (!panic.args.items[1].ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenValue;
+        const len = switch (panic.args.items[1].value) {
+            .int => |int| try i64Value(int),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
         const message_name = switch (panic.args.items[0].value) {
             .named => |name| name,
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         };
-        break :blk try globalSymbolName(message_name);
+        break :blk PanicMessageSlice{ .symbol = try globalSymbolName(message_name), .len = len };
     } else blk: {
         const ptr_result = block.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
         const len_result = block.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
@@ -872,14 +885,17 @@ pub fn mixCFilesNegativePanicMessage(block: ir.BasicBlock) ![]const u8 {
         if (panic.args.items[0].ty != .ptr or !isNamed(panic.args.items[0].value, ptr_result)) return error.UnsupportedCodegenValue;
         if (!panic.args.items[1].ty.eql(.{ .int = 64 }) or !isNamed(panic.args.items[1].value, len_result)) return error.UnsupportedCodegenValue;
         if (panic.args.items[2].ty != .ptr) return error.UnsupportedCodegenValue;
-        break :blk try globalSymbolNameFromAggregateConstant(ptr_extract.aggregate);
+        break :blk PanicMessageSlice{
+            .symbol = try globalSymbolNameFromAggregateConstant(ptr_extract.aggregate),
+            .len = try i64FromAggregateConstant(len_extract.aggregate),
+        };
     };
 
     switch (block.terminator orelse return error.BlockWithoutTerminator) {
         .@"unreachable" => {},
         else => return error.UnsupportedCodegenControlFlow,
     }
-    return message_symbol;
+    return message;
 }
 
 pub fn globalSymbolNameFromAggregateConstant(value: ir.Value) ![]const u8 {
@@ -888,6 +904,21 @@ pub fn globalSymbolNameFromAggregateConstant(value: ir.Value) ![]const u8 {
         .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
     };
     return x86_64_match.globalSymbolNameFromConstantExpr(text);
+}
+
+fn i64FromAggregateConstant(value: ir.Value) !i64 {
+    const text = switch (value) {
+        .constant_expr => |text| text,
+        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    };
+    const marker = "i64 ";
+    const marker_index = std.mem.lastIndexOf(u8, text, marker) orelse return error.UnsupportedCodegenValue;
+    var start = marker_index + marker.len;
+    while (start < text.len and text[start] == ' ') : (start += 1) {}
+    var end = start;
+    while (end < text.len and (std.ascii.isDigit(text[end]) or text[end] == '-')) : (end += 1) {}
+    if (end == start) return error.UnsupportedCodegenValue;
+    return std.fmt.parseInt(i64, text[start..end], 10) catch return error.UnsupportedCodegenValue;
 }
 
 pub fn lowerSelectedDebugScopeBranch(

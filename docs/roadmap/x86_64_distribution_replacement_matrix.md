@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=430`,
-`generic_codegen_functions=430`, `generic_cfg_functions=430`,
+three release modes at `source_rows=13`, `discovered_functions=434`,
+`generic_codegen_functions=434`, `generic_cfg_functions=434`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=430`, `object_failures=0`,
+`object_emitted_functions=434`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -445,8 +445,12 @@ progress, executable progress, and strict counter checks. The strict release
 baselines are split by corpus topology: broad is inputs + integrated,
 expanded adds `test/zig/expanded`, scale adds `test/zig/scale`, and frontier
 is isolated to `test/zig/frontier`. The selected slice-panic runtime-call row
-inside this proof still uses a row-scoped 12-byte panic-message length rather
-than general aggregate slice-length lowering. The memory and
+inside this proof now uses the release generic CFG slice runtime-call helper
+subset, deriving supported direct integer and `{ ptr, i64 }` aggregate-constant
+lengths from IR. The same frontier proof now includes typed-v2/generic-CFG
+optional-pointer unwrap/null panic, checked int-from-float
+`integerPartOutOfBounds`, direct bounds loads, and checked unsigned add rows.
+The memory and
 aggregate frontier slice closes selected nested loop-memory CFG, nested
 extern-struct field GEP, dynamic pointer-element GEP, branch-local
 global/TLS add/sub updates, and nested INTEGER aggregate add-chain field
