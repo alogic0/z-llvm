@@ -286,7 +286,8 @@ the call does not need outgoing stack arguments; live values across sret calls
 with outgoing stack arguments remain a targeted `UnsupportedLiveAcrossCall`
 boundary. Explicit `ptr byval(aggregate)` call arguments now have a first
 planner-owned subset: supported aggregate payloads are copied from the source
-pointer to outgoing stack eightbytes for direct and function-pointer calls, with
+pointer to outgoing stack eightbytes for direct and function-pointer calls.
+The source pointer may itself arrive in a register or an incoming stack slot, with
 unit proof for one-, two-, array-backed three-, and nested three-eightbyte
 payloads, plus max-sized exact-eightbyte payloads through the current
 24-stack-argument limit.

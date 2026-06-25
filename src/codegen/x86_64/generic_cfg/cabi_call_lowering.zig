@@ -675,7 +675,14 @@ pub fn appendSysVByvalStackCopyArgs(
     stack_arg_count: *usize,
     copy: sysv_abi.ByvalStackCopy,
 ) !void {
-    const source_reg = try paramReg(function, copy.source_name, .ptr);
+    const source_reg = paramRegOrNull(function, copy.source_name, .ptr) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi => null,
+        else => return err,
+    };
+    const source_stack_disp = if (source_reg == null)
+        try scalarParamStackDisp8(function, copy.source_name, .ptr)
+    else
+        0;
     const stack_eightbytes = sysv_abi.aggregateStackEightbytes(copy.classification);
     if (stack_eightbytes == 0) return error.UnsupportedCodegenAbi;
     var index: usize = 0;
@@ -683,7 +690,10 @@ pub fn appendSysVByvalStackCopyArgs(
         if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
         const offset = index * 8;
         if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
-        stack_args[stack_arg_count.*] = .{ .byval_ptr_disp = .{ .reg = source_reg, .offset = @intCast(offset) } };
+        stack_args[stack_arg_count.*] = if (source_reg) |reg|
+            .{ .byval_ptr_disp = .{ .reg = reg, .offset = @intCast(offset) } }
+        else
+            .{ .byval_stack_ptr_disp = .{ .stack_disp = source_stack_disp, .offset = @intCast(offset) } };
         stack_arg_count.* += 1;
     }
 }
@@ -764,6 +774,10 @@ pub const StackScalarCallArg = union(enum) {
         reg: ArgReg,
         offset: u8,
     },
+    byval_stack_ptr_disp: struct {
+        stack_disp: u8,
+        offset: u8,
+    },
     computed_i32: ir.Value,
     computed_i64: ir.Value,
     precomputed_rax,
@@ -783,6 +797,18 @@ pub fn appendStackScalarCallArg(
         .xmm_reg => |reg| try machine.instructions.append(allocator, .{ .push_xmm64 = reg }),
         .byval_ptr_disp => |source| {
             try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = source.offset } });
+            try machine.instructions.append(allocator, .push_rax);
+        },
+        .byval_stack_ptr_disp => |source| {
+            const adjusted = @as(usize, source.stack_disp) + reserved_stack_bytes;
+            if (adjusted <= std.math.maxInt(i8)) {
+                try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(adjusted) });
+            } else if (adjusted <= std.math.maxInt(u32)) {
+                try machine.instructions.append(allocator, .{ .load_stack_disp32_rax = @intCast(adjusted) });
+            } else {
+                return error.UnsupportedCodegenAbi;
+            }
+            try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = source.offset });
             try machine.instructions.append(allocator, .push_rax);
         },
         .computed_i32 => |value| {
