@@ -270,6 +270,9 @@ The last broad structural matcher fallback was
 CFG now owns this through guarded global-add lowering with an explicit
 ptr/length panic-call runtime boundary, and the selected mixed C/Zig helper is
 only a fallback after the generic router rejects unsupported variants.
+The current slice-panic call lowering still materializes the selected 12-byte
+panic-message length directly; this closes the strict frontier row but is not a
+general aggregate slice-length lowering implementation.
 
 The broad object progress gates now cover all three release modes without LLVM
 TargetMachine. ReleaseFast, ReleaseSafe, and ReleaseSmall each report
@@ -486,6 +489,9 @@ object progress, executable progress, and strict counter checks. It requires
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
+This proof includes the selected slice-panic runtime-call row; that row still
+uses a row-scoped 12-byte panic-message length rather than target-complete
+slice-panic lowering.
 
 Strict release baselines are now split by corpus topology: broad is cumulative
 `test/zig/inputs` + `test/zig/integrated`, expanded adds

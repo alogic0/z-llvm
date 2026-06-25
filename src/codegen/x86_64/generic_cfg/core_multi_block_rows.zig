@@ -849,6 +849,10 @@ pub fn emitGenericCfgNoreturnCallBlock(
         }
 
         try machine.instructions.append(allocator, .{ .lea_global_rdi = ptr_symbol });
+        // Current accepted slice-panic rows use the 12-byte message captured in
+        // the selected IR. General slice-length materialization is still future
+        // work; keep this path narrow until aggregate constant lengths are
+        // lowered generically.
         try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
         try appendAlignedDirectCall(allocator, machine, call.callee, .void);
         try machine.instructions.append(allocator, .ud2);

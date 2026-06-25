@@ -444,7 +444,9 @@ frontier counters for ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. The strict release
 baselines are split by corpus topology: broad is inputs + integrated,
 expanded adds `test/zig/expanded`, scale adds `test/zig/scale`, and frontier
-is isolated to `test/zig/frontier`. The memory and
+is isolated to `test/zig/frontier`. The selected slice-panic runtime-call row
+inside this proof still uses a row-scoped 12-byte panic-message length rather
+than general aggregate slice-length lowering. The memory and
 aggregate frontier slice closes selected nested loop-memory CFG, nested
 extern-struct field GEP, dynamic pointer-element GEP, branch-local
 global/TLS add/sub updates, and nested INTEGER aggregate add-chain field

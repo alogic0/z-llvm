@@ -671,6 +671,9 @@ progress, executable progress, and strict counter checks. It requires the
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
+One selected slice-panic runtime-call row still materializes the captured
+12-byte panic-message length directly; the strict gate proves that row, not a
+general panic-slice lowering policy.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,
