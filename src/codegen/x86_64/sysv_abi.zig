@@ -359,6 +359,7 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
             };
             const classification = try classifyAggregate(byval_ty);
             if (classification.size_bytes == 0) return error.UnsupportedSretByvalAbi;
+            if (!supportsByvalStackCopySize(classification.size_bytes)) return error.UnsupportedSretByvalAbi;
             try plan.assignments.append(allocator, .{ .byval_stack_copy = .{
                 .source_name = source_name,
                 .aggregate_ty = byval_ty,
@@ -532,6 +533,13 @@ fn attrsContainAbiPayload(attrs: []const u8, name: []const u8) bool {
         index = after;
     }
     return false;
+}
+
+fn supportsByvalStackCopySize(size_bytes: u64) bool {
+    return switch (size_bytes % 8) {
+        0, 1, 2, 4 => true,
+        else => false,
+    };
 }
 
 fn attrsContainPackedAbiPayload(attrs: []const u8, name: []const u8) bool {

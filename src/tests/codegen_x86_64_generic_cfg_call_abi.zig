@@ -2595,6 +2595,48 @@ test "x86_64 codegen accepts array byval stack-copy with four-byte tail" {
     try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 0 } });
 }
 
+test "x86_64 codegen rejects composite byval short-tail packing boundary" {
+    const direct_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr byval([3 x i16]))
+        \\
+        \\define i32 @caller(ptr %arg) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr byval([3 x i16]) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var direct_module = try ir.Module.parse(std.testing.allocator, direct_input);
+    defer direct_module.deinit();
+    try direct_module.verify();
+    const direct_call = direct_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedSretByvalAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, direct_module.functions.items[0], direct_call),
+    );
+
+    const indirect_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, ptr %arg) {
+        \\entry:
+        \\  %r = call i32 %fn(ptr byval([5 x i8]) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_module = try ir.Module.parse(std.testing.allocator, indirect_input);
+    defer indirect_module.deinit();
+    try indirect_module.verify();
+    const indirect_call = indirect_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedSretByvalAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_module.functions.items[0], indirect_call),
+    );
+}
+
 test "x86_64 codegen accepts memory aggregate stack call and rejects vector return boundary" {
     const aggregate_input =
         \\target triple = "x86_64-unknown-linux-gnu"
