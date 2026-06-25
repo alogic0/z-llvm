@@ -996,6 +996,60 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
         error.UnsupportedTailCallAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, tail_module.functions.items[0], tail_call),
     );
+    try std.testing.expectError(
+        error.UnsupportedTailCallAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, tail_module.target_triple.?, tail_module.functions.items[0]),
+    );
+
+    const musttail_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32)
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = musttail call i32 @callee(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var musttail_module = try ir.Module.parse(std.testing.allocator, musttail_input);
+    defer musttail_module.deinit();
+    try musttail_module.verify();
+    const musttail_call = musttail_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedTailCallAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, musttail_module.functions.items[0], musttail_call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedTailCallAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, musttail_module.target_triple.?, musttail_module.functions.items[0]),
+    );
+
+    const notail_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @callee(i32)
+        \\
+        \\define void @caller(i32 %a) {
+        \\entry:
+        \\  notail call void @callee(i32 %a)
+        \\  ret void
+        \\}
+        \\
+    ;
+    var notail_module = try ir.Module.parse(std.testing.allocator, notail_input);
+    defer notail_module.deinit();
+    try notail_module.verify();
+    const notail_call = notail_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(
+        error.UnsupportedTailCallAbi,
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, notail_module.functions.items[0], notail_call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedTailCallAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, notail_module.target_triple.?, notail_module.functions.items[0]),
+    );
 
     const indirect_tail_input =
         \\target triple = "x86_64-unknown-linux-gnu"
