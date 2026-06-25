@@ -232,7 +232,7 @@ accepted frontier:
   offset
   selected direct stack-passed f32/f64 parameter returns through a disp32
   incoming stack offset
-  selected stack-passed f32 helper-call argument reloads into outgoing XMM
+  selected stack-passed f32/f64 helper-call argument reloads into outgoing XMM
   registers for direct and pointer-callee calls
   selected direct two-/three-/six-live f32/f64 spill/reload across
   one-/two-/five-FP-argument void helper calls

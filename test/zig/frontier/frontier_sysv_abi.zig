@@ -2006,6 +2006,59 @@ export fn frontier_indirect_f32_stack_arg_to_registers(
     return func(a8, a9, a10, a11, a12);
 }
 
+export fn frontier_f64_stack_arg_to_registers(
+    a0: f64,
+    a1: f64,
+    a2: f64,
+    a3: f64,
+    a4: f64,
+    a5: f64,
+    a6: f64,
+    a7: f64,
+    a8: f64,
+    a9: f64,
+    a10: f64,
+    a11: f64,
+    a12: f64,
+) f64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    return frontier_sum5_f64(a8, a9, a10, a11, a12);
+}
+
+export fn frontier_indirect_f64_stack_arg_to_registers(
+    func: Sum5F64Fn,
+    a0: f64,
+    a1: f64,
+    a2: f64,
+    a3: f64,
+    a4: f64,
+    a5: f64,
+    a6: f64,
+    a7: f64,
+    a8: f64,
+    a9: f64,
+    a10: f64,
+    a11: f64,
+    a12: f64,
+) f64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    return func(a8, a9, a10, a11, a12);
+}
+
 export fn frontier_indirect_five_f64_external_call(func: Sum5F64Fn, a: f64, b: f64, c: f64, d: f64, e: f64) f64 {
     return func(a, b, c, d, e);
 }
