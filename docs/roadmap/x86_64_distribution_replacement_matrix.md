@@ -413,7 +413,9 @@ modes at `native_link_accepted_rows=111`, `executable_ok_rows=111`,
 `docs/roadmap/x86_64_scale_air_corpus.md`. The focused
 `zig build distribution-air-release-scale` gate composes scale discovery,
 object progress, and executable progress for all three release modes and
-reports these same executable counters per mode.
+reports these same executable counters per mode. It is a green
+frontier/progress gate with fail-closed local failure classification, not yet a
+strict counter-locked finish gate.
 
 The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasefast-frontier`,

@@ -593,7 +593,9 @@ local_fail=0
 
 The focused aggregate gate `zig build distribution-air-release-scale` composes
 scale discovery, object progress, and executable progress for ReleaseFast,
-ReleaseSafe, and ReleaseSmall. It currently reports `source_rows=112`,
+ReleaseSafe, and ReleaseSmall. It is a green frontier/progress gate with
+fail-closed local failure classification, not yet a strict counter-locked
+finish gate. It currently reports `source_rows=112`,
 `discovered_functions=216`, `generic_cfg_functions=216`,
 `structural_matcher_functions=0`, `object_emitted_functions=216`,
 `native_link_accepted_rows=111`, `executable_ok_rows=111`,
