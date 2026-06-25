@@ -1571,6 +1571,8 @@ pub fn emitSysVAggregateFieldLocationReturn(
                 try appendLoadStackDispRax(allocator, machine, offset);
             } else if (field_ty.eql(.float)) {
                 try appendLoadStackDispXmm0F32(allocator, machine, offset);
+            } else if (field_ty.eql(.double)) {
+                try appendLoadStackDispXmm0(allocator, machine, offset);
             } else {
                 return error.UnsupportedCodegenAbi;
             }

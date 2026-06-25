@@ -2318,6 +2318,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Mixed z_frontier_mixed_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_make");
     \\extern struct Mixed z_frontier_mixed_call_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_call_make");
     \\extern long long z_frontier_stack_mixed_call_int(long long, long long, long long, long long, long long, long long, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_mixed_call_int");
+    \\extern long long z_frontier_stack_mixed_call_int_after_pressure(long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_mixed_call_int_after_pressure");
+    \\extern double z_frontier_stack_mixed_call_float_after_pressure(long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_mixed_call_float_after_pressure");
     \\extern long long z_frontier_shifted_mixed_call_int(long long, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_mixed_call_int");
     \\extern double z_frontier_double_pair_first(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_first");
     \\extern double z_frontier_double_pair_second(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_second");
@@ -2399,6 +2401,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct Mixed call_made = z_frontier_mixed_call_make(81, 10.5);
     \\    if (call_made.a != 81 || call_made.b != 10.5) return 14;
     \\    if (z_frontier_stack_mixed_call_int(1, 2, 3, 4, 5, 6, value) != 123456789LL) return 48;
+    \\    if (z_frontier_stack_mixed_call_int_after_pressure(1, 2, 3, 4, 5, 6, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, value) != 123456789LL) return 76;
+    \\    if (z_frontier_stack_mixed_call_float_after_pressure(1, 2, 3, 4, 5, 6, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, value) != 6.25) return 77;
     \\    if (z_frontier_shifted_mixed_call_int(99, value) != 123456789LL) return 49;
     \\    struct DoublePair doubles = { 1.25, 7.5 };
     \\    if (z_frontier_double_pair_first(doubles) != 1.25) return 4;

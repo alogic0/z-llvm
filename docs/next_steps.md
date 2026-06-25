@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=389`,
-`generic_codegen_functions=389`, `generic_cfg_functions=389`,
+frontier gate reports `source_rows=13`, `discovered_functions=393`,
+`generic_codegen_functions=393`, `generic_cfg_functions=393`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=389`, `object_failures=0`,
+`object_emitted_functions=393`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -440,8 +440,10 @@ forwarding 12 and 14 `i32` arguments, including outgoing stack slots.
 The aggregate call-planner follow-up forwards stack-passed INTEGER register
 aggregates into outgoing helper calls by loading the caller stack eightbytes
 into the destination GPR aggregate slots. The mixed stack aggregate follow-up
-does the same for `{ i64, double }`, splitting the caller-stack aggregate into
-the outgoing GPR and SSE argument streams.
+now covers both stack-to-register and stack-to-stack pressure for
+`{ i64, double }`, splitting the caller-stack aggregate into the outgoing GPR
+and SSE argument streams and returning both stack eightbyte fields from the
+helper.
 The shifted mixed aggregate follow-up removes the exact-register-slot
 requirement for the GPR half of selected in-register aggregate pass-through
 calls: `{ i64, double }` can now move its INTEGER eightbyte from `%rsi` to

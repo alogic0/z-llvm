@@ -334,6 +334,10 @@ selected stack-passed INTEGER aggregate parameters are loaded from the caller
 stack into outgoing GPR aggregate slots before helper calls
 selected stack-passed INTEGER/INTEGER aggregate parameters are also pushed into
 outgoing stack aggregate slots when the callee-side GPR stream is exhausted
+selected stack-passed mixed INTEGER/SSE aggregate parameters are pushed into
+outgoing stack aggregate slots when both the callee-side GPR and SSE streams
+are exhausted; the same generic field-location path reloads the helper's
+stack-passed `double` field into `%xmm0` for return
 register-sourced INTEGER/INTEGER aggregate stack arguments are pushed before
 scalar call-register assignment to avoid clobbering the source GPR pair
 register-sourced SSE/SSE aggregate stack arguments are materialized before

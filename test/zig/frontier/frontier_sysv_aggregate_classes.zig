@@ -105,6 +105,42 @@ noinline fn helperMixedInt(value: Mixed) i64 {
     return value.a;
 }
 
+noinline fn helperMixedIntAfterPressure(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, value: Mixed) i64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = f0;
+    _ = f1;
+    _ = f2;
+    _ = f3;
+    _ = f4;
+    _ = f5;
+    _ = f6;
+    _ = f7;
+    return value.a;
+}
+
+noinline fn helperMixedFloatAfterPressure(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, value: Mixed) f64 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = f0;
+    _ = f1;
+    _ = f2;
+    _ = f3;
+    _ = f4;
+    _ = f5;
+    _ = f6;
+    _ = f7;
+    return value.b;
+}
+
 export fn frontier_mixed_call_make(a: i64, b: f64) Mixed {
     return helperMixedMake(a, b);
 }
@@ -117,6 +153,14 @@ export fn frontier_stack_mixed_call_int(a0: i64, a1: i64, a2: i64, a3: i64, a4: 
     _ = a4;
     _ = a5;
     return helperMixedInt(value);
+}
+
+export fn frontier_stack_mixed_call_int_after_pressure(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, value: Mixed) i64 {
+    return helperMixedIntAfterPressure(a0, a1, a2, a3, a4, a5, f0, f1, f2, f3, f4, f5, f6, f7, value);
+}
+
+export fn frontier_stack_mixed_call_float_after_pressure(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, value: Mixed) f64 {
+    return helperMixedFloatAfterPressure(a0, a1, a2, a3, a4, a5, f0, f1, f2, f3, f4, f5, f6, f7, value);
 }
 
 export fn frontier_shifted_mixed_call_int(prefix: i64, value: Mixed) i64 {

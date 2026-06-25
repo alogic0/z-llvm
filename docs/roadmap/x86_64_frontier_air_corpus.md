@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=389
-structured_functions=389
-generic_codegen_functions=389
-generic_cfg_functions=389
+discovered_functions=393
+structured_functions=393
+generic_codegen_functions=393
+generic_cfg_functions=393
 structural_matcher_functions=0
-structured_air_v2_functions=389
-typed_air_operand_functions=389
+structured_air_v2_functions=393
+typed_air_operand_functions=393
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=389
+generic_lowering_functions=393
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=389
+object_emitted_functions=393
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -179,9 +179,13 @@ Closed in the current memory/aggregate frontier slice:
   directly from a private helper without scalarizing through a selected wrapper;
   `frontier_stack_array_pair_call_sum` forwards a stack-passed INTEGER
   aggregate into a private helper by loading the stack eightbytes into outgoing
-  GPR aggregate slots, and `frontier_stack_mixed_call_int` forwards a
-  stack-passed `{ i64, double }` mixed aggregate by loading the INTEGER
-  eightbyte into the outgoing GPR stream and the SSE eightbyte into `%xmm0`;
+  GPR aggregate slots, `frontier_stack_mixed_call_int` forwards a stack-passed
+  `{ i64, double }` mixed aggregate into outgoing register aggregate slots, and
+  `frontier_stack_mixed_call_int_after_pressure` plus
+  `frontier_stack_mixed_call_float_after_pressure` prove the same mixed
+  aggregate can be stack-passed into a helper after both the GPR and SSE
+  argument streams are exhausted; the helper field returns cover both the
+  INTEGER and SSE stack eightbytes;
   `frontier_shifted_mixed_call_int` now proves in-register aggregate
   pass-through can move a shifted INTEGER eightbyte from `%rsi` to `%rdi`
   before the helper call instead of requiring exact source/destination slots

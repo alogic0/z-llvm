@@ -178,6 +178,10 @@ aggregate argument field reads and register aggregate return:
   shifted in-register mixed aggregate parameters can move the INTEGER eightbyte
   between GPR argument slots before helper calls when the SSE eightbyte already
   occupies the required destination SSE slot
+  stack-passed `{ i64, double }` mixed aggregates can now be forwarded into
+  outgoing stack aggregate slots after both the callee GPR and SSE argument
+  streams are exhausted, and helper field returns cover both the INTEGER
+  eightbyte and the stack-loaded `double` field
 frontier_sysv_aggregate_classes.SmallMixed and PackedMixed prove selected
 `i32`/`double` mixed INTEGER/SSE field reads:
   low-lane and high-lane `i32` fields are returned from the aggregate's GPR class register
