@@ -1870,7 +1870,7 @@ test "x86_64 codegen preserves live i32 across supported sret pointer call" {
     try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot0 } });
 }
 
-test "x86_64 codegen rejects live value across sret stack-arg call" {
+test "x86_64 codegen preserves live value across sret stack-arg call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -1891,10 +1891,23 @@ test "x86_64 codegen rejects live value across sret stack-arg call" {
     try std.testing.expectEqual(@as(usize, 6), counts.gpr_args);
     try std.testing.expectEqual(@as(usize, 1), counts.stack_args);
     try std.testing.expect(codegen.x86_64.sysvScalarCallNeedsStackArgsForTest(call));
-    try std.testing.expectError(
-        error.UnsupportedLiveAcrossCall,
-        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
-    );
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rsi } });
+    var found_call = false;
+    for (machine.instructions.items) |instruction| {
+        switch (instruction) {
+            .direct_call => |direct_call| {
+                try std.testing.expectEqualStrings("callee", direct_call.symbol);
+                try std.testing.expect(direct_call.ret_ty == .void);
+                found_call = true;
+            },
+            else => {},
+        }
+    }
+    try std.testing.expect(found_call);
+    try expectMachineInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 16 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot0 } });
 }
 
 test "x86_64 codegen accepts supported byval stack-copy call ABI subset" {

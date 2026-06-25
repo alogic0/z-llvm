@@ -282,9 +282,8 @@ ordinary pointer arguments, including shifted user arguments that overflow into
 outgoing stack slots for direct and function-pointer calls, while `byval(...)` remains a targeted boundary
 outside the selected source-backed forms. A selected direct sret-pointer call
 also preserves one live `i32` GPR through the existing spill/reload frame when
-the call does not need outgoing stack arguments; live values across sret calls
-with outgoing stack arguments remain a targeted `UnsupportedLiveAcrossCall`
-boundary. Explicit `ptr byval(aggregate)` call arguments now have a first
+the call does or does not need outgoing stack arguments. Explicit
+`ptr byval(aggregate)` call arguments now have a first
 planner-owned subset: supported aggregate payloads are copied from the source
 pointer to outgoing stack eightbytes for direct and function-pointer calls.
 The source pointer may itself arrive in a register or an incoming stack slot, with

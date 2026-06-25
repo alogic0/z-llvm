@@ -161,7 +161,7 @@ pub fn appendSysVScalarCallArgs(
     function: ir.Function,
     call: ir.CallInst,
 ) !usize {
-    return try appendSysVScalarCallArgsWithBlock(allocator, machine, function, null, call);
+    return (try appendSysVScalarCallArgsWithBlockAndAlignment(allocator, machine, function, null, call, .entry_unaligned)).stack_arg_count;
 }
 
 pub fn appendSysVScalarCallArgsWithBlock(
@@ -171,6 +171,27 @@ pub fn appendSysVScalarCallArgsWithBlock(
     maybe_block: ?ir.BasicBlock,
     call: ir.CallInst,
 ) anyerror!usize {
+    return (try appendSysVScalarCallArgsWithBlockAndAlignment(allocator, machine, function, maybe_block, call, .entry_unaligned)).stack_arg_count;
+}
+
+const StackArgAlignment = enum {
+    entry_unaligned,
+    already_aligned,
+};
+
+const StackArgEmission = struct {
+    stack_arg_count: usize,
+    cleanup_bytes: usize,
+};
+
+fn appendSysVScalarCallArgsWithBlockAndAlignment(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    maybe_block: ?ir.BasicBlock,
+    call: ir.CallInst,
+    alignment: StackArgAlignment,
+) anyerror!StackArgEmission {
     var plan = try planSysVCall(allocator, function, call);
     defer plan.deinit(allocator);
     if (plan.counts.stack_args > max_sysv_stack_call_args) return error.UnsupportedCodegenAbi;
@@ -241,7 +262,11 @@ pub fn appendSysVScalarCallArgsWithBlock(
     }
 
     var reserved_stack_bytes: usize = 0;
-    if (stack_arg_count != 0 and stack_arg_count % 2 == 0) {
+    const needs_padding = stack_arg_count != 0 and switch (alignment) {
+        .entry_unaligned => stack_arg_count % 2 == 0,
+        .already_aligned => stack_arg_count % 2 == 1,
+    };
+    if (needs_padding) {
         try machine.instructions.append(allocator, .sub_rsp_8);
         reserved_stack_bytes = 8;
     }
@@ -340,7 +365,10 @@ pub fn appendSysVScalarCallArgsWithBlock(
             .stack_i32_const, .stack_i32_param, .byval_stack_copy, .aggregate_stack_passthrough => {},
         }
     }
-    return stack_arg_count;
+    return .{
+        .stack_arg_count = stack_arg_count,
+        .cleanup_bytes = incoming_stack_adjust,
+    };
 }
 
 const max_gpr_parallel_copies = 6;
@@ -865,6 +893,25 @@ pub fn appendAlignedDirectCallPreservingI32Params(
     try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
 }
 
+fn appendCallStackCleanupBytes(allocator: std.mem.Allocator, machine: *MachineFunction, bytes: usize) !void {
+    if (bytes == 0) return;
+    switch (bytes) {
+        8 => try machine.instructions.append(allocator, .add_rsp_8),
+        24 => try machine.instructions.append(allocator, .add_rsp_24),
+        40 => try machine.instructions.append(allocator, .add_rsp_40),
+        56 => try machine.instructions.append(allocator, .add_rsp_56),
+        else => {
+            if (bytes <= std.math.maxInt(u8)) {
+                try machine.instructions.append(allocator, .{ .add_rsp_imm8 = @intCast(bytes) });
+            } else if (bytes <= std.math.maxInt(u32)) {
+                try machine.instructions.append(allocator, .{ .add_rsp_imm32 = @intCast(bytes) });
+            } else {
+                return error.UnsupportedCodegenAbi;
+            }
+        },
+    }
+}
+
 pub fn appendAlignedCallPreservingI32Params(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -885,8 +932,9 @@ pub fn appendAlignedCallPreservingI32Params(
                 .reg = live_params.regs[0],
             } });
             try setupSysVCallTarget(allocator, machine, call_target);
-            _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
+            const emission = try appendSysVScalarCallArgsWithBlockAndAlignment(allocator, machine, function, null, call, .already_aligned);
             try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+            try appendCallStackCleanupBytes(allocator, machine, emission.cleanup_bytes);
             try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
                 .reg = live_params.regs[0],
                 .frame_index = .slot0,
@@ -904,8 +952,9 @@ pub fn appendAlignedCallPreservingI32Params(
                 } });
             }
             try setupSysVCallTarget(allocator, machine, call_target);
-            _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
+            const emission = try appendSysVScalarCallArgsWithBlockAndAlignment(allocator, machine, function, null, call, .already_aligned);
             try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+            try appendCallStackCleanupBytes(allocator, machine, emission.cleanup_bytes);
             index = 0;
             while (index < live_params.count) : (index += 1) {
                 try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
