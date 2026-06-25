@@ -1058,6 +1058,39 @@ test "x86_64 codegen returns mixed i64 and f32 register aggregates" {
     try expectMachineInstruction(float_int.instructions.items, .{ .mov_arg_rax = .rdi });
 }
 
+test "x86_64 codegen returns mixed f64 and f32 SSE register aggregates" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { double, float } @make_double_float(double %d, float %prefix, float %f) {
+        \\entry:
+        \\  %a = insertvalue { double, float } undef, double %d, 0
+        \\  %b = insertvalue { double, float } %a, float %f, 1
+        \\  ret { double, float } %b
+        \\}
+        \\
+        \\define { float, double } @make_float_double(float %f, double %d) {
+        \\entry:
+        \\  %a = insertvalue { float, double } undef, float %f, 0
+        \\  %b = insertvalue { float, double } %a, double %d, 1
+        \\  ret { float, double } %b
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var double_float = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer double_float.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, double_float.codegen_path);
+    try expectMachineInstruction(double_float.instructions.items, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm2 } });
+
+    var float_double = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer float_double.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, float_double.codegen_path);
+}
+
 test "x86_64 codegen copies mixed-width memory aggregate leaves from byval to sret" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
