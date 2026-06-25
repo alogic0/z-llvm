@@ -280,7 +280,8 @@ as pointer-only annotations; supported `ptr sret(...)` call arguments are now
 assigned as hidden result pointers through the same GPR call planner path as
 ordinary pointer arguments, including shifted user arguments that overflow into
 outgoing stack slots for direct and function-pointer calls, while `byval(...)` remains a targeted boundary
-outside the selected source-backed forms. The frontier additionally lowers the selected
+outside the selected source-backed forms. A selected direct sret-pointer call
+also preserves one live `i32` GPR through the existing spill/reload frame. The frontier additionally lowers the selected
 source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by-value
 aggregate field-read shape, and byval-to-sret copies for all fields in those
 selected forms; the current frontier proves this through eight i64 fields,

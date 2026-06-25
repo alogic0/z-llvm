@@ -1840,6 +1840,33 @@ test "x86_64 codegen accepts indirect sret pointer with stack-passed user arg" {
     try expectMachineInstruction(machine.instructions.items, .{ .indirect_call_rax = .void });
 }
 
+test "x86_64 codegen preserves live i32 across supported sret pointer call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @callee(ptr sret({ i32, i32 }))
+        \\
+        \\define i32 @caller(ptr %out, i32 %keep) {
+        \\entry:
+        \\  call void @callee(ptr sret({ i32, i32 }) %out)
+        \\  ret i32 %keep
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call);
+    try std.testing.expectEqual(@as(usize, 1), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 0), counts.stack_args);
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot0 } });
+}
+
 test "x86_64 codegen rejects byval call ABI boundary" {
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
