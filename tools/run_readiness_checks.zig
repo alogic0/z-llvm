@@ -8,6 +8,7 @@ const commands = [_]Command{
     .{ .label = "tools/run_zig_corpus.zig", .argv = &.{ "zig", "run", "tools/run_zig_corpus.zig" } },
     .{ .label = "tools/run_handoff_validation.zig", .argv = &.{ "zig", "run", "tools/run_handoff_validation.zig" } },
     .{ .label = "tools/run_generated_scalar_diff.zig", .argv = &.{ "zig", "run", "tools/run_generated_scalar_diff.zig" } },
+    .{ .label = "zig build release-pipeline-policy", .argv = &.{ "zig", "build", "release-pipeline-policy" } },
 };
 
 const Command = struct {

@@ -363,138 +363,223 @@ fn nestedPipelineBody(expression: []const u8) ?[]const u8 {
     return null;
 }
 
-fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
-    if (std.mem.eql(u8, name, "instcombine")) {
-        try pm.add(instcombine.pass);
-    } else if (std.mem.eql(u8, name, "always-inline")) {
-        try pm.add(always_inline.pass);
-    } else if (std.mem.eql(u8, name, "jump-threading")) {
-        try pm.add(jump_threading.pass);
-    } else if (std.mem.eql(u8, name, "correlated-propagation")) {
-        try pm.add(correlated_propagation.pass);
-    } else if (std.mem.eql(u8, name, "lower-expect")) {
-        try pm.add(lower_expect.pass);
-    } else if (std.mem.eql(u8, name, "verify")) {
-        try pm.add(verify.pass);
-    } else if (std.mem.eql(u8, name, "dce")) {
-        try pm.add(dce.pass);
-    } else if (std.mem.eql(u8, name, "dse")) {
-        try pm.add(dse.pass);
-    } else if (std.mem.eql(u8, name, "adce")) {
-        try pm.add(adce.pass);
-    } else if (std.mem.eql(u8, name, "bdce")) {
-        try pm.add(bdce.pass);
-    } else if (std.mem.eql(u8, name, "early-cse")) {
-        try pm.add(early_cse.pass);
-    } else if (std.mem.eql(u8, name, "sccp")) {
-        try pm.add(sccp.pass);
-    } else if (std.mem.eql(u8, name, "gvn")) {
-        try pm.add(gvn.pass);
-    } else if (std.mem.eql(u8, name, "globalopt")) {
-        try pm.add(globalopt.pass);
-    } else if (std.mem.eql(u8, name, "globaldce")) {
-        try pm.add(globaldce.pass);
-    } else if (std.mem.eql(u8, name, "constmerge")) {
-        try pm.add(constmerge.pass);
-    } else if (std.mem.eql(u8, name, "function-attrs")) {
-        try pm.add(function_attrs.pass);
-    } else if (std.mem.eql(u8, name, "inline")) {
-        try pm.add(inline_pass.pass);
-    } else if (std.mem.eql(u8, name, "vector-combine")) {
-        try pm.add(vector_combine.pass);
-    } else if (std.mem.eql(u8, name, "slp-vectorizer")) {
-        try pm.add(slp_vectorizer.pass);
-    } else if (std.mem.eql(u8, name, "licm")) {
-        try pm.add(licm.pass);
-    } else if (std.mem.eql(u8, name, "loop-instsimplify")) {
-        try pm.add(loop_instsimplify.pass);
-    } else if (std.mem.eql(u8, name, "loop-simplifycfg")) {
-        try pm.add(loop_simplifycfg.pass);
-    } else if (std.mem.eql(u8, name, "loop-rotate")) {
-        try pm.add(loop_rotate.pass);
-    } else if (std.mem.eql(u8, name, "loop-deletion")) {
-        try pm.add(loop_deletion.pass);
-    } else if (std.mem.eql(u8, name, "indvars")) {
-        try pm.add(indvars.pass);
-    } else if (std.mem.eql(u8, name, "simplifycfg")) {
-        try pm.add(simplifycfg.pass);
-    } else if (std.mem.eql(u8, name, "mem2reg")) {
-        try pm.add(mem2reg.pass);
-    } else if (std.mem.eql(u8, name, "sroa")) {
-        try pm.add(sroa.pass);
-    } else if (placeholderPass(name)) |pass| {
-        try pm.add(pass);
-    } else {
-        return error.UnknownPass;
+pub const PassStatus = enum {
+    implemented,
+    placeholder,
+    conservative,
+};
+
+pub const PassStatusCounts = struct {
+    implemented: usize = 0,
+    placeholder: usize = 0,
+    conservative: usize = 0,
+    unknown: usize = 0,
+
+    pub fn note(counts: *PassStatusCounts, status: ?PassStatus) void {
+        switch (status orelse {
+            counts.unknown += 1;
+            return;
+        }) {
+            .implemented => counts.implemented += 1,
+            .placeholder => counts.placeholder += 1,
+            .conservative => counts.conservative += 1,
+        }
+    }
+};
+
+pub const PassRegistryEntry = struct {
+    name: []const u8,
+    category: pass_manager.PassCategory,
+    status: PassStatus,
+    upstream_path: []const u8,
+    pass: pass_manager.ModulePass,
+};
+
+fn implemented(pass: pass_manager.ModulePass) PassRegistryEntry {
+    return .{
+        .name = pass.name,
+        .category = pass.category,
+        .status = .implemented,
+        .upstream_path = pass.upstream_owner,
+        .pass = pass,
+    };
+}
+
+fn conservative(pass: pass_manager.ModulePass) PassRegistryEntry {
+    return .{
+        .name = pass.name,
+        .category = pass.category,
+        .status = .conservative,
+        .upstream_path = pass.upstream_owner,
+        .pass = pass,
+    };
+}
+
+fn placeholderEntry(
+    comptime name: []const u8,
+    comptime category: pass_manager.PassCategory,
+    comptime upstream_path: []const u8,
+) PassRegistryEntry {
+    return .{
+        .name = name,
+        .category = category,
+        .status = .placeholder,
+        .upstream_path = upstream_path,
+        .pass = placeholder.make(name, category, upstream_path),
+    };
+}
+
+pub const pass_registry = [_]PassRegistryEntry{
+    implemented(instcombine.pass),
+    implemented(always_inline.pass),
+    implemented(jump_threading.pass),
+    implemented(correlated_propagation.pass),
+    implemented(lower_expect.pass),
+    implemented(verify.pass),
+    implemented(dce.pass),
+    implemented(dse.pass),
+    implemented(adce.pass),
+    implemented(bdce.pass),
+    implemented(early_cse.pass),
+    implemented(sccp.pass),
+    implemented(gvn.pass),
+    implemented(globalopt.pass),
+    implemented(globaldce.pass),
+    implemented(constmerge.pass),
+    implemented(function_attrs.pass),
+    implemented(inline_pass.pass),
+    implemented(vector_combine.pass),
+    conservative(slp_vectorizer.pass),
+    implemented(licm.pass),
+    implemented(loop_instsimplify.pass),
+    implemented(loop_simplifycfg.pass),
+    implemented(loop_rotate.pass),
+    implemented(loop_deletion.pass),
+    implemented(indvars.pass),
+    implemented(simplifycfg.pass),
+    implemented(mem2reg.pass),
+    implemented(sroa.pass),
+    conservative(canonicalize_aliases.pass),
+    placeholderEntry("aggressive-instcombine", .canonicalization, "llvm/lib/Transforms/AggressiveInstCombine/"),
+    placeholderEntry("lower-constant-intrinsics", .canonicalization, "llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp"),
+    placeholderEntry("drop-unnecessary-assumes", .canonicalization, "llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp"),
+    placeholderEntry("tailcallelim", .codegen_prep, "llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp"),
+    placeholderEntry("div-rem-pairs", .codegen_prep, "llvm/lib/Transforms/Scalar/DivRemPairs.cpp"),
+    placeholderEntry("float2int", .codegen_prep, "llvm/lib/Transforms/Scalar/Float2Int.cpp"),
+    placeholderEntry("libcalls-shrinkwrap", .codegen_prep, "llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp"),
+    placeholderEntry("inject-tli-mappings", .codegen_prep, "llvm/lib/Transforms/Utils/InjectTLIMappings.cpp"),
+    placeholderEntry("rel-lookup-table-converter", .codegen_prep, "llvm/lib/Transforms/Utils/RelLookupTableConverter.cpp"),
+    placeholderEntry("memcpyopt", .memory, "llvm/lib/Transforms/Scalar/MemCpyOptimizer.cpp"),
+    placeholderEntry("mldst-motion", .memory, "llvm/lib/Transforms/Scalar/MergedLoadStoreMotion.cpp"),
+    placeholderEntry("infer-alignment", .memory, "llvm/lib/Transforms/Scalar/InferAlignment.cpp"),
+    placeholderEntry("alignment-from-assumptions", .memory, "llvm/lib/Transforms/Scalar/AlignmentFromAssumptions.cpp"),
+    placeholderEntry("move-auto-init", .memory, "llvm/lib/Transforms/Scalar/MoveAutoInit.cpp"),
+    placeholderEntry("ipsccp", .ipo, "llvm/lib/Transforms/IPO/SCCP.cpp"),
+    placeholderEntry("reassociate", .scalar, "llvm/lib/Transforms/Scalar/Reassociate.cpp"),
+    placeholderEntry("constraint-elimination", .scalar, "llvm/lib/Transforms/Scalar/ConstraintElimination.cpp"),
+    placeholderEntry("speculative-execution", .scalar, "llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp"),
+    placeholderEntry("simple-loop-unswitch", .loop, "llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp"),
+    placeholderEntry("loop-idiom", .loop, "llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp"),
+    placeholderEntry("loop-sink", .loop, "llvm/lib/Transforms/Scalar/LoopSink.cpp"),
+    placeholderEntry("loop-unroll", .loop, "llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp"),
+    placeholderEntry("loop-unroll-full", .loop, "llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp"),
+    placeholderEntry("loop-distribute", .loop, "llvm/lib/Transforms/Scalar/LoopDistribute.cpp"),
+    placeholderEntry("loop-load-elim", .loop, "llvm/lib/Transforms/Scalar/LoopLoadElimination.cpp"),
+    placeholderEntry("extra-simple-loop-unswitch-passes", .loop, "llvm/lib/Passes/PassBuilderPipelines.cpp"),
+    placeholderEntry("ee-instrument", .instrumentation, "llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp"),
+    placeholderEntry("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp"),
+    placeholderEntry("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp"),
+    placeholderEntry("add-discriminators", .instrumentation, "llvm/lib/Transforms/Utils/AddDiscriminators.cpp"),
+    placeholderEntry("annotation2metadata", .instrumentation, "llvm/lib/Transforms/IPO/Annotation2Metadata.cpp"),
+    placeholderEntry("sancov", .instrumentation, "llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp"),
+    placeholderEntry("module-tsan", .instrumentation, "llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp"),
+    placeholderEntry("tsan", .instrumentation, "llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp"),
+    placeholderEntry("memprof-remove-attributes", .instrumentation, "llvm/lib/Transforms/Instrumentation/MemProfUse.cpp"),
+    placeholderEntry("cg-profile", .instrumentation, "llvm/lib/Transforms/Instrumentation/CGProfile.cpp"),
+    placeholderEntry("chr", .instrumentation, "llvm/lib/Transforms/Instrumentation/ControlHeightReduction.cpp"),
+    placeholderEntry("transform-warning", .instrumentation, "llvm/lib/Transforms/Scalar/WarnMissedTransforms.cpp"),
+    placeholderEntry("loop-vectorize", .vector, "llvm/lib/Transforms/Vectorize/LoopVectorize.cpp"),
+    placeholderEntry("coro-early", .ipo, "llvm/lib/Transforms/Coroutines/CoroEarly.cpp"),
+    placeholderEntry("coro-split", .ipo, "llvm/lib/Transforms/Coroutines/CoroSplit.cpp"),
+    placeholderEntry("coro-elide", .ipo, "llvm/lib/Transforms/Coroutines/CoroElide.cpp"),
+    placeholderEntry("coro-cleanup", .ipo, "llvm/lib/Transforms/Coroutines/CoroCleanup.cpp"),
+    placeholderEntry("coro-annotation-elide", .ipo, "llvm/lib/Transforms/Coroutines/CoroAnnotationElide.cpp"),
+    placeholderEntry("openmp-opt", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp"),
+    placeholderEntry("openmp-opt-cgscc", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp"),
+    placeholderEntry("forceattrs", .ipo, "llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp"),
+    placeholderEntry("inferattrs", .ipo, "llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp"),
+    placeholderEntry("rpo-function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp"),
+    placeholderEntry("argpromotion", .ipo, "llvm/lib/Transforms/IPO/ArgumentPromotion.cpp"),
+    placeholderEntry("called-value-propagation", .ipo, "llvm/lib/Transforms/IPO/CalledValuePropagation.cpp"),
+    placeholderEntry("callsite-splitting", .scalar, "llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp"),
+    placeholderEntry("deadargelim", .ipo, "llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp"),
+    placeholderEntry("elim-avail-extern", .ipo, "llvm/lib/Transforms/IPO/ElimAvailExtern.cpp"),
+    placeholderEntry("recompute-globalsaa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp"),
+    placeholderEntry("globals-aa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp"),
+    placeholderEntry("mergefunc", .ipo, "llvm/lib/Transforms/IPO/MergeFunctions.cpp"),
+    placeholderEntry("name-anon-globals", .lto, "llvm/lib/Transforms/Utils/NameAnonGlobals.cpp"),
+    placeholderEntry("require<globals-aa>", .analysis, "llvm/include/llvm/IR/PassManager.h"),
+    placeholderEntry("invalidate<aa>", .analysis, "llvm/include/llvm/IR/PassManager.h"),
+    placeholderEntry("require<profile-summary>", .analysis, "llvm/include/llvm/IR/PassManager.h"),
+    placeholderEntry("require<branch-probability>", .analysis, "llvm/lib/Analysis/BranchProbabilityInfo.cpp"),
+    placeholderEntry("require<block-frequency>", .analysis, "llvm/lib/Analysis/BlockFrequencyInfo.cpp"),
+    placeholderEntry("require<should-not-run-function-passes>", .pipeline_guard, "llvm/lib/Passes/PassBuilderPipelines.cpp"),
+};
+
+pub fn findPass(name: []const u8) ?PassRegistryEntry {
+    for (pass_registry) |entry| {
+        if (std.mem.eql(u8, name, entry.name)) return entry;
+    }
+    return null;
+}
+
+pub fn summarizePipeline(pipeline: Pipeline) PassStatusCounts {
+    var counts: PassStatusCounts = .{};
+    for (pipeline.passes) |pass_name| {
+        counts.note(if (findPass(pass_name)) |entry| entry.status else null);
+    }
+    return counts;
+}
+
+pub const PlaceholderBudget = struct {
+    pipeline_name: []const u8,
+    expected_placeholders: usize,
+};
+
+pub const placeholder_budgets = [_]PlaceholderBudget{
+    .{ .pipeline_name = "release-o3", .expected_placeholders = 7 },
+    .{ .pipeline_name = "release-oz", .expected_placeholders = 7 },
+    .{ .pipeline_name = "lto-prelink-o3", .expected_placeholders = 6 },
+    .{ .pipeline_name = "lto-prelink-oz", .expected_placeholders = 4 },
+};
+
+pub const release_policy_pipeline_names = [_][]const u8{
+    "zig-release-safe-accepted",
+    "zig-release-fast-accepted",
+    "zig-release-small-accepted",
+    "release-o3",
+    "release-oz",
+    "lto-prelink-o3",
+    "lto-prelink-oz",
+};
+
+pub fn expectedPlaceholderBudget(pipeline_name: []const u8) ?usize {
+    for (placeholder_budgets) |budget| {
+        if (std.mem.eql(u8, pipeline_name, budget.pipeline_name)) return budget.expected_placeholders;
+    }
+    return null;
+}
+
+pub fn verifyPlaceholderBudgets() !void {
+    for (placeholder_budgets) |budget| {
+        const pipeline = find(budget.pipeline_name) orelse return error.UnknownPipeline;
+        const counts = summarizePipeline(pipeline);
+        if (counts.unknown != 0) return error.UnknownPass;
+        if (counts.placeholder != budget.expected_placeholders) return error.PlaceholderBudgetChanged;
     }
 }
 
-fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
-    if (std.mem.eql(u8, name, "aggressive-instcombine")) return placeholder.make("aggressive-instcombine", .canonicalization, "llvm/lib/Transforms/AggressiveInstCombine/");
-    if (std.mem.eql(u8, name, "lower-constant-intrinsics")) return placeholder.make("lower-constant-intrinsics", .canonicalization, "llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp");
-    if (std.mem.eql(u8, name, "drop-unnecessary-assumes")) return placeholder.make("drop-unnecessary-assumes", .canonicalization, "llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp");
-    if (std.mem.eql(u8, name, "tailcallelim")) return placeholder.make("tailcallelim", .codegen_prep, "llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp");
-    if (std.mem.eql(u8, name, "div-rem-pairs")) return placeholder.make("div-rem-pairs", .codegen_prep, "llvm/lib/Transforms/Scalar/DivRemPairs.cpp");
-    if (std.mem.eql(u8, name, "float2int")) return placeholder.make("float2int", .codegen_prep, "llvm/lib/Transforms/Scalar/Float2Int.cpp");
-    if (std.mem.eql(u8, name, "libcalls-shrinkwrap")) return placeholder.make("libcalls-shrinkwrap", .codegen_prep, "llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp");
-    if (std.mem.eql(u8, name, "inject-tli-mappings")) return placeholder.make("inject-tli-mappings", .codegen_prep, "llvm/lib/Transforms/Utils/InjectTLIMappings.cpp");
-    if (std.mem.eql(u8, name, "rel-lookup-table-converter")) return placeholder.make("rel-lookup-table-converter", .codegen_prep, "llvm/lib/Transforms/Utils/RelLookupTableConverter.cpp");
-    if (std.mem.eql(u8, name, "memcpyopt")) return placeholder.make("memcpyopt", .memory, "llvm/lib/Transforms/Scalar/MemCpyOptimizer.cpp");
-    if (std.mem.eql(u8, name, "mldst-motion")) return placeholder.make("mldst-motion", .memory, "llvm/lib/Transforms/Scalar/MergedLoadStoreMotion.cpp");
-    if (std.mem.eql(u8, name, "infer-alignment")) return placeholder.make("infer-alignment", .memory, "llvm/lib/Transforms/Scalar/InferAlignment.cpp");
-    if (std.mem.eql(u8, name, "alignment-from-assumptions")) return placeholder.make("alignment-from-assumptions", .memory, "llvm/lib/Transforms/Scalar/AlignmentFromAssumptions.cpp");
-    if (std.mem.eql(u8, name, "move-auto-init")) return placeholder.make("move-auto-init", .memory, "llvm/lib/Transforms/Scalar/MoveAutoInit.cpp");
-    if (std.mem.eql(u8, name, "ipsccp")) return placeholder.make("ipsccp", .ipo, "llvm/lib/Transforms/IPO/SCCP.cpp");
-    if (std.mem.eql(u8, name, "reassociate")) return placeholder.make("reassociate", .scalar, "llvm/lib/Transforms/Scalar/Reassociate.cpp");
-    if (std.mem.eql(u8, name, "constraint-elimination")) return placeholder.make("constraint-elimination", .scalar, "llvm/lib/Transforms/Scalar/ConstraintElimination.cpp");
-    if (std.mem.eql(u8, name, "speculative-execution")) return placeholder.make("speculative-execution", .scalar, "llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp");
-    if (std.mem.eql(u8, name, "simple-loop-unswitch")) return placeholder.make("simple-loop-unswitch", .loop, "llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp");
-    if (std.mem.eql(u8, name, "loop-idiom")) return placeholder.make("loop-idiom", .loop, "llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp");
-    if (std.mem.eql(u8, name, "loop-sink")) return placeholder.make("loop-sink", .loop, "llvm/lib/Transforms/Scalar/LoopSink.cpp");
-    if (std.mem.eql(u8, name, "loop-unroll")) return placeholder.make("loop-unroll", .loop, "llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp");
-    if (std.mem.eql(u8, name, "loop-unroll-full")) return placeholder.make("loop-unroll-full", .loop, "llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp");
-    if (std.mem.eql(u8, name, "loop-distribute")) return placeholder.make("loop-distribute", .loop, "llvm/lib/Transforms/Scalar/LoopDistribute.cpp");
-    if (std.mem.eql(u8, name, "loop-load-elim")) return placeholder.make("loop-load-elim", .loop, "llvm/lib/Transforms/Scalar/LoopLoadElimination.cpp");
-    if (std.mem.eql(u8, name, "extra-simple-loop-unswitch-passes")) return placeholder.make("extra-simple-loop-unswitch-passes", .loop, "llvm/lib/Passes/PassBuilderPipelines.cpp");
-    if (std.mem.eql(u8, name, "ee-instrument")) return placeholder.make("ee-instrument", .instrumentation, "llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp");
-    if (std.mem.eql(u8, name, "alloc-token")) return placeholder.make("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp");
-    if (std.mem.eql(u8, name, "annotation-remarks")) return placeholder.make("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp");
-    if (std.mem.eql(u8, name, "add-discriminators")) return placeholder.make("add-discriminators", .instrumentation, "llvm/lib/Transforms/Utils/AddDiscriminators.cpp");
-    if (std.mem.eql(u8, name, "annotation2metadata")) return placeholder.make("annotation2metadata", .instrumentation, "llvm/lib/Transforms/IPO/Annotation2Metadata.cpp");
-    if (std.mem.eql(u8, name, "sancov")) return placeholder.make("sancov", .instrumentation, "llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp");
-    if (std.mem.eql(u8, name, "module-tsan")) return placeholder.make("module-tsan", .instrumentation, "llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp");
-    if (std.mem.eql(u8, name, "tsan")) return placeholder.make("tsan", .instrumentation, "llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp");
-    if (std.mem.eql(u8, name, "memprof-remove-attributes")) return placeholder.make("memprof-remove-attributes", .instrumentation, "llvm/lib/Transforms/Instrumentation/MemProfUse.cpp");
-    if (std.mem.eql(u8, name, "cg-profile")) return placeholder.make("cg-profile", .instrumentation, "llvm/lib/Transforms/Instrumentation/CGProfile.cpp");
-    if (std.mem.eql(u8, name, "chr")) return placeholder.make("chr", .instrumentation, "llvm/lib/Transforms/Instrumentation/ControlHeightReduction.cpp");
-    if (std.mem.eql(u8, name, "transform-warning")) return placeholder.make("transform-warning", .instrumentation, "llvm/lib/Transforms/Scalar/WarnMissedTransforms.cpp");
-    if (std.mem.eql(u8, name, "loop-vectorize")) return placeholder.make("loop-vectorize", .vector, "llvm/lib/Transforms/Vectorize/LoopVectorize.cpp");
-    if (std.mem.eql(u8, name, "coro-early")) return placeholder.make("coro-early", .ipo, "llvm/lib/Transforms/Coroutines/CoroEarly.cpp");
-    if (std.mem.eql(u8, name, "coro-split")) return placeholder.make("coro-split", .ipo, "llvm/lib/Transforms/Coroutines/CoroSplit.cpp");
-    if (std.mem.eql(u8, name, "coro-elide")) return placeholder.make("coro-elide", .ipo, "llvm/lib/Transforms/Coroutines/CoroElide.cpp");
-    if (std.mem.eql(u8, name, "coro-cleanup")) return placeholder.make("coro-cleanup", .ipo, "llvm/lib/Transforms/Coroutines/CoroCleanup.cpp");
-    if (std.mem.eql(u8, name, "coro-annotation-elide")) return placeholder.make("coro-annotation-elide", .ipo, "llvm/lib/Transforms/Coroutines/CoroAnnotationElide.cpp");
-    if (std.mem.eql(u8, name, "openmp-opt")) return placeholder.make("openmp-opt", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp");
-    if (std.mem.eql(u8, name, "openmp-opt-cgscc")) return placeholder.make("openmp-opt-cgscc", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp");
-    if (std.mem.eql(u8, name, "forceattrs")) return placeholder.make("forceattrs", .ipo, "llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp");
-    if (std.mem.eql(u8, name, "inferattrs")) return placeholder.make("inferattrs", .ipo, "llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp");
-    if (std.mem.eql(u8, name, "rpo-function-attrs")) return placeholder.make("rpo-function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp");
-    if (std.mem.eql(u8, name, "argpromotion")) return placeholder.make("argpromotion", .ipo, "llvm/lib/Transforms/IPO/ArgumentPromotion.cpp");
-    if (std.mem.eql(u8, name, "called-value-propagation")) return placeholder.make("called-value-propagation", .ipo, "llvm/lib/Transforms/IPO/CalledValuePropagation.cpp");
-    if (std.mem.eql(u8, name, "callsite-splitting")) return placeholder.make("callsite-splitting", .scalar, "llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp");
-    if (std.mem.eql(u8, name, "deadargelim")) return placeholder.make("deadargelim", .ipo, "llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp");
-    if (std.mem.eql(u8, name, "dse")) return placeholder.make("dse", .memory, "llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp");
-    if (std.mem.eql(u8, name, "elim-avail-extern")) return placeholder.make("elim-avail-extern", .ipo, "llvm/lib/Transforms/IPO/ElimAvailExtern.cpp");
-    if (std.mem.eql(u8, name, "recompute-globalsaa")) return placeholder.make("recompute-globalsaa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp");
-    if (std.mem.eql(u8, name, "globals-aa")) return placeholder.make("globals-aa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp");
-    if (std.mem.eql(u8, name, "mergefunc")) return placeholder.make("mergefunc", .ipo, "llvm/lib/Transforms/IPO/MergeFunctions.cpp");
-    if (std.mem.eql(u8, name, "canonicalize-aliases")) return canonicalize_aliases.pass;
-    if (std.mem.eql(u8, name, "name-anon-globals")) return placeholder.make("name-anon-globals", .lto, "llvm/lib/Transforms/Utils/NameAnonGlobals.cpp");
-    if (std.mem.eql(u8, name, "require<globals-aa>")) return placeholder.make("require<globals-aa>", .analysis, "llvm/include/llvm/IR/PassManager.h");
-    if (std.mem.eql(u8, name, "invalidate<aa>")) return placeholder.make("invalidate<aa>", .analysis, "llvm/include/llvm/IR/PassManager.h");
-    if (std.mem.eql(u8, name, "require<profile-summary>")) return placeholder.make("require<profile-summary>", .analysis, "llvm/include/llvm/IR/PassManager.h");
-    if (std.mem.eql(u8, name, "require<branch-probability>")) return placeholder.make("require<branch-probability>", .analysis, "llvm/lib/Analysis/BranchProbabilityInfo.cpp");
-    if (std.mem.eql(u8, name, "require<block-frequency>")) return placeholder.make("require<block-frequency>", .analysis, "llvm/lib/Analysis/BlockFrequencyInfo.cpp");
-    if (std.mem.eql(u8, name, "require<should-not-run-function-passes>")) return placeholder.make("require<should-not-run-function-passes>", .pipeline_guard, "llvm/lib/Passes/PassBuilderPipelines.cpp");
-    return null;
+fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
+    const entry = findPass(name) orelse return error.UnknownPass;
+    try pm.add(entry.pass);
 }

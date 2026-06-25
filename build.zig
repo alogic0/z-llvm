@@ -42,6 +42,17 @@ pub fn build(b: *std.Build) void {
     const structural_smoke_step = b.step("structural-smoke", "Compile structural facade smoke tests");
     structural_smoke_step.dependOn(&b.addRunArtifact(structural_smoke_tests).step);
 
+    const release_pipeline_policy_report = b.addExecutable(.{
+        .name = "release_pipeline_policy_report",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/report_release_pipeline_policy.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const release_pipeline_policy_step = b.step("release-pipeline-policy", "Report release pipeline pass implementation and placeholder policy");
+    release_pipeline_policy_step.dependOn(&b.addRunArtifact(release_pipeline_policy_report).step);
+
     addToolStepWithArgs(b, "compare-opt", "Run optimizer fixture comparison; pass optional fixture args after --", "tools/compare_opt.zig");
     addToolStepWithFixedArgs(b, "compare-codegen-asm", "Compare generated x86_64 assembly fixtures", "tools/compare_codegen.zig", &.{"--mode=asm"});
     addToolStepWithFixedArgs(b, "compare-codegen-objdump", "Compare generated x86_64 object disassembly fixtures", "tools/compare_codegen.zig", &.{"--mode=objdump"});

@@ -354,6 +354,42 @@ test "lto prelink pipelines expose prelink placeholders without bitcode semantic
     }
 }
 
+test "release pipeline placeholder budgets are explicit policy" {
+    try pipelines.verifyPlaceholderBudgets();
+
+    const expected = [_]struct {
+        name: []const u8,
+        placeholders: usize,
+    }{
+        .{ .name = "release-o3", .placeholders = 7 },
+        .{ .name = "release-oz", .placeholders = 7 },
+        .{ .name = "lto-prelink-o3", .placeholders = 6 },
+        .{ .name = "lto-prelink-oz", .placeholders = 4 },
+    };
+
+    for (expected) |row| {
+        const pipeline = pipelines.find(row.name).?;
+        const counts = pipelines.summarizePipeline(pipeline);
+        try std.testing.expectEqual(row.placeholders, counts.placeholder);
+        try std.testing.expectEqual(@as(usize, 0), counts.unknown);
+        try std.testing.expectEqual(row.placeholders, pipelines.expectedPlaceholderBudget(row.name).?);
+    }
+}
+
+test "pass registry exposes implementation status and upstream path" {
+    const instcombine_entry = pipelines.findPass("instcombine").?;
+    try std.testing.expectEqual(pipelines.PassStatus.implemented, instcombine_entry.status);
+    try std.testing.expectEqual(pass_manager.PassCategory.canonicalization, instcombine_entry.category);
+    try std.testing.expect(std.mem.indexOf(u8, instcombine_entry.upstream_path, "InstCombine") != null);
+
+    const placeholder_entry = pipelines.findPass("aggressive-instcombine").?;
+    try std.testing.expectEqual(pipelines.PassStatus.placeholder, placeholder_entry.status);
+    try std.testing.expectEqualStrings("placeholder", placeholder_entry.pass.target_status);
+    try std.testing.expect(std.mem.indexOf(u8, placeholder_entry.upstream_path, "AggressiveInstCombine") != null);
+
+    try std.testing.expect(pipelines.findPass("definitely-not-a-pass") == null);
+}
+
 fn pipelineContainsPass(pm: pass_manager.ModulePassManager, pass_name: []const u8) bool {
     for (pm.passes.items) |pass| {
         if (std.mem.eql(u8, pass.name, pass_name)) return true;
