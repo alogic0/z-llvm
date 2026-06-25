@@ -1023,6 +1023,41 @@ test "x86_64 codegen returns i32 fields from mixed SysV aggregate classes" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, packed_reverse.instructions.items[2]);
 }
 
+test "x86_64 codegen returns mixed i64 and f32 register aggregates" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { i64, float } @make_int_float(i64 %i, float %prefix, float %f) {
+        \\entry:
+        \\  %a = insertvalue { i64, float } undef, i64 %i, 0
+        \\  %b = insertvalue { i64, float } %a, float %f, 1
+        \\  ret { i64, float } %b
+        \\}
+        \\
+        \\define { float, i64 } @make_float_int(float %f, i64 %i) {
+        \\entry:
+        \\  %a = insertvalue { float, i64 } undef, float %f, 0
+        \\  %b = insertvalue { float, i64 } %a, i64 %i, 1
+        \\  ret { float, i64 } %b
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var int_float = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer int_float.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, int_float.codegen_path);
+    try expectMachineInstruction(int_float.instructions.items, .{ .mov_arg_rax = .rdi });
+    try expectMachineInstruction(int_float.instructions.items, .{ .movapd_xmm = .{ .dst = .xmm0, .src = .xmm1 } });
+
+    var float_int = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer float_int.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, float_int.codegen_path);
+    try expectMachineInstruction(float_int.instructions.items, .{ .mov_arg_rax = .rdi });
+}
+
 test "x86_64 codegen copies mixed-width memory aggregate leaves from byval to sret" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

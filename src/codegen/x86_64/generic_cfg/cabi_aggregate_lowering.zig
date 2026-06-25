@@ -302,6 +302,22 @@ pub fn lowerRegisterAggregateReturn(
                     leaf_index += 1;
                     continue;
                 }
+                if (leaf.ty.eql(.float) and leaf.offset % 8 == 0) {
+                    const fp_index = try fpParamIndexFromValue(function, leaf.value, leaf.ty);
+                    switch (sse_return_index) {
+                        0 => switch (try XmmReg.fromIndex(fp_index)) {
+                            .xmm0 => {},
+                            .xmm1, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => |src| try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = src } }),
+                        },
+                        1 => switch (try XmmReg.fromIndex(fp_index)) {
+                            .xmm1 => {},
+                            .xmm0, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => |src| try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm1, .src = src } }),
+                        },
+                        else => return error.UnsupportedCodegenAbi,
+                    }
+                    sse_return_index += 1;
+                    continue;
+                }
                 if (!leaf.ty.eql(.double)) return false;
                 const fp_index = try fpParamIndexFromValue(function, leaf.value, leaf.ty);
                 switch (sse_return_index) {

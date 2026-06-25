@@ -183,6 +183,8 @@ frontier_sysv_aggregate_classes.SmallMixed and PackedMixed prove selected
   low-lane and high-lane `i32` fields are returned from the aggregate's GPR class register
   field `double` is returned from the aggregate's SSE class register
   `{ i32, i32, double }` construction packs adjacent `i32` fields into %rax and returns the `double` in %xmm0
+  `{ i64, float }` and `{ float, i64 }` construction returns cover single-f32
+  SSE eightbytes in both mixed field orders
 frontier_sysv_aggregate_classes.DoublePair proves the first SSE/SSE aggregate
 argument field reads and register aggregate return:
   both `double` fields are read from the SysV SSE argument stream
