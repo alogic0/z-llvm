@@ -2007,6 +2007,33 @@ test "x86_64 codegen accepts two-eightbyte byval stack-copy calls" {
     try expectMachineInstruction(indirect_machine.instructions.items, .{ .indirect_call_rax = .{ .int = 64 } });
 }
 
+test "x86_64 codegen accepts array-backed byval stack-copy payload" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @callee(ptr byval({ [2 x i64], i64 }))
+        \\
+        \\define i64 @caller(ptr %arg) {
+        \\entry:
+        \\  %r = call i64 @callee(ptr byval({ [2 x i64], i64 }) %arg)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call);
+    try std.testing.expectEqual(@as(usize, 0), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 3), counts.stack_args);
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 16 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 8 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 0 } });
+}
+
 test "x86_64 codegen rejects byval aggregate with non-eightbyte tail" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
