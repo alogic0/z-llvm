@@ -25,6 +25,7 @@ const callIsFastcc = x86_64_match.callIsFastcc;
 
 const appendAlignedDirectCallPreservingI32Param = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Param;
 const appendAlignedDirectCallPreservingI32Params = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Params;
+const appendDirectCallWithStackArgs = x86_64_emit.appendDirectCallWithStackArgs;
 const appendIndirectCallRaxWithStackArgs = x86_64_emit.appendIndirectCallRaxWithStackArgs;
 const appendSysVScalarCallArgs = x86_64_generic_cfg.appendSysVScalarCallArgs;
 const blockIndex = x86_64_generic_cfg.blockIndex;
@@ -123,20 +124,27 @@ pub fn lowerCall(
         if (call.ret_ty != .void and result == null) return error.InstructionNeedsResult;
         return;
     }
-    if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
 
     if (callHasArgAttrs(call)) {
-        try appendAlignedDirectCallPreservingI32Params(
-            allocator,
-            machine,
-            function,
-            call,
-            try liveParamsAfter(function, block, instruction_index),
-        );
+        const live_params = try liveParamsAfter(function, block, instruction_index);
+        if (live_params.count == 0) {
+            const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+            try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+        } else {
+            try appendAlignedDirectCallPreservingI32Params(
+                allocator,
+                machine,
+                function,
+                call,
+                live_params,
+            );
+        }
         if (call.ret_ty == .void and result != null) return error.VoidCallHasResult;
         if (call.ret_ty != .void and result == null) return error.InstructionNeedsResult;
         return;
     }
+
+    if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
 
     for (call.args.items, 0..) |arg, index| {
         try sysv_abi.rejectUnsupportedCallArgAttrs(arg);

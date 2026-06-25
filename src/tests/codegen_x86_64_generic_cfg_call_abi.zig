@@ -1779,6 +1779,42 @@ test "x86_64 codegen accepts supported sret pointer call argument" {
     try std.testing.expect(saw_direct_call);
 }
 
+test "x86_64 codegen accepts supported sret pointer with stack-passed user arg" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @callee(ptr sret({ i64, i64, i64 }), i32, i32, i32, i32, i32, i32)
+        \\
+        \\define void @caller(ptr %out, i32 %a0, i32 %a1, i32 %a2, i32 %a3, i32 %a4, i32 %a5) {
+        \\entry:
+        \\  call void @callee(ptr sret({ i64, i64, i64 }) %out, i32 %a0, i32 %a1, i32 %a2, i32 %a3, i32 %a4, i32 %a5)
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call);
+    try std.testing.expectEqual(@as(usize, 6), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), counts.stack_args);
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(machine.instructions.items, .{ .push_stack_disp8 = 8 });
+    var saw_direct_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |direct_call| {
+            saw_direct_call = true;
+            try std.testing.expectEqualStrings("callee", direct_call.symbol);
+            try std.testing.expect(direct_call.ret_ty == .void);
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_direct_call);
+}
+
 test "x86_64 codegen rejects byval call ABI boundary" {
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
