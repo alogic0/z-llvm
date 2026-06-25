@@ -2366,6 +2366,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_stack_array_double_call_sum(double, double, double, double, double, double, double, double, struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_stack_array_double_call_sum");
     \\extern double z_frontier_shifted_array_double_call_sum(double, struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_array_double_call_sum");
     \\extern double z_frontier_register_array_double_call_sum_after_eight(struct ArrayDouble, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_aggregate_classes.frontier_register_array_double_call_sum_after_eight");
+    \\extern double z_frontier_deep_stack_array_double_call_sum(double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_deep_stack_array_double_call_sum");
     \\extern struct ArrayDouble z_frontier_indirect_array_double_make(struct ArrayDouble (*)(double, double), double, double) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_array_double_make");
     \\extern double z_frontier_indirect_array_double_sum(double (*)(struct ArrayDouble), struct ArrayDouble) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_array_double_sum");
     \\extern double z_frontier_nested_double_left(struct NestedDouble) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_left");
@@ -2473,6 +2474,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_stack_array_double_call_sum(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, array_double) != 7.25) return 41;
     \\    if (z_frontier_shifted_array_double_call_sum(1.0, array_double) != 7.25) return 83;
     \\    if (z_frontier_register_array_double_call_sum_after_eight(array_double, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0) != 7.25) return 53;
+    \\    if (z_frontier_deep_stack_array_double_call_sum(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0, array_double) != 7.25) return 85;
     \\    struct ArrayDouble indirect_array_double = z_frontier_indirect_array_double_make(frontier_make_array_double, 9.25, 10.5);
     \\    if (indirect_array_double.values[0] != 9.25 || indirect_array_double.values[1] != 10.5) return 54;
     \\    if (z_frontier_indirect_array_double_sum(frontier_sum_array_double, indirect_array_double) != 19.75) return 55;

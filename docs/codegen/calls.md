@@ -202,6 +202,8 @@ accepted frontier:
   `{ { double }, { double } }`, plus `[4]f32` array-in-struct lanes
   selected shifted SSE/SSE `[2]f64` aggregate field reads and helper calls
   using generic XMM moves from higher argument registers
+  selected deep stack-sourced SSE/SSE `[2]f64` helper calls with disp32
+  stack-source reloads into outgoing XMM aggregate registers
   selected stack-passed `[4]f32` aggregate helper calls with generic
   stack-to-XMM `movss` reloads
   selected stack-sourced INTEGER aggregate forwarding into outgoing GPR
@@ -485,6 +487,8 @@ slots with disp32 reloads
 selected mixed INTEGER/SSE aggregate argument-field reads
 selected reversed mixed SSE/INTEGER aggregate argument-field reads
 selected SSE/SSE aggregate argument-field reads and register returns
+selected deep stack-sourced SSE/SSE aggregate forwarding into outgoing XMM slots
+with disp32 reloads
 selected shifted in-register mixed aggregate pass-through calls
 selected shifted in-register reversed mixed aggregate pass-through calls
 selected shifted nested mixed aggregate pass-through calls that move both GPR and SSE halves

@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=400`,
-`generic_codegen_functions=400`, `generic_cfg_functions=400`,
+three release modes at `source_rows=13`, `discovered_functions=401`,
+`generic_codegen_functions=401`, `generic_cfg_functions=401`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=400`, `object_failures=0`,
+`object_emitted_functions=401`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -410,7 +410,8 @@ deep stack-sourced INTEGER aggregate forwarding into outgoing stack aggregate
 slots with disp32 reloads,
 register-sourced INTEGER aggregate stack forwarding before scalar call-register
 assignment, register-sourced SSE/SSE aggregate stack forwarding before scalar
-FP call-register assignment, and a reusable
+FP call-register assignment, deep stack-sourced SSE/SSE aggregate forwarding
+into outgoing XMM aggregate registers with disp32 reloads, and a reusable
 up-to-six-live-i32 direct-call spill/reload frame plus disp8-safe stack-passed
 live `i32` post-call add-tree rows with executable proof. The selected
 sret/byval-style frontier row adds `{ i64, i64, i64 }`,

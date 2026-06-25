@@ -376,12 +376,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=400`,
-`generic_codegen_functions=400`, `generic_cfg_functions=400`,
+frontier gate reports `source_rows=13`, `discovered_functions=401`,
+`generic_codegen_functions=401`, `generic_cfg_functions=401`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=400`, `object_failures=0`,
+`object_emitted_functions=401`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -453,7 +453,11 @@ argument registers through the generic XMM move path. The deep stack
 INTEGER aggregate follow-up removes the disp8-only stack-source assumption for
 stack aggregate forwarding: `frontier_deep_stack_array_pair_call_sum_after_six`
 places `[2]i64` past the disp8 incoming stack window and forwards it into
-outgoing stack aggregate slots through the same planner path.
+outgoing stack aggregate slots through the same planner path. The deep
+stack-sourced SSE/SSE follow-up adds the companion `[2]f64` proof:
+`frontier_deep_stack_array_double_call_sum` exhausts the SSE argument stream,
+reloads the aggregate from disp32 stack-source offsets, and forwards it into
+the helper's XMM aggregate argument registers.
 The shifted mixed aggregate follow-up removes the exact-register-slot
 requirement for the GPR half of selected in-register aggregate pass-through
 calls: `{ i64, double }` can now move its INTEGER eightbyte from `%rsi` to

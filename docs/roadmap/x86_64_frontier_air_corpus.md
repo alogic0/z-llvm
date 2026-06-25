@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=400
-structured_functions=400
-generic_codegen_functions=400
-generic_cfg_functions=400
+discovered_functions=401
+structured_functions=401
+generic_codegen_functions=401
+generic_cfg_functions=401
 structural_matcher_functions=0
-structured_air_v2_functions=400
-typed_air_operand_functions=400
+structured_air_v2_functions=401
+typed_air_operand_functions=401
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=400
+generic_lowering_functions=401
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=400
+object_emitted_functions=401
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -270,6 +270,11 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_shifted_array_double_second` and
   `frontier_shifted_array_double_call_sum` prove that `[2]f64` fields shifted
   into `%xmm1`/`%xmm2` are returned or forwarded through generic XMM moves
+- deep stack-sourced SSE/SSE aggregate row in
+  `frontier_sysv_aggregate_classes.zig`:
+  `frontier_deep_stack_array_double_call_sum` exhausts the SSE argument stream
+  before passing `[2]f64`; the aggregate is reloaded from a disp32 stack-source
+  offset and forwarded into the helper's XMM aggregate argument registers
 - first nested SSE/SSE aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `{ { double }, { double } }` nested
   field GEPs lower through layout-backed byte offsets, read both `double`
