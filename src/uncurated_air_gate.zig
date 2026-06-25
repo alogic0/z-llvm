@@ -2067,6 +2067,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big16 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; long long i; long long j; long long k; long long l; long long m; long long n; long long o; long long p; };
     \\struct Big20 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; long long i; long long j; long long k; long long l; long long m; long long n; long long o; long long p; long long q; long long r; long long s; long long t; };
     \\struct Big32 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; long long i; long long j; long long k; long long l; long long m; long long n; long long o; long long p; long long q; long long r; long long s; long long t; long long u; long long v; long long w; long long x; long long y; long long z; long long aa; long long ab; long long ac; long long ad; long long ae; long long af; };
+    \\struct Big40 { long long values[40]; };
     \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\struct BigMixed { long long a; int b; long long c; int d; };
     \\struct NarrowInner { unsigned short b; int c; };
@@ -2123,6 +2124,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big32 z_frontier_big32_copy(struct Big32) __asm__("frontier_sysv_sret_byval.frontier_big32_copy");
     \\extern struct Big32 z_frontier_direct_big32_copy(struct Big32) __asm__("frontier_sysv_sret_byval.frontier_direct_big32_copy");
     \\extern struct Big32 z_frontier_indirect_big32_copy(struct Big32 (*)(struct Big32), struct Big32) __asm__("frontier_sysv_sret_byval.frontier_indirect_big32_copy");
+    \\extern struct Big40 z_frontier_big40_copy(struct Big40) __asm__("frontier_sysv_sret_byval.frontier_big40_copy");
+    \\extern struct Big40 z_frontier_direct_big40_copy(struct Big40) __asm__("frontier_sysv_sret_byval.frontier_direct_big40_copy");
+    \\extern struct Big40 z_frontier_indirect_big40_copy(struct Big40 (*)(struct Big40), struct Big40) __asm__("frontier_sysv_sret_byval.frontier_indirect_big40_copy");
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern struct BigNested z_frontier_direct_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_direct_big_nested_copy");
     \\extern struct BigNested z_frontier_indirect_big_nested_copy(struct BigNested (*)(struct BigNested), struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_nested_copy");
@@ -2243,6 +2247,13 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (direct32.a != 1 || direct32.p != 16 || direct32.q != 17 || direct32.af != 32) return 98;
     \\    struct Big32 indirect32 = z_frontier_indirect_big32_copy(z_frontier_big32_copy, input32);
     \\    if (indirect32.a != 1 || indirect32.p != 16 || indirect32.q != 17 || indirect32.af != 32) return 99;
+    \\    struct Big40 input40 = { .values = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40 } };
+    \\    struct Big40 copied40 = z_frontier_big40_copy(input40);
+    \\    if (copied40.values[0] != 1 || copied40.values[31] != 32 || copied40.values[32] != 33 || copied40.values[39] != 40) return 100;
+    \\    struct Big40 direct40 = z_frontier_direct_big40_copy(input40);
+    \\    if (direct40.values[0] != 1 || direct40.values[31] != 32 || direct40.values[32] != 33 || direct40.values[39] != 40) return 101;
+    \\    struct Big40 indirect40 = z_frontier_indirect_big40_copy(z_frontier_big40_copy, input40);
+    \\    if (indirect40.values[0] != 1 || indirect40.values[31] != 32 || indirect40.values[32] != 33 || indirect40.values[39] != 40) return 102;
     \\    struct BigNested nested = { .left = { .a = 2, .b = 3, .c = 5 }, .right = { .a = 7, .b = 11, .c = 13 } };
     \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 20;
     \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);

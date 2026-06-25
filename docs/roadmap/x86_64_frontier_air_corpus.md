@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=425
-structured_functions=425
-generic_codegen_functions=425
-generic_cfg_functions=425
+discovered_functions=428
+structured_functions=428
+generic_codegen_functions=428
+generic_cfg_functions=428
 structural_matcher_functions=0
-structured_air_v2_functions=425
-typed_air_operand_functions=425
+structured_air_v2_functions=428
+typed_air_operand_functions=428
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=425
+generic_lowering_functions=428
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=425
+object_emitted_functions=428
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -151,9 +151,10 @@ Closed in the current memory/aggregate frontier slice:
   `movss` stack loads and hidden-sret stores, and `BigDoubleArray` proves an
   array-of-double MEMORY aggregate through the same recursive copy path; the
   `BigArrayMixed` row combines array-contained `i32`, array-contained `f64`,
-  and pointer leaves in one byval-to-sret MEMORY aggregate; `Big32` raises the
-  same planner-owned byval-to-sret direct and pointer-callee copy path to the
-  safe 32-eightbyte stack-copy window;
+  and pointer leaves in one byval-to-sret MEMORY aggregate; `Big32` and
+  `Big40` raise the same planner-owned byval-to-sret direct and pointer-callee
+  copy path through exact-qword MEMORY payloads beyond byte-offset byval loads
+  using disp32 source-pointer reloads;
   `frontier_direct_big5_copy`,
   `frontier_indirect_big5_copy`, `frontier_direct_big_double_copy`,
   `frontier_indirect_big_double_copy`, `frontier_direct_big_float_copy`,

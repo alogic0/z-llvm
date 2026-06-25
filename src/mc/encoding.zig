@@ -332,6 +332,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                     try bytes.append(allocator, disp);
                 }
             },
+            .load_rax_ptr_disp32_rax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x80 });
+                try appendU32(&bytes, allocator, disp);
+            },
             .load_rax_ptr_disp8_u8_eax => |disp| {
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0xb6 });
                 try encodeRaxPtrDisp8Tail(&bytes, allocator, disp);
@@ -348,6 +352,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .load_rax_ptr_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x00 }),
             .load_arg_ptr_eax => |reg| try encodeArgPtrToEax(&bytes, allocator, reg),
             .load_arg_ptr_disp8_rax => |load| try encodeArgPtrDisp8ToRax(&bytes, allocator, load.reg, load.offset),
+            .load_arg_ptr_disp32_rax => |load| try encodeArgPtrDisp32ToRax(&bytes, allocator, load.reg, load.offset),
             .load_arg_ptr_disp8_eax => |load| try encodeArgPtrDisp8ToEax(&bytes, allocator, load.reg, load.offset),
             .load_arg_ptr_disp8_u8_eax => |load| try encodeArgPtrDisp8U8ToEax(&bytes, allocator, load.reg, load.offset),
             .load_arg_ptr_disp8_u16_eax => |load| try encodeArgPtrDisp8U16ToEax(&bytes, allocator, load.reg, load.offset),
@@ -603,6 +608,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .load_stack_disp32_arg32 => |load| if (load.reg.rexR()) 8 else 7,
         .load_stack_disp32_arg64 => 8,
         .load_rax_ptr_disp8_rax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,
+        .load_rax_ptr_disp32_rax => 7,
         .load_rax_ptr_disp8_u8_eax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,
         .load_rax_ptr_disp8_u16_eax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,
         .load_rax_ptr_disp8_eax => |offset| 2 + if (offset == 0) @as(u32, 0) else 1,
@@ -610,6 +616,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .load_rax_ptr_eax => 2,
         .load_arg_ptr_eax => |reg| if (reg.rexB()) 3 else 2,
         .load_arg_ptr_disp8_rax => |load| 3 + if (load.offset == 0) @as(u32, 0) else 1,
+        .load_arg_ptr_disp32_rax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 6,
         .load_arg_ptr_disp8_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 2 + if (load.offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_disp8_u8_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_disp8_u16_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,
@@ -959,6 +966,13 @@ fn encodeArgPtrDisp8ToRax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocato
     try bytes.append(allocator, if (reg.rexB()) 0x49 else 0x48);
     try bytes.append(allocator, 0x8b);
     try encodeArgPtrDisp8Tail(bytes, allocator, reg, offset);
+}
+
+fn encodeArgPtrDisp32ToRax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u32) !void {
+    try bytes.append(allocator, if (reg.rexB()) 0x49 else 0x48);
+    try bytes.append(allocator, 0x8b);
+    try bytes.append(allocator, 0x80 | @as(u8, reg.lowCode()));
+    try appendU32(bytes, allocator, offset);
 }
 
 fn encodeArgPtrDisp8ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8) !void {

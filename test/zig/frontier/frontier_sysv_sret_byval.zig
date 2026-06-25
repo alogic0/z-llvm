@@ -141,6 +141,10 @@ const Big32 = extern struct {
     af: i64,
 };
 
+const Big40 = extern struct {
+    values: [40]i64,
+};
+
 const BigNested = extern struct {
     left: Big3,
     right: Big3,
@@ -264,6 +268,7 @@ const BigByteTail6CopyFn = *const fn (BigByteTail6) callconv(.c) BigByteTail6;
 const BigByteTail7CopyFn = *const fn (BigByteTail7) callconv(.c) BigByteTail7;
 const BigWordTailCopyFn = *const fn (BigWordTail) callconv(.c) BigWordTail;
 const Big32CopyFn = *const fn (Big32) callconv(.c) Big32;
+const Big40CopyFn = *const fn (Big40) callconv(.c) Big40;
 
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
     return .{ .a = a, .b = b, .c = c };
@@ -410,6 +415,18 @@ export fn frontier_direct_big32_copy(value: Big32) Big32 {
 }
 
 export fn frontier_indirect_big32_copy(func: Big32CopyFn, value: Big32) Big32 {
+    return func(value);
+}
+
+export fn frontier_big40_copy(value: Big40) Big40 {
+    return value;
+}
+
+export fn frontier_direct_big40_copy(value: Big40) Big40 {
+    return frontier_big40_copy(value);
+}
+
+export fn frontier_indirect_big40_copy(func: Big40CopyFn, value: Big40) Big40 {
     return func(value);
 }
 

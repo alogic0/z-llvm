@@ -745,7 +745,6 @@ pub fn appendSysVByvalStackCopyArgs(
     while (index < stack_eightbytes) : (index += 1) {
         if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
         const offset = index * 8;
-        if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
         const remaining = copy.classification.size_bytes - offset;
         const chunk: ByvalCopyChunk = if (remaining >= 8)
             .qword
@@ -759,6 +758,8 @@ pub fn appendSysVByvalStackCopyArgs(
             .composite
         else
             return error.UnsupportedSretByvalAbi;
+        if (source_reg == null and offset > std.math.maxInt(u8)) return error.UnsupportedSretByvalAbi;
+        if (chunk != .qword and offset > std.math.maxInt(u8)) return error.UnsupportedSretByvalAbi;
         stack_args[stack_arg_count.*] = if (source_reg) |reg|
             .{ .byval_ptr_disp = .{ .reg = reg, .offset = @intCast(offset), .chunk = chunk, .len = @intCast(@min(remaining, 8)) } }
         else
@@ -843,7 +844,7 @@ pub const StackScalarCallArg = union(enum) {
     xmm_imm64: u64,
     byval_ptr_disp: struct {
         reg: ArgReg,
-        offset: u8,
+        offset: u32,
         chunk: ByvalCopyChunk,
         len: u8,
     },
@@ -888,14 +889,21 @@ pub fn appendStackScalarCallArg(
         },
         .byval_ptr_disp => |source| {
             switch (source.chunk) {
-                .qword => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = source.offset } }),
-                .dword => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = source.reg, .offset = source.offset } }),
-                .word => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_u16_eax = .{ .reg = source.reg, .offset = source.offset } }),
-                .byte => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = source.reg, .offset = source.offset } }),
+                .qword => {
+                    if (source.offset <= std.math.maxInt(u8)) {
+                        try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = @intCast(source.offset) } });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .load_arg_ptr_disp32_rax = .{ .reg = source.reg, .offset = source.offset } });
+                    }
+                },
+                .dword => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = source.reg, .offset = @intCast(source.offset) } }),
+                .word => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_u16_eax = .{ .reg = source.reg, .offset = @intCast(source.offset) } }),
+                .byte => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = source.reg, .offset = @intCast(source.offset) } }),
                 .composite => {
+                    if (source.offset > std.math.maxInt(u8)) return error.UnsupportedSretByvalAbi;
                     try machine.instructions.append(allocator, .{ .push_byval_tail_arg_ptr = .{
                         .reg = source.reg,
-                        .offset = source.offset,
+                        .offset = @intCast(source.offset),
                         .len = source.len,
                     } });
                     return;
