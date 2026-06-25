@@ -2213,6 +2213,57 @@ test "x86_64 codegen accepts stack-sourced byval stack-copy payload" {
     try expectMachineInstruction(machine.instructions.items, .{ .add_rsp_24 = {} });
 }
 
+test "x86_64 codegen accepts live indirect stack-sourced byval payload" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, i32 %keep, ptr %a, ptr %b, ptr %c, ptr %d, ptr %arg) {
+        \\entry:
+        \\  call void %fn(ptr byval({ i64, i64 }) %arg)
+        \\  ret i32 %keep
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call);
+    try std.testing.expectEqual(@as(usize, 0), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 2), counts.stack_args);
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rsi } });
+    var stack_source_load_index: ?usize = null;
+    var payload_load_index: ?usize = null;
+    var target_setup_index: ?usize = null;
+    var call_index: ?usize = null;
+    for (machine.instructions.items, 0..) |instruction, index| {
+        switch (instruction) {
+            .load_stack_disp8_rax => {
+                if (stack_source_load_index == null) stack_source_load_index = index;
+            },
+            .load_rax_ptr_disp8_rax => |offset| {
+                if (offset == 8 and payload_load_index == null) payload_load_index = index;
+            },
+            .mov_arg_rax => |reg| {
+                if (reg == .rdi) target_setup_index = index;
+            },
+            .indirect_call_rax => |ret_ty| {
+                if (ret_ty == .void) call_index = index;
+            },
+            else => {},
+        }
+    }
+    try std.testing.expect((stack_source_load_index orelse return error.TestExpectedEqual) < (payload_load_index orelse return error.TestExpectedEqual));
+    try std.testing.expect((payload_load_index orelse return error.TestExpectedEqual) < (target_setup_index orelse return error.TestExpectedEqual));
+    try std.testing.expect((target_setup_index orelse return error.TestExpectedEqual) < (call_index orelse return error.TestExpectedEqual));
+    try expectMachineInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 16 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .add_rsp_8);
+}
+
 test "x86_64 codegen rejects byval aggregate with non-eightbyte tail" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
