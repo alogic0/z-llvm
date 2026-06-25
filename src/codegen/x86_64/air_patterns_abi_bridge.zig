@@ -1781,7 +1781,7 @@ fn lowerRegisterAggregateDirectCallReturn(
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         };
         const callee_reg = try paramReg(function, callee_name, .ptr);
-        const stack_arg_count = if (callHasByvalArgAttrs(call)) count: {
+        const stack_arg_count = if (sysv_abi.callHasByvalArgAttrs(call)) count: {
             const count = appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
                 error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
                 else => if (sysv_abi.isBoundaryError(err)) return false else return err,
@@ -2110,11 +2110,4 @@ fn lowerMakePairReturn(
     try machine.instructions.append(allocator, .or_rdx_rax);
     try machine.instructions.append(allocator, .ret);
     return true;
-}
-
-fn callHasByvalArgAttrs(call: ir.CallInst) bool {
-    for (call.args.items) |arg| {
-        if (callArgAttrsContain(arg, "byval")) return true;
-    }
-    return false;
 }

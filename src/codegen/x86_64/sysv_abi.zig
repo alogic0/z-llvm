@@ -321,6 +321,15 @@ pub fn callPlanCountsForTest(allocator: std.mem.Allocator, function: ir.Function
     return plan.counts;
 }
 
+pub fn callHasByvalArgAttrs(call: ir.CallInst) bool {
+    for (call.args.items) |arg| {
+        if (arg.attrs) |attrs| {
+            if (std.mem.indexOf(u8, attrs, "byval") != null) return true;
+        }
+    }
+    return false;
+}
+
 pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !CallPlan {
     try rejectUnsupportedCallEnvelope(call);
     try rejectUnsupportedAbiType(call.ret_ty);

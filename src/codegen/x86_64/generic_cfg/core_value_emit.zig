@@ -5,6 +5,7 @@ const cabi_call_lowering = @import("cabi_call_lowering.zig");
 
 const std = shared.std;
 const ir = shared.ir;
+const sysv_abi = shared.sysv_abi;
 const MachineFunction = shared.MachineFunction;
 
 const appendDirectCallWithStackArgs = shared.appendDirectCallWithStackArgs;
@@ -255,7 +256,7 @@ pub fn emitGenericCfgI32CallIntoEax(
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             };
             const callee_reg = try paramReg(function, callee_name, .ptr);
-            const stack_arg_count = if (callHasByvalArgAttrs(call)) count: {
+            const stack_arg_count = if (sysv_abi.callHasByvalArgAttrs(call)) count: {
                 const count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
                 try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
                 break :count count;
@@ -301,7 +302,7 @@ pub fn emitGenericCfgVoidCall(
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             };
             const callee_reg = try paramReg(function, callee_name, .ptr);
-            const stack_arg_count = if (callHasByvalArgAttrs(call)) count: {
+            const stack_arg_count = if (sysv_abi.callHasByvalArgAttrs(call)) count: {
                 const count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
                 try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
                 break :count count;
@@ -326,13 +327,4 @@ pub fn emitGenericCfgVoidCall(
     } else {
         try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
     }
-}
-
-fn callHasByvalArgAttrs(call: ir.CallInst) bool {
-    for (call.args.items) |arg| {
-        if (arg.attrs) |attrs| {
-            if (std.mem.indexOf(u8, attrs, "byval") != null) return true;
-        }
-    }
-    return false;
 }
