@@ -1,0 +1,19 @@
+const impl = @import("cabi_aggregate_lowering_impl.zig");
+
+pub const classifySysVAggregateForTest = impl.classifySysVAggregateForTest;
+pub const classifySysVAggregate = impl.classifySysVAggregate;
+pub const classifySysVSmallIntegerAggregate = impl.classifySysVSmallIntegerAggregate;
+pub const AggregateReturnLeaf = impl.AggregateReturnLeaf;
+pub const aggregateInsertByteOffset = impl.aggregateInsertByteOffset;
+pub const aggregateFieldCount = impl.aggregateFieldCount;
+pub const aggregateFieldEightbyte = impl.aggregateFieldEightbyte;
+pub const fpParamIndexFromValue = impl.fpParamIndexFromValue;
+pub const valuesEqual = impl.valuesEqual;
+pub const isScalarElementGepType = impl.isScalarElementGepType;
+pub const isAggregateType = impl.isAggregateType;
+pub const isI64Aggregate = impl.isI64Aggregate;
+pub const isI64LeafAggregate = impl.isI64LeafAggregate;
+pub const SysVIntegerAggregateFieldLocation = impl.SysVIntegerAggregateFieldLocation;
+pub const SysVAggregateFieldLocation = impl.SysVAggregateFieldLocation;
+pub const sysvAggregateRegisterNeeds = impl.sysvAggregateRegisterNeeds;
+pub const sysvAggregateRegisterNeedsBefore = impl.sysvAggregateRegisterNeedsBefore;

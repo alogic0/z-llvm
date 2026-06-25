@@ -1,0 +1,25 @@
+const impl = @import("cabi_aggregate_lowering_impl.zig");
+
+pub const lowerAggregateAbiReturn = impl.lowerAggregateAbiReturn;
+pub const lowerMemoryAggregateCallReturn = impl.lowerMemoryAggregateCallReturn;
+pub const lowerSmallIntegerAggregateReturn = impl.lowerSmallIntegerAggregateReturn;
+pub const lowerRegisterAggregateReturn = impl.lowerRegisterAggregateReturn;
+pub const lowerFourI32RegisterAggregateReturn = impl.lowerFourI32RegisterAggregateReturn;
+pub const lowerSysVAggregateFieldReturn = impl.lowerSysVAggregateFieldReturn;
+pub const lowerRegisterAggregateIntegerFieldAddReturn = impl.lowerRegisterAggregateIntegerFieldAddReturn;
+pub const lowerRegisterAggregateFloatFieldAddReturn = impl.lowerRegisterAggregateFloatFieldAddReturn;
+pub const lowerRegisterAggregateDoubleFieldAddReturn = impl.lowerRegisterAggregateDoubleFieldAddReturn;
+pub const lowerMemoryIntegerAggregateFieldAddReturn = impl.lowerMemoryIntegerAggregateFieldAddReturn;
+pub const lowerRegisterAggregateDirectCallReturn = impl.lowerRegisterAggregateDirectCallReturn;
+pub const lowerAggregatePairAbiFamilyReturn = impl.lowerAggregatePairAbiFamilyReturn;
+pub const lowerRuntimeAggregatePairMainReturn = impl.lowerRuntimeAggregatePairMainReturn;
+pub const lowerRuntimeAggregatePairDirectMainReturn = impl.lowerRuntimeAggregatePairDirectMainReturn;
+pub const lowerRuntimeAggregatePairMakePairReturn = impl.lowerRuntimeAggregatePairMakePairReturn;
+pub const lowerRuntimeAggregatePairPairFirstReturn = impl.lowerRuntimeAggregatePairPairFirstReturn;
+pub const lowerTruncI64ArgReturn = impl.lowerTruncI64ArgReturn;
+pub const lowerMakePairReturn = impl.lowerMakePairReturn;
+pub const lowerStructSumReturn = impl.lowerStructSumReturn;
+pub const lowerRuntimeStructSumPreoptHelper = impl.lowerRuntimeStructSumPreoptHelper;
+pub const lowerRuntimeStructSumMainReturn = impl.lowerRuntimeStructSumMainReturn;
+pub const lowerAddChain3Return = impl.lowerAddChain3Return;
+pub const lowerRuntimeArraySumPreoptHelper = impl.lowerRuntimeArraySumPreoptHelper;
