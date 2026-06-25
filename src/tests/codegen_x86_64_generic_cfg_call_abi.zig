@@ -1184,6 +1184,10 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
         error.UnsupportedCallConvAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, callconv_module.functions.items[0], callconv_call),
     );
+    try std.testing.expectError(
+        error.UnsupportedCallConvAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, callconv_module.target_triple.?, callconv_module.functions.items[0]),
+    );
 
     const indirect_callconv_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1690,6 +1694,10 @@ test "x86_64 SysV call planner rejects packed sret and byval attributes directly
         error.UnsupportedPackedAggregateAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, sret_module.functions.items[0], sret_call),
     );
+    try std.testing.expectError(
+        error.UnsupportedPackedAggregateAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]),
+    );
 
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1710,6 +1718,10 @@ test "x86_64 SysV call planner rejects packed sret and byval attributes directly
     try std.testing.expectError(
         error.UnsupportedPackedAggregateAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, byval_module.functions.items[0], byval_call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedPackedAggregateAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, byval_module.target_triple.?, byval_module.functions.items[0]),
     );
 }
 
@@ -1734,6 +1746,10 @@ test "x86_64 SysV call planner rejects vector sret and byval attributes directly
         error.UnsupportedVectorAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, sret_module.functions.items[0], sret_call),
     );
+    try std.testing.expectError(
+        error.UnsupportedVectorAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]),
+    );
 
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1754,6 +1770,10 @@ test "x86_64 SysV call planner rejects vector sret and byval attributes directly
     try std.testing.expectError(
         error.UnsupportedVectorAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, byval_module.functions.items[0], byval_call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedVectorAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, byval_module.target_triple.?, byval_module.functions.items[0]),
     );
 }
 
@@ -1778,6 +1798,10 @@ test "x86_64 SysV call planner rejects long-double sret and byval attributes dir
         error.UnsupportedLongDoubleAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, sret_module.functions.items[0], sret_call),
     );
+    try std.testing.expectError(
+        error.UnsupportedLongDoubleAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]),
+    );
 
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1798,6 +1822,10 @@ test "x86_64 SysV call planner rejects long-double sret and byval attributes dir
     try std.testing.expectError(
         error.UnsupportedLongDoubleAbi,
         codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, byval_module.functions.items[0], byval_call),
+    );
+    try std.testing.expectError(
+        error.UnsupportedLongDoubleAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, byval_module.target_triple.?, byval_module.functions.items[0]),
     );
 }
 
