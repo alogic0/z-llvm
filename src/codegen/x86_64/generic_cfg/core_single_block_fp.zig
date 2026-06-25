@@ -1365,14 +1365,29 @@ pub fn lowerGenericCfgFpParamReturn(
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    const fp_index = try fpParamIndex(function, name, function.ret_ty);
-    switch (fp_index) {
-        0 => {},
-        1 => {
-            if (!function.ret_ty.eql(.double)) return error.UnsupportedCodegenAbi;
-            try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
-        },
-        else => return error.UnsupportedCodegenAbi,
+    const fp_index = fpParamIndex(function, name, function.ret_ty) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi => null,
+        error.UnsupportedCodegenValue => return false,
+    };
+    if (fp_index) |index| {
+        switch (index) {
+            0 => {},
+            1 => {
+                if (!function.ret_ty.eql(.double)) return error.UnsupportedCodegenAbi;
+                try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+            },
+            else => return error.UnsupportedCodegenAbi,
+        }
+    } else {
+        const offset = scalarParamStackDisp8(function, name, function.ret_ty) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi, error.UnsupportedCodegenValue => return false,
+            else => return err,
+        };
+        if (function.ret_ty.eql(.float)) {
+            try appendLoadStackDispXmm0F32(allocator, machine, offset);
+        } else {
+            try appendLoadStackDispXmm0(allocator, machine, offset);
+        }
     }
     try machine.instructions.append(allocator, .ret);
     return true;
