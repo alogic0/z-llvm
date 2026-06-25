@@ -2127,6 +2127,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big40 z_frontier_big40_copy(struct Big40) __asm__("frontier_sysv_sret_byval.frontier_big40_copy");
     \\extern struct Big40 z_frontier_direct_big40_copy(struct Big40) __asm__("frontier_sysv_sret_byval.frontier_direct_big40_copy");
     \\extern struct Big40 z_frontier_indirect_big40_copy(struct Big40 (*)(struct Big40), struct Big40) __asm__("frontier_sysv_sret_byval.frontier_indirect_big40_copy");
+    \\extern struct Big40 z_frontier_stack_source_big40_copy(long long, long long, long long, long long, long long, long long, struct Big40) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big40_copy");
+    \\extern struct Big40 z_frontier_stack_source_indirect_big40_copy(struct Big40 (*)(struct Big40), long long, long long, long long, long long, long long, long long, struct Big40) __asm__("frontier_sysv_sret_byval.frontier_stack_source_indirect_big40_copy");
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern struct BigNested z_frontier_direct_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_direct_big_nested_copy");
     \\extern struct BigNested z_frontier_indirect_big_nested_copy(struct BigNested (*)(struct BigNested), struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_nested_copy");
@@ -2254,6 +2256,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (direct40.values[0] != 1 || direct40.values[31] != 32 || direct40.values[32] != 33 || direct40.values[39] != 40) return 101;
     \\    struct Big40 indirect40 = z_frontier_indirect_big40_copy(z_frontier_big40_copy, input40);
     \\    if (indirect40.values[0] != 1 || indirect40.values[31] != 32 || indirect40.values[32] != 33 || indirect40.values[39] != 40) return 102;
+    \\    struct Big40 stack_source40 = z_frontier_stack_source_big40_copy(10, 20, 30, 40, 50, 60, input40);
+    \\    if (stack_source40.values[0] != 1 || stack_source40.values[31] != 32 || stack_source40.values[32] != 33 || stack_source40.values[39] != 40) return 103;
+    \\    struct Big40 stack_source_indirect40 = z_frontier_stack_source_indirect_big40_copy(z_frontier_big40_copy, 10, 20, 30, 40, 50, 60, input40);
+    \\    if (stack_source_indirect40.values[0] != 1 || stack_source_indirect40.values[31] != 32 || stack_source_indirect40.values[32] != 33 || stack_source_indirect40.values[39] != 40) return 104;
     \\    struct BigNested nested = { .left = { .a = 2, .b = 3, .c = 5 }, .right = { .a = 7, .b = 11, .c = 13 } };
     \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 20;
     \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);

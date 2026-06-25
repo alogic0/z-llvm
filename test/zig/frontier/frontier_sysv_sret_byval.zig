@@ -430,6 +430,26 @@ export fn frontier_indirect_big40_copy(func: Big40CopyFn, value: Big40) Big40 {
     return func(value);
 }
 
+export fn frontier_stack_source_big40_copy(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big40) Big40 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return frontier_big40_copy(value);
+}
+
+export fn frontier_stack_source_indirect_big40_copy(func: Big40CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big40) Big40 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return func(value);
+}
+
 export fn frontier_big_nested_copy(value: BigNested) BigNested {
     return value;
 }

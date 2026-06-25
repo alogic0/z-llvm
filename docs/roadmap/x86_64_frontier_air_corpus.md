@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=428
-structured_functions=428
-generic_codegen_functions=428
-generic_cfg_functions=428
+discovered_functions=430
+structured_functions=430
+generic_codegen_functions=430
+generic_cfg_functions=430
 structural_matcher_functions=0
-structured_air_v2_functions=428
-typed_air_operand_functions=428
+structured_air_v2_functions=430
+typed_air_operand_functions=430
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=428
+generic_lowering_functions=430
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=428
+object_emitted_functions=430
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -63,7 +63,7 @@ Object inspection is green for all three modes:
 ```text
 inspected=13
 elf64_rel=13
-relocation_rows=4
+relocation_rows=5
 tls_rows=1
 undefined_import_rows=1
 comdat_rows=0
@@ -154,7 +154,10 @@ Closed in the current memory/aggregate frontier slice:
   and pointer leaves in one byval-to-sret MEMORY aggregate; `Big32` and
   `Big40` raise the same planner-owned byval-to-sret direct and pointer-callee
   copy path through exact-qword MEMORY payloads beyond byte-offset byval loads
-  using disp32 source-pointer reloads;
+  using disp32 source-pointer reloads; the stack-sourced `Big40` direct and
+  pointer-callee copy rows prove incoming byval payloads that begin in the
+  caller stack argument area are copied as payload slots rather than treated as
+  pointers;
   `frontier_direct_big5_copy`,
   `frontier_indirect_big5_copy`, `frontier_direct_big_double_copy`,
   `frontier_indirect_big_double_copy`, `frontier_direct_big_float_copy`,

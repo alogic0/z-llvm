@@ -731,11 +731,15 @@ pub fn appendSysVByvalStackCopyArgs(
     stack_arg_count: *usize,
     copy: sysv_abi.ByvalStackCopy,
 ) !void {
-    const source_reg = paramRegOrNull(function, copy.source_name, .ptr) catch |err| switch (err) {
-        error.UnsupportedCodegenAbi => null,
-        else => return err,
-    };
-    const source_stack_disp = if (source_reg == null)
+    const source_payload_stack_disp = try byvalParamPayloadStackDisp(function, copy.source_name, copy.aggregate_ty);
+    const source_reg = if (source_payload_stack_disp == null)
+        paramRegOrNull(function, copy.source_name, .ptr) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi => null,
+            else => return err,
+        }
+    else
+        null;
+    const source_stack_disp = if (source_payload_stack_disp == null and source_reg == null)
         try scalarParamStackDisp8(function, copy.source_name, .ptr)
     else
         0;
@@ -758,14 +762,107 @@ pub fn appendSysVByvalStackCopyArgs(
             .composite
         else
             return error.UnsupportedSretByvalAbi;
-        if (source_reg == null and offset > std.math.maxInt(u8)) return error.UnsupportedSretByvalAbi;
         if (chunk != .qword and offset > std.math.maxInt(u8)) return error.UnsupportedSretByvalAbi;
-        stack_args[stack_arg_count.*] = if (source_reg) |reg|
+        stack_args[stack_arg_count.*] = if (source_payload_stack_disp) |base_disp|
+            .{ .byval_stack_payload_disp = .{ .base_disp = base_disp, .offset = @intCast(offset), .chunk = chunk, .len = @intCast(@min(remaining, 8)) } }
+        else if (source_reg) |reg|
             .{ .byval_ptr_disp = .{ .reg = reg, .offset = @intCast(offset), .chunk = chunk, .len = @intCast(@min(remaining, 8)) } }
         else
             .{ .byval_stack_ptr_disp = .{ .stack_disp = source_stack_disp, .offset = @intCast(offset), .chunk = chunk, .len = @intCast(@min(remaining, 8)) } };
         stack_arg_count.* += 1;
     }
+}
+
+fn byvalParamPayloadStackDisp(function: ir.Function, source_name: []const u8, aggregate_ty: ir.Type) !?u32 {
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    var stack_eightbytes: usize = 0;
+    for (function.params.items) |param| {
+        const param_byval_ty = paramByvalAggregateType(param.attrs);
+        if (std.mem.eql(u8, param.name, source_name)) {
+            const byval_ty = param_byval_ty orelse return null;
+            if (!byval_ty.eql(aggregate_ty) or param.ty != .ptr) return error.UnsupportedSretByvalAbi;
+            const offset = 8 + stack_eightbytes * 8;
+            if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+            return @intCast(offset);
+        }
+        if (param_byval_ty) |byval_ty| {
+            const classification = try sysv_abi.classifyAggregate(byval_ty);
+            const eightbytes = sysv_abi.aggregateStackEightbytes(classification);
+            if (eightbytes == 0) return error.UnsupportedSretByvalAbi;
+            stack_eightbytes += eightbytes;
+        } else {
+            try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
+        }
+    }
+    return null;
+}
+
+fn paramByvalAggregateType(attrs: ?[]const u8) ?ir.Type {
+    return aggregateAbiAttrType(attrs, "byval");
+}
+
+fn aggregateAbiAttrType(attrs: ?[]const u8, name: []const u8) ?ir.Type {
+    const text = attrs orelse return null;
+    var start: usize = 0;
+    while (std.mem.indexOfPos(u8, text, start, name)) |name_index| {
+        const open_index = name_index + name.len;
+        start = open_index;
+        if (open_index >= text.len or text[open_index] != '(') continue;
+        const close_index = findMatchingParen(text, open_index) orelse return null;
+        const payload = std.mem.trim(u8, text[open_index + 1 .. close_index], " \t");
+        if (payload.len >= 2 and ((payload[0] == '{' and payload[payload.len - 1] == '}') or
+            (payload[0] == '[' and payload[payload.len - 1] == ']') or
+            (payload[0] == '%' and payload.len > 1)))
+        {
+            return .{ .aggregate = payload };
+        }
+        start = close_index + 1;
+    }
+    return null;
+}
+
+fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
+    if (open_index >= text.len or text[open_index] != '(') return null;
+    var paren_depth: usize = 0;
+    var brace_depth: usize = 0;
+    var bracket_depth: usize = 0;
+    var angle_depth: usize = 0;
+    var index = open_index;
+    while (index < text.len) : (index += 1) {
+        switch (text[index]) {
+            '(' => {
+                if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0) paren_depth += 1;
+            },
+            ')' => {
+                if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0) {
+                    if (paren_depth == 0) return null;
+                    paren_depth -= 1;
+                    if (paren_depth == 0) return index;
+                }
+            },
+            '{' => {
+                if (bracket_depth == 0 and angle_depth == 0) brace_depth += 1;
+            },
+            '}' => {
+                if (bracket_depth == 0 and angle_depth == 0 and brace_depth != 0) brace_depth -= 1;
+            },
+            '[' => {
+                if (brace_depth == 0 and angle_depth == 0) bracket_depth += 1;
+            },
+            ']' => {
+                if (brace_depth == 0 and angle_depth == 0 and bracket_depth != 0) bracket_depth -= 1;
+            },
+            '<' => {
+                if (brace_depth == 0 and bracket_depth == 0) angle_depth += 1;
+            },
+            '>' => {
+                if (brace_depth == 0 and bracket_depth == 0 and angle_depth != 0) angle_depth -= 1;
+            },
+            else => {},
+        }
+    }
+    return null;
 }
 
 pub fn appendSysVMemoryAggregateStackPassThroughArgs(
@@ -850,7 +947,13 @@ pub const StackScalarCallArg = union(enum) {
     },
     byval_stack_ptr_disp: struct {
         stack_disp: u32,
-        offset: u8,
+        offset: u32,
+        chunk: ByvalCopyChunk,
+        len: u8,
+    },
+    byval_stack_payload_disp: struct {
+        base_disp: u32,
+        offset: u32,
         chunk: ByvalCopyChunk,
         len: u8,
     },
@@ -921,17 +1024,68 @@ pub fn appendStackScalarCallArg(
                 return error.UnsupportedCodegenAbi;
             }
             switch (source.chunk) {
-                .qword => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = source.offset }),
-                .dword => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_eax = source.offset }),
-                .word => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_u16_eax = source.offset }),
-                .byte => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_u8_eax = source.offset }),
+                .qword => {
+                    if (source.offset <= std.math.maxInt(u8)) {
+                        try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = @intCast(source.offset) });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .load_rax_ptr_disp32_rax = source.offset });
+                    }
+                },
+                .dword => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_eax = @intCast(source.offset) }),
+                .word => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_u16_eax = @intCast(source.offset) }),
+                .byte => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_u8_eax = @intCast(source.offset) }),
                 .composite => {
+                    if (source.offset > std.math.maxInt(u8)) return error.UnsupportedSretByvalAbi;
                     if (adjusted > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
                     try machine.instructions.append(allocator, .{ .push_byval_tail_stack_ptr = .{
                         .stack_disp = @intCast(adjusted),
-                        .offset = source.offset,
+                        .offset = @intCast(source.offset),
                         .len = source.len,
                     } });
+                    return;
+                },
+            }
+            try machine.instructions.append(allocator, .push_rax);
+        },
+        .byval_stack_payload_disp => |source| {
+            const adjusted = @as(usize, source.base_disp) + @as(usize, source.offset) + reserved_stack_bytes;
+            if (adjusted > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+            switch (source.chunk) {
+                .qword => {
+                    if (adjusted <= std.math.maxInt(i8)) {
+                        try machine.instructions.append(allocator, .{ .push_stack_disp8 = @intCast(adjusted) });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .push_stack_disp32 = @intCast(adjusted) });
+                    }
+                    return;
+                },
+                .dword => {
+                    if (adjusted <= std.math.maxInt(i8)) {
+                        try machine.instructions.append(allocator, .{ .load_stack_disp8_eax = @intCast(adjusted) });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .load_stack_disp32_eax = @intCast(adjusted) });
+                    }
+                },
+                .word => {
+                    if (adjusted <= std.math.maxInt(i8)) {
+                        try machine.instructions.append(allocator, .{ .load_stack_disp8_u16_eax = @intCast(adjusted) });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .load_stack_disp32_u16_eax = @intCast(adjusted) });
+                    }
+                },
+                .byte => {
+                    if (adjusted <= std.math.maxInt(i8)) {
+                        try machine.instructions.append(allocator, .{ .load_stack_disp8_u8_eax = @intCast(adjusted) });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .load_stack_disp32_u8_eax = @intCast(adjusted) });
+                    }
+                },
+                .composite => {
+                    if (adjusted <= std.math.maxInt(i8)) {
+                        try machine.instructions.append(allocator, .{ .push_stack_disp8 = @intCast(adjusted) });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .push_stack_disp32 = @intCast(adjusted) });
+                    }
                     return;
                 },
             }

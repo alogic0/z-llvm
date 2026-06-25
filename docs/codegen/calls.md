@@ -314,11 +314,14 @@ payloads through the current 40-stack-argument limit. Source-owned frontier
 rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`,
 `[9 x i16]`, and flat 32-/40-eightbyte MEMORY byval-to-sret copies through
 direct and function-pointer calls; the 40-eightbyte rows prove disp32
-source-pointer reloads once payload offsets exceed the byte displacement range.
+source-pointer reloads once payload offsets exceed the byte displacement range,
+and the stack-sourced Big40 rows prove incoming `byval` payload parameters are
+copied directly from caller stack payload slots rather than treated as pointers.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
 spill/reload frame now covers the same indirect byval call shape for both
-GPR-sourced and incoming-stack-sourced byval payload pointers.
+GPR-sourced and stack-slot-sourced byval payload pointers, plus incoming
+stack-payload byval parameters.
 Unsupported layouts, alignments, packed payloads, X87, and vector leaves remain
 targeted boundaries.
 The frontier additionally lowers the selected

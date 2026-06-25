@@ -2000,6 +2000,28 @@ pub fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *Ma
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (block.instructions.items.len == 1) {
+        const instruction = block.instructions.items[0];
+        if (instruction.removed) return false;
+        switch (instruction.kind) {
+            .store => |store| {
+                if (!genericCfgSupportsSingleBlockStore(function, block, store)) return false;
+                try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
+                try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
+                try appendGenericCfgReturn(allocator, machine);
+                machine.codegen_path = .generic_cfg;
+                return true;
+            },
+            .call => |call| {
+                if (instruction.result != null or call.ret_ty != .void) return false;
+                try emitGenericCfgVoidCall(allocator, machine, function, block, 0, call);
+                try appendGenericCfgReturn(allocator, machine);
+                machine.codegen_path = .generic_cfg;
+                return true;
+            },
+            else => return false,
+        }
+    }
     if (block.instructions.items.len == 0) {
         try appendGenericCfgReturn(allocator, machine);
         machine.codegen_path = .generic_cfg;

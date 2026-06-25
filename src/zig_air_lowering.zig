@@ -1108,6 +1108,9 @@ fn lowerTypedV2SretIntegerAggregateAbi(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
+    if (typedV2SretIntegerAggregateCallWrapperRecords(function_type, structured_air_v2)) {
+        return try lowerSretIntegerAggregateCallWrapper(allocator, module, air_function, function_type, structured_air_v2);
+    }
     if (typedV2SretIntegerAggregateCopyRecords(function_type, structured_air_v2)) {
         return try lowerSretIntegerAggregateCopy(allocator, module, air_function, function_type.return_type.ir_type);
     }
@@ -1136,6 +1139,17 @@ fn typedV2SretIntegerAggregateCopyRecords(
     if (!function_type.params[0].ir_type.eql(function_type.return_type.ir_type)) return false;
     return typedOpcodeCount(structured_air_v2, "arg") == 1 and
         typedHasReturnOpcode(structured_air_v2);
+}
+
+fn typedV2SretIntegerAggregateCallWrapperRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    const leaf_count = supportedAggregateCopyLeafCount(function_type.return_type.ir_type) orelse return false;
+    if (leaf_count < 3 or function_type.params.len < 2) return false;
+    if (!function_type.params[function_type.params.len - 1].ir_type.eql(function_type.return_type.ir_type)) return false;
+    if (typedOpcodeCount(structured_air_v2, "call") != 1 or !typedHasReturnOpcode(structured_air_v2)) return false;
+    return true;
 }
 
 fn supportedScalarAggregateLeafParamCount(ty: ir.Type, params: []const ZigType) ?usize {
@@ -1322,6 +1336,65 @@ fn lowerSretIntegerAggregateCopy(
             } },
         });
     }
+    block.terminator = .{ .ret = .{ .ty = .void } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerSretIntegerAggregateCallWrapper(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !ir.Function {
+    const aggregate_ty = function_type.return_type.ir_type;
+    const call_instruction = typedSingleInstructionByOpcode(structured_air_v2, "call") orelse return error.UnsupportedAir;
+    const callee_text = typedDetail(call_instruction, "callee_text") orelse return error.UnsupportedAir;
+    const parsed_callee = typedCallee(callee_text);
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+    errdefer function.deinit(allocator);
+    function.linkage = .default;
+    function.calling_conv = null;
+    try function.params.append(allocator, .{ .ty = .ptr, .attrs = try sretAttrsForAggregate(module, aggregate_ty), .name = "sret" });
+    for (function_type.params, 0..) |param, param_index| {
+        const name = try ownPrint(module, "arg{}", .{param_index});
+        if (param_index == function_type.params.len - 1) {
+            try function.params.append(allocator, .{ .ty = .ptr, .attrs = try byvalAttrsForAggregate(module, aggregate_ty), .name = name });
+        } else {
+            try function.params.append(allocator, .{ .ty = param.ir_type, .name = name });
+        }
+    }
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    var call: ir.CallInst = .{
+        .ret_ty = .void,
+        .callee = "",
+        .calling_conv = null,
+        .args = .empty,
+    };
+    errdefer call.deinit(allocator);
+    if (parsed_callee) |direct| {
+        if (direct.external) return error.UnsupportedAir;
+        const dot = std.mem.lastIndexOfScalar(u8, air_function.name, '.') orelse return error.UnsupportedAir;
+        call.callee = try ownPrint(module, "{s}.{s}", .{ air_function.name[0..dot], direct.name });
+    } else {
+        call.callee_value = .{ .named = "arg0" };
+    }
+    try call.args.append(allocator, .{
+        .ty = .ptr,
+        .value = .{ .named = "sret" },
+        .attrs = try sretAttrsForAggregate(module, aggregate_ty),
+    });
+    const byval_arg_name = function.params.items[function.params.items.len - 1].name;
+    try call.args.append(allocator, .{
+        .ty = .ptr,
+        .value = .{ .named = byval_arg_name },
+        .attrs = try byvalAttrsForAggregate(module, aggregate_ty),
+    });
+    try block.instructions.append(allocator, .{ .result = null, .kind = .{ .call = call } });
     block.terminator = .{ .ret = .{ .ty = .void } };
     try function.blocks.append(allocator, block);
     return function;
@@ -5710,6 +5783,16 @@ fn typedInstructionByIndex(structured_air_v2: air_export.StructuredAirV2, index:
         if (instruction.index == index) return instruction;
     }
     return null;
+}
+
+fn typedSingleInstructionByOpcode(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) ?air_export.TypedInstruction {
+    var found: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
+        if (found != null) return null;
+        found = instruction;
+    }
+    return found;
 }
 
 fn typedDetail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {

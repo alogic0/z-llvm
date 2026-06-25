@@ -376,15 +376,15 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=428`,
-`generic_codegen_functions=428`, `generic_cfg_functions=428`,
+frontier gate reports `source_rows=13`, `discovered_functions=430`,
+`generic_codegen_functions=430`, `generic_cfg_functions=430`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=428`, `object_failures=0`,
+`object_emitted_functions=430`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
-`elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
+`elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
 `local_fail=0`; native-link and executable gates are also green at
 `native_link_accepted_rows=13`, `executable_ok_rows=13`,
@@ -424,7 +424,11 @@ MEMORY aggregate copy proof through dedicated `movss` stack loads, while
 byval-to-sret copy. `BigArrayMixed` combines array-contained `i32`, array-contained
 `f64`, and pointer leaves. `BigNarrow` proves nested `i8`/`i16`/`i32`/`i64`
 supported-leaf copies use width-correct byte/word stack loads and hidden-sret
-stores through the same layout-derived path. Direct and indirect MEMORY
+stores through the same layout-derived path. `Big32` and `Big40` extend the
+same direct and pointer-callee byval-to-sret copy path through exact-qword
+payloads beyond byte-offset byval loads, including disp32 source-pointer
+reloads and stack-sourced `Big40` payload copies from the caller stack argument
+area. Direct and indirect MEMORY
 aggregate calls are now proven for Big3, Big4, Big5, BigDouble,
 BigDoubleArray, BigArrayMixed, BigFloat, BigPtrDouble, BigNested, BigMixed,
 BigNarrow, and BigArray by preserving the hidden sret pointer, forwarding pointer callees
