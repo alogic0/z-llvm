@@ -1112,6 +1112,91 @@ export fn frontier_deep_stack_ptr_return(
     return a39;
 }
 
+export fn frontier_deep_stack_ptr_live_after_call(
+    a0: *i32,
+    a1: *i32,
+    a2: *i32,
+    a3: *i32,
+    a4: *i32,
+    a5: *i32,
+    a6: *i32,
+    a7: *i32,
+    a8: *i32,
+    a9: *i32,
+    a10: *i32,
+    a11: *i32,
+    a12: *i32,
+    a13: *i32,
+    a14: *i32,
+    a15: *i32,
+    a16: *i32,
+    a17: *i32,
+    a18: *i32,
+    a19: *i32,
+    a20: *i32,
+    a21: *i32,
+    a22: *i32,
+    a23: *i32,
+    a24: *i32,
+    a25: *i32,
+    a26: *i32,
+    a27: *i32,
+    a28: *i32,
+    a29: *i32,
+    a30: *i32,
+    a31: *i32,
+    a32: *i32,
+    a33: *i32,
+    a34: *i32,
+    a35: *i32,
+    a36: *i32,
+    a37: *i32,
+    a38: *i32,
+    a39: *i32,
+) *i32 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    _ = a8;
+    _ = a9;
+    _ = a10;
+    _ = a11;
+    _ = a12;
+    _ = a13;
+    _ = a14;
+    _ = a15;
+    _ = a16;
+    _ = a17;
+    _ = a18;
+    _ = a19;
+    _ = a20;
+    _ = a21;
+    _ = a22;
+    _ = a23;
+    _ = a24;
+    _ = a25;
+    _ = a26;
+    _ = a27;
+    _ = a28;
+    _ = a29;
+    _ = a30;
+    _ = a31;
+    _ = a32;
+    _ = a33;
+    _ = a34;
+    _ = a35;
+    _ = a36;
+    _ = a37;
+    _ = a38;
+    frontier_touch_none();
+    return a39;
+}
+
 export fn frontier_deep_stack_i64_live_after_call(
     a0: i64,
     a1: i64,

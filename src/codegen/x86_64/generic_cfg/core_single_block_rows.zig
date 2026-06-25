@@ -774,7 +774,7 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         machine.codegen_path = .generic_cfg;
         return true;
     }
-    if (try lowerGenericCfgI64VoidCallStackParamReturn(allocator, machine, function, block, ret)) {
+    if (try lowerGenericCfgGprVoidCallStackParamReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -809,19 +809,19 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
     return false;
 }
 
-fn lowerGenericCfgI64VoidCallStackParamReturn(
+fn lowerGenericCfgGprVoidCallStackParamReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 1) return false;
+    if ((!ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.ptr)) or block.instructions.items.len != 1) return false;
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    const stack_disp = scalarParamStackDisp8(function, ret_name, .{ .int = 64 }) catch |err| switch (err) {
+    const stack_disp = scalarParamStackDisp8(function, ret_name, ret.ty) catch |err| switch (err) {
         error.UnsupportedCodegenAbi, error.UnsupportedCodegenValue => return false,
         else => return err,
     };
@@ -1344,6 +1344,10 @@ pub fn lowerGenericCfgSingleBlockPtr(allocator: std.mem.Allocator, machine: *Mac
         else => return false,
     };
     if (try lowerGenericCfgGprParamReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgGprVoidCallStackParamReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
