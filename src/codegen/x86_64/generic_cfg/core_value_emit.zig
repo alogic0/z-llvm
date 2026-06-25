@@ -255,8 +255,14 @@ pub fn emitGenericCfgI32CallIntoEax(
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             };
             const callee_reg = try paramReg(function, callee_name, .ptr);
-            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
-            const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+            const stack_arg_count = if (callHasByvalArgAttrs(call)) count: {
+                const count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+                break :count count;
+            } else count: {
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+                break :count try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+            };
             try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
             return;
         }
@@ -295,8 +301,14 @@ pub fn emitGenericCfgVoidCall(
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             };
             const callee_reg = try paramReg(function, callee_name, .ptr);
-            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
-            const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+            const stack_arg_count = if (callHasByvalArgAttrs(call)) count: {
+                const count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+                break :count count;
+            } else count: {
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+                break :count try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+            };
             try appendIndirectCallRaxWithStackArgs(allocator, machine, .void, stack_arg_count);
             return;
         }
@@ -314,4 +326,13 @@ pub fn emitGenericCfgVoidCall(
     } else {
         try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
     }
+}
+
+fn callHasByvalArgAttrs(call: ir.CallInst) bool {
+    for (call.args.items) |arg| {
+        if (arg.attrs) |attrs| {
+            if (std.mem.indexOf(u8, attrs, "byval") != null) return true;
+        }
+    }
+    return false;
 }

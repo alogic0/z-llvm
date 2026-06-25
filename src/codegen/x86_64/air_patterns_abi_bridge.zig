@@ -1781,10 +1781,19 @@ fn lowerRegisterAggregateDirectCallReturn(
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         };
         const callee_reg = try paramReg(function, callee_name, .ptr);
-        try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
-        const stack_arg_count = appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
-            error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
-            else => if (sysv_abi.isBoundaryError(err)) return false else return err,
+        const stack_arg_count = if (callHasByvalArgAttrs(call)) count: {
+            const count = appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
+                error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
+                else => if (sysv_abi.isBoundaryError(err)) return false else return err,
+            };
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+            break :count count;
+        } else count: {
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+            break :count appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
+                error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
+                else => if (sysv_abi.isBoundaryError(err)) return false else return err,
+            };
         };
         try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
         try machine.instructions.append(allocator, .ret);
@@ -2101,4 +2110,11 @@ fn lowerMakePairReturn(
     try machine.instructions.append(allocator, .or_rdx_rax);
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn callHasByvalArgAttrs(call: ir.CallInst) bool {
+    for (call.args.items) |arg| {
+        if (callArgAttrsContain(arg, "byval")) return true;
+    }
+    return false;
 }

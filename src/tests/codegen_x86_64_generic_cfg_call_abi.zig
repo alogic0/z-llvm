@@ -1994,9 +1994,43 @@ test "x86_64 codegen accepts supported byval stack-copy call ABI subset" {
     try std.testing.expectEqual(@as(usize, 1), indirect_byval_counts.stack_args);
     var indirect_byval_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, indirect_byval_module.target_triple.?, indirect_byval_module.functions.items[0]);
     defer indirect_byval_machine.deinit(std.testing.allocator);
-    try expectMachineInstruction(indirect_byval_machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rsi, .offset = 0 } });
-    try expectMachineInstruction(indirect_byval_machine.instructions.items, .push_rax);
-    try expectMachineInstruction(indirect_byval_machine.instructions.items, .{ .indirect_call_rax = .{ .int = 32 } });
+    var payload_load_index: ?usize = null;
+    var final_target_setup_index: ?usize = null;
+    var indirect_call_index: ?usize = null;
+    for (indirect_byval_machine.instructions.items, 0..) |instruction, index| {
+        switch (instruction) {
+            .load_arg_ptr_disp8_rax => |load| {
+                if (load.reg == .rsi and load.offset == 0) payload_load_index = index;
+            },
+            .mov_arg_rax => |reg| {
+                if (reg == .rdi) final_target_setup_index = index;
+            },
+            .indirect_call_rax => |ret_ty| {
+                if (ret_ty.eql(.{ .int = 32 })) indirect_call_index = index;
+            },
+            else => {},
+        }
+    }
+    try std.testing.expect((payload_load_index orelse return error.TestExpectedEqual) < (final_target_setup_index orelse return error.TestExpectedEqual));
+    try std.testing.expect((final_target_setup_index orelse return error.TestExpectedEqual) < (indirect_call_index orelse return error.TestExpectedEqual));
+
+    const indirect_byval_live_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, ptr %arg, i32 %keep) {
+        \\entry:
+        \\  call void %fn(ptr byval({ i32, i32 }) %arg)
+        \\  ret i32 %keep
+        \\}
+        \\
+    ;
+    var indirect_byval_live_module = try ir.Module.parse(std.testing.allocator, indirect_byval_live_input);
+    defer indirect_byval_live_module.deinit();
+    try indirect_byval_live_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedLiveAcrossCall,
+        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_byval_live_module.target_triple.?, indirect_byval_live_module.functions.items[0]),
+    );
 }
 
 test "x86_64 codegen accepts two-eightbyte byval stack-copy calls" {

@@ -119,10 +119,17 @@ pub fn lowerCall(
         const callee_reg = try paramReg(function, callee_name, .ptr);
         const live_params = try liveParamsAfter(function, block, instruction_index);
         if (live_params.count == 0) {
-            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
-            const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+            const stack_arg_count = if (callHasByvalArgAttrs(call)) count: {
+                const count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+                break :count count;
+            } else count: {
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+                break :count try appendSysVScalarCallArgs(allocator, machine, function, call);
+            };
             try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
         } else {
+            if (callHasByvalArgAttrs(call)) return error.UnsupportedLiveAcrossCall;
             try appendAlignedCallPreservingI32Params(
                 allocator,
                 machine,
@@ -183,6 +190,15 @@ pub fn lowerCall(
 fn callHasArgAttrs(call: ir.CallInst) bool {
     for (call.args.items) |arg| {
         if (arg.attrs != null) return true;
+    }
+    return false;
+}
+
+fn callHasByvalArgAttrs(call: ir.CallInst) bool {
+    for (call.args.items) |arg| {
+        if (arg.attrs) |attrs| {
+            if (std.mem.indexOf(u8, attrs, "byval") != null) return true;
+        }
     }
     return false;
 }

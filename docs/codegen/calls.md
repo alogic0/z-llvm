@@ -290,7 +290,9 @@ pointer to outgoing stack eightbytes for direct and function-pointer calls.
 The source pointer may itself arrive in a register or an incoming stack slot, with
 unit proof for one-, two-, array-backed three-, and nested three-eightbyte
 payloads, plus max-sized exact-eightbyte payloads through the current
-24-stack-argument limit.
+24-stack-argument limit. Function-pointer byval calls reload the callee into
+`%rax` after byval payload loads before `callq *%rax`; live values across
+indirect byval calls remain a targeted `UnsupportedLiveAcrossCall` boundary.
 Unsupported layouts and non-eightbyte tail copies remain targeted boundaries.
 The frontier additionally lowers the selected
 source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by-value

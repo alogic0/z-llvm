@@ -555,6 +555,15 @@ pub fn planSysVCall(allocator: std.mem.Allocator, function: ir.Function, call: i
     return try sysv_abi.planCall(allocator, function, call);
 }
 
+fn callHasByvalArgAttrs(call: ir.CallInst) bool {
+    for (call.args.items) |arg| {
+        if (arg.attrs) |attrs| {
+            if (std.mem.indexOf(u8, attrs, "byval") != null) return true;
+        }
+    }
+    return false;
+}
+
 pub fn appendSysVRegisterAggregatePassThroughArg(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -1802,8 +1811,14 @@ pub fn lowerGenericCfgGprDirectCallReturn(
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         };
         const callee_reg = try paramReg(function, callee_name, .ptr);
-        try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
-        const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+        const stack_arg_count = if (callHasByvalArgAttrs(call)) count: {
+            const count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+            break :count count;
+        } else count: {
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+            break :count try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+        };
         try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
     } else {
         const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
