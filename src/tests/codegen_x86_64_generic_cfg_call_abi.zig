@@ -1910,6 +1910,34 @@ test "x86_64 codegen preserves live value across sret stack-arg call" {
     try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot0 } });
 }
 
+test "x86_64 codegen preserves live value across indirect sret stack-arg call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, ptr %out, i32 %keep, i32 %a0, i32 %a1, i32 %a2, i32 %a3, i32 %a4, i32 %a5) {
+        \\entry:
+        \\  call void %fn(ptr sret({ i64, i64, i64 }) %out, i32 %a0, i32 %a1, i32 %a2, i32 %a3, i32 %a4, i32 %a5)
+        \\  ret i32 %keep
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(call.callee_value != null);
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call);
+    try std.testing.expectEqual(@as(usize, 6), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), counts.stack_args);
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rdx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .indirect_call_rax = .void });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 16 });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot0 } });
+}
+
 test "x86_64 codegen accepts supported byval stack-copy call ABI subset" {
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"

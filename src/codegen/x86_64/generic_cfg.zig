@@ -3,6 +3,7 @@ const cabi = @import("generic_cfg/cabi.zig");
 
 pub const appendAlignedDirectCallPreservingI32Param = impl.appendAlignedDirectCallPreservingI32Param;
 pub const appendAlignedDirectCallPreservingI32Params = impl.appendAlignedDirectCallPreservingI32Params;
+pub const appendAlignedCallPreservingI32Params = cabi.appendAlignedCallPreservingI32Params;
 pub const appendI32CallArgs = impl.appendI32CallArgs;
 pub const appendSysVMemoryAggregateStackPassThroughArgs = impl.appendSysVMemoryAggregateStackPassThroughArgs;
 pub const appendSysVScalarCallArgs = impl.appendSysVScalarCallArgs;

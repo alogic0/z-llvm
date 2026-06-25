@@ -25,6 +25,7 @@ const callIsFastcc = x86_64_match.callIsFastcc;
 
 const appendAlignedDirectCallPreservingI32Param = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Param;
 const appendAlignedDirectCallPreservingI32Params = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Params;
+const appendAlignedCallPreservingI32Params = x86_64_generic_cfg.appendAlignedCallPreservingI32Params;
 const appendDirectCallWithStackArgs = x86_64_emit.appendDirectCallWithStackArgs;
 const appendIndirectCallRaxWithStackArgs = x86_64_emit.appendIndirectCallRaxWithStackArgs;
 const appendSysVScalarCallArgs = x86_64_generic_cfg.appendSysVScalarCallArgs;
@@ -116,9 +117,21 @@ pub fn lowerCall(
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         };
         const callee_reg = try paramReg(function, callee_name, .ptr);
-        try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
-        const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
-        try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
+        const live_params = try liveParamsAfter(function, block, instruction_index);
+        if (live_params.count == 0) {
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = callee_reg });
+            const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+            try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
+        } else {
+            try appendAlignedCallPreservingI32Params(
+                allocator,
+                machine,
+                function,
+                call,
+                live_params,
+                .{ .indirect_from_reg = callee_reg },
+            );
+        }
 
         if (call.ret_ty == .void and result != null) return error.VoidCallHasResult;
         if (call.ret_ty != .void and result == null) return error.InstructionNeedsResult;

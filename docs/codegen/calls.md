@@ -281,8 +281,9 @@ assigned as hidden result pointers through the same GPR call planner path as
 ordinary pointer arguments, including shifted user arguments that overflow into
 outgoing stack slots for direct and function-pointer calls, while `byval(...)` remains a targeted boundary
 outside the selected source-backed forms. A selected direct sret-pointer call
-also preserves one live `i32` GPR through the existing spill/reload frame when
-the call does or does not need outgoing stack arguments. Explicit
+also preserves one live `i32` GPR through the existing spill/reload frame for
+direct and function-pointer calls, whether or not the call needs outgoing stack
+arguments. Explicit
 `ptr byval(aggregate)` call arguments now have a first
 planner-owned subset: supported aggregate payloads are copied from the source
 pointer to outgoing stack eightbytes for direct and function-pointer calls.
