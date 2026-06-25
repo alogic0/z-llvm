@@ -269,6 +269,8 @@ const BigByteTail7CopyFn = *const fn (BigByteTail7) callconv(.c) BigByteTail7;
 const BigWordTailCopyFn = *const fn (BigWordTail) callconv(.c) BigWordTail;
 const Big32CopyFn = *const fn (Big32) callconv(.c) Big32;
 const Big40CopyFn = *const fn (Big40) callconv(.c) Big40;
+const ScalarMixedCopyFn = *const fn (ScalarMixed) callconv(.c) ScalarMixed;
+const ScalarNestedCopyFn = *const fn (ScalarNested) callconv(.c) ScalarNested;
 const ScalarArrayCopyFn = *const fn (ScalarArray) callconv(.c) ScalarArray;
 
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
@@ -631,8 +633,32 @@ export fn frontier_scalar_mixed_make(a: u8, b: u16, c: i32, d: i64, ptr: *const 
     return .{ .a = a, .b = b, .c = c, .d = d, .ptr = ptr, .f = f, .g = g };
 }
 
+export fn frontier_scalar_mixed_copy(value: ScalarMixed) ScalarMixed {
+    return value;
+}
+
+export fn frontier_direct_scalar_mixed_copy(value: ScalarMixed) ScalarMixed {
+    return frontier_scalar_mixed_copy(value);
+}
+
+export fn frontier_indirect_scalar_mixed_copy(func: ScalarMixedCopyFn, value: ScalarMixed) ScalarMixed {
+    return func(value);
+}
+
 export fn frontier_scalar_nested_make(a: u8, b: u16, c: i32, d: f64, ptr: *const i64) ScalarNested {
     return .{ .inner = .{ .a = a, .b = b }, .c = c, .d = d, .ptr = ptr };
+}
+
+export fn frontier_scalar_nested_copy(value: ScalarNested) ScalarNested {
+    return value;
+}
+
+export fn frontier_direct_scalar_nested_copy(value: ScalarNested) ScalarNested {
+    return frontier_scalar_nested_copy(value);
+}
+
+export fn frontier_indirect_scalar_nested_copy(func: ScalarNestedCopyFn, value: ScalarNested) ScalarNested {
+    return func(value);
 }
 
 export fn frontier_scalar_array_make(a: i32, b: i32, c: i32, d: f64, e: f64, ptr: *const i64) ScalarArray {

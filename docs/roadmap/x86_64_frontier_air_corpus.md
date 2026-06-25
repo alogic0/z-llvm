@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=449
-structured_functions=449
-generic_codegen_functions=449
-generic_cfg_functions=449
+discovered_functions=455
+structured_functions=455
+generic_codegen_functions=455
+generic_cfg_functions=455
 structural_matcher_functions=0
-structured_air_v2_functions=449
-typed_air_operand_functions=449
+structured_air_v2_functions=455
+typed_air_operand_functions=455
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=449
+generic_lowering_functions=455
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=449
+object_emitted_functions=455
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -170,10 +170,11 @@ Closed in the current memory/aggregate frontier slice:
   proves recursive supported-leaf scalar-parameter hidden-sret construction
   through layout-derived byte-offset stores, and `ScalarArray` proves the same
   scalar-param construction path for array-backed `i32`/`f64` leaves; the
-  `ScalarArray` follow-up now also proves direct and pointer-callee
-  byval-to-sret copies for mixed array-contained integer leaves, array-contained
-  double leaves, and a pointer leaf through the same layout-derived MEMORY copy
-  path; the
+  `ScalarMixed`/`ScalarNested`/`ScalarArray` follow-up now also proves direct
+  and pointer-callee byval-to-sret copies for top-level supported leaves,
+  nested supported leaves, mixed array-contained integer leaves,
+  array-contained double leaves, and pointer leaves through the same
+  layout-derived MEMORY copy path; the
   `BigDouble` row
   adds the first double-leaf MEMORY byval-to-sret copy proof through XMM
   `movsd` stack loads and hidden-sret stores, the `BigPtrDouble` row proves the
@@ -755,7 +756,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   array-backed `{ [5 x i64] }` copy/read rows,
   a `double`-leaf copy, a mixed pointer/`double`/`i64` copy, and the
   `ScalarMixed`/`ScalarNested`/`ScalarArray` direct scalar-param sret make
-  rows plus direct and pointer-callee `ScalarArray` byval-to-sret copy rows;
+  rows plus direct and pointer-callee `ScalarMixed`/`ScalarNested`/`ScalarArray`
+  byval-to-sret copy rows;
   explicit `ptr byval(...)` calls now include single-`i8`, single-`i16`,
   single-`i32`, and `[3 x i32]` tail stack-copy proof, while source-owned
   MEMORY byval-to-sret rows now include `[17 x i8]`, `[21 x i8]`,

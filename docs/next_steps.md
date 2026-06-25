@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=449`,
-`generic_codegen_functions=449`, `generic_cfg_functions=449`,
+frontier gate reports `source_rows=13`, `discovered_functions=455`,
+`generic_codegen_functions=455`, `generic_cfg_functions=455`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=449`, `object_failures=0`,
+`object_emitted_functions=455`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,9 +483,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=449`,
-`generic_cfg_functions=449`, `structural_matcher_functions=0`,
-`object_emitted_functions=449`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=455`,
+`generic_cfg_functions=455`, `structural_matcher_functions=0`,
+`object_emitted_functions=455`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -550,12 +550,14 @@ reloads and stack-sourced `Big40` payload copies from the caller stack argument
 area. `ScalarArray` now also proves the same direct and pointer-callee
 byval-to-sret copy path for mixed array-contained integer leaves,
 array-contained `double` leaves, and a pointer leaf through layout-derived
-MEMORY offsets. Direct and indirect MEMORY
+MEMORY offsets; `ScalarMixed` and `ScalarNested` extend that direct and
+pointer-callee copy proof to top-level and recursively nested supported scalar
+leaves. Direct and indirect MEMORY
 aggregate calls are now proven for Big3, Big4, Big5, BigDouble,
 BigDoubleArray, BigArrayMixed, BigFloat, BigPtrDouble, BigNested, BigMixed,
-BigNarrow, BigArray, and ScalarArray by preserving the hidden sret pointer,
-forwarding pointer callees through `%rax`, and copying incoming by-value stack
-slots to outgoing stack slots before the call.
+BigNarrow, BigArray, ScalarMixed, ScalarNested, and ScalarArray by preserving
+the hidden sret pointer, forwarding pointer callees through `%rax`, and copying
+incoming by-value stack slots to outgoing stack slots before the call.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads
 incoming stack-passed `i32` parameters into outgoing GPR call slots, and emits
