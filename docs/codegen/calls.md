@@ -279,8 +279,11 @@ byval(...) and sret(...) are preserved on pointer parameters and verified
 as pointer-only annotations; supported `ptr sret(...)` call arguments are now
 assigned as hidden result pointers through the same GPR call planner path as
 ordinary pointer arguments, including shifted user arguments that overflow into
-outgoing stack slots for direct and function-pointer calls, while `byval(...)` remains a targeted boundary
-outside the selected source-backed forms. A selected direct sret-pointer call
+outgoing stack slots for direct and function-pointer calls. Unsupported
+`byval(...)` payload layouts and non-eightbyte tail copies remain targeted
+boundaries, but explicit supported `ptr byval(aggregate)` call arguments now
+flow through the planner-owned stack-copy path below. A selected direct
+sret-pointer call
 also preserves one live `i32` GPR through the existing spill/reload frame for
 direct and function-pointer calls, whether or not the call needs outgoing stack
 arguments. Explicit
