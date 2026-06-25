@@ -5,9 +5,23 @@ const codegen = @import("codegen.zig");
 const mc = @import("mc.zig");
 
 pub fn main(init: std.process.Init) !void {
+    const options = try parseOptions(init.minimal.args);
+    if (options.all_release_modes) {
+        const modes = [_]Mode{ .ReleaseFast, .ReleaseSafe, .ReleaseSmall };
+        for (modes) |mode| {
+            var mode_options = options;
+            mode_options.mode = mode;
+            mode_options.all_release_modes = false;
+            try runMode(init, mode_options);
+        }
+    } else {
+        try runMode(init, options);
+    }
+}
+
+fn runMode(init: std.process.Init, options: Options) !void {
     const allocator = init.gpa;
     const io = init.io;
-    const options = try parseOptions(init.minimal.args);
     const mode = options.mode;
 
     const debug_dump_ir_source = init.minimal.environ.getAlloc(allocator, "ZLLVM_DEBUG_DUMP_IR_SOURCE") catch |err| switch (err) {
@@ -400,15 +414,13 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    var stdout_buffer: [4096]u8 = undefined;
-    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const air_local_fail: usize = if ((options.corpus == .expanded or options.corpus == .scale or options.corpus == .frontier) and
         (unsupported_functions != 0 or codegen_failures != 0 or typed_v2_fallback_functions != 0 or legacy_air_text_lowering_functions != 0 or shape_recognizer_functions != 0 or
             (options.corpus == .frontier and structural_matcher_functions != 0)))
         1
     else
         0;
-    try stdout_writer.interface.print(
+    std.debug.print(
         "summary uncurated-zig-air mode={s} corpus={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} generic_cfg_functions={} structural_matcher_functions={} structured_air_v1_functions={} structured_air_v2_functions={} typed_air_type_functions={} typed_air_operand_functions={} legacy_air_text_lowering_functions={} typed_v2_fallback_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} first_typed_v2_fallback_function={s} first_typed_v2_fallback_opcode={s} first_typed_v2_fallback_data_kind={s} first_typed_v2_fallback_reason={s} top_typed_v2_fallback_reason={s} top_typed_v2_fallback_count={} local_fail={}\n",
         .{
             mode.name(),
@@ -444,20 +456,20 @@ pub fn main(init: std.process.Init) !void {
         },
     );
     if (options.object_progress) {
-        try stdout_writer.interface.print(
+        std.debug.print(
             "summary uncurated-zig-air-object mode={s} target=x86_64-linux-gnu object_emitted_functions={} object_failures={} llvm_targetmachine_rows=0 local_fail=0\n",
             .{ mode.name(), object_emitted_functions, object_failures },
         );
     }
     if (options.object_inspection) {
-        try stdout_writer.interface.print(
+        std.debug.print(
             "summary uncurated-zig-air-object-inspection mode={s} target=x86_64-linux-gnu inspected={} elf64_rel={} relocation_rows={} tls_rows={} undefined_import_rows={} comdat_rows=0 eh_frame_rows=0 unsupported_relocation_rows=0 local_fail=0\n",
             .{ mode.name(), inspected_objects, inspected_objects, relocation_rows, tls_rows, undefined_import_rows },
         );
     }
     if (options.native_link_progress) {
         const local_fail: usize = if (native_link_failures == 0 and unsupported_zig_linker_feature_rows == 0) 0 else 1;
-        try stdout_writer.interface.print(
+        std.debug.print(
             "summary uncurated-zig-air-native-link mode={s} target=x86_64-linux-gnu native_link_accepted_rows={} executable_ok_rows={} link_only_rows={} runtime_boundary_rows={} unsupported_zig_linker_feature_rows={} native_link_failures={} llvm_targetmachine_rows=0 lld_rows=0 local_fail={}\n",
             .{
                 mode.name(),
@@ -473,7 +485,7 @@ pub fn main(init: std.process.Init) !void {
     }
     if (options.executable_progress) {
         const local_fail: usize = if (native_link_failures == 0 and unsupported_zig_linker_feature_rows == 0) 0 else 1;
-        try stdout_writer.interface.print(
+        std.debug.print(
             "summary uncurated-zig-air-executable mode={s} target=x86_64-linux-gnu native_link_accepted_rows={} executable_ok_rows={} link_only_rows={} runtime_boundary_rows={} unsupported_zig_linker_feature_rows={} native_link_failures={} llvm_targetmachine_rows=0 lld_rows=0 local_fail={}\n",
             .{
                 mode.name(),
@@ -487,7 +499,6 @@ pub fn main(init: std.process.Init) !void {
             },
         );
     }
-    try stdout_writer.interface.flush();
 
     if (air_local_fail != 0) return error.ExpandedCorpusLocalFailure;
     if ((options.native_link_progress or options.executable_progress) and

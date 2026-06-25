@@ -313,19 +313,17 @@ fn addUncuratedAirTripleGate(
     uncurated_air_gate: *std.Build.Step.Compile,
     spec: UncuratedAirGateSpec,
 ) *std.Build.Step {
-    const modes = [_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" };
+    const run_cmd = b.addRunArtifact(uncurated_air_gate);
+    run_cmd.stdio = .inherit;
+    run_cmd.addArg("--all-release-modes");
+    addUncuratedAirArgs(run_cmd, .{
+        .name = spec.name,
+        .description = spec.description,
+        .corpus = spec.corpus,
+        .variant = spec.variant,
+    });
     const step = b.step(spec.name, spec.description);
-    for (modes) |mode| {
-        const run_cmd = b.addRunArtifact(uncurated_air_gate);
-        addUncuratedAirArgs(run_cmd, .{
-            .name = spec.name,
-            .description = spec.description,
-            .mode = mode,
-            .corpus = spec.corpus,
-            .variant = spec.variant,
-        });
-        step.dependOn(&run_cmd.step);
-    }
+    step.dependOn(&run_cmd.step);
     return step;
 }
 

@@ -14,6 +14,7 @@ pub fn rootFunctionCount(module: air_export.Module) usize {
 
 pub const Options = struct {
     mode: Mode = .ReleaseFast,
+    all_release_modes: bool = false,
     corpus: Corpus = .inputs,
     object_progress: bool = false,
     object_inspection: bool = false,
@@ -81,6 +82,8 @@ pub fn parseOptions(args: std.process.Args) !Options {
             options.mode = .ReleaseSafe;
         } else if (std.mem.eql(u8, arg, "--mode=ReleaseSmall")) {
             options.mode = .ReleaseSmall;
+        } else if (std.mem.eql(u8, arg, "--all-release-modes")) {
+            options.all_release_modes = true;
         } else if (std.mem.eql(u8, arg, "--corpus=inputs")) {
             options.corpus = .inputs;
         } else if (std.mem.eql(u8, arg, "--corpus=broad")) {

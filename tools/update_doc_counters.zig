@@ -5,6 +5,7 @@ const usage =
     \\usage: zig run tools/update_doc_counters.zig -- --gate=distribution-air-release-frontier --from-log=<log>
     \\
     \\Updates documented counter snapshots from a saved gate log.
+    \\The frontier gate log must contain complete ReleaseFast, ReleaseSafe, and ReleaseSmall summaries.
     \\Currently supported gates:
     \\  distribution-air-release-frontier
     \\
@@ -100,6 +101,9 @@ const ParsedGate = struct {
         }
         if (complete_modes == 0) {
             try common.validationError(io, "missing frontier gate summaries in log\n", .{});
+        }
+        if (complete_modes != 3) {
+            try common.validationError(io, "incomplete frontier gate log: expected 3 complete release mode summaries, found {}\n", .{complete_modes});
         }
         return result orelse unreachable;
     }
