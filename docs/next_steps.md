@@ -7,6 +7,41 @@ Future checklist items must include upstream LLVM mapping before they can be
 marked complete. See [development_cycle.md](development_cycle.md) and
 [stub_replacement_cycle.md](stub_replacement_cycle.md).
 
+## Structural Debt Status
+
+The release pass pipeline surface is now registry-driven in `src/pipelines.zig`.
+Each registered pass records its upstream path and status:
+`implemented`, `placeholder`, or `conservative`. `addPass` rejects unknown pass
+names, and `zig build release-pipeline-policy` prints machine-readable counts
+for active release pipelines. The accepted Zig ReleaseFast/ReleaseSafe/
+ReleaseSmall pipelines have no placeholders; `release-o3`, `release-oz`, and
+LTO prelink pipelines have explicit fail-closed placeholder budgets. A
+placeholder means "known upstream pass surface, no local algorithm yet," not
+implemented release coverage.
+
+Debug variable-location salvage remains a deliberate boundary. The pass manager
+now scans for `llvm.dbg.value`/variable-location intrinsics once per
+pass-manager run, skips transform passes from the cached result, reports
+`skipped_transform_passes` in the normal summary, and still runs mandatory
+verifier passes. Full salvage is still future work, not an implicit transform
+claim.
+
+The uncurated AIR build topology is generated through one helper over
+`mode/corpus/variant` tuples, while preserving the public build step names for
+discovery, object progress, object inspection, native-link progress,
+executable progress, and strict-finish gates. Use focused row/gate commands and
+`zig build structural-smoke` during iteration; keep `distribution-all` as a
+milestone confirmation gate.
+
+Remaining intentional facade surfaces are now explicit tables instead of
+scattered string comparisons where practical. Structured-direct surfaces that
+must run the local fold pipeline live in
+`src/main_flow_ir_writer.zig` as `structured_direct_fold_pipeline_surfaces`,
+with a reason per surface. DescriptorV2 is no longer a monolithic location for
+all behavior: types, programs, verifier, lowering, canonicalization, and API
+facades live in the split `src/semantic_descriptor_v2_*.zig` files, while
+IR-writer case routing lives under `src/main_flow_ir_writer*.zig`.
+
 ## Active Cycle
 
 Replacement goal:

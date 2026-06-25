@@ -52,7 +52,10 @@ LLVM-compatibility legality study; not a Zig stack model.
 ### Loop optimizer
 
 Current capability:
-LoopInfo, simple LCSSA helper, scalar LICM, and loop placeholders.
+LoopInfo, simple LCSSA helper, scalar LICM, and explicitly budgeted loop/pass
+placeholders. Placeholder accounting is registry-backed by
+`zig build release-pipeline-policy`; placeholders prove the upstream pipeline
+surface is known, not that the local algorithm is implemented.
 
 Zig boundary:
 AIR/liveness loop optimization study.

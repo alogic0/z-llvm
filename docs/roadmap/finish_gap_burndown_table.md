@@ -67,14 +67,31 @@ Opt fixture counts from `test/opt/fixtures.tsv`:
 | `parse-preserve-only` | 12 | Fixture proves parser/verifier/printer preservation without transform parity. |
 | Total | 240 | Current opt fixture table size. |
 
-Pass status counts from the active pass pipeline inventory:
+Pass policy counts from the active release pipeline registry:
 
-| Status | Count | Meaning |
-| --- | ---: | --- |
-| `placeholder` | 70 | Known upstream pass surface, no local algorithm implementation. |
-| `LLVM-shaped subset` | 2 | Broad LLVM structure exists for accepted IR, but not fixture-equivalent pass behavior. |
-| `fixture-equivalent` | 13 | Listed fixtures match or intentionally document local-only conservative behavior. |
-| `algorithm-parity target` | 0 | No pass currently claims full LLVM algorithm parity for its supported surface. |
+| Pipeline | Implemented | Placeholder | Conservative | Unknown | Expected placeholders |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `zig-release-safe-accepted` | 5 | 0 | 0 | 0 | n/a |
+| `zig-release-fast-accepted` | 5 | 0 | 0 | 0 | n/a |
+| `zig-release-small-accepted` | 5 | 0 | 0 | 0 | n/a |
+| `release-o3` | 22 | 7 | 0 | 0 | 7 |
+| `release-oz` | 15 | 7 | 0 | 0 | 7 |
+| `lto-prelink-o3` | 18 | 6 | 1 | 0 | 6 |
+| `lto-prelink-oz` | 13 | 4 | 1 | 0 | 4 |
+
+These counts come from the same registry that dispatches passes in
+`src/pipelines.zig`, exposed by `zig build release-pipeline-policy`. A
+placeholder means the upstream pass surface is known and intentionally modeled
+as a no-op boundary; it does not mean the pass algorithm is implemented. A
+conservative pass is an intentionally narrower local behavior with an explicit
+policy reason. Unknown passes are rejected by name instead of becoming implicit
+placeholders.
+
+Release O3, Release Oz, and LTO prelink pipelines have fail-closed placeholder
+budgets. If a pipeline gains or loses placeholders without updating the
+registry and this table, `zig build release-pipeline-policy` and readiness fail.
+This separates "pipeline surface known" from "algorithm implemented" and
+prevents silent placeholder drift.
 
 ## Remaining Corpus Blockers
 
@@ -110,7 +127,7 @@ Cycles 02-08 closed the measured finish burn-down wave:
 | Raw Debug whole-program shape | later measured blocker | `tiny_scalar_debug` plus reduced Debug rows | Activation condition: reduce a concrete uncovered Debug construct from raw Zig output. |
 | Raw ReleaseSafe whole-program shape | later measured blocker | `tiny_scalar_release_safe` plus reduced safety rows | Activation condition: reduce a concrete uncovered safety/runtime-call construct from raw Zig output. |
 | Fixed-vector optimizer participation | conservative accepted boundary | `vector_future_release_fast`, vector opt fixtures | Cycle 04 keeps the row parse/verify/future; activate only with target-cost or native vector-lowering requirements. |
-| Full debug variable-location salvage | out of scope for finish | debug intrinsic fixtures, `debug_*_dbg_*` opt fixtures, and debug docs | Cycle 06 documents DCE, InstCombine, EarlyCSE, GVN, and SROA debug-location-only behavior; preserve `llvm.dbg.value`/`llvm.dbg.declare` and do not transform them until salvage exists. |
+| Full debug variable-location salvage | out of scope for finish | debug intrinsic fixtures, `debug_*_dbg_*` opt fixtures, and debug docs | Cycle 06 documents DCE, InstCombine, EarlyCSE, GVN, and SROA debug-location-only behavior; preserve `llvm.dbg.value`/`llvm.dbg.declare` and do not transform them until salvage exists. The pass manager now scans for debug variable-location intrinsics once per pass-manager run, skips transform passes from the cached result, reports `skipped_transform_passes`, and still runs mandatory verifier passes. |
 | Full ThinLTO/bitcode summary behavior | out of scope for finish | bitcode/LTO docs | Keep compatibility decision and explicit unsupported diagnostics. |
 | Broad MC/Object/backend parity | out of scope for finish | backend handoff docs and readiness checks | Cycle 07 adds `call_stack_slot`; keep the x86_64 smoke proof bounded to scalar return, direct call, stack slot, and stack-memory-to-call shapes. |
 | SROA pointer field scalarization | conservative accepted boundary | `sroa_struct_ptr_field`, `sroa_struct_ptr_field_no_layout_reject` | Closed by Cycle 05 for DataLayout-backed simple aggregate fields. |
