@@ -17,6 +17,7 @@ const Sum8PtrFn = *const fn (*const i32, *const i32, *const i32, *const i32, *co
 const ChoosePtrFn = *const fn (*const i32, *const i32, i32) callconv(.c) *const i32;
 const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
+const Sum9F32Fn = *const fn (f32, f32, f32, f32, f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum9F64Fn = *const fn (f64, f64, f64, f64, f64, f64, f64, f64, f64) callconv(.c) f64;
 const TouchF32Fn = *const fn (f32) callconv(.c) void;
 const TouchF64Fn = *const fn (f64) callconv(.c) void;
@@ -71,6 +72,7 @@ extern fn frontier_ordered_f64(value: f64) f64;
 extern fn frontier_ordered2_f64(value: f64) f64;
 extern fn frontier_sum5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) f32;
 extern fn frontier_sum5_f64(a: f64, b: f64, c: f64, d: f64, e: f64) f64;
+extern fn frontier_sum9_f32(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32, i: f32) f32;
 extern fn frontier_sum9_f64(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, g: f64, h: f64, i: f64) f64;
 extern fn frontier_sub_f32(a: f32, b: f32) f32;
 extern fn frontier_sub_f64(a: f64, b: f64) f64;
@@ -2059,6 +2061,35 @@ export fn frontier_indirect_f64_stack_arg_to_registers(
     _ = a6;
     _ = a7;
     return func(a8, a9, a10, a11, a12);
+}
+
+export fn frontier_nine_f32_stack_arg_call(
+    a0: f32,
+    a1: f32,
+    a2: f32,
+    a3: f32,
+    a4: f32,
+    a5: f32,
+    a6: f32,
+    a7: f32,
+    a8: f32,
+) f32 {
+    return frontier_sum9_f32(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+}
+
+export fn frontier_indirect_nine_f32_stack_arg_call(
+    func: Sum9F32Fn,
+    a0: f32,
+    a1: f32,
+    a2: f32,
+    a3: f32,
+    a4: f32,
+    a5: f32,
+    a6: f32,
+    a7: f32,
+    a8: f32,
+) f32 {
+    return func(a0, a1, a2, a3, a4, a5, a6, a7, a8);
 }
 
 export fn frontier_nine_f64_stack_arg_call(
