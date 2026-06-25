@@ -269,6 +269,183 @@ fn emitGenericCfgOptionalPointerUnwrapNullPath(
     }
 }
 
+pub fn lowerGenericCfgGuardReturnNoreturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.blocks.items.len == 5) return try lowerGenericCfgGuardReturnBoundsThenNoreturn(allocator, machine, function);
+    if (function.blocks.items.len != 3) return false;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 0) return false;
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return false;
+    const cond_reg = paramValueReg(function, condbr.cond, .{ .int = 1 }) catch return false;
+
+    const then_block = blockByName(function, condbr.then_target) orelse return false;
+    const else_block = blockByName(function, condbr.else_target) orelse return false;
+    const then_ret = genericCfgConstI32Return(then_block);
+    const else_ret = genericCfgConstI32Return(else_block);
+    if (then_ret == null and else_ret == null) return false;
+    const ret_block = if (then_ret != null) then_block else else_block;
+    const panic_block = if (then_ret != null) else_block else then_block;
+    const ret_value = then_ret orelse else_ret.?;
+
+    _ = validateNoreturnSliceRuntimeCall(panic_block) catch return false;
+    try machine.instructions.append(allocator, .{ .test_arg8 = cond_reg });
+    if (then_ret != null) {
+        try appendGenericCfgConditionalBranch(allocator, machine, .jne, ret_block.name);
+    } else {
+        try appendGenericCfgConditionalBranch(allocator, machine, .je, ret_block.name);
+    }
+    try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
+    try emitGenericCfgNoreturnCallBlock(allocator, machine, function, panic_block);
+    try appendGenericCfgBlockLabel(allocator, machine, ret_block.name);
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = ret_value });
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn lowerGenericCfgGuardReturnBoundsThenNoreturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 0) return false;
+    const entry_condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return false;
+    const cond_reg = paramValueReg(function, entry_condbr.cond, .{ .int = 1 }) catch return false;
+
+    const then_block = blockByName(function, entry_condbr.then_target) orelse return false;
+    const else_block = blockByName(function, entry_condbr.else_target) orelse return false;
+    const then_ret = genericCfgConstI32Return(then_block);
+    const else_ret = genericCfgConstI32Return(else_block);
+    if (then_ret == null and else_ret == null) return false;
+    const ret_block = if (then_ret != null) then_block else else_block;
+    const guard_block = if (then_ret != null) else_block else then_block;
+    const ret_value = then_ret orelse else_ret.?;
+
+    const guard = try genericCfgBoundsGuard(function, guard_block);
+    const panic_block = blockByName(function, guard.panic_target) orelse return false;
+    const cont_block = blockByName(function, guard.cont_target) orelse return false;
+    _ = validateNoreturnSliceRuntimeCall(cont_block) catch return false;
+    try validateI64NoreturnCallBlock(panic_block);
+
+    try machine.instructions.append(allocator, .{ .test_arg8 = cond_reg });
+    if (then_ret != null) {
+        try appendGenericCfgConditionalBranch(allocator, machine, .jne, ret_block.name);
+    } else {
+        try appendGenericCfgConditionalBranch(allocator, machine, .je, ret_block.name);
+    }
+
+    try appendGenericCfgBlockLabel(allocator, machine, guard_block.name);
+    try emitI64ValueIntoArgReg(allocator, machine, function, guard_block, .rdi, guard.len_value);
+    try machine.instructions.append(allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rdi, .imm = guard.max_value + 1 } });
+    try appendGenericCfgConditionalBranch(allocator, machine, .jae, panic_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, cont_block.name);
+    try emitGenericCfgNoreturnCallBlock(allocator, machine, function, cont_block);
+
+    try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
+    try emitI64ValueIntoArgReg(allocator, machine, function, guard_block, .rdi, guard.len_value);
+    try appendMoveImmToArgReg(allocator, machine, .rsi, guard.max_value);
+    try emitValidatedI64NoreturnCallBlock(allocator, machine, panic_block);
+
+    try appendGenericCfgBlockLabel(allocator, machine, ret_block.name);
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = ret_value });
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+const GenericCfgBoundsGuard = struct {
+    len_value: ir.Value,
+    max_value: i64,
+    cont_target: []const u8,
+    panic_target: []const u8,
+};
+
+fn genericCfgBoundsGuard(function: ir.Function, block: ir.BasicBlock) !GenericCfgBoundsGuard {
+    if (block.instructions.items.len == 0) return error.UnsupportedCodegenControlFlow;
+    const condbr = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return error.UnsupportedCodegenControlFlow;
+    const icmp_name = switch (condbr.cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const instruction = findInstructionInFunction(function, block, icmp_name) orelse return error.UnsupportedCodegenInstruction;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (icmp.predicate != .ule or !icmp.operand_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+    const max_value = switch (icmp.rhs) {
+        .int => |int| try i64Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (max_value == std.math.maxInt(i64)) return error.UnsupportedCodegenValue;
+    return .{
+        .len_value = icmp.lhs,
+        .max_value = max_value,
+        .cont_target = condbr.then_target,
+        .panic_target = condbr.else_target,
+    };
+}
+
+fn validateI64NoreturnCallBlock(block: ir.BasicBlock) !void {
+    if (block.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const call = switch (block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (call.callee_value != null or call.inline_asm != null or call.ret_ty != .void) return error.UnsupportedCodegenInstruction;
+    if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
+    if (call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 64 }) or !call.args.items[1].ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+    switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        else => return error.UnsupportedCodegenControlFlow,
+    }
+}
+
+fn emitValidatedI64NoreturnCallBlock(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    block: ir.BasicBlock,
+) !void {
+    try validateI64NoreturnCallBlock(block);
+    const call = switch (block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => unreachable,
+    };
+    try appendAlignedDirectCall(allocator, machine, call.callee, .void);
+    try machine.instructions.append(allocator, .ud2);
+}
+
+fn genericCfgConstI32Return(block: ir.BasicBlock) ?i32 {
+    if (block.instructions.items.len != 0) return null;
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const value = switch (ret.value orelse return null) {
+        .int => |int| int,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    return i32Value(value) catch null;
+}
+
 pub fn lowerGenericCfgGuardedDynamicPointerLoadReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -970,13 +1147,22 @@ pub fn emitGenericCfgNoreturnCallBlock(
     function: ir.Function,
     block: ir.BasicBlock,
 ) !void {
-    if (block.instructions.items.len == 4) {
-        const call = try validateNoreturnSliceRuntimeCall(block);
-        try emitSlicePointerIntoRdi(allocator, machine, block, call.args.items[0].value);
-        try emitSliceLengthIntoRsi(allocator, machine, function, block, call.args.items[1].value);
-        try appendAlignedDirectCall(allocator, machine, call.callee, .void);
-        try machine.instructions.append(allocator, .ud2);
-        return;
+    if (block.instructions.items.len >= 4) {
+        if (validateNoreturnSliceRuntimeCall(block)) |call| {
+            try emitSlicePointerIntoRdi(allocator, machine, block, call.args.items[0].value);
+            try emitSliceLengthIntoRsi(allocator, machine, function, block, call.args.items[1].value);
+            try appendAlignedDirectCall(allocator, machine, call.callee, .void);
+            try machine.instructions.append(allocator, .ud2);
+            return;
+        } else |err| switch (err) {
+            error.UnsupportedCodegenInstruction,
+            error.UnsupportedCodegenType,
+            error.UnsupportedCodegenValue,
+            error.BlockWithoutTerminator,
+            error.UnsupportedCodegenControlFlow,
+            => {},
+            else => return err,
+        }
     }
 
     if (block.instructions.items.len == 0 or block.instructions.items.len > 2) return error.UnsupportedCodegenInstruction;
@@ -1008,8 +1194,14 @@ pub fn emitGenericCfgNoreturnCallBlock(
 }
 
 pub fn validateNoreturnSliceRuntimeCall(block: ir.BasicBlock) !ir.CallInst {
-    try validateAssumeColdCall(block.instructions.items[0]);
-    const call = switch (block.instructions.items[3].kind) {
+    if (block.instructions.items.len == 0) return error.UnsupportedCodegenInstruction;
+    if (block.instructions.items.len > 1) {
+        validateAssumeColdCall(block.instructions.items[0]) catch |err| switch (err) {
+            error.UnsupportedCodegenInstruction, error.UnsupportedCodegenValue => {},
+        };
+    }
+    const call_instruction = block.instructions.items[block.instructions.items.len - 1];
+    const call = switch (call_instruction.kind) {
         .call => |call| call,
         else => return error.UnsupportedCodegenInstruction,
     };
@@ -1017,10 +1209,7 @@ pub fn validateNoreturnSliceRuntimeCall(block: ir.BasicBlock) !ir.CallInst {
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     try validateSliceRuntimeCallArgs(call);
     if (call.args.items.len == 3 and call.args.items[2].ty != .ptr) return error.UnsupportedCodegenType;
-    const ptr_name = block.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
-    const len_name = block.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
-    if (!isNamed(call.args.items[0].value, ptr_name)) return error.UnsupportedCodegenValue;
-    if (!isNamed(call.args.items[1].value, len_name)) return error.UnsupportedCodegenValue;
+    _ = try resolveSlicePointerValue(block, call.args.items[0].value);
     switch (block.terminator orelse return error.BlockWithoutTerminator) {
         .@"unreachable" => {},
         else => return error.UnsupportedCodegenControlFlow,
@@ -1044,6 +1233,7 @@ pub fn resolveSlicePointerValue(block: ir.BasicBlock, value: ir.Value) ![]const 
                 else => return error.UnsupportedCodegenInstruction,
             };
             if (!extract.result_ty.eql(.ptr) or !std.mem.eql(u8, extract.indices, "0")) return error.UnsupportedCodegenInstruction;
+            if (resolveSlicePointerFromInsertedAggregate(block, extract.aggregate)) |symbol| return symbol;
             return try globalSymbolNameFromValue(extract.aggregate);
         },
         .constant_expr => return try globalSymbolNameFromValue(value),
@@ -1051,26 +1241,73 @@ pub fn resolveSlicePointerValue(block: ir.BasicBlock, value: ir.Value) ![]const 
     }
 }
 
-pub fn resolveSliceLengthValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value) !SliceLengthValue {
+fn resolveSlicePointerFromInsertedAggregate(block: ir.BasicBlock, aggregate: ir.Value) ?[]const u8 {
+    const aggregate_name = switch (aggregate) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const len_insert = findInstruction(block, aggregate_name) orelse return null;
+    const len_insertvalue = switch (len_insert.kind) {
+        .insertvalue => |insertvalue| insertvalue,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, len_insertvalue.indices, "1")) return null;
+    const ptr_insert_name = switch (len_insertvalue.aggregate) {
+        .named => |name| name,
+        .undef => return null,
+        .int, .fp, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const ptr_insert = findInstruction(block, ptr_insert_name) orelse return null;
+    const ptr_insertvalue = switch (ptr_insert.kind) {
+        .insertvalue => |insertvalue| insertvalue,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, ptr_insertvalue.indices, "0") or !ptr_insertvalue.value_ty.eql(.ptr)) return null;
+    return globalSymbolNameFromValue(ptr_insertvalue.value) catch null;
+}
+
+pub fn resolveSliceLengthValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value) anyerror!SliceLengthValue {
     switch (value) {
         .int => |int| return .{ .imm = try i64Value(int) },
         .named => |name| {
             if (paramRegOrNull(function, name, .{ .int = 64 }) catch null) |reg| return .{ .reg = reg };
-            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
-            const extract = switch (instruction.kind) {
-                .extractvalue => |extractvalue| extractvalue,
+            const instruction = findInstructionInFunction(function, block, name) orelse return error.UnsupportedCodegenValue;
+            switch (instruction.kind) {
+                .extractvalue => |extract| {
+                    if (!extract.result_ty.eql(.{ .int = 64 }) or !std.mem.eql(u8, extract.indices, "1")) return error.UnsupportedCodegenInstruction;
+                    if (try resolveSliceLengthFromInsertedAggregate(function, block, extract.aggregate)) |len| return len;
+                    return .{ .imm = try sliceLengthFromAggregateConstant(extract.aggregate) };
+                },
+                .cast, .load, .binary => return .{ .materialize = value },
+                .phi => |phi| {
+                    if (!phi.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+                    return .{ .materialize = value };
+                },
                 else => return error.UnsupportedCodegenInstruction,
-            };
-            if (!extract.result_ty.eql(.{ .int = 64 }) or !std.mem.eql(u8, extract.indices, "1")) return error.UnsupportedCodegenInstruction;
-            return .{ .imm = try sliceLengthFromAggregateConstant(extract.aggregate) };
+            }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
 }
 
+fn resolveSliceLengthFromInsertedAggregate(function: ir.Function, block: ir.BasicBlock, aggregate: ir.Value) anyerror!?SliceLengthValue {
+    const aggregate_name = switch (aggregate) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const instruction = findInstructionInFunction(function, block, aggregate_name) orelse return null;
+    const insert = switch (instruction.kind) {
+        .insertvalue => |insertvalue| insertvalue,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, insert.indices, "1") or !insert.value_ty.eql(.{ .int = 64 })) return null;
+    return try resolveSliceLengthValue(function, block, insert.value);
+}
+
 pub const SliceLengthValue = union(enum) {
     imm: i64,
     reg: ArgReg,
+    materialize: ir.Value,
 };
 
 pub fn emitSlicePointerIntoRdi(
@@ -1092,7 +1329,158 @@ pub fn emitSliceLengthIntoRsi(
     switch (try resolveSliceLengthValue(function, block, value)) {
         .imm => |len| try appendMoveImmToArgReg(allocator, machine, .rsi, len),
         .reg => |reg| if (reg != .rsi) try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rsi, .src = reg } }),
+        .materialize => |materialized| try emitI64ValueIntoArgReg(allocator, machine, function, block, .rsi, materialized),
     }
+}
+
+pub fn emitI64ValueIntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    dst: ArgReg,
+    value: ir.Value,
+) anyerror!void {
+    switch (value) {
+        .int => |int| return try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
+        .named => |name| {
+            if (try emitNamedI64ValueIntoArgReg(allocator, machine, function, block, dst, name)) return;
+            return error.UnsupportedCodegenValue;
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+pub fn emitNamedI64ValueIntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    dst: ArgReg,
+    name: []const u8,
+) anyerror!bool {
+    if (paramRegOrNull(function, name, .{ .int = 64 }) catch null) |reg| {
+        if (reg != dst) try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = reg } });
+        return true;
+    }
+    const instruction = findInstructionInFunction(function, block, name) orelse return false;
+    switch (instruction.kind) {
+        .cast => |cast| {
+            if (cast.op != .bitcast or !cast.from_ty.eql(.{ .int = 64 }) or !cast.to_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+            try emitI64ValueIntoArgReg(allocator, machine, function, block, dst, cast.value);
+            return true;
+        },
+        .load => |load| {
+            try emitLoadedI64IntoArgReg(allocator, machine, function, dst, load);
+            return true;
+        },
+        .binary => |binary| {
+            try emitComputedI64IntoArgReg(allocator, machine, function, block, dst, binary);
+            return true;
+        },
+        .phi => |phi| {
+            try emitPhiSelectedI64IntoArgReg(allocator, machine, function, block, dst, phi);
+            return true;
+        },
+        .extractvalue => |extract| {
+            if (!extract.result_ty.eql(.{ .int = 64 }) or !std.mem.eql(u8, extract.indices, "1")) return error.UnsupportedCodegenInstruction;
+            try appendMoveImmToArgReg(allocator, machine, dst, try sliceLengthFromAggregateConstant(extract.aggregate));
+            return true;
+        },
+        else => return error.UnsupportedCodegenInstruction,
+    }
+}
+
+pub fn emitLoadedI64IntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    dst: ArgReg,
+    load: ir.LoadInst,
+) anyerror!void {
+    if (!load.ty.eql(.{ .int = 64 }) or load.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+    switch (load.ptr) {
+        .named => |name| {
+            if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
+                try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = reg, .offset = 0 } });
+            } else if (std.mem.startsWith(u8, name, "@")) {
+                try machine.instructions.append(allocator, .{ .load_global_ptr_rax = try globalSymbolName(name) });
+            } else {
+                return error.UnsupportedCodegenValue;
+            }
+        },
+        .constant_expr => try machine.instructions.append(allocator, .{ .load_global_ptr_rax = try globalSymbolNameFromValue(load.ptr) }),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    }
+    try emitRaxIntoArgReg(allocator, machine, dst);
+}
+
+pub fn emitComputedI64IntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    dst: ArgReg,
+    binary: ir.BinaryInst,
+) anyerror!void {
+    if (!binary.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+    switch (binary.op) {
+        .add => {
+            try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, binary.lhs);
+            switch (binary.rhs) {
+                .int => |int| {
+                    const rhs = try i64Value(int);
+                    if (rhs < 0 or rhs > std.math.maxInt(u8)) return error.UnsupportedCodegenValue;
+                    if (rhs != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = @intCast(rhs) });
+                },
+                .named => |name| {
+                    const reg = (paramRegOrNull(function, name, .{ .int = 64 }) catch null) orelse return error.UnsupportedCodegenValue;
+                    try machine.instructions.append(allocator, .{ .add_arg64_rax = reg });
+                },
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            }
+        },
+        .sub => {
+            const rhs = switch (binary.rhs) {
+                .int => |int| try i64Value(int),
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            if (rhs != 0) return error.UnsupportedCodegenInstruction;
+            try emitI64ValueIntoArgReg(allocator, machine, function, block, dst, binary.lhs);
+            return;
+        },
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    try emitRaxIntoArgReg(allocator, machine, dst);
+}
+
+fn emitPhiSelectedI64IntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    dst: ArgReg,
+    phi: ir.PhiInst,
+) anyerror!void {
+    if (phi.incoming.items.len != 1) return error.UnsupportedCodegenControlFlow;
+    try emitI64ValueIntoArgReg(allocator, machine, function, block, dst, phi.incoming.items[0].value);
+}
+
+fn emitRaxIntoArgReg(allocator: std.mem.Allocator, machine: *MachineFunction, dst: ArgReg) !void {
+    switch (dst) {
+        .rdi => try machine.instructions.append(allocator, .mov_rax_rdi),
+        .rsi => try machine.instructions.append(allocator, .mov_rax_rsi),
+        .rdx, .rcx, .r8, .r9 => return error.UnsupportedCodegenAbi,
+    }
+}
+
+fn findInstructionInFunction(function: ir.Function, preferred_block: ir.BasicBlock, result_name: []const u8) ?ir.Instruction {
+    if (findInstruction(preferred_block, result_name)) |instruction| return instruction;
+    for (function.blocks.items) |candidate_block| {
+        if (std.mem.eql(u8, candidate_block.name, preferred_block.name)) continue;
+        if (findInstruction(candidate_block, result_name)) |instruction| return instruction;
+    }
+    return null;
 }
 
 fn sliceLengthFromAggregateConstant(value: ir.Value) !i64 {

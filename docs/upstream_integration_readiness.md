@@ -626,20 +626,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=434
-structured_functions=434
-generic_codegen_functions=434
-generic_cfg_functions=434
+discovered_functions=437
+structured_functions=437
+generic_codegen_functions=437
+generic_cfg_functions=437
 structural_matcher_functions=0
-structured_air_v2_functions=434
-typed_air_operand_functions=434
+structured_air_v2_functions=437
+typed_air_operand_functions=437
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=434
+generic_lowering_functions=437
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=434
+object_emitted_functions=437
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -672,14 +672,16 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 434-function counters above plus `native_link_accepted_rows=13`,
+13-source / 437-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
 The selected slice-panic runtime-call row now uses the release generic CFG
 slice runtime-call helper subset, which derives direct integer lengths and
-`{ ptr, i64 }` aggregate slice constant lengths from IR rather than using a
-selected message-length constant.
+`{ ptr, i64 }` aggregate slice constant lengths, i64 parameter lengths, loaded
+i64 lengths, and simple computed i64 add/sub lengths from IR rather than using
+a selected message-length constant. Phi-selected lengths are still outside this
+slice unless they collapse to a currently supported one-incoming form.
 The frontier safety-edge executable harnesses resolve the cold
 `outOfBounds`, `integerPartOutOfBounds`, and `unwrapNull` symbols with local
 trap stubs so the stable non-panic C ABI probes link and run without turning

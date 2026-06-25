@@ -231,6 +231,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         if (child.ir_type == .ptr) return child;
         return null;
     }
+    if (std.mem.startsWith(u8, trimmed, "[]")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, i64 }" } };
+    }
     if (trimmed.len > 1 and (trimmed[0] == 'u' or trimmed[0] == 'i')) {
         const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
         return .{ .ir_type = .{ .int = bits }, .signed = trimmed[0] == 'i' };
@@ -780,6 +783,7 @@ pub fn isStraightLineOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "is_non_null") or
         std.mem.eql(u8, opcode, "wrap_optional") or
         std.mem.eql(u8, opcode, "optional_payload") or
+        std.mem.eql(u8, opcode, "slice") or
         std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         std.mem.eql(u8, opcode, "atomic_rmw") or
         std.mem.eql(u8, opcode, "array_elem_val") or
@@ -807,6 +811,7 @@ pub fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "is_non_null") or
         std.mem.eql(u8, opcode, "wrap_optional") or
         std.mem.eql(u8, opcode, "optional_payload") or
+        std.mem.eql(u8, opcode, "slice") or
         std.mem.eql(u8, opcode, "ptr_add") or
         std.mem.eql(u8, opcode, "ptr_elem_ptr") or
         std.mem.eql(u8, opcode, "array_elem_val") or

@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=434`,
-`generic_codegen_functions=434`, `generic_cfg_functions=434`,
+three release modes at `source_rows=13`, `discovered_functions=437`,
+`generic_codegen_functions=437`, `generic_cfg_functions=437`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=434`, `object_failures=0`,
+`object_emitted_functions=437`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -446,8 +446,11 @@ baselines are split by corpus topology: broad is inputs + integrated,
 expanded adds `test/zig/expanded`, scale adds `test/zig/scale`, and frontier
 is isolated to `test/zig/frontier`. The selected slice-panic runtime-call row
 inside this proof now uses the release generic CFG slice runtime-call helper
-subset, deriving supported direct integer and `{ ptr, i64 }` aggregate-constant
-lengths from IR. The same frontier proof now includes typed-v2/generic-CFG
+subset, deriving supported direct integer, `{ ptr, i64 }` aggregate-constant,
+i64 parameter, loaded i64, and simple computed i64 add/sub lengths from IR.
+Phi-selected panic-slice lengths and child-process negative-path panic proof
+remain explicit future runtime/safety-edge work. The same frontier proof now
+includes typed-v2/generic-CFG
 optional-pointer unwrap/null panic, checked int-from-float
 `integerPartOutOfBounds`, direct bounds loads, and checked unsigned add rows.
 The memory and

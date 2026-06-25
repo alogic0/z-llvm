@@ -1,3 +1,6 @@
+const frontier_runtime_panic_message = "frontier runtime panic message with variable length";
+var frontier_runtime_panic_len: usize = 23;
+
 export fn frontier_checked_add(value: i32) i32 {
     return value + 11;
 }
@@ -28,4 +31,20 @@ export fn frontier_optional_unwrap(flag: bool, value: *const i32) i32 {
 
 export fn frontier_int_from_float_checked(value: f32) i32 {
     return @intFromFloat(value);
+}
+
+export fn frontier_panic_param_len(ok: bool, len: usize) i32 {
+    if (ok) return 91;
+    @panic(frontier_runtime_panic_message[0..len]);
+}
+
+export fn frontier_panic_computed_len(ok: bool, base_len: usize) i32 {
+    if (ok) return 92;
+    const len = base_len + 7;
+    @panic(frontier_runtime_panic_message[0..len]);
+}
+
+export fn frontier_panic_loaded_len(ok: bool) i32 {
+    if (ok) return 93;
+    @panic(frontier_runtime_panic_message[0..frontier_runtime_panic_len]);
 }

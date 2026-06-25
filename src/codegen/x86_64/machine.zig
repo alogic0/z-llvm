@@ -19,6 +19,7 @@ pub const Instruction = union(enum) {
     mov_imm_r8: i64,
     mov_imm_r9: i64,
     mov_rax_rdi,
+    mov_rax_rsi,
     mov_arg_rax: ArgReg,
     movq_xmm_rax: XmmReg,
     mov_arg_eax: ArgReg,

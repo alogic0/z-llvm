@@ -11,6 +11,10 @@ const ir = shared.ir;
 pub const GenericCfgLoopSumPlan = loop_rows.GenericCfgLoopSumPlan;
 
 pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.MachineFunction, function: ir.Function) !bool {
+    if (try multi_block_rows.lowerGenericCfgGuardReturnNoreturn(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try multi_block_rows.lowerGenericCfgGuardedDynamicPointerLoadReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;

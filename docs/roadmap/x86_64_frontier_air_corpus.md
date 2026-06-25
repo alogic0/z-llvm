@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=434
-structured_functions=434
-generic_codegen_functions=434
-generic_cfg_functions=434
+discovered_functions=437
+structured_functions=437
+generic_codegen_functions=437
+generic_cfg_functions=437
 structural_matcher_functions=0
-structured_air_v2_functions=434
-typed_air_operand_functions=434
+structured_air_v2_functions=437
+typed_air_operand_functions=437
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=434
+generic_lowering_functions=437
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=434
+object_emitted_functions=437
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -99,6 +99,27 @@ llvm_targetmachine_rows=0
 lld_rows=0
 local_fail=0
 ```
+
+Closed in the current runtime/safety-edge slice:
+
+- panic-slice runtime-call lowering no longer uses a selected message-length
+  immediate in the strict release path; `debug.defaultPanic` slice lengths are
+  derived from typed AIR values for direct constants, `{ ptr, i64 }` slice
+  aggregates, i64 parameters, loaded i64 globals/parameter pointers, and simple
+  i64 add/sub expressions
+- ReleaseSafe slice-panic guard CFGs with an ok return, bounds check block,
+  cold `outOfBounds` edge, default panic continuation, and noreturn/unreachable
+  runtime blocks now route through generic CFG
+- new frontier rows cover parameter-derived, computed, and loaded panic-slice
+  lengths while keeping stable executable probes on the non-panic path
+
+Remaining runtime/safety-edge debt:
+
+- phi-selected panic-slice lengths are still only supported when they collapse
+  to the current one-incoming helper form
+- child-process negative-path executable proof for the panic paths is still
+  future work; current harnesses link trap stubs and execute stable non-panic
+  paths
 
 Closed in the current memory/aggregate frontier slice:
 
