@@ -588,7 +588,7 @@ pub fn runStructuredDirectAcceptedPipelineForSurface(
     const pipeline_mode = environ.get("ZLLVM_PIPELINE") orelse return;
     if (!std.mem.eql(u8, pipeline_mode, "preopt")) return;
     if (environ.get("ZLLVM_ZIG_MODE") == null) return;
-    if (!structuredDirectNeedsFoldPipeline(surface)) return;
+    if (structuredDirectFoldPipelineReason(surface) == null) return;
 
     var pm = pass_manager.ModulePassManager.init(allocator);
     defer pm.deinit();
@@ -600,14 +600,26 @@ pub fn runStructuredDirectAcceptedPipelineForSurface(
     _ = try pm.runWithOptions(module, &context, &discard_writer.writer, .{ .verify_each_pass = false });
 }
 
-fn structuredDirectNeedsFoldPipeline(surface: []const u8) bool {
-    return std.mem.eql(u8, surface, "scalar-add-ret") or
-        std.mem.eql(u8, surface, "integer-arithmetic") or
-        std.mem.eql(u8, surface, "error-switch-select") or
-        std.mem.eql(u8, surface, "runtime-phi-merge") or
-        std.mem.eql(u8, surface, "struct-field-sum") or
-        std.mem.eql(u8, surface, "float-select") or
-        std.mem.eql(u8, surface, "packed-replace-low");
+pub const StructuredDirectFoldPipelineSurface = struct {
+    surface: []const u8,
+    reason: []const u8,
+};
+
+pub const structured_direct_fold_pipeline_surfaces = [_]StructuredDirectFoldPipelineSurface{
+    .{ .surface = "scalar-add-ret", .reason = "fold scalar identity arithmetic emitted by structured direct rows" },
+    .{ .surface = "integer-arithmetic", .reason = "fold integer arithmetic and compare/select constants before object emission" },
+    .{ .surface = "error-switch-select", .reason = "fold selected error classifier branches into the expected i32 return" },
+    .{ .surface = "runtime-phi-merge", .reason = "fold selected PHI merge constants before x86_64 lowering" },
+    .{ .surface = "struct-field-sum", .reason = "fold aggregate field loads/adds into the selected return shape" },
+    .{ .surface = "float-select", .reason = "fold selected fcmp/select wrapper main checks" },
+    .{ .surface = "packed-replace-low", .reason = "fold packed-bit mask/insert arithmetic in selected rows" },
+};
+
+pub fn structuredDirectFoldPipelineReason(surface: []const u8) ?[]const u8 {
+    for (structured_direct_fold_pipeline_surfaces) |entry| {
+        if (std.mem.eql(u8, surface, entry.surface)) return entry.reason;
+    }
+    return null;
 }
 
 pub fn resolveDirectIrWriterCase(contents: []const u8) ?IrWriterCase {
@@ -690,7 +702,6 @@ fn envEquals(environ: *const std.process.Environ.Map, name: []const u8, expected
     const value = environ.get(name) orelse return false;
     return std.mem.eql(u8, value, expected);
 }
-
 
 const case_data = @import("main_flow_ir_writer_cases.zig");
 

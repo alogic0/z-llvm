@@ -14,10 +14,13 @@ test "descriptor facades compile" {
 
 test "ir writer stage facades compile" {
     const writers = @import("main_flow_ir_writer_case_writers.zig");
+    const flow_writer = @import("main_flow_ir_writer.zig");
 
     _ = writers.stage1.writeTinyScalarIrWriterBody;
     _ = writers.stage2.writeMinimalIrWriterBody;
     _ = writers.writeMinimalIrWriterBody;
+    try std.testing.expect(flow_writer.structuredDirectFoldPipelineReason("scalar-add-ret") != null);
+    try std.testing.expect(flow_writer.structuredDirectFoldPipelineReason("minimal-ret0") == null);
 }
 
 test "generic cfg responsibility facades compile" {
