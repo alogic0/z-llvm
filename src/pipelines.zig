@@ -1,5 +1,6 @@
 const std = @import("std");
 const pass_manager = @import("pass_manager.zig");
+const aggressive_instcombine = @import("passes/aggressive_instcombine.zig");
 const adce = @import("passes/adce.zig");
 const always_inline = @import("passes/always_inline.zig");
 const bdce = @import("passes/bdce.zig");
@@ -15,6 +16,7 @@ const globaldce = @import("passes/globaldce.zig");
 const globalopt = @import("passes/globalopt.zig");
 const gvn = @import("passes/gvn.zig");
 const indvars = @import("passes/indvars.zig");
+const inferattrs = @import("passes/inferattrs.zig");
 const inline_pass = @import("passes/inline.zig");
 const jump_threading = @import("passes/jump_threading.zig");
 const licm = @import("passes/licm.zig");
@@ -22,6 +24,7 @@ const loop_instsimplify = @import("passes/loop_instsimplify.zig");
 const loop_deletion = @import("passes/loop_deletion.zig");
 const loop_rotate = @import("passes/loop_rotate.zig");
 const loop_simplifycfg = @import("passes/loop_simplifycfg.zig");
+const lower_constant_intrinsics = @import("passes/lower_constant_intrinsics.zig");
 const lower_expect = @import("passes/lower_expect.zig");
 const mem2reg = @import("passes/mem2reg.zig");
 const placeholder = @import("passes/placeholder.zig");
@@ -460,8 +463,8 @@ pub const pass_registry = [_]PassRegistryEntry{
     implemented(mem2reg.pass),
     implemented(sroa.pass),
     conservative(canonicalize_aliases.pass),
-    placeholderEntry("aggressive-instcombine", .canonicalization, "llvm/lib/Transforms/AggressiveInstCombine/"),
-    placeholderEntry("lower-constant-intrinsics", .canonicalization, "llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp"),
+    conservative(aggressive_instcombine.pass),
+    conservative(lower_constant_intrinsics.pass),
     placeholderEntry("drop-unnecessary-assumes", .canonicalization, "llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp"),
     placeholderEntry("tailcallelim", .codegen_prep, "llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp"),
     placeholderEntry("div-rem-pairs", .codegen_prep, "llvm/lib/Transforms/Scalar/DivRemPairs.cpp"),
@@ -507,7 +510,7 @@ pub const pass_registry = [_]PassRegistryEntry{
     placeholderEntry("openmp-opt", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp"),
     placeholderEntry("openmp-opt-cgscc", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp"),
     placeholderEntry("forceattrs", .ipo, "llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp"),
-    placeholderEntry("inferattrs", .ipo, "llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp"),
+    conservative(inferattrs.pass),
     placeholderEntry("rpo-function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp"),
     placeholderEntry("argpromotion", .ipo, "llvm/lib/Transforms/IPO/ArgumentPromotion.cpp"),
     placeholderEntry("called-value-propagation", .ipo, "llvm/lib/Transforms/IPO/CalledValuePropagation.cpp"),
@@ -547,10 +550,10 @@ pub const PlaceholderBudget = struct {
 };
 
 pub const placeholder_budgets = [_]PlaceholderBudget{
-    .{ .pipeline_name = "release-o3", .expected_placeholders = 7 },
-    .{ .pipeline_name = "release-oz", .expected_placeholders = 7 },
-    .{ .pipeline_name = "lto-prelink-o3", .expected_placeholders = 6 },
-    .{ .pipeline_name = "lto-prelink-oz", .expected_placeholders = 4 },
+    .{ .pipeline_name = "release-o3", .expected_placeholders = 4 },
+    .{ .pipeline_name = "release-oz", .expected_placeholders = 4 },
+    .{ .pipeline_name = "lto-prelink-o3", .expected_placeholders = 3 },
+    .{ .pipeline_name = "lto-prelink-oz", .expected_placeholders = 3 },
 };
 
 pub const release_policy_pipeline_names = [_][]const u8{

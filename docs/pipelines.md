@@ -105,8 +105,8 @@ scalar-foundation:
   jump-threading
   correlated-propagation
   instcombine
-  aggressive-instcombine placeholder
-  lower-constant-intrinsics placeholder
+  aggressive-instcombine conservative subset
+  lower-constant-intrinsics conservative subset
   early-cse
   gvn
   dce
@@ -127,8 +127,8 @@ zig-scalar-foundation:
   jump-threading
   correlated-propagation
   instcombine
-  aggressive-instcombine placeholder
-  lower-constant-intrinsics placeholder
+  aggressive-instcombine conservative subset
+  lower-constant-intrinsics conservative subset
   early-cse
   gvn
   dce
@@ -150,7 +150,7 @@ release-o3:
   verify
   add-discriminators placeholder
   forceattrs placeholder
-  inferattrs placeholder
+  inferattrs conservative subset
   sroa
   mem2reg
   simplifycfg
@@ -161,8 +161,8 @@ release-o3:
   jump-threading
   correlated-propagation
   instcombine
-  aggressive-instcombine placeholder
-  lower-constant-intrinsics placeholder
+  aggressive-instcombine conservative subset
+  lower-constant-intrinsics conservative subset
   early-cse
   gvn
   dse placeholder

@@ -361,10 +361,10 @@ test "release pipeline placeholder budgets are explicit policy" {
         name: []const u8,
         placeholders: usize,
     }{
-        .{ .name = "release-o3", .placeholders = 7 },
-        .{ .name = "release-oz", .placeholders = 7 },
-        .{ .name = "lto-prelink-o3", .placeholders = 6 },
-        .{ .name = "lto-prelink-oz", .placeholders = 4 },
+        .{ .name = "release-o3", .placeholders = 4 },
+        .{ .name = "release-oz", .placeholders = 4 },
+        .{ .name = "lto-prelink-o3", .placeholders = 3 },
+        .{ .name = "lto-prelink-oz", .placeholders = 3 },
     };
 
     for (expected) |row| {
@@ -382,10 +382,18 @@ test "pass registry exposes implementation status and upstream path" {
     try std.testing.expectEqual(pass_manager.PassCategory.canonicalization, instcombine_entry.category);
     try std.testing.expect(std.mem.indexOf(u8, instcombine_entry.upstream_path, "InstCombine") != null);
 
-    const placeholder_entry = pipelines.findPass("aggressive-instcombine").?;
-    try std.testing.expectEqual(pipelines.PassStatus.placeholder, placeholder_entry.status);
-    try std.testing.expectEqualStrings("placeholder", placeholder_entry.pass.target_status);
-    try std.testing.expect(std.mem.indexOf(u8, placeholder_entry.upstream_path, "AggressiveInstCombine") != null);
+    const conservative_entry = pipelines.findPass("aggressive-instcombine").?;
+    try std.testing.expectEqual(pipelines.PassStatus.conservative, conservative_entry.status);
+    try std.testing.expect(std.mem.indexOf(u8, conservative_entry.pass.target_status, "InstCombine subset") != null);
+    try std.testing.expect(std.mem.indexOf(u8, conservative_entry.upstream_path, "AggressiveInstCombine") != null);
+
+    const inferattrs_entry = pipelines.findPass("inferattrs").?;
+    try std.testing.expectEqual(pipelines.PassStatus.conservative, inferattrs_entry.status);
+    try std.testing.expect(std.mem.indexOf(u8, inferattrs_entry.pass.target_status, "FunctionAttrs subset") != null);
+
+    const lower_constant_entry = pipelines.findPass("lower-constant-intrinsics").?;
+    try std.testing.expectEqual(pipelines.PassStatus.conservative, lower_constant_entry.status);
+    try std.testing.expect(std.mem.indexOf(u8, lower_constant_entry.pass.target_status, "min/max intrinsic subset") != null);
 
     try std.testing.expect(pipelines.findPass("definitely-not-a-pass") == null);
 }
@@ -431,10 +439,12 @@ test "debug and release mode pipelines expose mode-sensitive scalar behavior" {
     try release_module.print(&release_output.writer);
 
     const expected_release =
-        \\define i32 @mode(i32 %a) {
+        \\define i32 @mode(i32 %a) #0 {
         \\entry:
         \\  ret i32 %a
         \\}
+        \\
+        \\attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }
         \\
     ;
     try std.testing.expectEqualStrings(expected_release, release_output.writer.buffered());

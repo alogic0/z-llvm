@@ -18,6 +18,11 @@ ReleaseSmall pipelines have no placeholders; `release-o3`, `release-oz`, and
 LTO prelink pipelines have explicit fail-closed placeholder budgets. A
 placeholder means "known upstream pass surface, no local algorithm yet," not
 implemented release coverage.
+`docs/roadmap/release_placeholder_classification.md` now classifies the active
+Release O3/Oz placeholders by x86_64 replacement relevance. `inferattrs`,
+`aggressive-instcombine`, and `lower-constant-intrinsics` have conservative
+local subsets; remaining placeholders are explicit boundary-noop or out-of-scope
+surfaces until source-backed rows require them.
 
 Debug variable-location salvage remains a deliberate boundary. The pass manager
 now scans for `llvm.dbg.value`/variable-location intrinsics once per

@@ -63,9 +63,9 @@ Opt fixture counts from `test/opt/fixtures.tsv`:
 | Fixture kind | Count | Meaning |
 | --- | ---: | --- |
 | `opt-equivalent` | 216 | Normalized local output matches `opt-22` for the listed pass pipeline. |
-| `local-conservative` | 12 | Local output is deliberately narrower or named differently while preserving a documented safety boundary. |
+| `local-conservative` | 15 | Local output is deliberately narrower or named differently while preserving a documented safety boundary. |
 | `parse-preserve-only` | 12 | Fixture proves parser/verifier/printer preservation without transform parity. |
-| Total | 240 | Current opt fixture table size. |
+| Total | 243 | Current opt fixture table size. |
 
 Pass policy counts from the active release pipeline registry:
 
@@ -74,10 +74,10 @@ Pass policy counts from the active release pipeline registry:
 | `zig-release-safe-accepted` | 5 | 0 | 0 | 0 | n/a |
 | `zig-release-fast-accepted` | 5 | 0 | 0 | 0 | n/a |
 | `zig-release-small-accepted` | 5 | 0 | 0 | 0 | n/a |
-| `release-o3` | 22 | 7 | 0 | 0 | 7 |
-| `release-oz` | 15 | 7 | 0 | 0 | 7 |
-| `lto-prelink-o3` | 18 | 6 | 1 | 0 | 6 |
-| `lto-prelink-oz` | 13 | 4 | 1 | 0 | 4 |
+| `release-o3` | 22 | 4 | 3 | 0 | 4 |
+| `release-oz` | 15 | 4 | 3 | 0 | 4 |
+| `lto-prelink-o3` | 18 | 3 | 4 | 0 | 3 |
+| `lto-prelink-oz` | 13 | 3 | 2 | 0 | 3 |
 
 These counts come from the same registry that dispatches passes in
 `src/pipelines.zig`, exposed by `zig build release-pipeline-policy`. A
@@ -92,6 +92,12 @@ budgets. If a pipeline gains or loses placeholders without updating the
 registry and this table, `zig build release-pipeline-policy` and readiness fail.
 This separates "pipeline surface known" from "algorithm implemented" and
 prevents silent placeholder drift.
+
+The active Release O3/Oz placeholder classification lives in
+`docs/roadmap/release_placeholder_classification.md`. The first conservative
+subsets promoted from placeholders are `inferattrs`, `aggressive-instcombine`,
+and `lower-constant-intrinsics`; each remains a bounded local subset rather than
+a full LLVM algorithm parity claim.
 
 ## Remaining Corpus Blockers
 

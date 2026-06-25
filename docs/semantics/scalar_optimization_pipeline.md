@@ -66,8 +66,8 @@ simplifycfg
 jump-threading
 correlated-propagation
 instcombine
-aggressive-instcombine placeholder
-lower-constant-intrinsics placeholder
+aggressive-instcombine conservative subset
+lower-constant-intrinsics conservative subset
 early-cse
 sccp
 gvn
