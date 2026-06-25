@@ -13,6 +13,7 @@ pub const GenericCfgBranchKind = enum {
     je,
     jne,
     jo,
+    jc,
     js,
     jae,
 };
@@ -31,6 +32,7 @@ pub fn appendGenericCfgConditionalBranch(
         .je => .{ .je = label },
         .jne => .{ .jne = label },
         .jo => .{ .jo = label },
+        .jc => .{ .jc = label },
         .js => .{ .js = label },
         .jae => .{ .jae = label },
     });

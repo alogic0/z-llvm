@@ -309,6 +309,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),
             .jne => |label| try writer.print("\tjne .L{s}_{s}\n", .{ function.name, label }),
             .jo => |label| try writer.print("\tjo .L{s}_{s}\n", .{ function.name, label }),
+            .jc => |label| try writer.print("\tjc .L{s}_{s}\n", .{ function.name, label }),
             .jp => |label| try writer.print("\tjp .L{s}_{s}\n", .{ function.name, label }),
             .js => |label| try writer.print("\tjs .L{s}_{s}\n", .{ function.name, label }),
             .jae => |label| try writer.print("\tjae .L{s}_{s}\n", .{ function.name, label }),

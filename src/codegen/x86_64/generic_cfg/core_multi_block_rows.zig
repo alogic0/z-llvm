@@ -508,6 +508,64 @@ pub fn lowerGenericCfgGuardedDynamicPointerLoadReturn(
     return true;
 }
 
+pub fn lowerGenericCfgGuardedDynamicPointerLoadPanicReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 3) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or
+        !function.params.items[1].ty.eql(.{ .int = 64 }) or
+        !function.params.items[2].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return false;
+    const cond_name = switch (condbr.cond) {
+        .named => |name| name,
+        else => return false,
+    };
+    const cond_instruction = findInstruction(entry, cond_name) orelse return false;
+    const icmp = switch (cond_instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .uge or !icmp.operand_ty.eql(.{ .int = 64 })) return false;
+
+    const true_block = blockByName(function, condbr.then_target) orelse return false;
+    const false_block = blockByName(function, condbr.else_target) orelse return false;
+    const true_panic = if (validateNoreturnSliceRuntimeCall(true_block)) |_| true else |_| false;
+    const false_panic = if (validateNoreturnSliceRuntimeCall(false_block)) |_| true else |_| false;
+    if (true_panic == false_panic) return false;
+    const panic_block = if (true_panic) true_block else false_block;
+    const load_block = if (true_panic) false_block else true_block;
+
+    const address = genericCfgDynamicI32LoadReturnAddress(function, entry, load_block) orelse return false;
+    const lhs_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, icmp.lhs) orelse return false;
+    const rhs_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, icmp.rhs) orelse return false;
+    if (address.index_reg != lhs_reg) return false;
+
+    try emitGenericCfgUgeI64ParamCondition(allocator, machine, lhs_reg, rhs_reg);
+    if (true_panic) {
+        try appendGenericCfgConditionalBranch(allocator, machine, .jae, panic_block.name);
+        try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
+        try appendGenericCfgReturn(allocator, machine);
+        try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
+        try emitGenericCfgNoreturnCallBlock(allocator, machine, function, panic_block);
+    } else {
+        try appendGenericCfgConditionalBranch(allocator, machine, .jae, load_block.name);
+        try emitGenericCfgNoreturnCallBlock(allocator, machine, function, panic_block);
+        try appendGenericCfgBlockLabel(allocator, machine, load_block.name);
+        try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
+        try appendGenericCfgReturn(allocator, machine);
+    }
+    return true;
+}
+
 pub fn genericCfgConstantI32Return(block: ir.BasicBlock) ?i32 {
     if (block.instructions.items.len != 0) return null;
     const ret = switch (block.terminator orelse return null) {
@@ -992,6 +1050,177 @@ pub fn lowerGenericCfgGuardedGlobalAddReturn(
     try appendGenericCfgBlockLabel(allocator, machine, overflow_block.name);
     try emitGenericCfgNoreturnCallBlock(allocator, machine, function, overflow_block);
     return true;
+}
+
+pub fn lowerGenericCfgStackCheckedAddReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    const checked = genericCfgStackCheckedAdd(entry) catch |err| switch (err) {
+        error.UnsupportedCodegenInstruction,
+        error.UnsupportedCodegenType,
+        error.UnsupportedCodegenValue,
+        error.BlockWithoutTerminator,
+        error.UnsupportedCodegenControlFlow,
+        => return false,
+    };
+
+    const panic_block = blockByName(function, checked.overflow_target) orelse return error.InvalidBranchTarget;
+    const ok_block = blockByName(function, checked.ret_target) orelse return error.InvalidBranchTarget;
+    try genericCfgValidateStackCheckedAddRet(ok_block, checked.slot_name);
+
+    try emitGenericCfgCheckedAddIntoEax(allocator, machine, function, checked.call);
+    try appendGenericCfgConditionalBranch(allocator, machine, checked.branch_kind, panic_block.name);
+    try appendGenericCfgReturn(allocator, machine);
+
+    try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
+    try emitGenericCfgNoreturnCallBlock(allocator, machine, function, panic_block);
+    return true;
+}
+
+const GenericCfgStackCheckedAdd = struct {
+    call: ir.CallInst,
+    branch_kind: core_cfg_emit.GenericCfgBranchKind,
+    slot_name: []const u8,
+    overflow_target: []const u8,
+    ret_target: []const u8,
+};
+
+fn genericCfgStackCheckedAdd(entry: ir.BasicBlock) !GenericCfgStackCheckedAdd {
+    if (entry.instructions.items.len != 6) return error.UnsupportedCodegenInstruction;
+    const call_name = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const slot_name = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    const flag_ptr_name = entry.instructions.items[3].result orelse return error.UnsupportedCodegenInstruction;
+    const flag_name = entry.instructions.items[4].result orelse return error.UnsupportedCodegenInstruction;
+    const cond_name = entry.instructions.items[5].result orelse return error.UnsupportedCodegenInstruction;
+
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+    if (!call.ret_ty.eql(.{ .aggregate = "{ i32, i1 }" })) return error.UnsupportedCodegenType;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[1].ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+    const branch_kind: core_cfg_emit.GenericCfgBranchKind = if (isCalleeName(call.callee, "llvm.sadd.with.overflow.i32"))
+        .jo
+    else if (isCalleeName(call.callee, "llvm.uadd.with.overflow.i32"))
+        .jc
+    else
+        return error.UnsupportedCodegenInstruction;
+
+    const alloca = switch (entry.instructions.items[1].kind) {
+        .alloca => |alloca| alloca,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!alloca.allocated_ty.eql(.{ .aggregate = "{ i32, i1 }" })) return error.UnsupportedCodegenType;
+
+    const store = switch (entry.instructions.items[2].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(.{ .aggregate = "{ i32, i1 }" }) or !isNamed(store.value, call_name) or !isNamed(store.ptr, slot_name)) {
+        return error.UnsupportedCodegenInstruction;
+    }
+
+    const flag_gep = switch (entry.instructions.items[3].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!flag_gep.source_ty.eql(.{ .int = 8 }) or !isNamed(flag_gep.ptr, slot_name) or flag_gep.indices.items.len != 1) {
+        return error.UnsupportedCodegenInstruction;
+    }
+    const flag_offset = flag_gep.indices.items[0];
+    if (!flag_offset.ty.eql(.{ .int = 64 }) or !isInt(flag_offset.value, 4)) return error.UnsupportedCodegenValue;
+
+    const flag_load = switch (entry.instructions.items[4].kind) {
+        .load => |load| load,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!flag_load.ty.eql(.{ .int = 1 }) or flag_load.attrs.isBarrier() or !isNamed(flag_load.ptr, flag_ptr_name)) {
+        return error.UnsupportedCodegenInstruction;
+    }
+
+    const flag_cmp = switch (entry.instructions.items[5].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (flag_cmp.predicate != .ne or !flag_cmp.operand_ty.eql(.{ .int = 1 }) or
+        !isNamed(flag_cmp.lhs, flag_name) or !isInt(flag_cmp.rhs, 0))
+    {
+        return error.UnsupportedCodegenInstruction;
+    }
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, cond_name)) return error.UnsupportedCodegenValue;
+
+    return .{
+        .call = call,
+        .branch_kind = branch_kind,
+        .slot_name = slot_name,
+        .overflow_target = condbr.then_target,
+        .ret_target = condbr.else_target,
+    };
+}
+
+fn genericCfgValidateStackCheckedAddRet(ok: ir.BasicBlock, slot_name: []const u8) !void {
+    if (ok.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const load_name = ok.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const load = switch (ok.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, slot_name)) return error.UnsupportedCodegenInstruction;
+    const ret = switch (ok.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return error.UnsupportedCodegenValue;
+}
+
+fn emitGenericCfgCheckedAddIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    call: ir.CallInst,
+) !void {
+    const lhs = call.args.items[0].value;
+    const rhs = call.args.items[1].value;
+    if ((paramValueReg(function, lhs, .{ .int = 32 }) catch null)) |reg| {
+        try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+        try emitGenericCfgCheckedAddOperand(allocator, machine, function, rhs);
+        return;
+    }
+    if ((paramValueReg(function, rhs, .{ .int = 32 }) catch null)) |reg| {
+        try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+        try emitGenericCfgCheckedAddOperand(allocator, machine, function, lhs);
+        return;
+    }
+    return error.UnsupportedCodegenValue;
+}
+
+fn emitGenericCfgCheckedAddOperand(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    value: ir.Value,
+) !void {
+    if ((paramValueReg(function, value, .{ .int = 32 }) catch null)) |reg| {
+        try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = reg } });
+        return;
+    }
+    switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
 }
 
 pub fn genericCfgSupportsNegativeI32Guard(function: ir.Function, icmp: ir.IcmpInst) bool {

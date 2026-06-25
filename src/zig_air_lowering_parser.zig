@@ -225,6 +225,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
         return .{ .ir_type = .{ .int = 16 } };
     }
+    if (parseAnonymousStructType(trimmed)) |struct_ty| return struct_ty;
     if (trimmed.len > 1 and trimmed[0] == '?') {
         const child = parseZigType(trimmed[1..]) orelse return null;
         if (child.ir_type == .int and (child.ir_type.int == 32 or child.ir_type.int == 64)) return child;
@@ -249,6 +250,45 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         };
     }
     return null;
+}
+
+pub fn parseAnonymousStructType(trimmed: []const u8) ?ZigType {
+    const prefix = "struct {";
+    if (!std.mem.startsWith(u8, trimmed, prefix) or !std.mem.endsWith(u8, trimmed, "}")) return null;
+    const body = std.mem.trim(u8, trimmed[prefix.len .. trimmed.len - 1], " ");
+    if (body.len == 0) return null;
+
+    var fields = splitTopLevel(body, ',');
+    var aggregate: std.ArrayList(u8) = .empty;
+    aggregate.appendSlice(std.heap.page_allocator, "{ ") catch return null;
+    var count: usize = 0;
+    while (fields.next()) |field| {
+        const field_ty = parseZigType(std.mem.trim(u8, field, " ")) orelse return null;
+        if (count > 0) aggregate.appendSlice(std.heap.page_allocator, ", ") catch return null;
+        appendIrTypeText(&aggregate, field_ty.ir_type) catch return null;
+        count += 1;
+    }
+    if (count == 0) return null;
+    aggregate.appendSlice(std.heap.page_allocator, " }") catch return null;
+    return .{ .ir_type = .{ .aggregate = aggregate.toOwnedSlice(std.heap.page_allocator) catch return null } };
+}
+
+fn appendIrTypeText(aggregate: *std.ArrayList(u8), ty: ir.Type) !void {
+    switch (ty) {
+        .void => try aggregate.appendSlice(std.heap.page_allocator, "void"),
+        .int => |bits| {
+            const text = try std.fmt.allocPrint(std.heap.page_allocator, "i{}", .{bits});
+            try aggregate.appendSlice(std.heap.page_allocator, text);
+        },
+        .float => try aggregate.appendSlice(std.heap.page_allocator, "float"),
+        .double => try aggregate.appendSlice(std.heap.page_allocator, "double"),
+        .x86_fp80 => try aggregate.appendSlice(std.heap.page_allocator, "x86_fp80"),
+        .fp128 => try aggregate.appendSlice(std.heap.page_allocator, "fp128"),
+        .metadata => try aggregate.appendSlice(std.heap.page_allocator, "metadata"),
+        .ptr => try aggregate.appendSlice(std.heap.page_allocator, "ptr"),
+        .aggregate => |text| try aggregate.appendSlice(std.heap.page_allocator, text),
+        .vector => return error.UnsupportedAir,
+    }
 }
 
 pub fn parseZigArrayType(trimmed: []const u8) ?ZigType {
@@ -573,6 +613,7 @@ pub fn isGenericTypedCfgBranchBody(
 ) bool {
     const structured_air_v2 = function.structured_air_v2 orelse return false;
     if (typedReturnBody(structured_air_v2, body)) return true;
+    if (typedNoreturnBody(structured_air_v2, body)) return true;
     var saw_branch = false;
     for (body.instructions) |instruction_index| {
         const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
@@ -774,6 +815,7 @@ pub fn isIgnoredOpcode(opcode: []const u8) bool {
 pub fn isStraightLineOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "arg") or
         isArithmeticOpcode(opcode) or
+        std.mem.eql(u8, opcode, "add_with_overflow") or
         std.mem.startsWith(u8, opcode, "cmp_") or
         isCastOpcode(opcode) or
         std.mem.eql(u8, opcode, "alloc") or
@@ -801,6 +843,7 @@ pub fn isStraightLineOpcode(opcode: []const u8) bool {
 pub fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "arg") or
         isArithmeticOpcode(opcode) or
+        std.mem.eql(u8, opcode, "add_with_overflow") or
         std.mem.startsWith(u8, opcode, "cmp_") or
         isCastOpcode(opcode) or
         std.mem.eql(u8, opcode, "alloc") or
@@ -830,7 +873,7 @@ pub fn isFieldPtrOpcode(opcode: []const u8) bool {
 
 pub fn isPlainFieldPointerChild(ty: ir.Type) bool {
     return switch (ty) {
-        .int => |bits| bits != 1 and bits % 8 == 0,
+        .int => |bits| bits == 1 or bits % 8 == 0,
         .float, .double, .ptr => true,
         .aggregate => true,
         .void, .x86_fp80, .fp128, .metadata, .vector => false,

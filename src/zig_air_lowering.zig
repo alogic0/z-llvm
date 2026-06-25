@@ -921,6 +921,8 @@ const LoweringContext = struct {
         if (isIgnoredOpcode(instruction.opcode)) return;
         if (std.mem.eql(u8, instruction.opcode, "arg")) {
             try self.lowerTypedArg(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "add_with_overflow")) {
+            try self.lowerTypedAddWithOverflow(instruction);
         } else if (isArithmeticOpcode(instruction.opcode)) {
             try self.lowerTypedBinary(instruction);
         } else if (std.mem.startsWith(u8, instruction.opcode, "cmp_")) {
@@ -1013,6 +1015,34 @@ const LoweringContext = struct {
         });
         self.values[instruction.index] = .{
             .ty = lhs.ty,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedAddWithOverflow(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 2) return error.UnsupportedAir;
+        const lhs = try self.resolveTypedOperand(instruction, 0);
+        const rhs = try self.resolveTypedOperand(instruction, 1);
+        if (!lhs.ty.ir_type.eql(.{ .int = 32 }) or !rhs.ty.ir_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+        if (!lhs.ty.ir_type.eql(rhs.ty.ir_type)) return error.UnsupportedAir;
+        const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (!result_type.ir_type.eql(.{ .aggregate = "{ i32, i1 }" })) return error.UnsupportedAir;
+
+        const result_name = try self.resultName(instruction.index);
+        var call: ir.CallInst = .{
+            .ret_ty = result_type.ir_type,
+            .callee = if (lhs.ty.signed) "llvm.sadd.with.overflow.i32" else "llvm.uadd.with.overflow.i32",
+            .args = .empty,
+        };
+        errdefer call.deinit(self.allocator);
+        try call.args.append(self.allocator, .{ .ty = lhs.ty.ir_type, .value = lhs.value });
+        try call.args.append(self.allocator, .{ .ty = rhs.ty.ir_type, .value = rhs.value });
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .call = call },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
             .value = .{ .named = result_name },
         };
     }
@@ -2126,6 +2156,7 @@ const LoweringContext = struct {
                 };
             }
             if (try self.resolveStringLiteralPointer(literal)) |string_pointer| return string_pointer;
+            if (try self.resolveStringLiteralSlice(instruction, operand_index, literal)) |string_slice| return string_slice;
             return parseConstant(literal) orelse error.UnsupportedAir;
         }
         if (std.mem.eql(u8, operand.kind, "none")) return error.UnsupportedAir;
@@ -2148,6 +2179,71 @@ const LoweringContext = struct {
             .ty = ty,
             .value = .{ .named = try ownPrint(self.module, "@{s}", .{symbol}) },
         };
+    }
+
+    fn resolveStringLiteralSlice(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+        operand_index: usize,
+        literal: []const u8,
+    ) !?TypedValue {
+        if (!std.mem.startsWith(u8, literal, "<") or !std.mem.endsWith(u8, literal, ">")) return null;
+        var fields = splitTopLevel(literal[1 .. literal.len - 1], ',');
+        const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+        const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+        if (fields.next() != null) return null;
+        const ty = parseZigType(type_text) orelse return null;
+        if (!ty.ir_type.eql(.{ .aggregate = "{ ptr, i64 }" })) return null;
+
+        const slice = parseStringSliceLiteral(value_text) orelse return null;
+        const global_len = cStringLiteralByteLen(slice.body) orelse return null;
+        const symbol = try self.ensureStringLiteralGlobal(slice.body, global_len);
+
+        const ptr_name = try ownPrint(self.module, "air{}_op{}_slice_ptr", .{ instruction.index, operand_index });
+        try self.block.instructions.append(self.allocator, .{
+            .result = ptr_name,
+            .kind = .{ .insertvalue = .{
+                .aggregate_ty = ty.ir_type,
+                .aggregate = .undef,
+                .value_ty = .ptr,
+                .value = .{ .named = try ownPrint(self.module, "@{s}", .{symbol}) },
+                .indices = "0",
+            } },
+        });
+
+        const result_name = try ownPrint(self.module, "air{}_op{}_slice", .{ instruction.index, operand_index });
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .insertvalue = .{
+                .aggregate_ty = ty.ir_type,
+                .aggregate = .{ .named = ptr_name },
+                .value_ty = .{ .int = 64 },
+                .value = .{ .int = slice.len },
+                .indices = "1",
+            } },
+        });
+        return .{
+            .ty = ty,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    const StringSliceLiteral = struct {
+        body: []const u8,
+        len: i128,
+    };
+
+    fn parseStringSliceLiteral(text: []const u8) ?StringSliceLiteral {
+        if (text.len < 2 or text[0] != '"') return null;
+        const quote_end = std.mem.lastIndexOfScalar(u8, text, '"') orelse return null;
+        if (quote_end == 0) return null;
+        const body = text[1..quote_end];
+        const suffix = text[quote_end + 1 ..];
+        const range_prefix = "[0..";
+        if (!std.mem.startsWith(u8, suffix, range_prefix) or !std.mem.endsWith(u8, suffix, "]")) return null;
+        const len = std.fmt.parseInt(i128, suffix[range_prefix.len .. suffix.len - 1], 10) catch return null;
+        if (len < 0) return null;
+        return .{ .body = body, .len = len };
     }
 
     fn ensureStringLiteralGlobal(self: *LoweringContext, body: []const u8, byte_len: usize) ![]const u8 {

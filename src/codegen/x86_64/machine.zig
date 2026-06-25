@@ -385,6 +385,7 @@ pub const Instruction = union(enum) {
     je: []const u8,
     jne: []const u8,
     jo: []const u8,
+    jc: []const u8,
     jp: []const u8,
     js: []const u8,
     jae: []const u8,

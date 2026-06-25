@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=437
-structured_functions=437
-generic_codegen_functions=437
-generic_cfg_functions=437
+discovered_functions=440
+structured_functions=440
+generic_codegen_functions=440
+generic_cfg_functions=440
 structural_matcher_functions=0
-structured_air_v2_functions=437
-typed_air_operand_functions=437
+structured_air_v2_functions=440
+typed_air_operand_functions=440
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=437
+generic_lowering_functions=440
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=437
+object_emitted_functions=440
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -112,14 +112,16 @@ Closed in the current runtime/safety-edge slice:
   runtime blocks now route through generic CFG
 - new frontier rows cover parameter-derived, computed, and loaded panic-slice
   lengths while keeping stable executable probes on the non-panic path
+- child-process negative-path executable proof covers non-constant panic-slice
+  calls, explicit signed/unsigned checked-overflow panic rows, and ReleaseSafe
+  bounds/null/int-conversion panic rows
 
 Remaining runtime/safety-edge debt:
 
 - phi-selected panic-slice lengths are still only supported when they collapse
   to the current one-incoming helper form
-- child-process negative-path executable proof for the panic paths is still
-  future work; current harnesses link trap stubs and execute stable non-panic
-  paths
+- arbitrary panic payload forms and loaded/computed payloads outside the current
+  slice-pointer plus i64-length subset remain future runtime-call work
 
 Closed in the current memory/aggregate frontier slice:
 

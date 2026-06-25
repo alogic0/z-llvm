@@ -9,6 +9,18 @@ export fn frontier_checked_uadd(value: u32) u32 {
     return value + 19;
 }
 
+export fn frontier_explicit_sadd_overflow(value: i32) i32 {
+    const checked = @addWithOverflow(value, 11);
+    if (checked[1] != 0) @panic("frontier signed add overflow");
+    return checked[0];
+}
+
+export fn frontier_explicit_uadd_overflow(value: u32) u32 {
+    const checked = @addWithOverflow(value, 19);
+    if (checked[1] != 0) @panic("frontier unsigned add overflow");
+    return checked[0];
+}
+
 export fn frontier_bounds_guard(value: *const i32, len: usize, index: usize) i32 {
     _ = len;
     _ = index;
@@ -16,6 +28,11 @@ export fn frontier_bounds_guard(value: *const i32, len: usize, index: usize) i32
 }
 
 export fn frontier_bounds_direct(values: [*]const i32, index: usize) i32 {
+    return values[index];
+}
+
+export fn frontier_bounds_panic(values: [*]const i32, len: usize, index: usize) i32 {
+    if (index >= len) @panic("frontier bounds panic");
     return values[index];
 }
 

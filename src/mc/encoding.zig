@@ -429,6 +429,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0x80 });
                 try appendI32(&bytes, allocator, @intCast(displacement));
             },
+            .jc => |label| {
+                const target = offsets.get(label) orelse return error.InvalidBranchTarget;
+                const next = offset + instructionSize(instruction);
+                const displacement: i64 = @as(i64, @intCast(target)) - @as(i64, @intCast(next));
+                if (displacement < std.math.minInt(i32) or displacement > std.math.maxInt(i32)) return error.BranchOutOfRange;
+                try bytes.appendSlice(allocator, &.{ 0x0f, 0x82 });
+                try appendI32(&bytes, allocator, @intCast(displacement));
+            },
             .jp => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
                 const next = offset + instructionSize(instruction);
@@ -659,7 +667,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .base64_raw_args_to_decode4_regs => @intCast(base64RawArgsToDecode4RegsBytes().len),
         .base64_decode4_from_table_rax => @intCast(base64Decode4FromTableRaxBytes().len),
         .ud2 => 2,
-        .je, .jne, .jo, .jp, .js, .jae, .jle => 6,
+        .je, .jne, .jo, .jc, .jp, .js, .jae, .jle => 6,
         .jmp => 5,
         .ret => 1,
     };
