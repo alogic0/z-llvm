@@ -656,7 +656,7 @@ pub fn appendSysVStackAggregatePassThroughArgs(
         while (index < stack_eightbytes) : (index += 1) {
             if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
             const offset = 8 + (pass.source.stack_eightbytes + index) * 8;
-            if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
             stack_args[stack_arg_count.*] = .{ .stack_disp = @intCast(offset) };
             stack_arg_count.* += 1;
         }
@@ -691,7 +691,7 @@ pub fn appendSysVStackAggregatePassThroughArgs(
         _ = pass.classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi;
         if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
         const offset = 8 + (pass.source.stack_eightbytes + eightbyte_index) * 8;
-        if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+        if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
         stack_args[stack_arg_count.*] = .{ .stack_disp = @intCast(offset) };
         stack_arg_count.* += 1;
     }
@@ -754,7 +754,7 @@ pub fn appendSysVMemoryAggregateStackPassThroughArgs(
     var index: usize = 0;
     while (index < stack_arg_count) : (index += 1) {
         const offset = 8 + (source.stack_eightbytes + index) * 8;
-        if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+        if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
         stack_args[index] = .{ .stack_disp = @intCast(offset) };
     }
 
@@ -808,7 +808,7 @@ pub fn sysvScalarCallNeedsStackArgs(call: ir.CallInst) bool {
 
 pub const StackScalarCallArg = union(enum) {
     imm: i32,
-    stack_disp: u8,
+    stack_disp: u32,
     arg_reg: ArgReg,
     xmm_reg: XmmReg,
     byval_ptr_disp: struct {

@@ -382,6 +382,82 @@ export fn frontier_register_array_pair_call_sum_after_six(value: ArrayPair) i64 
     return helperArrayPairSumAfterSix(1, 2, 3, 4, 5, 6, value);
 }
 
+export fn frontier_deep_stack_array_pair_call_sum_after_six(
+    a0: i64,
+    a1: i64,
+    a2: i64,
+    a3: i64,
+    a4: i64,
+    a5: i64,
+    a6: i64,
+    a7: i64,
+    a8: i64,
+    a9: i64,
+    a10: i64,
+    a11: i64,
+    a12: i64,
+    a13: i64,
+    a14: i64,
+    a15: i64,
+    a16: i64,
+    a17: i64,
+    a18: i64,
+    a19: i64,
+    a20: i64,
+    a21: i64,
+    a22: i64,
+    a23: i64,
+    a24: i64,
+    a25: i64,
+    a26: i64,
+    a27: i64,
+    a28: i64,
+    a29: i64,
+    a30: i64,
+    a31: i64,
+    a32: i64,
+    a33: i64,
+    a34: i64,
+    a35: i64,
+    a36: i64,
+    a37: i64,
+    value: ArrayPair,
+) i64 {
+    _ = a6;
+    _ = a7;
+    _ = a8;
+    _ = a9;
+    _ = a10;
+    _ = a11;
+    _ = a12;
+    _ = a13;
+    _ = a14;
+    _ = a15;
+    _ = a16;
+    _ = a17;
+    _ = a18;
+    _ = a19;
+    _ = a20;
+    _ = a21;
+    _ = a22;
+    _ = a23;
+    _ = a24;
+    _ = a25;
+    _ = a26;
+    _ = a27;
+    _ = a28;
+    _ = a29;
+    _ = a30;
+    _ = a31;
+    _ = a32;
+    _ = a33;
+    _ = a34;
+    _ = a35;
+    _ = a36;
+    _ = a37;
+    return helperArrayPairSumAfterSix(a0, a1, a2, a3, a4, a5, value);
+}
+
 noinline fn helperArrayDoubleSum(value: ArrayDouble) f64 {
     return value.values[0] + value.values[1];
 }

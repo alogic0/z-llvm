@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=399`,
-`generic_codegen_functions=399`, `generic_cfg_functions=399`,
+three release modes at `source_rows=13`, `discovered_functions=400`,
+`generic_codegen_functions=400`, `generic_cfg_functions=400`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=399`, `object_failures=0`,
+`object_emitted_functions=400`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -406,6 +406,8 @@ field add-chain reads, nested mixed aggregate field reads/construction,
 stack-passed register aggregate field reads after GPR exhaustion,
 array-in-struct INTEGER aggregate sums, stack-sourced INTEGER aggregate
 forwarding into outgoing stack aggregate slots after callee GPR exhaustion,
+deep stack-sourced INTEGER aggregate forwarding into outgoing stack aggregate
+slots with disp32 reloads,
 register-sourced INTEGER aggregate stack forwarding before scalar call-register
 assignment, register-sourced SSE/SSE aggregate stack forwarding before scalar
 FP call-register assignment, and a reusable

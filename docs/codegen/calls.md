@@ -480,6 +480,8 @@ named stack-passed i32 parameter loading into outgoing GPR call registers
 selected computed block-local i32/i64 values pushed into outgoing stack call slots
 mixed integer/SSE scalar call streams
 selected small INTEGER/INTEGER aggregate return and argument-field reads
+selected deep stack-sourced INTEGER aggregate forwarding into outgoing stack
+slots with disp32 reloads
 selected mixed INTEGER/SSE aggregate argument-field reads
 selected reversed mixed SSE/INTEGER aggregate argument-field reads
 selected SSE/SSE aggregate argument-field reads and register returns

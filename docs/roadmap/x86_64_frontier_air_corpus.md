@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=399
-structured_functions=399
-generic_codegen_functions=399
-generic_cfg_functions=399
+discovered_functions=400
+structured_functions=400
+generic_codegen_functions=400
+generic_cfg_functions=400
 structural_matcher_functions=0
-structured_air_v2_functions=399
-typed_air_operand_functions=399
+structured_air_v2_functions=400
+typed_air_operand_functions=400
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=399
+generic_lowering_functions=400
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=399
+object_emitted_functions=400
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -248,7 +248,10 @@ Closed in the current memory/aggregate frontier slice:
   argument forwarding without register-slot assumptions; the
   `frontier_register_array_pair_call_sum_after_six` row proves the companion
   register-sourced form by pushing the aggregate eightbytes before the six
-  leading scalar call arguments reuse `%rdi`/`%rsi`
+  leading scalar call arguments reuse `%rdi`/`%rsi`; the
+  `frontier_deep_stack_array_pair_call_sum_after_six` row places the incoming
+  aggregate past the disp8 stack window and proves disp32 stack-source
+  aggregate forwarding into outgoing stack slots
 - stack-passed nested mixed aggregate row in
   `frontier_sysv_aggregate_classes.zig`:
   `frontier_stack_nested_mixed_call_int_after_pressure` exhausts both the GPR

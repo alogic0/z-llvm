@@ -171,7 +171,8 @@ aggregate argument field reads and register aggregate return:
   stack-passed INTEGER aggregate parameters can now be forwarded into outgoing register aggregate helper calls by loading the source stack eightbytes into the destination GPR pair
   stack-passed INTEGER/INTEGER aggregate parameters can also be forwarded into
   outgoing stack aggregate slots when preceding scalar arguments exhaust the
-  callee GPR stream
+  callee GPR stream, including incoming aggregates that require disp32
+  stack-source reloads
   register-sourced INTEGER/INTEGER aggregates use the same stack destination
   path and are pushed before scalar call arguments are assigned, so source GPRs
   are not clobbered by outgoing `%rdi`/`%rsi` reuse
