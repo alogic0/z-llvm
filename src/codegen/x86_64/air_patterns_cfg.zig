@@ -129,7 +129,6 @@ pub fn lowerCall(
             };
             try appendIndirectCallRaxWithStackArgs(allocator, machine, call.ret_ty, stack_arg_count);
         } else {
-            if (sysv_abi.callHasByvalArgAttrs(call)) return error.UnsupportedLiveAcrossCall;
             try appendAlignedCallPreservingI32Params(
                 allocator,
                 machine,

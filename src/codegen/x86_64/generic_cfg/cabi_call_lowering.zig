@@ -931,8 +931,10 @@ pub fn appendAlignedCallPreservingI32Params(
                 .frame_index = .slot0,
                 .reg = live_params.regs[0],
             } });
-            try setupSysVCallTarget(allocator, machine, call_target);
+            const delayed_target_setup = callTargetNeedsDelayedSetup(call_target, call);
+            if (!delayed_target_setup) try setupSysVCallTarget(allocator, machine, call_target);
             const emission = try appendSysVScalarCallArgsWithBlockAndAlignment(allocator, machine, function, null, call, .already_aligned);
+            if (delayed_target_setup) try setupSysVCallTarget(allocator, machine, call_target);
             try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
             try appendCallStackCleanupBytes(allocator, machine, emission.cleanup_bytes);
             try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
@@ -951,8 +953,10 @@ pub fn appendAlignedCallPreservingI32Params(
                     .reg = live_params.regs[index],
                 } });
             }
-            try setupSysVCallTarget(allocator, machine, call_target);
+            const delayed_target_setup = callTargetNeedsDelayedSetup(call_target, call);
+            if (!delayed_target_setup) try setupSysVCallTarget(allocator, machine, call_target);
             const emission = try appendSysVScalarCallArgsWithBlockAndAlignment(allocator, machine, function, null, call, .already_aligned);
+            if (delayed_target_setup) try setupSysVCallTarget(allocator, machine, call_target);
             try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
             try appendCallStackCleanupBytes(allocator, machine, emission.cleanup_bytes);
             index = 0;
@@ -966,6 +970,13 @@ pub fn appendAlignedCallPreservingI32Params(
         },
         else => return error.UnsupportedLiveAcrossCall,
     }
+}
+
+fn callTargetNeedsDelayedSetup(call_target: SysVCallTarget, call: ir.CallInst) bool {
+    return switch (call_target) {
+        .direct => false,
+        .indirect_from_reg => sysv_abi.callHasByvalArgAttrs(call),
+    };
 }
 
 pub fn frameIndexForLiveParam(index: usize) FrameIndex {

@@ -2027,10 +2027,30 @@ test "x86_64 codegen accepts supported byval stack-copy call ABI subset" {
     var indirect_byval_live_module = try ir.Module.parse(std.testing.allocator, indirect_byval_live_input);
     defer indirect_byval_live_module.deinit();
     try indirect_byval_live_module.verify();
-    try std.testing.expectError(
-        error.UnsupportedLiveAcrossCall,
-        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_byval_live_module.target_triple.?, indirect_byval_live_module.functions.items[0]),
-    );
+    var indirect_byval_live_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, indirect_byval_live_module.target_triple.?, indirect_byval_live_module.functions.items[0]);
+    defer indirect_byval_live_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(indirect_byval_live_machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rdx } });
+    var live_payload_load_index: ?usize = null;
+    var live_target_setup_index: ?usize = null;
+    var live_indirect_call_index: ?usize = null;
+    for (indirect_byval_live_machine.instructions.items, 0..) |instruction, index| {
+        switch (instruction) {
+            .load_arg_ptr_disp8_rax => |load| {
+                if (load.reg == .rsi and load.offset == 0) live_payload_load_index = index;
+            },
+            .mov_arg_rax => |reg| {
+                if (reg == .rdi) live_target_setup_index = index;
+            },
+            .indirect_call_rax => |ret_ty| {
+                if (ret_ty == .void) live_indirect_call_index = index;
+            },
+            else => {},
+        }
+    }
+    try std.testing.expect((live_payload_load_index orelse return error.TestExpectedEqual) < (live_target_setup_index orelse return error.TestExpectedEqual));
+    try std.testing.expect((live_target_setup_index orelse return error.TestExpectedEqual) < (live_indirect_call_index orelse return error.TestExpectedEqual));
+    try expectMachineInstruction(indirect_byval_live_machine.instructions.items, .{ .add_rsp_imm8 = 16 });
+    try expectMachineInstruction(indirect_byval_live_machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot0 } });
 }
 
 test "x86_64 codegen accepts two-eightbyte byval stack-copy calls" {
