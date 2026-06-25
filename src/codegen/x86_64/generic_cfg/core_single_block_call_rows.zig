@@ -1,0 +1,21 @@
+const impl = @import("core_single_block_rows_impl.zig");
+
+pub const lowerGenericCfgSingleBlockEffectBarrier = impl.lowerGenericCfgSingleBlockEffectBarrier;
+pub const lowerGenericCfgSingleBlockVoidCallMain = impl.lowerGenericCfgSingleBlockVoidCallMain;
+pub const lowerGenericCfgSingleBlockDirectCallMain = impl.lowerGenericCfgSingleBlockDirectCallMain;
+pub const lowerGenericCfgSingleBlockCallChainMain = impl.lowerGenericCfgSingleBlockCallChainMain;
+pub const lowerGenericCfgMultiBlockCallGlobalCheckMain = impl.lowerGenericCfgMultiBlockCallGlobalCheckMain;
+pub const lowerGenericCfgMultiBlockTwoCallCheckMain = impl.lowerGenericCfgMultiBlockTwoCallCheckMain;
+pub const lowerGenericCfgSingleBlockUpdateGetMain = impl.lowerGenericCfgSingleBlockUpdateGetMain;
+pub const lowerGenericCfgSingleBlockCallCheckMain = impl.lowerGenericCfgSingleBlockCallCheckMain;
+pub const lowerGenericCfgSingleBlockIntCallCheckMainReturn = impl.lowerGenericCfgSingleBlockIntCallCheckMainReturn;
+pub const lowerGenericCfgSingleBlockFpCallCheckMainReturn = impl.lowerGenericCfgSingleBlockFpCallCheckMainReturn;
+pub const lowerGenericCfgSingleBlockBoolCallCheckMainReturn = impl.lowerGenericCfgSingleBlockBoolCallCheckMainReturn;
+pub const genericCfgSupportsConstantWrapperCall = impl.genericCfgSupportsConstantWrapperCall;
+pub const genericCfgSupportsConstantWrapperCallArg = impl.genericCfgSupportsConstantWrapperCallArg;
+pub const genericCfgGlobalPtrArg = impl.genericCfgGlobalPtrArg;
+pub const genericCfgSupportsUnaryPtrSiblingCall = impl.genericCfgSupportsUnaryPtrSiblingCall;
+pub const genericCfgCallEqExpected = impl.genericCfgCallEqExpected;
+pub const emitGenericCfgUnaryPtrCallArg = impl.emitGenericCfgUnaryPtrCallArg;
+pub const genericCfgCallTargetsWrapperSibling = impl.genericCfgCallTargetsWrapperSibling;
+pub const lowerGenericCfgSingleBlockVoid = impl.lowerGenericCfgSingleBlockVoid;
