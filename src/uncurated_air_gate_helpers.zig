@@ -117,6 +117,7 @@ pub const StrictFinishCounters = struct {
     structured_functions: usize,
     generic_codegen_functions: usize,
     generic_cfg_functions: usize,
+    structural_matcher_functions: usize,
     structured_air_v2_functions: usize,
     typed_air_operand_functions: usize,
     legacy_air_text_lowering_functions: usize,
@@ -145,13 +146,8 @@ pub fn validateStrictFinish(counters: StrictFinishCounters) !void {
     try expectStrict(counters.mode, "discovered_functions", counters.discovered_functions, expected_functions);
     try expectStrict(counters.mode, "structured_functions", counters.structured_functions, expected_functions);
     try expectStrict(counters.mode, "generic_codegen_functions", counters.generic_codegen_functions, expected_functions);
-    if (counters.generic_cfg_functions == 0) {
-        std.debug.print(
-            "strict-finish-failure mode={s} field=generic_cfg_functions expected=>0 actual=0\n",
-            .{counters.mode.name()},
-        );
-        return error.StrictFinishFailed;
-    }
+    try expectStrict(counters.mode, "generic_cfg_functions", counters.generic_cfg_functions, expected_functions);
+    try expectStrict(counters.mode, "structural_matcher_functions", counters.structural_matcher_functions, 0);
     try expectStrict(counters.mode, "structured_air_v2_functions", counters.structured_air_v2_functions, expected_functions);
     try expectStrict(counters.mode, "typed_air_operand_functions", counters.typed_air_operand_functions, expected_functions);
     try expectStrict(counters.mode, "legacy_air_text_lowering_functions", counters.legacy_air_text_lowering_functions, 0);

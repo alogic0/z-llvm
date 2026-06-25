@@ -506,6 +506,7 @@ pub fn main(init: std.process.Init) !void {
             .structured_functions = structured_functions,
             .generic_codegen_functions = generic_codegen_functions,
             .generic_cfg_functions = generic_cfg_functions,
+            .structural_matcher_functions = structural_matcher_functions,
             .structured_air_v2_functions = structured_air_v2_functions,
             .typed_air_operand_functions = typed_air_operand_functions,
             .legacy_air_text_lowering_functions = legacy_air_text_lowering_functions,
@@ -519,7 +520,6 @@ pub fn main(init: std.process.Init) !void {
         });
     }
 }
-
 
 const helpers = @import("uncurated_air_gate_helpers.zig");
 

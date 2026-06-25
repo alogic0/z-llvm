@@ -178,6 +178,18 @@ pub fn build(b: *std.Build) void {
         .variant = .executable_strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-air-release-expanded",
+        .description = "Strict expanded x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
+        .corpus = "expanded",
+        .variant = .executable_strict_finish,
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-air-release-scale",
+        .description = "Scale x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
+        .corpus = "scale",
+        .variant = .object_executable_progress,
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-zig-air-uncurated-release-expanded-finish",
         .description = "Strict finish-line gate for expanded x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR v2 ownership and object emission",
         .corpus = "expanded",
@@ -259,6 +271,7 @@ const UncuratedAirVariant = enum {
     object_inspection,
     native_link_progress,
     executable_progress,
+    object_executable_progress,
     strict_finish,
     executable_strict_finish,
 };
@@ -313,6 +326,10 @@ fn addUncuratedAirArgs(run_cmd: *std.Build.Step.Run, spec: UncuratedAirGateSpec)
         .object_inspection => run_cmd.addArg("--object-inspection"),
         .native_link_progress => run_cmd.addArg("--native-link-progress"),
         .executable_progress => run_cmd.addArg("--executable-progress"),
+        .object_executable_progress => {
+            run_cmd.addArg("--object-progress");
+            run_cmd.addArg("--executable-progress");
+        },
         .strict_finish => {
             run_cmd.addArg("--object-progress");
             run_cmd.addArg("--strict-finish");

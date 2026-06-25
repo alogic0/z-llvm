@@ -545,13 +545,32 @@ pub fn lowerGenericCfgGuardedOptionalPointerBranchReturn(
 }
 
 pub fn genericCfgGuardPanicBlock(block: ir.BasicBlock) bool {
-    if (block.instructions.items.len != 1) return false;
-    const call = switch (block.instructions.items[0].kind) {
+    if (block.instructions.items.len == 0 or block.instructions.items.len > 2) return false;
+    var call_index: usize = 0;
+    if (block.instructions.items.len == 2) {
+        validateAssumeColdCall(block.instructions.items[0]) catch return false;
+        call_index = 1;
+    }
+    const call = switch (block.instructions.items[call_index].kind) {
         .call => |call| call,
         else => return false,
     };
-    if (call.ret_ty != .void or call.args.items.len != 0 or call.callee_value != null or call.inline_asm != null) return false;
+    if (call.ret_ty != .void or call.callee_value != null or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (call.args.items.len == 2) {
+        if (call.args.items[0].ty != .ptr) return false;
+        if (!call.args.items[1].ty.eql(.{ .int = 64 })) return false;
+        switch (call.args.items[0].value) {
+            .named => {},
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        }
+        switch (call.args.items[1].value) {
+            .int => |int| _ = i64Value(int) catch return false,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        }
+    } else if (call.args.items.len != 0) {
+        return false;
+    }
     return switch (block.terminator orelse return false) {
         .@"unreachable" => true,
         else => false,

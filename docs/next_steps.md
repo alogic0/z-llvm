@@ -242,7 +242,7 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=151`, `structural_matcher_functions=1`,
+`generic_cfg_functions=152`, `structural_matcher_functions=0`,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,
@@ -261,6 +261,16 @@ panic-edge runtime-boundary lowering. No broad functions now fall back to
 legacy AIR text or shape-recognizer ownership; the closure is recorded in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`.
 
+The last broad structural matcher fallback was
+`test/zig/integrated/runtime_mix_c_add_may_panic_main.zig` /
+`runtime_mix_c_add_may_panic_main.add_may_panic`. Its typed AIR shape is an
+`icmp slt` guard, a cold panic block with `llvm.assume(i1 1)` followed by
+`debug.defaultPanic(ptr, i64)`, and an ok block that loads
+`runtime_mix_c_add_may_panic_main.zig_k`, adds the input, and returns. Generic
+CFG now owns this through guarded global-add lowering with an explicit
+ptr/length panic-call runtime boundary, and the selected mixed C/Zig helper is
+only a fallback after the generic router rejects unsupported variants.
+
 The broad object progress gates now cover all three release modes without LLVM
 TargetMachine. ReleaseFast, ReleaseSafe, and ReleaseSmall each report
 `object_emitted_functions=152`, `object_failures=0`,
@@ -277,8 +287,10 @@ The strict finish-line gate
 `zig build distribution-zig-air-uncurated-release-broad-finish` runs the broad
 ReleaseFast, ReleaseSafe, and ReleaseSmall typed-v2/object paths and fails
 closed if any mode regresses from the 152-function generic lowering and object
-emission target. It remains outside `distribution-all` because it is a
-milestone confirmation gate, not the regular inner loop.
+emission target. `zig build distribution-air-release-broad` adds executable
+proof and fails closed if any mode reports `structural_matcher_functions != 0`.
+It remains outside `distribution-all` because it is a milestone confirmation
+gate, not the regular inner loop.
 
 Expanded corpus frontier:
 `zig build distribution-zig-air-uncurated-releasefast-expanded`,
@@ -326,7 +338,15 @@ executable progress gates are green for all three release modes:
 `native_link_accepted_rows=108`, `executable_ok_rows=108`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
-`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The wider
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The focused
+`zig build distribution-air-release-expanded` gate composes expanded
+discovery, object progress, executable progress, and strict finish for
+ReleaseFast, ReleaseSafe, and ReleaseSmall, and currently reports
+`source_rows=109`, `discovered_functions=199`,
+`generic_cfg_functions=199`, `structural_matcher_functions=0`,
+`object_emitted_functions=199`, `native_link_accepted_rows=108`,
+`executable_ok_rows=108`, `link_only_rows=0`, `runtime_boundary_rows=1`,
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` per mode. The wider
 branch-return and byte-table-return forms from the candidate bucket failed
 closed with typed/control-flow and backend diagnostics and remain the next
 explicit source-frontier work. The memory/CFG bucket now exports the branch
@@ -416,7 +436,15 @@ ReleaseSmall report `native_link_accepted_rows=111`, `link_only_rows=111`,
 executable gates are green for all three modes at
 `native_link_accepted_rows=111`, `executable_ok_rows=111`,
 `link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`,
-`lld_rows=0`, and `local_fail=0`.
+`lld_rows=0`, and `local_fail=0`. The focused
+`zig build distribution-air-release-scale` gate composes scale discovery,
+object progress, and executable progress for ReleaseFast, ReleaseSafe, and
+ReleaseSmall. It currently reports `source_rows=112`,
+`discovered_functions=216`, `generic_cfg_functions=216`,
+`structural_matcher_functions=0`, `object_emitted_functions=216`,
+`native_link_accepted_rows=111`, `executable_ok_rows=111`,
+`link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`,
+`lld_rows=0`, and `local_fail=0` per mode.
 
 Volatile memory roundtrips, broader aggregate field stores, broader global/TLS
 addressing, and larger loop-memory dependencies remain named future generic CFG

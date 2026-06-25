@@ -814,11 +814,6 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
-    if (try air_patterns_global_tls_rows.lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
-    }
-
     if (try lowerSelectedIssue339TestFoo(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -932,6 +927,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try x86_64_generic_cfg.lowerGenericCfgFunction(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try air_patterns_global_tls_rows.lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }

@@ -305,7 +305,8 @@ The strict finish-line gate
 three broad release modes with object emission and fail-closed counter checks.
 It requires each mode to stay at `source_rows=101`,
 `discovered_functions=152`, `structured_functions=152`,
-`generic_codegen_functions=152`, `generic_cfg_functions>0`,
+`generic_codegen_functions=152`, `generic_cfg_functions=152`,
+`structural_matcher_functions=0`,
 `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
@@ -321,8 +322,8 @@ release modes. Each mode reports:
 source_rows=101
 discovered_functions=152
 generic_codegen_functions=152
-generic_cfg_functions=151
-structural_matcher_functions=1
+generic_cfg_functions=152
+structural_matcher_functions=0
 object_emitted_functions=152
 native_link_accepted_rows=100
 executable_ok_rows=100
@@ -334,7 +335,11 @@ lld_rows=0
 local_fail=0
 ```
 
-The single runtime boundary is the named `debug.defaultPanic` row. Optimizer,
+The single runtime boundary is the named `debug.defaultPanic` row. The last
+broad structural fallback was
+`runtime_mix_c_add_may_panic_main.add_may_panic`, whose `icmp` guard,
+`llvm.assume` + `debug.defaultPanic(ptr, i64)` panic block, global load/add,
+and return now lower through the generic guarded global-add CFG path. Optimizer,
 x86_64 lowering, ELF/object emission, and native-link failures are separate
 failure buckets in the underlying gate output; there are currently no local
 failures in any of those buckets for the broad release corpus.
@@ -367,7 +372,10 @@ at `native_link_accepted_rows=108`, `executable_ok_rows=108`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The expanded
-audit lives in `docs/roadmap/x86_64_expanded_air_corpus.md`.
+audit lives in `docs/roadmap/x86_64_expanded_air_corpus.md`. The focused
+`zig build distribution-air-release-expanded` gate composes expanded discovery,
+object progress, executable progress, and strict finish for all three release
+modes and reports these same executable counters per mode.
 
 The selected practical SysV ABI milestone is closed for the expanded frontier:
 the reusable call/frame helpers cover multiple stack-passed integer arguments,
@@ -402,7 +410,10 @@ ReleaseSmall report `native_link_accepted_rows=111`, `link_only_rows=111`,
 modes at `native_link_accepted_rows=111`, `executable_ok_rows=111`,
 `link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`,
 `lld_rows=0`, and `local_fail=0`. The scale audit lives in
-`docs/roadmap/x86_64_scale_air_corpus.md`.
+`docs/roadmap/x86_64_scale_air_corpus.md`. The focused
+`zig build distribution-air-release-scale` gate composes scale discovery,
+object progress, and executable progress for all three release modes and
+reports these same executable counters per mode.
 
 The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasefast-frontier`,

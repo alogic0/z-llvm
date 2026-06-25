@@ -336,8 +336,8 @@ source_rows=101
 discovered_functions=152
 structured_functions=152
 generic_codegen_functions=152
-generic_cfg_functions=151
-structural_matcher_functions=1
+generic_cfg_functions=152
+structural_matcher_functions=0
 structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
@@ -414,11 +414,12 @@ The focused release optimizer milestone gate is
 ReleaseFast, ReleaseSafe, and ReleaseSmall executable-progress path and keeps the
 proof outside `distribution-all` during iteration. Current per-mode counts are
 `source_rows=101`, `discovered_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=151`, `structural_matcher_functions=1`,
+`generic_cfg_functions=152`, `structural_matcher_functions=0`,
 `object_emitted_functions=152`, `native_link_accepted_rows=100`,
 `executable_ok_rows=100`, `link_only_rows=0`, `runtime_boundary_rows=1`,
 `native_link_failures=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
-`local_fail=0`.
+`local_fail=0`. It fails closed if any broad function returns to structural
+matcher fallback.
 
 ### Expanded uncurated release AIR frontier
 
@@ -498,6 +499,15 @@ llvm_targetmachine_rows=0
 lld_rows=0
 local_fail=0
 ```
+
+The focused aggregate gate `zig build distribution-air-release-expanded`
+composes expanded discovery, object progress, executable progress, and strict
+finish for ReleaseFast, ReleaseSafe, and ReleaseSmall. It currently reports
+`source_rows=109`, `discovered_functions=199`,
+`generic_cfg_functions=199`, `structural_matcher_functions=0`,
+`object_emitted_functions=199`, `native_link_accepted_rows=108`,
+`executable_ok_rows=108`, `link_only_rows=0`, `runtime_boundary_rows=1`,
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` per mode.
 
 Zig boundary:
 New frontier only. The slice closes additional scalar CFG, memory, call,
@@ -580,6 +590,15 @@ llvm_targetmachine_rows=0
 lld_rows=0
 local_fail=0
 ```
+
+The focused aggregate gate `zig build distribution-air-release-scale` composes
+scale discovery, object progress, and executable progress for ReleaseFast,
+ReleaseSafe, and ReleaseSmall. It currently reports `source_rows=112`,
+`discovered_functions=216`, `generic_cfg_functions=216`,
+`structural_matcher_functions=0`, `object_emitted_functions=216`,
+`native_link_accepted_rows=111`, `executable_ok_rows=111`,
+`link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`,
+`lld_rows=0`, and `local_fail=0` per mode.
 
 Zig boundary:
 Frontier only. It keeps broad/expanded claims intact while adding broader SysV
