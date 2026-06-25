@@ -1640,6 +1640,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_thirteen_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_thirteen_live_after_call");
     \\extern int z_frontier_fourteen_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_fourteen_live_after_call");
     \\extern int z_frontier_eighteen_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_eighteen_live_after_call");
+    \\extern int z_frontier_deep_stack_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_deep_stack_live_after_call");
     \\extern float z_frontier_f32_live_after_call(float, float) __asm__("frontier_sysv_abi.frontier_f32_live_after_call");
     \\extern double z_frontier_f64_live_after_call(double, double) __asm__("frontier_sysv_abi.frontier_f64_live_after_call");
     \\extern float z_frontier_two_f32_live_sum_after_call(float, float) __asm__("frontier_sysv_abi.frontier_two_f32_live_sum_after_call");
@@ -1949,6 +1950,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_thirteen_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41) != 251) return 31;
     \\    if (z_frontier_fourteen_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43) != 294) return 32;
     \\    if (z_frontier_eighteen_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61) != 514) return 33;
+    \\    if (z_frontier_deep_stack_live_after_call(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40) != 40) return 140;
     \\    if (z_frontier_f32_live_after_call(4.5f, 2.25f) != 4.5f || frontier_seen_f32 != 2.25f) return 9;
     \\    if (z_frontier_f64_live_after_call(9.5, 3.25) != 9.5 || frontier_seen_f64 != 3.25) return 10;
     \\    if (z_frontier_two_f32_live_sum_after_call(1.5f, 2.75f) != 4.25f) return 11;

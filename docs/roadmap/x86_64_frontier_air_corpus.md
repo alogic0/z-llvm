@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=401
-structured_functions=401
-generic_codegen_functions=401
-generic_cfg_functions=401
+discovered_functions=402
+structured_functions=402
+generic_codegen_functions=402
+generic_cfg_functions=402
 structural_matcher_functions=0
-structured_air_v2_functions=401
-typed_air_operand_functions=401
+structured_air_v2_functions=402
+typed_air_operand_functions=402
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=401
+generic_lowering_functions=402
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=401
+object_emitted_functions=402
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -301,8 +301,9 @@ Closed in the current memory/aggregate frontier slice:
   than six stack-passed `i32` parameters are read from the restored incoming
   stack argument area for the post-call add-tree return; current executable
   rows prove seven, eight, twelve, thirteen, fourteen, and eighteen
-  stack-passed live `i32` values within
-  the backend's disp8-safe stack offset model
+  stack-passed live `i32` values, and
+  `frontier_deep_stack_live_after_call` proves post-call reload of a deep
+  stack-passed `i32` parameter through a disp32 incoming stack offset
 - six stack-passed scalar `i32` call arguments in `frontier_sysv_abi.zig`:
   `frontier_six_stack_arg_call` calls a C helper with 12 scalar arguments. The
   backend reserves alignment padding before pushing stack arguments so arg 7 is
@@ -656,7 +657,7 @@ Closed in the current memory/aggregate frontier slice:
 Remaining measured frontier blockers kept out of accepted rows:
 
 - private helper call graphs with stack-passed live values beyond the current
-  disp8-safe selected model, live SSE values beyond the selected no-argument-call
+  selected direct-call/void-call model, live SSE values beyond the selected no-argument-call
   spill shapes and selected direct two-/three-/six-live FP-argument call shapes,
   and arbitrary mixed/non-void live values
   across multiple calls beyond the selected direct/indirect/later-void,

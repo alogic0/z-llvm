@@ -2016,7 +2016,7 @@ pub fn lowerGenericCfgSelectedSretStores(
         if (maybe_src_reg) |src_reg| {
             try appendStoreArg64ArgPtrDisp(allocator, machine, .rdi, src_reg, offset);
         } else {
-            try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try scalarParamStackDisp8(function, function.params.items[pair_index + 1].name, .{ .int = 64 }) });
+            try appendLoadStackDispRax(allocator, machine, try scalarParamStackDisp8(function, function.params.items[pair_index + 1].name, .{ .int = 64 }));
             try appendStoreRaxArgPtrDisp(allocator, machine, .rdi, offset);
         }
     }

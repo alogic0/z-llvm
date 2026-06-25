@@ -231,8 +231,8 @@ accepted frontier:
   selected direct two-/three-/six-live f32/f64 spill/reload across
   one-/two-/five-FP-argument void helper calls
   selected two-live f32/f64 spill/reload across two direct no-argument void calls
-  disp8-safe stack-passed live i32 post-call add-tree rows after local
-  call-frame restoration
+  stack-passed live i32 post-call rows after local call-frame restoration,
+  including a selected disp32 incoming stack reload
   selected two-call six-live i32 GPR spill/reload frames
   selected ordered i32 call-result spill/reload across a later side-effecting
   void C ABI call before the post-call add
@@ -498,7 +498,7 @@ selected live i32 GPR preservation across direct and pointer-callee f64-argument
 selected two-call six-live-i32 spill/reload call frame
 selected two-call two-live f32/f64 direct and pointer-callee spill/reload call frames
 selected mixed i32/i64 one-GPR/one-SSE live direct/pointer-callee spill/reload call frames
-selected disp8-safe stack-passed live i32 post-call add-tree rows
+selected stack-passed live i32 post-call rows including disp32 reload
 selected one-live f32/f64 SSE spill/reload call frame
 selected two-/three-live f32/f64 no-argument-call spill/reload frames
 selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames

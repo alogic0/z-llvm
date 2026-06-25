@@ -49,7 +49,7 @@ pub fn paramRegOrNullWithInitialGpr(function: ir.Function, name: []const u8, ty:
     return null;
 }
 
-pub fn scalarParamStackDisp8(function: ir.Function, name: []const u8, ty: ir.Type) !u8 {
+pub fn scalarParamStackDisp8(function: ir.Function, name: []const u8, ty: ir.Type) !u32 {
     if (!isSysVIntegerParamType(ty) and !ty.eql(.float) and !ty.eql(.double)) return error.UnsupportedCodegenType;
     var gpr_index: usize = 0;
     var sse_index: usize = 0;
@@ -60,7 +60,7 @@ pub fn scalarParamStackDisp8(function: ir.Function, name: []const u8, ty: ir.Typ
             const in_register = if (isSysVIntegerParamType(ty)) gpr_index < 6 else sse_index < 8;
             if (in_register) return error.UnsupportedCodegenAbi;
             const offset = 8 + stack_eightbytes * 8;
-            if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
             return @intCast(offset);
         }
         try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
@@ -89,7 +89,7 @@ pub fn fpParamIndex(function: ir.Function, name: []const u8, ty: ir.Type) !usize
     return error.UnsupportedCodegenValue;
 }
 
-pub fn stackParamDisp8OrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?u8 {
+pub fn stackParamDisp8OrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?u32 {
     if (!isSysVIntegerParamType(ty) and !ty.eql(.float) and !ty.eql(.double)) return error.UnsupportedCodegenType;
     var gpr_index: usize = 0;
     var sse_index: usize = 0;
@@ -100,7 +100,7 @@ pub fn stackParamDisp8OrNull(function: ir.Function, name: []const u8, ty: ir.Typ
             const in_register = if (isSysVIntegerParamType(ty)) gpr_index < 6 else sse_index < 8;
             if (in_register) return null;
             const offset = 8 + stack_eightbytes * 8;
-            if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
             return @intCast(offset);
         }
         try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);

@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=401`,
-`generic_codegen_functions=401`, `generic_cfg_functions=401`,
+three release modes at `source_rows=13`, `discovered_functions=402`,
+`generic_codegen_functions=402`, `generic_cfg_functions=402`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=401`, `object_failures=0`,
+`object_emitted_functions=402`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -412,8 +412,8 @@ register-sourced INTEGER aggregate stack forwarding before scalar call-register
 assignment, register-sourced SSE/SSE aggregate stack forwarding before scalar
 FP call-register assignment, deep stack-sourced SSE/SSE aggregate forwarding
 into outgoing XMM aggregate registers with disp32 reloads, and a reusable
-up-to-six-live-i32 direct-call spill/reload frame plus disp8-safe stack-passed
-live `i32` post-call add-tree rows with executable proof. The selected
+up-to-six-live-i32 direct-call spill/reload frame plus stack-passed
+live `i32` post-call rows, including disp32 stack reload evidence, with executable proof. The selected
 sret/byval-style frontier row adds `{ i64, i64, i64 }`,
 `{ i64, i64, i64, i64 }`, `{ i64, i64, i64, i64, i64 }`,
 `{ i64, i64, i64, i64, i64, i64 }`, and
@@ -477,8 +477,8 @@ live `i32` GPR parameters across direct and pointer-callee `f64`-argument
 The SysV scalar stack frontier now also proves up to eighteen stack-passed
 `i32` call arguments with immediate `%rsp` cleanup,
 seven/eight/twelve/thirteen/fourteen/eighteen
-stack-passed live `i32` values within the current disp8-safe incoming stack
-offset model, named stack-parameter forwarding into outgoing stack argument
+stack-passed live `i32` values plus a deep post-call stack `i32` reload through
+a disp32 incoming stack offset, named stack-parameter forwarding into outgoing stack argument
 slots and outgoing GPR argument registers, typed AIR v2 pointer-callee indirect
 calls that load stack-passed
 parameters into outgoing GPR call slots or forward 12/14 `i32` arguments
@@ -536,7 +536,7 @@ The mixed numeric frontier now lowers typed AIR v2 `sitofp` plus `fadd` or
 codegen and executable C ABI checks.
 Remaining non-accepted
 blockers are helper graphs with
-stack-passed live values beyond the current disp8-safe selected model, broader
+stack-passed live values beyond the current selected direct-call/void-call model, broader
 live SSE values beyond the selected no-argument-call shapes,
 selected direct two-/three-/six-live FP-argument call shapes,
 two-live no-argument and one-FP-argument pointer-callee shapes,
@@ -571,7 +571,7 @@ Big4, Big5, BigDouble, BigDoubleArray, BigArrayMixed, BigFloat, BigPtrDouble,
 BigNested, BigMixed, BigNarrow, and BigArray, plus 5-/6-/7-byte composite
 byval stack-copy tails through `[21 x i8]`, `[22 x i8]`, and `[23 x i8]`,
 arbitrary non-selected sret/byval copies,
-varargs, vectors, stack-passed live values beyond the current disp8-safe selected model,
+varargs, vectors, stack-passed live-value scheduling beyond the current selected model,
 and broader SSE live-across-call frames beyond the selected one-live through
 six-live `f32`/`f64` no-argument-call shapes, two-live repeated no-argument
 direct and pointer-callee shapes, selected mixed one-GPR/one-SSE i32/i64

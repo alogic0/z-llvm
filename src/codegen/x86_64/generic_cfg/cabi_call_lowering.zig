@@ -541,9 +541,9 @@ fn appendParallelXmmArgCopies(
     }
 }
 
-pub fn adjustedIncomingStackDisp8(base_offset: u8, incoming_stack_adjust: usize) !u8 {
+pub fn adjustedIncomingStackDisp8(base_offset: u32, incoming_stack_adjust: usize) !u32 {
     const adjusted = @as(usize, base_offset) + incoming_stack_adjust;
-    if (adjusted > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+    if (adjusted > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
     return @intCast(adjusted);
 }
 
@@ -818,7 +818,7 @@ pub const StackScalarCallArg = union(enum) {
         len: u8,
     },
     byval_stack_ptr_disp: struct {
-        stack_disp: u8,
+        stack_disp: u32,
         offset: u8,
         chunk: ByvalCopyChunk,
         len: u8,
@@ -1311,7 +1311,11 @@ pub fn lowerI32AddTreeReturn(
                 if (try registerParamRegOrNull(function, name, .{ .int = 32 })) |reg| {
                     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = reg } });
                 } else if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
-                    try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = offset });
+                    if (offset <= std.math.maxInt(u8)) {
+                        try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = @intCast(offset) });
+                    } else {
+                        try machine.instructions.append(allocator, .{ .add_stack_disp32_eax = offset });
+                    }
                 } else return false;
             },
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
@@ -1473,7 +1477,11 @@ pub fn appendI32AddTermToEax(
                 return;
             }
             if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
-                try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = offset });
+                if (offset <= std.math.maxInt(u8)) {
+                    try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = @intCast(offset) });
+                } else {
+                    try machine.instructions.append(allocator, .{ .add_stack_disp32_eax = offset });
+                }
                 return;
             }
             return error.UnsupportedCodegenValue;
@@ -1782,7 +1790,11 @@ pub fn emitI32ParamOrStackIntoEax(
         return true;
     }
     if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
-        try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = offset });
+        if (offset <= std.math.maxInt(u8)) {
+            try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(offset) });
+        } else {
+            try machine.instructions.append(allocator, .{ .load_stack_disp32_rax = offset });
+        }
         return true;
     }
     return false;
