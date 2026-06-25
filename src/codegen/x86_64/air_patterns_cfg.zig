@@ -38,6 +38,7 @@ const blockByName = x86_64_generic_cfg.blockByName;
 const findInstruction = x86_64_generic_cfg.findInstruction;
 const liveParamsAfter = x86_64_generic_cfg.liveParamsAfter;
 const singleLiveParamAfter = x86_64_generic_cfg.singleLiveParamAfter;
+const sysvScalarCallNeedsStackArgs = x86_64_generic_cfg.sysvScalarCallNeedsStackArgs;
 const matchIcmpEqParamImm = x86_64_generic_cfg.matchIcmpEqParamImm;
 
 pub fn lowerStraightLineInstructions(
@@ -131,6 +132,7 @@ pub fn lowerCall(
             const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
             try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
         } else {
+            if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
             try appendAlignedDirectCallPreservingI32Params(
                 allocator,
                 machine,
