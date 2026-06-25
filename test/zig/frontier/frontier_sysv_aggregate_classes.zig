@@ -438,6 +438,24 @@ noinline fn helperNestedMixedIntSum(value: NestedMixed) i32 {
     return value.ints.a + value.ints.b;
 }
 
+noinline fn helperNestedMixedIntSumAfterPressure(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, value: NestedMixed) i32 {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = f0;
+    _ = f1;
+    _ = f2;
+    _ = f3;
+    _ = f4;
+    _ = f5;
+    _ = f6;
+    _ = f7;
+    return value.ints.a + value.ints.b;
+}
+
 export fn frontier_nested_mixed_float(value: NestedMixed) f64 {
     return value.value;
 }
@@ -450,6 +468,10 @@ export fn frontier_shifted_nested_mixed_call_int(prefix_int: i64, prefix_float: 
     _ = prefix_int;
     _ = prefix_float;
     return helperNestedMixedIntSum(value);
+}
+
+export fn frontier_stack_nested_mixed_call_int_after_pressure(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, value: NestedMixed) i32 {
+    return helperNestedMixedIntSumAfterPressure(a0, a1, a2, a3, a4, a5, f0, f1, f2, f3, f4, f5, f6, f7, value);
 }
 
 export fn frontier_small_mixed_int(value: SmallMixed) i32 {

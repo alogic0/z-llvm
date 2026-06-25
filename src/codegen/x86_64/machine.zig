@@ -200,6 +200,8 @@ pub const Instruction = union(enum) {
     reload_rsp_eax: FrameIndex,
     spill_rax_rsp: FrameIndex,
     reload_rsp_rax: FrameIndex,
+    load_stack_disp8_eax: u8,
+    load_stack_disp32_eax: u32,
     load_stack_disp8_rax: u8,
     load_stack_disp32_rax: u32,
     load_stack_disp8_u8_eax: u8,

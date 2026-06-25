@@ -1042,8 +1042,11 @@ pub fn emitAggregateIntegerTerm(
                     try appendAddStackDispRax(allocator, machine, offset);
                 }
             } else if (ty.eql(.{ .int = 32 })) {
-                if (first) return error.UnsupportedCodegenAbi;
-                try appendAddStackDispEax(allocator, machine, offset);
+                if (first) {
+                    try appendLoadStackDispEax(allocator, machine, offset);
+                } else {
+                    try appendAddStackDispEax(allocator, machine, offset);
+                }
             } else {
                 return error.UnsupportedCodegenAbi;
             }
@@ -1109,6 +1112,14 @@ pub fn appendLoadStackDispRax(allocator: std.mem.Allocator, machine: *MachineFun
         try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(offset) });
     } else {
         try machine.instructions.append(allocator, .{ .load_stack_disp32_rax = offset });
+    }
+}
+
+pub fn appendLoadStackDispEax(allocator: std.mem.Allocator, machine: *MachineFunction, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .load_stack_disp8_eax = @intCast(offset) });
+    } else {
+        try machine.instructions.append(allocator, .{ .load_stack_disp32_eax = offset });
     }
 }
 
@@ -1527,8 +1538,13 @@ pub fn emitSysVIntegerAggregateFieldLocationReturn(
             }
         },
         .stack => |offset| {
-            if (!field_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenAbi;
-            try appendLoadStackDispRax(allocator, machine, offset);
+            if (field_ty.eql(.{ .int = 64 })) {
+                try appendLoadStackDispRax(allocator, machine, offset);
+            } else if (field_ty.eql(.{ .int = 32 })) {
+                try appendLoadStackDispEax(allocator, machine, offset);
+            } else {
+                return error.UnsupportedCodegenAbi;
+            }
         },
     }
 }

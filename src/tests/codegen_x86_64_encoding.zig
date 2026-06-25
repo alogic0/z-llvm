@@ -128,12 +128,16 @@ test "x86_64 encoding stores eax through argument pointer displacement" {
 test "x86_64 encoding copies narrow stack integers through argument pointer displacement" {
     var machine = codegen.x86_64.MachineFunction.init("copy_narrow_stack_ptr", .void);
     defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp8_eax = 8 });
+    try machine.instructions.append(std.testing.allocator, .{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 0 } });
     try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp8_u8_eax = 16 });
     try machine.instructions.append(std.testing.allocator, .{ .store_al_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 5 } });
     try machine.instructions.append(std.testing.allocator, .{ .load_stack_disp8_u16_eax = 24 });
     try machine.instructions.append(std.testing.allocator, .{ .store_ax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 6 } });
     try machine.instructions.append(std.testing.allocator, .ret);
 
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .load_stack_disp8_eax = 8 }));
+    try std.testing.expectEqual(@as(u32, 2), mc.encoding.instructionSize(.{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 0 } }));
     try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .load_stack_disp8_u8_eax = 16 }));
     try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .store_al_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 5 } }));
     try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .load_stack_disp8_u16_eax = 24 }));
@@ -141,10 +145,11 @@ test "x86_64 encoding copies narrow stack integers through argument pointer disp
     const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
     try std.testing.expectEqualSlices(u8, &.{
-        0x0f, 0xb6, 0x44, 0x24, 0x10,
-        0x88, 0x47, 0x05, 0x0f, 0xb7,
-        0x44, 0x24, 0x18, 0x66, 0x89,
-        0x47, 0x06, 0xc3,
+        0x8b, 0x44, 0x24, 0x08, 0x89,
+        0x07, 0x0f, 0xb6, 0x44, 0x24,
+        0x10, 0x88, 0x47, 0x05, 0x0f,
+        0xb7, 0x44, 0x24, 0x18, 0x66,
+        0x89, 0x47, 0x06, 0xc3,
     }, bytes);
 }
 

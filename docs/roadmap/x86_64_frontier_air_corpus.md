@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=393
-structured_functions=393
-generic_codegen_functions=393
-generic_cfg_functions=393
+discovered_functions=395
+structured_functions=395
+generic_codegen_functions=395
+generic_cfg_functions=395
 structural_matcher_functions=0
-structured_air_v2_functions=393
-typed_air_operand_functions=393
+structured_air_v2_functions=395
+typed_air_operand_functions=395
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=393
+generic_lowering_functions=395
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=393
+object_emitted_functions=395
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -249,6 +249,12 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_register_array_pair_call_sum_after_six` row proves the companion
   register-sourced form by pushing the aggregate eightbytes before the six
   leading scalar call arguments reuse `%rdi`/`%rsi`
+- stack-passed nested mixed aggregate row in
+  `frontier_sysv_aggregate_classes.zig`:
+  `frontier_stack_nested_mixed_call_int_after_pressure` exhausts both the GPR
+  and SSE argument streams before passing `{ { i32, i32 }, double }` through a
+  private helper; the generic aggregate field path now loads stack-passed
+  `i32` fields into `%eax` before add-chain returns
 - first array-in-struct SSE/SSE aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `[2]f64` field and pointer-element
   GEPs lower from typed AIR v2, the two `double` elements are read from the
