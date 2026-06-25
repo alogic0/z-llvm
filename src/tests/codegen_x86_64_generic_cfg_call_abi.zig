@@ -1842,6 +1842,71 @@ test "x86_64 codegen accepts indirect sret pointer with stack-passed user arg" {
     try expectMachineInstruction(machine.instructions.items, .{ .indirect_call_rax = .void });
 }
 
+test "x86_64 codegen accepts stack-sourced hidden sret pointer call argument" {
+    const direct_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @callee(ptr sret({ i64, i64, i64 }))
+        \\
+        \\define void @caller(i32 %a0, i32 %a1, i32 %a2, i32 %a3, i32 %a4, i32 %a5, ptr %out) {
+        \\entry:
+        \\  call void @callee(ptr sret({ i64, i64, i64 }) %out)
+        \\  ret void
+        \\}
+        \\
+    ;
+    var direct_module = try ir.Module.parse(std.testing.allocator, direct_input);
+    defer direct_module.deinit();
+    try direct_module.verify();
+    const direct_call = direct_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const direct_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, direct_module.functions.items[0], direct_call);
+    try std.testing.expectEqual(@as(usize, 1), direct_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 0), direct_counts.stack_args);
+    var direct_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, direct_module.target_triple.?, direct_module.functions.items[0]);
+    defer direct_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(direct_machine.instructions.items, .{ .load_stack_disp8_arg64 = .{ .reg = .rdi, .disp = 8 } });
+
+    const indirect_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @caller(ptr %fn, i32 %a0, i32 %a1, i32 %a2, i32 %a3, i32 %a4, ptr %out) {
+        \\entry:
+        \\  call void %fn(ptr sret({ i64, i64, i64 }) %out)
+        \\  ret void
+        \\}
+        \\
+    ;
+    var indirect_module = try ir.Module.parse(std.testing.allocator, indirect_input);
+    defer indirect_module.deinit();
+    try indirect_module.verify();
+    const indirect_call = indirect_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(indirect_call.callee_value != null);
+    const indirect_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_module.functions.items[0], indirect_call);
+    try std.testing.expectEqual(@as(usize, 1), indirect_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 0), indirect_counts.stack_args);
+    var indirect_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, indirect_module.target_triple.?, indirect_module.functions.items[0]);
+    defer indirect_machine.deinit(std.testing.allocator);
+    var target_setup_index: ?usize = null;
+    var sret_load_index: ?usize = null;
+    var indirect_call_index: ?usize = null;
+    for (indirect_machine.instructions.items, 0..) |instruction, index| {
+        switch (instruction) {
+            .mov_arg_rax => |reg| {
+                if (reg == .rdi) target_setup_index = index;
+            },
+            .load_stack_disp8_arg64 => |load| {
+                if (load.reg == .rdi and load.disp == 8) sret_load_index = index;
+            },
+            .indirect_call_rax => |ret_ty| {
+                if (ret_ty == .void) indirect_call_index = index;
+            },
+            else => {},
+        }
+    }
+    try std.testing.expect((target_setup_index orelse return error.TestExpectedEqual) < (sret_load_index orelse return error.TestExpectedEqual));
+    try std.testing.expect((sret_load_index orelse return error.TestExpectedEqual) < (indirect_call_index orelse return error.TestExpectedEqual));
+}
+
 test "x86_64 codegen preserves live i32 across supported sret pointer call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
