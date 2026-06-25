@@ -2472,8 +2472,8 @@ test "x86_64 codegen accepts live indirect stack-sourced byval payload" {
     try expectMachineInstruction(machine.instructions.items, .add_rsp_8);
 }
 
-test "x86_64 codegen rejects byval aggregate with non-eightbyte tail" {
-    const input =
+test "x86_64 codegen accepts four-byte byval stack-copy tail" {
+    const direct_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
         \\declare i32 @callee(ptr byval({ i32 }))
@@ -2485,14 +2485,65 @@ test "x86_64 codegen rejects byval aggregate with non-eightbyte tail" {
         \\}
         \\
     ;
+    var direct_module = try ir.Module.parse(std.testing.allocator, direct_input);
+    defer direct_module.deinit();
+    try direct_module.verify();
+    const direct_call = direct_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const direct_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, direct_module.functions.items[0], direct_call);
+    try std.testing.expectEqual(@as(usize, 0), direct_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), direct_counts.stack_args);
+    var direct_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, direct_module.target_triple.?, direct_module.functions.items[0]);
+    defer direct_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(direct_machine.instructions.items, .{ .load_arg_ptr_disp8_eax = .{ .reg = .rdi, .offset = 0 } });
+    try expectMachineInstruction(direct_machine.instructions.items, .push_rax);
+
+    const indirect_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, ptr %arg) {
+        \\entry:
+        \\  %r = call i32 %fn(ptr byval({ i32 }) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_module = try ir.Module.parse(std.testing.allocator, indirect_input);
+    defer indirect_module.deinit();
+    try indirect_module.verify();
+    const indirect_call = indirect_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const indirect_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_module.functions.items[0], indirect_call);
+    try std.testing.expectEqual(@as(usize, 0), indirect_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), indirect_counts.stack_args);
+    var indirect_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, indirect_module.target_triple.?, indirect_module.functions.items[0]);
+    defer indirect_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(indirect_machine.instructions.items, .{ .load_arg_ptr_disp8_eax = .{ .reg = .rsi, .offset = 0 } });
+    try expectMachineInstruction(indirect_machine.instructions.items, .{ .indirect_call_rax = .{ .int = 32 } });
+}
+
+test "x86_64 codegen accepts array byval stack-copy with four-byte tail" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr byval([3 x i32]))
+        \\
+        \\define i32 @caller(ptr %arg) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr byval([3 x i32]) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
     var module = try ir.Module.parse(std.testing.allocator, input);
     defer module.deinit();
     try module.verify();
     const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
-    try std.testing.expectError(
-        error.UnsupportedSretByvalAbi,
-        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
-    );
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call);
+    try std.testing.expectEqual(@as(usize, 0), counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 2), counts.stack_args);
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp8_eax = .{ .reg = .rdi, .offset = 8 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 0 } });
 }
 
 test "x86_64 codegen accepts memory aggregate stack call and rejects vector return boundary" {

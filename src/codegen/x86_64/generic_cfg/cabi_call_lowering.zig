@@ -718,10 +718,17 @@ pub fn appendSysVByvalStackCopyArgs(
         if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
         const offset = index * 8;
         if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
-        stack_args[stack_arg_count.*] = if (source_reg) |reg|
-            .{ .byval_ptr_disp = .{ .reg = reg, .offset = @intCast(offset) } }
+        const remaining = copy.classification.size_bytes - offset;
+        const chunk: ByvalCopyChunk = if (remaining >= 8)
+            .qword
+        else if (remaining == 4)
+            .dword
         else
-            .{ .byval_stack_ptr_disp = .{ .stack_disp = source_stack_disp, .offset = @intCast(offset) } };
+            return error.UnsupportedSretByvalAbi;
+        stack_args[stack_arg_count.*] = if (source_reg) |reg|
+            .{ .byval_ptr_disp = .{ .reg = reg, .offset = @intCast(offset), .chunk = chunk } }
+        else
+            .{ .byval_stack_ptr_disp = .{ .stack_disp = source_stack_disp, .offset = @intCast(offset), .chunk = chunk } };
         stack_arg_count.* += 1;
     }
 }
@@ -801,14 +808,21 @@ pub const StackScalarCallArg = union(enum) {
     byval_ptr_disp: struct {
         reg: ArgReg,
         offset: u8,
+        chunk: ByvalCopyChunk,
     },
     byval_stack_ptr_disp: struct {
         stack_disp: u8,
         offset: u8,
+        chunk: ByvalCopyChunk,
     },
     computed_i32: ir.Value,
     computed_i64: ir.Value,
     precomputed_rax,
+};
+
+const ByvalCopyChunk = enum {
+    qword,
+    dword,
 };
 
 pub fn appendStackScalarCallArg(
@@ -824,7 +838,10 @@ pub fn appendStackScalarCallArg(
         .arg_reg => |reg| try machine.instructions.append(allocator, .{ .push_arg = reg }),
         .xmm_reg => |reg| try machine.instructions.append(allocator, .{ .push_xmm64 = reg }),
         .byval_ptr_disp => |source| {
-            try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = source.offset } });
+            switch (source.chunk) {
+                .qword => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = source.offset } }),
+                .dword => try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = source.reg, .offset = source.offset } }),
+            }
             try machine.instructions.append(allocator, .push_rax);
         },
         .byval_stack_ptr_disp => |source| {
@@ -836,7 +853,10 @@ pub fn appendStackScalarCallArg(
             } else {
                 return error.UnsupportedCodegenAbi;
             }
-            try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = source.offset });
+            switch (source.chunk) {
+                .qword => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = source.offset }),
+                .dword => try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_eax = source.offset }),
+            }
             try machine.instructions.append(allocator, .push_rax);
         },
         .computed_i32 => |value| {

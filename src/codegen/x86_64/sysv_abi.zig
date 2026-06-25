@@ -358,7 +358,7 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             };
             const classification = try classifyAggregate(byval_ty);
-            if (classification.size_bytes == 0 or classification.size_bytes % 8 != 0) return error.UnsupportedSretByvalAbi;
+            if (classification.size_bytes == 0) return error.UnsupportedSretByvalAbi;
             try plan.assignments.append(allocator, .{ .byval_stack_copy = .{
                 .source_name = source_name,
                 .aggregate_ty = byval_ty,
