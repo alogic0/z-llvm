@@ -28,6 +28,15 @@ local subsets; `add-discriminators`, `forceattrs`, `mergefunc`, and
 `annotation-remarks` are explicit boundary-noop or out-of-scope surfaces until
 source-backed rows require implementation.
 
+Release optimizer evidence has a focused real-AIR gate:
+`zig build distribution-air-release-broad`. It runs the broad x86_64
+ReleaseFast/ReleaseSafe/ReleaseSmall real-AIR corpus through local z_llvm
+optimization/codegen, object emission, Zig native linker handoff, and executable
+classification. The current broad release row counts are documented in
+`docs/roadmap/x86_64_distribution_replacement_matrix.md`; this gate is the
+development-loop proof for broad release optimizer behavior and remains outside
+`distribution-all`.
+
 Debug variable-location salvage remains a deliberate boundary. The pass manager
 now scans for `llvm.dbg.value`/variable-location intrinsics once per
 pass-manager run, skips transform passes from the cached result, reports
@@ -233,7 +242,7 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=152`, `structural_matcher_functions=0`,
+`generic_cfg_functions=151`, `structural_matcher_functions=1`,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,

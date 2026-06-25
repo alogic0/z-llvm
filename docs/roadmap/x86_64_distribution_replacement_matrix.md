@@ -312,6 +312,33 @@ It requires each mode to stay at `source_rows=101`,
 `codegen_failures=0`, `object_emitted_functions=152`,
 `object_failures=0`, and `local_fail=0`.
 
+The focused release optimizer milestone gate
+`zig build distribution-air-release-broad` builds on that same broad real-AIR
+corpus and also runs Zig native linker/executable accounting for all three
+release modes. Each mode reports:
+
+```text
+source_rows=101
+discovered_functions=152
+generic_codegen_functions=152
+generic_cfg_functions=151
+structural_matcher_functions=1
+object_emitted_functions=152
+native_link_accepted_rows=100
+executable_ok_rows=100
+link_only_rows=0
+runtime_boundary_rows=1
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+The single runtime boundary is the named `debug.defaultPanic` row. Optimizer,
+x86_64 lowering, ELF/object emission, and native-link failures are separate
+failure buckets in the underlying gate output; there are currently no local
+failures in any of those buckets for the broad release corpus.
+
 The expanded corpus frontier is intentionally separate:
 `distribution-zig-air-uncurated-releasefast-expanded`,
 `distribution-zig-air-uncurated-releasesafe-expanded`, and

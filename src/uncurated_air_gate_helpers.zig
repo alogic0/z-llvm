@@ -27,7 +27,7 @@ pub const Mode = enum {
     ReleaseSafe,
     ReleaseSmall,
 
-    fn name(self: Mode) []const u8 {
+    pub fn name(self: Mode) []const u8 {
         return switch (self) {
             .ReleaseFast => "ReleaseFast",
             .ReleaseSafe => "ReleaseSafe",
@@ -35,7 +35,7 @@ pub const Mode = enum {
         };
     }
 
-    fn lowerName(self: Mode) []const u8 {
+    pub fn lowerName(self: Mode) []const u8 {
         return switch (self) {
             .ReleaseFast => "releasefast",
             .ReleaseSafe => "releasesafe",
@@ -43,7 +43,7 @@ pub const Mode = enum {
         };
     }
 
-    fn zigOptimizeArg(self: Mode) []const u8 {
+    pub fn zigOptimizeArg(self: Mode) []const u8 {
         return switch (self) {
             .ReleaseFast => "-OReleaseFast",
             .ReleaseSafe => "-OReleaseSafe",
@@ -59,7 +59,7 @@ pub const Corpus = enum {
     scale,
     frontier,
 
-    fn name(self: Corpus) []const u8 {
+    pub fn name(self: Corpus) []const u8 {
         return switch (self) {
             .inputs => "inputs",
             .broad => "broad",

@@ -336,8 +336,8 @@ source_rows=101
 discovered_functions=152
 structured_functions=152
 generic_codegen_functions=152
-generic_cfg_functions=152
-structural_matcher_functions=0
+generic_cfg_functions=151
+structural_matcher_functions=1
 structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
@@ -408,6 +408,17 @@ Zig boundary:
 Broad real-AIR lowering/codegen/object evidence for all three release modes.
 The named runtime boundary is `debug.defaultPanic`. These gates stay out of
 `distribution-all` until runtime and executable proof cost is known.
+
+The focused release optimizer milestone gate is
+`zig build distribution-air-release-broad`. It composes the broad real-AIR
+ReleaseFast, ReleaseSafe, and ReleaseSmall executable-progress path and keeps the
+proof outside `distribution-all` during iteration. Current per-mode counts are
+`source_rows=101`, `discovered_functions=152`, `generic_codegen_functions=152`,
+`generic_cfg_functions=151`, `structural_matcher_functions=1`,
+`object_emitted_functions=152`, `native_link_accepted_rows=100`,
+`executable_ok_rows=100`, `link_only_rows=0`, `runtime_boundary_rows=1`,
+`native_link_failures=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
+`local_fail=0`.
 
 ### Expanded uncurated release AIR frontier
 
