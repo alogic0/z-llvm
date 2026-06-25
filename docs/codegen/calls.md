@@ -288,7 +288,8 @@ boundary. Explicit `ptr byval(aggregate)` call arguments now have a first
 planner-owned subset: supported aggregate payloads are copied from the source
 pointer to outgoing stack eightbytes for direct and function-pointer calls, with
 unit proof for one-, two-, array-backed three-, and nested three-eightbyte
-payloads.
+payloads, plus max-sized exact-eightbyte payloads through the current
+24-stack-argument limit.
 Unsupported layouts and non-eightbyte tail copies remain targeted boundaries.
 The frontier additionally lowers the selected
 source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by-value
