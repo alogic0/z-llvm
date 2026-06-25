@@ -161,6 +161,7 @@ pub const phiHasIncoming = impl.phiHasIncoming;
 pub const phiHasIncomingInt = impl.phiHasIncomingInt;
 pub const liveParamsAfter = impl.liveParamsAfter;
 pub const singleLiveParamAfter = impl.singleLiveParamAfter;
+pub const sysvScalarCallNeedsStackArgs = impl.sysvScalarCallNeedsStackArgs;
 pub const sysvCallPlanCountsForTest = impl.sysvCallPlanCountsForTest;
 pub const sysvIntegerParamReg = impl.sysvIntegerParamReg;
 pub const sysvParamCursorForWithInitial = impl.sysvParamCursorForWithInitial;

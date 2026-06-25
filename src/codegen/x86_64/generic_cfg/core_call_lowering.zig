@@ -28,6 +28,7 @@ pub const paramValueReg = cabi_abi_helpers.paramValueReg;
 pub const phiHasIncoming = cabi_call_lowering.phiHasIncoming;
 pub const phiHasIncomingInt = cabi_call_lowering.phiHasIncomingInt;
 pub const singleLiveParamAfter = cabi_call_lowering.singleLiveParamAfter;
+pub const sysvScalarCallNeedsStackArgs = cabi_call_lowering.sysvScalarCallNeedsStackArgs;
 pub const sysvCallPlanCountsForTest = cabi_call_lowering.sysvCallPlanCountsForTest;
 pub const sysvIntegerParamReg = cabi_abi_helpers.sysvIntegerParamReg;
 pub const sysvParamCursorForWithInitial = cabi_call_lowering.sysvParamCursorForWithInitial;

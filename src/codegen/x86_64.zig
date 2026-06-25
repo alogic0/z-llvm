@@ -16,6 +16,7 @@ pub const SysVAggregateClassification = sysv_abi.AggregateClassification;
 pub const SysVCallPlanCounts = sysv_abi.CallPlanCounts;
 
 pub const sysvCallPlanCountsForTest = x86_64_generic_cfg.sysvCallPlanCountsForTest;
+pub const sysvScalarCallNeedsStackArgsForTest = x86_64_generic_cfg.sysvScalarCallNeedsStackArgs;
 pub const sysvReturnPlanCountsForTest = sysv_abi.planReturn;
 
 pub const Instruction = x86_64_machine.Instruction;

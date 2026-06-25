@@ -719,8 +719,8 @@ pub fn sysvScalarCallNeedsStackArgs(call: ir.CallInst) bool {
     var int_arg_index: usize = 0;
     var fp_arg_index: usize = 0;
     for (call.args.items) |arg| {
-        if (arg.attrs != null) return true;
-        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
+        if (arg.attrs != null) sysv_abi.rejectUnsupportedCallArgAttrs(arg) catch return true;
+        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr) {
             if (int_arg_index >= 6) return true;
             int_arg_index += 1;
         } else if (arg.ty.eql(.float) or arg.ty.eql(.double)) {

@@ -79,6 +79,7 @@ pub const phiHasIncoming = call_lowering.phiHasIncoming;
 pub const phiHasIncomingInt = call_lowering.phiHasIncomingInt;
 pub const liveParamsAfter = call_lowering.liveParamsAfter;
 pub const singleLiveParamAfter = call_lowering.singleLiveParamAfter;
+pub const sysvScalarCallNeedsStackArgs = call_lowering.sysvScalarCallNeedsStackArgs;
 pub const sysvCallPlanCountsForTest = call_lowering.sysvCallPlanCountsForTest;
 pub const sysvIntegerParamReg = call_lowering.sysvIntegerParamReg;
 pub const sysvParamCursorForWithInitial = call_lowering.sysvParamCursorForWithInitial;
