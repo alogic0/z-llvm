@@ -521,6 +521,11 @@ expanded stack/mixed SysV ABI rows. Remaining non-selected ABI boundaries are
 full aggregate classification beyond selected INTEGER/normal integer-leaf
 MEMORY forms, arbitrary non-selected sret/byval copies, varargs, vectors, and
 high-register-pressure spill/reload-heavy call frames.
+The latest frontier ABI slice narrows that sret/byval gap for supported
+normal MEMORY leaves with `ScalarArray` direct and pointer-callee copies, and
+narrows nested mixed aggregate call coverage with pointer-callee
+`{ { i32, i32 }, double }` argument/return rows. Varargs and vectors remain
+explicit fail-closed boundaries, not accepted frontier rows.
 
 ### Scale uncurated release AIR frontier
 
@@ -626,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=442
-structured_functions=442
-generic_codegen_functions=442
-generic_cfg_functions=442
+discovered_functions=449
+structured_functions=449
+generic_codegen_functions=449
+generic_cfg_functions=449
 structural_matcher_functions=0
-structured_air_v2_functions=442
-typed_air_operand_functions=442
+structured_air_v2_functions=449
+typed_air_operand_functions=449
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=442
+generic_lowering_functions=449
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=442
+object_emitted_functions=449
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -672,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 442-function counters above plus `native_link_accepted_rows=13`,
+13-source / 449-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

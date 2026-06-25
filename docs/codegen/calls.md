@@ -334,6 +334,9 @@ larger flat normal integer-leaf copies through `Big20`, nested `i8`/`i16`
 width-correct byval-to-sret copies, the `ScalarMixed`, `ScalarNested`, and
 `ScalarArray` direct scalar-param hidden-sret construction rows for top-level,
 nested, and array-backed `i8`/`i16`/`i32`/`i64`/pointer/`f32`/`f64` leaves,
+direct and pointer-callee `ScalarArray` byval-to-sret copies for mixed
+array-contained integer leaves, array-contained `double` leaves, and a pointer
+leaf,
 the first
 double-leaf copy through `BigDouble`, array-contained `double` copy through
 `BigDoubleArray`, mixed array/pointer copy through `BigArrayMixed`, f32-leaf copy through `BigFloat`, and
@@ -341,8 +344,8 @@ pointer/`double`/integer copy through `BigPtrDouble`. Direct and indirect
 MEMORY aggregate calls prove the same by-value stack-copy and hidden-sret
 forwarding path for Big3, Big4, Big5, BigDouble, BigDoubleArray,
 BigArrayMixed, BigFloat, BigPtrDouble,
-BigNested, BigMixed, and BigArray
-varargs remain rejected at declarations and call sites
+BigNested, BigMixed, BigArray, and ScalarArray.
+Varargs remain rejected at declarations and call sites.
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax
 selected SSE aggregate returns, including single-eightbyte `{ f32, f32 }`,

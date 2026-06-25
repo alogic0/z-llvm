@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=442`,
-`generic_codegen_functions=442`, `generic_cfg_functions=442`,
+three release modes at `source_rows=13`, `discovered_functions=449`,
+`generic_codegen_functions=449`, `generic_cfg_functions=449`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=442`, `object_failures=0`,
+`object_emitted_functions=449`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -629,7 +629,7 @@ copy row plus `BigPtrDouble` pointer/`double`/`i64` byval-to-sret copy row,
 array-of-double byval-to-sret copy row, `BigArrayMixed` array/pointer mixed
 byval-to-sret copy row, and direct/indirect MEMORY aggregate calls for Big3,
 Big4, Big5, BigDouble, BigDoubleArray, BigArrayMixed, BigFloat, BigPtrDouble,
-BigNested, BigMixed, BigNarrow, and BigArray; Big32 and Big40 extend the same
+BigNested, BigMixed, BigNarrow, BigArray, and ScalarArray; Big32 and Big40 extend the same
 planner-owned copy path through exact-qword MEMORY payloads beyond byte-offset
 byval loads, including disp32 source-pointer reloads and stack-sourced Big40
 payload copies from the caller stack argument area; plus 5-/6-/7-byte composite

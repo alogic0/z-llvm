@@ -230,7 +230,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 442,
+            .functions = 449,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1810,6 +1810,9 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct ScalarMixed z_frontier_scalar_mixed_make(unsigned char, unsigned short, int, long long, const long long *, float, double) __asm__("frontier_sysv_sret_byval.frontier_scalar_mixed_make");
     \\extern struct ScalarNested z_frontier_scalar_nested_make(unsigned char, unsigned short, int, double, const long long *) __asm__("frontier_sysv_sret_byval.frontier_scalar_nested_make");
     \\extern struct ScalarArray z_frontier_scalar_array_make(int, int, int, double, double, const long long *) __asm__("frontier_sysv_sret_byval.frontier_scalar_array_make");
+    \\extern struct ScalarArray z_frontier_scalar_array_copy(struct ScalarArray) __asm__("frontier_sysv_sret_byval.frontier_scalar_array_copy");
+    \\extern struct ScalarArray z_frontier_direct_scalar_array_copy(struct ScalarArray) __asm__("frontier_sysv_sret_byval.frontier_direct_scalar_array_copy");
+    \\extern struct ScalarArray z_frontier_indirect_scalar_array_copy(struct ScalarArray (*)(struct ScalarArray), struct ScalarArray) __asm__("frontier_sysv_sret_byval.frontier_indirect_scalar_array_copy");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -2001,6 +2004,12 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (scalar_nested.inner.a != 9 || scalar_nested.inner.b != 6551 || scalar_nested.c != -4567 || scalar_nested.d != 12.75 || scalar_nested.ptr != &pointed || *scalar_nested.ptr != 987654321LL) return 80;
     \\    struct ScalarArray scalar_array = z_frontier_scalar_array_make(31, 37, 41, 17.5, 19.25, &pointed);
     \\    if (scalar_array.ints[0] != 31 || scalar_array.ints[1] != 37 || scalar_array.ints[2] != 41 || scalar_array.doubles[0] != 17.5 || scalar_array.doubles[1] != 19.25 || scalar_array.ptr != &pointed || *scalar_array.ptr != 987654321LL) return 81;
+    \\    struct ScalarArray scalar_array_copy = z_frontier_scalar_array_copy(scalar_array);
+    \\    if (scalar_array_copy.ints[0] != 31 || scalar_array_copy.ints[1] != 37 || scalar_array_copy.ints[2] != 41 || scalar_array_copy.doubles[0] != 17.5 || scalar_array_copy.doubles[1] != 19.25 || scalar_array_copy.ptr != &pointed || *scalar_array_copy.ptr != 987654321LL) return 97;
+    \\    struct ScalarArray scalar_array_direct = z_frontier_direct_scalar_array_copy(scalar_array);
+    \\    if (scalar_array_direct.ints[0] != 31 || scalar_array_direct.ints[1] != 37 || scalar_array_direct.ints[2] != 41 || scalar_array_direct.doubles[0] != 17.5 || scalar_array_direct.doubles[1] != 19.25 || scalar_array_direct.ptr != &pointed || *scalar_array_direct.ptr != 987654321LL) return 98;
+    \\    struct ScalarArray scalar_array_indirect = z_frontier_indirect_scalar_array_copy(z_frontier_scalar_array_copy, scalar_array);
+    \\    if (scalar_array_indirect.ints[0] != 31 || scalar_array_indirect.ints[1] != 37 || scalar_array_indirect.ints[2] != 41 || scalar_array_indirect.doubles[0] != 17.5 || scalar_array_indirect.doubles[1] != 19.25 || scalar_array_indirect.ptr != &pointed || *scalar_array_indirect.ptr != 987654321LL) return 99;
     \\    return 0;
     \\}
     \\
@@ -2085,6 +2094,9 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_nested_mixed_float(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_float");
     \\extern struct NestedMixed z_frontier_nested_mixed_make(int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_make");
     \\extern int z_frontier_shifted_nested_mixed_call_int(long long, double, struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_nested_mixed_call_int");
+    \\extern int z_frontier_indirect_nested_mixed_call_int(int (*)(struct NestedMixed), struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_nested_mixed_call_int");
+    \\extern struct NestedMixed z_frontier_nested_mixed_call_make(int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_call_make");
+    \\extern struct NestedMixed z_frontier_indirect_nested_mixed_make(struct NestedMixed (*)(int, int, double), int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_nested_mixed_make");
     \\extern int z_frontier_stack_nested_mixed_call_int_after_pressure(long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_nested_mixed_call_int_after_pressure");
     \\extern int z_frontier_small_mixed_int(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_int");
     \\extern double z_frontier_small_mixed_float(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_float");
@@ -2198,6 +2210,11 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct NestedMixed made_nested_mixed = z_frontier_nested_mixed_make(89, 97, 101.5);
     \\    if (made_nested_mixed.ints.a != 89 || made_nested_mixed.ints.b != 97 || made_nested_mixed.value != 101.5) return 37;
     \\    if (z_frontier_shifted_nested_mixed_call_int(123, 456.5, nested_mixed) != 100) return 64;
+    \\    if (z_frontier_indirect_nested_mixed_call_int(z_frontier_nested_mixed_int_sum, nested_mixed) != 100) return 86;
+    \\    struct NestedMixed call_made_nested_mixed = z_frontier_nested_mixed_call_make(101, 103, 107.5);
+    \\    if (call_made_nested_mixed.ints.a != 101 || call_made_nested_mixed.ints.b != 103 || call_made_nested_mixed.value != 107.5) return 87;
+    \\    struct NestedMixed indirect_made_nested_mixed = z_frontier_indirect_nested_mixed_make(z_frontier_nested_mixed_make, 109, 113, 127.5);
+    \\    if (indirect_made_nested_mixed.ints.a != 109 || indirect_made_nested_mixed.ints.b != 113 || indirect_made_nested_mixed.value != 127.5) return 88;
     \\    if (z_frontier_stack_nested_mixed_call_int_after_pressure(1, 2, 3, 4, 5, 6, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, nested_mixed) != 100) return 78;
     \\    struct SmallMixed small_mixed = { 17, 23.5 };
     \\    if (z_frontier_small_mixed_int(small_mixed) != 17) return 16;

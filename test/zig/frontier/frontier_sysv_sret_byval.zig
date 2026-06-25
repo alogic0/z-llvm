@@ -269,6 +269,7 @@ const BigByteTail7CopyFn = *const fn (BigByteTail7) callconv(.c) BigByteTail7;
 const BigWordTailCopyFn = *const fn (BigWordTail) callconv(.c) BigWordTail;
 const Big32CopyFn = *const fn (Big32) callconv(.c) Big32;
 const Big40CopyFn = *const fn (Big40) callconv(.c) Big40;
+const ScalarArrayCopyFn = *const fn (ScalarArray) callconv(.c) ScalarArray;
 
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
     return .{ .a = a, .b = b, .c = c };
@@ -636,4 +637,16 @@ export fn frontier_scalar_nested_make(a: u8, b: u16, c: i32, d: f64, ptr: *const
 
 export fn frontier_scalar_array_make(a: i32, b: i32, c: i32, d: f64, e: f64, ptr: *const i64) ScalarArray {
     return .{ .ints = .{ a, b, c }, .doubles = .{ d, e }, .ptr = ptr };
+}
+
+export fn frontier_scalar_array_copy(value: ScalarArray) ScalarArray {
+    return value;
+}
+
+export fn frontier_direct_scalar_array_copy(value: ScalarArray) ScalarArray {
+    return frontier_scalar_array_copy(value);
+}
+
+export fn frontier_indirect_scalar_array_copy(func: ScalarArrayCopyFn, value: ScalarArray) ScalarArray {
+    return func(value);
 }
