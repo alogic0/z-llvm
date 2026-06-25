@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=410
-structured_functions=410
-generic_codegen_functions=410
-generic_cfg_functions=410
+discovered_functions=412
+structured_functions=412
+generic_codegen_functions=412
+generic_cfg_functions=412
 structural_matcher_functions=0
-structured_air_v2_functions=410
-typed_air_operand_functions=410
+structured_air_v2_functions=412
+typed_air_operand_functions=412
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=410
+generic_lowering_functions=412
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=410
+object_emitted_functions=412
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -333,7 +333,10 @@ Closed in the current memory/aggregate frontier slice:
 - named stack-parameter register assignment for scalar `i32` call arguments in
   `frontier_sysv_abi.zig`: `frontier_stack_arg_to_registers` loads incoming
   stack-passed parameters into outgoing `%edi`..`%r9d` argument registers for a
-  six-argument helper call.
+  six-argument helper call. `frontier_ptr_stack_arg_to_registers` and
+  `frontier_indirect_ptr_stack_arg_to_registers` prove the same cursor-derived
+  incoming stack reload path for pointer parameters assigned into outgoing GPR
+  registers for direct and function-pointer helper calls.
 - selected computed stack-passed scalar `i32` call argument in
   `frontier_sysv_abi.zig`: `frontier_computed_stack_arg_call` computes a
   block-local `i32`, materializes it through `%eax`, and pushes it into the

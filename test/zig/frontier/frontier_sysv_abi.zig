@@ -7,6 +7,7 @@ const Sum6Fn = *const fn (i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 const Sum12Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 const Sum14Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
 const Sum24Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) callconv(.c) i32;
+const Sum6PtrFn = *const fn (*const i32, *const i32, *const i32, *const i32, *const i32, *const i32) callconv(.c) i32;
 const SubI32Fn = *const fn (i32, i32) callconv(.c) i32;
 const SubI64Fn = *const fn (i64, i64) callconv(.c) i64;
 const SubF32Fn = *const fn (f32, f32) callconv(.c) f32;
@@ -83,6 +84,7 @@ extern fn frontier_sum6_i64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64) i64;
 extern fn frontier_sum8_i64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64) i64;
 extern fn frontier_sub_i64(a: i64, b: i64) i64;
 extern fn frontier_weighted3_i64(a: i64, b: i64, c: i64) i64;
+extern fn frontier_sum6_ptr(a: *const i32, b: *const i32, c: *const i32, d: *const i32, e: *const i32, f: *const i32) i32;
 extern fn frontier_sum8_ptr(a: *const i32, b: *const i32, c: *const i32, d: *const i32, e: *const i32, f: *const i32, g: *const i32, h: *const i32) i32;
 extern fn frontier_choose_ptr(a: *const i32, b: *const i32, tag: i32) *const i32;
 
@@ -710,6 +712,53 @@ export fn frontier_ptr_stack_arg_forward(a: *const i32, b: *const i32, c: *const
 
 export fn frontier_indirect_ptr_stack_arg_forward(func: Sum8PtrFn, a: *const i32, b: *const i32, c: *const i32, d: *const i32, e: *const i32, f: *const i32, g: *const i32, h: *const i32) i32 {
     return func(a, b, c, d, e, f, g, h);
+}
+
+export fn frontier_ptr_stack_arg_to_registers(
+    a: *const i32,
+    b: *const i32,
+    c: *const i32,
+    d: *const i32,
+    e: *const i32,
+    f: *const i32,
+    g: *const i32,
+    h: *const i32,
+    i: *const i32,
+    j: *const i32,
+    k: *const i32,
+    l: *const i32,
+) i32 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return frontier_sum6_ptr(g, h, i, j, k, l);
+}
+
+export fn frontier_indirect_ptr_stack_arg_to_registers(
+    func: Sum6PtrFn,
+    a: *const i32,
+    b: *const i32,
+    c: *const i32,
+    d: *const i32,
+    e: *const i32,
+    f: *const i32,
+    g: *const i32,
+    h: *const i32,
+    i: *const i32,
+    j: *const i32,
+    k: *const i32,
+    l: *const i32,
+) i32 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return func(g, h, i, j, k, l);
 }
 
 export fn frontier_ptr_return_param(a: *const i32, b: *const i32) *const i32 {
