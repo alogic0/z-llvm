@@ -34,6 +34,23 @@ pub fn globalSymbolName(name: []const u8) ![]const u8 {
     return symbolName(name);
 }
 
+pub fn globalSymbolNameFromValue(value: ir.Value) ![]const u8 {
+    return switch (value) {
+        .named => |name| try globalSymbolName(name),
+        .constant_expr => |text| try globalSymbolNameFromConstantExpr(text),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => error.UnsupportedCodegenValue,
+    };
+}
+
+pub fn globalSymbolNameFromConstantExpr(text: []const u8) ![]const u8 {
+    const at_index = std.mem.indexOfScalar(u8, text, '@') orelse return error.UnsupportedCodegenValue;
+    const start = at_index + 1;
+    var end = start;
+    while (end < text.len and text[end] != ' ' and text[end] != ',' and text[end] != '}' and text[end] != ')') : (end += 1) {}
+    if (end == start) return error.UnsupportedCodegenValue;
+    return symbolName(text[start..end]);
+}
+
 pub fn symbolName(name: []const u8) []const u8 {
     const without_at = if (std.mem.startsWith(u8, name, "@")) name[1..] else name;
     if (without_at.len >= 2 and without_at[0] == '"' and without_at[without_at.len - 1] == '"') {

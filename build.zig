@@ -185,9 +185,21 @@ pub fn build(b: *std.Build) void {
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-air-release-scale",
-        .description = "Scale x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
+        .description = "Scale x86_64 release real-AIR optimizer/object/native-link/executable progress gate",
         .corpus = "scale",
         .variant = .object_executable_progress,
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-air-release-scale-finish",
+        .description = "Strict scale x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
+        .corpus = "scale",
+        .variant = .executable_strict_finish,
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-air-release-frontier",
+        .description = "Strict frontier x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
+        .corpus = "frontier",
+        .variant = .executable_strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-zig-air-uncurated-release-expanded-finish",

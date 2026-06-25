@@ -601,6 +601,9 @@ finish gate. It currently reports `source_rows=112`,
 `native_link_accepted_rows=111`, `executable_ok_rows=111`,
 `link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`,
 `lld_rows=0`, and `local_fail=0` per mode.
+The strict `zig build distribution-air-release-scale-finish` gate locks the
+same scale counters with `--strict-finish`, while
+`distribution-air-release-scale` remains the lower-cost progress command.
 
 Zig boundary:
 Frontier only. It keeps broad/expanded claims intact while adding broader SysV
@@ -660,6 +663,19 @@ llvm_targetmachine_rows=0
 lld_rows=0
 local_fail=0
 ```
+
+The strict `zig build distribution-air-release-frontier` gate runs the isolated
+frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
+progress, executable progress, and strict counter checks. It requires the
+13-source / 430-function counters above plus `native_link_accepted_rows=13`,
+`executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
+`unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
+
+Strict release baselines now cover the cumulative broad, expanded, and scale
+corpora plus the isolated frontier corpus: broad is inputs + integrated,
+expanded adds `test/zig/expanded`, scale adds `test/zig/scale`, and frontier
+is `test/zig/frontier` only.
 
 Accepted frontier evidence:
 

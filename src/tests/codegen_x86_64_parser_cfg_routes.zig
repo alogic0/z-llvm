@@ -38,6 +38,59 @@ const slp_vectorizer = codegen_x86_64_common.slp_vectorizer;
 const sroa = codegen_x86_64_common.sroa;
 const expectMachineInstruction = codegen_x86_64_common.expectMachineInstruction;
 
+test "x86_64 codegen lowers mix C panic helper with slice panic block" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@runtime_mix_c_add_may_panic_main.zig_k = private unnamed_addr global i32 1, align 4
+        \\@__anon_186 = private unnamed_addr constant [13 x i8] c"negative int\00", align 1
+        \\@__anon_310 = private unnamed_addr constant { i64, i8, [7 x i8] } { i64 undef, i8 0, [7 x i8] undef }, align 8
+        \\
+        \\declare void @llvm.assume(i1)
+        \\declare fastcc void @debug.defaultPanic(ptr, i64, ptr)
+        \\
+        \\define private fastcc i32 @runtime_mix_c_add_may_panic_main.add_may_panic(i32 %0) unnamed_addr align 1 {
+        \\1:
+        \\  %2 = icmp slt i32 %0, 0
+        \\  br i1 %2, label %6, label %3
+        \\
+        \\3:
+        \\  %4 = load i32, ptr getelementptr inbounds (i8, ptr @runtime_mix_c_add_may_panic_main.zig_k, i64 0), align 4
+        \\  %5 = add nsw i32 %4, %0
+        \\  ret i32 %5
+        \\
+        \\6:
+        \\  call void @llvm.assume(i1 true) [ "cold"() ]
+        \\  %7 = extractvalue { ptr, i64 } { ptr getelementptr inbounds (i8, ptr @__anon_186, i64 0), i64 12 }, 0
+        \\  %8 = extractvalue { ptr, i64 } { ptr getelementptr inbounds (i8, ptr @__anon_186, i64 0), i64 12 }, 1
+        \\  call fastcc void @debug.defaultPanic(ptr readonly nonnull %7, i64 %8, ptr align 8 readonly nonnull @__anon_310)
+        \\  unreachable
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try expectMachineInstruction(machine.instructions.items, .{ .test_arg32 = .rdi });
+    var saw_zig_k_load = false;
+    var saw_panic_message = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .load_global_i32_eax => |symbol| saw_zig_k_load = saw_zig_k_load or std.mem.eql(u8, symbol, "runtime_mix_c_add_may_panic_main.zig_k"),
+        .lea_global_rdi => |symbol| saw_panic_message = saw_panic_message or std.mem.eql(u8, symbol, "__anon_186"),
+        else => {},
+    };
+    try std.testing.expect(saw_zig_k_load);
+    try std.testing.expect(saw_panic_message);
+}
+
 test "x86_64 codegen routes alloca pointer struct field loads through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

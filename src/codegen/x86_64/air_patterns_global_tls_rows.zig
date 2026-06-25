@@ -13,6 +13,7 @@ const appendIntegerOverflowCall = x86_64_emit.appendIntegerOverflowCall;
 const appendPanicCall = x86_64_emit.appendPanicCall;
 const callIsFastcc = x86_64_match.callIsFastcc;
 const globalSymbolName = x86_64_match.globalSymbolName;
+const globalSymbolNameFromValue = x86_64_match.globalSymbolNameFromValue;
 const symbolName = x86_64_match.symbolName;
 const isCalleeName = x86_64_match.isCalleeName;
 const isInt = x86_64_match.isInt;
@@ -576,7 +577,7 @@ pub fn lowerSelectedMixCFilesAddMayPanic(
     if (!std.mem.endsWith(u8, function.name, ".add_may_panic")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
-    if (function.blocks.items.len != 3 and function.blocks.items.len != 5) return false;
+    if (function.blocks.items.len < 3 or function.blocks.items.len > 6) return false;
 
     const entry = function.blocks.items[0];
     if (entry.instructions.items.len != 1) return false;
@@ -597,8 +598,8 @@ pub fn lowerSelectedMixCFilesAddMayPanic(
     const ok_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
     const negative_panic_message = try mixCFilesNegativePanicMessage(function.blocks.items[panic_index]);
 
-    const ok = function.blocks.items[ok_index];
-    if (function.blocks.items.len == 5) {
+    const ok = try resolveMixCForwardingBlock(function, function.blocks.items[ok_index]);
+    if (ok.instructions.items.len == 3) {
         return lowerSelectedMixCFilesCheckedAddMayPanic(
             allocator,
             machine,
@@ -744,12 +745,19 @@ pub fn lowerSelectedMixCFilesCheckedAddMayPanic(
 }
 
 pub fn mixCAddMayPanicGlobalName(value: ir.Value) ![]const u8 {
-    const name = switch (value) {
-        .named => |name| try globalSymbolName(name),
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
+    const name = try globalSymbolNameFromValue(value);
     if (!std.mem.endsWith(u8, name, ".zig_k")) return error.UnsupportedCodegenValue;
     return name;
+}
+
+fn resolveMixCForwardingBlock(function: ir.Function, block: ir.BasicBlock) !ir.BasicBlock {
+    if (block.instructions.items.len != 0) return block;
+    const br = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return block,
+    };
+    const target_index = blockIndex(function, br.target) orelse return error.InvalidBranchTarget;
+    return function.blocks.items[target_index];
 }
 
 pub fn lowerSelectedMixCFilesAddZigDebugO0(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -879,12 +887,7 @@ pub fn globalSymbolNameFromAggregateConstant(value: ir.Value) ![]const u8 {
         .constant_expr => |text| text,
         .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
     };
-    const at_index = std.mem.indexOfScalar(u8, text, '@') orelse return error.UnsupportedCodegenValue;
-    const start = at_index + 1;
-    var end = start;
-    while (end < text.len and text[end] != ' ' and text[end] != ',' and text[end] != '}') : (end += 1) {}
-    if (end == start) return error.UnsupportedCodegenValue;
-    return text[start..end];
+    return x86_64_match.globalSymbolNameFromConstantExpr(text);
 }
 
 pub fn lowerSelectedDebugScopeBranch(

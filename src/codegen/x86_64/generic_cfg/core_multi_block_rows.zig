@@ -28,6 +28,7 @@ const emitGenericCfgLoadI32IntoEax = core_value_emit.emitGenericCfgLoadI32IntoEa
 const emitGenericCfgIcmpCondition = cabi_call_lowering.emitGenericCfgIcmpCondition;
 const findInstruction = cabi_call_lowering.findInstruction;
 const globalSymbolName = shared.globalSymbolName;
+const globalSymbolNameFromValue = shared.globalSymbolNameFromValue;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
 const isCalleeName = shared.isCalleeName;
@@ -545,6 +546,7 @@ pub fn lowerGenericCfgGuardedOptionalPointerBranchReturn(
 }
 
 pub fn genericCfgGuardPanicBlock(block: ir.BasicBlock) bool {
+    if (block.instructions.items.len == 4) return genericCfgGuardSlicePanicBlock(block);
     if (block.instructions.items.len == 0 or block.instructions.items.len > 2) return false;
     var call_index: usize = 0;
     if (block.instructions.items.len == 2) {
@@ -571,6 +573,39 @@ pub fn genericCfgGuardPanicBlock(block: ir.BasicBlock) bool {
     } else if (call.args.items.len != 0) {
         return false;
     }
+    return switch (block.terminator orelse return false) {
+        .@"unreachable" => true,
+        else => false,
+    };
+}
+
+fn genericCfgGuardSlicePanicBlock(block: ir.BasicBlock) bool {
+    validateAssumeColdCall(block.instructions.items[0]) catch return false;
+    const ptr_name = block.instructions.items[1].result orelse return false;
+    const len_name = block.instructions.items[2].result orelse return false;
+    const ptr_extract = switch (block.instructions.items[1].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    const len_extract = switch (block.instructions.items[2].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    if (!ptr_extract.result_ty.eql(.ptr) or !std.mem.eql(u8, ptr_extract.indices, "0")) return false;
+    if (!len_extract.result_ty.eql(.{ .int = 64 }) or !std.mem.eql(u8, len_extract.indices, "1")) return false;
+    if (!ptr_extract.aggregate.eql(len_extract.aggregate)) return false;
+    _ = globalSymbolNameFromValue(ptr_extract.aggregate) catch return false;
+
+    const call = switch (block.instructions.items[3].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.ret_ty != .void or call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (call.args.items.len != 3) return false;
+    if (call.args.items[0].ty != .ptr or !isNamed(call.args.items[0].value, ptr_name)) return false;
+    if (!call.args.items[1].ty.eql(.{ .int = 64 }) or !isNamed(call.args.items[1].value, len_name)) return false;
+    if (call.args.items[2].ty != .ptr) return false;
     return switch (block.terminator orelse return false) {
         .@"unreachable" => true,
         else => false,
@@ -745,10 +780,7 @@ pub fn emitGenericCfgGlobalLoadParamAdd(
     add: anytype,
 ) !void {
     if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
-    const global_name = switch (load.ptr) {
-        .named => |name| try globalSymbolName(name),
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
+    const global_name = try globalSymbolNameFromValue(load.ptr);
     try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
 
     if (@TypeOf(add) == ir.BinaryInst) {
@@ -784,6 +816,45 @@ pub fn emitGenericCfgNoreturnCallBlock(
     machine: *MachineFunction,
     block: ir.BasicBlock,
 ) !void {
+    if (block.instructions.items.len == 4) {
+        try validateAssumeColdCall(block.instructions.items[0]);
+        const ptr_name = block.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+        const len_name = block.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+        const ptr_extract = switch (block.instructions.items[1].kind) {
+            .extractvalue => |extractvalue| extractvalue,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        const len_extract = switch (block.instructions.items[2].kind) {
+            .extractvalue => |extractvalue| extractvalue,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        if (!ptr_extract.result_ty.eql(.ptr) or !std.mem.eql(u8, ptr_extract.indices, "0")) return error.UnsupportedCodegenInstruction;
+        if (!len_extract.result_ty.eql(.{ .int = 64 }) or !std.mem.eql(u8, len_extract.indices, "1")) return error.UnsupportedCodegenInstruction;
+        if (!ptr_extract.aggregate.eql(len_extract.aggregate)) return error.UnsupportedCodegenValue;
+        const ptr_symbol = try globalSymbolNameFromValue(ptr_extract.aggregate);
+
+        const call = switch (block.instructions.items[3].kind) {
+            .call => |call| call,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        if (call.callee_value != null or call.inline_asm != null or call.ret_ty != .void) return error.UnsupportedCodegenInstruction;
+        if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
+        if (call.args.items.len != 3) return error.UnsupportedCodegenInstruction;
+        if (call.args.items[0].ty != .ptr or !isNamed(call.args.items[0].value, ptr_name)) return error.UnsupportedCodegenValue;
+        if (!call.args.items[1].ty.eql(.{ .int = 64 }) or !isNamed(call.args.items[1].value, len_name)) return error.UnsupportedCodegenValue;
+        if (call.args.items[2].ty != .ptr) return error.UnsupportedCodegenType;
+        switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .@"unreachable" => {},
+            else => return error.UnsupportedCodegenControlFlow,
+        }
+
+        try machine.instructions.append(allocator, .{ .lea_global_rdi = ptr_symbol });
+        try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
+        try appendAlignedDirectCall(allocator, machine, call.callee, .void);
+        try machine.instructions.append(allocator, .ud2);
+        return;
+    }
+
     if (block.instructions.items.len == 0 or block.instructions.items.len > 2) return error.UnsupportedCodegenInstruction;
     var call_index: usize = 0;
     if (block.instructions.items.len == 2) {

@@ -54,6 +54,7 @@ pub const callIsFastcc = x86_64_match.callIsFastcc;
 pub const callArgAttrsContain = x86_64_match.callArgAttrsContain;
 pub const paramAttrsContain = x86_64_match.paramAttrsContain;
 pub const globalSymbolName = x86_64_match.globalSymbolName;
+pub const globalSymbolNameFromValue = x86_64_match.globalSymbolNameFromValue;
 pub const symbolName = x86_64_match.symbolName;
 pub const isInt = x86_64_match.isInt;
 pub const i32Value = x86_64_match.i32Value;

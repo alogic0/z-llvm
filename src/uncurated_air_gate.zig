@@ -501,6 +501,7 @@ pub fn main(init: std.process.Init) !void {
             .mode = mode,
             .corpus = options.corpus,
             .object_progress = options.object_progress,
+            .executable_progress = options.executable_progress,
             .source_rows = source_rows,
             .discovered_functions = discovered_functions,
             .structured_functions = structured_functions,
@@ -517,6 +518,12 @@ pub fn main(init: std.process.Init) !void {
             .codegen_failures = codegen_failures,
             .object_emitted_functions = object_emitted_functions,
             .object_failures = object_failures,
+            .native_link_accepted_rows = native_link_accepted_rows,
+            .executable_ok_rows = executable_ok_rows,
+            .link_only_rows = link_only_rows,
+            .runtime_boundary_rows = runtime_boundary_rows,
+            .unsupported_zig_linker_feature_rows = unsupported_zig_linker_feature_rows,
+            .native_link_failures = native_link_failures,
         });
     }
 }

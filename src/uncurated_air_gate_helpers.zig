@@ -112,6 +112,7 @@ pub const StrictFinishCounters = struct {
     mode: Mode,
     corpus: Corpus,
     object_progress: bool,
+    executable_progress: bool,
     source_rows: usize,
     discovered_functions: usize,
     structured_functions: usize,
@@ -128,38 +129,114 @@ pub const StrictFinishCounters = struct {
     codegen_failures: usize,
     object_emitted_functions: usize,
     object_failures: usize,
+    native_link_accepted_rows: usize,
+    executable_ok_rows: usize,
+    link_only_rows: usize,
+    runtime_boundary_rows: usize,
+    unsupported_zig_linker_feature_rows: usize,
+    native_link_failures: usize,
 };
 
 pub fn validateStrictFinish(counters: StrictFinishCounters) !void {
-    const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
-        .broad => .{ 101, 152 },
-        .expanded => .{ 109, 199 },
-        .inputs, .scale, .frontier => {
-            std.debug.print(
-                "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
-                .{ counters.mode.name(), counters.corpus.name() },
-            );
-            return error.StrictFinishFailed;
-        },
+    const expected = strictExpectations(counters.corpus) orelse {
+        std.debug.print(
+            "strict-finish-failure mode={s} field=corpus expected=broad-expanded-scale-or-frontier actual={s}\n",
+            .{ counters.mode.name(), counters.corpus.name() },
+        );
+        return error.StrictFinishFailed;
     };
-    try expectStrict(counters.mode, "source_rows", counters.source_rows, expected_source_rows);
-    try expectStrict(counters.mode, "discovered_functions", counters.discovered_functions, expected_functions);
-    try expectStrict(counters.mode, "structured_functions", counters.structured_functions, expected_functions);
-    try expectStrict(counters.mode, "generic_codegen_functions", counters.generic_codegen_functions, expected_functions);
-    try expectStrict(counters.mode, "generic_cfg_functions", counters.generic_cfg_functions, expected_functions);
+    try expectStrict(counters.mode, "source_rows", counters.source_rows, expected.source_rows);
+    try expectStrict(counters.mode, "discovered_functions", counters.discovered_functions, expected.functions);
+    try expectStrict(counters.mode, "structured_functions", counters.structured_functions, expected.functions);
+    try expectStrict(counters.mode, "generic_codegen_functions", counters.generic_codegen_functions, expected.functions);
+    try expectStrict(counters.mode, "generic_cfg_functions", counters.generic_cfg_functions, expected.functions);
     try expectStrict(counters.mode, "structural_matcher_functions", counters.structural_matcher_functions, 0);
-    try expectStrict(counters.mode, "structured_air_v2_functions", counters.structured_air_v2_functions, expected_functions);
-    try expectStrict(counters.mode, "typed_air_operand_functions", counters.typed_air_operand_functions, expected_functions);
+    try expectStrict(counters.mode, "structured_air_v2_functions", counters.structured_air_v2_functions, expected.functions);
+    try expectStrict(counters.mode, "typed_air_operand_functions", counters.typed_air_operand_functions, expected.functions);
     try expectStrict(counters.mode, "legacy_air_text_lowering_functions", counters.legacy_air_text_lowering_functions, 0);
     try expectStrict(counters.mode, "typed_v2_fallback_functions", counters.typed_v2_fallback_functions, 0);
-    try expectStrict(counters.mode, "generic_lowering_functions", counters.generic_lowering_functions, expected_functions);
+    try expectStrict(counters.mode, "generic_lowering_functions", counters.generic_lowering_functions, expected.functions);
     try expectStrict(counters.mode, "shape_recognizer_functions", counters.shape_recognizer_functions, 0);
     try expectStrict(counters.mode, "unsupported_functions", counters.unsupported_functions, 0);
     try expectStrict(counters.mode, "codegen_failures", counters.codegen_failures, 0);
     if (counters.object_progress) {
-        try expectStrict(counters.mode, "object_emitted_functions", counters.object_emitted_functions, expected_functions);
+        try expectStrict(counters.mode, "object_emitted_functions", counters.object_emitted_functions, expected.functions);
         try expectStrict(counters.mode, "object_failures", counters.object_failures, 0);
     }
+    if (counters.executable_progress) {
+        const exec = expected.executable orelse {
+            std.debug.print(
+                "strict-finish-failure mode={s} field=executable_progress expected=unsupported actual={s}\n",
+                .{ counters.mode.name(), counters.corpus.name() },
+            );
+            return error.StrictFinishFailed;
+        };
+        try expectStrict(counters.mode, "native_link_accepted_rows", counters.native_link_accepted_rows, exec.native_link_accepted_rows);
+        try expectStrict(counters.mode, "executable_ok_rows", counters.executable_ok_rows, exec.executable_ok_rows);
+        try expectStrict(counters.mode, "link_only_rows", counters.link_only_rows, exec.link_only_rows);
+        try expectStrict(counters.mode, "runtime_boundary_rows", counters.runtime_boundary_rows, exec.runtime_boundary_rows);
+        try expectStrict(counters.mode, "unsupported_zig_linker_feature_rows", counters.unsupported_zig_linker_feature_rows, 0);
+        try expectStrict(counters.mode, "native_link_failures", counters.native_link_failures, 0);
+    }
+}
+
+const StrictExpectations = struct {
+    source_rows: usize,
+    functions: usize,
+    executable: ?StrictExecutableExpectations = null,
+};
+
+const StrictExecutableExpectations = struct {
+    native_link_accepted_rows: usize,
+    executable_ok_rows: usize,
+    link_only_rows: usize,
+    runtime_boundary_rows: usize,
+};
+
+fn strictExpectations(corpus: Corpus) ?StrictExpectations {
+    return switch (corpus) {
+        .broad => .{
+            .source_rows = 101,
+            .functions = 152,
+            .executable = .{
+                .native_link_accepted_rows = 100,
+                .executable_ok_rows = 100,
+                .link_only_rows = 0,
+                .runtime_boundary_rows = 1,
+            },
+        },
+        .expanded => .{
+            .source_rows = 109,
+            .functions = 199,
+            .executable = .{
+                .native_link_accepted_rows = 108,
+                .executable_ok_rows = 108,
+                .link_only_rows = 0,
+                .runtime_boundary_rows = 1,
+            },
+        },
+        .scale => .{
+            .source_rows = 112,
+            .functions = 216,
+            .executable = .{
+                .native_link_accepted_rows = 111,
+                .executable_ok_rows = 111,
+                .link_only_rows = 0,
+                .runtime_boundary_rows = 1,
+            },
+        },
+        .frontier => .{
+            .source_rows = 13,
+            .functions = 430,
+            .executable = .{
+                .native_link_accepted_rows = 13,
+                .executable_ok_rows = 13,
+                .link_only_rows = 0,
+                .runtime_boundary_rows = 0,
+            },
+        },
+        .inputs => null,
+    };
 }
 
 pub fn expectStrict(mode: Mode, field: []const u8, actual: usize, expected: usize) !void {

@@ -447,6 +447,9 @@ currently reports `source_rows=112`,
 `native_link_accepted_rows=111`, `executable_ok_rows=111`,
 `link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`,
 `lld_rows=0`, and `local_fail=0` per mode.
+The new strict `zig build distribution-air-release-scale-finish` gate locks
+those same per-mode counters with `--strict-finish`, so the cumulative scale
+baseline is now counter-locked separately from the progress command.
 
 Volatile memory roundtrips, broader aggregate field stores, broader global/TLS
 addressing, and larger loop-memory dependencies remain named future generic CFG
@@ -473,6 +476,21 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `native_link_accepted_rows=13`, `executable_ok_rows=13`,
 `link_only_rows=0`, `runtime_boundary_rows=0`, `llvm_targetmachine_rows=0`,
 `lld_rows=0`, and `local_fail=0`.
+
+The new strict `zig build distribution-air-release-frontier` gate runs this
+isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
+object progress, executable progress, and strict counter checks. It requires
+`source_rows=13`, `discovered_functions=430`,
+`generic_cfg_functions=430`, `structural_matcher_functions=0`,
+`object_emitted_functions=430`, `native_link_accepted_rows=13`,
+`executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
+`unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
+
+Strict release baselines are now split by corpus topology: broad is cumulative
+`test/zig/inputs` + `test/zig/integrated`, expanded adds
+`test/zig/expanded`, scale adds `test/zig/scale`, and frontier is isolated to
+`test/zig/frontier`.
 
 The memory/aggregate frontier moved several previously rejected classes into
 accepted rows: nested counted loops with inner memory dependencies, selected

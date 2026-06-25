@@ -415,7 +415,10 @@ modes at `native_link_accepted_rows=111`, `executable_ok_rows=111`,
 object progress, and executable progress for all three release modes and
 reports these same executable counters per mode. It is a green
 frontier/progress gate with fail-closed local failure classification, not yet a
-strict counter-locked finish gate.
+strict counter-locked finish gate. The strict
+`zig build distribution-air-release-scale-finish` gate locks those same
+per-mode counters with `--strict-finish`, so scale now has both a progress
+command and a counter-locked finish command.
 
 The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasefast-frontier`,
@@ -435,7 +438,13 @@ green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `local_fail=0`. Frontier native-link and executable proof are green for all
 three modes at `native_link_accepted_rows=13`, `executable_ok_rows=13`,
 `link_only_rows=0`, `runtime_boundary_rows=0`,
-`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The memory and
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The strict
+`zig build distribution-air-release-frontier` gate now locks these isolated
+frontier counters for ReleaseFast, ReleaseSafe, and ReleaseSmall with object
+progress, executable progress, and strict counter checks. The strict release
+baselines are split by corpus topology: broad is inputs + integrated,
+expanded adds `test/zig/expanded`, scale adds `test/zig/scale`, and frontier
+is isolated to `test/zig/frontier`. The memory and
 aggregate frontier slice closes selected nested loop-memory CFG, nested
 extern-struct field GEP, dynamic pointer-element GEP, branch-local
 global/TLS add/sub updates, and nested INTEGER aggregate add-chain field
