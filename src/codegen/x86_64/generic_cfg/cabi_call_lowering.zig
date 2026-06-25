@@ -121,7 +121,7 @@ pub fn appendI32CallArgs(
                 stack_args[stack_arg_count] = .{ .stack_disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }) };
                 stack_arg_count += 1;
             },
-            .sse, .aggregate_register_passthrough, .aggregate_stack_passthrough => return error.UnsupportedCodegenType,
+            .sse, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return error.UnsupportedCodegenType,
         }
     }
 
@@ -213,6 +213,9 @@ pub fn appendSysVScalarCallArgsWithBlock(
             },
             .aggregate_stack_passthrough => |aggregate| {
                 try appendSysVStackAggregatePassThroughArgs(&stack_args, &stack_arg_count, aggregate);
+            },
+            .byval_stack_copy => |copy| {
+                try appendSysVByvalStackCopyArgs(function, &stack_args, &stack_arg_count, copy);
             },
         }
     }
@@ -334,7 +337,7 @@ pub fn appendSysVScalarCallArgsWithBlock(
             .aggregate_register_passthrough => |aggregate| {
                 try appendSysVRegisterAggregatePassThroughArg(allocator, machine, aggregate, incoming_stack_adjust);
             },
-            .stack_i32_const, .stack_i32_param, .aggregate_stack_passthrough => {},
+            .stack_i32_const, .stack_i32_param, .byval_stack_copy, .aggregate_stack_passthrough => {},
         }
     }
     return stack_arg_count;
@@ -362,7 +365,7 @@ fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
             .gpr => |dst| dst,
-            .sse, .stack_i32_const, .stack_i32_param, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
+            .sse, .stack_i32_const, .stack_i32_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
         };
 
         const writes_dst = switch (arg.value) {
@@ -438,7 +441,7 @@ fn analyzeXmmArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
             .sse => |dst| dst,
-            .gpr, .stack_i32_const, .stack_i32_param, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
+            .gpr, .stack_i32_const, .stack_i32_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
         };
 
         const writes_dst = switch (arg.value) {
@@ -666,6 +669,25 @@ pub fn appendSysVStackAggregatePassThroughArgs(
     }
 }
 
+pub fn appendSysVByvalStackCopyArgs(
+    function: ir.Function,
+    stack_args: *[max_sysv_stack_call_args]StackScalarCallArg,
+    stack_arg_count: *usize,
+    copy: sysv_abi.ByvalStackCopy,
+) !void {
+    const source_reg = try paramReg(function, copy.source_name, .ptr);
+    const stack_eightbytes = sysv_abi.aggregateStackEightbytes(copy.classification);
+    if (stack_eightbytes == 0) return error.UnsupportedCodegenAbi;
+    var index: usize = 0;
+    while (index < stack_eightbytes) : (index += 1) {
+        if (stack_arg_count.* >= stack_args.len) return error.UnsupportedCodegenAbi;
+        const offset = index * 8;
+        if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+        stack_args[stack_arg_count.*] = .{ .byval_ptr_disp = .{ .reg = source_reg, .offset = @intCast(offset) } };
+        stack_arg_count.* += 1;
+    }
+}
+
 pub fn appendSysVMemoryAggregateStackPassThroughArgs(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -738,6 +760,10 @@ pub const StackScalarCallArg = union(enum) {
     stack_disp: u8,
     arg_reg: ArgReg,
     xmm_reg: XmmReg,
+    byval_ptr_disp: struct {
+        reg: ArgReg,
+        offset: u8,
+    },
     computed_i32: ir.Value,
     computed_i64: ir.Value,
     precomputed_rax,
@@ -755,6 +781,10 @@ pub fn appendStackScalarCallArg(
         .imm => |value| try machine.instructions.append(allocator, .{ .push_imm32 = value }),
         .arg_reg => |reg| try machine.instructions.append(allocator, .{ .push_arg = reg }),
         .xmm_reg => |reg| try machine.instructions.append(allocator, .{ .push_xmm64 = reg }),
+        .byval_ptr_disp => |source| {
+            try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = source.offset } });
+            try machine.instructions.append(allocator, .push_rax);
+        },
         .computed_i32 => |value| {
             const block = maybe_block orelse return error.UnsupportedCodegenAbi;
             try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);

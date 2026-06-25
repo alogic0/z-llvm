@@ -284,7 +284,11 @@ outside the selected source-backed forms. A selected direct sret-pointer call
 also preserves one live `i32` GPR through the existing spill/reload frame when
 the call does not need outgoing stack arguments; live values across sret calls
 with outgoing stack arguments remain a targeted `UnsupportedLiveAcrossCall`
-boundary. The frontier additionally lowers the selected
+boundary. Explicit `ptr byval(aggregate)` call arguments now have a first
+planner-owned subset: supported aggregate payloads are copied from the source
+pointer to outgoing stack eightbytes for direct and function-pointer calls.
+Unsupported layouts and non-eightbyte tail copies remain targeted boundaries.
+The frontier additionally lowers the selected
 source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by-value
 aggregate field-read shape, and byval-to-sret copies for all fields in those
 selected forms; the current frontier proves this through eight i64 fields,
@@ -361,7 +365,7 @@ X87 / long double, including aggregate-contained long-double leaves and
   long-double `sret`/`byval` payloads (`UnsupportedLongDoubleAbi`)
 packed aggregate ABI call/return forms, including direct planner inputs and
   packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`)
-byval lowering and arbitrary sret copy/storage beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
+byval lowering outside supported aggregate payload stack copies and arbitrary sret copy/storage beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
 operand bundles
 invoke
 callbr

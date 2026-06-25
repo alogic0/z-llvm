@@ -265,8 +265,15 @@ pub const CallArgAssignment = union(enum) {
     sse: XmmReg,
     stack_i32_const: i32,
     stack_i32_param: []const u8,
+    byval_stack_copy: ByvalStackCopy,
     aggregate_register_passthrough: RegisterAggregatePassThrough,
     aggregate_stack_passthrough: RegisterAggregatePassThrough,
+};
+
+pub const ByvalStackCopy = struct {
+    source_name: []const u8,
+    aggregate_ty: ir.Type,
+    classification: AggregateClassification,
 };
 
 pub const AggregatePassDestination = union(enum) {
@@ -334,6 +341,24 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
     var int_arg_index: usize = 0;
     var fp_arg_index: usize = 0;
     for (call.args.items) |arg| {
+        if (callArgByvalType(arg)) |byval_ty| {
+            try rejectUnsupportedAbiType(byval_ty);
+            if (arg.ty != .ptr) return error.UnsupportedSretByvalAbi;
+            const source_name = switch (arg.value) {
+                .named => |name| name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            const classification = try classifyAggregate(byval_ty);
+            if (classification.size_bytes == 0 or classification.size_bytes % 8 != 0) return error.UnsupportedSretByvalAbi;
+            try plan.assignments.append(allocator, .{ .byval_stack_copy = .{
+                .source_name = source_name,
+                .aggregate_ty = byval_ty,
+                .classification = classification,
+            } });
+            plan.has_non_i32_arg = true;
+            plan.counts.stack_args += aggregateStackEightbytes(classification);
+            continue;
+        }
         try rejectUnsupportedCallArgAttrs(arg);
         try rejectUnsupportedAbiType(arg.ty);
         if (isGprScalarType(arg.ty)) {
@@ -447,6 +472,47 @@ pub fn rejectUnsupportedCallArgAttrs(arg: ir.CallArg) !void {
         return;
     }
     return error.UnsupportedCallAttributeAbi;
+}
+
+pub fn callArgByvalType(arg: ir.CallArg) ?ir.Type {
+    return aggregateAbiAttrType(arg.attrs, "byval");
+}
+
+fn aggregateAbiAttrType(attrs: ?[]const u8, name: []const u8) ?ir.Type {
+    const text = attrs orelse return null;
+    var start: usize = 0;
+    while (std.mem.indexOfPos(u8, text, start, name)) |name_index| {
+        const open_index = name_index + name.len;
+        start = open_index;
+        if (open_index >= text.len or text[open_index] != '(') continue;
+        const close_index = findMatchingParen(text, open_index) orelse return null;
+        const payload = std.mem.trim(u8, text[open_index + 1 .. close_index], " \t");
+        if (payload.len >= 2 and ((payload[0] == '{' and payload[payload.len - 1] == '}') or
+            (payload[0] == '[' and payload[payload.len - 1] == ']') or
+            (payload[0] == '%' and payload.len > 1)))
+        {
+            return .{ .aggregate = payload };
+        }
+        start = close_index + 1;
+    }
+    return null;
+}
+
+fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
+    var depth: usize = 0;
+    var index = open_index;
+    while (index < text.len) : (index += 1) {
+        switch (text[index]) {
+            '(' => depth += 1,
+            ')' => {
+                if (depth == 0) return null;
+                depth -= 1;
+                if (depth == 0) return index;
+            },
+            else => {},
+        }
+    }
+    return null;
 }
 
 fn attrsContainAbiPayload(attrs: []const u8, name: []const u8) bool {

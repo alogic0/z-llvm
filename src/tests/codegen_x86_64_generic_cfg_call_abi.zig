@@ -1897,7 +1897,7 @@ test "x86_64 codegen rejects live value across sret stack-arg call" {
     );
 }
 
-test "x86_64 codegen rejects byval call ABI boundary" {
+test "x86_64 codegen accepts supported byval stack-copy call ABI subset" {
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -1913,10 +1913,24 @@ test "x86_64 codegen rejects byval call ABI boundary" {
     var byval_module = try ir.Module.parse(std.testing.allocator, byval_input);
     defer byval_module.deinit();
     try byval_module.verify();
-    try std.testing.expectError(
-        error.UnsupportedSretByvalAbi,
-        codegen.x86_64.lowerFunction(std.testing.allocator, byval_module.target_triple.?, byval_module.functions.items[0]),
-    );
+    const byval_call = byval_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    const byval_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, byval_module.functions.items[0], byval_call);
+    try std.testing.expectEqual(@as(usize, 0), byval_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), byval_counts.stack_args);
+    var byval_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, byval_module.target_triple.?, byval_module.functions.items[0]);
+    defer byval_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(byval_machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 0 } });
+    try expectMachineInstruction(byval_machine.instructions.items, .push_rax);
+    var saw_byval_direct_call = false;
+    for (byval_machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |direct_call| {
+            saw_byval_direct_call = true;
+            try std.testing.expectEqualStrings("callee", direct_call.symbol);
+            try std.testing.expect(direct_call.ret_ty.eql(.{ .int = 32 }));
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_byval_direct_call);
 
     const indirect_byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1934,13 +1948,36 @@ test "x86_64 codegen rejects byval call ABI boundary" {
     const indirect_byval_call = indirect_byval_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expect(indirect_byval_call.callee_value != null);
     try std.testing.expect(codegen.x86_64.sysvScalarCallNeedsStackArgsForTest(indirect_byval_call));
+    const indirect_byval_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_byval_module.functions.items[0], indirect_byval_call);
+    try std.testing.expectEqual(@as(usize, 0), indirect_byval_counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), indirect_byval_counts.stack_args);
+    var indirect_byval_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, indirect_byval_module.target_triple.?, indirect_byval_module.functions.items[0]);
+    defer indirect_byval_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(indirect_byval_machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rsi, .offset = 0 } });
+    try expectMachineInstruction(indirect_byval_machine.instructions.items, .push_rax);
+    try expectMachineInstruction(indirect_byval_machine.instructions.items, .{ .indirect_call_rax = .{ .int = 32 } });
+}
+
+test "x86_64 codegen rejects byval aggregate with non-eightbyte tail" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr byval({ i32 }))
+        \\
+        \\define i32 @caller(ptr %arg) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr byval({ i32 }) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expectError(
         error.UnsupportedSretByvalAbi,
-        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_byval_module.functions.items[0], indirect_byval_call),
-    );
-    try std.testing.expectError(
-        error.UnsupportedSretByvalAbi,
-        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_byval_module.target_triple.?, indirect_byval_module.functions.items[0]),
+        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, module.functions.items[0], call),
     );
 }
 
