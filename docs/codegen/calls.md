@@ -296,7 +296,9 @@ The source pointer may itself arrive in a register or an incoming stack slot, wi
 unit proof for one-, two-, array-backed three-, and nested three-eightbyte
 payloads, single-`i8`, single-`i16`, single-`i32`, and `[3 x i32]`
 tail payloads, plus max-sized exact-eightbyte payloads through the current
-24-stack-argument limit.
+24-stack-argument limit. Source-owned frontier rows now prove `[17 x i8]`
+and `[9 x i16]` MEMORY byval-to-sret byte-/word-tail copies through direct
+and function-pointer calls.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
 spill/reload frame now covers the same indirect byval call shape for both

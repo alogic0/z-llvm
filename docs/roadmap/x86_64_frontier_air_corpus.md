@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=363
-structured_functions=363
-generic_codegen_functions=363
-generic_cfg_functions=363
+discovered_functions=369
+structured_functions=369
+generic_codegen_functions=369
+generic_cfg_functions=369
 structural_matcher_functions=0
-structured_air_v2_functions=363
-typed_air_operand_functions=363
+structured_air_v2_functions=369
+typed_air_operand_functions=369
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=363
+generic_lowering_functions=369
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=363
+object_emitted_functions=369
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -644,7 +644,9 @@ Remaining measured frontier blockers kept out of accepted rows:
   a `double`-leaf copy, a mixed pointer/`double`/`i64` copy, and the
   `ScalarMixed`/`ScalarNested`/`ScalarArray` direct scalar-param sret make
   rows; explicit `ptr byval(...)` calls now include single-`i8`, single-`i16`,
-  single-`i32`, and `[3 x i32]` tail stack-copy proof; supported
+  single-`i32`, and `[3 x i32]` tail stack-copy proof, while source-owned
+  MEMORY byval-to-sret rows now include `[17 x i8]` and `[9 x i16]`
+  byte-/word-tail copies through direct and pointer-callee calls; supported
   `ptr sret(...)` call arguments now use the normal GPR hidden-result-pointer
   planner path; X87,
   packed/unaligned aggregate ABI classes,

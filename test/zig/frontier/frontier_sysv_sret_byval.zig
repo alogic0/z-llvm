@@ -163,6 +163,14 @@ const BigArrayMixed = extern struct {
     ptr: *const i64,
 };
 
+const BigByteTail = extern struct {
+    values: [17]u8,
+};
+
+const BigWordTail = extern struct {
+    values: [9]u16,
+};
+
 const ScalarMixed = extern struct {
     a: u8,
     b: u16,
@@ -203,6 +211,8 @@ const BigDoubleArrayCopyFn = *const fn (BigDoubleArray) callconv(.c) BigDoubleAr
 const BigFloatCopyFn = *const fn (BigFloat) callconv(.c) BigFloat;
 const BigPtrDoubleCopyFn = *const fn (BigPtrDouble) callconv(.c) BigPtrDouble;
 const BigArrayMixedCopyFn = *const fn (BigArrayMixed) callconv(.c) BigArrayMixed;
+const BigByteTailCopyFn = *const fn (BigByteTail) callconv(.c) BigByteTail;
+const BigWordTailCopyFn = *const fn (BigWordTail) callconv(.c) BigWordTail;
 
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
     return .{ .a = a, .b = b, .c = c };
@@ -453,6 +463,30 @@ export fn frontier_direct_big_array_mixed_copy(value: BigArrayMixed) BigArrayMix
 }
 
 export fn frontier_indirect_big_array_mixed_copy(func: BigArrayMixedCopyFn, value: BigArrayMixed) BigArrayMixed {
+    return func(value);
+}
+
+export fn frontier_big_byte_tail_copy(value: BigByteTail) BigByteTail {
+    return value;
+}
+
+export fn frontier_direct_big_byte_tail_copy(value: BigByteTail) BigByteTail {
+    return frontier_big_byte_tail_copy(value);
+}
+
+export fn frontier_indirect_big_byte_tail_copy(func: BigByteTailCopyFn, value: BigByteTail) BigByteTail {
+    return func(value);
+}
+
+export fn frontier_big_word_tail_copy(value: BigWordTail) BigWordTail {
+    return value;
+}
+
+export fn frontier_direct_big_word_tail_copy(value: BigWordTail) BigWordTail {
+    return frontier_big_word_tail_copy(value);
+}
+
+export fn frontier_indirect_big_word_tail_copy(func: BigWordTailCopyFn, value: BigWordTail) BigWordTail {
     return func(value);
 }
 
