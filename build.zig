@@ -96,381 +96,100 @@ pub fn build(b: *std.Build) void {
             .optimize = .Debug,
         }),
     });
-    const run_uncurated_air_gate = b.addRunArtifact(uncurated_air_gate);
-    const uncurated_air_step = b.step("distribution-zig-air-uncurated-releasefast", "Discover and generically lower uncurated x86_64 ReleaseFast Zig AIR");
-    uncurated_air_step.dependOn(&run_uncurated_air_gate.step);
-    const run_uncurated_air_releasefast_broad_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_broad_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_broad_gate.addArg("--corpus=broad");
-    const uncurated_air_releasefast_broad_step = b.step("distribution-zig-air-uncurated-releasefast-broad", "Discover and generically lower broad uncurated x86_64 ReleaseFast Zig AIR");
-    uncurated_air_releasefast_broad_step.dependOn(&run_uncurated_air_releasefast_broad_gate.step);
-    const run_uncurated_air_releasefast_expanded_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_expanded_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_expanded_gate.addArg("--corpus=expanded");
-    const uncurated_air_releasefast_expanded_step = b.step("distribution-zig-air-uncurated-releasefast-expanded", "Discover and lower the expanded x86_64 ReleaseFast Zig AIR frontier corpus");
-    uncurated_air_releasefast_expanded_step.dependOn(&run_uncurated_air_releasefast_expanded_gate.step);
-    const run_uncurated_air_releasefast_scale_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_scale_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_scale_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasefast_scale_gate.addArg("--object-progress");
-    const uncurated_air_releasefast_scale_step = b.step("distribution-zig-air-uncurated-releasefast-scale", "Discover, lower, and emit objects for the scale x86_64 ReleaseFast Zig AIR frontier corpus");
-    uncurated_air_releasefast_scale_step.dependOn(&run_uncurated_air_releasefast_scale_gate.step);
-    const run_uncurated_air_releasefast_scale_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_scale_object_inspection_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_scale_object_inspection_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasefast_scale_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasefast_scale_object_inspection_step = b.step("distribution-zig-air-uncurated-releasefast-scale-object-inspection", "Inspect scale uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasefast_scale_object_inspection_step.dependOn(&run_uncurated_air_releasefast_scale_object_inspection_gate.step);
-    const run_uncurated_air_releasefast_scale_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_scale_native_link_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_scale_native_link_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasefast_scale_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasefast_scale_native_link_step = b.step("distribution-zig-air-uncurated-releasefast-scale-native-link", "Link scale uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasefast_scale_native_link_step.dependOn(&run_uncurated_air_releasefast_scale_native_link_gate.step);
-    const run_uncurated_air_releasefast_scale_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_scale_executable_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_scale_executable_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasefast_scale_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasefast_scale_executable_step = b.step("distribution-zig-air-uncurated-releasefast-scale-executable", "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseFast real-AIR objects");
-    uncurated_air_releasefast_scale_executable_step.dependOn(&run_uncurated_air_releasefast_scale_executable_gate.step);
-    const run_uncurated_air_releasefast_frontier_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_frontier_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_frontier_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasefast_frontier_gate.addArg("--object-progress");
-    const uncurated_air_releasefast_frontier_step = b.step("distribution-zig-air-uncurated-releasefast-frontier", "Discover, lower, and emit objects for the frontier x86_64 ReleaseFast Zig AIR corpus");
-    uncurated_air_releasefast_frontier_step.dependOn(&run_uncurated_air_releasefast_frontier_gate.step);
-    const run_uncurated_air_releasefast_frontier_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_frontier_object_inspection_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_frontier_object_inspection_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasefast_frontier_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasefast_frontier_object_inspection_step = b.step("distribution-zig-air-uncurated-releasefast-frontier-object-inspection", "Inspect frontier uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasefast_frontier_object_inspection_step.dependOn(&run_uncurated_air_releasefast_frontier_object_inspection_gate.step);
-    const run_uncurated_air_releasefast_frontier_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_frontier_native_link_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_frontier_native_link_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasefast_frontier_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasefast_frontier_native_link_step = b.step("distribution-zig-air-uncurated-releasefast-frontier-native-link", "Link frontier uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasefast_frontier_native_link_step.dependOn(&run_uncurated_air_releasefast_frontier_native_link_gate.step);
-    const run_uncurated_air_releasefast_frontier_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_frontier_executable_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_frontier_executable_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasefast_frontier_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasefast_frontier_executable_step = b.step("distribution-zig-air-uncurated-releasefast-frontier-executable", "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseFast real-AIR objects");
-    uncurated_air_releasefast_frontier_executable_step.dependOn(&run_uncurated_air_releasefast_frontier_executable_gate.step);
-    const run_uncurated_air_releasefast_expanded_object_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_expanded_object_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_expanded_object_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasefast_expanded_object_gate.addArg("--object-progress");
-    const uncurated_air_releasefast_expanded_object_step = b.step("distribution-zig-air-uncurated-releasefast-expanded-object", "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseFast Zig AIR progress accounting");
-    uncurated_air_releasefast_expanded_object_step.dependOn(&run_uncurated_air_releasefast_expanded_object_gate.step);
-    const run_uncurated_air_releasefast_expanded_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_expanded_object_inspection_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_expanded_object_inspection_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasefast_expanded_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasefast_expanded_object_inspection_step = b.step("distribution-zig-air-uncurated-releasefast-expanded-object-inspection", "Inspect expanded uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasefast_expanded_object_inspection_step.dependOn(&run_uncurated_air_releasefast_expanded_object_inspection_gate.step);
-    const run_uncurated_air_releasefast_expanded_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_expanded_native_link_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_expanded_native_link_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasefast_expanded_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasefast_expanded_native_link_step = b.step("distribution-zig-air-uncurated-releasefast-expanded-native-link", "Link expanded uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasefast_expanded_native_link_step.dependOn(&run_uncurated_air_releasefast_expanded_native_link_gate.step);
-    const run_uncurated_air_releasefast_expanded_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_expanded_executable_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_expanded_executable_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasefast_expanded_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasefast_expanded_executable_step = b.step("distribution-zig-air-uncurated-releasefast-expanded-executable", "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseFast real-AIR objects");
-    uncurated_air_releasefast_expanded_executable_step.dependOn(&run_uncurated_air_releasefast_expanded_executable_gate.step);
-    const run_uncurated_air_releasefast_broad_object_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_broad_object_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_broad_object_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasefast_broad_object_gate.addArg("--object-progress");
-    const uncurated_air_releasefast_broad_object_step = b.step("distribution-zig-air-uncurated-releasefast-broad-object", "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseFast Zig AIR progress accounting");
-    uncurated_air_releasefast_broad_object_step.dependOn(&run_uncurated_air_releasefast_broad_object_gate.step);
-    const run_uncurated_air_releasefast_broad_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_broad_object_inspection_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_broad_object_inspection_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasefast_broad_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasefast_broad_object_inspection_step = b.step("distribution-zig-air-uncurated-releasefast-broad-object-inspection", "Inspect broad uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasefast_broad_object_inspection_step.dependOn(&run_uncurated_air_releasefast_broad_object_inspection_gate.step);
-    const run_uncurated_air_releasefast_broad_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_broad_native_link_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_broad_native_link_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasefast_broad_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasefast_broad_native_link_step = b.step("distribution-zig-air-uncurated-releasefast-broad-native-link", "Link broad uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasefast_broad_native_link_step.dependOn(&run_uncurated_air_releasefast_broad_native_link_gate.step);
-    const run_uncurated_air_releasefast_broad_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_broad_executable_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_broad_executable_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasefast_broad_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasefast_broad_executable_step = b.step("distribution-zig-air-uncurated-releasefast-broad-executable", "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseFast real-AIR objects");
-    uncurated_air_releasefast_broad_executable_step.dependOn(&run_uncurated_air_releasefast_broad_executable_gate.step);
-    const run_uncurated_air_releasesafe_broad_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_broad_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_broad_gate.addArg("--corpus=broad");
-    const uncurated_air_releasesafe_broad_step = b.step("distribution-zig-air-uncurated-releasesafe-broad", "Discover and generically lower broad uncurated x86_64 ReleaseSafe Zig AIR progress");
-    uncurated_air_releasesafe_broad_step.dependOn(&run_uncurated_air_releasesafe_broad_gate.step);
-    const run_uncurated_air_releasesafe_expanded_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_expanded_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_expanded_gate.addArg("--corpus=expanded");
-    const uncurated_air_releasesafe_expanded_step = b.step("distribution-zig-air-uncurated-releasesafe-expanded", "Discover and lower the expanded x86_64 ReleaseSafe Zig AIR frontier corpus");
-    uncurated_air_releasesafe_expanded_step.dependOn(&run_uncurated_air_releasesafe_expanded_gate.step);
-    const run_uncurated_air_releasesafe_scale_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_scale_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_scale_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasesafe_scale_gate.addArg("--object-progress");
-    const uncurated_air_releasesafe_scale_step = b.step("distribution-zig-air-uncurated-releasesafe-scale", "Discover, lower, and emit objects for the scale x86_64 ReleaseSafe Zig AIR frontier corpus");
-    uncurated_air_releasesafe_scale_step.dependOn(&run_uncurated_air_releasesafe_scale_gate.step);
-    const run_uncurated_air_releasesafe_scale_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_scale_object_inspection_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_scale_object_inspection_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasesafe_scale_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasesafe_scale_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesafe-scale-object-inspection", "Inspect scale uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasesafe_scale_object_inspection_step.dependOn(&run_uncurated_air_releasesafe_scale_object_inspection_gate.step);
-    const run_uncurated_air_releasesafe_scale_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_scale_native_link_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_scale_native_link_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasesafe_scale_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasesafe_scale_native_link_step = b.step("distribution-zig-air-uncurated-releasesafe-scale-native-link", "Link scale uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasesafe_scale_native_link_step.dependOn(&run_uncurated_air_releasesafe_scale_native_link_gate.step);
-    const run_uncurated_air_releasesafe_scale_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_scale_executable_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_scale_executable_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasesafe_scale_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasesafe_scale_executable_step = b.step("distribution-zig-air-uncurated-releasesafe-scale-executable", "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseSafe real-AIR objects");
-    uncurated_air_releasesafe_scale_executable_step.dependOn(&run_uncurated_air_releasesafe_scale_executable_gate.step);
-    const run_uncurated_air_releasesafe_frontier_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_frontier_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_frontier_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasesafe_frontier_gate.addArg("--object-progress");
-    const uncurated_air_releasesafe_frontier_step = b.step("distribution-zig-air-uncurated-releasesafe-frontier", "Discover, lower, and emit objects for the frontier x86_64 ReleaseSafe Zig AIR corpus");
-    uncurated_air_releasesafe_frontier_step.dependOn(&run_uncurated_air_releasesafe_frontier_gate.step);
-    const run_uncurated_air_releasesafe_frontier_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_frontier_object_inspection_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_frontier_object_inspection_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasesafe_frontier_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasesafe_frontier_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesafe-frontier-object-inspection", "Inspect frontier uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasesafe_frontier_object_inspection_step.dependOn(&run_uncurated_air_releasesafe_frontier_object_inspection_gate.step);
-    const run_uncurated_air_releasesafe_frontier_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_frontier_native_link_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_frontier_native_link_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasesafe_frontier_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasesafe_frontier_native_link_step = b.step("distribution-zig-air-uncurated-releasesafe-frontier-native-link", "Link frontier uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasesafe_frontier_native_link_step.dependOn(&run_uncurated_air_releasesafe_frontier_native_link_gate.step);
-    const run_uncurated_air_releasesafe_frontier_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_frontier_executable_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_frontier_executable_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasesafe_frontier_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasesafe_frontier_executable_step = b.step("distribution-zig-air-uncurated-releasesafe-frontier-executable", "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseSafe real-AIR objects");
-    uncurated_air_releasesafe_frontier_executable_step.dependOn(&run_uncurated_air_releasesafe_frontier_executable_gate.step);
-    const run_uncurated_air_releasesafe_expanded_object_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_expanded_object_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_expanded_object_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesafe_expanded_object_gate.addArg("--object-progress");
-    const uncurated_air_releasesafe_expanded_object_step = b.step("distribution-zig-air-uncurated-releasesafe-expanded-object", "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseSafe Zig AIR progress accounting");
-    uncurated_air_releasesafe_expanded_object_step.dependOn(&run_uncurated_air_releasesafe_expanded_object_gate.step);
-    const run_uncurated_air_releasesafe_expanded_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_expanded_object_inspection_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_expanded_object_inspection_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesafe_expanded_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasesafe_expanded_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesafe-expanded-object-inspection", "Inspect expanded uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasesafe_expanded_object_inspection_step.dependOn(&run_uncurated_air_releasesafe_expanded_object_inspection_gate.step);
-    const run_uncurated_air_releasesafe_expanded_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_expanded_native_link_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_expanded_native_link_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesafe_expanded_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasesafe_expanded_native_link_step = b.step("distribution-zig-air-uncurated-releasesafe-expanded-native-link", "Link expanded uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasesafe_expanded_native_link_step.dependOn(&run_uncurated_air_releasesafe_expanded_native_link_gate.step);
-    const run_uncurated_air_releasesafe_expanded_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_expanded_executable_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_expanded_executable_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesafe_expanded_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasesafe_expanded_executable_step = b.step("distribution-zig-air-uncurated-releasesafe-expanded-executable", "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseSafe real-AIR objects");
-    uncurated_air_releasesafe_expanded_executable_step.dependOn(&run_uncurated_air_releasesafe_expanded_executable_gate.step);
-    const run_uncurated_air_releasesafe_broad_object_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_broad_object_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_broad_object_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesafe_broad_object_gate.addArg("--object-progress");
-    const uncurated_air_releasesafe_broad_object_step = b.step("distribution-zig-air-uncurated-releasesafe-broad-object", "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSafe Zig AIR progress accounting");
-    uncurated_air_releasesafe_broad_object_step.dependOn(&run_uncurated_air_releasesafe_broad_object_gate.step);
-    const run_uncurated_air_releasesafe_broad_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_broad_object_inspection_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_broad_object_inspection_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesafe_broad_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasesafe_broad_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesafe-broad-object-inspection", "Inspect broad uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasesafe_broad_object_inspection_step.dependOn(&run_uncurated_air_releasesafe_broad_object_inspection_gate.step);
-    const run_uncurated_air_releasesafe_broad_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_broad_executable_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_broad_executable_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesafe_broad_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasesafe_broad_executable_step = b.step("distribution-zig-air-uncurated-releasesafe-broad-executable", "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseSafe real-AIR objects");
-    uncurated_air_releasesafe_broad_executable_step.dependOn(&run_uncurated_air_releasesafe_broad_executable_gate.step);
-    const run_uncurated_air_releasesmall_broad_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_broad_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_broad_gate.addArg("--corpus=broad");
-    const uncurated_air_releasesmall_broad_step = b.step("distribution-zig-air-uncurated-releasesmall-broad", "Discover and generically lower broad uncurated x86_64 ReleaseSmall Zig AIR progress");
-    uncurated_air_releasesmall_broad_step.dependOn(&run_uncurated_air_releasesmall_broad_gate.step);
-    const run_uncurated_air_releasesmall_expanded_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_expanded_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_expanded_gate.addArg("--corpus=expanded");
-    const uncurated_air_releasesmall_expanded_step = b.step("distribution-zig-air-uncurated-releasesmall-expanded", "Discover and lower the expanded x86_64 ReleaseSmall Zig AIR frontier corpus");
-    uncurated_air_releasesmall_expanded_step.dependOn(&run_uncurated_air_releasesmall_expanded_gate.step);
-    const run_uncurated_air_releasesmall_scale_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_scale_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_scale_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasesmall_scale_gate.addArg("--object-progress");
-    const uncurated_air_releasesmall_scale_step = b.step("distribution-zig-air-uncurated-releasesmall-scale", "Discover, lower, and emit objects for the scale x86_64 ReleaseSmall Zig AIR frontier corpus");
-    uncurated_air_releasesmall_scale_step.dependOn(&run_uncurated_air_releasesmall_scale_gate.step);
-    const run_uncurated_air_releasesmall_scale_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_scale_object_inspection_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_scale_object_inspection_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasesmall_scale_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasesmall_scale_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesmall-scale-object-inspection", "Inspect scale uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasesmall_scale_object_inspection_step.dependOn(&run_uncurated_air_releasesmall_scale_object_inspection_gate.step);
-    const run_uncurated_air_releasesmall_scale_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_scale_native_link_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_scale_native_link_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasesmall_scale_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasesmall_scale_native_link_step = b.step("distribution-zig-air-uncurated-releasesmall-scale-native-link", "Link scale uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasesmall_scale_native_link_step.dependOn(&run_uncurated_air_releasesmall_scale_native_link_gate.step);
-    const run_uncurated_air_releasesmall_scale_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_scale_executable_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_scale_executable_gate.addArg("--corpus=scale");
-    run_uncurated_air_releasesmall_scale_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasesmall_scale_executable_step = b.step("distribution-zig-air-uncurated-releasesmall-scale-executable", "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseSmall real-AIR objects");
-    uncurated_air_releasesmall_scale_executable_step.dependOn(&run_uncurated_air_releasesmall_scale_executable_gate.step);
-    const run_uncurated_air_releasesmall_frontier_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_frontier_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_frontier_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasesmall_frontier_gate.addArg("--object-progress");
-    const uncurated_air_releasesmall_frontier_step = b.step("distribution-zig-air-uncurated-releasesmall-frontier", "Discover, lower, and emit objects for the frontier x86_64 ReleaseSmall Zig AIR corpus");
-    uncurated_air_releasesmall_frontier_step.dependOn(&run_uncurated_air_releasesmall_frontier_gate.step);
-    const run_uncurated_air_releasesmall_frontier_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_frontier_object_inspection_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_frontier_object_inspection_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasesmall_frontier_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasesmall_frontier_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesmall-frontier-object-inspection", "Inspect frontier uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasesmall_frontier_object_inspection_step.dependOn(&run_uncurated_air_releasesmall_frontier_object_inspection_gate.step);
-    const run_uncurated_air_releasesmall_frontier_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_frontier_native_link_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_frontier_native_link_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasesmall_frontier_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasesmall_frontier_native_link_step = b.step("distribution-zig-air-uncurated-releasesmall-frontier-native-link", "Link frontier uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasesmall_frontier_native_link_step.dependOn(&run_uncurated_air_releasesmall_frontier_native_link_gate.step);
-    const run_uncurated_air_releasesmall_frontier_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_frontier_executable_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_frontier_executable_gate.addArg("--corpus=frontier");
-    run_uncurated_air_releasesmall_frontier_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasesmall_frontier_executable_step = b.step("distribution-zig-air-uncurated-releasesmall-frontier-executable", "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseSmall real-AIR objects");
-    uncurated_air_releasesmall_frontier_executable_step.dependOn(&run_uncurated_air_releasesmall_frontier_executable_gate.step);
-    const run_uncurated_air_releasesmall_expanded_object_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_expanded_object_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_expanded_object_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesmall_expanded_object_gate.addArg("--object-progress");
-    const uncurated_air_releasesmall_expanded_object_step = b.step("distribution-zig-air-uncurated-releasesmall-expanded-object", "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseSmall Zig AIR progress accounting");
-    uncurated_air_releasesmall_expanded_object_step.dependOn(&run_uncurated_air_releasesmall_expanded_object_gate.step);
-    const run_uncurated_air_releasesmall_expanded_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_expanded_object_inspection_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_expanded_object_inspection_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesmall_expanded_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasesmall_expanded_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesmall-expanded-object-inspection", "Inspect expanded uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasesmall_expanded_object_inspection_step.dependOn(&run_uncurated_air_releasesmall_expanded_object_inspection_gate.step);
-    const run_uncurated_air_releasesmall_expanded_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_expanded_native_link_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_expanded_native_link_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesmall_expanded_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasesmall_expanded_native_link_step = b.step("distribution-zig-air-uncurated-releasesmall-expanded-native-link", "Link expanded uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasesmall_expanded_native_link_step.dependOn(&run_uncurated_air_releasesmall_expanded_native_link_gate.step);
-    const run_uncurated_air_releasesmall_expanded_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_expanded_executable_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_expanded_executable_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesmall_expanded_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasesmall_expanded_executable_step = b.step("distribution-zig-air-uncurated-releasesmall-expanded-executable", "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseSmall real-AIR objects");
-    uncurated_air_releasesmall_expanded_executable_step.dependOn(&run_uncurated_air_releasesmall_expanded_executable_gate.step);
-    const run_uncurated_air_releasesmall_broad_object_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_broad_object_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_broad_object_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesmall_broad_object_gate.addArg("--object-progress");
-    const uncurated_air_releasesmall_broad_object_step = b.step("distribution-zig-air-uncurated-releasesmall-broad-object", "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSmall Zig AIR progress accounting");
-    uncurated_air_releasesmall_broad_object_step.dependOn(&run_uncurated_air_releasesmall_broad_object_gate.step);
-    const run_uncurated_air_releasesmall_broad_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_broad_object_inspection_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_broad_object_inspection_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesmall_broad_object_inspection_gate.addArg("--object-inspection");
-    const uncurated_air_releasesmall_broad_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesmall-broad-object-inspection", "Inspect broad uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump");
-    uncurated_air_releasesmall_broad_object_inspection_step.dependOn(&run_uncurated_air_releasesmall_broad_object_inspection_gate.step);
-    const run_uncurated_air_releasesmall_broad_native_link_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_broad_native_link_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_broad_native_link_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesmall_broad_native_link_gate.addArg("--native-link-progress");
-    const uncurated_air_releasesmall_broad_native_link_step = b.step("distribution-zig-air-uncurated-releasesmall-broad-native-link", "Link broad uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting");
-    uncurated_air_releasesmall_broad_native_link_step.dependOn(&run_uncurated_air_releasesmall_broad_native_link_gate.step);
-    const run_uncurated_air_releasesmall_broad_executable_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_broad_executable_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_broad_executable_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesmall_broad_executable_gate.addArg("--executable-progress");
-    const uncurated_air_releasesmall_broad_executable_step = b.step("distribution-zig-air-uncurated-releasesmall-broad-executable", "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseSmall real-AIR objects");
-    uncurated_air_releasesmall_broad_executable_step.dependOn(&run_uncurated_air_releasesmall_broad_executable_gate.step);
-    const run_uncurated_air_releasefast_broad_finish_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_broad_finish_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_broad_finish_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasefast_broad_finish_gate.addArg("--object-progress");
-    run_uncurated_air_releasefast_broad_finish_gate.addArg("--strict-finish");
-    const run_uncurated_air_releasesafe_broad_finish_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_broad_finish_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_broad_finish_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesafe_broad_finish_gate.addArg("--object-progress");
-    run_uncurated_air_releasesafe_broad_finish_gate.addArg("--strict-finish");
-    const run_uncurated_air_releasesmall_broad_finish_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_broad_finish_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_broad_finish_gate.addArg("--corpus=broad");
-    run_uncurated_air_releasesmall_broad_finish_gate.addArg("--object-progress");
-    run_uncurated_air_releasesmall_broad_finish_gate.addArg("--strict-finish");
-    const uncurated_air_release_broad_finish_step = b.step("distribution-zig-air-uncurated-release-broad-finish", "Strict finish-line gate for broad x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR v2 ownership and object emission");
-    uncurated_air_release_broad_finish_step.dependOn(&run_uncurated_air_releasefast_broad_finish_gate.step);
-    uncurated_air_release_broad_finish_step.dependOn(&run_uncurated_air_releasesafe_broad_finish_gate.step);
-    uncurated_air_release_broad_finish_step.dependOn(&run_uncurated_air_releasesmall_broad_finish_gate.step);
-    const run_uncurated_air_releasefast_expanded_finish_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_expanded_finish_gate.addArg("--mode=ReleaseFast");
-    run_uncurated_air_releasefast_expanded_finish_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasefast_expanded_finish_gate.addArg("--object-progress");
-    run_uncurated_air_releasefast_expanded_finish_gate.addArg("--strict-finish");
-    const run_uncurated_air_releasesafe_expanded_finish_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_expanded_finish_gate.addArg("--mode=ReleaseSafe");
-    run_uncurated_air_releasesafe_expanded_finish_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesafe_expanded_finish_gate.addArg("--object-progress");
-    run_uncurated_air_releasesafe_expanded_finish_gate.addArg("--strict-finish");
-    const run_uncurated_air_releasesmall_expanded_finish_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_expanded_finish_gate.addArg("--mode=ReleaseSmall");
-    run_uncurated_air_releasesmall_expanded_finish_gate.addArg("--corpus=expanded");
-    run_uncurated_air_releasesmall_expanded_finish_gate.addArg("--object-progress");
-    run_uncurated_air_releasesmall_expanded_finish_gate.addArg("--strict-finish");
-    const uncurated_air_release_expanded_finish_step = b.step("distribution-zig-air-uncurated-release-expanded-finish", "Strict finish-line gate for expanded x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR v2 ownership and object emission");
-    uncurated_air_release_expanded_finish_step.dependOn(&run_uncurated_air_releasefast_expanded_finish_gate.step);
-    uncurated_air_release_expanded_finish_step.dependOn(&run_uncurated_air_releasesafe_expanded_finish_gate.step);
-    uncurated_air_release_expanded_finish_step.dependOn(&run_uncurated_air_releasesmall_expanded_finish_gate.step);
-    const uncurated_air_release_scale_step = b.step("distribution-zig-air-uncurated-release-scale", "Run scale x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR frontier object-progress gates");
-    uncurated_air_release_scale_step.dependOn(&run_uncurated_air_releasefast_scale_gate.step);
-    uncurated_air_release_scale_step.dependOn(&run_uncurated_air_releasesafe_scale_gate.step);
-    uncurated_air_release_scale_step.dependOn(&run_uncurated_air_releasesmall_scale_gate.step);
-    const uncurated_air_release_frontier_step = b.step("distribution-zig-air-uncurated-release-frontier", "Run frontier x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR object-progress gates");
-    uncurated_air_release_frontier_step.dependOn(&run_uncurated_air_releasefast_frontier_gate.step);
-    uncurated_air_release_frontier_step.dependOn(&run_uncurated_air_releasesafe_frontier_gate.step);
-    uncurated_air_release_frontier_step.dependOn(&run_uncurated_air_releasesmall_frontier_gate.step);
-    const run_uncurated_air_releasesafe_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesafe_gate.addArg("--mode=ReleaseSafe");
-    const uncurated_air_releasesafe_step = b.step("distribution-zig-air-uncurated-releasesafe", "Discover and generically lower uncurated x86_64 ReleaseSafe Zig AIR");
-    uncurated_air_releasesafe_step.dependOn(&run_uncurated_air_releasesafe_gate.step);
-    const run_uncurated_air_releasesmall_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasesmall_gate.addArg("--mode=ReleaseSmall");
-    const uncurated_air_releasesmall_step = b.step("distribution-zig-air-uncurated-releasesmall", "Discover and generically lower uncurated x86_64 ReleaseSmall Zig AIR");
-    uncurated_air_releasesmall_step.dependOn(&run_uncurated_air_releasesmall_gate.step);
-    const run_uncurated_air_releasefast_gate = b.addRunArtifact(uncurated_air_gate);
-    run_uncurated_air_releasefast_gate.addArg("--mode=ReleaseFast");
-    const uncurated_air_release_step = b.step("distribution-zig-air-uncurated-release", "Run uncurated x86_64 release Zig AIR gates for ReleaseFast, ReleaseSafe, and ReleaseSmall");
-    uncurated_air_release_step.dependOn(&run_uncurated_air_releasefast_gate.step);
-    uncurated_air_release_step.dependOn(&run_uncurated_air_releasesafe_gate.step);
-    uncurated_air_release_step.dependOn(&run_uncurated_air_releasesmall_gate.step);
+
+    const uncurated_air_specs = [_]UncuratedAirGateSpec{
+        .{ .name = "distribution-zig-air-uncurated-releasefast", .description = "Discover and generically lower uncurated x86_64 ReleaseFast Zig AIR" },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe", .description = "Discover and generically lower uncurated x86_64 ReleaseSafe Zig AIR", .mode = "ReleaseSafe" },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall", .description = "Discover and generically lower uncurated x86_64 ReleaseSmall Zig AIR", .mode = "ReleaseSmall" },
+
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseFast Zig AIR", .mode = "ReleaseFast", .corpus = "broad" },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseSafe Zig AIR progress", .mode = "ReleaseSafe", .corpus = "broad" },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseSmall Zig AIR progress", .mode = "ReleaseSmall", .corpus = "broad" },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseFast Zig AIR progress accounting", .mode = "ReleaseFast", .corpus = "broad", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSafe Zig AIR progress accounting", .mode = "ReleaseSafe", .corpus = "broad", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSmall Zig AIR progress accounting", .mode = "ReleaseSmall", .corpus = "broad", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = "ReleaseFast", .corpus = "broad", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSafe", .corpus = "broad", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSmall", .corpus = "broad", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-native-link", .description = "Link broad uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseFast", .corpus = "broad", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-native-link", .description = "Link broad uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSmall", .corpus = "broad", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseFast real-AIR objects", .mode = "ReleaseFast", .corpus = "broad", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseSafe real-AIR objects", .mode = "ReleaseSafe", .corpus = "broad", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseSmall real-AIR objects", .mode = "ReleaseSmall", .corpus = "broad", .variant = .executable_progress },
+
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded", .description = "Discover and lower the expanded x86_64 ReleaseFast Zig AIR frontier corpus", .mode = "ReleaseFast", .corpus = "expanded" },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded", .description = "Discover and lower the expanded x86_64 ReleaseSafe Zig AIR frontier corpus", .mode = "ReleaseSafe", .corpus = "expanded" },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded", .description = "Discover and lower the expanded x86_64 ReleaseSmall Zig AIR frontier corpus", .mode = "ReleaseSmall", .corpus = "expanded" },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseFast Zig AIR progress accounting", .mode = "ReleaseFast", .corpus = "expanded", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseSafe Zig AIR progress accounting", .mode = "ReleaseSafe", .corpus = "expanded", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseSmall Zig AIR progress accounting", .mode = "ReleaseSmall", .corpus = "expanded", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = "ReleaseFast", .corpus = "expanded", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSafe", .corpus = "expanded", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSmall", .corpus = "expanded", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseFast", .corpus = "expanded", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSafe", .corpus = "expanded", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSmall", .corpus = "expanded", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseFast real-AIR objects", .mode = "ReleaseFast", .corpus = "expanded", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseSafe real-AIR objects", .mode = "ReleaseSafe", .corpus = "expanded", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseSmall real-AIR objects", .mode = "ReleaseSmall", .corpus = "expanded", .variant = .executable_progress },
+
+        .{ .name = "distribution-zig-air-uncurated-releasefast-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseFast Zig AIR frontier corpus", .mode = "ReleaseFast", .corpus = "scale", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseSafe Zig AIR frontier corpus", .mode = "ReleaseSafe", .corpus = "scale", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseSmall Zig AIR frontier corpus", .mode = "ReleaseSmall", .corpus = "scale", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = "ReleaseFast", .corpus = "scale", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSafe", .corpus = "scale", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSmall", .corpus = "scale", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseFast", .corpus = "scale", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSafe", .corpus = "scale", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSmall", .corpus = "scale", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseFast real-AIR objects", .mode = "ReleaseFast", .corpus = "scale", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseSafe real-AIR objects", .mode = "ReleaseSafe", .corpus = "scale", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseSmall real-AIR objects", .mode = "ReleaseSmall", .corpus = "scale", .variant = .executable_progress },
+
+        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseFast Zig AIR corpus", .mode = "ReleaseFast", .corpus = "frontier", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseSafe Zig AIR corpus", .mode = "ReleaseSafe", .corpus = "frontier", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseSmall Zig AIR corpus", .mode = "ReleaseSmall", .corpus = "frontier", .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = "ReleaseFast", .corpus = "frontier", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSafe", .corpus = "frontier", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSmall", .corpus = "frontier", .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseFast", .corpus = "frontier", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSafe", .corpus = "frontier", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSmall", .corpus = "frontier", .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseFast real-AIR objects", .mode = "ReleaseFast", .corpus = "frontier", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseSafe real-AIR objects", .mode = "ReleaseSafe", .corpus = "frontier", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseSmall real-AIR objects", .mode = "ReleaseSmall", .corpus = "frontier", .variant = .executable_progress },
+    };
+    for (uncurated_air_specs) |spec| _ = addUncuratedAirGate(b, uncurated_air_gate, spec);
+
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-zig-air-uncurated-release",
+        .description = "Run uncurated x86_64 release Zig AIR gates for ReleaseFast, ReleaseSafe, and ReleaseSmall",
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-zig-air-uncurated-release-broad-finish",
+        .description = "Strict finish-line gate for broad x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR v2 ownership and object emission",
+        .corpus = "broad",
+        .variant = .strict_finish,
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-zig-air-uncurated-release-expanded-finish",
+        .description = "Strict finish-line gate for expanded x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR v2 ownership and object emission",
+        .corpus = "expanded",
+        .variant = .strict_finish,
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-zig-air-uncurated-release-scale",
+        .description = "Run scale x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR frontier object-progress gates",
+        .corpus = "scale",
+        .variant = .object_progress,
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-zig-air-uncurated-release-frontier",
+        .description = "Run frontier x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR object-progress gates",
+        .corpus = "frontier",
+        .variant = .object_progress,
+    });
+
     addToolStep(b, "distribution-native-link-boundary2", "Run broad x86_64 native-link boundary accounting gate", "tools/run_distribution_native_link_boundary2.zig");
     addToolStepWithArgs(b, "probe-native-linker", "Probe selected local objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig");
     addToolStepWithArgs(b, "probe-native-linker-broad", "Probe broad optimized IR directories for native Zig linker link-only acceptance", "tools/probe_native_linker_broad.zig");
@@ -526,4 +245,96 @@ fn addToolStepWithFixedAndUserArgs(
     if (b.args) |args| run_cmd.addArgs(args);
     const step = b.step(name, description);
     step.dependOn(&run_cmd.step);
+}
+
+const UncuratedAirVariant = enum {
+    discovery,
+    object_progress,
+    object_inspection,
+    native_link_progress,
+    executable_progress,
+    strict_finish,
+};
+
+const UncuratedAirGateSpec = struct {
+    name: []const u8,
+    description: []const u8,
+    mode: ?[]const u8 = null,
+    corpus: ?[]const u8 = null,
+    variant: UncuratedAirVariant = .discovery,
+};
+
+fn addUncuratedAirGate(
+    b: *std.Build,
+    uncurated_air_gate: *std.Build.Step.Compile,
+    spec: UncuratedAirGateSpec,
+) *std.Build.Step {
+    const run_cmd = b.addRunArtifact(uncurated_air_gate);
+    addUncuratedAirArgs(run_cmd, spec);
+    const step = b.step(spec.name, spec.description);
+    step.dependOn(&run_cmd.step);
+    return step;
+}
+
+fn addUncuratedAirTripleGate(
+    b: *std.Build,
+    uncurated_air_gate: *std.Build.Step.Compile,
+    spec: UncuratedAirGateSpec,
+) *std.Build.Step {
+    const modes = [_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" };
+    const step = b.step(spec.name, spec.description);
+    for (modes) |mode| {
+        const run_cmd = b.addRunArtifact(uncurated_air_gate);
+        addUncuratedAirArgs(run_cmd, .{
+            .name = spec.name,
+            .description = spec.description,
+            .mode = mode,
+            .corpus = spec.corpus,
+            .variant = spec.variant,
+        });
+        step.dependOn(&run_cmd.step);
+    }
+    return step;
+}
+
+fn addUncuratedAirArgs(run_cmd: *std.Build.Step.Run, spec: UncuratedAirGateSpec) void {
+    if (spec.mode) |mode| addUncuratedAirModeArg(run_cmd, mode);
+    if (spec.corpus) |corpus| addUncuratedAirCorpusArg(run_cmd, corpus);
+    switch (spec.variant) {
+        .discovery => {},
+        .object_progress => run_cmd.addArg("--object-progress"),
+        .object_inspection => run_cmd.addArg("--object-inspection"),
+        .native_link_progress => run_cmd.addArg("--native-link-progress"),
+        .executable_progress => run_cmd.addArg("--executable-progress"),
+        .strict_finish => {
+            run_cmd.addArg("--object-progress");
+            run_cmd.addArg("--strict-finish");
+        },
+    }
+}
+
+fn addUncuratedAirModeArg(run_cmd: *std.Build.Step.Run, mode: []const u8) void {
+    if (std.mem.eql(u8, mode, "ReleaseFast")) {
+        run_cmd.addArg("--mode=ReleaseFast");
+    } else if (std.mem.eql(u8, mode, "ReleaseSafe")) {
+        run_cmd.addArg("--mode=ReleaseSafe");
+    } else if (std.mem.eql(u8, mode, "ReleaseSmall")) {
+        run_cmd.addArg("--mode=ReleaseSmall");
+    } else {
+        @panic("unknown uncurated AIR mode");
+    }
+}
+
+fn addUncuratedAirCorpusArg(run_cmd: *std.Build.Step.Run, corpus: []const u8) void {
+    if (std.mem.eql(u8, corpus, "broad")) {
+        run_cmd.addArg("--corpus=broad");
+    } else if (std.mem.eql(u8, corpus, "expanded")) {
+        run_cmd.addArg("--corpus=expanded");
+    } else if (std.mem.eql(u8, corpus, "scale")) {
+        run_cmd.addArg("--corpus=scale");
+    } else if (std.mem.eql(u8, corpus, "frontier")) {
+        run_cmd.addArg("--corpus=frontier");
+    } else {
+        @panic("unknown uncurated AIR corpus");
+    }
 }
