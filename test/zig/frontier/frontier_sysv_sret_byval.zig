@@ -167,6 +167,18 @@ const BigByteTail = extern struct {
     values: [17]u8,
 };
 
+const BigByteTail5 = extern struct {
+    values: [21]u8,
+};
+
+const BigByteTail6 = extern struct {
+    values: [22]u8,
+};
+
+const BigByteTail7 = extern struct {
+    values: [23]u8,
+};
+
 const BigWordTail = extern struct {
     values: [9]u16,
 };
@@ -212,6 +224,9 @@ const BigFloatCopyFn = *const fn (BigFloat) callconv(.c) BigFloat;
 const BigPtrDoubleCopyFn = *const fn (BigPtrDouble) callconv(.c) BigPtrDouble;
 const BigArrayMixedCopyFn = *const fn (BigArrayMixed) callconv(.c) BigArrayMixed;
 const BigByteTailCopyFn = *const fn (BigByteTail) callconv(.c) BigByteTail;
+const BigByteTail5CopyFn = *const fn (BigByteTail5) callconv(.c) BigByteTail5;
+const BigByteTail6CopyFn = *const fn (BigByteTail6) callconv(.c) BigByteTail6;
+const BigByteTail7CopyFn = *const fn (BigByteTail7) callconv(.c) BigByteTail7;
 const BigWordTailCopyFn = *const fn (BigWordTail) callconv(.c) BigWordTail;
 
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
@@ -475,6 +490,42 @@ export fn frontier_direct_big_byte_tail_copy(value: BigByteTail) BigByteTail {
 }
 
 export fn frontier_indirect_big_byte_tail_copy(func: BigByteTailCopyFn, value: BigByteTail) BigByteTail {
+    return func(value);
+}
+
+export fn frontier_big_byte_tail5_copy(value: BigByteTail5) BigByteTail5 {
+    return value;
+}
+
+export fn frontier_direct_big_byte_tail5_copy(value: BigByteTail5) BigByteTail5 {
+    return frontier_big_byte_tail5_copy(value);
+}
+
+export fn frontier_indirect_big_byte_tail5_copy(func: BigByteTail5CopyFn, value: BigByteTail5) BigByteTail5 {
+    return func(value);
+}
+
+export fn frontier_big_byte_tail6_copy(value: BigByteTail6) BigByteTail6 {
+    return value;
+}
+
+export fn frontier_direct_big_byte_tail6_copy(value: BigByteTail6) BigByteTail6 {
+    return frontier_big_byte_tail6_copy(value);
+}
+
+export fn frontier_indirect_big_byte_tail6_copy(func: BigByteTail6CopyFn, value: BigByteTail6) BigByteTail6 {
+    return func(value);
+}
+
+export fn frontier_big_byte_tail7_copy(value: BigByteTail7) BigByteTail7 {
+    return value;
+}
+
+export fn frontier_direct_big_byte_tail7_copy(value: BigByteTail7) BigByteTail7 {
+    return frontier_big_byte_tail7_copy(value);
+}
+
+export fn frontier_indirect_big_byte_tail7_copy(func: BigByteTail7CopyFn, value: BigByteTail7) BigByteTail7 {
     return func(value);
 }
 

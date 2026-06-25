@@ -282,8 +282,8 @@ as pointer-only annotations; supported `ptr sret(...)` call arguments are now
 assigned as hidden result pointers through the same GPR call planner path as
 ordinary pointer arguments, including shifted user arguments that overflow into
 outgoing stack slots for direct and function-pointer calls. Unsupported
-`byval(...)` payload layouts and composite 3-/5-/6-/7-byte tail copies remain
-targeted boundaries, but explicit supported `ptr byval(aggregate)` call
+`byval(...)` payload layouts remain targeted boundaries, but explicit
+supported `ptr byval(aggregate)` call
 arguments now flow through the planner-owned stack-copy path below. A selected direct
 sret-pointer call
 also preserves one live `i32` GPR through the existing spill/reload frame for
@@ -294,17 +294,18 @@ planner-owned subset: supported aggregate payloads are copied from the source
 pointer to outgoing stack eightbytes for direct and function-pointer calls.
 The source pointer may itself arrive in a register or an incoming stack slot, with
 unit proof for one-, two-, array-backed three-, and nested three-eightbyte
-payloads, single-`i8`, single-`i16`, single-`i32`, and `[3 x i32]`
-tail payloads, plus max-sized exact-eightbyte payloads through the current
-24-stack-argument limit. Source-owned frontier rows now prove `[17 x i8]`
-and `[9 x i16]` MEMORY byval-to-sret byte-/word-tail copies through direct
-and function-pointer calls.
+payloads, single-`i8`, single-`i16`, single-`i32`, `[3 x i32]`
+tail payloads, composite 3-/5-/6-/7-byte tails, and max-sized exact-eightbyte
+payloads through the current 24-stack-argument limit. Source-owned frontier
+rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`, and
+`[9 x i16]` MEMORY byval-to-sret byte-/word-tail copies through direct and
+function-pointer calls.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
 spill/reload frame now covers the same indirect byval call shape for both
 GPR-sourced and incoming-stack-sourced byval payload pointers.
-Unsupported layouts and composite 3-/5-/6-/7-byte tail copies remain targeted
-boundaries.
+Unsupported layouts, alignments, packed payloads, X87, and vector leaves remain
+targeted boundaries.
 The frontier additionally lowers the selected
 source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by-value
 aggregate field-read shape, and byval-to-sret copies for all fields in those

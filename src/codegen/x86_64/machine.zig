@@ -34,6 +34,16 @@ pub const Instruction = union(enum) {
     pop_arg: ArgReg,
     push_rax,
     push_xmm64: XmmReg,
+    push_byval_tail_arg_ptr: struct {
+        reg: ArgReg,
+        offset: u8,
+        len: u8,
+    },
+    push_byval_tail_stack_ptr: struct {
+        stack_disp: u8,
+        offset: u8,
+        len: u8,
+    },
     binary_arg_eax: struct {
         op: MachineBinaryOp,
         reg: ArgReg,

@@ -7,6 +7,8 @@ const MachineFunction = machine_ir.MachineFunction;
 pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
+        .push_byval_tail_arg_ptr => |copy| try validateByvalTail(copy.offset, copy.len),
+        .push_byval_tail_stack_ptr => |copy| try validateByvalTail(copy.offset, copy.len),
         .label,
         .mov_imm_eax,
         .mov_imm_rax,
@@ -242,7 +244,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             eax_defined = function.ret_ty == .void or ret_ty != .void;
         },
         .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
-        .push_imm32, .push_stack_disp8, .push_stack_disp32, .push_arg, .pop_arg, .push_rax, .push_xmm64 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
+        .push_imm32, .push_stack_disp8, .push_stack_disp32, .push_arg, .pop_arg, .push_rax, .push_xmm64, .push_byval_tail_arg_ptr, .push_byval_tail_stack_ptr => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
         .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
         .sub_rsp_56, .add_rsp_56 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 56) % 16),
@@ -389,6 +391,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .pop_arg,
         .push_rax,
         .push_xmm64,
+        .push_byval_tail_arg_ptr,
+        .push_byval_tail_stack_ptr,
         .sub_rsp_24,
         .add_rsp_24,
         .sub_rsp_40,
@@ -499,4 +503,12 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         => {},
     };
     return false;
+}
+
+fn validateByvalTail(offset: u8, len: u8) !void {
+    switch (len) {
+        3, 5, 6, 7 => {},
+        else => return error.UnsupportedSretByvalAbi,
+    }
+    if (@as(u16, offset) + @as(u16, len) > 256) return error.UnsupportedCodegenAbi;
 }

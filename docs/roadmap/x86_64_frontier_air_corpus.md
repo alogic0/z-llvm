@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=380
-structured_functions=380
-generic_codegen_functions=380
-generic_cfg_functions=380
+discovered_functions=389
+structured_functions=389
+generic_codegen_functions=389
+generic_cfg_functions=389
 structural_matcher_functions=0
-structured_air_v2_functions=380
-typed_air_operand_functions=380
+structured_air_v2_functions=389
+typed_air_operand_functions=389
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=380
+generic_lowering_functions=389
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=380
+object_emitted_functions=389
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -651,8 +651,11 @@ Remaining measured frontier blockers kept out of accepted rows:
   `ScalarMixed`/`ScalarNested`/`ScalarArray` direct scalar-param sret make
   rows; explicit `ptr byval(...)` calls now include single-`i8`, single-`i16`,
   single-`i32`, and `[3 x i32]` tail stack-copy proof, while source-owned
-  MEMORY byval-to-sret rows now include `[17 x i8]` and `[9 x i16]`
-  byte-/word-tail copies through direct and pointer-callee calls; supported
+  MEMORY byval-to-sret rows now include `[17 x i8]`, `[21 x i8]`,
+  `[22 x i8]`, `[23 x i8]`, and `[9 x i16]` byte-/word-tail copies through
+  direct and pointer-callee calls; the 21/22/23-byte rows prove composite
+  5-/6-/7-byte final stack-copy tails are byte-composed and zero-padded
+  instead of rejected. Supported
   `ptr sret(...)` call arguments now use the normal GPR hidden-result-pointer
   planner path; X87,
   packed/unaligned aggregate ABI classes,

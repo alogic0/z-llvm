@@ -536,10 +536,7 @@ fn attrsContainAbiPayload(attrs: []const u8, name: []const u8) bool {
 }
 
 fn supportsByvalStackCopySize(size_bytes: u64) bool {
-    return switch (size_bytes % 8) {
-        0, 1, 2, 4 => true,
-        else => false,
-    };
+    return size_bytes != 0;
 }
 
 fn attrsContainPackedAbiPayload(attrs: []const u8, name: []const u8) bool {

@@ -64,6 +64,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .pop_arg => |reg| try encodePopArg(&bytes, allocator, reg),
             .push_rax => try bytes.append(allocator, 0x50),
             .push_xmm64 => |reg| try encodePushXmm64(&bytes, allocator, reg),
+            .push_byval_tail_arg_ptr => |copy| try encodePushByvalTailArgPtr(&bytes, allocator, copy.reg, copy.offset, copy.len),
+            .push_byval_tail_stack_ptr => |copy| try encodePushByvalTailStackPtr(&bytes, allocator, copy.stack_disp, copy.offset, copy.len),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .add_arg64_rax => |reg| try encodeRegToRax64Binary(&bytes, allocator, 0x01, reg),
             .add_arg_high32_eax => |reg| try encodeAddHigh32ToEax(&bytes, allocator, reg),
@@ -470,6 +472,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .pop_arg => |reg| if (reg.rexB()) 2 else 1,
         .push_rax => 1,
         .push_xmm64 => 9,
+        .push_byval_tail_arg_ptr => |copy| pushByvalTailArgPtrSize(copy.reg, copy.offset, copy.len),
+        .push_byval_tail_stack_ptr => |copy| pushByvalTailStackPtrSize(copy.len),
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
         .add_arg64_rax => |reg| if (reg.rexR()) 3 else 2,
         .add_arg_high32_eax => |reg| (if (reg.rexR()) @as(u32, 3) else 3) + 6,
@@ -949,6 +953,67 @@ fn encodeArgPtrDisp8U16ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Alloc
     if (reg.rexB()) try bytes.append(allocator, 0x41);
     try bytes.appendSlice(allocator, &.{ 0x0f, 0xb7 });
     try encodeArgPtrDisp8Tail(bytes, allocator, reg, offset);
+}
+
+fn encodePushByvalTailArgPtr(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8, len: u8) !void {
+    try validateByvalTail(offset, len);
+    try encodeReserveZeroedStackEightbyte(bytes, allocator);
+    var index: u8 = 0;
+    while (index < len) : (index += 1) {
+        try encodeArgPtrDisp8U8ToEax(bytes, allocator, reg, offset + index);
+        try encodeStoreAlToRspDisp8(bytes, allocator, index);
+    }
+}
+
+fn encodePushByvalTailStackPtr(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, stack_disp: u8, offset: u8, len: u8) !void {
+    try validateByvalTail(offset, len);
+    try encodeStackDisp8ToRdx(bytes, allocator, stack_disp);
+    try encodeReserveZeroedStackEightbyte(bytes, allocator);
+    var index: u8 = 0;
+    while (index < len) : (index += 1) {
+        try encodeRdxPtrDisp8U8ToEax(bytes, allocator, offset + index);
+        try encodeStoreAlToRspDisp8(bytes, allocator, index);
+    }
+}
+
+fn validateByvalTail(offset: u8, len: u8) !void {
+    switch (len) {
+        3, 5, 6, 7 => {},
+        else => return error.UnsupportedSretByvalAbi,
+    }
+    if (@as(u16, offset) + @as(u16, len) > 256) return error.UnsupportedCodegenAbi;
+}
+
+fn encodeReserveZeroedStackEightbyte(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator) !void {
+    try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 });
+    try bytes.appendSlice(allocator, &.{ 0x48, 0xc7, 0x04, 0x24, 0x00, 0x00, 0x00, 0x00 });
+}
+
+fn encodeStackDisp8ToRdx(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, stack_disp: u8) !void {
+    try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x54, 0x24, stack_disp });
+}
+
+fn encodeRdxPtrDisp8U8ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, offset: u8) !void {
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0xb6, 0x42, offset });
+}
+
+fn encodeStoreAlToRspDisp8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, offset: u8) !void {
+    try bytes.appendSlice(allocator, &.{ 0x88, 0x44, 0x24, offset });
+}
+
+fn pushByvalTailArgPtrSize(reg: x86_64.ArgReg, offset: u8, len: u8) u32 {
+    var size: u32 = 12;
+    var index: u8 = 0;
+    while (index < len) : (index += 1) {
+        const current = offset + index;
+        size += (if (reg.rexB()) @as(u32, 1) else 0) + 3 + if (current == 0) @as(u32, 0) else 1;
+        size += 4;
+    }
+    return size;
+}
+
+fn pushByvalTailStackPtrSize(len: u8) u32 {
+    return 5 + 12 + @as(u32, len) * 8;
 }
 
 fn encodeStoreImm64ArgPtrDisp8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8, imm: i32) !void {

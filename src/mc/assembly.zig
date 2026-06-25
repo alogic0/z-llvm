@@ -25,6 +25,20 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .pop_arg => |reg| try writer.print("\tpopq {s}\n", .{reg.name64()}),
             .push_rax => try writer.writeAll("\tpushq %rax\n"),
             .push_xmm64 => |reg| try writer.print("\tsubq $8, %rsp\n\tmovsd {s}, (%rsp)\n", .{reg.name()}),
+            .push_byval_tail_arg_ptr => |copy| {
+                try writer.writeAll("\tsubq $8, %rsp\n\tmovq $0, (%rsp)\n");
+                var index: u8 = 0;
+                while (index < copy.len) : (index += 1) {
+                    try writer.print("\tmovzbl {}({s}), %eax\n\tmovb %al, {}(%rsp)\n", .{ copy.offset + index, copy.reg.name64(), index });
+                }
+            },
+            .push_byval_tail_stack_ptr => |copy| {
+                try writer.print("\tmovq {}(%rsp), %rdx\n\tsubq $8, %rsp\n\tmovq $0, (%rsp)\n", .{copy.stack_disp});
+                var index: u8 = 0;
+                while (index < copy.len) : (index += 1) {
+                    try writer.print("\tmovzbl {}(%rdx), %eax\n\tmovb %al, {}(%rsp)\n", .{ copy.offset + index, index });
+                }
+            },
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
             .add_arg64_rax => |reg| try writer.print("\taddq {s}, %rax\n", .{reg.name64()}),
             .add_arg_high32_eax => |reg| try writer.print("\tmovq {s}, %rcx\n\tshrq $32, %rcx\n\taddl %ecx, %eax\n", .{reg.name64()}),

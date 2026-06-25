@@ -5205,6 +5205,15 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail")) {
         return .{ .ir_type = .{ .aggregate = "{ [17 x i8] }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail5")) {
+        return .{ .ir_type = .{ .aggregate = "{ [21 x i8] }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail6")) {
+        return .{ .ir_type = .{ .aggregate = "{ [22 x i8] }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail7")) {
+        return .{ .ir_type = .{ .aggregate = "{ [23 x i8] }" } };
+    }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigWordTail")) {
         return .{ .ir_type = .{ .aggregate = "{ [9 x i16] }" } };
     }
