@@ -69,35 +69,41 @@ Opt fixture counts from `test/opt/fixtures.tsv`:
 
 Pass policy counts from the active release pipeline registry:
 
-| Pipeline | Implemented | Placeholder | Conservative | Unknown | Expected placeholders |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `zig-release-safe-accepted` | 5 | 0 | 0 | 0 | n/a |
-| `zig-release-fast-accepted` | 5 | 0 | 0 | 0 | n/a |
-| `zig-release-small-accepted` | 5 | 0 | 0 | 0 | n/a |
-| `release-o3` | 22 | 4 | 3 | 0 | 4 |
-| `release-oz` | 15 | 4 | 3 | 0 | 4 |
-| `lto-prelink-o3` | 18 | 3 | 4 | 0 | 3 |
-| `lto-prelink-oz` | 13 | 3 | 2 | 0 | 3 |
+| Pipeline | Implemented | Placeholder | Conservative | Boundary-noop | Out-of-scope | Unknown | Expected placeholders |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `zig-release-safe-accepted` | 5 | 0 | 0 | 0 | 0 | 0 | n/a |
+| `zig-release-fast-accepted` | 5 | 0 | 0 | 0 | 0 | 0 | n/a |
+| `zig-release-small-accepted` | 5 | 0 | 0 | 0 | 0 | 0 | n/a |
+| `release-o3` | 22 | 0 | 3 | 2 | 2 | 0 | 0 |
+| `release-oz` | 15 | 0 | 3 | 2 | 2 | 0 | 0 |
+| `lto-prelink-o3` | 18 | 1 | 4 | 1 | 1 | 0 | 1 |
+| `lto-prelink-oz` | 13 | 1 | 2 | 1 | 1 | 0 | 1 |
 
 These counts come from the same registry that dispatches passes in
 `src/pipelines.zig`, exposed by `zig build release-pipeline-policy`. A
-placeholder means the upstream pass surface is known and intentionally modeled
-as a no-op boundary; it does not mean the pass algorithm is implemented. A
-conservative pass is an intentionally narrower local behavior with an explicit
-policy reason. Unknown passes are rejected by name instead of becoming implicit
-placeholders.
+placeholder means the upstream pass surface is known but still has no local
+algorithm or explicit permanent policy. A conservative pass is an intentionally
+narrower local behavior with an explicit policy reason. Boundary-noop entries
+are release-scope no-ops with an evidence-backed policy reason, and out-of-scope
+entries are metadata/diagnostic surfaces that do not affect the x86_64 release
+object/codegen claim. Unknown passes are rejected by name instead of becoming
+implicit placeholders.
 
 Release O3, Release Oz, and LTO prelink pipelines have fail-closed placeholder
-budgets. If a pipeline gains or loses placeholders without updating the
-registry and this table, `zig build release-pipeline-policy` and readiness fail.
-This separates "pipeline surface known" from "algorithm implemented" and
-prevents silent placeholder drift.
+and boundary budgets. If a pipeline gains or loses placeholders,
+boundary-noops, or out-of-scope entries without updating the registry and this
+table, `zig build release-pipeline-policy` and readiness fail. This separates
+"pipeline surface known" from "algorithm implemented" and prevents silent
+placeholder drift.
 
 The active Release O3/Oz placeholder classification lives in
 `docs/roadmap/release_placeholder_classification.md`. The first conservative
 subsets promoted from placeholders are `inferattrs`, `aggressive-instcombine`,
 and `lower-constant-intrinsics`; each remains a bounded local subset rather than
-a full LLVM algorithm parity claim.
+a full LLVM algorithm parity claim. The remaining non-LTO release entries
+(`add-discriminators`, `forceattrs`, `mergefunc`, and `annotation-remarks`) are
+now explicit boundary or out-of-scope entries, so `release-o3` and `release-oz`
+have zero ambiguous placeholders.
 
 ## Remaining Corpus Blockers
 

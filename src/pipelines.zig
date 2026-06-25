@@ -370,12 +370,16 @@ pub const PassStatus = enum {
     implemented,
     placeholder,
     conservative,
+    boundary_noop,
+    out_of_scope,
 };
 
 pub const PassStatusCounts = struct {
     implemented: usize = 0,
     placeholder: usize = 0,
     conservative: usize = 0,
+    boundary_noop: usize = 0,
+    out_of_scope: usize = 0,
     unknown: usize = 0,
 
     pub fn note(counts: *PassStatusCounts, status: ?PassStatus) void {
@@ -386,6 +390,8 @@ pub const PassStatusCounts = struct {
             .implemented => counts.implemented += 1,
             .placeholder => counts.placeholder += 1,
             .conservative => counts.conservative += 1,
+            .boundary_noop => counts.boundary_noop += 1,
+            .out_of_scope => counts.out_of_scope += 1,
         }
     }
 };
@@ -429,6 +435,34 @@ fn placeholderEntry(
         .status = .placeholder,
         .upstream_path = upstream_path,
         .pass = placeholder.make(name, category, upstream_path),
+    };
+}
+
+fn boundaryNoopEntry(
+    comptime name: []const u8,
+    comptime category: pass_manager.PassCategory,
+    comptime upstream_path: []const u8,
+) PassRegistryEntry {
+    return .{
+        .name = name,
+        .category = category,
+        .status = .boundary_noop,
+        .upstream_path = upstream_path,
+        .pass = placeholder.makeBoundaryNoop(name, category, upstream_path),
+    };
+}
+
+fn outOfScopeEntry(
+    comptime name: []const u8,
+    comptime category: pass_manager.PassCategory,
+    comptime upstream_path: []const u8,
+) PassRegistryEntry {
+    return .{
+        .name = name,
+        .category = category,
+        .status = .out_of_scope,
+        .upstream_path = upstream_path,
+        .pass = placeholder.makeOutOfScope(name, category, upstream_path),
     };
 }
 
@@ -491,8 +525,8 @@ pub const pass_registry = [_]PassRegistryEntry{
     placeholderEntry("extra-simple-loop-unswitch-passes", .loop, "llvm/lib/Passes/PassBuilderPipelines.cpp"),
     placeholderEntry("ee-instrument", .instrumentation, "llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp"),
     placeholderEntry("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp"),
-    placeholderEntry("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp"),
-    placeholderEntry("add-discriminators", .instrumentation, "llvm/lib/Transforms/Utils/AddDiscriminators.cpp"),
+    outOfScopeEntry("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp"),
+    outOfScopeEntry("add-discriminators", .instrumentation, "llvm/lib/Transforms/Utils/AddDiscriminators.cpp"),
     placeholderEntry("annotation2metadata", .instrumentation, "llvm/lib/Transforms/IPO/Annotation2Metadata.cpp"),
     placeholderEntry("sancov", .instrumentation, "llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp"),
     placeholderEntry("module-tsan", .instrumentation, "llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp"),
@@ -509,7 +543,7 @@ pub const pass_registry = [_]PassRegistryEntry{
     placeholderEntry("coro-annotation-elide", .ipo, "llvm/lib/Transforms/Coroutines/CoroAnnotationElide.cpp"),
     placeholderEntry("openmp-opt", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp"),
     placeholderEntry("openmp-opt-cgscc", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp"),
-    placeholderEntry("forceattrs", .ipo, "llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp"),
+    boundaryNoopEntry("forceattrs", .ipo, "llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp"),
     conservative(inferattrs.pass),
     placeholderEntry("rpo-function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp"),
     placeholderEntry("argpromotion", .ipo, "llvm/lib/Transforms/IPO/ArgumentPromotion.cpp"),
@@ -519,7 +553,7 @@ pub const pass_registry = [_]PassRegistryEntry{
     placeholderEntry("elim-avail-extern", .ipo, "llvm/lib/Transforms/IPO/ElimAvailExtern.cpp"),
     placeholderEntry("recompute-globalsaa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp"),
     placeholderEntry("globals-aa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp"),
-    placeholderEntry("mergefunc", .ipo, "llvm/lib/Transforms/IPO/MergeFunctions.cpp"),
+    boundaryNoopEntry("mergefunc", .ipo, "llvm/lib/Transforms/IPO/MergeFunctions.cpp"),
     placeholderEntry("name-anon-globals", .lto, "llvm/lib/Transforms/Utils/NameAnonGlobals.cpp"),
     placeholderEntry("require<globals-aa>", .analysis, "llvm/include/llvm/IR/PassManager.h"),
     placeholderEntry("invalidate<aa>", .analysis, "llvm/include/llvm/IR/PassManager.h"),
@@ -547,13 +581,15 @@ pub fn summarizePipeline(pipeline: Pipeline) PassStatusCounts {
 pub const PlaceholderBudget = struct {
     pipeline_name: []const u8,
     expected_placeholders: usize,
+    expected_boundary_noop: usize = 0,
+    expected_out_of_scope: usize = 0,
 };
 
 pub const placeholder_budgets = [_]PlaceholderBudget{
-    .{ .pipeline_name = "release-o3", .expected_placeholders = 4 },
-    .{ .pipeline_name = "release-oz", .expected_placeholders = 4 },
-    .{ .pipeline_name = "lto-prelink-o3", .expected_placeholders = 3 },
-    .{ .pipeline_name = "lto-prelink-oz", .expected_placeholders = 3 },
+    .{ .pipeline_name = "release-o3", .expected_placeholders = 0, .expected_boundary_noop = 2, .expected_out_of_scope = 2 },
+    .{ .pipeline_name = "release-oz", .expected_placeholders = 0, .expected_boundary_noop = 2, .expected_out_of_scope = 2 },
+    .{ .pipeline_name = "lto-prelink-o3", .expected_placeholders = 1, .expected_boundary_noop = 1, .expected_out_of_scope = 1 },
+    .{ .pipeline_name = "lto-prelink-oz", .expected_placeholders = 1, .expected_boundary_noop = 1, .expected_out_of_scope = 1 },
 };
 
 pub const release_policy_pipeline_names = [_][]const u8{
@@ -573,12 +609,21 @@ pub fn expectedPlaceholderBudget(pipeline_name: []const u8) ?usize {
     return null;
 }
 
+pub fn expectedReleasePolicyBudget(pipeline_name: []const u8) ?PlaceholderBudget {
+    for (placeholder_budgets) |budget| {
+        if (std.mem.eql(u8, pipeline_name, budget.pipeline_name)) return budget;
+    }
+    return null;
+}
+
 pub fn verifyPlaceholderBudgets() !void {
     for (placeholder_budgets) |budget| {
         const pipeline = find(budget.pipeline_name) orelse return error.UnknownPipeline;
         const counts = summarizePipeline(pipeline);
         if (counts.unknown != 0) return error.UnknownPass;
         if (counts.placeholder != budget.expected_placeholders) return error.PlaceholderBudgetChanged;
+        if (counts.boundary_noop != budget.expected_boundary_noop) return error.PlaceholderBudgetChanged;
+        if (counts.out_of_scope != budget.expected_out_of_scope) return error.PlaceholderBudgetChanged;
     }
 }
 

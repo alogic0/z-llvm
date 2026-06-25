@@ -14,17 +14,25 @@ pub fn main(init: std.process.Init) !void {
         const counts = pipelines.summarizePipeline(pipeline);
         const expected_placeholders = pipelines.expectedPlaceholderBudget(pipeline_name);
         try stdout_writer.interface.print(
-            "pipeline={s} implemented_passes={} placeholder_passes={} conservative_passes={} unknown_passes={}",
+            "pipeline={s} implemented_passes={} placeholder_passes={} conservative_passes={} boundary_noop_passes={} out_of_scope_passes={} unknown_passes={}",
             .{
                 pipeline.name,
                 counts.implemented,
                 counts.placeholder,
                 counts.conservative,
+                counts.boundary_noop,
+                counts.out_of_scope,
                 counts.unknown,
             },
         );
         if (expected_placeholders) |expected| {
             try stdout_writer.interface.print(" expected_placeholder_passes={}", .{expected});
+        }
+        if (pipelines.expectedReleasePolicyBudget(pipeline_name)) |expected| {
+            try stdout_writer.interface.print(
+                " expected_boundary_noop_passes={} expected_out_of_scope_passes={}",
+                .{ expected.expected_boundary_noop, expected.expected_out_of_scope },
+            );
         }
         try stdout_writer.interface.writeAll("\n");
     }

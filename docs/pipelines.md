@@ -143,13 +143,13 @@ debug-o0:
   ee-instrument placeholder
   always-inline
   alloc-token placeholder
-  annotation-remarks placeholder
+  annotation-remarks out-of-scope
   verify
 
 release-o3:
   verify
-  add-discriminators placeholder
-  forceattrs placeholder
+  add-discriminators out-of-scope
+  forceattrs boundary-noop
   inferattrs conservative subset
   sroa
   mem2reg
@@ -165,21 +165,22 @@ release-o3:
   lower-constant-intrinsics conservative subset
   early-cse
   gvn
-  dse placeholder
+  dse
   adce
   licm
   globalopt
   globaldce
   constmerge
-  mergefunc placeholder
-  annotation-remarks placeholder
+  mergefunc boundary-noop
+  annotation-remarks out-of-scope
   verify
 
 release-oz:
   size-oriented release descriptor with the same scalar/memory foundation but
   without local LICM until code-size gates exist
   size and profile facts are preserved only; BFI/BPI and profile-summary
-  entries are placeholders
+  entries remain explicit LTO/prelink placeholders outside the non-LTO
+  release-o3/release-oz placeholder burndown
 
 zig-debug-accepted:
   verify
@@ -201,8 +202,8 @@ aarch64-target-independent:
   verify
 
 lto-prelink-o3 / lto-prelink-oz:
-  release descriptors plus canonicalize-aliases and name-anon-globals
-  placeholders at the front
+  release descriptors plus canonicalize-aliases, name-anon-globals placeholder,
+  and the same boundary/out-of-scope release metadata entries
 ```
 
 The `zig-*-accepted` aliases are corpus conformance pipelines, not replacements

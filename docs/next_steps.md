@@ -11,18 +11,22 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 The release pass pipeline surface is now registry-driven in `src/pipelines.zig`.
 Each registered pass records its upstream path and status:
-`implemented`, `placeholder`, or `conservative`. `addPass` rejects unknown pass
-names, and `zig build release-pipeline-policy` prints machine-readable counts
-for active release pipelines. The accepted Zig ReleaseFast/ReleaseSafe/
-ReleaseSmall pipelines have no placeholders; `release-o3`, `release-oz`, and
-LTO prelink pipelines have explicit fail-closed placeholder budgets. A
-placeholder means "known upstream pass surface, no local algorithm yet," not
+`implemented`, `placeholder`, `conservative`, `boundary-noop`, or
+`out-of-scope`. `addPass` rejects unknown pass names, and
+`zig build release-pipeline-policy` prints machine-readable counts for active
+release pipelines. The accepted Zig ReleaseFast/ReleaseSafe/ReleaseSmall
+pipelines have no placeholders; `release-o3` and `release-oz` now also have
+zero ambiguous placeholders, with remaining non-transforming surfaces counted as
+explicit boundary-noop or out-of-scope entries. LTO prelink still has one
+placeholder (`name-anon-globals`) plus explicit boundary counts. A placeholder
+means "known upstream pass surface, no local algorithm or final policy yet," not
 implemented release coverage.
 `docs/roadmap/release_placeholder_classification.md` now classifies the active
 Release O3/Oz placeholders by x86_64 replacement relevance. `inferattrs`,
 `aggressive-instcombine`, and `lower-constant-intrinsics` have conservative
-local subsets; remaining placeholders are explicit boundary-noop or out-of-scope
-surfaces until source-backed rows require them.
+local subsets; `add-discriminators`, `forceattrs`, `mergefunc`, and
+`annotation-remarks` are explicit boundary-noop or out-of-scope surfaces until
+source-backed rows require implementation.
 
 Debug variable-location salvage remains a deliberate boundary. The pass manager
 now scans for `llvm.dbg.value`/variable-location intrinsics once per

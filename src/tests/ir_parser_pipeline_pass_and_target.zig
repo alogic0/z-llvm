@@ -120,7 +120,7 @@ test "Zig mode pipelines expand to stable pass and placeholder sequences" {
         .{ .name = "ee-instrument", .category = .instrumentation, .status = "placeholder" },
         .{ .name = "always-inline", .category = .ipo, .status = "LLVM-shaped subset for direct internal single-block calls" },
         .{ .name = "alloc-token", .category = .instrumentation, .status = "placeholder" },
-        .{ .name = "annotation-remarks", .category = .instrumentation, .status = "placeholder" },
+        .{ .name = "annotation-remarks", .category = .instrumentation, .status = "out-of-scope" },
         .{ .name = "verify", .category = .mandatory, .status = "LLVM-shaped algorithm subset" },
     };
     try std.testing.expectEqual(debug_expected.len, debug_pm.passes.items.len);
@@ -360,19 +360,26 @@ test "release pipeline placeholder budgets are explicit policy" {
     const expected = [_]struct {
         name: []const u8,
         placeholders: usize,
+        boundary_noop: usize,
+        out_of_scope: usize,
     }{
-        .{ .name = "release-o3", .placeholders = 4 },
-        .{ .name = "release-oz", .placeholders = 4 },
-        .{ .name = "lto-prelink-o3", .placeholders = 3 },
-        .{ .name = "lto-prelink-oz", .placeholders = 3 },
+        .{ .name = "release-o3", .placeholders = 0, .boundary_noop = 2, .out_of_scope = 2 },
+        .{ .name = "release-oz", .placeholders = 0, .boundary_noop = 2, .out_of_scope = 2 },
+        .{ .name = "lto-prelink-o3", .placeholders = 1, .boundary_noop = 1, .out_of_scope = 1 },
+        .{ .name = "lto-prelink-oz", .placeholders = 1, .boundary_noop = 1, .out_of_scope = 1 },
     };
 
     for (expected) |row| {
         const pipeline = pipelines.find(row.name).?;
         const counts = pipelines.summarizePipeline(pipeline);
         try std.testing.expectEqual(row.placeholders, counts.placeholder);
+        try std.testing.expectEqual(row.boundary_noop, counts.boundary_noop);
+        try std.testing.expectEqual(row.out_of_scope, counts.out_of_scope);
         try std.testing.expectEqual(@as(usize, 0), counts.unknown);
-        try std.testing.expectEqual(row.placeholders, pipelines.expectedPlaceholderBudget(row.name).?);
+        const budget = pipelines.expectedReleasePolicyBudget(row.name).?;
+        try std.testing.expectEqual(row.placeholders, budget.expected_placeholders);
+        try std.testing.expectEqual(row.boundary_noop, budget.expected_boundary_noop);
+        try std.testing.expectEqual(row.out_of_scope, budget.expected_out_of_scope);
     }
 }
 
@@ -394,6 +401,14 @@ test "pass registry exposes implementation status and upstream path" {
     const lower_constant_entry = pipelines.findPass("lower-constant-intrinsics").?;
     try std.testing.expectEqual(pipelines.PassStatus.conservative, lower_constant_entry.status);
     try std.testing.expect(std.mem.indexOf(u8, lower_constant_entry.pass.target_status, "min/max intrinsic subset") != null);
+
+    const forceattrs_entry = pipelines.findPass("forceattrs").?;
+    try std.testing.expectEqual(pipelines.PassStatus.boundary_noop, forceattrs_entry.status);
+    try std.testing.expectEqualStrings("boundary-noop", forceattrs_entry.pass.target_status);
+
+    const remarks_entry = pipelines.findPass("annotation-remarks").?;
+    try std.testing.expectEqual(pipelines.PassStatus.out_of_scope, remarks_entry.status);
+    try std.testing.expectEqualStrings("out-of-scope", remarks_entry.pass.target_status);
 
     try std.testing.expect(pipelines.findPass("definitely-not-a-pass") == null);
 }
