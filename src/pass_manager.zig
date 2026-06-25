@@ -30,6 +30,8 @@ pub const Context = struct {
     io: ?std.Io = null,
     diagnostic_count: usize = 0,
     last_diagnostic: ?PassDiagnostic = null,
+    debug_variable_location_scan_count: usize = 0,
+    skipped_transform_passes: usize = 0,
 
     pub fn emitDiagnostic(
         context: *Context,
@@ -93,6 +95,9 @@ pub const ModulePassManager = struct {
     pub fn runWithOptions(pm: ModulePassManager, module: *ir.Module, context: *Context, writer: anytype, options: RunOptions) !PassResult {
         var result: PassResult = .unchanged;
         var executed: usize = 0;
+        const has_debug_variable_locations = module.hasDebugVariableLocationIntrinsics();
+        context.debug_variable_location_scan_count += 1;
+        var skipped_transform_passes: usize = 0;
         for (pm.passes.items) |pass| {
             if (options.pass_limit) |limit| {
                 if (executed >= limit) {
@@ -104,9 +109,11 @@ pub const ModulePassManager = struct {
                 try writer.print("; before {s}\n", .{pass.name});
                 try module.print(writer);
             }
-            if (module.hasDebugVariableLocationIntrinsics() and isTransformPass(pass.category)) {
+            if (has_debug_variable_locations and isTransformPass(pass.category)) {
                 if (options.verify_each_pass) try module.verify();
                 if (options.trace) try writer.print("; skipped {s}: debug variable-location salvage is not modeled\n", .{pass.name});
+                skipped_transform_passes += 1;
+                context.skipped_transform_passes += 1;
                 executed += 1;
                 continue;
             }
@@ -129,6 +136,9 @@ pub const ModulePassManager = struct {
             }
             result = result.merge(pass_result);
             executed += 1;
+        }
+        if (skipped_transform_passes != 0) {
+            try writer.print("; skipped_transform_passes={} reason=debug-variable-location-salvage-unmodeled\n", .{skipped_transform_passes});
         }
         return result;
     }

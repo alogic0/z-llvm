@@ -469,7 +469,61 @@ test "pass manager pass limit and timing output are deterministic without an io 
     try std.testing.expectEqualStrings("; time first: 0 ns\n", output.writer.buffered());
 }
 
+test "debug variable-location intrinsics skip transform passes with cached scan" {
+    const input =
+        \\declare void @llvm.dbg.value(metadata, metadata, metadata)
+        \\
+        \\define i32 @debug_value(i32 %a) !dbg !4 {
+        \\entry:
+        \\  call void @llvm.dbg.value(metadata i32 %a, metadata !9, metadata !DIExpression()), !dbg !8
+        \\  %x = add i32 %a, 0
+        \\  ret i32 %x
+        \\}
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2, producer: "zig", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        \\!2 = !DIFile(filename: "debug_value.zig", directory: ".")
+        \\!4 = distinct !DISubprogram(name: "debug_value", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{}
+        \\!8 = !DILocation(line: 2, column: 5, scope: !4)
+        \\!9 = !DILocalVariable(name: "a", arg: 1, scope: !4, file: !2, line: 1, type: !10)
+        \\!10 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_signed)
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(.{ .name = "transform-one", .category = .scalar, .run = diagnosticTransformPass });
+    try pm.add(.{ .name = "transform-two", .category = .memory, .run = diagnosticTransformPass });
+    try pm.add(.{ .name = "mandatory", .category = .mandatory, .run = diagnosticMandatoryPass });
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    const result = try pm.runWithOptions(&module, &context, &output.writer, .{});
+    try std.testing.expectEqual(pass_manager.PassResult.unchanged, result);
+    try std.testing.expectEqual(@as(usize, 1), context.debug_variable_location_scan_count);
+    try std.testing.expectEqual(@as(usize, 2), context.skipped_transform_passes);
+    try std.testing.expectEqual(@as(usize, 1), context.diagnostic_count);
+    try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), "skipped_transform_passes=2") != null);
+}
+
 fn noopPass(_: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
+    return .unchanged;
+}
+
+fn diagnosticTransformPass(_: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
+    context.emitDiagnostic("transform", "debug_value", null, "should have been skipped");
+    return .changed;
+}
+
+fn diagnosticMandatoryPass(_: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
+    context.emitDiagnostic("mandatory", "debug_value", null, "mandatory pass ran");
     return .unchanged;
 }
 
