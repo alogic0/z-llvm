@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=522
-structured_functions=522
-generic_codegen_functions=522
-generic_cfg_functions=522
+discovered_functions=524
+structured_functions=524
+generic_codegen_functions=524
+generic_cfg_functions=524
 structural_matcher_functions=0
-structured_air_v2_functions=522
-typed_air_operand_functions=522
+structured_air_v2_functions=524
+typed_air_operand_functions=524
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=522
+generic_lowering_functions=524
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=522
+object_emitted_functions=524
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 522-function counters above plus `native_link_accepted_rows=13`,
+13-source / 524-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -686,16 +686,15 @@ Source-backed ABI boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs
 `test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
 ReleaseSmall and currently reports per mode: `source_rows=7`,
-`discovered_functions=13`, `varargs_boundary_rows=2`,
+`discovered_functions=12`, `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
-`callconv_boundary_rows=1`, `stack_pressure_boundary_rows=3`,
+`callconv_boundary_rows=1`, `stack_pressure_boundary_rows=2`,
 `unexpected_accept_rows=0`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries for
 varargs, vectors, long-double/X87, packed aggregates, tail calls, non-default
-call conventions, the over-cap Big81 stack-pressure byval row, and the two
-unsupported Big80 forwarding rows; they are not part of the accepted
+call conventions, and the two unsupported Big80 forwarding rows; they are not part of the accepted
 executable frontier counters.
 The selected slice-panic runtime-call row now uses the release generic CFG
 slice runtime-call helper subset, which derives direct integer lengths and

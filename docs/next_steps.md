@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=522`,
-`generic_codegen_functions=522`, `generic_cfg_functions=522`,
+frontier gate reports `source_rows=13`, `discovered_functions=524`,
+`generic_codegen_functions=524`, `generic_cfg_functions=524`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=522`, `object_failures=0`,
+`object_emitted_functions=524`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,9 +483,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=522`,
-`generic_cfg_functions=522`, `structural_matcher_functions=0`,
-`object_emitted_functions=522`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=524`,
+`generic_cfg_functions=524`, `structural_matcher_functions=0`,
+`object_emitted_functions=524`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -563,12 +563,12 @@ byval-to-sret copy path.
 `BigNarrow` proves nested `i8`/`i16`/`i32`/`i64`
 supported-leaf copies use width-correct byte/word stack loads and hidden-sret
 stores through the same layout-derived path. `Big32`, `Big40`, `Big48`, `Big64`,
-and `Big80` extend the same direct and pointer-callee byval-to-sret copy path through
+`Big80`, and `Big81` extend the same direct byval-to-sret copy path through
 exact-qword payloads beyond byte-offset byval loads, including disp32
-source-pointer reloads through the current 80-stack-argument planner cap and
+source-pointer reloads through the current 81-stack-argument planner cap and
 stack-sourced `Big40`/`Big48`/`Big64` payload copies from the caller stack
-argument area. Separate source-backed `Big81` and Big80 forwarding boundary
-rows now prove over-cap and unsupported forwarding stack pressure reject with
+argument area. Separate source-backed Big80 forwarding boundary
+rows now prove unsupported forwarding stack pressure rejects with
 targeted ABI boundaries instead of becoming ambiguous backend failures.
 `ScalarArray` now also proves the same direct and pointer-callee
 byval-to-sret copy path for mixed array-contained integer leaves,
@@ -589,7 +589,7 @@ the dedicated `test/zig/frontier_boundaries/*.zig` rows in ReleaseFast,
 ReleaseSafe, and ReleaseSmall and currently reports `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
-`callconv_boundary_rows=1`, `stack_pressure_boundary_rows=3`,
+`callconv_boundary_rows=1`, `stack_pressure_boundary_rows=2`,
 `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0` per
 mode. Varargs, vectors, X87/long double, packed/unaligned aggregates, tail
 calls, non-default call conventions, and over-cap stack-pressure byval shapes

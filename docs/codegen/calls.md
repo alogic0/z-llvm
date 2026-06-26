@@ -324,15 +324,15 @@ unit proof for one-, two-, array-backed three-, and nested three-eightbyte
 payloads, single-`i8`, single-`i16`, single-`i32`, `[3 x i32]`
 tail payloads, composite 3-/5-/6-/7-byte tails, and exact-eightbyte
 payloads beyond the former 40-stack-argument proof through the current
-80-stack-argument planner cap. Source-owned frontier
+81-stack-argument planner cap. Source-owned frontier
 rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`,
-`[9 x i16]`, and flat 32-/40-/48-/64-/80-eightbyte MEMORY byval-to-sret copies through
-direct and function-pointer calls; the 40-/48-/64-/80-eightbyte rows prove disp32
+`[9 x i16]`, and flat 32-/40-/48-/64-/80-/81-eightbyte MEMORY byval-to-sret copies through
+direct and function-pointer calls; the 40-/48-/64-/80-/81-eightbyte rows prove disp32
 source-pointer reloads once payload offsets exceed the byte displacement range,
 and the stack-sourced Big40/Big48/Big64 rows prove incoming `byval` payload
 parameters are copied directly from caller stack payload slots rather than
-treated as pointers. Source-backed Big81 and Big80 forwarding boundary rows now
-prove over-cap and unsupported forwarding byval stack pressure reject as
+treated as pointers. Source-backed Big80 forwarding boundary rows now
+prove unsupported forwarding byval stack pressure rejects as
 targeted ABI boundaries.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
@@ -436,8 +436,8 @@ packed aggregate ABI call/return forms, including direct planner inputs and
   packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`);
   source-backed fail-closed by `distribution-air-release-frontier-boundaries`
 byval lowering outside supported aggregate payload stack copies and arbitrary sret copy/storage beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
-over-cap byval stack-pressure shapes beyond the current 80-stack-argument
-  planner cap (`UnsupportedCodegenAbi`); source-backed fail-closed by
+unsupported byval stack-pressure forwarding shapes beyond the current selected
+  scheduling model (`UnsupportedCodegenAbi`); source-backed fail-closed by
   `distribution-air-release-frontier-boundaries`
 operand bundles
 invoke

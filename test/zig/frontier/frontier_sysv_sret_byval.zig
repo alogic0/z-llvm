@@ -157,6 +157,10 @@ const Big80 = extern struct {
     values: [80]i64,
 };
 
+const Big81 = extern struct {
+    values: [81]i64,
+};
+
 const BigNested = extern struct {
     left: Big3,
     right: Big3,
@@ -577,6 +581,14 @@ export fn frontier_big80_copy(value: Big80) Big80 {
 
 export fn frontier_direct_big80_copy(value: Big80) Big80 {
     return frontier_big80_copy(value);
+}
+
+export fn frontier_big81_copy(value: Big81) Big81 {
+    return value;
+}
+
+export fn frontier_direct_big81_copy(value: Big81) Big81 {
+    return frontier_big81_copy(value);
 }
 
 export fn frontier_big_nested_copy(value: BigNested) BigNested {

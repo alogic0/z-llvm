@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=522
-structured_functions=522
-generic_codegen_functions=522
-generic_cfg_functions=522
+discovered_functions=524
+structured_functions=524
+generic_codegen_functions=524
+generic_cfg_functions=524
 structural_matcher_functions=0
-structured_air_v2_functions=522
-typed_air_operand_functions=522
+structured_air_v2_functions=524
+typed_air_operand_functions=524
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=522
+generic_lowering_functions=524
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=522
+object_emitted_functions=524
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -102,14 +102,14 @@ Source-backed ABI boundary proof is green for all three modes through
 
 ```text
 source_rows=7
-discovered_functions=13
+discovered_functions=12
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
 packed_aggregate_boundary_rows=2
 tail_call_boundary_rows=1
 callconv_boundary_rows=1
-stack_pressure_boundary_rows=3
+stack_pressure_boundary_rows=2
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -118,10 +118,10 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 522-function strict frontier
-executable proof. The stack-pressure rows use a Big81 byval shape plus Big80
-indirect/stack-source forwarding shapes to prove over-cap and unsupported
-forwarding pressure fail closed with targeted ABI boundaries instead of
+are not counted in the accepted 13-source / 524-function strict frontier
+executable proof. The stack-pressure rows use Big80 indirect/stack-source
+forwarding shapes to prove unsupported forwarding pressure fails closed with
+targeted ABI boundaries instead of
 silently falling back.
 
 Executable ABI proof is green for all three modes:
@@ -233,9 +233,9 @@ Closed in the current memory/aggregate frontier slice:
   array-backed float/double leaves, array-of-aggregate records, recursively
   nested scalar leaves, pointer arrays, and an integer tail through the same
   direct and pointer-callee byval-to-sret copy path; `Big32`, `Big40`,
-  `Big48`, `Big64`, and `Big80` raise the same planner-owned byval-to-sret direct and pointer-callee
+  `Big48`, `Big64`, `Big80`, and `Big81` raise the same planner-owned byval-to-sret direct
   copy path through exact-qword MEMORY payloads beyond byte-offset byval loads
-  using disp32 source-pointer reloads through the current 80-stack-argument
+  using disp32 source-pointer reloads through the current 81-stack-argument
   planner cap; the stack-sourced `Big40`, `Big48`, and `Big64` direct and
   pointer-callee copy rows prove incoming byval payloads that begin in the
   caller stack argument area are copied as payload slots rather than treated as
