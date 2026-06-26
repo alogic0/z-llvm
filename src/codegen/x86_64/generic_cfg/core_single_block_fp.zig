@@ -1298,8 +1298,8 @@ const FpVoidCallAddend = union(enum) {
     stack_disp: u32,
 };
 
-const max_fp_void_call_addends = 20;
-const max_fp_void_call_stack_addends = 14;
+const max_fp_void_call_addends = 24;
+const max_fp_void_call_stack_addends = 18;
 
 const FpVoidCallAddendList = struct {
     items: [max_fp_void_call_addends]FpVoidCallAddend = undefined,

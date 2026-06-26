@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=595
-structured_functions=595
-generic_codegen_functions=595
-generic_cfg_functions=595
+discovered_functions=599
+structured_functions=599
+generic_codegen_functions=599
+generic_cfg_functions=599
 structural_matcher_functions=0
-structured_air_v2_functions=595
-typed_air_operand_functions=595
+structured_air_v2_functions=599
+typed_air_operand_functions=599
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=595
+generic_lowering_functions=599
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=595
+object_emitted_functions=599
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -803,12 +803,13 @@ Closed in the current memory/aggregate frontier slice:
   reload two additional stack-passed FP addends through adjusted incoming stack
   offsets after the no-argument helper call or calls, and return the
   eight-value post-call `fadd` sum
-- ten-, twelve-, fourteen-, eighteen-, and twenty-addend stack-passed SSE live-across-call
+- ten-, twelve-, fourteen-, eighteen-, twenty-, and twenty-four-addend stack-passed SSE live-across-call
   rows in `frontier_sysv_abi.zig`: `frontier_ten_fp_live_stack_*`,
   `frontier_twelve_fp_live_stack_*`, `frontier_fourteen_fp_live_stack_*`,
-  `frontier_eighteen_fp_live_stack_*`, `frontier_twenty_fp_live_stack_*`, and
+  `frontier_eighteen_fp_live_stack_*`, `frontier_twenty_fp_live_stack_*`,
+  `frontier_twenty_four_fp_live_stack_*`, and
   their indirect variants reuse the same generic addend collector with six
-  spilled XMM addends plus up to fourteen
+  spilled XMM addends plus up to eighteen
   incoming stack-passed FP addends across direct and pointer-callee no-argument
   `void` calls before the post-call `fadd` return
 - selected FP-argument SSE live-across-call rows in `frontier_sysv_abi.zig`:
