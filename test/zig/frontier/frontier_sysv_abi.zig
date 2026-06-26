@@ -1026,6 +1026,34 @@ export fn frontier_indirect_fourteen_fp_live_stack_f32_sum_after_call(func: Void
     return a + b + c + d + e + f + g + h + i + j + k + l + m + n;
 }
 
+export fn frontier_eighteen_fp_live_stack_f64_sum_after_call(skip0: f64, skip1: f64, a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, g: f64, h: f64, i: f64, j: f64, k: f64, l: f64, m: f64, n: f64, o: f64, p: f64, q: f64, r: f64) f64 {
+    _ = skip0;
+    _ = skip1;
+    frontier_touch_none();
+    return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r;
+}
+
+export fn frontier_eighteen_fp_live_stack_f32_sum_after_call(skip0: f32, skip1: f32, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32, i: f32, j: f32, k: f32, l: f32, m: f32, n: f32, o: f32, p: f32, q: f32, r: f32) f32 {
+    _ = skip0;
+    _ = skip1;
+    frontier_touch_none();
+    return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r;
+}
+
+export fn frontier_indirect_eighteen_fp_live_stack_f64_sum_after_call(func: VoidFn, skip0: f64, skip1: f64, a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, g: f64, h: f64, i: f64, j: f64, k: f64, l: f64, m: f64, n: f64, o: f64, p: f64, q: f64, r: f64) f64 {
+    _ = skip0;
+    _ = skip1;
+    func();
+    return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r;
+}
+
+export fn frontier_indirect_eighteen_fp_live_stack_f32_sum_after_call(func: VoidFn, skip0: f32, skip1: f32, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32, i: f32, j: f32, k: f32, l: f32, m: f32, n: f32, o: f32, p: f32, q: f32, r: f32) f32 {
+    _ = skip0;
+    _ = skip1;
+    func();
+    return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r;
+}
+
 export fn frontier_stack_arg_forward(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {
     return frontier_sum12_i32(a, b, c, d, e, f, g, h, i, j, k, l);
 }

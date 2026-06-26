@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=569
-structured_functions=569
-generic_codegen_functions=569
-generic_cfg_functions=569
+discovered_functions=573
+structured_functions=573
+generic_codegen_functions=573
+generic_cfg_functions=573
 structural_matcher_functions=0
-structured_air_v2_functions=569
-typed_air_operand_functions=569
+structured_air_v2_functions=573
+typed_air_operand_functions=573
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=569
+generic_lowering_functions=573
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=569
+object_emitted_functions=573
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -118,7 +118,7 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 569-function strict frontier
+are not counted in the accepted 13-source / 573-function strict frontier
 executable proof. Stack-pressure forwarding for the previous Big80/Big81/Big96/Big128/Big160
 indirect and stack-source rows is now accepted in the frontier corpus; the
 boundary gate keeps `stack_pressure_boundary_rows=0` as a regression guard.
@@ -803,13 +803,13 @@ Closed in the current memory/aggregate frontier slice:
   reload two additional stack-passed FP addends through adjusted incoming stack
   offsets after the no-argument helper call or calls, and return the
   eight-value post-call `fadd` sum
-- ten-, twelve-, and fourteen-addend stack-passed SSE live-across-call rows in
-  `frontier_sysv_abi.zig`: `frontier_ten_fp_live_stack_*`,
-  `frontier_twelve_fp_live_stack_*`, `frontier_fourteen_fp_live_stack_*`, and
-  their indirect variants reuse the same generic addend collector with six
-  spilled XMM addends plus up to eight incoming stack-passed FP addends across
-  direct and pointer-callee no-argument `void` calls before the post-call
-  `fadd` return
+- ten-, twelve-, fourteen-, and eighteen-addend stack-passed SSE live-across-call
+  rows in `frontier_sysv_abi.zig`: `frontier_ten_fp_live_stack_*`,
+  `frontier_twelve_fp_live_stack_*`, `frontier_fourteen_fp_live_stack_*`,
+  `frontier_eighteen_fp_live_stack_*`, and their indirect variants reuse the
+  same generic addend collector with six spilled XMM addends plus up to twelve
+  incoming stack-passed FP addends across direct and pointer-callee no-argument
+  `void` calls before the post-call `fadd` return
 - selected FP-argument SSE live-across-call rows in `frontier_sysv_abi.zig`:
   two live `f32` or `f64` parameters are spilled, `%xmm1` is assigned to the
   helper's first FP argument, and both live values are reloaded for the
