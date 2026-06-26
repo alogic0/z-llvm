@@ -229,6 +229,14 @@ const BigStructArrayMixed = extern struct {
     tag: i64,
 };
 
+const BigDeepMixed = extern struct {
+    nested: BigNestedArrayMixed,
+    records: [2]MixedArrayLeaf,
+    scalar: ScalarNested,
+    ptrs: [2]*const i64,
+    code: i32,
+};
+
 const BigByteTail = extern struct {
     values: [17]u8,
 };
@@ -293,6 +301,7 @@ const BigPtrFloatCopyFn = *const fn (BigPtrFloat) callconv(.c) BigPtrFloat;
 const BigArrayMixedCopyFn = *const fn (BigArrayMixed) callconv(.c) BigArrayMixed;
 const BigNestedArrayMixedCopyFn = *const fn (BigNestedArrayMixed) callconv(.c) BigNestedArrayMixed;
 const BigStructArrayMixedCopyFn = *const fn (BigStructArrayMixed) callconv(.c) BigStructArrayMixed;
+const BigDeepMixedCopyFn = *const fn (BigDeepMixed) callconv(.c) BigDeepMixed;
 const BigByteTailCopyFn = *const fn (BigByteTail) callconv(.c) BigByteTail;
 const BigByteTail5CopyFn = *const fn (BigByteTail5) callconv(.c) BigByteTail5;
 const BigByteTail6CopyFn = *const fn (BigByteTail6) callconv(.c) BigByteTail6;
@@ -645,6 +654,18 @@ export fn frontier_direct_big_struct_array_mixed_copy(value: BigStructArrayMixed
 }
 
 export fn frontier_indirect_big_struct_array_mixed_copy(func: BigStructArrayMixedCopyFn, value: BigStructArrayMixed) BigStructArrayMixed {
+    return func(value);
+}
+
+export fn frontier_big_deep_mixed_copy(value: BigDeepMixed) BigDeepMixed {
+    return value;
+}
+
+export fn frontier_direct_big_deep_mixed_copy(value: BigDeepMixed) BigDeepMixed {
+    return frontier_big_deep_mixed_copy(value);
+}
+
+export fn frontier_indirect_big_deep_mixed_copy(func: BigDeepMixedCopyFn, value: BigDeepMixed) BigDeepMixed {
     return func(value);
 }
 

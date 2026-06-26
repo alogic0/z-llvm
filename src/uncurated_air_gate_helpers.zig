@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 483,
+            .functions = 486,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1744,14 +1744,15 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct BigNestedArrayMixed { struct BigFloatArray floats; struct BigDoubleArray doubles; const long long *ptr; long long tag; };
     \\struct MixedArrayLeaf { int code; double weight; };
     \\struct BigStructArrayMixed { struct MixedArrayLeaf entries[3]; long long tag; };
+    \\struct ScalarNestedInner { unsigned char a; unsigned short b; };
+    \\struct ScalarNested { struct ScalarNestedInner inner; int c; double d; const long long *ptr; };
+    \\struct BigDeepMixed { struct BigNestedArrayMixed nested; struct MixedArrayLeaf records[2]; struct ScalarNested scalar; const long long *ptrs[2]; int code; };
     \\struct BigByteTail { unsigned char values[17]; };
     \\struct BigByteTail5 { unsigned char values[21]; };
     \\struct BigByteTail6 { unsigned char values[22]; };
     \\struct BigByteTail7 { unsigned char values[23]; };
     \\struct BigWordTail { unsigned short values[9]; };
     \\struct ScalarMixed { unsigned char a; unsigned short b; int c; long long d; const long long *ptr; float f; double g; };
-    \\struct ScalarNestedInner { unsigned char a; unsigned short b; };
-    \\struct ScalarNested { struct ScalarNestedInner inner; int c; double d; const long long *ptr; };
     \\struct ScalarArray { int ints[3]; double doubles[2]; const long long *ptr; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
@@ -1836,6 +1837,9 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigStructArrayMixed z_frontier_big_struct_array_mixed_copy(struct BigStructArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_big_struct_array_mixed_copy");
     \\extern struct BigStructArrayMixed z_frontier_direct_big_struct_array_mixed_copy(struct BigStructArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_direct_big_struct_array_mixed_copy");
     \\extern struct BigStructArrayMixed z_frontier_indirect_big_struct_array_mixed_copy(struct BigStructArrayMixed (*)(struct BigStructArrayMixed), struct BigStructArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_struct_array_mixed_copy");
+    \\extern struct BigDeepMixed z_frontier_big_deep_mixed_copy(struct BigDeepMixed) __asm__("frontier_sysv_sret_byval.frontier_big_deep_mixed_copy");
+    \\extern struct BigDeepMixed z_frontier_direct_big_deep_mixed_copy(struct BigDeepMixed) __asm__("frontier_sysv_sret_byval.frontier_direct_big_deep_mixed_copy");
+    \\extern struct BigDeepMixed z_frontier_indirect_big_deep_mixed_copy(struct BigDeepMixed (*)(struct BigDeepMixed), struct BigDeepMixed) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_deep_mixed_copy");
     \\extern struct BigByteTail z_frontier_big_byte_tail_copy(struct BigByteTail) __asm__("frontier_sysv_sret_byval.frontier_big_byte_tail_copy");
     \\extern struct BigByteTail z_frontier_direct_big_byte_tail_copy(struct BigByteTail) __asm__("frontier_sysv_sret_byval.frontier_direct_big_byte_tail_copy");
     \\extern struct BigByteTail z_frontier_indirect_big_byte_tail_copy(struct BigByteTail (*)(struct BigByteTail), struct BigByteTail) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_byte_tail_copy");
@@ -2041,6 +2045,20 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (direct_struct_array_mixed.entries[0].code != 11 || direct_struct_array_mixed.entries[0].weight != 1.5 || direct_struct_array_mixed.entries[1].code != 13 || direct_struct_array_mixed.entries[1].weight != 2.25 || direct_struct_array_mixed.entries[2].code != 17 || direct_struct_array_mixed.entries[2].weight != 3.75 || direct_struct_array_mixed.tag != 31415926LL) return 237;
     \\    struct BigStructArrayMixed indirect_struct_array_mixed = z_frontier_indirect_big_struct_array_mixed_copy(z_frontier_big_struct_array_mixed_copy, struct_array_mixed);
     \\    if (indirect_struct_array_mixed.entries[0].code != 11 || indirect_struct_array_mixed.entries[0].weight != 1.5 || indirect_struct_array_mixed.entries[1].code != 13 || indirect_struct_array_mixed.entries[1].weight != 2.25 || indirect_struct_array_mixed.entries[2].code != 17 || indirect_struct_array_mixed.entries[2].weight != 3.75 || indirect_struct_array_mixed.tag != 31415926LL) return 238;
+    \\    long long pointed2 = 1122334455LL;
+    \\    struct BigDeepMixed deep_mixed = {
+    \\        .nested = nested_array_mixed,
+    \\        .records = { { .code = 19, .weight = 4.5 }, { .code = 23, .weight = 5.75 } },
+    \\        .scalar = { .inner = { .a = 15, .b = 4093 }, .c = -2468, .d = 17.25, .ptr = &pointed },
+    \\        .ptrs = { &pointed, &pointed2 },
+    \\        .code = 271828,
+    \\    };
+    \\    struct BigDeepMixed copied_deep_mixed = z_frontier_big_deep_mixed_copy(deep_mixed);
+    \\    if (copied_deep_mixed.nested.floats.values[4] != 5.25f || copied_deep_mixed.nested.doubles.values[2] != 8.75 || copied_deep_mixed.records[0].code != 19 || copied_deep_mixed.records[1].weight != 5.75 || copied_deep_mixed.scalar.inner.a != 15 || copied_deep_mixed.scalar.inner.b != 4093 || copied_deep_mixed.scalar.c != -2468 || copied_deep_mixed.scalar.d != 17.25 || copied_deep_mixed.scalar.ptr != &pointed || copied_deep_mixed.ptrs[1] != &pointed2 || *copied_deep_mixed.ptrs[1] != 1122334455LL || copied_deep_mixed.code != 271828) return 239;
+    \\    struct BigDeepMixed direct_deep_mixed = z_frontier_direct_big_deep_mixed_copy(deep_mixed);
+    \\    if (direct_deep_mixed.nested.floats.values[4] != 5.25f || direct_deep_mixed.nested.doubles.values[2] != 8.75 || direct_deep_mixed.records[0].code != 19 || direct_deep_mixed.records[1].weight != 5.75 || direct_deep_mixed.scalar.inner.a != 15 || direct_deep_mixed.scalar.inner.b != 4093 || direct_deep_mixed.scalar.c != -2468 || direct_deep_mixed.scalar.d != 17.25 || direct_deep_mixed.scalar.ptr != &pointed || direct_deep_mixed.ptrs[1] != &pointed2 || *direct_deep_mixed.ptrs[1] != 1122334455LL || direct_deep_mixed.code != 271828) return 240;
+    \\    struct BigDeepMixed indirect_deep_mixed = z_frontier_indirect_big_deep_mixed_copy(z_frontier_big_deep_mixed_copy, deep_mixed);
+    \\    if (indirect_deep_mixed.nested.floats.values[4] != 5.25f || indirect_deep_mixed.nested.doubles.values[2] != 8.75 || indirect_deep_mixed.records[0].code != 19 || indirect_deep_mixed.records[1].weight != 5.75 || indirect_deep_mixed.scalar.inner.a != 15 || indirect_deep_mixed.scalar.inner.b != 4093 || indirect_deep_mixed.scalar.c != -2468 || indirect_deep_mixed.scalar.d != 17.25 || indirect_deep_mixed.scalar.ptr != &pointed || indirect_deep_mixed.ptrs[1] != &pointed2 || *indirect_deep_mixed.ptrs[1] != 1122334455LL || indirect_deep_mixed.code != 271828) return 241;
     \\    struct BigByteTail byte_tail = { .values = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 } };
     \\    struct BigByteTail copied_byte_tail = z_frontier_big_byte_tail_copy(byte_tail);
     \\    if (copied_byte_tail.values[0] != 1 || copied_byte_tail.values[8] != 9 || copied_byte_tail.values[16] != 17) return 82;

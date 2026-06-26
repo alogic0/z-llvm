@@ -218,6 +218,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigStructArrayMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ [3 x { i32, double }], i64 }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigDeepMixed")) {
+        return .{ .ir_type = .{ .aggregate = "{ { { [5 x float] }, { [3 x double] }, ptr, i64 }, [2 x { i32, double }], { { i8, i16 }, i32, double, ptr }, [2 x ptr], i32 }" } };
+    }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail")) {
         return .{ .ir_type = .{ .aggregate = "{ [17 x i8] }" } };
     }
