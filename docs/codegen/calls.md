@@ -322,14 +322,16 @@ pointer to outgoing stack eightbytes for direct and function-pointer calls.
 The source pointer may itself arrive in a register or an incoming stack slot, with
 unit proof for one-, two-, array-backed three-, and nested three-eightbyte
 payloads, single-`i8`, single-`i16`, single-`i32`, `[3 x i32]`
-tail payloads, composite 3-/5-/6-/7-byte tails, and max-sized exact-eightbyte
-payloads through the current 40-stack-argument limit. Source-owned frontier
+tail payloads, composite 3-/5-/6-/7-byte tails, and exact-eightbyte
+payloads beyond the former 40-stack-argument proof through the current
+64-stack-argument planner cap. Source-owned frontier
 rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`,
-`[9 x i16]`, and flat 32-/40-eightbyte MEMORY byval-to-sret copies through
-direct and function-pointer calls; the 40-eightbyte rows prove disp32
+`[9 x i16]`, and flat 32-/40-/48-eightbyte MEMORY byval-to-sret copies through
+direct and function-pointer calls; the 40-/48-eightbyte rows prove disp32
 source-pointer reloads once payload offsets exceed the byte displacement range,
-and the stack-sourced Big40 rows prove incoming `byval` payload parameters are
-copied directly from caller stack payload slots rather than treated as pointers.
+and the stack-sourced Big40/Big48 rows prove incoming `byval` payload
+parameters are copied directly from caller stack payload slots rather than
+treated as pointers.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
 spill/reload frame now covers the same indirect byval call shape for both

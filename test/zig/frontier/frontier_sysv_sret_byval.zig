@@ -145,6 +145,10 @@ const Big40 = extern struct {
     values: [40]i64,
 };
 
+const Big48 = extern struct {
+    values: [48]i64,
+};
+
 const BigNested = extern struct {
     left: Big3,
     right: Big3,
@@ -309,6 +313,7 @@ const BigByteTail7CopyFn = *const fn (BigByteTail7) callconv(.c) BigByteTail7;
 const BigWordTailCopyFn = *const fn (BigWordTail) callconv(.c) BigWordTail;
 const Big32CopyFn = *const fn (Big32) callconv(.c) Big32;
 const Big40CopyFn = *const fn (Big40) callconv(.c) Big40;
+const Big48CopyFn = *const fn (Big48) callconv(.c) Big48;
 const ScalarMixedCopyFn = *const fn (ScalarMixed) callconv(.c) ScalarMixed;
 const ScalarNestedCopyFn = *const fn (ScalarNested) callconv(.c) ScalarNested;
 const ScalarArrayCopyFn = *const fn (ScalarArray) callconv(.c) ScalarArray;
@@ -484,6 +489,38 @@ export fn frontier_stack_source_big40_copy(a: i64, b: i64, c: i64, d: i64, e: i6
 }
 
 export fn frontier_stack_source_indirect_big40_copy(func: Big40CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big40) Big40 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return func(value);
+}
+
+export fn frontier_big48_copy(value: Big48) Big48 {
+    return value;
+}
+
+export fn frontier_direct_big48_copy(value: Big48) Big48 {
+    return frontier_big48_copy(value);
+}
+
+export fn frontier_indirect_big48_copy(func: Big48CopyFn, value: Big48) Big48 {
+    return func(value);
+}
+
+export fn frontier_stack_source_big48_copy(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big48) Big48 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return frontier_big48_copy(value);
+}
+
+export fn frontier_stack_source_indirect_big48_copy(func: Big48CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big48) Big48 {
     _ = a;
     _ = b;
     _ = c;

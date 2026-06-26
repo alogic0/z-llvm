@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=510
-structured_functions=510
-generic_codegen_functions=510
-generic_cfg_functions=510
+discovered_functions=515
+structured_functions=515
+generic_codegen_functions=515
+generic_cfg_functions=515
 structural_matcher_functions=0
-structured_air_v2_functions=510
-typed_air_operand_functions=510
+structured_air_v2_functions=515
+typed_air_operand_functions=515
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=510
+generic_lowering_functions=515
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=510
+object_emitted_functions=515
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -228,13 +228,13 @@ Closed in the current memory/aggregate frontier slice:
   byval-to-sret copy path; the `BigDeepMixed` row composes nested
   array-backed float/double leaves, array-of-aggregate records, recursively
   nested scalar leaves, pointer arrays, and an integer tail through the same
-  direct and pointer-callee byval-to-sret copy path; `Big32` and
-  `Big40` raise the same planner-owned byval-to-sret direct and pointer-callee
+  direct and pointer-callee byval-to-sret copy path; `Big32`, `Big40`, and
+  `Big48` raise the same planner-owned byval-to-sret direct and pointer-callee
   copy path through exact-qword MEMORY payloads beyond byte-offset byval loads
-  using disp32 source-pointer reloads; the stack-sourced `Big40` direct and
-  pointer-callee copy rows prove incoming byval payloads that begin in the
-  caller stack argument area are copied as payload slots rather than treated as
-  pointers;
+  using disp32 source-pointer reloads; the stack-sourced `Big40` and `Big48`
+  direct and pointer-callee copy rows prove incoming byval payloads that begin
+  in the caller stack argument area are copied as payload slots rather than
+  treated as pointers;
   `frontier_direct_big5_copy`,
   `frontier_indirect_big5_copy`, `frontier_direct_big_double_copy`,
   `frontier_indirect_big_double_copy`, `frontier_direct_big_float_copy`,

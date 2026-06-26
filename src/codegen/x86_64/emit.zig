@@ -7,7 +7,7 @@ const ArgReg = types.ArgReg;
 const XmmReg = types.XmmReg;
 const MachineFunction = machine_ir.MachineFunction;
 
-pub const max_sysv_stack_call_args = 40;
+pub const max_sysv_stack_call_args = 64;
 
 pub const SysVCallTarget = union(enum) {
     direct: []const u8,
