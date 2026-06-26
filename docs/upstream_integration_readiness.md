@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=590
-structured_functions=590
-generic_codegen_functions=590
-generic_cfg_functions=590
+discovered_functions=595
+structured_functions=595
+generic_codegen_functions=595
+generic_cfg_functions=595
 structural_matcher_functions=0
-structured_air_v2_functions=590
-typed_air_operand_functions=590
+structured_air_v2_functions=595
+typed_air_operand_functions=595
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=590
+generic_lowering_functions=595
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=590
+object_emitted_functions=595
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 590-function counters above plus `native_link_accepted_rows=13`,
+13-source / 595-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -694,7 +694,7 @@ ReleaseSmall and currently reports per mode: `source_rows=6`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries for
 varargs, vectors, long-double/X87, packed aggregates, tail calls, non-default
-call conventions. The prior Big80/Big81/Big96/Big128/Big160/Big192/Big224 stack-source forwarding boundary is now
+call conventions. The prior Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 stack-source forwarding boundary is now
 accepted in the strict frontier corpus, and the boundary counter remains at
 `stack_pressure_boundary_rows=0` as a regression guard; boundary rows are not
 part of the accepted executable frontier counters.

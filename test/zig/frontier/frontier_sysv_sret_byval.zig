@@ -181,6 +181,10 @@ const Big224 = extern struct {
     values: [224]i64,
 };
 
+const Big256 = extern struct {
+    values: [256]i64,
+};
+
 const BigNested = extern struct {
     left: Big3,
     right: Big3,
@@ -354,6 +358,7 @@ const Big128CopyFn = *const fn (Big128) callconv(.c) Big128;
 const Big160CopyFn = *const fn (Big160) callconv(.c) Big160;
 const Big192CopyFn = *const fn (Big192) callconv(.c) Big192;
 const Big224CopyFn = *const fn (Big224) callconv(.c) Big224;
+const Big256CopyFn = *const fn (Big256) callconv(.c) Big256;
 const ScalarMixedCopyFn = *const fn (ScalarMixed) callconv(.c) ScalarMixed;
 const ScalarNestedCopyFn = *const fn (ScalarNested) callconv(.c) ScalarNested;
 const ScalarArrayCopyFn = *const fn (ScalarArray) callconv(.c) ScalarArray;
@@ -817,6 +822,38 @@ export fn frontier_stack_source_big224_copy(a: i64, b: i64, c: i64, d: i64, e: i
 }
 
 export fn frontier_stack_source_indirect_big224_copy(func: Big224CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big224) Big224 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return func(value);
+}
+
+export fn frontier_big256_copy(value: Big256) Big256 {
+    return value;
+}
+
+export fn frontier_direct_big256_copy(value: Big256) Big256 {
+    return frontier_big256_copy(value);
+}
+
+export fn frontier_indirect_big256_copy(func: Big256CopyFn, value: Big256) Big256 {
+    return func(value);
+}
+
+export fn frontier_stack_source_big256_copy(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big256) Big256 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return frontier_big256_copy(value);
+}
+
+export fn frontier_stack_source_indirect_big256_copy(func: Big256CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big256) Big256 {
     _ = a;
     _ = b;
     _ = c;
