@@ -43,6 +43,8 @@ Current frontier ABI boundary seed:
 - `test/zig/frontier_boundaries/frontier_vector_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_x87_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_packed_aggregate_boundary.zig`
+- `test/zig/frontier_boundaries/frontier_tail_call_boundary.zig`
+- `test/zig/frontier_boundaries/frontier_callconv_boundary.zig`
 
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
@@ -99,12 +101,14 @@ Source-backed ABI boundary proof is green for all three modes through
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=4
-discovered_functions=8
+source_rows=6
+discovered_functions=10
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
 packed_aggregate_boundary_rows=2
+tail_call_boundary_rows=1
+callconv_boundary_rows=1
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0

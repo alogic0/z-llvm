@@ -22,6 +22,7 @@ const isCallOpcode = lowering_parser.isCallOpcode;
 const ownPrint = lowering_parser.ownPrint;
 const splitTopLevel = lowering_parser.splitTopLevel;
 const parseSymbolPointer = lowering_parser.parseSymbolPointer;
+const irCallingConvention = lowering_parser.irCallingConvention;
 
 const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
 const lowerConditionalSlotUpdate = legacy.lowerConditionalSlotUpdate;
@@ -95,7 +96,7 @@ fn lowerRegisterAggregateMake(
     var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     const arg_names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7" };
     for (function_type.params, 0..) |param, index| {
         try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_names[index] });
@@ -136,7 +137,7 @@ fn lowerMaybeError(allocator: std.mem.Allocator, air_function: air_export.Functi
     var function = ir.Function.init(lowering_parser.shortFunctionName(air_function.name), .{ .int = 64 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     try function.params.append(allocator, .{ .ty = param_ty, .name = "arg0" });
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
@@ -170,7 +171,7 @@ fn lowerErrorSwitch(allocator: std.mem.Allocator, air_function: air_export.Funct
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
@@ -218,7 +219,7 @@ fn lowerErrorClassify(allocator: std.mem.Allocator, air_function: air_export.Fun
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 64 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
@@ -1144,7 +1145,7 @@ pub fn lowerTypedV2InlineAsmBarrier(
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
@@ -1197,7 +1198,7 @@ pub fn lowerTypedV2AtomicAdd(
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
@@ -1322,7 +1323,7 @@ pub fn lowerTypedV2DenseIntegerSwitch(
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
 
     var entry = ir.BasicBlock.init("entry");
@@ -1579,7 +1580,7 @@ pub fn lowerTypedV2CheckedIntFromFloat(
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     try function.params.append(allocator, .{ .ty = operand_ty, .name = "arg0" });
 
     var entry = ir.BasicBlock.init("entry");

@@ -434,9 +434,11 @@ byval lowering outside supported aggregate payload stack copies and arbitrary sr
 operand bundles
 invoke
 callbr
-tail, musttail, and notail markers (`UnsupportedTailCallAbi`)
+tail, musttail, and notail markers (`UnsupportedTailCallAbi`);
+  source-backed fail-closed by `distribution-air-release-frontier-boundaries`
 unsupported call attributes
-unsupported calling conventions (`UnsupportedCallConvAbi`)
+unsupported calling conventions (`UnsupportedCallConvAbi`);
+  source-backed fail-closed by `distribution-air-release-frontier-boundaries`
 ```
 
 Narrow indirect calls are no longer part of the rejected surface: typed AIR v2
@@ -499,7 +501,8 @@ typed AIR v2 pointer-callee indirect call with single-eightbyte `{ f32, f32 }`
   aggregate arguments and f32 return
 typed AIR v2 pointer-callee indirect call with `[4]f32` SSE/SSE aggregate
   arguments and returns
-tail-call marker rejection
+source-backed tail-call marker rejection
+source-backed non-default callconv rejection
 invoke rejection
 call_no_args assembly fixture
 call_one_arg assembly fixture

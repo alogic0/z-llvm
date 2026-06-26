@@ -94,6 +94,7 @@ const typedOperandTextDetail = lowering_parser.typedOperandTextDetail;
 const typedCalleeName = lowering_parser.typedCalleeName;
 const typedCallee = lowering_parser.typedCallee;
 const typedCalleeWithMarker = lowering_parser.typedCalleeWithMarker;
+const irCallingConvention = lowering_parser.irCallingConvention;
 const isIgnoredOpcode = lowering_parser.isIgnoredOpcode;
 const isStraightLineOpcode = lowering_parser.isStraightLineOpcode;
 const isArithmeticOpcode = lowering_parser.isArithmeticOpcode;
@@ -690,7 +691,7 @@ fn lowerFunction(
     var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     if (runtimeNavSymbol(air_function)) |tls_symbol| {
         function.attrs = try ownPrint(module, "\"zllvm-tls-symbol\"=\"{s}\"", .{tls_symbol});
     }
@@ -852,7 +853,7 @@ fn lowerFunctionTypedV2(
     var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    function.calling_conv = irCallingConvention(function_type);
     if (runtimeNavSymbol(air_function)) |tls_symbol| {
         function.attrs = try ownPrint(module, "\"zllvm-tls-symbol\"=\"{s}\"", .{tls_symbol});
     }
@@ -892,6 +893,13 @@ fn lowerFunctionTypedV2(
     if (block.terminator == null) return error.UnsupportedAir;
     try function.blocks.append(allocator, block);
     return function;
+}
+
+fn tailKindForCallOpcode(opcode: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, opcode, "call_always_tail")) return "tail";
+    if (std.mem.eql(u8, opcode, "call_never_tail")) return "notail";
+    if (std.mem.eql(u8, opcode, "call_never_inline")) return "neverinline";
+    return null;
 }
 
 const LoweringContext = struct {
@@ -1697,7 +1705,8 @@ const LoweringContext = struct {
             .ret_ty = call_type.return_type.ir_type,
             .callee = if (is_default_panic) "debug.defaultPanic" else callee,
             .callee_value = callee_value,
-            .calling_conv = if (call_type.c_calling_convention) null else "fastcc",
+            .calling_conv = irCallingConvention(call_type),
+            .tail_kind = tailKindForCallOpcode(instruction.opcode),
             .args = .empty,
         };
         errdefer call.deinit(self.allocator);
@@ -1982,7 +1991,7 @@ const LoweringContext = struct {
         var call: ir.CallInst = .{
             .ret_ty = call_type.return_type.ir_type,
             .callee = callee,
-            .calling_conv = if (call_type.c_calling_convention) null else "fastcc",
+            .calling_conv = irCallingConvention(call_type),
             .args = .empty,
         };
         errdefer call.deinit(self.allocator);

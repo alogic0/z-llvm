@@ -15,11 +15,18 @@ pub const FunctionType = struct {
     params: []ZigType,
     return_type: ZigType,
     c_calling_convention: bool,
+    non_default_calling_convention: bool,
 
     pub fn deinit(self: FunctionType, allocator: std.mem.Allocator) void {
         allocator.free(self.params);
     }
 };
+
+pub fn irCallingConvention(function_type: FunctionType) ?[]const u8 {
+    if (function_type.c_calling_convention) return null;
+    if (function_type.non_default_calling_convention) return "unsupported";
+    return "fastcc";
+}
 
 pub const TypedValue = struct {
     ty: ZigType,
@@ -40,6 +47,7 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
     const params_text = trimmed[4..params_end];
     const suffix = std.mem.trim(u8, trimmed[params_end + 1 ..], " ");
     const c_calling_convention = std.mem.startsWith(u8, suffix, "callconv(.c)");
+    const non_default_calling_convention = std.mem.startsWith(u8, suffix, "callconv(") and !c_calling_convention;
     const return_text = if (std.mem.startsWith(u8, suffix, "callconv(")) blk: {
         const close = std.mem.indexOfScalar(u8, suffix, ')') orelse return error.UnsupportedAir;
         break :blk std.mem.trim(u8, suffix[close + 1 ..], " ");
@@ -58,6 +66,7 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
         .params = try params.toOwnedSlice(allocator),
         .return_type = return_type,
         .c_calling_convention = c_calling_convention,
+        .non_default_calling_convention = non_default_calling_convention,
     };
 }
 
