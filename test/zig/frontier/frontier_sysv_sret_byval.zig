@@ -327,6 +327,7 @@ const Big32CopyFn = *const fn (Big32) callconv(.c) Big32;
 const Big40CopyFn = *const fn (Big40) callconv(.c) Big40;
 const Big48CopyFn = *const fn (Big48) callconv(.c) Big48;
 const Big64CopyFn = *const fn (Big64) callconv(.c) Big64;
+const Big80CopyFn = *const fn (Big80) callconv(.c) Big80;
 const ScalarMixedCopyFn = *const fn (ScalarMixed) callconv(.c) ScalarMixed;
 const ScalarNestedCopyFn = *const fn (ScalarNested) callconv(.c) ScalarNested;
 const ScalarArrayCopyFn = *const fn (ScalarArray) callconv(.c) ScalarArray;
@@ -581,6 +582,10 @@ export fn frontier_big80_copy(value: Big80) Big80 {
 
 export fn frontier_direct_big80_copy(value: Big80) Big80 {
     return frontier_big80_copy(value);
+}
+
+export fn frontier_indirect_big80_copy(func: Big80CopyFn, value: Big80) Big80 {
+    return func(value);
 }
 
 export fn frontier_big81_copy(value: Big81) Big81 {

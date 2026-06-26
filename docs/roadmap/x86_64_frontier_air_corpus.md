@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=524
-structured_functions=524
-generic_codegen_functions=524
-generic_cfg_functions=524
+discovered_functions=525
+structured_functions=525
+generic_codegen_functions=525
+generic_cfg_functions=525
 structural_matcher_functions=0
-structured_air_v2_functions=524
-typed_air_operand_functions=524
+structured_air_v2_functions=525
+typed_air_operand_functions=525
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=524
+generic_lowering_functions=525
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=524
+object_emitted_functions=525
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -102,14 +102,14 @@ Source-backed ABI boundary proof is green for all three modes through
 
 ```text
 source_rows=7
-discovered_functions=12
+discovered_functions=11
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
 packed_aggregate_boundary_rows=2
 tail_call_boundary_rows=1
 callconv_boundary_rows=1
-stack_pressure_boundary_rows=2
+stack_pressure_boundary_rows=1
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -118,9 +118,9 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 524-function strict frontier
-executable proof. The stack-pressure rows use Big80 indirect/stack-source
-forwarding shapes to prove unsupported forwarding pressure fails closed with
+are not counted in the accepted 13-source / 525-function strict frontier
+executable proof. The remaining stack-pressure row uses the Big80 stack-source
+forwarding shape to prove unsupported forwarding pressure fails closed with
 targeted ABI boundaries instead of
 silently falling back.
 

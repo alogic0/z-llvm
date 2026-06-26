@@ -2105,6 +2105,12 @@ pub fn lowerGenericCfgScalarSretParamStores(
     block: ir.BasicBlock,
 ) !bool {
     if (function.params.items.len < 2) return false;
+    if (block.instructions.items.len == 1) {
+        switch (block.instructions.items[0].kind) {
+            .call => return false,
+            else => {},
+        }
+    }
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
     if (!isSupportedAggregateCopyLeafAggregate(aggregate_ty)) return false;
     var leaves: [64]ScalarSretLeaf = undefined;
