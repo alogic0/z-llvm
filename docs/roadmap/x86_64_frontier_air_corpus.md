@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=494
-structured_functions=494
-generic_codegen_functions=494
-generic_cfg_functions=494
+discovered_functions=498
+structured_functions=498
+generic_codegen_functions=498
+generic_cfg_functions=498
 structural_matcher_functions=0
-structured_air_v2_functions=494
-typed_air_operand_functions=494
+structured_air_v2_functions=498
+typed_air_operand_functions=498
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=494
+generic_lowering_functions=498
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=494
+object_emitted_functions=498
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -788,6 +788,10 @@ Closed in the current memory/aggregate frontier slice:
 - selected FP-argument SSE live-across-call rows in `frontier_sysv_abi.zig`:
   two live `f32` or `f64` parameters are spilled, `%xmm1` is assigned to the
   helper's first FP argument, and both live values are reloaded for the
+  post-call `fadd` return; the `frontier_fp_arg_call_stack_*` and
+  `frontier_indirect_fp_arg_call_stack_*` rows extend the same helper-call
+  argument setup to six spilled XMM addends plus two stack-passed addends
+  across direct and function-pointer one-FP-argument `void` calls before the
   post-call `fadd` return
 - selected indirect SSE live-across-call rows in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled, the pointer callee is moved to

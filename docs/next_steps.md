@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=494`,
-`generic_codegen_functions=494`, `generic_cfg_functions=494`,
+frontier gate reports `source_rows=13`, `discovered_functions=498`,
+`generic_codegen_functions=498`, `generic_cfg_functions=498`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=494`, `object_failures=0`,
+`object_emitted_functions=498`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,9 +483,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=494`,
-`generic_cfg_functions=494`, `structural_matcher_functions=0`,
-`object_emitted_functions=494`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=498`,
+`generic_cfg_functions=498`, `structural_matcher_functions=0`,
+`object_emitted_functions=498`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -696,7 +696,9 @@ return, selected two-live one-FP-argument pointer-callee spill/reload frames,
 selected three-/four-/six-live two-/three-/five-FP-argument pointer-callee
 spill/reload frames, selected repeated pointer-callee stack-passed FP addend
 frames that keep six register-backed addends, two stack-passed addends, and the
-callee pointer in distinct frame slots,
+callee pointer in distinct frame slots, selected direct and pointer-callee
+one-FP-argument helper calls that preserve six register-backed FP addends plus
+two stack-passed FP addends,
 and the same shared scalar
 planner now preserves live `i32` GPR parameters across direct and pointer-callee
 `f64`-argument `void` calls before the post-call integer add. The FP argument

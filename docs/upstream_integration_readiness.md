@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=494
-structured_functions=494
-generic_codegen_functions=494
-generic_cfg_functions=494
+discovered_functions=498
+structured_functions=498
+generic_codegen_functions=498
+generic_cfg_functions=498
 structural_matcher_functions=0
-structured_air_v2_functions=494
-typed_air_operand_functions=494
+structured_air_v2_functions=498
+typed_air_operand_functions=498
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=494
+generic_lowering_functions=498
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=494
+object_emitted_functions=498
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 494-function counters above plus `native_link_accepted_rows=13`,
+13-source / 498-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -782,7 +782,7 @@ arbitrary non-selected sret/byval copies
 varargs
 vectors
 stack-passed live-value scheduling beyond the current selected direct-call/void-call model
-broader SSE live-across-call helpers beyond selected no-argument-call shapes, selected direct/repeated-direct/pointer-callee/repeated-pointer-callee stack-passed FP addend sums after no-argument calls, selected repeated two-live direct/pointer-callee no-argument shapes, selected mixed one-GPR/one-SSE i32/i64 one-/two-call direct/pointer-callee shapes, selected direct two-/three-/six-live FP-argument shapes, pointer-callee shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width two-result f32/f64 call frames, selected mixed f32/f64 two-result call frames, selected mixed f32/f64 two-result frames with one live double or i64 addend, selected mixed i64/f64, i64/f32, f64/i64, and f32/i64 two-result frames, selected direct/pointer-callee i64 result live-across-later-void frames, and selected direct/pointer-callee two-result i64 live-across-later-void frames
+broader SSE live-across-call helpers beyond selected no-argument-call shapes, selected direct/repeated-direct/pointer-callee/repeated-pointer-callee stack-passed FP addend sums after no-argument calls, selected one-FP-argument direct/pointer-callee stack-passed FP addend sums, selected repeated two-live direct/pointer-callee no-argument shapes, selected mixed one-GPR/one-SSE i32/i64 one-/two-call direct/pointer-callee shapes, selected direct two-/three-/six-live FP-argument shapes, pointer-callee shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width two-result f32/f64 call frames, selected mixed f32/f64 two-result call frames, selected mixed f32/f64 two-result frames with one live double or i64 addend, selected mixed i64/f64, i64/f32, f64/i64, and f32/i64 two-result frames, selected direct/pointer-callee i64 result live-across-later-void frames, and selected direct/pointer-callee two-result i64 live-across-later-void frames
 alternate safety-guard control flow
 ```
 
