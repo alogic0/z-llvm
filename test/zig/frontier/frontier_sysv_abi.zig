@@ -798,6 +798,26 @@ export fn frontier_indirect_fp_arg_call_stack_f32_live_sum(func: TouchF32Fn, ski
     return a + b + c + d + e + f + g + h;
 }
 
+export fn frontier_five_fp_arg_call_stack_f64_live_sum(p0: f64, p1: f64, p2: f64, p3: f64, p4: f64, a: f64, b: f64, c: f64, d: f64, e: f64) f64 {
+    frontier_touch5_f64(p0, p1, p2, p3, p4);
+    return a + b + c + d + e;
+}
+
+export fn frontier_five_fp_arg_call_stack_f32_live_sum(p0: f32, p1: f32, p2: f32, p3: f32, p4: f32, a: f32, b: f32, c: f32, d: f32, e: f32) f32 {
+    frontier_touch5_f32(p0, p1, p2, p3, p4);
+    return a + b + c + d + e;
+}
+
+export fn frontier_indirect_five_fp_arg_call_stack_f64_live_sum(func: Touch5F64Fn, p0: f64, p1: f64, p2: f64, p3: f64, p4: f64, a: f64, b: f64, c: f64, d: f64, e: f64) f64 {
+    func(p0, p1, p2, p3, p4);
+    return a + b + c + d + e;
+}
+
+export fn frontier_indirect_five_fp_arg_call_stack_f32_live_sum(func: Touch5F32Fn, p0: f32, p1: f32, p2: f32, p3: f32, p4: f32, a: f32, b: f32, c: f32, d: f32, e: f32) f32 {
+    func(p0, p1, p2, p3, p4);
+    return a + b + c + d + e;
+}
+
 export fn frontier_stack_arg_forward(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {
     return frontier_sum12_i32(a, b, c, d, e, f, g, h, i, j, k, l);
 }
