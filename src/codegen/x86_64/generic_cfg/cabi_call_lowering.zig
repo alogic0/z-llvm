@@ -573,7 +573,7 @@ fn appendParallelXmmArgCopies(
     for (copy_plan.copies[0..copy_plan.count], 0..) |copy, index| {
         const stack_offset = (copy_plan.count - 1 - index) * 8;
         if (stack_offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
-        if (stack_offset <= std.math.maxInt(u8)) {
+        if (stack_offset <= std.math.maxInt(i8)) {
             try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm = .{ .reg = copy.dst, .disp = @intCast(stack_offset) } });
         } else {
             try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm = .{ .reg = copy.dst, .disp = @intCast(stack_offset) } });
@@ -581,7 +581,7 @@ fn appendParallelXmmArgCopies(
     }
     const restore_bytes = copy_plan.count * 8;
     if (restore_bytes > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
-    if (restore_bytes <= std.math.maxInt(u8)) {
+    if (restore_bytes <= std.math.maxInt(i8)) {
         try machine.instructions.append(allocator, .{ .add_rsp_imm8 = @intCast(restore_bytes) });
     } else {
         try machine.instructions.append(allocator, .{ .add_rsp_imm32 = @intCast(restore_bytes) });
@@ -1012,7 +1012,7 @@ pub fn appendStackScalarCallArg(
         .byval_ptr_disp => |source| {
             switch (source.chunk) {
                 .qword => {
-                    if (source.offset <= std.math.maxInt(u8)) {
+                    if (source.offset <= std.math.maxInt(i8)) {
                         try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = source.reg, .offset = @intCast(source.offset) } });
                     } else {
                         try machine.instructions.append(allocator, .{ .load_arg_ptr_disp32_rax = .{ .reg = source.reg, .offset = source.offset } });
@@ -1044,7 +1044,7 @@ pub fn appendStackScalarCallArg(
             }
             switch (source.chunk) {
                 .qword => {
-                    if (source.offset <= std.math.maxInt(u8)) {
+                    if (source.offset <= std.math.maxInt(i8)) {
                         try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = @intCast(source.offset) });
                     } else {
                         try machine.instructions.append(allocator, .{ .load_rax_ptr_disp32_rax = source.offset });
@@ -1172,7 +1172,7 @@ fn appendCallStackCleanupBytes(allocator: std.mem.Allocator, machine: *MachineFu
         40 => try machine.instructions.append(allocator, .add_rsp_40),
         56 => try machine.instructions.append(allocator, .add_rsp_56),
         else => {
-            if (bytes <= std.math.maxInt(u8)) {
+            if (bytes <= std.math.maxInt(i8)) {
                 try machine.instructions.append(allocator, .{ .add_rsp_imm8 = @intCast(bytes) });
             } else if (bytes <= std.math.maxInt(u32)) {
                 try machine.instructions.append(allocator, .{ .add_rsp_imm32 = @intCast(bytes) });
@@ -1530,7 +1530,7 @@ pub fn lowerI32AddTreeReturn(
                 if (try registerParamRegOrNull(function, name, .{ .int = 32 })) |reg| {
                     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = reg } });
                 } else if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
-                    if (offset <= std.math.maxInt(u8)) {
+                    if (offset <= std.math.maxInt(i8)) {
                         try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = @intCast(offset) });
                     } else {
                         try machine.instructions.append(allocator, .{ .add_stack_disp32_eax = offset });
@@ -1700,7 +1700,7 @@ pub fn appendI32AddTermToEax(
                 return;
             }
             if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
-                if (offset <= std.math.maxInt(u8)) {
+                if (offset <= std.math.maxInt(i8)) {
                     try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = @intCast(offset) });
                 } else {
                     try machine.instructions.append(allocator, .{ .add_stack_disp32_eax = offset });
@@ -2013,7 +2013,7 @@ pub fn emitI32ParamOrStackIntoEax(
         return true;
     }
     if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
-        if (offset <= std.math.maxInt(u8)) {
+        if (offset <= std.math.maxInt(i8)) {
             try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(offset) });
         } else {
             try machine.instructions.append(allocator, .{ .load_stack_disp32_rax = offset });
@@ -2061,7 +2061,7 @@ pub fn lowerGenericCfgGprParamReturn(
     if (try registerParamRegOrNull(function, name, ret.ty)) |reg| {
         try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
     } else if (try stackParamDisp8OrNull(function, name, ret.ty)) |offset| {
-        if (offset <= std.math.maxInt(u8)) {
+        if (offset <= std.math.maxInt(i8)) {
             try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(offset) });
         } else {
             try machine.instructions.append(allocator, .{ .load_stack_disp32_rax = offset });

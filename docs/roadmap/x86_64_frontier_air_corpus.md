@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=588
-structured_functions=588
-generic_codegen_functions=588
-generic_cfg_functions=588
+discovered_functions=589
+structured_functions=589
+generic_codegen_functions=589
+generic_cfg_functions=589
 structural_matcher_functions=0
-structured_air_v2_functions=588
-typed_air_operand_functions=588
+structured_air_v2_functions=589
+typed_air_operand_functions=589
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=588
+generic_lowering_functions=589
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=588
+object_emitted_functions=589
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -118,7 +118,7 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 588-function strict frontier
+are not counted in the accepted 13-source / 589-function strict frontier
 executable proof. Stack-pressure forwarding for the previous Big80/Big81/Big96/Big128/Big160/Big192/Big224
 indirect and stack-source rows is now accepted in the frontier corpus; the
 boundary gate keeps `stack_pressure_boundary_rows=0` as a regression guard.

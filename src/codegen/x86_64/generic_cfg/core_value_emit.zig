@@ -90,7 +90,7 @@ pub fn emitGenericCfgI32ValueIntoEax(
                             }
                             if (try stackParamDisp8OrNull(function, rhs_name, .{ .int = 32 })) |offset| {
                                 if (op != .add) return error.UnsupportedCodegenInstruction;
-                                if (offset <= std.math.maxInt(u8)) {
+                                if (offset <= std.math.maxInt(i8)) {
                                     try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = @intCast(offset) });
                                 } else {
                                     try machine.instructions.append(allocator, .{ .add_stack_disp32_eax = offset });
@@ -145,7 +145,7 @@ pub fn emitGenericCfgI64ValueIntoRax(
                 error.UnsupportedCodegenValue => null,
                 else => return err,
             }) |offset| {
-                if (offset <= std.math.maxInt(u8)) {
+                if (offset <= std.math.maxInt(i8)) {
                     try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = @intCast(offset) });
                 } else {
                     try machine.instructions.append(allocator, .{ .load_stack_disp32_rax = offset });
@@ -185,7 +185,7 @@ pub fn emitGenericCfgI32AddValueToEax(
                 return;
             }
             if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
-                if (offset <= std.math.maxInt(u8)) {
+                if (offset <= std.math.maxInt(i8)) {
                     try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = @intCast(offset) });
                 } else {
                     try machine.instructions.append(allocator, .{ .add_stack_disp32_eax = offset });

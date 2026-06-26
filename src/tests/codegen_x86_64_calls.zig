@@ -1528,6 +1528,57 @@ test "x86_64 codegen preserves indirect two i32 call results across calls" {
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 4 });
 }
 
+test "x86_64 codegen uses disp32 for high incoming stack i32 addends" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc i32 @id(i32)
+        \\
+        \\define i32 @caller(i32 %arg0, i32 %arg1, i32 %arg2, i32 %arg3, i32 %arg4, i32 %arg5, i32 %arg6, i32 %arg7, i32 %arg8, i32 %arg9, i32 %arg10, i32 %arg11, i32 %arg12, i32 %arg13, i32 %arg14, i32 %arg15, i32 %arg16, i32 %arg17, i32 %arg18, i32 %arg19, i32 %arg20, i32 %arg21, i32 %arg22, i32 %arg23) {
+        \\entry:
+        \\  %call = call fastcc i32 @id(i32 %arg5)
+        \\  %sum01 = add i32 %arg0, %arg1
+        \\  %sum02 = add i32 %sum01, %arg2
+        \\  %sum03 = add i32 %sum02, %arg3
+        \\  %sum04 = add i32 %sum03, %arg4
+        \\  %sum05 = add i32 %sum04, %arg5
+        \\  %sum06 = add i32 %sum05, %arg6
+        \\  %sum07 = add i32 %sum06, %arg7
+        \\  %sum08 = add i32 %sum07, %arg8
+        \\  %sum09 = add i32 %sum08, %arg9
+        \\  %sum10 = add i32 %sum09, %arg10
+        \\  %sum11 = add i32 %sum10, %arg11
+        \\  %sum12 = add i32 %sum11, %arg12
+        \\  %sum13 = add i32 %sum12, %arg13
+        \\  %sum14 = add i32 %sum13, %arg14
+        \\  %sum15 = add i32 %sum14, %arg15
+        \\  %sum16 = add i32 %sum15, %arg16
+        \\  %sum17 = add i32 %sum16, %arg17
+        \\  %sum18 = add i32 %sum17, %arg18
+        \\  %sum19 = add i32 %sum18, %arg19
+        \\  %sum20 = add i32 %sum19, %arg20
+        \\  %sum21 = add i32 %sum20, %arg21
+        \\  %sum22 = add i32 %sum21, %arg22
+        \\  %sum23 = add i32 %sum22, %arg23
+        \\  %result = add i32 %sum23, %call
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 120 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp32_eax = 128 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp32_eax = 136 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp32_eax = 144 });
+}
+
 test "x86_64 codegen preserves i64 pointer-callee result across later pointer-callee void call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

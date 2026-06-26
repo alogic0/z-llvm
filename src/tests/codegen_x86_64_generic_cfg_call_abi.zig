@@ -2508,7 +2508,7 @@ test "x86_64 codegen accepts max-sized byval stack-copy payload" {
     var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
     defer machine.deinit(std.testing.allocator);
     try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 0 } });
-    try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 184 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .load_arg_ptr_disp32_rax = .{ .reg = .rdi, .offset = 184 } });
     try expectMachineInstruction(machine.instructions.items, .{ .add_rsp_imm32 = 200 });
 }
 
