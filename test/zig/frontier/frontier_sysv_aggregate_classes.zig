@@ -506,6 +506,18 @@ export fn frontier_stack_array_double_call_sum(a0: f64, a1: f64, a2: f64, a3: f6
     return helperArrayDoubleSum(value);
 }
 
+export fn frontier_stack_array_double_forward_after_pressure(a0: f64, a1: f64, a2: f64, a3: f64, a4: f64, a5: f64, a6: f64, a7: f64, value: ArrayDouble) ArrayDouble {
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    _ = a6;
+    _ = a7;
+    return value;
+}
+
 export fn frontier_shifted_array_double_call_sum(prefix: f64, value: ArrayDouble) f64 {
     _ = prefix;
     return helperArrayDoubleSum(value);

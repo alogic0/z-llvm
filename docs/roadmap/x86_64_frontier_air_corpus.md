@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=459
-structured_functions=459
-generic_codegen_functions=459
-generic_cfg_functions=459
+discovered_functions=460
+structured_functions=460
+generic_codegen_functions=460
+generic_cfg_functions=460
 structural_matcher_functions=0
-structured_air_v2_functions=459
-typed_air_operand_functions=459
+structured_air_v2_functions=460
+typed_air_operand_functions=460
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=459
+generic_lowering_functions=460
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=459
+object_emitted_functions=460
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -242,7 +242,10 @@ Closed in the current memory/aggregate frontier slice:
   helper body adds both f32 fields through generic aggregate field-add
   lowering. The `frontier_stack_array_double_call_sum` row forwards a stack-passed SSE/SSE
   `[2]f64` aggregate into a private helper by loading the source stack
-  eightbytes into outgoing XMM aggregate slots
+  eightbytes into outgoing XMM aggregate slots; the
+  `frontier_stack_array_double_forward_after_pressure` row returns the same
+  stack-passed `[2]f64` aggregate by reloading caller-stack eightbytes into
+  `%xmm0`/`%xmm1`
 - first reversed mixed aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ double, i64 }`, selected
   `{ double, i32 }`, and selected `{ double, i32, i32 }` forms are classified as

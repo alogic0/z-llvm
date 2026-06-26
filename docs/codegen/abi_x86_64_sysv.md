@@ -80,6 +80,7 @@ selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream, including `[2]f64`, nested double leaves, and `[4]f32` split across two SSE eightbytes
 selected shifted SSE/SSE aggregate field reads and helper calls move `double` fields from higher XMM argument registers through the generic XMM move path
 selected deep stack-sourced SSE/SSE aggregate helper calls reload `[2]f64` eightbytes from disp32 stack offsets into outgoing XMM argument registers
+selected stack-passed SSE/SSE aggregate pass-through returns reload `[2]f64` caller-stack eightbytes into `%xmm0`/`%xmm1`
 selected stack-passed SSE/SSE aggregate helper calls load `[4]f32` fields from the caller and callee stack into arbitrary XMM temporaries with `movss`
 leaf functions only
 no stack frame for register-only leaf functions
@@ -256,6 +257,8 @@ reads and register aggregate return:
   layout-backed byte offsets
   both `double` leaves are read from the SysV SSE argument stream
   construction returns through %xmm0/%xmm1
+  stack-passed `[2]f64` aggregate pass-through returns reload both stack
+  eightbytes into `%xmm0`/`%xmm1`
 frontier_sysv_aggregate_classes.ReverseMixed proves the first reversed
 SSE/INTEGER aggregate argument field reads and register aggregate return:
   field `double` is returned from the aggregate's SSE class register

@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=459`,
-`generic_codegen_functions=459`, `generic_cfg_functions=459`,
+three release modes at `source_rows=13`, `discovered_functions=460`,
+`generic_codegen_functions=460`, `generic_cfg_functions=460`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=459`, `object_failures=0`,
+`object_emitted_functions=460`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -526,6 +526,8 @@ The stack-passed nested mixed forward row now reloads caller-stack aggregate
 eightbytes into `%rax`/`%xmm0` for a direct aggregate pass-through return.
 The stack-passed f32 frontier row forwards `[4]f32` after the SSE stream is
 exhausted and uses generic stack-to-XMM `movss` loads for helper-call sums.
+The stack-passed `[2]f64` forward row reloads SSE/SSE aggregate eightbytes from
+the caller stack into `%xmm0`/`%xmm1` for a direct pass-through return.
 The shifted `[2]f64` frontier rows move array-in-struct aggregate fields from
 `%xmm1`/`%xmm2` through the same generic XMM move path for field returns and
 helper-call sums.

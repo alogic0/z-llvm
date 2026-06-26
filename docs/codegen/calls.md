@@ -205,6 +205,8 @@ accepted frontier:
   using generic XMM moves from higher argument registers
   selected deep stack-sourced SSE/SSE `[2]f64` helper calls with disp32
   stack-source reloads into outgoing XMM aggregate registers
+  selected stack-sourced SSE/SSE `[2]f64` pass-through returns by reloading
+  incoming stack eightbytes into `%xmm0`/`%xmm1`
   selected stack-passed `[4]f32` aggregate helper calls with generic
   stack-to-XMM `movss` reloads
   selected stack-sourced INTEGER aggregate forwarding into outgoing GPR
@@ -506,6 +508,7 @@ selected reversed mixed SSE/INTEGER aggregate argument-field reads
 selected SSE/SSE aggregate argument-field reads and register returns
 selected deep stack-sourced SSE/SSE aggregate forwarding into outgoing XMM slots
 with disp32 reloads
+selected stack-sourced SSE/SSE pass-through returns into `%xmm0`/`%xmm1`
 selected shifted in-register mixed aggregate pass-through calls
 selected shifted in-register reversed mixed aggregate pass-through calls
 selected shifted nested mixed aggregate pass-through calls that move both GPR and SSE halves
