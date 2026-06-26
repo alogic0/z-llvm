@@ -230,7 +230,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 471,
+            .functions = 474,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1731,6 +1731,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct BigDoubleArray { double values[3]; };
     \\struct BigFloat { float a; float b; float c; float d; float e; };
     \\struct BigPtrDouble { const long long *ptr; double value; long long tag; };
+    \\struct BigPtrFloat { const long long *ptr; float value; long long tag; };
     \\struct BigArrayMixed { int ints[2]; double doubles[2]; const long long *ptr; };
     \\struct BigByteTail { unsigned char values[17]; };
     \\struct BigByteTail5 { unsigned char values[21]; };
@@ -1809,6 +1810,9 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigPtrDouble z_frontier_big_ptr_double_copy(struct BigPtrDouble) __asm__("frontier_sysv_sret_byval.frontier_big_ptr_double_copy");
     \\extern struct BigPtrDouble z_frontier_direct_big_ptr_double_copy(struct BigPtrDouble) __asm__("frontier_sysv_sret_byval.frontier_direct_big_ptr_double_copy");
     \\extern struct BigPtrDouble z_frontier_indirect_big_ptr_double_copy(struct BigPtrDouble (*)(struct BigPtrDouble), struct BigPtrDouble) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_ptr_double_copy");
+    \\extern struct BigPtrFloat z_frontier_big_ptr_float_copy(struct BigPtrFloat) __asm__("frontier_sysv_sret_byval.frontier_big_ptr_float_copy");
+    \\extern struct BigPtrFloat z_frontier_direct_big_ptr_float_copy(struct BigPtrFloat) __asm__("frontier_sysv_sret_byval.frontier_direct_big_ptr_float_copy");
+    \\extern struct BigPtrFloat z_frontier_indirect_big_ptr_float_copy(struct BigPtrFloat (*)(struct BigPtrFloat), struct BigPtrFloat) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_ptr_float_copy");
     \\extern struct BigArrayMixed z_frontier_big_array_mixed_copy(struct BigArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_big_array_mixed_copy");
     \\extern struct BigArrayMixed z_frontier_direct_big_array_mixed_copy(struct BigArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_direct_big_array_mixed_copy");
     \\extern struct BigArrayMixed z_frontier_indirect_big_array_mixed_copy(struct BigArrayMixed (*)(struct BigArrayMixed), struct BigArrayMixed) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_array_mixed_copy");
@@ -1982,6 +1986,13 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (direct_ptr_double.ptr != &pointed || *direct_ptr_double.ptr != 987654321LL || direct_ptr_double.value != 6.5 || direct_ptr_double.tag != 1234567LL) return 54;
     \\    struct BigPtrDouble indirect_ptr_double = z_frontier_indirect_big_ptr_double_copy(z_frontier_big_ptr_double_copy, ptr_double);
     \\    if (indirect_ptr_double.ptr != &pointed || *indirect_ptr_double.ptr != 987654321LL || indirect_ptr_double.value != 6.5 || indirect_ptr_double.tag != 1234567LL) return 55;
+    \\    struct BigPtrFloat ptr_float = { .ptr = &pointed, .value = 4.25f, .tag = 7654321LL };
+    \\    struct BigPtrFloat copied_ptr_float = z_frontier_big_ptr_float_copy(ptr_float);
+    \\    if (copied_ptr_float.ptr != &pointed || *copied_ptr_float.ptr != 987654321LL || copied_ptr_float.value != 4.25f || copied_ptr_float.tag != 7654321LL) return 227;
+    \\    struct BigPtrFloat direct_ptr_float = z_frontier_direct_big_ptr_float_copy(ptr_float);
+    \\    if (direct_ptr_float.ptr != &pointed || *direct_ptr_float.ptr != 987654321LL || direct_ptr_float.value != 4.25f || direct_ptr_float.tag != 7654321LL) return 228;
+    \\    struct BigPtrFloat indirect_ptr_float = z_frontier_indirect_big_ptr_float_copy(z_frontier_big_ptr_float_copy, ptr_float);
+    \\    if (indirect_ptr_float.ptr != &pointed || *indirect_ptr_float.ptr != 987654321LL || indirect_ptr_float.value != 4.25f || indirect_ptr_float.tag != 7654321LL) return 229;
     \\    struct BigArrayMixed array_mixed = { .ints = { 101, 103 }, .doubles = { 10.5, 11.25 }, .ptr = &pointed };
     \\    struct BigArrayMixed copied_array_mixed = z_frontier_big_array_mixed_copy(array_mixed);
     \\    if (copied_array_mixed.ints[0] != 101 || copied_array_mixed.ints[1] != 103 || copied_array_mixed.doubles[0] != 10.5 || copied_array_mixed.doubles[1] != 11.25 || copied_array_mixed.ptr != &pointed || *copied_array_mixed.ptr != 987654321LL) return 76;

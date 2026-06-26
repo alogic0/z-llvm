@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=471`,
-`generic_codegen_functions=471`, `generic_cfg_functions=471`,
+three release modes at `source_rows=13`, `discovered_functions=474`,
+`generic_codegen_functions=474`, `generic_cfg_functions=474`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=471`, `object_failures=0`,
+`object_emitted_functions=474`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -641,11 +641,12 @@ sret/byval field/copy forms currently proven through thirty-two flat fields and 
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy and
 array-backed `{ [5 x i64] }` copy/read rows plus the BigN-backed `Big20`
 construction/copy rows and the first double-leaf `BigDouble` byval-to-sret
-copy row plus `BigPtrDouble` pointer/`double`/`i64` byval-to-sret copy row,
+copy row plus `BigPtrDouble` pointer/`double`/`i64` and `BigPtrFloat`
+pointer/`float`/`i64` byval-to-sret copy rows,
 `BigFloat` five-`f32` byval-to-sret copy row, `BigDoubleArray`
 array-of-double byval-to-sret copy row, `BigArrayMixed` array/pointer mixed
 byval-to-sret copy row, and direct/indirect MEMORY aggregate calls for Big3,
-Big4, Big5, BigDouble, BigDoubleArray, BigArrayMixed, BigFloat, BigPtrDouble,
+Big4, Big5, BigDouble, BigDoubleArray, BigArrayMixed, BigFloat, BigPtrDouble, BigPtrFloat,
 BigNested, BigMixed, BigNarrow, BigArray, ScalarMixed, ScalarNested, and ScalarArray; Big32 and Big40 extend the same
 planner-owned copy path through exact-qword MEMORY payloads beyond byte-offset
 byval loads, including disp32 source-pointer reloads and stack-sourced Big40
