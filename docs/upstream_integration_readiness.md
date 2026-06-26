@@ -681,6 +681,17 @@ progress, executable progress, and strict counter checks. It requires the
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
+
+Source-backed ABI boundary proof is tracked separately by
+`zig build distribution-air-release-frontier-boundaries`. It runs
+`test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
+ReleaseSmall and currently reports per mode: `source_rows=2`,
+`discovered_functions=4`, `varargs_boundary_rows=2`,
+`vector_boundary_rows=2`, `x87_boundary_rows=0`,
+`packed_aggregate_boundary_rows=0`, `unexpected_accept_rows=0`,
+`wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
+`local_fail=0`. These rows prove explicit fail-closed ABI boundaries and are
+not part of the accepted executable frontier counters.
 The selected slice-panic runtime-call row now uses the release generic CFG
 slice runtime-call helper subset, which derives direct integer lengths and
 `{ ptr, i64 }` aggregate slice constant lengths, i64 parameter lengths, loaded

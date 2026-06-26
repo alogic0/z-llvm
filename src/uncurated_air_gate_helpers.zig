@@ -21,6 +21,7 @@ pub const Options = struct {
     native_link_progress: bool = false,
     executable_progress: bool = false,
     strict_finish: bool = false,
+    abi_boundary_expectations: bool = false,
 };
 
 pub const Mode = enum {
@@ -59,6 +60,7 @@ pub const Corpus = enum {
     expanded,
     scale,
     frontier,
+    frontier_boundaries,
 
     pub fn name(self: Corpus) []const u8 {
         return switch (self) {
@@ -67,6 +69,7 @@ pub const Corpus = enum {
             .expanded => "expanded",
             .scale => "scale",
             .frontier => "frontier",
+            .frontier_boundaries => "frontier-boundaries",
         };
     }
 };
@@ -94,6 +97,8 @@ pub fn parseOptions(args: std.process.Args) !Options {
             options.corpus = .scale;
         } else if (std.mem.eql(u8, arg, "--corpus=frontier")) {
             options.corpus = .frontier;
+        } else if (std.mem.eql(u8, arg, "--corpus=frontier-boundaries")) {
+            options.corpus = .frontier_boundaries;
         } else if (std.mem.eql(u8, arg, "--object-progress")) {
             options.object_progress = true;
         } else if (std.mem.eql(u8, arg, "--object-inspection")) {
@@ -104,6 +109,8 @@ pub fn parseOptions(args: std.process.Args) !Options {
             options.executable_progress = true;
         } else if (std.mem.eql(u8, arg, "--strict-finish")) {
             options.strict_finish = true;
+        } else if (std.mem.eql(u8, arg, "--abi-boundary-expectations")) {
+            options.abi_boundary_expectations = true;
         } else {
             return error.UnsupportedUncuratedAirArgument;
         }
@@ -238,7 +245,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
                 .runtime_boundary_rows = 0,
             },
         },
-        .inputs => null,
+        .inputs, .frontier_boundaries => null,
     };
 }
 
@@ -2535,6 +2542,15 @@ pub fn collectSources(allocator: std.mem.Allocator, io: std.Io, corpus: Corpus) 
     }
     if (corpus == .frontier) {
         try collectSourcesFromRoot(allocator, io, &sources, "test/zig/frontier");
+        std.mem.sort([]const u8, sources.items, {}, struct {
+            fn lessThan(_: void, lhs: []const u8, rhs: []const u8) bool {
+                return std.mem.lessThan(u8, lhs, rhs);
+            }
+        }.lessThan);
+        return sources.toOwnedSlice(allocator);
+    }
+    if (corpus == .frontier_boundaries) {
+        try collectSourcesFromRoot(allocator, io, &sources, "test/zig/frontier_boundaries");
         std.mem.sort([]const u8, sources.items, {}, struct {
             fn lessThan(_: void, lhs: []const u8, rhs: []const u8) bool {
                 return std.mem.lessThan(u8, lhs, rhs);

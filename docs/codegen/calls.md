@@ -415,11 +415,13 @@ The first slice rejects:
 
 ```text
 inline assembly calls
-direct and function-pointer varargs (`UnsupportedVarargsAbi`); excluded from
-  the current release claim until a SysV varargs `%al`/register-save-area
+direct and function-pointer varargs (`UnsupportedVarargsAbi`); source-backed
+  fail-closed by `distribution-air-release-frontier-boundaries` and excluded
+  from the current release claim until a SysV varargs `%al`/register-save-area
   policy is implemented
 vectors, including vector-containing aggregate ABI forms and vector
-  `sret`/`byval` payloads (`UnsupportedVectorAbi`)
+  `sret`/`byval` payloads (`UnsupportedVectorAbi`); source-backed fail-closed
+  by `distribution-air-release-frontier-boundaries`
 X87 / long double, including aggregate-contained long-double leaves and
   long-double `sret`/`byval` payloads (`UnsupportedLongDoubleAbi`)
 packed aggregate ABI call/return forms, including direct planner inputs and

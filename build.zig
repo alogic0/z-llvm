@@ -202,6 +202,12 @@ pub fn build(b: *std.Build) void {
         .variant = .executable_strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
+        .name = "distribution-air-release-frontier-boundaries",
+        .description = "Expected fail-closed x86_64 release frontier ABI boundary gate for varargs and vectors",
+        .corpus = "frontier-boundaries",
+        .variant = .abi_boundary_expectations,
+    });
+    _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-zig-air-uncurated-release-expanded-finish",
         .description = "Strict finish-line gate for expanded x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR v2 ownership and object emission",
         .corpus = "expanded",
@@ -286,6 +292,7 @@ const UncuratedAirVariant = enum {
     object_executable_progress,
     strict_finish,
     executable_strict_finish,
+    abi_boundary_expectations,
 };
 
 const UncuratedAirGateSpec = struct {
@@ -349,6 +356,7 @@ fn addUncuratedAirArgs(run_cmd: *std.Build.Step.Run, spec: UncuratedAirGateSpec)
             run_cmd.addArg("--executable-progress");
             run_cmd.addArg("--strict-finish");
         },
+        .abi_boundary_expectations => run_cmd.addArg("--abi-boundary-expectations"),
     }
 }
 
@@ -373,6 +381,8 @@ fn addUncuratedAirCorpusArg(run_cmd: *std.Build.Step.Run, corpus: []const u8) vo
         run_cmd.addArg("--corpus=scale");
     } else if (std.mem.eql(u8, corpus, "frontier")) {
         run_cmd.addArg("--corpus=frontier");
+    } else if (std.mem.eql(u8, corpus, "frontier-boundaries")) {
+        run_cmd.addArg("--corpus=frontier-boundaries");
     } else {
         @panic("unknown uncurated AIR corpus");
     }

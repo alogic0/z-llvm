@@ -97,6 +97,12 @@ fn runMode(init: std.process.Init, options: Options) !void {
     var typed_v2_fallback_functions: usize = 0;
     var object_failures: usize = 0;
     var native_link_failures: usize = 0;
+    var varargs_boundary_rows: usize = 0;
+    var vector_boundary_rows: usize = 0;
+    var x87_boundary_rows: usize = 0;
+    var packed_aggregate_boundary_rows: usize = 0;
+    var unexpected_accept_rows: usize = 0;
+    var wrong_diagnostic_rows: usize = 0;
     var first_unsupported_source: ?[]const u8 = null;
     defer if (first_unsupported_source) |value| allocator.free(value);
     var first_unsupported_function: ?[]const u8 = null;
@@ -239,6 +245,27 @@ fn runMode(init: std.process.Init, options: Options) !void {
         }
         unsupported_functions += lowered.unsupported.len;
         for (lowered.unsupported) |diagnostic| {
+            if (options.abi_boundary_expectations) {
+                if (boundaryCategoryForUnsupported(source, diagnostic)) |category| {
+                    switch (category) {
+                        .varargs => varargs_boundary_rows += 1,
+                        .vector => vector_boundary_rows += 1,
+                        .x87 => x87_boundary_rows += 1,
+                        .packed_aggregate => packed_aggregate_boundary_rows += 1,
+                    }
+                    std.debug.print(
+                        "abi-boundary source={s} function={s} category={s} diagnostic={s}\n",
+                        .{ source, diagnostic.function, category.name(), category.diagnosticName() },
+                    );
+                    continue;
+                }
+                wrong_diagnostic_rows += 1;
+                std.debug.print(
+                    "abi-boundary-failure source={s} function={s} expected=targeted-abi-boundary actual={s}/{s}\n",
+                    .{ source, diagnostic.function, diagnostic.opcode, @tagName(diagnostic.reason) },
+                );
+                continue;
+            }
             if (diagnostic.reason == .opcode or diagnostic.reason == .control_flow_shape) {
                 try incrementCount(allocator, &unsupported_counts, diagnostic.opcode);
             }
@@ -258,11 +285,51 @@ fn runMode(init: std.process.Init, options: Options) !void {
             machines.deinit(allocator);
         }
         for (lowered.module.functions.items) |function| {
-            const machine = codegen.x86_64.lowerFunction(
+            var machine = codegen.x86_64.lowerFunction(
                 allocator,
                 "x86_64-unknown-linux-gnu",
                 function,
             ) catch |err| {
+                if (options.abi_boundary_expectations) {
+                    switch (err) {
+                        error.UnsupportedVarargsAbi => {
+                            varargs_boundary_rows += 1;
+                            std.debug.print(
+                                "abi-boundary source={s} function={s} category=varargs diagnostic=UnsupportedVarargsAbi\n",
+                                .{ source, function.name },
+                            );
+                        },
+                        error.UnsupportedVectorAbi => {
+                            vector_boundary_rows += 1;
+                            std.debug.print(
+                                "abi-boundary source={s} function={s} category=vector diagnostic=UnsupportedVectorAbi\n",
+                                .{ source, function.name },
+                            );
+                        },
+                        error.UnsupportedLongDoubleAbi => {
+                            x87_boundary_rows += 1;
+                            std.debug.print(
+                                "abi-boundary source={s} function={s} category=x87 diagnostic=UnsupportedLongDoubleAbi\n",
+                                .{ source, function.name },
+                            );
+                        },
+                        error.UnsupportedPackedAggregateAbi => {
+                            packed_aggregate_boundary_rows += 1;
+                            std.debug.print(
+                                "abi-boundary source={s} function={s} category=packed-aggregate diagnostic=UnsupportedPackedAggregateAbi\n",
+                                .{ source, function.name },
+                            );
+                        },
+                        else => {
+                            wrong_diagnostic_rows += 1;
+                            std.debug.print(
+                                "abi-boundary-failure source={s} function={s} expected=UnsupportedVarargsAbi-or-UnsupportedVectorAbi actual={s}\n",
+                                .{ source, function.name, @errorName(err) },
+                            );
+                        },
+                    }
+                    continue;
+                }
                 codegen_failures += 1;
                 std.debug.print(
                     "unsupported-codegen source={s} function={s} error={s}\n",
@@ -270,6 +337,15 @@ fn runMode(init: std.process.Init, options: Options) !void {
                 );
                 continue;
             };
+            if (options.abi_boundary_expectations) {
+                unexpected_accept_rows += 1;
+                std.debug.print(
+                    "abi-boundary-failure source={s} function={s} expected=unsupported actual=accepted\n",
+                    .{ source, function.name },
+                );
+                machine.deinit(allocator);
+                continue;
+            }
             try machines.append(allocator, machine);
             generic_codegen_functions += 1;
             const codegen_path = machines.items[machines.items.len - 1].codegen_path;
@@ -499,6 +575,37 @@ fn runMode(init: std.process.Init, options: Options) !void {
             },
         );
     }
+    if (options.abi_boundary_expectations) {
+        const boundary_local_fail: usize = if (options.corpus == .frontier_boundaries and
+            source_rows == 2 and
+            discovered_functions == 4 and
+            varargs_boundary_rows == 2 and
+            vector_boundary_rows == 2 and
+            x87_boundary_rows == 0 and
+            packed_aggregate_boundary_rows == 0 and
+            unexpected_accept_rows == 0 and
+            wrong_diagnostic_rows == 0)
+            0
+        else
+            1;
+        std.debug.print(
+            "summary uncurated-zig-air-abi-boundaries mode={s} corpus={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} varargs_boundary_rows={} vector_boundary_rows={} x87_boundary_rows={} packed_aggregate_boundary_rows={} unexpected_accept_rows={} wrong_diagnostic_rows={} llvm_targetmachine_rows=0 lld_rows=0 local_fail={}\n",
+            .{
+                mode.name(),
+                options.corpus.name(),
+                source_rows,
+                discovered_functions,
+                varargs_boundary_rows,
+                vector_boundary_rows,
+                x87_boundary_rows,
+                packed_aggregate_boundary_rows,
+                unexpected_accept_rows,
+                wrong_diagnostic_rows,
+                boundary_local_fail,
+            },
+        );
+        if (boundary_local_fail != 0) return error.AbiBoundaryExpectationFailed;
+    }
 
     if (air_local_fail != 0) return error.ExpandedCorpusLocalFailure;
     if ((options.native_link_progress or options.executable_progress) and
@@ -568,4 +675,45 @@ const classifyNativeLinkFailure = helpers.classifyNativeLinkFailure;
 const cloneEnvironment = helpers.cloneEnvironment;
 const incrementCount = helpers.incrementCount;
 const collectSources = helpers.collectSources;
+
+const BoundaryCategory = enum {
+    varargs,
+    vector,
+    x87,
+    packed_aggregate,
+
+    fn name(self: BoundaryCategory) []const u8 {
+        return switch (self) {
+            .varargs => "varargs",
+            .vector => "vector",
+            .x87 => "x87",
+            .packed_aggregate => "packed-aggregate",
+        };
+    }
+
+    fn diagnosticName(self: BoundaryCategory) []const u8 {
+        return switch (self) {
+            .varargs => "UnsupportedVarargsAbi",
+            .vector => "UnsupportedVectorAbi",
+            .x87 => "UnsupportedLongDoubleAbi",
+            .packed_aggregate => "UnsupportedPackedAggregateAbi",
+        };
+    }
+};
+
+fn boundaryCategoryForUnsupported(source: []const u8, diagnostic: air_lowering.Diagnostic) ?BoundaryCategory {
+    if (std.mem.indexOf(u8, source, "frontier_varargs_boundary.zig") != null and
+        std.mem.eql(u8, diagnostic.opcode, "lowering") and
+        diagnostic.reason == .instruction_type)
+    {
+        return .varargs;
+    }
+    if (std.mem.indexOf(u8, source, "frontier_vector_boundary.zig") != null and
+        std.mem.eql(u8, diagnostic.opcode, "function-type") and
+        diagnostic.reason == .function_type)
+    {
+        return .vector;
+    }
+    return null;
+}
 const firstLine = helpers.firstLine;

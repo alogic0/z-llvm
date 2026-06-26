@@ -8,6 +8,7 @@ const usage =
     \\The frontier gate log must contain complete ReleaseFast, ReleaseSafe, and ReleaseSmall summaries.
     \\Currently supported gates:
     \\  distribution-air-release-frontier
+    \\  distribution-air-release-frontier-boundaries
     \\
 ;
 
@@ -55,6 +56,20 @@ const CounterSet = struct {
     runtime_boundary_rows: usize = 0,
     unsupported_zig_linker_feature_rows: usize = 0,
     native_link_failures: usize = 0,
+    llvm_targetmachine_rows: usize = 0,
+    lld_rows: usize = 0,
+    local_fail: usize = 0,
+};
+
+const BoundaryCounterSet = struct {
+    source_rows: usize = 0,
+    discovered_functions: usize = 0,
+    varargs_boundary_rows: usize = 0,
+    vector_boundary_rows: usize = 0,
+    x87_boundary_rows: usize = 0,
+    packed_aggregate_boundary_rows: usize = 0,
+    unexpected_accept_rows: usize = 0,
+    wrong_diagnostic_rows: usize = 0,
     llvm_targetmachine_rows: usize = 0,
     lld_rows: usize = 0,
     local_fail: usize = 0,
@@ -114,6 +129,11 @@ const Field = struct {
     value: *const fn (CounterSet) usize,
 };
 
+const BoundaryField = struct {
+    name: []const u8,
+    value: *const fn (BoundaryCounterSet) usize,
+};
+
 const fields = [_]Field{
     .{ .name = "source_rows", .value = fieldSourceRows },
     .{ .name = "discovered_functions", .value = fieldDiscoveredFunctions },
@@ -142,6 +162,20 @@ const fields = [_]Field{
     .{ .name = "local_fail", .value = fieldLocalFail },
 };
 
+const boundary_fields = [_]BoundaryField{
+    .{ .name = "source_rows", .value = boundaryFieldSourceRows },
+    .{ .name = "discovered_functions", .value = boundaryFieldDiscoveredFunctions },
+    .{ .name = "varargs_boundary_rows", .value = boundaryFieldVarargsRows },
+    .{ .name = "vector_boundary_rows", .value = boundaryFieldVectorRows },
+    .{ .name = "x87_boundary_rows", .value = boundaryFieldX87Rows },
+    .{ .name = "packed_aggregate_boundary_rows", .value = boundaryFieldPackedRows },
+    .{ .name = "unexpected_accept_rows", .value = boundaryFieldUnexpectedAcceptRows },
+    .{ .name = "wrong_diagnostic_rows", .value = boundaryFieldWrongDiagnosticRows },
+    .{ .name = "llvm_targetmachine_rows", .value = boundaryFieldLlvmTargetmachineRows },
+    .{ .name = "lld_rows", .value = boundaryFieldLldRows },
+    .{ .name = "local_fail", .value = boundaryFieldLocalFail },
+};
+
 const Section = struct {
     start: []const u8,
     end: ?[]const u8 = null,
@@ -151,16 +185,59 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
     const options = try parseArgs(allocator, io, init);
-    if (!std.mem.eql(u8, options.gate, "distribution-air-release-frontier")) {
+    if (!std.mem.eql(u8, options.gate, "distribution-air-release-frontier") and
+        !std.mem.eql(u8, options.gate, "distribution-air-release-frontier-boundaries"))
+    {
         try common.validationError(io, "unsupported gate: {s}\n{s}", .{ options.gate, usage });
     }
 
     const log = try std.Io.Dir.cwd().readFileAlloc(io, options.from_log, allocator, .limited(128 * 1024 * 1024));
     defer allocator.free(log);
 
+    if (std.mem.eql(u8, options.gate, "distribution-air-release-frontier-boundaries")) {
+        const counters = try parseFrontierBoundaryGateLog(io, log);
+        var changed_files: usize = 0;
+        changed_files += try updateBoundaryLineFilteredFile(allocator, io, "docs/build_steps.md", counters, &.{
+            "`zig build distribution-air-release-frontier-boundaries`",
+        });
+        changed_files += try updateBoundarySectionFile(allocator, io, "docs/roadmap/x86_64_frontier_air_corpus.md", counters, &.{
+            .{ .start = "Source-backed ABI boundary proof is green", .end = "Executable ABI proof" },
+        });
+        changed_files += try updateBoundarySectionFile(allocator, io, "docs/upstream_integration_readiness.md", counters, &.{
+            .{ .start = "Source-backed ABI boundary proof is tracked separately", .end = "The selected slice-panic" },
+        });
+        changed_files += try updateBoundarySectionFile(allocator, io, "docs/next_steps.md", counters, &.{
+            .{ .start = "Source-backed ABI boundaries are now measured separately", .end = "Typed AIR v2 pointer-callee" },
+        });
+        changed_files += try updateBoundarySectionFile(allocator, io, "docs/roadmap/x86_64_distribution_replacement_matrix.md", counters, &.{
+            .{ .start = "source-backed fail-closed varargs/vector boundary proof", .end = "while arbitrary" },
+        });
+
+        var stdout_buffer: [512]u8 = undefined;
+        var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+        try stdout_writer.interface.print(
+            "updated-doc-counters gate={s} source_rows={} discovered_functions={} varargs_boundary_rows={} vector_boundary_rows={} changed_files={}\n",
+            .{
+                options.gate,
+                counters.source_rows,
+                counters.discovered_functions,
+                counters.varargs_boundary_rows,
+                counters.vector_boundary_rows,
+                changed_files,
+            },
+        );
+        try stdout_writer.interface.flush();
+        return;
+    }
+
     const counters = try parseFrontierGateLog(io, log);
     var changed_files: usize = 0;
-    changed_files += try updateWholeFile(allocator, io, "docs/roadmap/x86_64_frontier_air_corpus.md", counters);
+    changed_files += try updateSectionFile(allocator, io, "docs/roadmap/x86_64_frontier_air_corpus.md", counters, &.{
+        .{ .start = "Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:", .end = "Object inspection is green" },
+        .{ .start = "Object inspection is green", .end = "Native-link progress is green" },
+        .{ .start = "Native-link progress is green", .end = "Source-backed ABI boundary proof" },
+        .{ .start = "Executable ABI proof is green", .end = "Closed in the current runtime/safety-edge slice:" },
+    });
     changed_files += try updateLineFilteredFile(allocator, io, "docs/build_steps.md", counters, &.{
         "`zig build distribution-zig-air-uncurated-releasefast-frontier`",
         "`zig build distribution-zig-air-uncurated-releasesafe-frontier`",
@@ -172,10 +249,10 @@ pub fn main(init: std.process.Init) !void {
         .{ .start = "Next corpus frontier:", .end = "Strict release baselines" },
     });
     changed_files += try updateSectionFile(allocator, io, "docs/upstream_integration_readiness.md", counters, &.{
-        .{ .start = "`distribution-zig-air-uncurated-release-frontier` covers only", .end = "Strict release baselines" },
+        .{ .start = "`distribution-zig-air-uncurated-release-frontier` covers only", .end = "Source-backed ABI boundary proof" },
     });
     changed_files += try updateSectionFile(allocator, io, "docs/roadmap/x86_64_distribution_replacement_matrix.md", counters, &.{
-        .{ .start = "The next corpus frontier is isolated", .end = "The memory and" },
+        .{ .start = "The next corpus frontier is isolated", .end = "source-backed fail-closed varargs/vector boundary proof" },
     });
 
     var stdout_buffer: [512]u8 = undefined;
@@ -247,6 +324,29 @@ fn parseFrontierGateLog(io: std.Io, log: []const u8) !CounterSet {
     return parsed.merged(io);
 }
 
+fn parseFrontierBoundaryGateLog(io: std.Io, log: []const u8) !BoundaryCounterSet {
+    var result: ?BoundaryCounterSet = null;
+    var complete_modes: usize = 0;
+    var lines = std.mem.splitScalar(u8, log, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trimEnd(u8, raw_line, "\r");
+        if (!std.mem.startsWith(u8, line, "summary uncurated-zig-air-abi-boundaries")) continue;
+        if (!hasToken(line, "corpus=frontier-boundaries")) continue;
+        _ = parseModeToken(line) orelse continue;
+        const counters = parseBoundaryCounterLine(line);
+        complete_modes += 1;
+        if (result) |expected| {
+            try expectSameBoundaryCounters(io, expected, counters);
+        } else {
+            result = counters;
+        }
+    }
+    if (complete_modes != 3) {
+        try common.validationError(io, "incomplete frontier boundary gate log: expected 3 complete release mode summaries, found {}\n", .{complete_modes});
+    }
+    return result orelse try common.validationError(io, "missing frontier boundary gate summaries in log\n", .{});
+}
+
 fn parseModeToken(line: []const u8) ?Mode {
     const prefix = "mode=";
     const start = (std.mem.indexOf(u8, line, prefix) orelse return null) + prefix.len;
@@ -279,6 +379,22 @@ fn parseCounterLine(line: []const u8) CounterSet {
         .runtime_boundary_rows = parseField(line, "runtime_boundary_rows") orelse 0,
         .unsupported_zig_linker_feature_rows = parseField(line, "unsupported_zig_linker_feature_rows") orelse 0,
         .native_link_failures = parseField(line, "native_link_failures") orelse 0,
+        .llvm_targetmachine_rows = parseField(line, "llvm_targetmachine_rows") orelse 0,
+        .lld_rows = parseField(line, "lld_rows") orelse 0,
+        .local_fail = parseField(line, "local_fail") orelse 0,
+    };
+}
+
+fn parseBoundaryCounterLine(line: []const u8) BoundaryCounterSet {
+    return .{
+        .source_rows = parseField(line, "source_rows") orelse 0,
+        .discovered_functions = parseField(line, "discovered_functions") orelse 0,
+        .varargs_boundary_rows = parseField(line, "varargs_boundary_rows") orelse 0,
+        .vector_boundary_rows = parseField(line, "vector_boundary_rows") orelse 0,
+        .x87_boundary_rows = parseField(line, "x87_boundary_rows") orelse 0,
+        .packed_aggregate_boundary_rows = parseField(line, "packed_aggregate_boundary_rows") orelse 0,
+        .unexpected_accept_rows = parseField(line, "unexpected_accept_rows") orelse 0,
+        .wrong_diagnostic_rows = parseField(line, "wrong_diagnostic_rows") orelse 0,
         .llvm_targetmachine_rows = parseField(line, "llvm_targetmachine_rows") orelse 0,
         .lld_rows = parseField(line, "lld_rows") orelse 0,
         .local_fail = parseField(line, "local_fail") orelse 0,
@@ -378,6 +494,76 @@ fn updateSectionFile(
     return try writeIfChanged(io, path, contents, updated);
 }
 
+fn updateBoundaryLineFilteredFile(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    counters: BoundaryCounterSet,
+    required_texts: []const []const u8,
+) !usize {
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(16 * 1024 * 1024));
+    defer allocator.free(contents);
+    var output: std.ArrayList(u8) = .empty;
+    errdefer output.deinit(allocator);
+
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        const updated_line = if (containsAny(line, required_texts))
+            try updateBoundaryTextCounters(allocator, line, counters, .all)
+        else
+            try allocator.dupe(u8, line);
+        defer allocator.free(updated_line);
+        try output.appendSlice(allocator, updated_line);
+        if (lines.index != null) try output.append(allocator, '\n');
+    }
+    const updated = try output.toOwnedSlice(allocator);
+    defer allocator.free(updated);
+    return try writeIfChanged(io, path, contents, updated);
+}
+
+fn updateBoundarySectionFile(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    counters: BoundaryCounterSet,
+    sections: []const Section,
+) !usize {
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(16 * 1024 * 1024));
+    defer allocator.free(contents);
+    var output: std.ArrayList(u8) = .empty;
+    errdefer output.deinit(allocator);
+
+    var active: ?usize = null;
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        if (active == null) {
+            for (sections, 0..) |section, index| {
+                if (std.mem.indexOf(u8, line, section.start) != null) {
+                    active = index;
+                    break;
+                }
+            }
+        }
+
+        const updated_line = if (active != null)
+            try updateBoundaryTextCounters(allocator, line, counters, .all)
+        else
+            try allocator.dupe(u8, line);
+        defer allocator.free(updated_line);
+        try output.appendSlice(allocator, updated_line);
+        if (lines.index != null) try output.append(allocator, '\n');
+
+        if (active) |section_index| {
+            if (sections[section_index].end) |end_marker| {
+                if (std.mem.indexOf(u8, line, end_marker) != null) active = null;
+            }
+        }
+    }
+    const updated = try output.toOwnedSlice(allocator);
+    defer allocator.free(updated);
+    return try writeIfChanged(io, path, contents, updated);
+}
+
 const UpdateMode = enum { none, all };
 
 fn updateTextCounters(
@@ -397,6 +583,23 @@ fn updateTextCounters(
     const compact = try replaceCompactSourceFunction(allocator, current, counters);
     allocator.free(current);
     return compact;
+}
+
+fn updateBoundaryTextCounters(
+    allocator: std.mem.Allocator,
+    text: []const u8,
+    counters: BoundaryCounterSet,
+    mode: UpdateMode,
+) ![]u8 {
+    if (mode == .none) return allocator.dupe(u8, text);
+    var current = try allocator.dupe(u8, text);
+    errdefer allocator.free(current);
+    for (boundary_fields) |field| {
+        const next = try replaceCounterField(allocator, current, field.name, field.value(counters));
+        allocator.free(current);
+        current = next;
+    }
+    return current;
 }
 
 fn replaceCounterField(allocator: std.mem.Allocator, text: []const u8, field: []const u8, value: usize) ![]u8 {
@@ -464,6 +667,18 @@ fn expectSameCounters(io: std.Io, expected: CounterSet, actual: CounterSet) !voi
             try common.validationError(
                 io,
                 "frontier mode counter mismatch field={s} expected={} actual={}\n",
+                .{ field.name, @field(expected, field.name), @field(actual, field.name) },
+            );
+        }
+    }
+}
+
+fn expectSameBoundaryCounters(io: std.Io, expected: BoundaryCounterSet, actual: BoundaryCounterSet) !void {
+    inline for (std.meta.fields(BoundaryCounterSet)) |field| {
+        if (@field(expected, field.name) != @field(actual, field.name)) {
+            try common.validationError(
+                io,
+                "frontier boundary mode counter mismatch field={s} expected={} actual={}\n",
                 .{ field.name, @field(expected, field.name), @field(actual, field.name) },
             );
         }
@@ -543,5 +758,39 @@ fn fieldLldRows(c: CounterSet) usize {
     return c.lld_rows;
 }
 fn fieldLocalFail(c: CounterSet) usize {
+    return c.local_fail;
+}
+
+fn boundaryFieldSourceRows(c: BoundaryCounterSet) usize {
+    return c.source_rows;
+}
+fn boundaryFieldDiscoveredFunctions(c: BoundaryCounterSet) usize {
+    return c.discovered_functions;
+}
+fn boundaryFieldVarargsRows(c: BoundaryCounterSet) usize {
+    return c.varargs_boundary_rows;
+}
+fn boundaryFieldVectorRows(c: BoundaryCounterSet) usize {
+    return c.vector_boundary_rows;
+}
+fn boundaryFieldX87Rows(c: BoundaryCounterSet) usize {
+    return c.x87_boundary_rows;
+}
+fn boundaryFieldPackedRows(c: BoundaryCounterSet) usize {
+    return c.packed_aggregate_boundary_rows;
+}
+fn boundaryFieldUnexpectedAcceptRows(c: BoundaryCounterSet) usize {
+    return c.unexpected_accept_rows;
+}
+fn boundaryFieldWrongDiagnosticRows(c: BoundaryCounterSet) usize {
+    return c.wrong_diagnostic_rows;
+}
+fn boundaryFieldLlvmTargetmachineRows(c: BoundaryCounterSet) usize {
+    return c.llvm_targetmachine_rows;
+}
+fn boundaryFieldLldRows(c: BoundaryCounterSet) usize {
+    return c.lld_rows;
+}
+fn boundaryFieldLocalFail(c: BoundaryCounterSet) usize {
     return c.local_fail;
 }

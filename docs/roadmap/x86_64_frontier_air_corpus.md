@@ -11,6 +11,8 @@ Current corpus coverage:
 - Expanded covers broad plus `test/zig/expanded/*.zig`.
 - Scale covers expanded plus `test/zig/scale/*.zig`.
 - Frontier covers only `test/zig/frontier/*.zig`.
+- Frontier ABI boundary proof covers only `test/zig/frontier_boundaries/*.zig`
+  and is intentionally separate from accepted executable rows.
 
 Still excluded from real-AIR release gates:
 
@@ -34,6 +36,11 @@ Current frontier seed:
 - `test/zig/frontier/frontier_sysv_abi.zig`
 - `test/zig/frontier/frontier_sysv_aggregate_classes.zig`
 - `test/zig/frontier/frontier_sysv_sret_byval.zig`
+
+Current frontier ABI boundary seed:
+
+- `test/zig/frontier_boundaries/frontier_varargs_boundary.zig`
+- `test/zig/frontier_boundaries/frontier_vector_boundary.zig`
 
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
@@ -85,6 +92,27 @@ llvm_targetmachine_rows=0
 lld_rows=0
 local_fail=0
 ```
+
+Source-backed ABI boundary proof is green for all three modes through
+`zig build distribution-air-release-frontier-boundaries`:
+
+```text
+source_rows=2
+discovered_functions=4
+varargs_boundary_rows=2
+vector_boundary_rows=2
+x87_boundary_rows=0
+packed_aggregate_boundary_rows=0
+unexpected_accept_rows=0
+wrong_diagnostic_rows=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+These boundary rows are expected unsupported source-backed ABI surfaces. They
+are not counted in the accepted 13-source / 477-function strict frontier
+executable proof.
 
 Executable ABI proof is green for all three modes:
 
