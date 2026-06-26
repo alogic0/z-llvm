@@ -63,7 +63,7 @@ outgoing SysV stack slots for direct and pointer-callee calls, including named
 parameters and immediate FP constants
 mixed GPR/SSE helper-call arguments can overflow both integer and SSE argument
 streams in one call, with later integer and `double` arguments assigned to
-their SysV stack slots
+their SysV stack slots for direct and function-pointer calls
 direct i64/pointer parameter returns now load stack-passed parameters
 from the incoming stack argument area once the GPR stream is exhausted
 two or three live f32/f64 caller arguments can be spilled from %xmm0/%xmm1
@@ -369,7 +369,7 @@ no arbitrary non-selected sret/byval copy lowering outside supported `i8`/`i16`/
 no broad indirect calls beyond selected scalar, register-aggregate, and normal
 supported-leaf MEMORY aggregate byval-to-sret forms, tail calls, or unsupported
 non-default call conventions
-no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected stack-passed i32/i64, computed stack-passed i32/i64, selected mixed GPR/SSE outgoing stack-argument calls, one- through six-live f32/f64 no-argument-call shapes, selected f32/f64 register-source argument permutations, selected direct two-/three-/six-live FP-argument call shapes, selected pointer-callee FP call shapes through six live values and five FP helper arguments, selected two-call six-live i32 GPR frame, selected two-call two-live f32/f64 direct and pointer-callee void-call frames, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width and mixed f32/f64 two-result call frames, selected mixed i64/f64, i64/f32, f64/i64, and f32/i64 two-result call frames, selected direct/pointer-callee i64 result live-across-later-void frames, selected direct/pointer-callee two-result i64 live-across-later-void frames, and selected mixed i32/i64 one-GPR/one-SSE live one-/two-call direct/pointer-callee void-call frames
+no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected stack-passed i32/i64, computed stack-passed i32/i64, selected direct and pointer-callee mixed GPR/SSE outgoing stack-argument calls, one- through six-live f32/f64 no-argument-call shapes, selected f32/f64 register-source argument permutations, selected direct two-/three-/six-live FP-argument call shapes, selected pointer-callee FP call shapes through six live values and five FP helper arguments, selected two-call six-live i32 GPR frame, selected two-call two-live f32/f64 direct and pointer-callee void-call frames, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected same-width and mixed f32/f64 two-result call frames, selected mixed i64/f64, i64/f32, f64/i64, and f32/i64 two-result call frames, selected direct/pointer-callee i64 result live-across-later-void frames, selected direct/pointer-callee two-result i64 live-across-later-void frames, and selected mixed i32/i64 one-GPR/one-SSE live one-/two-call direct/pointer-callee void-call frames
 stack-passed live integer pressure beyond the current selected scheduling model is rejected explicitly rather than guessed
 integer and pointer cyclic GPR argument shuffles use a generic push/pop
 parallel-copy path for register-source call arguments; mixed non-register
