@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=545
-structured_functions=545
-generic_codegen_functions=545
-generic_cfg_functions=545
+discovered_functions=549
+structured_functions=549
+generic_codegen_functions=549
+generic_cfg_functions=549
 structural_matcher_functions=0
-structured_air_v2_functions=545
-typed_air_operand_functions=545
+structured_air_v2_functions=549
+typed_air_operand_functions=549
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=545
+generic_lowering_functions=549
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=545
+object_emitted_functions=549
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -758,7 +758,13 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_mixed_indirect_first_f32_f64_results_with_f32_live_across_calls`,
   `frontier_mixed_indirect_second_f32_f64_results_with_f32_live_across_calls`,
   and
-  `frontier_mixed_indirect_both_f32_f64_results_with_f32_live_across_calls`
+  `frontier_mixed_indirect_both_f32_f64_results_with_f32_live_across_calls`,
+  plus the reversed
+  `frontier_mixed_f64_f32_results_with_f32_live_across_calls`,
+  `frontier_mixed_indirect_first_f64_f32_results_with_f32_live_across_calls`,
+  `frontier_mixed_indirect_second_f64_f32_results_with_f32_live_across_calls`,
+  and
+  `frontier_mixed_indirect_both_f64_f32_results_with_f32_live_across_calls`
   preserve the later FP argument, any second pointer callee, the first FP
   result, and an independent live `double`, `float`, or `i64` addend across
   both non-void calls before producing the final three-value `double` sum. The
