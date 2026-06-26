@@ -686,6 +686,10 @@ export fn frontier_indirect_mixed_gpr_sse_stack_arg_call(func: Sum8I32TenF64Fn, 
     return func(a, b, c, d, e, f, g, h, fa, fb, fc, fd, fe, ff, fg, fh, fi, fj);
 }
 
+export fn frontier_mixed_i64_sse_stack_arg_call(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64, fa: f64, fb: f64, fc: f64, fd: f64, fe: f64, ff: f64, fg: f64, fh: f64, fi: f64, fj: f64) f64 {
+    return frontier_sum8_i64_10_f64(a, b, c, d, e, f, g, h, fa, fb, fc, fd, fe, ff, fg, fh, fi, fj);
+}
+
 export fn frontier_indirect_mixed_i64_sse_stack_arg_call(func: Sum8I64TenF64Fn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64, fa: f64, fb: f64, fc: f64, fd: f64, fe: f64, ff: f64, fg: f64, fh: f64, fi: f64, fj: f64) f64 {
     return func(a, b, c, d, e, f, g, h, fa, fb, fc, fd, fe, ff, fg, fh, fi, fj);
 }

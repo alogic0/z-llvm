@@ -230,7 +230,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 466,
+            .functions = 467,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1236,6 +1236,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_eighteen_stack_arg_call(void) __asm__("frontier_sysv_abi.frontier_eighteen_stack_arg_call");
     \\extern double z_frontier_mixed_gpr_sse_stack_arg_call(int, int, int, int, int, int, int, int, double, double, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_mixed_gpr_sse_stack_arg_call");
     \\extern double z_frontier_indirect_mixed_gpr_sse_stack_arg_call(double (*)(int, int, int, int, int, int, int, int, double, double, double, double, double, double, double, double, double, double), int, int, int, int, int, int, int, int, double, double, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_indirect_mixed_gpr_sse_stack_arg_call");
+    \\extern double z_frontier_mixed_i64_sse_stack_arg_call(long long, long long, long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_mixed_i64_sse_stack_arg_call");
     \\extern double z_frontier_indirect_mixed_i64_sse_stack_arg_call(double (*)(long long, long long, long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, double, double), long long, long long, long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_indirect_mixed_i64_sse_stack_arg_call");
     \\extern int z_frontier_stack_arg_forward(int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_stack_arg_forward");
     \\extern int z_frontier_stack_arg_to_registers(int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_stack_arg_to_registers");
@@ -1516,7 +1517,8 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_eighteen_stack_arg_call() != 300) return 70;
     \\    if (z_frontier_mixed_gpr_sse_stack_arg_call(1, 2, 3, 4, 5, 6, 7, 8, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0) != 91.0) return 201;
     \\    if (z_frontier_indirect_mixed_gpr_sse_stack_arg_call(frontier_sum8_i32_10_f64, 1, 2, 3, 4, 5, 6, 7, 8, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0) != 91.0) return 202;
-    \\    if (z_frontier_indirect_mixed_i64_sse_stack_arg_call(frontier_sum8_i64_10_f64, 1, 2, 3, 4, 5, 6, 7, 8, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0) != 91.0) return 203;
+    \\    if (z_frontier_mixed_i64_sse_stack_arg_call(1, 2, 3, 4, 5, 6, 7, 8, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0) != 91.0) return 203;
+    \\    if (z_frontier_indirect_mixed_i64_sse_stack_arg_call(frontier_sum8_i64_10_f64, 1, 2, 3, 4, 5, 6, 7, 8, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0) != 91.0) return 204;
     \\    if (z_frontier_stack_arg_forward(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 78) return 36;
     \\    if (z_frontier_stack_arg_to_registers(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 57) return 37;
     \\    if (z_frontier_indirect_stack_arg_to_registers(frontier_sum6_i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 57) return 38;
