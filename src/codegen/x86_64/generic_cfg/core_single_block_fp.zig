@@ -786,6 +786,7 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
 
     const LiveAddend = union(enum) {
         double_param: usize,
+        float_param: usize,
         i64_param: ArgReg,
     };
 
@@ -793,21 +794,21 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
     const second_call_inst = block.instructions.items[1];
     const cast_inst = block.instructions.items[2];
     const add_inst = block.instructions.items[3];
-    const int_cast_inst = if (block.instructions.items.len == 6) block.instructions.items[4] else null;
+    const live_cast_inst = if (block.instructions.items.len == 6) block.instructions.items[4] else null;
     const final_add_inst = switch (block.instructions.items.len) {
         5 => block.instructions.items[4],
         6 => block.instructions.items[5],
         else => null,
     };
     if (first_call_inst.removed or second_call_inst.removed or cast_inst.removed or add_inst.removed) return false;
-    if (int_cast_inst) |instruction| if (instruction.removed) return false;
+    if (live_cast_inst) |instruction| if (instruction.removed) return false;
     if (final_add_inst) |instruction| if (instruction.removed) return false;
 
     const first_result = first_call_inst.result orelse return false;
     const second_result = second_call_inst.result orelse return false;
     const cast_result = cast_inst.result orelse return false;
     const add_result = add_inst.result orelse return false;
-    const int_cast_result = if (int_cast_inst) |instruction| instruction.result orelse return false else null;
+    const live_cast_result = if (live_cast_inst) |instruction| instruction.result orelse return false else null;
     const ret_value = ret.value orelse return error.InvalidRet;
     if (final_add_inst == null and !isNamed(ret_value, add_result)) return false;
 
@@ -871,19 +872,26 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
         const rhs_sum = isNamed(final_binary.rhs, add_result);
         if (lhs_sum == rhs_sum) return false;
         const addend = if (lhs_sum) final_binary.rhs else final_binary.lhs;
-        if (int_cast_inst) |instruction_cast| {
-            const cast_result_value = int_cast_result orelse return false;
+        if (live_cast_inst) |instruction_cast| {
+            const cast_result_value = live_cast_result orelse return false;
             if (!isNamed(addend, cast_result_value)) return false;
-            const int_cast = switch (instruction_cast.kind) {
-                .cast => |int_cast| int_cast,
+            const live_cast = switch (instruction_cast.kind) {
+                .cast => |cast_payload| cast_payload,
                 else => return false,
             };
-            if (int_cast.op != .sitofp or !int_cast.from_ty.eql(.{ .int = 64 }) or !int_cast.to_ty.eql(.double)) return false;
-            const param_name = switch (int_cast.value) {
+            const param_name = switch (live_cast.value) {
                 .named => |name| name,
                 else => return false,
             };
-            break :blk .{ .i64_param = try paramReg(function, param_name, .{ .int = 64 }) };
+            if (live_cast.op == .sitofp and live_cast.from_ty.eql(.{ .int = 64 }) and live_cast.to_ty.eql(.double)) {
+                break :blk .{ .i64_param = try paramReg(function, param_name, .{ .int = 64 }) };
+            }
+            if (live_cast.op == .fpext and live_cast.from_ty.eql(.float) and live_cast.to_ty.eql(.double)) {
+                const index = try fpParamIndex(function, param_name, .float);
+                if (index >= 6) return error.UnsupportedLiveAcrossCall;
+                break :blk .{ .float_param = index };
+            }
+            return false;
         } else {
             const index = try fpParamIndexFromValue(function, addend, .double);
             if (index >= 6) return error.UnsupportedLiveAcrossCall;
@@ -911,6 +919,7 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
     if (live_addend) |addend| {
         switch (addend) {
             .double_param => |index| try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = try XmmReg.fromIndex(index), .frame_index = live_addend_slot } }),
+            .float_param => |index| try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = try XmmReg.fromIndex(index), .frame_index = live_addend_slot } }),
             .i64_param => |reg| try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = live_addend_slot } }),
         }
     }
@@ -954,6 +963,12 @@ pub fn lowerGenericCfgMixedFpTwoCallResultsReturn(
         switch (addend) {
             .double_param => {
                 try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = live_addend_slot } });
+                try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+            },
+            .float_param => {
+                try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm1, .src = .xmm0 } });
+                try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = live_addend_slot } });
+                try machine.instructions.append(allocator, .cvtss2sd_xmm0_xmm0);
                 try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
             },
             .i64_param => {

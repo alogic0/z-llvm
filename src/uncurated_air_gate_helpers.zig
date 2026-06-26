@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 541,
+            .functions = 545,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1191,6 +1191,10 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_mixed_indirect_first_f32_f64_results_with_i64_live_across_calls(float (*)(float), float, double, long long) __asm__("frontier_sysv_abi.frontier_mixed_indirect_first_f32_f64_results_with_i64_live_across_calls");
     \\extern double z_frontier_mixed_indirect_second_f32_f64_results_with_i64_live_across_calls(double (*)(double), float, double, long long) __asm__("frontier_sysv_abi.frontier_mixed_indirect_second_f32_f64_results_with_i64_live_across_calls");
     \\extern double z_frontier_mixed_indirect_both_f32_f64_results_with_i64_live_across_calls(float (*)(float), double (*)(double), float, double, long long) __asm__("frontier_sysv_abi.frontier_mixed_indirect_both_f32_f64_results_with_i64_live_across_calls");
+    \\extern double z_frontier_mixed_f32_f64_results_with_f32_live_across_calls(float, double, float) __asm__("frontier_sysv_abi.frontier_mixed_f32_f64_results_with_f32_live_across_calls");
+    \\extern double z_frontier_mixed_indirect_first_f32_f64_results_with_f32_live_across_calls(float (*)(float), float, double, float) __asm__("frontier_sysv_abi.frontier_mixed_indirect_first_f32_f64_results_with_f32_live_across_calls");
+    \\extern double z_frontier_mixed_indirect_second_f32_f64_results_with_f32_live_across_calls(double (*)(double), float, double, float) __asm__("frontier_sysv_abi.frontier_mixed_indirect_second_f32_f64_results_with_f32_live_across_calls");
+    \\extern double z_frontier_mixed_indirect_both_f32_f64_results_with_f32_live_across_calls(float (*)(float), double (*)(double), float, double, float) __asm__("frontier_sysv_abi.frontier_mixed_indirect_both_f32_f64_results_with_f32_live_across_calls");
     \\extern double z_frontier_mixed_f64_f32_results_across_calls(double, float) __asm__("frontier_sysv_abi.frontier_mixed_f64_f32_results_across_calls");
     \\extern double z_frontier_mixed_indirect_first_f64_f32_results_across_calls(double (*)(double), double, float) __asm__("frontier_sysv_abi.frontier_mixed_indirect_first_f64_f32_results_across_calls");
     \\extern double z_frontier_mixed_indirect_second_f64_f32_results_across_calls(float (*)(float), double, float) __asm__("frontier_sysv_abi.frontier_mixed_indirect_second_f64_f32_results_across_calls");
@@ -1528,6 +1532,14 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_mixed_indirect_second_f32_f64_results_with_i64_live_across_calls(frontier_ordered2_f64, 8.0f, 9.0, 10) != 31.0 || frontier_order_step != 2) return 188;
     \\    frontier_order_step = 0;
     \\    if (z_frontier_mixed_indirect_both_f32_f64_results_with_i64_live_across_calls(frontier_ordered_f32, frontier_ordered2_f64, 11.0f, 12.0, 13) != 40.0 || frontier_order_step != 2) return 189;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_mixed_f32_f64_results_with_f32_live_across_calls(2.0f, 3.0, 4.0f) != 13.0 || frontier_order_step != 2) return 360;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_mixed_indirect_first_f32_f64_results_with_f32_live_across_calls(frontier_ordered_f32, 5.0f, 6.0, 7.0f) != 22.0 || frontier_order_step != 2) return 361;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_mixed_indirect_second_f32_f64_results_with_f32_live_across_calls(frontier_ordered2_f64, 8.0f, 9.0, 10.0f) != 31.0 || frontier_order_step != 2) return 362;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_mixed_indirect_both_f32_f64_results_with_f32_live_across_calls(frontier_ordered_f32, frontier_ordered2_f64, 11.0f, 12.0, 13.0f) != 40.0 || frontier_order_step != 2) return 363;
     \\    frontier_order_step = 0;
     \\    if (z_frontier_mixed_f64_f32_results_across_calls(2.0, 3.0f) != 9.0 || frontier_order_step != 2) return 144;
     \\    frontier_order_step = 0;

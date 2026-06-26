@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=541`,
-`generic_codegen_functions=541`, `generic_cfg_functions=541`,
+frontier gate reports `source_rows=13`, `discovered_functions=545`,
+`generic_codegen_functions=545`, `generic_cfg_functions=545`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=541`, `object_failures=0`,
+`object_emitted_functions=545`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,9 +483,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=541`,
-`generic_cfg_functions=541`, `structural_matcher_functions=0`,
-`object_emitted_functions=541`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=545`,
+`generic_cfg_functions=545`, `structural_matcher_functions=0`,
+`object_emitted_functions=545`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -749,8 +749,9 @@ The two-result FP follow-up preserves a first direct or pointer-callee C ABI
 `f32`/`f64` call result across a second direct or pointer-callee FP result call,
 then reloads the saved XMM slot for the final `fadd`.
 The mixed-width FP live-addend follow-up preserves the later FP argument, the
-first FP result, any second pointer callee, and one independent live `double`
-or `i64` addend across both non-void calls before the final `double` add.
+first FP result, any second pointer callee, and one independent live `double`,
+`float`, or `i64` addend across both non-void calls before the final `double`
+add.
 The `i64` two-result follow-up preserves a first C ABI `i64` call result in a
 frame slot, preserves later pointer callees when present, lowers both direct
 and pointer-callee `i64` calls through the shared SysV scalar planner, and adds
