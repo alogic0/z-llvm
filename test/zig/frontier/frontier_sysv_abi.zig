@@ -842,6 +842,34 @@ export fn frontier_indirect_nine_fp_arg_call_live_f32_sum(func: Touch9F32Fn, a: 
     return a + b;
 }
 
+export fn frontier_nine_fp_arg_call_stack_f64_live_sum(skip0: f64, skip1: f64, a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, g: f64, h: f64) f64 {
+    _ = skip0;
+    _ = skip1;
+    frontier_touch9_f64(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return a + b + c + d + e + f + g + h;
+}
+
+export fn frontier_nine_fp_arg_call_stack_f32_live_sum(skip0: f32, skip1: f32, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32) f32 {
+    _ = skip0;
+    _ = skip1;
+    frontier_touch9_f32(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return a + b + c + d + e + f + g + h;
+}
+
+export fn frontier_indirect_nine_fp_arg_call_stack_f64_live_sum(func: Touch9F64Fn, skip0: f64, skip1: f64, a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, g: f64, h: f64) f64 {
+    _ = skip0;
+    _ = skip1;
+    func(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return a + b + c + d + e + f + g + h;
+}
+
+export fn frontier_indirect_nine_fp_arg_call_stack_f32_live_sum(func: Touch9F32Fn, skip0: f32, skip1: f32, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32) f32 {
+    _ = skip0;
+    _ = skip1;
+    func(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return a + b + c + d + e + f + g + h;
+}
+
 export fn frontier_stack_arg_forward(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {
     return frontier_sum12_i32(a, b, c, d, e, f, g, h, i, j, k, l);
 }
