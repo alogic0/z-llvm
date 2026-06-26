@@ -606,6 +606,16 @@ export fn frontier_direct_big81_copy(value: Big81) Big81 {
     return frontier_big81_copy(value);
 }
 
+export fn frontier_stack_source_big81_copy(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big81) Big81 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return frontier_big81_copy(value);
+}
+
 export fn frontier_big_nested_copy(value: BigNested) BigNested {
     return value;
 }

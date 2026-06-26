@@ -329,13 +329,14 @@ rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`,
 `[9 x i16]`, and flat 32-/40-/48-/64-/80-/81-eightbyte MEMORY byval-to-sret copies through
 direct and function-pointer calls; the 40-/48-/64-/80-/81-eightbyte rows prove disp32
 source-pointer reloads once payload offsets exceed the byte displacement range,
-and the stack-sourced Big40/Big48/Big64/Big80 rows prove incoming `byval` payload
+and the stack-sourced Big40/Big48/Big64/Big80/Big81 rows prove incoming `byval` payload
 parameters are copied directly from caller stack payload slots rather than
 treated as pointers. Big80 indirect forwarding is now accepted through the
 same planner-owned function-pointer byval copy path, and Big80 stack-source
-forwarding is accepted through the same layout-derived stack-copy path. The
-frontier boundary gate keeps `stack_pressure_boundary_rows=0` as a regression
-guard for unsupported forwarding pressure shapes.
+forwarding plus Big81 stack-source forwarding are accepted through the same
+layout-derived stack-copy path. The frontier boundary gate keeps
+`stack_pressure_boundary_rows=0` as a regression guard for unsupported
+forwarding pressure shapes.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
 spill/reload frame now covers the same indirect byval call shape for both

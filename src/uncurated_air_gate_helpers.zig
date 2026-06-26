@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 526,
+            .functions = 527,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1866,6 +1866,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big80 z_frontier_stack_source_big80_copy(long long, long long, long long, long long, long long, long long, struct Big80) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big80_copy");
     \\extern struct Big81 z_frontier_big81_copy(struct Big81) __asm__("frontier_sysv_sret_byval.frontier_big81_copy");
     \\extern struct Big81 z_frontier_direct_big81_copy(struct Big81) __asm__("frontier_sysv_sret_byval.frontier_direct_big81_copy");
+    \\extern struct Big81 z_frontier_stack_source_big81_copy(long long, long long, long long, long long, long long, long long, struct Big81) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big81_copy");
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern struct BigNested z_frontier_direct_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_direct_big_nested_copy");
     \\extern struct BigNested z_frontier_indirect_big_nested_copy(struct BigNested (*)(struct BigNested), struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_nested_copy");
@@ -2073,6 +2074,8 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (!check_big81(copied81, 1, 64, 73, 81)) return 247;
     \\    struct Big81 direct81 = z_frontier_direct_big81_copy(input81);
     \\    if (!check_big81(direct81, 1, 64, 73, 81)) return 248;
+    \\    struct Big81 stack_source81 = z_frontier_stack_source_big81_copy(10, 20, 30, 40, 50, 60, input81);
+    \\    if (!check_big81(stack_source81, 1, 64, 73, 81)) return 342;
     \\    struct BigNested nested = { .left = { .a = 2, .b = 3, .c = 5 }, .right = { .a = 7, .b = 11, .c = 13 } };
     \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 20;
     \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);

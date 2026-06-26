@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=526
-structured_functions=526
-generic_codegen_functions=526
-generic_cfg_functions=526
+discovered_functions=527
+structured_functions=527
+generic_codegen_functions=527
+generic_cfg_functions=527
 structural_matcher_functions=0
-structured_air_v2_functions=526
-typed_air_operand_functions=526
+structured_air_v2_functions=527
+typed_air_operand_functions=527
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=526
+generic_lowering_functions=527
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=526
+object_emitted_functions=527
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 526-function counters above plus `native_link_accepted_rows=13`,
+13-source / 527-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
