@@ -216,13 +216,15 @@ pub fn main(init: std.process.Init) !void {
         var stdout_buffer: [512]u8 = undefined;
         var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
         try stdout_writer.interface.print(
-            "updated-doc-counters gate={s} source_rows={} discovered_functions={} varargs_boundary_rows={} vector_boundary_rows={} changed_files={}\n",
+            "updated-doc-counters gate={s} source_rows={} discovered_functions={} varargs_boundary_rows={} vector_boundary_rows={} x87_boundary_rows={} packed_aggregate_boundary_rows={} changed_files={}\n",
             .{
                 options.gate,
                 counters.source_rows,
                 counters.discovered_functions,
                 counters.varargs_boundary_rows,
                 counters.vector_boundary_rows,
+                counters.x87_boundary_rows,
+                counters.packed_aggregate_boundary_rows,
                 changed_files,
             },
         );
@@ -252,7 +254,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .start = "`distribution-zig-air-uncurated-release-frontier` covers only", .end = "Source-backed ABI boundary proof" },
     });
     changed_files += try updateSectionFile(allocator, io, "docs/roadmap/x86_64_distribution_replacement_matrix.md", counters, &.{
-        .{ .start = "The next corpus frontier is isolated", .end = "source-backed fail-closed varargs/vector boundary proof" },
+        .{ .start = "The next corpus frontier is isolated", .end = "source-backed fail-closed" },
     });
 
     var stdout_buffer: [512]u8 = undefined;

@@ -685,10 +685,10 @@ progress, executable progress, and strict counter checks. It requires the
 Source-backed ABI boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs
 `test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
-ReleaseSmall and currently reports per mode: `source_rows=2`,
-`discovered_functions=4`, `varargs_boundary_rows=2`,
-`vector_boundary_rows=2`, `x87_boundary_rows=0`,
-`packed_aggregate_boundary_rows=0`, `unexpected_accept_rows=0`,
+ReleaseSmall and currently reports per mode: `source_rows=4`,
+`discovered_functions=8`, `varargs_boundary_rows=2`,
+`vector_boundary_rows=2`, `x87_boundary_rows=2`,
+`packed_aggregate_boundary_rows=2`, `unexpected_accept_rows=0`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries and are
 not part of the accepted executable frontier counters.

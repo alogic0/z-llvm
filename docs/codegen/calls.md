@@ -423,9 +423,11 @@ vectors, including vector-containing aggregate ABI forms and vector
   `sret`/`byval` payloads (`UnsupportedVectorAbi`); source-backed fail-closed
   by `distribution-air-release-frontier-boundaries`
 X87 / long double, including aggregate-contained long-double leaves and
-  long-double `sret`/`byval` payloads (`UnsupportedLongDoubleAbi`)
+  long-double `sret`/`byval` payloads (`UnsupportedLongDoubleAbi`);
+  source-backed fail-closed by `distribution-air-release-frontier-boundaries`
 packed aggregate ABI call/return forms, including direct planner inputs and
-  packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`)
+  packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`);
+  source-backed fail-closed by `distribution-air-release-frontier-boundaries`
 byval lowering outside supported aggregate payload stack copies and arbitrary sret copy/storage beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
 operand bundles
 invoke

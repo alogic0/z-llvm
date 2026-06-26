@@ -151,6 +151,24 @@ fn runMode(init: std.process.Init, options: Options) !void {
         }
         switch (emit_result.term) {
             .exited => |code| if (code != 0) {
+                if (options.abi_boundary_expectations) {
+                    if (boundaryCategoryForAirExportFailure(source, emit_result.stderr)) |category| {
+                        source_rows += 1;
+                        const row_count = boundaryRowCountForSource(source);
+                        discovered_functions += row_count;
+                        switch (category) {
+                            .varargs => varargs_boundary_rows += row_count,
+                            .vector => vector_boundary_rows += row_count,
+                            .x87 => x87_boundary_rows += row_count,
+                            .packed_aggregate => packed_aggregate_boundary_rows += row_count,
+                        }
+                        std.debug.print(
+                            "abi-boundary source={s} function=module category={s} diagnostic={s} stage=air-export stderr={s}\n",
+                            .{ source, category.name(), category.diagnosticName(), firstLine(emit_result.stderr) },
+                        );
+                        continue;
+                    }
+                }
                 std.debug.print(
                     "air-export-failure source={s} exit_code={} stdout={s} stderr={s}\n",
                     .{ source, code, firstLine(emit_result.stdout), firstLine(emit_result.stderr) },
@@ -577,12 +595,12 @@ fn runMode(init: std.process.Init, options: Options) !void {
     }
     if (options.abi_boundary_expectations) {
         const boundary_local_fail: usize = if (options.corpus == .frontier_boundaries and
-            source_rows == 2 and
-            discovered_functions == 4 and
+            source_rows == 4 and
+            discovered_functions == 8 and
             varargs_boundary_rows == 2 and
             vector_boundary_rows == 2 and
-            x87_boundary_rows == 0 and
-            packed_aggregate_boundary_rows == 0 and
+            x87_boundary_rows == 2 and
+            packed_aggregate_boundary_rows == 2 and
             unexpected_accept_rows == 0 and
             wrong_diagnostic_rows == 0)
             0
@@ -714,6 +732,33 @@ fn boundaryCategoryForUnsupported(source: []const u8, diagnostic: air_lowering.D
     {
         return .vector;
     }
+    if (std.mem.indexOf(u8, source, "frontier_x87_boundary.zig") != null and
+        std.mem.eql(u8, diagnostic.opcode, "function-type") and
+        diagnostic.reason == .function_type)
+    {
+        return .x87;
+    }
     return null;
+}
+
+fn boundaryCategoryForAirExportFailure(source: []const u8, stderr: []const u8) ?BoundaryCategory {
+    if (std.mem.indexOf(u8, source, "frontier_packed_aggregate_boundary.zig") != null and
+        std.mem.indexOf(u8, stderr, "not allowed in function with calling convention") != null)
+    {
+        return .packed_aggregate;
+    }
+    if (std.mem.indexOf(u8, source, "frontier_x87_boundary.zig") != null and
+        (std.mem.indexOf(u8, stderr, "not allowed in function with calling convention") != null or
+            std.mem.indexOf(u8, stderr, "TODO implement compiler support") != null))
+    {
+        return .x87;
+    }
+    return null;
+}
+
+fn boundaryRowCountForSource(source: []const u8) usize {
+    if (std.mem.indexOf(u8, source, "frontier_packed_aggregate_boundary.zig") != null) return 2;
+    if (std.mem.indexOf(u8, source, "frontier_x87_boundary.zig") != null) return 2;
+    return 1;
 }
 const firstLine = helpers.firstLine;

@@ -573,10 +573,12 @@ Source-backed ABI boundaries are now measured separately from accepted
 frontier rows. `zig build distribution-air-release-frontier-boundaries` runs
 the dedicated `test/zig/frontier_boundaries/*.zig` rows in ReleaseFast,
 ReleaseSafe, and ReleaseSmall and currently reports `varargs_boundary_rows=2`,
-`vector_boundary_rows=2`, `unexpected_accept_rows=0`,
-`wrong_diagnostic_rows=0`, and `local_fail=0` per mode. Varargs and vectors are
-therefore source-backed fail-closed boundaries, not vague docs-only gaps and
-not accepted executable proof.
+`vector_boundary_rows=2`, `x87_boundary_rows=2`,
+`packed_aggregate_boundary_rows=2`, `unexpected_accept_rows=0`,
+`wrong_diagnostic_rows=0`, and `local_fail=0` per mode. Varargs, vectors,
+X87/long double, and packed/unaligned aggregates are therefore source-backed
+fail-closed boundaries, not vague docs-only gaps and not accepted executable
+proof.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads
 incoming stack-passed `i32` parameters into outgoing GPR call slots, and emits
