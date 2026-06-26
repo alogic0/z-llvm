@@ -31,6 +31,8 @@ const Touch3F32Fn = *const fn (f32, f32, f32) callconv(.c) void;
 const Touch3F64Fn = *const fn (f64, f64, f64) callconv(.c) void;
 const Touch5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) void;
 const Touch5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) void;
+const Touch9F32Fn = *const fn (f32, f32, f32, f32, f32, f32, f32, f32, f32) callconv(.c) void;
+const Touch9F64Fn = *const fn (f64, f64, f64, f64, f64, f64, f64, f64, f64) callconv(.c) void;
 const IdI32Fn = *const fn (i32) callconv(.c) i32;
 const IdI64Fn = *const fn (i64) callconv(.c) i64;
 const IdF32Fn = *const fn (f32) callconv(.c) f32;
@@ -63,6 +65,8 @@ extern fn frontier_touch3_f32(a: f32, b: f32, c: f32) void;
 extern fn frontier_touch3_f64(a: f64, b: f64, c: f64) void;
 extern fn frontier_touch5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) void;
 extern fn frontier_touch5_f64(a: f64, b: f64, c: f64, d: f64, e: f64) void;
+extern fn frontier_touch9_f32(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32, i: f32) void;
+extern fn frontier_touch9_f64(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, g: f64, h: f64, i: f64) void;
 extern fn frontier_touch_none() void;
 extern fn frontier_touch_ordered() void;
 extern fn frontier_touch_ordered_after_two() void;
@@ -816,6 +820,26 @@ export fn frontier_indirect_five_fp_arg_call_stack_f64_live_sum(func: Touch5F64F
 export fn frontier_indirect_five_fp_arg_call_stack_f32_live_sum(func: Touch5F32Fn, p0: f32, p1: f32, p2: f32, p3: f32, p4: f32, a: f32, b: f32, c: f32, d: f32, e: f32) f32 {
     func(p0, p1, p2, p3, p4);
     return a + b + c + d + e;
+}
+
+export fn frontier_nine_fp_arg_call_live_f64_sum(a: f64, b: f64) f64 {
+    frontier_touch9_f64(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return a + b;
+}
+
+export fn frontier_nine_fp_arg_call_live_f32_sum(a: f32, b: f32) f32 {
+    frontier_touch9_f32(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return a + b;
+}
+
+export fn frontier_indirect_nine_fp_arg_call_live_f64_sum(func: Touch9F64Fn, a: f64, b: f64) f64 {
+    func(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return a + b;
+}
+
+export fn frontier_indirect_nine_fp_arg_call_live_f32_sum(func: Touch9F32Fn, a: f32, b: f32) f32 {
+    func(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return a + b;
 }
 
 export fn frontier_stack_arg_forward(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {

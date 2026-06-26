@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 502,
+            .functions = 506,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1360,6 +1360,10 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_indirect_four_f64_live_sum_after_three_arg_call(void (*)(double, double, double), double, double, double, double) __asm__("frontier_sysv_abi.frontier_indirect_four_f64_live_sum_after_three_arg_call");
     \\extern float z_frontier_indirect_six_f32_live_sum_after_five_arg_call(void (*)(float, float, float, float, float), float, float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_indirect_six_f32_live_sum_after_five_arg_call");
     \\extern double z_frontier_indirect_six_f64_live_sum_after_five_arg_call(void (*)(double, double, double, double, double), double, double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_indirect_six_f64_live_sum_after_five_arg_call");
+    \\extern double z_frontier_nine_fp_arg_call_live_f64_sum(double, double) __asm__("frontier_sysv_abi.frontier_nine_fp_arg_call_live_f64_sum");
+    \\extern float z_frontier_nine_fp_arg_call_live_f32_sum(float, float) __asm__("frontier_sysv_abi.frontier_nine_fp_arg_call_live_f32_sum");
+    \\extern double z_frontier_indirect_nine_fp_arg_call_live_f64_sum(void (*)(double, double, double, double, double, double, double, double, double), double, double) __asm__("frontier_sysv_abi.frontier_indirect_nine_fp_arg_call_live_f64_sum");
+    \\extern float z_frontier_indirect_nine_fp_arg_call_live_f32_sum(void (*)(float, float, float, float, float, float, float, float, float), float, float) __asm__("frontier_sysv_abi.frontier_indirect_nine_fp_arg_call_live_f32_sum");
     \\extern float z_frontier_three_f32_live_sum_after_call(float, float, float) __asm__("frontier_sysv_abi.frontier_three_f32_live_sum_after_call");
     \\extern float z_frontier_four_f32_live_sum_after_call(float, float, float, float) __asm__("frontier_sysv_abi.frontier_four_f32_live_sum_after_call");
     \\extern float z_frontier_five_f32_live_sum_after_call(float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_five_f32_live_sum_after_call");
@@ -1393,6 +1397,8 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\void frontier_touch3_f64(double a, double b, double c) { frontier_seen_f64 = a + b + c; }
     \\void frontier_touch5_f32(float a, float b, float c, float d, float e) { frontier_seen_f32 = a + b + c + d + e; }
     \\void frontier_touch5_f64(double a, double b, double c, double d, double e) { frontier_seen_f64 = a + b + c + d + e; }
+    \\void frontier_touch9_f32(float a, float b, float c, float d, float e, float f, float g, float h, float i) { frontier_seen_f32 = a + b + c + d + e + f + g + h + i; }
+    \\void frontier_touch9_f64(double a, double b, double c, double d, double e, double f, double g, double h, double i) { frontier_seen_f64 = a + b + c + d + e + f + g + h + i; }
     \\void frontier_touch_none(void) {}
     \\void frontier_touch_ordered(void) { frontier_order_step = frontier_order_step == 1 ? 2 : -100; }
     \\void frontier_touch_ordered_after_two(void) { frontier_order_step = frontier_order_step == 2 ? 3 : -300; }
@@ -1568,6 +1574,10 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_five_fp_arg_call_stack_f32_live_sum(1.0f, 2.0f, 3.0f, 4.0f, 103.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.5f) != 60.5f || frontier_seen_f32 != 113.0f) return 224;
     \\    if (z_frontier_indirect_five_fp_arg_call_stack_f64_live_sum(frontier_touch5_f64, 1.0, 2.0, 3.0, 4.0, 104.0, 10.0, 11.0, 12.0, 13.0, 14.5) != 60.5 || frontier_seen_f64 != 114.0) return 225;
     \\    if (z_frontier_indirect_five_fp_arg_call_stack_f32_live_sum(frontier_touch5_f32, 1.0f, 2.0f, 3.0f, 4.0f, 104.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.5f) != 60.5f || frontier_seen_f32 != 114.0f) return 226;
+    \\    if (z_frontier_nine_fp_arg_call_live_f64_sum(31.0, 32.5) != 63.5 || frontier_seen_f64 != 45.0) return 227;
+    \\    if (z_frontier_nine_fp_arg_call_live_f32_sum(31.0f, 32.5f) != 63.5f || frontier_seen_f32 != 45.0f) return 228;
+    \\    if (z_frontier_indirect_nine_fp_arg_call_live_f64_sum(frontier_touch9_f64, 41.0, 42.5) != 83.5 || frontier_seen_f64 != 45.0) return 229;
+    \\    if (z_frontier_indirect_nine_fp_arg_call_live_f32_sum(frontier_touch9_f32, 41.0f, 42.5f) != 83.5f || frontier_seen_f32 != 45.0f) return 230;
     \\    if (z_frontier_stack_arg_forward(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 78) return 36;
     \\    if (z_frontier_stack_arg_to_registers(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 57) return 37;
     \\    if (z_frontier_indirect_stack_arg_to_registers(frontier_sum6_i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12) != 57) return 38;

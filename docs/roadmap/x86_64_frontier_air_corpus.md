@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=502
-structured_functions=502
-generic_codegen_functions=502
-generic_cfg_functions=502
+discovered_functions=506
+structured_functions=506
+generic_codegen_functions=506
+generic_cfg_functions=506
 structural_matcher_functions=0
-structured_air_v2_functions=502
-typed_air_operand_functions=502
+structured_air_v2_functions=506
+typed_air_operand_functions=506
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=502
+generic_lowering_functions=506
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=502
+object_emitted_functions=506
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -792,7 +792,10 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_indirect_fp_arg_call_stack_*` rows extend the same helper-call
   argument setup to six spilled XMM addends plus two stack-passed addends
   across direct and function-pointer one-FP-argument `void` calls before the
-  post-call `fadd` return
+  post-call `fadd` return; the `frontier_nine_fp_arg_call_live_*` direct and
+  indirect rows also prove aligned-frame cleanup for a `void` helper call with
+  a ninth FP argument passed on the stack while live FP values are preserved
+  across the call
 - selected indirect SSE live-across-call rows in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled, the pointer callee is moved to
   `%rax`, `callq *%rax` is emitted for both no-argument and one-FP-argument

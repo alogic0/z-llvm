@@ -182,6 +182,25 @@ pub fn appendSysVScalarCallArgsWithBlock(
     return (try appendSysVScalarCallArgsWithBlockAndAlignment(allocator, machine, function, maybe_block, call, .entry_unaligned)).stack_arg_count;
 }
 
+pub fn appendSysVScalarCallInAlignedFrame(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    maybe_block: ?ir.BasicBlock,
+    call: ir.CallInst,
+    call_target: SysVCallTarget,
+) anyerror!void {
+    const delayed_target_setup = switch (call_target) {
+        .direct => false,
+        .indirect_from_reg => true,
+    };
+    if (!delayed_target_setup) try setupSysVCallTarget(allocator, machine, call_target);
+    const emission = try appendSysVScalarCallArgsWithBlockAndAlignment(allocator, machine, function, maybe_block, call, .already_aligned);
+    if (delayed_target_setup) try setupSysVCallTarget(allocator, machine, call_target);
+    try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+    try appendCallStackCleanupBytes(allocator, machine, emission.cleanup_bytes);
+}
+
 const StackArgAlignment = enum {
     entry_unaligned,
     already_aligned,

@@ -554,6 +554,8 @@ selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames
 selected stack-passed f32/f64 post-call reload through disp32 incoming stack offset
 selected direct, repeated-direct, pointer-callee, and repeated pointer-callee post-call f32/f64 sums with six spilled XMM addends plus stack-passed FP addends
 selected direct and pointer-callee one-FP-argument helper calls with six spilled XMM addends plus stack-passed FP addends
+selected direct and pointer-callee nine-FP-argument void helper calls with a
+stack-passed FP helper argument while preserving live FP values
 selected direct stack-passed f32/f64 parameter return through disp32 incoming stack offset
 selected ninth-argument f32/f64 stack slots for direct, pointer-callee, and
 constant-argument calls

@@ -18,6 +18,7 @@ const appendStackFrame = shared.appendStackFrame;
 const appendStackFrameEnd = shared.appendStackFrameEnd;
 const appendSysVCallTarget = shared.appendSysVCallTarget;
 const appendSysVScalarCallArgs = cabi_call_lowering.appendSysVScalarCallArgs;
+const appendSysVScalarCallInAlignedFrame = cabi_call_lowering.appendSysVScalarCallInAlignedFrame;
 const callIsFastcc = shared.callIsFastcc;
 const fp32TextBits = shared.fp32TextBits;
 const fp64TextBits = shared.fp64TextBits;
@@ -435,9 +436,7 @@ pub fn lowerGenericCfgFpVoidCallIntToFpAddReturn(
                 try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
             }
         }
-        try setupSysVCallTarget(allocator, machine, call_target);
-        _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
-        try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+        try appendSysVScalarCallInAlignedFrame(allocator, machine, function, null, call, call_target);
     }
     if (int_param.ty.eql(.{ .int = 64 })) {
         try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
@@ -526,9 +525,7 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
                 try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = try frameIndexForFpPreservedCallee(function.ret_ty, addends.register_count) } });
             }
         }
-        try setupSysVCallTarget(allocator, machine, call_target);
-        _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
-        try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
+        try appendSysVScalarCallInAlignedFrame(allocator, machine, function, null, call, call_target);
     }
     if (function.ret_ty.eql(.float)) {
         try emitFpVoidCallAddendIntoXmm(allocator, machine, function.ret_ty, addends.items[0], .xmm0, frame_bytes);
@@ -1214,7 +1211,6 @@ fn validateFpVoidCall(call: ir.CallInst) !void {
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
     }
-    if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
 }
 
 fn fpVoidCallTarget(function: ir.Function, call: ir.CallInst) !SysVCallTarget {
