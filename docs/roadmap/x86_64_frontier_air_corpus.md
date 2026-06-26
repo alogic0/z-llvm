@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=474
-structured_functions=474
-generic_codegen_functions=474
-generic_cfg_functions=474
+discovered_functions=477
+structured_functions=477
+generic_codegen_functions=477
+generic_cfg_functions=477
 structural_matcher_functions=0
-structured_air_v2_functions=474
-typed_air_operand_functions=474
+structured_air_v2_functions=477
+typed_air_operand_functions=477
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=474
+generic_lowering_functions=477
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=474
+object_emitted_functions=477
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -181,7 +181,8 @@ Closed in the current memory/aggregate frontier slice:
   same layout-derived copy path for pointer, `double`, and `i64` leaves in one
   MEMORY aggregate, `BigPtrFloat` proves pointer, `f32`, and `i64` leaves in
   the same MEMORY copy path, `BigFloat` proves five `f32` leaves through
-  dedicated `movss` stack loads and hidden-sret stores, and `BigDoubleArray` proves an
+  dedicated `movss` stack loads and hidden-sret stores, `BigFloatArray` proves
+  array-contained `f32` leaves through the recursive copy path, and `BigDoubleArray` proves an
   array-of-double MEMORY aggregate through the same recursive copy path; the
   `BigArrayMixed` row combines array-contained `i32`, array-contained `f64`,
   and pointer leaves in one byval-to-sret MEMORY aggregate; `Big32` and

@@ -352,12 +352,13 @@ byval-to-sret copies for top-level, recursively nested, and array-backed
 supported leaves,
 the first
 double-leaf copy through `BigDouble`, array-contained `double` copy through
-`BigDoubleArray`, mixed array/pointer copy through `BigArrayMixed`, f32-leaf copy through `BigFloat`, and
+`BigDoubleArray`, array-contained `float` copy through `BigFloatArray`,
+mixed array/pointer copy through `BigArrayMixed`, f32-leaf copy through `BigFloat`, and
 pointer/`double`/integer copy through `BigPtrDouble`, and
 pointer/`float`/integer copy through `BigPtrFloat`. Direct and indirect
 MEMORY aggregate calls prove the same by-value stack-copy and hidden-sret
 forwarding path for Big3, Big4, Big5, BigDouble, BigDoubleArray,
-BigArrayMixed, BigFloat, BigPtrDouble, BigPtrFloat,
+BigArrayMixed, BigFloat, BigFloatArray, BigPtrDouble, BigPtrFloat,
 BigNested, BigMixed, BigArray, ScalarMixed, ScalarNested, and ScalarArray.
 Varargs remain rejected at declarations and call sites.
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
