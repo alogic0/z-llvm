@@ -1,7 +1,7 @@
-const Big65 = extern struct {
-    values: [65]i64,
+const Big81 = extern struct {
+    values: [81]i64,
 };
 
-export fn frontier_big65_copy_boundary(value: Big65) Big65 {
+export fn frontier_big81_copy_boundary(value: Big81) Big81 {
     return value;
 }
