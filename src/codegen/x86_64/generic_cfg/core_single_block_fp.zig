@@ -493,24 +493,29 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
     const call_count = try leadingFpVoidCallCount(block);
     if (call_count == 0) return false;
 
-    const addend_count = try collectFpVoidCallFaddParamChain(function, block, call_count, ret.value orelse return error.InvalidRet);
-    if (addend_count < 2 or addend_count > 6) return error.UnsupportedLiveAcrossCall;
+    const addends = try collectFpVoidCallFaddParamChain(function, block, call_count, ret.value orelse return error.InvalidRet);
+    if (addends.count < 2 or addends.register_count > 6) return error.UnsupportedLiveAcrossCall;
 
     const preserved_callee = try repeatedFpVoidCallPreservedCallee(function, block, call_count);
-    const frame_bytes = try fpLiveAddendFrameBytes(function.ret_ty, addend_count, preserved_callee != null);
+    const frame_bytes = try fpLiveAddendFrameBytes(function.ret_ty, addends.register_count, preserved_callee != null);
     try appendStackFrame(allocator, machine, frame_bytes);
     var index: usize = 0;
-    while (index < addend_count) : (index += 1) {
-        const reg = try XmmReg.fromIndex(index);
-        const frame_index = try frameIndexForFpLiveAddend(function.ret_ty, index);
-        if (function.ret_ty.eql(.float)) {
-            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = reg, .frame_index = frame_index } });
-        } else {
-            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = reg, .frame_index = frame_index } });
+    while (index < addends.count) : (index += 1) {
+        switch (addends.items[index]) {
+            .register => |reg_addend| {
+                const reg = try XmmReg.fromIndex(reg_addend.param_index);
+                const frame_index = try frameIndexForFpLiveAddend(function.ret_ty, reg_addend.spill_index);
+                if (function.ret_ty.eql(.float)) {
+                    try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = reg, .frame_index = frame_index } });
+                } else {
+                    try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = reg, .frame_index = frame_index } });
+                }
+            },
+            .stack_disp => {},
         }
     }
     if (preserved_callee) |reg| {
-        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = try frameIndexForFpPreservedCallee(function.ret_ty, addend_count) } });
+        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = try frameIndexForFpPreservedCallee(function.ret_ty, addends.register_count) } });
     }
     index = 0;
     while (index < call_count) : (index += 1) {
@@ -518,7 +523,7 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
         const call_target = try fpVoidCallTarget(function, call);
         if (preserved_callee) |reg| {
             if (call_target == .indirect_from_reg) {
-                try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = try frameIndexForFpPreservedCallee(function.ret_ty, addend_count) } });
+                try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = try frameIndexForFpPreservedCallee(function.ret_ty, addends.register_count) } });
             }
         }
         try setupSysVCallTarget(allocator, machine, call_target);
@@ -526,17 +531,17 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
         try appendSysVCallTarget(allocator, machine, call_target, call.ret_ty);
     }
     if (function.ret_ty.eql(.float)) {
-        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, 0) } });
+        try emitFpVoidCallAddendIntoXmm(allocator, machine, function.ret_ty, addends.items[0], .xmm0, frame_bytes);
         index = 1;
-        while (index < addend_count) : (index += 1) {
-            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, index) } });
+        while (index < addends.count) : (index += 1) {
+            try emitFpVoidCallAddendIntoXmm(allocator, machine, function.ret_ty, addends.items[index], .xmm1, frame_bytes);
             try machine.instructions.append(allocator, .addss_xmm1_xmm0);
         }
     } else {
-        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, 0) } });
+        try emitFpVoidCallAddendIntoXmm(allocator, machine, function.ret_ty, addends.items[0], .xmm0, frame_bytes);
         index = 1;
-        while (index < addend_count) : (index += 1) {
-            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, index) } });
+        while (index < addends.count) : (index += 1) {
+            try emitFpVoidCallAddendIntoXmm(allocator, machine, function.ret_ty, addends.items[index], .xmm1, frame_bytes);
             try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
         }
     }
@@ -1243,13 +1248,53 @@ fn repeatedFpVoidCallPreservedCallee(function: ir.Function, block: ir.BasicBlock
     return preserved;
 }
 
-pub fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, first_binary_index: usize, ret_value: ir.Value) !usize {
+const FpVoidCallAddend = union(enum) {
+    register: struct {
+        param_index: usize,
+        spill_index: usize,
+    },
+    stack_disp: u32,
+};
+
+const FpVoidCallAddendList = struct {
+    items: [8]FpVoidCallAddend = undefined,
+    count: usize = 0,
+    register_count: usize = 0,
+    register_seen: [8]bool = [_]bool{false} ** 8,
+    stack_disps: [4]u32 = undefined,
+    stack_count: usize = 0,
+
+    fn appendRegister(self: *FpVoidCallAddendList, param_index: usize) !void {
+        if (param_index >= self.register_seen.len) return error.UnsupportedLiveAcrossCall;
+        if (self.register_seen[param_index]) return error.UnsupportedLiveAcrossCall;
+        if (self.count >= self.items.len) return error.UnsupportedLiveAcrossCall;
+        self.register_seen[param_index] = true;
+        self.items[self.count] = .{ .register = .{
+            .param_index = param_index,
+            .spill_index = self.register_count,
+        } };
+        self.count += 1;
+        self.register_count += 1;
+    }
+
+    fn appendStackDisp(self: *FpVoidCallAddendList, disp: u32) !void {
+        if (self.count >= self.items.len or self.stack_count >= self.stack_disps.len) return error.UnsupportedLiveAcrossCall;
+        for (self.stack_disps[0..self.stack_count]) |existing| {
+            if (existing == disp) return error.UnsupportedLiveAcrossCall;
+        }
+        self.stack_disps[self.stack_count] = disp;
+        self.stack_count += 1;
+        self.items[self.count] = .{ .stack_disp = disp };
+        self.count += 1;
+    }
+};
+
+fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, first_binary_index: usize, ret_value: ir.Value) !FpVoidCallAddendList {
     if (first_binary_index >= block.instructions.items.len) return error.UnsupportedCodegenInstruction;
     const binary_count = block.instructions.items.len - first_binary_index;
-    if (binary_count < 1 or binary_count > 5) return error.UnsupportedCodegenInstruction;
+    if (binary_count < 1 or binary_count > 7) return error.UnsupportedCodegenInstruction;
 
-    var addend_seen = [_]bool{false} ** 6;
-    var addend_count: usize = 0;
+    var addends = FpVoidCallAddendList{};
     var previous_name: ?[]const u8 = null;
 
     for (block.instructions.items[first_binary_index..], 0..) |instruction, index| {
@@ -1270,8 +1315,8 @@ pub fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlo
                 .named => |name| name,
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             };
-            try noteFpAddendIndex(function, lhs_name, &addend_seen, &addend_count);
-            try noteFpAddendIndex(function, rhs_name, &addend_seen, &addend_count);
+            try noteFpAddend(function, lhs_name, &addends);
+            try noteFpAddend(function, rhs_name, &addends);
         } else {
             const previous = previous_name orelse return error.UnsupportedCodegenInstruction;
             const lhs_is_previous = isNamed(binary.lhs, previous);
@@ -1282,24 +1327,60 @@ pub fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlo
                 .named => |name| name,
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             };
-            try noteFpAddendIndex(function, next_name, &addend_seen, &addend_count);
+            try noteFpAddend(function, next_name, &addends);
         }
         previous_name = result_name;
     }
 
-    var expected: usize = 0;
-    while (expected < addend_count) : (expected += 1) {
-        if (!addend_seen[expected]) return error.UnsupportedLiveAcrossCall;
-    }
-    return addend_count;
+    return addends;
 }
 
-pub fn noteFpAddendIndex(function: ir.Function, name: []const u8, seen: *[6]bool, count: *usize) !void {
-    const index = try fpParamIndex(function, name, function.ret_ty);
-    if (index >= seen.len) return error.UnsupportedLiveAcrossCall;
-    if (seen[index]) return error.UnsupportedLiveAcrossCall;
-    seen[index] = true;
-    count.* += 1;
+fn noteFpAddend(function: ir.Function, name: []const u8, addends: *FpVoidCallAddendList) !void {
+    const index = fpParamIndex(function, name, function.ret_ty) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi => null,
+        else => return err,
+    };
+    if (index) |param_index| {
+        try addends.appendRegister(param_index);
+    } else {
+        try addends.appendStackDisp(try scalarParamStackDisp8(function, name, function.ret_ty));
+    }
+}
+
+fn emitFpVoidCallAddendIntoXmm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    ty: ir.Type,
+    addend: FpVoidCallAddend,
+    reg: XmmReg,
+    frame_bytes: u8,
+) !void {
+    switch (addend) {
+        .register => |reg_addend| {
+            const frame_index = try frameIndexForFpLiveAddend(ty, reg_addend.spill_index);
+            if (ty.eql(.float)) {
+                try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = reg, .frame_index = frame_index } });
+            } else if (ty.eql(.double)) {
+                try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = reg, .frame_index = frame_index } });
+            } else return error.UnsupportedCodegenType;
+        },
+        .stack_disp => |disp| {
+            const adjusted = disp + @as(u32, frame_bytes);
+            if (ty.eql(.float)) {
+                if (adjusted <= std.math.maxInt(i8)) {
+                    try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm_f32 = .{ .reg = reg, .disp = @intCast(adjusted) } });
+                } else {
+                    try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm_f32 = .{ .reg = reg, .disp = adjusted } });
+                }
+            } else if (ty.eql(.double)) {
+                if (adjusted <= std.math.maxInt(i8)) {
+                    try machine.instructions.append(allocator, .{ .load_stack_disp8_xmm = .{ .reg = reg, .disp = @intCast(adjusted) } });
+                } else {
+                    try machine.instructions.append(allocator, .{ .load_stack_disp32_xmm = .{ .reg = reg, .disp = adjusted } });
+                }
+            } else return error.UnsupportedCodegenType;
+        },
+    }
 }
 
 pub fn fpLiveAddendFrameBytes(ty: ir.Type, addend_count: usize, preserve_callee: bool) !u8 {
