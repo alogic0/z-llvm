@@ -13,6 +13,7 @@ const FloatPair = extern struct {
     b: f32,
 };
 const FloatPairSumFn = *const fn (FloatPair) callconv(.c) f32;
+const FloatPairForwardFn = *const fn (FloatPair) callconv(.c) FloatPair;
 
 const FloatArray = extern struct {
     values: [4]f32,
@@ -222,6 +223,18 @@ export fn frontier_stack_float_pair_forward_after_pressure(f0: f64, f1: f64, f2:
     _ = f6;
     _ = f7;
     return value;
+}
+
+export fn frontier_stack_float_pair_indirect_forward_after_pressure(func: FloatPairForwardFn, f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, value: FloatPair) FloatPair {
+    _ = f0;
+    _ = f1;
+    _ = f2;
+    _ = f3;
+    _ = f4;
+    _ = f5;
+    _ = f6;
+    _ = f7;
+    return func(value);
 }
 
 export fn frontier_float_array_first(value: FloatArray) f32 {

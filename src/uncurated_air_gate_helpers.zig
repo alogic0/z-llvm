@@ -230,7 +230,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 462,
+            .functions = 463,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -2067,6 +2067,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern float z_frontier_shifted_float_pair_call_sum(double, struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_float_pair_call_sum");
     \\extern float z_frontier_indirect_float_pair_sum(float (*)(struct FloatPair), struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_float_pair_sum");
     \\extern struct FloatPair z_frontier_stack_float_pair_forward_after_pressure(double, double, double, double, double, double, double, double, struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_float_pair_forward_after_pressure");
+    \\extern struct FloatPair z_frontier_stack_float_pair_indirect_forward_after_pressure(struct FloatPair (*)(struct FloatPair), double, double, double, double, double, double, double, double, struct FloatPair) __asm__("frontier_sysv_aggregate_classes.frontier_stack_float_pair_indirect_forward_after_pressure");
     \\extern float z_frontier_float_array_first(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_first");
     \\extern float z_frontier_float_array_second(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_second");
     \\extern float z_frontier_float_array_third(struct FloatArray) __asm__("frontier_sysv_aggregate_classes.frontier_float_array_third");
@@ -2135,6 +2136,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_packed_reverse_mixed_high_int(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_high_int");
     \\extern struct PackedReverseMixed z_frontier_packed_reverse_mixed_make(double, int, int) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_make");
     \\float frontier_sum_float_pair(struct FloatPair value) { return value.a + value.b; }
+    \\struct FloatPair frontier_forward_float_pair(struct FloatPair value) { return value; }
     \\struct ArrayDouble frontier_make_array_double(double a, double b) { struct ArrayDouble result = { { a, b } }; return result; }
     \\double frontier_sum_array_double(struct ArrayDouble value) { return value.values[0] + value.values[1]; }
     \\float frontier_sum_float_array(struct FloatArray value) { return value.values[0] + value.values[1] + value.values[2] + value.values[3]; }
@@ -2170,6 +2172,8 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_indirect_float_pair_sum(frontier_sum_float_pair, floats) != 27.25f) return 61;
     \\    struct FloatPair stack_forwarded_floats = z_frontier_stack_float_pair_forward_after_pressure(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, floats);
     \\    if (stack_forwarded_floats.a != floats.a || stack_forwarded_floats.b != floats.b) return 94;
+    \\    struct FloatPair stack_forwarded_indirect_floats = z_frontier_stack_float_pair_indirect_forward_after_pressure(frontier_forward_float_pair, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, floats);
+    \\    if (stack_forwarded_indirect_floats.a != floats.a || stack_forwarded_indirect_floats.b != floats.b) return 95;
     \\    struct FloatArray float_array = { { 1.25f, 2.5f, 3.75f, 4.5f } };
     \\    if (z_frontier_float_array_first(float_array) != 1.25f) return 67;
     \\    if (z_frontier_float_array_second(float_array) != 2.5f) return 68;

@@ -209,6 +209,8 @@ accepted frontier:
   incoming stack eightbytes into `%xmm0`/`%xmm1`
   selected stack-sourced single-eightbyte SSE `{ f32, f32 }` pass-through
   returns by reloading the incoming stack eightbyte into `%xmm0`
+  selected stack-sourced single-eightbyte SSE `{ f32, f32 }` function-pointer
+  forwarding by reloading `%xmm0` before `callq *%rax`
   selected stack-passed `[4]f32` aggregate helper calls with generic
   stack-to-XMM `movss` reloads
   selected stack-sourced INTEGER aggregate forwarding into outgoing GPR
@@ -512,6 +514,7 @@ selected deep stack-sourced SSE/SSE aggregate forwarding into outgoing XMM slots
 with disp32 reloads
 selected stack-sourced SSE/SSE pass-through returns into `%xmm0`/`%xmm1`
 selected stack-sourced single-eightbyte SSE pass-through returns into `%xmm0`
+selected stack-sourced single-eightbyte SSE function-pointer forwarding through `%xmm0`
 selected shifted in-register mixed aggregate pass-through calls
 selected shifted in-register reversed mixed aggregate pass-through calls
 selected shifted nested mixed aggregate pass-through calls that move both GPR and SSE halves
