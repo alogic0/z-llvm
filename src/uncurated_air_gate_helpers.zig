@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 578,
+            .functions = 583,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1855,6 +1855,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big128 { long long values[128]; };
     \\struct Big160 { long long values[160]; };
     \\struct Big192 { long long values[192]; };
+    \\struct Big224 { long long values[224]; };
     \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\struct BigMixed { long long a; int b; long long c; int d; };
     \\struct NarrowInner { unsigned short b; int c; };
@@ -1962,6 +1963,11 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big192 z_frontier_indirect_big192_copy(struct Big192 (*)(struct Big192), struct Big192) __asm__("frontier_sysv_sret_byval.frontier_indirect_big192_copy");
     \\extern struct Big192 z_frontier_stack_source_big192_copy(long long, long long, long long, long long, long long, long long, struct Big192) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big192_copy");
     \\extern struct Big192 z_frontier_stack_source_indirect_big192_copy(struct Big192 (*)(struct Big192), long long, long long, long long, long long, long long, long long, struct Big192) __asm__("frontier_sysv_sret_byval.frontier_stack_source_indirect_big192_copy");
+    \\extern struct Big224 z_frontier_big224_copy(struct Big224) __asm__("frontier_sysv_sret_byval.frontier_big224_copy");
+    \\extern struct Big224 z_frontier_direct_big224_copy(struct Big224) __asm__("frontier_sysv_sret_byval.frontier_direct_big224_copy");
+    \\extern struct Big224 z_frontier_indirect_big224_copy(struct Big224 (*)(struct Big224), struct Big224) __asm__("frontier_sysv_sret_byval.frontier_indirect_big224_copy");
+    \\extern struct Big224 z_frontier_stack_source_big224_copy(long long, long long, long long, long long, long long, long long, struct Big224) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big224_copy");
+    \\extern struct Big224 z_frontier_stack_source_indirect_big224_copy(struct Big224 (*)(struct Big224), long long, long long, long long, long long, long long, long long, struct Big224) __asm__("frontier_sysv_sret_byval.frontier_stack_source_indirect_big224_copy");
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern struct BigNested z_frontier_direct_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_direct_big_nested_copy");
     \\extern struct BigNested z_frontier_indirect_big_nested_copy(struct BigNested (*)(struct BigNested), struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_nested_copy");
@@ -2019,6 +2025,14 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\static int check_big192(struct Big192 value, long long a, long long b, long long c, long long d) {
     \\    return value.values[0] == a && value.values[63] == b && value.values[184] == c && value.values[191] == d;
+    \\}
+    \\static struct Big224 make_big224(void) {
+    \\    struct Big224 result = {0};
+    \\    for (int i = 0; i < 224; i += 1) result.values[i] = (long long)(i + 1);
+    \\    return result;
+    \\}
+    \\static int check_big224(struct Big224 value, long long a, long long b, long long c, long long d) {
+    \\    return value.values[0] == a && value.values[63] == b && value.values[216] == c && value.values[223] == d;
     \\}
     \\extern struct BigArray z_frontier_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_copy");
     \\extern struct BigArray z_frontier_direct_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_direct_big_array_copy");
@@ -2253,6 +2267,17 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (!check_big192(stack_source192, 1, 64, 185, 192)) return 395;
     \\    struct Big192 stack_source_indirect192 = z_frontier_stack_source_indirect_big192_copy(z_frontier_big192_copy, 10, 20, 30, 40, 50, 60, input192);
     \\    if (!check_big192(stack_source_indirect192, 1, 64, 185, 192)) return 396;
+    \\    struct Big224 input224 = make_big224();
+    \\    struct Big224 copied224 = z_frontier_big224_copy(input224);
+    \\    if (!check_big224(copied224, 1, 64, 217, 224)) return 397;
+    \\    struct Big224 direct224 = z_frontier_direct_big224_copy(input224);
+    \\    if (!check_big224(direct224, 1, 64, 217, 224)) return 398;
+    \\    struct Big224 indirect224 = z_frontier_indirect_big224_copy(z_frontier_big224_copy, input224);
+    \\    if (!check_big224(indirect224, 1, 64, 217, 224)) return 399;
+    \\    struct Big224 stack_source224 = z_frontier_stack_source_big224_copy(10, 20, 30, 40, 50, 60, input224);
+    \\    if (!check_big224(stack_source224, 1, 64, 217, 224)) return 400;
+    \\    struct Big224 stack_source_indirect224 = z_frontier_stack_source_indirect_big224_copy(z_frontier_big224_copy, 10, 20, 30, 40, 50, 60, input224);
+    \\    if (!check_big224(stack_source_indirect224, 1, 64, 217, 224)) return 401;
     \\    struct BigNested nested = { .left = { .a = 2, .b = 3, .c = 5 }, .right = { .a = 7, .b = 11, .c = 13 } };
     \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 20;
     \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);

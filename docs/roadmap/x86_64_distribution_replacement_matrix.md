@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=578`,
-`generic_codegen_functions=578`, `generic_cfg_functions=578`,
+three release modes at `source_rows=13`, `discovered_functions=583`,
+`generic_codegen_functions=583`, `generic_cfg_functions=583`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=578`, `object_failures=0`,
+`object_emitted_functions=583`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -655,11 +655,11 @@ float/double plus pointer/integer byval-to-sret copy row,
 `BigDeepMixed` deeper nested array/aggregate/pointer/scalar byval-to-sret copy row, and direct/indirect
 MEMORY aggregate calls for Big3,
 Big4, Big5, BigDouble, BigDoubleArray, BigArrayMixed, BigNestedArrayMixed, BigStructArrayMixed, BigDeepMixed, BigFloat, BigFloatArray, BigPtrDouble, BigPtrFloat,
-BigNested, BigMixed, BigNarrow, BigArray, ScalarMixed, ScalarNested, and ScalarArray; Big32, Big40, Big48, Big64, Big80, Big81, Big96, Big128, Big160, and Big192 extend the same
+BigNested, BigMixed, BigNarrow, BigArray, ScalarMixed, ScalarNested, and ScalarArray; Big32, Big40, Big48, Big64, Big80, Big81, Big96, Big128, Big160, Big192, and Big224 extend the same
 planner-owned copy path through exact-qword MEMORY payloads beyond byte-offset
-byval loads, including disp32 source-pointer reloads through the 192-stack-argument
-planner cap, Big80/Big81/Big96/Big128/Big160/Big192 direct and pointer-callee forwarding,
-and stack-sourced Big40/Big48/Big64/Big80/Big81/Big96/Big128/Big160/Big192 payload copies from the caller stack argument area; plus 5-/6-/7-byte composite
+byval loads, including disp32 source-pointer reloads through the 224-stack-argument
+planner cap, Big80/Big81/Big96/Big128/Big160/Big192/Big224 direct and pointer-callee forwarding,
+and stack-sourced Big40/Big48/Big64/Big80/Big81/Big96/Big128/Big160/Big192/Big224 payload copies from the caller stack argument area; plus 5-/6-/7-byte composite
 byval stack-copy tails through `[21 x i8]`, `[22 x i8]`, and `[23 x i8]`,
 source-backed fail-closed varargs/vector/X87/packed aggregate/tail-call/callconv boundary proof through
 `distribution-air-release-frontier-boundaries` with
