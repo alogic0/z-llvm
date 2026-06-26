@@ -64,6 +64,7 @@ const NestedMixed = extern struct {
 };
 const NestedMixedIntFn = *const fn (NestedMixed) callconv(.c) i32;
 const NestedMixedMakeFn = *const fn (i32, i32, f64) callconv(.c) NestedMixed;
+const NestedMixedForwardFn = *const fn (NestedMixed) callconv(.c) NestedMixed;
 
 const SmallMixed = extern struct {
     a: i32,
@@ -658,6 +659,10 @@ noinline fn helperNestedMixedMake(a: i32, b: i32, c: f64) NestedMixed {
     return .{ .ints = .{ .a = a, .b = b }, .value = c };
 }
 
+noinline fn helperNestedMixedForward(value: NestedMixed) NestedMixed {
+    return value;
+}
+
 export fn frontier_shifted_nested_mixed_call_int(prefix_int: i64, prefix_float: f64, value: NestedMixed) i32 {
     _ = prefix_int;
     _ = prefix_float;
@@ -674,6 +679,14 @@ export fn frontier_nested_mixed_call_make(a: i32, b: i32, c: f64) NestedMixed {
 
 export fn frontier_indirect_nested_mixed_make(func: NestedMixedMakeFn, a: i32, b: i32, c: f64) NestedMixed {
     return func(a, b, c);
+}
+
+export fn frontier_nested_mixed_call_forward(value: NestedMixed) NestedMixed {
+    return helperNestedMixedForward(value);
+}
+
+export fn frontier_indirect_nested_mixed_forward(func: NestedMixedForwardFn, value: NestedMixed) NestedMixed {
+    return func(value);
 }
 
 export fn frontier_stack_nested_mixed_call_int_after_pressure(a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, value: NestedMixed) i32 {

@@ -212,6 +212,9 @@ accepted frontier:
   selected shifted in-register mixed aggregate helper calls where the INTEGER
   eightbyte moves between GPR argument slots and the SSE eightbyte already
   occupies the destination SSE slot
+  selected direct and pointer-callee nested mixed aggregate pass-through
+  returns where `{ { i32, i32 }, double }` stays a register-class SysV
+  aggregate in `%rax`/`%xmm0`
   selected shifted in-register reversed mixed aggregate helper calls where the
   SSE eightbyte moves between XMM argument slots and the INTEGER eightbyte
   already occupies the destination GPR slot
@@ -505,6 +508,8 @@ with disp32 reloads
 selected shifted in-register mixed aggregate pass-through calls
 selected shifted in-register reversed mixed aggregate pass-through calls
 selected shifted nested mixed aggregate pass-through calls that move both GPR and SSE halves
+selected direct and pointer-callee nested mixed aggregate pass-through returns
+without sret ABI rewriting
 selected pointer-callee reversed mixed SSE/INTEGER aggregate pass-through calls
 selected up-to-six-live-i32 spill/reload call frame
 selected live i32 GPR preservation across direct and pointer-callee f64-argument calls

@@ -199,9 +199,11 @@ pub fn lowerRegisterAggregateReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    if (!isAggregateType(function.ret_ty)) return false;
     if (!ret.ty.eql(function.ret_ty)) return false;
     const classification = classifySysVAggregate(function.ret_ty) catch return false;
     if (classification.kind != .register or classification.eightbyte_count == 0) return false;
+    if (try lowerRegisterAggregateParamReturn(allocator, machine, function, block, ret, classification)) return true;
     const leaf_count = block.instructions.items.len;
     if (leaf_count == 0 or leaf_count > 8) return false;
 
@@ -333,6 +335,63 @@ pub fn lowerRegisterAggregateReturn(
                     },
                     else => return error.UnsupportedCodegenAbi,
                 }
+                sse_return_index += 1;
+            },
+        }
+    }
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRegisterAggregateParamReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+    classification: SysVAggregateClassification,
+) !bool {
+    if (block.instructions.items.len != 0) return false;
+    const ret_value = ret.value orelse return error.InvalidRet;
+    const param_name = switch (ret_value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const source = sysvParamCursorForWithInitial(function, param_name, function.ret_ty, .{
+        .gpr = 0,
+        .sse = 0,
+        .stack_eightbytes = 0,
+    }) catch |err| switch (err) {
+        error.UnsupportedCodegenValue, error.UnsupportedCodegenType => return false,
+    };
+    const needs = sysv_abi.aggregateRegisterNeeds(classification);
+    const source_in_registers = source.gpr + needs.gpr <= 6 and source.sse + needs.sse <= 8 and source.stack_eightbytes == 0;
+    if (!source_in_registers) return error.UnsupportedCodegenAbi;
+
+    var gpr_return_index: usize = 0;
+    var sse_return_index: usize = 0;
+    var gpr_source_offset: usize = 0;
+    var sse_source_offset: usize = 0;
+    var eightbyte_index: usize = 0;
+    while (eightbyte_index < classification.eightbyte_count) : (eightbyte_index += 1) {
+        switch (classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi) {
+            .integer => {
+                const src = try ArgReg.fromIndex(source.gpr + gpr_source_offset);
+                switch (gpr_return_index) {
+                    0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
+                    1 => try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } }),
+                    else => return error.UnsupportedCodegenAbi,
+                }
+                gpr_source_offset += 1;
+                gpr_return_index += 1;
+            },
+            .sse => {
+                const src = try XmmReg.fromIndex(source.sse + sse_source_offset);
+                const dst = try XmmReg.fromIndex(sse_return_index);
+                if (src != dst) {
+                    try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = src } });
+                }
+                sse_source_offset += 1;
                 sse_return_index += 1;
             },
         }

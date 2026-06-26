@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=455
-structured_functions=455
-generic_codegen_functions=455
-generic_cfg_functions=455
+discovered_functions=458
+structured_functions=458
+generic_codegen_functions=458
+generic_cfg_functions=458
 structural_matcher_functions=0
-structured_air_v2_functions=455
-typed_air_operand_functions=455
+structured_air_v2_functions=458
+typed_air_operand_functions=458
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=455
+generic_lowering_functions=458
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=455
+object_emitted_functions=458
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -226,7 +226,9 @@ Closed in the current memory/aggregate frontier slice:
   INTEGER and SSE stack eightbytes;
   `frontier_shifted_mixed_call_int` now proves in-register aggregate
   pass-through can move a shifted INTEGER eightbyte from `%rsi` to `%rdi`
-  before the helper call instead of requiring exact source/destination slots
+  before the helper call instead of requiring exact source/destination slots;
+  direct and pointer-callee nested mixed aggregate forward rows now also prove
+  register-class aggregate pass-through returns without selected sret rewriting
 - first SSE/SSE aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ double, double }` is classified as
   SSE/SSE, field reads return from the independent SSE argument stream, and
@@ -266,8 +268,11 @@ Closed in the current memory/aggregate frontier slice:
   a private helper call, and the pointer-callee follow-up proves
   `{ { i32, i32 }, double }` INTEGER/SSE aggregate arguments and returns through
   indirect helper calls using the same SysV planner-owned register assignment
-  path
-  a private helper call using the same register aggregate pass-through helper
+  path. `frontier_nested_mixed_call_forward` and
+  `frontier_indirect_nested_mixed_forward` keep the same nested mixed aggregate
+  in the register ABI, forwarding incoming GPR/SSE eightbytes to
+  `%rax`/`%xmm0` for direct and pointer-callee helper returns without sret
+  rewriting
 - first nested mixed aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `{ { i32, i32 }, double }` field
   pointers carry `align(...)` qualifiers from typed AIR v2, lower through

@@ -230,7 +230,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 455,
+            .functions = 458,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -2115,6 +2115,8 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_indirect_nested_mixed_call_int(int (*)(struct NestedMixed), struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_nested_mixed_call_int");
     \\extern struct NestedMixed z_frontier_nested_mixed_call_make(int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_call_make");
     \\extern struct NestedMixed z_frontier_indirect_nested_mixed_make(struct NestedMixed (*)(int, int, double), int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_nested_mixed_make");
+    \\extern struct NestedMixed z_frontier_nested_mixed_call_forward(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_call_forward");
+    \\extern struct NestedMixed z_frontier_indirect_nested_mixed_forward(struct NestedMixed (*)(struct NestedMixed), struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_nested_mixed_forward");
     \\extern int z_frontier_stack_nested_mixed_call_int_after_pressure(long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_nested_mixed_call_int_after_pressure");
     \\extern int z_frontier_small_mixed_int(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_int");
     \\extern double z_frontier_small_mixed_float(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_float");
@@ -2233,6 +2235,10 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (call_made_nested_mixed.ints.a != 101 || call_made_nested_mixed.ints.b != 103 || call_made_nested_mixed.value != 107.5) return 87;
     \\    struct NestedMixed indirect_made_nested_mixed = z_frontier_indirect_nested_mixed_make(z_frontier_nested_mixed_make, 109, 113, 127.5);
     \\    if (indirect_made_nested_mixed.ints.a != 109 || indirect_made_nested_mixed.ints.b != 113 || indirect_made_nested_mixed.value != 127.5) return 88;
+    \\    struct NestedMixed forwarded_nested_mixed = z_frontier_nested_mixed_call_forward(nested_mixed);
+    \\    if (forwarded_nested_mixed.ints.a != nested_mixed.ints.a || forwarded_nested_mixed.ints.b != nested_mixed.ints.b || forwarded_nested_mixed.value != nested_mixed.value) return 89;
+    \\    struct NestedMixed indirect_forwarded_nested_mixed = z_frontier_indirect_nested_mixed_forward(z_frontier_nested_mixed_call_forward, nested_mixed);
+    \\    if (indirect_forwarded_nested_mixed.ints.a != nested_mixed.ints.a || indirect_forwarded_nested_mixed.ints.b != nested_mixed.ints.b || indirect_forwarded_nested_mixed.value != nested_mixed.value) return 90;
     \\    if (z_frontier_stack_nested_mixed_call_int_after_pressure(1, 2, 3, 4, 5, 6, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, nested_mixed) != 100) return 78;
     \\    struct SmallMixed small_mixed = { 17, 23.5 };
     \\    if (z_frontier_small_mixed_int(small_mixed) != 17) return 16;

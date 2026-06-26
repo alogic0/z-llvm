@@ -557,6 +557,7 @@ pub fn typedV2SretIntegerAggregateRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
+    if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     const leaf_count = supportedScalarAggregateLeafParamCount(function_type.return_type.ir_type, function_type.params) orelse return false;
     if (leaf_count < 3) return false;
     return typedOpcodeCount(structured_air_v2, "arg") == leaf_count and
@@ -569,6 +570,7 @@ pub fn typedV2SretIntegerAggregateCopyRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
+    if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     const leaf_count = supportedAggregateCopyLeafCount(function_type.return_type.ir_type) orelse return false;
     if (leaf_count < 3 or function_type.params.len != 1) return false;
     if (!function_type.params[0].ir_type.eql(function_type.return_type.ir_type)) return false;
@@ -580,6 +582,7 @@ pub fn typedV2SretIntegerAggregateCallWrapperRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
+    if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     const leaf_count = supportedAggregateCopyLeafCount(function_type.return_type.ir_type) orelse return false;
     if (leaf_count < 3 or function_type.params.len < 2) return false;
     if (!function_type.params[function_type.params.len - 1].ir_type.eql(function_type.return_type.ir_type)) return false;

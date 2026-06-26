@@ -72,6 +72,7 @@ selected small INTEGER/INTEGER aggregate argument field reads use the SysV integ
 the reusable aggregate classifier now distinguishes INTEGER, SSE, mixed INTEGER/SSE, and MEMORY classes for <=16-byte aggregates, with packed/unaligned and too-large aggregates classified as MEMORY
 selected nested mixed INTEGER/SSE aggregate field reads and construction returns use layout-backed byte offsets and the independent SysV GPR/SSE streams
 selected shifted nested mixed INTEGER/SSE helper calls move both GPR and SSE aggregate halves through the shared register aggregate pass-through helper
+selected nested mixed INTEGER/SSE pass-through returns move incoming GPR/SSE aggregate eightbytes into the SysV return registers for direct and pointer-callee helper forwarding
 selected stack-passed nested mixed INTEGER/SSE aggregate helper calls read nested `i32` fields from caller and callee stack slots through the same layout-derived offsets
 selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV GPR/SSE streams
 selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV SSE/GPR streams
@@ -199,6 +200,9 @@ aggregate argument field reads and register aggregate return:
   shifted in-register mixed aggregate parameters can move the INTEGER eightbyte
   between GPR argument slots before helper calls when the SSE eightbyte already
   occupies the required destination SSE slot
+  direct and pointer-callee nested mixed aggregate pass-through returns now
+  return `{ { i32, i32 }, double }` by moving the incoming INTEGER/SSE
+  eightbytes into `%rax`/`%xmm0` without rewriting the public C ABI to sret
   stack-passed `{ i64, double }` mixed aggregates can now be forwarded into
   outgoing stack aggregate slots after both the callee GPR and SSE argument
   streams are exhausted, and helper field returns cover both the INTEGER

@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=455
-structured_functions=455
-generic_codegen_functions=455
-generic_cfg_functions=455
+discovered_functions=458
+structured_functions=458
+generic_codegen_functions=458
+generic_cfg_functions=458
 structural_matcher_functions=0
-structured_air_v2_functions=455
-typed_air_operand_functions=455
+structured_air_v2_functions=458
+typed_air_operand_functions=458
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=455
+generic_lowering_functions=458
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=455
+object_emitted_functions=458
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 455-function counters above plus `native_link_accepted_rows=13`,
+13-source / 458-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -696,6 +696,10 @@ rows, and ReleaseSafe bounds/null/int-conversion panic rows. They also resolve t
 `outOfBounds`, `integerPartOutOfBounds`, and `unwrapNull` symbols with local
 trap stubs so the stable non-panic C ABI probes link and run without turning
 those symbols into native-link runtime-boundary rows.
+The latest SysV aggregate slice adds direct and pointer-callee nested mixed
+aggregate forwarding rows: `{ { i32, i32 }, double }` remains a register-class
+aggregate and returns through `%rax`/`%xmm0`, while typed-v2 sret rewriting is
+kept to non-register aggregate candidates.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,
