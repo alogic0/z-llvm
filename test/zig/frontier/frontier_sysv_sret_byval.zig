@@ -336,6 +336,7 @@ const Big40CopyFn = *const fn (Big40) callconv(.c) Big40;
 const Big48CopyFn = *const fn (Big48) callconv(.c) Big48;
 const Big64CopyFn = *const fn (Big64) callconv(.c) Big64;
 const Big80CopyFn = *const fn (Big80) callconv(.c) Big80;
+const Big81CopyFn = *const fn (Big81) callconv(.c) Big81;
 const Big96CopyFn = *const fn (Big96) callconv(.c) Big96;
 const Big128CopyFn = *const fn (Big128) callconv(.c) Big128;
 const ScalarMixedCopyFn = *const fn (ScalarMixed) callconv(.c) ScalarMixed;
@@ -608,12 +609,26 @@ export fn frontier_stack_source_big80_copy(a: i64, b: i64, c: i64, d: i64, e: i6
     return frontier_big80_copy(value);
 }
 
+export fn frontier_stack_source_indirect_big80_copy(func: Big80CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big80) Big80 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return func(value);
+}
+
 export fn frontier_big81_copy(value: Big81) Big81 {
     return value;
 }
 
 export fn frontier_direct_big81_copy(value: Big81) Big81 {
     return frontier_big81_copy(value);
+}
+
+export fn frontier_indirect_big81_copy(func: Big81CopyFn, value: Big81) Big81 {
+    return func(value);
 }
 
 export fn frontier_stack_source_big81_copy(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big81) Big81 {
@@ -624,6 +639,16 @@ export fn frontier_stack_source_big81_copy(a: i64, b: i64, c: i64, d: i64, e: i6
     _ = e;
     _ = f;
     return frontier_big81_copy(value);
+}
+
+export fn frontier_stack_source_indirect_big81_copy(func: Big81CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big81) Big81 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return func(value);
 }
 
 export fn frontier_big96_copy(value: Big96) Big96 {

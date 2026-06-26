@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 549,
+            .functions = 552,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1902,9 +1902,12 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big80 z_frontier_direct_big80_copy(struct Big80) __asm__("frontier_sysv_sret_byval.frontier_direct_big80_copy");
     \\extern struct Big80 z_frontier_indirect_big80_copy(struct Big80 (*)(struct Big80), struct Big80) __asm__("frontier_sysv_sret_byval.frontier_indirect_big80_copy");
     \\extern struct Big80 z_frontier_stack_source_big80_copy(long long, long long, long long, long long, long long, long long, struct Big80) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big80_copy");
+    \\extern struct Big80 z_frontier_stack_source_indirect_big80_copy(struct Big80 (*)(struct Big80), long long, long long, long long, long long, long long, long long, struct Big80) __asm__("frontier_sysv_sret_byval.frontier_stack_source_indirect_big80_copy");
     \\extern struct Big81 z_frontier_big81_copy(struct Big81) __asm__("frontier_sysv_sret_byval.frontier_big81_copy");
     \\extern struct Big81 z_frontier_direct_big81_copy(struct Big81) __asm__("frontier_sysv_sret_byval.frontier_direct_big81_copy");
+    \\extern struct Big81 z_frontier_indirect_big81_copy(struct Big81 (*)(struct Big81), struct Big81) __asm__("frontier_sysv_sret_byval.frontier_indirect_big81_copy");
     \\extern struct Big81 z_frontier_stack_source_big81_copy(long long, long long, long long, long long, long long, long long, struct Big81) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big81_copy");
+    \\extern struct Big81 z_frontier_stack_source_indirect_big81_copy(struct Big81 (*)(struct Big81), long long, long long, long long, long long, long long, long long, struct Big81) __asm__("frontier_sysv_sret_byval.frontier_stack_source_indirect_big81_copy");
     \\extern struct Big96 z_frontier_big96_copy(struct Big96) __asm__("frontier_sysv_sret_byval.frontier_big96_copy");
     \\extern struct Big96 z_frontier_direct_big96_copy(struct Big96) __asm__("frontier_sysv_sret_byval.frontier_direct_big96_copy");
     \\extern struct Big96 z_frontier_indirect_big96_copy(struct Big96 (*)(struct Big96), struct Big96) __asm__("frontier_sysv_sret_byval.frontier_indirect_big96_copy");
@@ -2133,13 +2136,19 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (!check_big80(indirect80, 1, 64, 73, 80)) return 340;
     \\    struct Big80 stack_source80 = z_frontier_stack_source_big80_copy(10, 20, 30, 40, 50, 60, input80);
     \\    if (!check_big80(stack_source80, 1, 64, 73, 80)) return 341;
+    \\    struct Big80 stack_source_indirect80 = z_frontier_stack_source_indirect_big80_copy(z_frontier_big80_copy, 10, 20, 30, 40, 50, 60, input80);
+    \\    if (!check_big80(stack_source_indirect80, 1, 64, 73, 80)) return 370;
     \\    struct Big81 input81 = make_big81();
     \\    struct Big81 copied81 = z_frontier_big81_copy(input81);
     \\    if (!check_big81(copied81, 1, 64, 73, 81)) return 247;
     \\    struct Big81 direct81 = z_frontier_direct_big81_copy(input81);
     \\    if (!check_big81(direct81, 1, 64, 73, 81)) return 248;
+    \\    struct Big81 indirect81 = z_frontier_indirect_big81_copy(z_frontier_big81_copy, input81);
+    \\    if (!check_big81(indirect81, 1, 64, 73, 81)) return 368;
     \\    struct Big81 stack_source81 = z_frontier_stack_source_big81_copy(10, 20, 30, 40, 50, 60, input81);
     \\    if (!check_big81(stack_source81, 1, 64, 73, 81)) return 342;
+    \\    struct Big81 stack_source_indirect81 = z_frontier_stack_source_indirect_big81_copy(z_frontier_big81_copy, 10, 20, 30, 40, 50, 60, input81);
+    \\    if (!check_big81(stack_source_indirect81, 1, 64, 73, 81)) return 369;
     \\    struct Big96 input96 = make_big96();
     \\    struct Big96 copied96 = z_frontier_big96_copy(input96);
     \\    if (!check_big96(copied96, 1, 64, 89, 96)) return 347;

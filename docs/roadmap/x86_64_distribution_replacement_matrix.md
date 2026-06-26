@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=549`,
-`generic_codegen_functions=549`, `generic_cfg_functions=549`,
+three release modes at `source_rows=13`, `discovered_functions=552`,
+`generic_codegen_functions=552`, `generic_cfg_functions=552`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=549`, `object_failures=0`,
+`object_emitted_functions=552`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -658,7 +658,8 @@ Big4, Big5, BigDouble, BigDoubleArray, BigArrayMixed, BigNestedArrayMixed, BigSt
 BigNested, BigMixed, BigNarrow, BigArray, ScalarMixed, ScalarNested, and ScalarArray; Big32, Big40, Big48, Big64, Big80, Big81, Big96, and Big128 extend the same
 planner-owned copy path through exact-qword MEMORY payloads beyond byte-offset
 byval loads, including disp32 source-pointer reloads through the 128-stack-argument
-planner cap and stack-sourced Big40/Big48/Big64/Big80/Big81/Big96/Big128 payload copies from the caller stack argument area; plus 5-/6-/7-byte composite
+planner cap, Big80/Big81/Big96/Big128 direct and pointer-callee forwarding,
+and stack-sourced Big40/Big48/Big64/Big80/Big81/Big96/Big128 payload copies from the caller stack argument area; plus 5-/6-/7-byte composite
 byval stack-copy tails through `[21 x i8]`, `[22 x i8]`, and `[23 x i8]`,
 source-backed fail-closed varargs/vector/X87/packed aggregate/tail-call/callconv boundary proof through
 `distribution-air-release-frontier-boundaries` with

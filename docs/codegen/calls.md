@@ -331,9 +331,9 @@ direct and function-pointer calls; the 40-/48-/64-/80-/81-/96-/128-eightbyte row
 source-pointer reloads once payload offsets exceed the byte displacement range,
 and the stack-sourced Big40/Big48/Big64/Big80/Big81/Big96/Big128 rows prove incoming `byval` payload
 parameters are copied directly from caller stack payload slots rather than
-treated as pointers. Big80 indirect forwarding is now accepted through the
-same planner-owned function-pointer byval copy path, and Big80/Big81/Big96/Big128
-stack-source forwarding is accepted through the same
+treated as pointers. Big80/Big81/Big96/Big128 indirect forwarding is now
+accepted through the same planner-owned function-pointer byval copy path, with
+Big81 covering a non-qword tail, and Big80/Big81/Big96/Big128 stack-source forwarding is accepted through the same
 layout-derived stack-copy path. The frontier boundary gate keeps
 `stack_pressure_boundary_rows=0` as a regression guard for unsupported
 forwarding pressure shapes.
