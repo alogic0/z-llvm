@@ -173,6 +173,10 @@ const Big160 = extern struct {
     values: [160]i64,
 };
 
+const Big192 = extern struct {
+    values: [192]i64,
+};
+
 const BigNested = extern struct {
     left: Big3,
     right: Big3,
@@ -344,6 +348,7 @@ const Big81CopyFn = *const fn (Big81) callconv(.c) Big81;
 const Big96CopyFn = *const fn (Big96) callconv(.c) Big96;
 const Big128CopyFn = *const fn (Big128) callconv(.c) Big128;
 const Big160CopyFn = *const fn (Big160) callconv(.c) Big160;
+const Big192CopyFn = *const fn (Big192) callconv(.c) Big192;
 const ScalarMixedCopyFn = *const fn (ScalarMixed) callconv(.c) ScalarMixed;
 const ScalarNestedCopyFn = *const fn (ScalarNested) callconv(.c) ScalarNested;
 const ScalarArrayCopyFn = *const fn (ScalarArray) callconv(.c) ScalarArray;
@@ -743,6 +748,38 @@ export fn frontier_stack_source_big160_copy(a: i64, b: i64, c: i64, d: i64, e: i
 }
 
 export fn frontier_stack_source_indirect_big160_copy(func: Big160CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big160) Big160 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return func(value);
+}
+
+export fn frontier_big192_copy(value: Big192) Big192 {
+    return value;
+}
+
+export fn frontier_direct_big192_copy(value: Big192) Big192 {
+    return frontier_big192_copy(value);
+}
+
+export fn frontier_indirect_big192_copy(func: Big192CopyFn, value: Big192) Big192 {
+    return func(value);
+}
+
+export fn frontier_stack_source_big192_copy(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big192) Big192 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return frontier_big192_copy(value);
+}
+
+export fn frontier_stack_source_indirect_big192_copy(func: Big192CopyFn, a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big192) Big192 {
     _ = a;
     _ = b;
     _ = c;
