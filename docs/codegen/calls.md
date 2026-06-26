@@ -569,6 +569,8 @@ stack-passed FP helper argument while preserving live FP values
 selected direct and pointer-callee nine-FP-argument void helper calls that also
 reload six spilled XMM addends plus incoming stack-passed FP addends after the
 call
+selected direct f64 call-result live-across-later-call frame where the later
+f64-result helper uses an outgoing constant ninth FP stack argument
 selected direct stack-passed f32/f64 parameter return through disp32 incoming stack offset
 selected ninth-argument f32/f64 stack slots for direct, pointer-callee, and
 constant-argument calls

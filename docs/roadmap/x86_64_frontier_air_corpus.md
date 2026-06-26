@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=527
-structured_functions=527
-generic_codegen_functions=527
-generic_cfg_functions=527
+discovered_functions=528
+structured_functions=528
+generic_codegen_functions=528
+generic_cfg_functions=528
 structural_matcher_functions=0
-structured_air_v2_functions=527
-typed_air_operand_functions=527
+structured_air_v2_functions=528
+typed_air_operand_functions=528
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=527
+generic_lowering_functions=528
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=527
+object_emitted_functions=528
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -803,6 +803,11 @@ Closed in the current memory/aggregate frontier slice:
   rows combine both forms by preserving six spilled XMM addends and two
   incoming stack-passed addends while the helper's ninth FP argument is also
   passed through the outgoing stack area
+- selected FP-result live-across-stack-argument row in `frontier_sysv_abi.zig`:
+  `frontier_f64_result_live_across_const_stack_arg_call` spills the first
+  direct f64 call result, emits a second direct f64-result helper call with
+  eight constant XMM arguments plus a constant ninth outgoing stack argument,
+  then reloads the first result for the final `fadd`
 - selected indirect SSE live-across-call rows in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled, the pointer callee is moved to
   `%rax`, `callq *%rax` is emitted for both no-argument and one-FP-argument
@@ -876,6 +881,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   selected one-live through six-live `f32`/`f64` no-argument-call shapes,
   selected direct two-/three-/six-live FP-argument call shapes, selected
   stack-passed `f32`/`f64` addend sums after no-argument calls, selected
+  direct f64 result live-across-later constant-stack-argument f64 call frame, selected
   two-live repeated no-argument direct and pointer-callee call shapes, selected
   mixed one-GPR/one-SSE live direct and pointer-callee call shapes, selected
   one-FP-argument pointer-callee call shapes, selected three-/four-/six-live

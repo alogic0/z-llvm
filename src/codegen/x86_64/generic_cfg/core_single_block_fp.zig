@@ -678,12 +678,34 @@ pub fn lowerGenericCfgFpTwoCallResultsReturn(
     if (!callIsFastcc(first_call.calling_conv)) validateDefaultCallConv(first_call.calling_conv) catch return false;
     if (!callIsFastcc(second_call.calling_conv)) validateDefaultCallConv(second_call.calling_conv) catch return false;
     if (first_call.ret_attrs != null or first_call.attrs != null or second_call.ret_attrs != null or second_call.attrs != null) return error.UnsupportedCodegenAbi;
-    if (sysvScalarCallNeedsStackArgs(first_call) or sysvScalarCallNeedsStackArgs(second_call)) return error.UnsupportedLiveAcrossCall;
-    if (first_call.args.items.len != 1 or second_call.args.items.len != 1) return false;
-    if (!first_call.args.items[0].ty.eql(function.ret_ty) or !second_call.args.items[0].ty.eql(function.ret_ty)) return false;
+    if (sysvScalarCallNeedsStackArgs(first_call)) return error.UnsupportedLiveAcrossCall;
+    if (first_call.args.items.len != 1) return false;
+    if (!first_call.args.items[0].ty.eql(function.ret_ty)) return false;
     if ((try fpParamIndexFromValue(function, first_call.args.items[0].value, function.ret_ty)) != 0) return error.UnsupportedLiveAcrossCall;
-    const second_arg_index = try fpParamIndexFromValue(function, second_call.args.items[0].value, function.ret_ty);
-    if (second_arg_index >= 6) return error.UnsupportedLiveAcrossCall;
+    const second_call_needs_general_args = second_call.args.items.len != 1 or sysvScalarCallNeedsStackArgs(second_call);
+    var second_arg_index: ?usize = null;
+    if (second_call_needs_general_args) {
+        if (second_call.callee_value != null) return error.UnsupportedLiveAcrossCall;
+        for (second_call.args.items) |arg| {
+            if (!arg.ty.eql(function.ret_ty)) return false;
+            switch (arg.value) {
+                .named => |name| {
+                    _ = fpParamIndex(function, name, arg.ty) catch |err| switch (err) {
+                        error.UnsupportedCodegenAbi => continue,
+                        else => return err,
+                    };
+                    return error.UnsupportedLiveAcrossCall;
+                },
+                .fp => {},
+                else => return error.UnsupportedCodegenValue,
+            }
+        }
+    } else {
+        if (!second_call.args.items[0].ty.eql(function.ret_ty)) return false;
+        const index = try fpParamIndexFromValue(function, second_call.args.items[0].value, function.ret_ty);
+        if (index >= 6) return error.UnsupportedLiveAcrossCall;
+        second_arg_index = index;
+    }
 
     const binary = switch (add_inst.kind) {
         .binary => |binary| binary,
@@ -704,14 +726,16 @@ pub fn lowerGenericCfgFpTwoCallResultsReturn(
     };
 
     try appendStackFrame(allocator, machine, 24);
-    const second_arg_reg = try XmmReg.fromIndex(second_arg_index);
-    if (function.ret_ty.eql(.float)) {
-        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = second_arg_reg, .frame_index = .slot0 } });
-    } else {
-        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = second_arg_reg, .frame_index = .slot0 } });
-    }
-    if (second_callee) |reg| {
-        try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+    if (second_arg_index) |index| {
+        const second_arg_reg = try XmmReg.fromIndex(index);
+        if (function.ret_ty.eql(.float)) {
+            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = second_arg_reg, .frame_index = .slot0 } });
+        } else {
+            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = second_arg_reg, .frame_index = .slot0 } });
+        }
+        if (second_callee) |reg| {
+            try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+        }
     }
 
     try setupSysVCallTarget(allocator, machine, first_target);
@@ -720,16 +744,24 @@ pub fn lowerGenericCfgFpTwoCallResultsReturn(
     try appendSysVCallTarget(allocator, machine, first_target, first_call.ret_ty);
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
-        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        if (second_arg_index != null) {
+            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        }
     } else {
         try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot2 } });
-        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        if (second_arg_index != null) {
+            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        }
     }
-    if (second_callee) |reg| {
-        try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+    if (second_call_needs_general_args) {
+        _ = try appendSysVScalarCallInAlignedFrame(allocator, machine, function, null, second_call, second_target);
+    } else {
+        if (second_callee) |reg| {
+            try machine.instructions.append(allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = .slot4 } });
+        }
+        try setupSysVCallTarget(allocator, machine, second_target);
+        try appendSysVCallTarget(allocator, machine, second_target, second_call.ret_ty);
     }
-    try setupSysVCallTarget(allocator, machine, second_target);
-    try appendSysVCallTarget(allocator, machine, second_target, second_call.ret_ty);
 
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
