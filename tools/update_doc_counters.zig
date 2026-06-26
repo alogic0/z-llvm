@@ -216,7 +216,7 @@ pub fn main(init: std.process.Init) !void {
             .{ .start = "Source-backed ABI boundaries are now measured separately", .end = "Typed AIR v2 pointer-callee" },
         });
         changed_files += try updateBoundarySectionFile(allocator, io, "docs/roadmap/x86_64_distribution_replacement_matrix.md", counters, &.{
-            .{ .start = "source-backed fail-closed varargs/vector boundary proof", .end = "while arbitrary" },
+            .{ .start = "source-backed fail-closed varargs/vector/X87/packed aggregate/tail-call/callconv boundary proof", .end = "while arbitrary" },
         });
 
         var stdout_buffer: [512]u8 = undefined;

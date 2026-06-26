@@ -331,8 +331,9 @@ direct and function-pointer calls; the 40-/48-/64-/80-eightbyte rows prove disp3
 source-pointer reloads once payload offsets exceed the byte displacement range,
 and the stack-sourced Big40/Big48/Big64 rows prove incoming `byval` payload
 parameters are copied directly from caller stack payload slots rather than
-treated as pointers. A source-backed Big81 boundary row now proves over-cap
-byval stack pressure rejects as a targeted ABI boundary.
+treated as pointers. Source-backed Big81 and Big80 forwarding boundary rows now
+prove over-cap and unsupported forwarding byval stack pressure reject as
+targeted ABI boundaries.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
 spill/reload frame now covers the same indirect byval call shape for both

@@ -102,14 +102,14 @@ Source-backed ABI boundary proof is green for all three modes through
 
 ```text
 source_rows=7
-discovered_functions=11
+discovered_functions=13
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
 packed_aggregate_boundary_rows=2
 tail_call_boundary_rows=1
 callconv_boundary_rows=1
-stack_pressure_boundary_rows=1
+stack_pressure_boundary_rows=3
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -119,9 +119,10 @@ local_fail=0
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
 are not counted in the accepted 13-source / 522-function strict frontier
-executable proof. The stack-pressure row uses a Big81 byval shape to prove the
-current 80-stack-argument planner cap fails closed with a targeted ABI boundary
-instead of silently falling back.
+executable proof. The stack-pressure rows use a Big81 byval shape plus Big80
+indirect/stack-source forwarding shapes to prove over-cap and unsupported
+forwarding pressure fail closed with targeted ABI boundaries instead of
+silently falling back.
 
 Executable ABI proof is green for all three modes:
 

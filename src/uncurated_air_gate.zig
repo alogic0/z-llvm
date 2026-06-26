@@ -648,14 +648,14 @@ fn runMode(init: std.process.Init, options: Options) !void {
     if (options.abi_boundary_expectations) {
         const boundary_local_fail: usize = if (options.corpus == .frontier_boundaries and
             source_rows == 7 and
-            discovered_functions == 11 and
+            discovered_functions == 13 and
             varargs_boundary_rows == 2 and
             vector_boundary_rows == 2 and
             x87_boundary_rows == 2 and
             packed_aggregate_boundary_rows == 2 and
             tail_call_boundary_rows == 1 and
             callconv_boundary_rows == 1 and
-            stack_pressure_boundary_rows == 1 and
+            stack_pressure_boundary_rows == 3 and
             unexpected_accept_rows == 0 and
             wrong_diagnostic_rows == 0)
             0
