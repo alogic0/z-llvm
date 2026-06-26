@@ -48,6 +48,10 @@ test "x86_64 codegen argument register model excludes callee-saved GPRs" {
     try std.testing.expectError(error.UnsupportedCodegenAbi, codegen.x86_64.ArgReg.fromIndex(6));
 }
 
+test "x86_64 codegen stack argument cap matches Big81 byval frontier proof" {
+    try std.testing.expectEqual(@as(usize, 81), codegen.x86_64.maxSysVStackCallArgsForTest);
+}
+
 test "x86_64 codegen rejects unsupported control flow" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
