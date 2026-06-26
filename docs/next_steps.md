@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=461`,
-`generic_codegen_functions=461`, `generic_cfg_functions=461`,
+frontier gate reports `source_rows=13`, `discovered_functions=462`,
+`generic_codegen_functions=462`, `generic_cfg_functions=462`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=461`, `object_failures=0`,
+`object_emitted_functions=462`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,9 +483,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=461`,
-`generic_cfg_functions=461`, `structural_matcher_functions=0`,
-`object_emitted_functions=461`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=462`,
+`generic_cfg_functions=462`, `structural_matcher_functions=0`,
+`object_emitted_functions=462`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -520,6 +520,7 @@ field reads, nested mixed aggregate field reads/construction and direct plus
 pointer-callee register-class nested mixed aggregate pass-through returns,
 stack-sourced nested mixed aggregate pass-through returns after GPR/SSE
 exhaustion, stack-sourced SSE/SSE `[2]f64` pass-through returns,
+stack-sourced single-eightbyte SSE `{ f32, f32 }` pass-through returns,
 stack-sourced reversed mixed SSE/INTEGER pass-through returns,
 array-in-struct INTEGER aggregate sums, selected stack-passed register
 aggregate field reads after GPR exhaustion, and the selected
@@ -590,6 +591,9 @@ stack-sourced SSE/SSE follow-up adds the companion `[2]f64` proof:
 `frontier_deep_stack_array_double_call_sum` exhausts the SSE argument stream,
 reloads the aggregate from disp32 stack-source offsets, and forwards it into
 the helper's XMM aggregate argument registers.
+The single-eightbyte SSE follow-up adds `frontier_stack_float_pair_forward_after_pressure`,
+which exhausts the SSE argument stream and reloads the stack-passed `{ f32, f32 }`
+payload into `%xmm0` for a pass-through aggregate return.
 The shifted mixed aggregate follow-up removes the exact-register-slot
 requirement for the GPR half of selected in-register aggregate pass-through
 calls: `{ i64, double }` can now move its INTEGER eightbyte from `%rsi` to

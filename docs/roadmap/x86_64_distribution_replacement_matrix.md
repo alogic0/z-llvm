@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=461`,
-`generic_codegen_functions=461`, `generic_cfg_functions=461`,
+three release modes at `source_rows=13`, `discovered_functions=462`,
+`generic_codegen_functions=462`, `generic_cfg_functions=462`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=461`, `object_failures=0`,
+`object_emitted_functions=462`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -512,6 +512,8 @@ the same layout-backed field path for nested SSE leaves and returns through
 `%xmm0`/`%xmm1`. The stack-sourced SSE aggregate frontier row forwards a
 stack-passed `[2]f64` aggregate into an outgoing register aggregate helper call
 by loading incoming stack eightbytes into `%xmm0`/`%xmm1`.
+The single-eightbyte SSE stack-source row returns a stack-passed `{ f32, f32 }`
+aggregate by reloading its caller-stack eightbyte into `%xmm0`.
 The `[4]f32` SSE/SSE aggregate frontier rows use typed AIR v2 array-element
 paths to read four float lanes from `%xmm0`/`%xmm1`, construct the paired SSE
 return registers, and pass the aggregate through direct and indirect helper
@@ -627,7 +629,8 @@ selected stack-sourced INTEGER aggregate forwarding into outgoing register
 aggregate helper calls, selected stack-sourced SSE/SSE aggregate forwarding
 into outgoing XMM aggregate helper calls, selected shifted in-register mixed
 aggregate GPR movement before helper calls, selected shifted in-register
-reversed mixed aggregate SSE movement before helper calls, and
+reversed mixed aggregate SSE movement before helper calls,
+selected stack-sourced single-eightbyte SSE aggregate pass-through returns, and
 generated normal MEMORY i64
 sret/byval field/copy forms currently proven through thirty-two flat fields and a
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy and

@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=461
-structured_functions=461
-generic_codegen_functions=461
-generic_cfg_functions=461
+discovered_functions=462
+structured_functions=462
+generic_codegen_functions=462
+generic_cfg_functions=462
 structural_matcher_functions=0
-structured_air_v2_functions=461
-typed_air_operand_functions=461
+structured_air_v2_functions=462
+typed_air_operand_functions=462
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=461
+generic_lowering_functions=462
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=461
+object_emitted_functions=462
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -240,7 +240,10 @@ Closed in the current memory/aggregate frontier slice:
   return path. The f32 pair follow-up forwards the same single-eightbyte SSE
   aggregate through direct, shifted, and pointer-callee helper calls, and the
   helper body adds both f32 fields through generic aggregate field-add
-  lowering. The `frontier_stack_array_double_call_sum` row forwards a stack-passed SSE/SSE
+  lowering. `frontier_stack_float_pair_forward_after_pressure` returns the same
+  single-eightbyte SSE aggregate from a caller-stack argument by reloading it
+  into `%xmm0` after the SSE argument stream is exhausted. The
+  `frontier_stack_array_double_call_sum` row forwards a stack-passed SSE/SSE
   `[2]f64` aggregate into a private helper by loading the source stack
   eightbytes into outgoing XMM aggregate slots; the
   `frontier_stack_array_double_forward_after_pressure` row returns the same
