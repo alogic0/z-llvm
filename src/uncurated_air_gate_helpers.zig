@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 589,
+            .functions = 590,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1321,6 +1321,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_eighteen_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_eighteen_live_after_call");
     \\extern int z_frontier_twenty_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_twenty_live_after_call");
     \\extern int z_frontier_twenty_four_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_twenty_four_live_after_call");
+    \\extern int z_frontier_thirty_two_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_thirty_two_live_after_call");
     \\extern int z_frontier_deep_stack_live_after_call(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_deep_stack_live_after_call");
     \\extern long long z_frontier_deep_stack_i64_return(long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_abi.frontier_deep_stack_i64_return");
     \\extern int *z_frontier_deep_stack_ptr_return(int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *, int *) __asm__("frontier_sysv_abi.frontier_deep_stack_ptr_return");
@@ -1767,6 +1768,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_eighteen_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61) != 514) return 33;
     \\    if (z_frontier_twenty_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71) != 652) return 34;
     \\    if (z_frontier_twenty_four_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89) != 976) return 35;
+    \\    if (z_frontier_thirty_two_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131) != 1864) return 36;
     \\    if (z_frontier_deep_stack_live_after_call(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40) != 40) return 140;
     \\    if (z_frontier_deep_stack_i64_return(1000000001LL, 1000000002LL, 1000000003LL, 1000000004LL, 1000000005LL, 1000000006LL, 1000000007LL, 1000000008LL, 1000000009LL, 1000000010LL, 1000000011LL, 1000000012LL, 1000000013LL, 1000000014LL, 1000000015LL, 1000000016LL, 1000000017LL, 1000000018LL, 1000000019LL, 1000000020LL, 1000000021LL, 1000000022LL, 1000000023LL, 1000000024LL, 1000000025LL, 1000000026LL, 1000000027LL, 1000000028LL, 1000000029LL, 1000000030LL, 1000000031LL, 1000000032LL, 1000000033LL, 1000000034LL, 1000000035LL, 1000000036LL, 1000000037LL, 1000000038LL, 1000000039LL, 1000000040LL) != 1000000040LL) return 146;
     \\    int ptrs[40];

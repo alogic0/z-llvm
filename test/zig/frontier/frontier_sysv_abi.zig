@@ -1330,6 +1330,44 @@ export fn frontier_twenty_four_live_after_call(a: i32, b: i32, c: i32, d: i32, e
     return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r_arg + s + t + u + v + w + x + r;
 }
 
+export fn frontier_thirty_two_live_after_call(
+    a0: i32,
+    a1: i32,
+    a2: i32,
+    a3: i32,
+    a4: i32,
+    a5: i32,
+    a6: i32,
+    a7: i32,
+    a8: i32,
+    a9: i32,
+    a10: i32,
+    a11: i32,
+    a12: i32,
+    a13: i32,
+    a14: i32,
+    a15: i32,
+    a16: i32,
+    a17: i32,
+    a18: i32,
+    a19: i32,
+    a20: i32,
+    a21: i32,
+    a22: i32,
+    a23: i32,
+    a24: i32,
+    a25: i32,
+    a26: i32,
+    a27: i32,
+    a28: i32,
+    a29: i32,
+    a30: i32,
+    a31: i32,
+) i32 {
+    const r = frontier_id_i32(a5);
+    return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24 + a25 + a26 + a27 + a28 + a29 + a30 + a31 + r;
+}
+
 export fn frontier_deep_stack_live_after_call(
     a0: i32,
     a1: i32,
