@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=460
-structured_functions=460
-generic_codegen_functions=460
-generic_cfg_functions=460
+discovered_functions=461
+structured_functions=461
+generic_codegen_functions=461
+generic_cfg_functions=461
 structural_matcher_functions=0
-structured_air_v2_functions=460
-typed_air_operand_functions=460
+structured_air_v2_functions=461
+typed_air_operand_functions=461
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=460
+generic_lowering_functions=461
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=460
+object_emitted_functions=461
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 460-function counters above plus `native_link_accepted_rows=13`,
+13-source / 461-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -706,6 +706,8 @@ the GPR and SSE streams.
 The SSE/SSE follow-up does the same for a stack-passed `[2]f64` aggregate,
 reloading caller-stack eightbytes into `%xmm0`/`%xmm1` for the pass-through
 return.
+The reversed mixed follow-up covers the opposite SSE/INTEGER order by reloading
+stack-passed `{ double, i64 }` into `%xmm0`/`%rax`.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

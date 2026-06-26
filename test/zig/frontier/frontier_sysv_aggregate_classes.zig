@@ -301,6 +301,24 @@ export fn frontier_indirect_reverse_mixed_make(func: ReverseMixedMakeFn, a: f64,
     return func(a, b);
 }
 
+export fn frontier_stack_reverse_mixed_forward_after_pressure(f0: f64, f1: f64, f2: f64, f3: f64, f4: f64, f5: f64, f6: f64, f7: f64, a0: i64, a1: i64, a2: i64, a3: i64, a4: i64, a5: i64, value: ReverseMixed) ReverseMixed {
+    _ = f0;
+    _ = f1;
+    _ = f2;
+    _ = f3;
+    _ = f4;
+    _ = f5;
+    _ = f6;
+    _ = f7;
+    _ = a0;
+    _ = a1;
+    _ = a2;
+    _ = a3;
+    _ = a4;
+    _ = a5;
+    return value;
+}
+
 export fn frontier_nested_pair_sum(value: NestedPair) i32 {
     return value.left.a + value.left.b + value.right.a + value.right.b;
 }

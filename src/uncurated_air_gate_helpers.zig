@@ -230,7 +230,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 460,
+            .functions = 461,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -2082,6 +2082,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_shifted_reverse_mixed_call_float(double, struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_shifted_reverse_mixed_call_float");
     \\extern double z_frontier_indirect_reverse_mixed_call_float(double (*)(struct ReverseMixed), struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_reverse_mixed_call_float");
     \\extern struct ReverseMixed z_frontier_indirect_reverse_mixed_make(struct ReverseMixed (*)(double, long long), double, long long) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_reverse_mixed_make");
+    \\extern struct ReverseMixed z_frontier_stack_reverse_mixed_forward_after_pressure(double, double, double, double, double, double, double, double, long long, long long, long long, long long, long long, long long, struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_reverse_mixed_forward_after_pressure");
     \\extern int z_frontier_nested_pair_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_sum");
     \\extern int z_frontier_nested_pair_call_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_call_sum");
     \\extern int z_frontier_indirect_nested_pair_sum(int (*)(struct NestedPair), struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_indirect_nested_pair_sum");
@@ -2190,6 +2191,8 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_indirect_reverse_mixed_call_float(frontier_reverse_mixed_float_c, reverse) != 2.75) return 62;
     \\    struct ReverseMixed indirect_reverse = z_frontier_indirect_reverse_mixed_make(frontier_make_reverse_mixed, 15.25, 987);
     \\    if (indirect_reverse.a != 15.25 || indirect_reverse.b != 987) return 63;
+    \\    struct ReverseMixed stack_forwarded_reverse = z_frontier_stack_reverse_mixed_forward_after_pressure(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 11, 12, 13, 14, 15, 16, reverse);
+    \\    if (stack_forwarded_reverse.a != reverse.a || stack_forwarded_reverse.b != reverse.b) return 93;
     \\    struct NestedPair nested = { { 1, 2 }, { 3, 4 } };
     \\    if (z_frontier_nested_pair_sum(nested) != 10) return 10;
     \\    if (z_frontier_nested_pair_call_sum(nested) != 10) return 15;

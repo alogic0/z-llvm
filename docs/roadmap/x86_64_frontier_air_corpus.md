@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=460
-structured_functions=460
-generic_codegen_functions=460
-generic_cfg_functions=460
+discovered_functions=461
+structured_functions=461
+generic_codegen_functions=461
+generic_cfg_functions=461
 structural_matcher_functions=0
-structured_air_v2_functions=460
-typed_air_operand_functions=460
+structured_air_v2_functions=461
+typed_air_operand_functions=461
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=460
+generic_lowering_functions=461
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=460
+object_emitted_functions=461
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -258,7 +258,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_indirect_reverse_mixed_call_float` and
   `frontier_indirect_reverse_mixed_make` prove the same SSE/INTEGER aggregate
   argument and return classes through pointer-callee SysV call planning with
-  executable C ABI checks
+  executable C ABI checks. `frontier_stack_reverse_mixed_forward_after_pressure`
+  returns a stack-passed `{ double, i64 }` aggregate by reloading caller-stack
+  eightbytes into `%xmm0`/`%rax`
 - first nested INTEGER aggregate add-chain row in
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed

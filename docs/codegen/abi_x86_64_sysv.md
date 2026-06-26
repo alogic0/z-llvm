@@ -77,6 +77,7 @@ selected stack-passed nested mixed INTEGER/SSE aggregate helper calls read neste
 selected stack-passed nested mixed INTEGER/SSE aggregate pass-through returns reload caller-stack eightbytes into `%rax`/`%xmm0`
 selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV GPR/SSE streams
 selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV SSE/GPR streams
+selected stack-passed reversed mixed SSE/INTEGER aggregate pass-through returns reload caller-stack eightbytes into `%xmm0`/`%rax`
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream, including `[2]f64`, nested double leaves, and `[4]f32` split across two SSE eightbytes
 selected shifted SSE/SSE aggregate field reads and helper calls move `double` fields from higher XMM argument registers through the generic XMM move path
 selected deep stack-sourced SSE/SSE aggregate helper calls reload `[2]f64` eightbytes from disp32 stack offsets into outgoing XMM argument registers
@@ -269,6 +270,8 @@ SSE/INTEGER aggregate argument field reads and register aggregate return:
   eightbyte already occupies the required destination GPR slot
   pointer-callee reversed mixed aggregate calls reuse the same SSE/INTEGER
   planner assignments for arguments and register returns
+  stack-passed reversed mixed aggregates can be returned directly by reloading
+  the SSE eightbyte into `%xmm0` and the INTEGER eightbyte into `%rax`
 frontier_sysv_aggregate_classes.SmallReverseMixed and PackedReverseMixed prove
 selected reversed `double`/`i32` field reads through the same independent
 SSE/GPR streams, including high-lane `i32` extraction and `{ double, i32, i32 }`

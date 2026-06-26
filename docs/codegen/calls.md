@@ -197,7 +197,7 @@ accepted frontier:
   construction returns, and direct helper-call return
   selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and
   `double` argument field reads and register return including packed adjacent
-  `i32` construction returns
+  `i32` construction returns plus a stack-sourced pass-through return
   selected SSE/SSE aggregate argument field reads and register return including
   single-eightbyte `{ f32, f32 }`, `[2]f64` array-in-struct, and nested
   `{ { double }, { double } }`, plus `[4]f32` array-in-struct lanes
@@ -517,6 +517,8 @@ without sret ABI rewriting
 selected stack-sourced nested mixed aggregate pass-through returns by reloading
 incoming stack eightbytes into `%rax`/`%xmm0`
 selected pointer-callee reversed mixed SSE/INTEGER aggregate pass-through calls
+selected stack-sourced reversed mixed SSE/INTEGER pass-through returns into
+`%xmm0`/`%rax`
 selected up-to-six-live-i32 spill/reload call frame
 selected live i32 GPR preservation across direct and pointer-callee f64-argument calls
 selected two-call six-live-i32 spill/reload call frame
