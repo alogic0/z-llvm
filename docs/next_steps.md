@@ -386,7 +386,7 @@ incoming stack argument area for a post-call add-tree return. The same frontier
 source now proves eight, twelve, and eighteen stack-passed scalar `i32` call arguments
 with immediate `%rsp` cleanup, plus forwarding of named incoming stack-passed
 `i32` parameters into outgoing stack-argument slots and outgoing GPR argument
-registers, seven/eight/twelve/thirteen/fourteen/eighteen stack-passed live `i32` values,
+registers, seven/eight/twelve/thirteen/fourteen/eighteen/twenty stack-passed live `i32` values,
 and deep post-call stack `i32`/`i64` reloads through disp32 incoming stack offsets. It also proves a selected
 two-call/six-live GPR frame through the generic CFG void-call path. The follow-up
 `frontier_sysv_sret_byval.zig` row adds selected MEMORY aggregate ABI evidence:
@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=587`,
-`generic_codegen_functions=587`, `generic_cfg_functions=587`,
+frontier gate reports `source_rows=13`, `discovered_functions=588`,
+`generic_codegen_functions=588`, `generic_cfg_functions=588`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=587`, `object_failures=0`,
+`object_emitted_functions=588`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,9 +483,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=587`,
-`generic_cfg_functions=587`, `structural_matcher_functions=0`,
-`object_emitted_functions=587`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=588`,
+`generic_cfg_functions=588`, `structural_matcher_functions=0`,
+`object_emitted_functions=588`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
