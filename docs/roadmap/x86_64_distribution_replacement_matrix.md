@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=477`,
-`generic_codegen_functions=477`, `generic_cfg_functions=477`,
+three release modes at `source_rows=13`, `discovered_functions=480`,
+`generic_codegen_functions=480`, `generic_cfg_functions=480`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=477`, `object_failures=0`,
+`object_emitted_functions=480`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -645,8 +645,10 @@ copy row plus `BigPtrDouble` pointer/`double`/`i64` and `BigPtrFloat`
 pointer/`float`/`i64` byval-to-sret copy rows,
 `BigFloat` five-`f32` and `BigFloatArray` array-of-float byval-to-sret copy rows, `BigDoubleArray`
 array-of-double byval-to-sret copy row, `BigArrayMixed` array/pointer mixed
-byval-to-sret copy row, and direct/indirect MEMORY aggregate calls for Big3,
-Big4, Big5, BigDouble, BigDoubleArray, BigArrayMixed, BigFloat, BigFloatArray, BigPtrDouble, BigPtrFloat,
+byval-to-sret copy row, `BigNestedArrayMixed` nested array-backed
+float/double plus pointer/integer byval-to-sret copy row, and direct/indirect
+MEMORY aggregate calls for Big3,
+Big4, Big5, BigDouble, BigDoubleArray, BigArrayMixed, BigNestedArrayMixed, BigFloat, BigFloatArray, BigPtrDouble, BigPtrFloat,
 BigNested, BigMixed, BigNarrow, BigArray, ScalarMixed, ScalarNested, and ScalarArray; Big32 and Big40 extend the same
 planner-owned copy path through exact-qword MEMORY payloads beyond byte-offset
 byval loads, including disp32 source-pointer reloads and stack-sourced Big40

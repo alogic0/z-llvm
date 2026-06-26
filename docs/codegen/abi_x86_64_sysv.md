@@ -185,6 +185,7 @@ frontier_sysv_sret_byval.Big3 through Big20 lower as selected normal MEMORY clas
   `{ double, double, double }` proves the first double-leaf byval-to-sret MEMORY aggregate copy path through XMM `movsd` stack loads and hidden-sret stores
   `{ [3 x double] }` proves array-contained `f64` MEMORY aggregate copy leaves through the same recursive byval-to-sret path
   `{ [2 x i32], [2 x double], ptr }` proves mixed array-contained integer, array-contained `f64`, and pointer leaves through the same recursive byval-to-sret path
+  `{ { [5 x float] }, { [3 x double] }, ptr, i64 }` proves nested array-contained `f32`/`f64`, pointer, and integer leaves through the same recursive direct and pointer-callee byval-to-sret path
   `{ float, float, float, float, float }` proves `f32` MEMORY aggregate copy leaves through XMM `movss` stack loads and hidden-sret stores
   `{ [5 x float] }` proves array-contained `f32` MEMORY aggregate copy leaves through the same recursive byval-to-sret path
   `{ ptr, double, i64 }` proves mixed pointer/`double`/integer MEMORY aggregate copy leaves through the same layout-derived byte-offset path
