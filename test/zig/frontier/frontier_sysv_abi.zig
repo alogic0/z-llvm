@@ -19,6 +19,7 @@ const Sum5F32Fn = *const fn (f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum5F64Fn = *const fn (f64, f64, f64, f64, f64) callconv(.c) f64;
 const Sum9F32Fn = *const fn (f32, f32, f32, f32, f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum9F64Fn = *const fn (f64, f64, f64, f64, f64, f64, f64, f64, f64) callconv(.c) f64;
+const Sum8I32TenF32Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32) callconv(.c) f32;
 const Sum8I32TenF64Fn = *const fn (i32, i32, i32, i32, i32, i32, i32, i32, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64) callconv(.c) f64;
 const Sum8I64TenF64Fn = *const fn (i64, i64, i64, i64, i64, i64, i64, i64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64) callconv(.c) f64;
 const TouchF32Fn = *const fn (f32) callconv(.c) void;
@@ -83,6 +84,7 @@ extern fn frontier_sum12_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: 
 extern fn frontier_sum14_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32) i32;
 extern fn frontier_sum18_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32, o: i32, p: i32, q: i32, r: i32) i32;
 extern fn frontier_sum24_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32, o: i32, p: i32, q: i32, r: i32, s: i32, t: i32, u: i32, v: i32, w: i32, x: i32) i32;
+extern fn frontier_sum8_i32_10_f32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, fa: f32, fb: f32, fc: f32, fd: f32, fe: f32, ff: f32, fg: f32, fh: f32, fi: f32, fj: f32) f32;
 extern fn frontier_sum8_i32_10_f64(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, fa: f64, fb: f64, fc: f64, fd: f64, fe: f64, ff: f64, fg: f64, fh: f64, fi: f64, fj: f64) f64;
 extern fn frontier_sum8_i64_10_f64(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64, fa: f64, fb: f64, fc: f64, fd: f64, fe: f64, ff: f64, fg: f64, fh: f64, fi: f64, fj: f64) f64;
 extern fn frontier_sub_i32(a: i32, b: i32) i32;
@@ -683,6 +685,14 @@ export fn frontier_mixed_gpr_sse_stack_arg_call(a: i32, b: i32, c: i32, d: i32, 
 }
 
 export fn frontier_indirect_mixed_gpr_sse_stack_arg_call(func: Sum8I32TenF64Fn, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, fa: f64, fb: f64, fc: f64, fd: f64, fe: f64, ff: f64, fg: f64, fh: f64, fi: f64, fj: f64) f64 {
+    return func(a, b, c, d, e, f, g, h, fa, fb, fc, fd, fe, ff, fg, fh, fi, fj);
+}
+
+export fn frontier_mixed_gpr_sse_f32_stack_arg_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, fa: f32, fb: f32, fc: f32, fd: f32, fe: f32, ff: f32, fg: f32, fh: f32, fi: f32, fj: f32) f32 {
+    return frontier_sum8_i32_10_f32(a, b, c, d, e, f, g, h, fa, fb, fc, fd, fe, ff, fg, fh, fi, fj);
+}
+
+export fn frontier_indirect_mixed_gpr_sse_f32_stack_arg_call(func: Sum8I32TenF32Fn, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, fa: f32, fb: f32, fc: f32, fd: f32, fe: f32, ff: f32, fg: f32, fh: f32, fi: f32, fj: f32) f32 {
     return func(a, b, c, d, e, f, g, h, fa, fb, fc, fd, fe, ff, fg, fh, fi, fj);
 }
 

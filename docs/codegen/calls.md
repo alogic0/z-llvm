@@ -244,7 +244,7 @@ accepted frontier:
   incoming stack offset
   selected stack-passed f32/f64 helper-call argument reloads into outgoing XMM
   registers for direct and pointer-callee calls
-  selected mixed GPR/SSE helper calls where both `i32`/`i64` and `double`
+  selected mixed GPR/SSE helper calls where both `i32`/`i64` and `float`/`double`
   arguments overflow into outgoing stack slots for direct and function-pointer
   calls
   selected direct two-/three-/six-live f32/f64 spill/reload across
@@ -543,7 +543,7 @@ selected stack-passed f32/f64 post-call reload through disp32 incoming stack off
 selected direct stack-passed f32/f64 parameter return through disp32 incoming stack offset
 selected ninth-argument f32/f64 stack slots for direct, pointer-callee, and
 constant-argument calls
-selected mixed `i32`/`i64` plus `double` outgoing stack slots after both GPR and SSE
+selected mixed `i32`/`i64` plus `float`/`double` outgoing stack slots after both GPR and SSE
 argument register streams are exhausted for direct and function-pointer calls
 selected two-live f32/f64 no-argument pointer-callee spill/reload frames
 selected two-live f32/f64 one-FP-argument pointer-callee spill/reload frames

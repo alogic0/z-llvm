@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=467`,
-`generic_codegen_functions=467`, `generic_cfg_functions=467`,
+three release modes at `source_rows=13`, `discovered_functions=469`,
+`generic_codegen_functions=469`, `generic_cfg_functions=469`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=467`, `object_failures=0`,
+`object_emitted_functions=469`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -635,7 +635,7 @@ aggregate GPR movement before helper calls, selected shifted in-register
 reversed mixed aggregate SSE movement before helper calls,
 selected stack-sourced single-eightbyte SSE aggregate pass-through returns,
 selected stack-sourced single-eightbyte SSE aggregate function-pointer forwarding,
-selected direct and pointer-callee mixed GPR/SSE outgoing stack-argument calls where both streams overflow for `i32`/`i64` plus `double` arguments, and
+selected direct and pointer-callee mixed GPR/SSE outgoing stack-argument calls where both streams overflow for `i32`/`i64` plus `float`/`double` arguments, and
 generated normal MEMORY i64
 sret/byval field/copy forms currently proven through thirty-two flat fields and a
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy and

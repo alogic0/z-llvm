@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=467
-structured_functions=467
-generic_codegen_functions=467
-generic_cfg_functions=467
+discovered_functions=469
+structured_functions=469
+generic_codegen_functions=469
+generic_cfg_functions=469
 structural_matcher_functions=0
-structured_air_v2_functions=467
-typed_air_operand_functions=467
+structured_air_v2_functions=469
+typed_air_operand_functions=469
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=467
+generic_lowering_functions=469
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=467
+object_emitted_functions=469
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 467-function counters above plus `native_link_accepted_rows=13`,
+13-source / 469-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -711,7 +711,7 @@ reloading the caller-stack eightbyte into `%xmm0`.
 The companion pointer-callee row uses the same stack-source reload before
 `callq *%rax`, proving the indirect SysV planner path for this class.
 The mixed stack-argument rows call external C ABI helpers directly and through
-function pointers with both overflowing `i32`/`i64` and `double` argument
+function pointers with both overflowing `i32`/`i64` and `float`/`double` argument
 streams, proving the GPR and SSE cursors assign outgoing stack slots
 independently in the same call.
 The reversed mixed follow-up covers the opposite SSE/INTEGER order by reloading
