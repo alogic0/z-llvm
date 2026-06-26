@@ -567,7 +567,9 @@ stores through the same layout-derived path. `Big32`, `Big40`, `Big48`, and
 exact-qword payloads beyond byte-offset byval loads, including disp32
 source-pointer reloads through the current 64-stack-argument planner cap and
 stack-sourced `Big40`/`Big48`/`Big64` payload copies from the caller stack
-argument area. `ScalarArray` now also proves the same direct and pointer-callee
+argument area. A separate source-backed `Big65` boundary row now proves
+over-cap byval stack pressure rejects with a targeted ABI boundary instead of
+becoming an ambiguous backend failure. `ScalarArray` now also proves the same direct and pointer-callee
 byval-to-sret copy path for mixed array-contained integer leaves,
 array-contained `double` leaves, and a pointer leaf through layout-derived
 MEMORY offsets; `ScalarMixed` and `ScalarNested` extend that direct and
@@ -586,11 +588,12 @@ the dedicated `test/zig/frontier_boundaries/*.zig` rows in ReleaseFast,
 ReleaseSafe, and ReleaseSmall and currently reports `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
-`callconv_boundary_rows=1`, `unexpected_accept_rows=0`,
-`wrong_diagnostic_rows=0`, and `local_fail=0` per mode. Varargs, vectors,
-X87/long double, packed/unaligned aggregates, tail calls, and non-default call
-conventions are therefore source-backed fail-closed boundaries, not vague
-docs-only gaps and not accepted executable proof.
+`callconv_boundary_rows=1`, `stack_pressure_boundary_rows=1`,
+`unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0` per
+mode. Varargs, vectors, X87/long double, packed/unaligned aggregates, tail
+calls, non-default call conventions, and over-cap stack-pressure byval shapes
+are therefore source-backed fail-closed boundaries, not vague docs-only gaps
+and not accepted executable proof.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads
 incoming stack-passed `i32` parameters into outgoing GPR call slots, and emits

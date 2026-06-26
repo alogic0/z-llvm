@@ -101,14 +101,15 @@ Source-backed ABI boundary proof is green for all three modes through
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=6
-discovered_functions=10
+source_rows=7
+discovered_functions=11
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
 packed_aggregate_boundary_rows=2
 tail_call_boundary_rows=1
 callconv_boundary_rows=1
+stack_pressure_boundary_rows=1
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -117,8 +118,10 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 477-function strict frontier
-executable proof.
+are not counted in the accepted 13-source / 520-function strict frontier
+executable proof. The stack-pressure row uses a Big65 byval shape to prove the
+current 64-stack-argument planner cap fails closed with a targeted ABI boundary
+instead of silently falling back.
 
 Executable ABI proof is green for all three modes:
 

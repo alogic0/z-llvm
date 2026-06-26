@@ -331,7 +331,8 @@ direct and function-pointer calls; the 40-/48-/64-eightbyte rows prove disp32
 source-pointer reloads once payload offsets exceed the byte displacement range,
 and the stack-sourced Big40/Big48/Big64 rows prove incoming `byval` payload
 parameters are copied directly from caller stack payload slots rather than
-treated as pointers.
+treated as pointers. A source-backed Big65 boundary row now proves over-cap
+byval stack pressure rejects as a targeted ABI boundary.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
 spill/reload frame now covers the same indirect byval call shape for both
@@ -434,6 +435,9 @@ packed aggregate ABI call/return forms, including direct planner inputs and
   packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`);
   source-backed fail-closed by `distribution-air-release-frontier-boundaries`
 byval lowering outside supported aggregate payload stack copies and arbitrary sret copy/storage beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
+over-cap byval stack-pressure shapes beyond the current 64-stack-argument
+  planner cap (`UnsupportedCodegenAbi`); source-backed fail-closed by
+  `distribution-air-release-frontier-boundaries`
 operand bundles
 invoke
 callbr
