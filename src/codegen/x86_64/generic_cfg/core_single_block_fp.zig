@@ -488,7 +488,7 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
     ret: anytype,
 ) !bool {
     if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty) or
-        block.instructions.items.len < 2 or block.instructions.items.len > 10) return false;
+        block.instructions.items.len < 2 or block.instructions.items.len > 12) return false;
     const call_count = try leadingFpVoidCallCount(block);
     if (call_count == 0) return false;
 
@@ -1299,11 +1299,11 @@ const FpVoidCallAddend = union(enum) {
 };
 
 const FpVoidCallAddendList = struct {
-    items: [10]FpVoidCallAddend = undefined,
+    items: [12]FpVoidCallAddend = undefined,
     count: usize = 0,
     register_count: usize = 0,
     register_seen: [8]bool = [_]bool{false} ** 8,
-    stack_disps: [4]u32 = undefined,
+    stack_disps: [6]u32 = undefined,
     stack_count: usize = 0,
 
     fn appendRegister(self: *FpVoidCallAddendList, param_index: usize) !void {
@@ -1334,7 +1334,7 @@ const FpVoidCallAddendList = struct {
 fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, first_binary_index: usize, ret_value: ir.Value) !FpVoidCallAddendList {
     if (first_binary_index >= block.instructions.items.len) return error.UnsupportedCodegenInstruction;
     const binary_count = block.instructions.items.len - first_binary_index;
-    if (binary_count < 1 or binary_count > 9) return error.UnsupportedCodegenInstruction;
+    if (binary_count < 1 or binary_count > 11) return error.UnsupportedCodegenInstruction;
 
     var addends = FpVoidCallAddendList{};
     var previous_name: ?[]const u8 = null;

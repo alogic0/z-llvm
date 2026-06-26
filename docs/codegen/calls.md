@@ -570,7 +570,7 @@ selected direct and pointer-callee nine-FP-argument void helper calls that also
 reload six spilled XMM addends plus incoming stack-passed FP addends after the
 call
 selected direct and pointer-callee no-argument void helper calls that reload six
-spilled XMM addends plus four incoming stack-passed FP addends after the call
+spilled XMM addends plus up to six incoming stack-passed FP addends after the call
 selected direct/pointer-callee f32/f64 call-result live-across-later-call frames where the later
 FP-result helper uses an outgoing constant ninth FP stack argument
 selected direct stack-passed f32/f64 parameter return through disp32 incoming stack offset

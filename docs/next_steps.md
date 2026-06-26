@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=561`,
-`generic_codegen_functions=561`, `generic_cfg_functions=561`,
+frontier gate reports `source_rows=13`, `discovered_functions=565`,
+`generic_codegen_functions=565`, `generic_cfg_functions=565`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=561`, `object_failures=0`,
+`object_emitted_functions=565`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,9 +483,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=561`,
-`generic_cfg_functions=561`, `structural_matcher_functions=0`,
-`object_emitted_functions=561`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=565`,
+`generic_cfg_functions=565`, `structural_matcher_functions=0`,
+`object_emitted_functions=565`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -709,7 +709,7 @@ callee pointer in distinct frame slots, selected direct and pointer-callee
 one-FP-argument helper calls that preserve six register-backed FP addends plus
 two stack-passed FP addends,
 selected direct and pointer-callee no-argument `void` calls that preserve six
-register-backed FP addends plus four stack-passed FP addends,
+register-backed FP addends plus up to six stack-passed FP addends,
 selected direct and pointer-callee f32/f64 call-result preservation across a
 later FP helper call with a constant ninth FP stack argument,
 and the same shared scalar
