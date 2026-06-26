@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=536
-structured_functions=536
-generic_codegen_functions=536
-generic_cfg_functions=536
+discovered_functions=541
+structured_functions=541
+generic_codegen_functions=541
+generic_cfg_functions=541
 structural_matcher_functions=0
-structured_air_v2_functions=536
-typed_air_operand_functions=536
+structured_air_v2_functions=541
+typed_air_operand_functions=541
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=536
+generic_lowering_functions=541
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=536
+object_emitted_functions=541
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -232,9 +232,9 @@ Closed in the current memory/aggregate frontier slice:
   array-backed float/double leaves, array-of-aggregate records, recursively
   nested scalar leaves, pointer arrays, and an integer tail through the same
   direct and pointer-callee byval-to-sret copy path; `Big32`, `Big40`,
-  `Big48`, `Big64`, `Big80`, `Big81`, and `Big96` raise the same planner-owned byval-to-sret direct
+  `Big48`, `Big64`, `Big80`, `Big81`, `Big96`, and `Big128` raise the same planner-owned byval-to-sret direct
   copy path through exact-qword MEMORY payloads beyond byte-offset byval loads
-  using disp32 source-pointer reloads through the current 96-stack-argument
+  using disp32 source-pointer reloads through the current 128-stack-argument
   planner cap; the stack-sourced `Big40`, `Big48`, and `Big64` direct and
   pointer-callee copy rows prove incoming byval payloads that begin in the
   caller stack argument area are copied as payload slots rather than treated as

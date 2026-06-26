@@ -382,6 +382,7 @@ pub fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ZigType {
         80 => "{ [80 x i64] }",
         81 => "{ [81 x i64] }",
         96 => "{ [96 x i64] }",
+        128 => "{ [128 x i64] }",
         else => return null,
     };
     return .{ .ir_type = .{ .aggregate = aggregate } };
