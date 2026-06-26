@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=552
-structured_functions=552
-generic_codegen_functions=552
-generic_cfg_functions=552
+discovered_functions=557
+structured_functions=557
+generic_codegen_functions=557
+generic_cfg_functions=557
 structural_matcher_functions=0
-structured_air_v2_functions=552
-typed_air_operand_functions=552
+structured_air_v2_functions=557
+typed_air_operand_functions=557
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=552
+generic_lowering_functions=557
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=552
+object_emitted_functions=557
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -118,8 +118,8 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 552-function strict frontier
-executable proof. Stack-pressure forwarding for the previous Big80/Big81/Big96/Big128
+are not counted in the accepted 13-source / 557-function strict frontier
+executable proof. Stack-pressure forwarding for the previous Big80/Big81/Big96/Big128/Big160
 indirect and stack-source rows is now accepted in the frontier corpus; the
 boundary gate keeps `stack_pressure_boundary_rows=0` as a regression guard.
 
@@ -232,12 +232,12 @@ Closed in the current memory/aggregate frontier slice:
   array-backed float/double leaves, array-of-aggregate records, recursively
   nested scalar leaves, pointer arrays, and an integer tail through the same
   direct and pointer-callee byval-to-sret copy path; `Big32`, `Big40`,
-  `Big48`, `Big64`, `Big80`, `Big81`, `Big96`, and `Big128` raise the same planner-owned byval-to-sret direct
+  `Big48`, `Big64`, `Big80`, `Big81`, `Big96`, `Big128`, and `Big160` raise the same planner-owned byval-to-sret direct
   copy path through exact-qword MEMORY payloads beyond byte-offset byval loads
-  using disp32 source-pointer reloads through the current 128-stack-argument
-  planner cap; Big80, Big81, Big96, and Big128 now also prove pointer-callee
+  using disp32 source-pointer reloads through the current 160-stack-argument
+  planner cap; Big80, Big81, Big96, Big128, and Big160 now also prove pointer-callee
   byval forwarding, with Big81 covering a non-qword tail, and the stack-sourced
-  `Big40`, `Big48`, `Big64`, `Big80`, `Big81`, `Big96`, and `Big128` direct
+  `Big40`, `Big48`, `Big64`, `Big80`, `Big81`, `Big96`, `Big128`, and `Big160` direct
   and pointer-callee copy rows prove incoming byval payloads that begin in the
   caller stack argument area are copied as payload slots rather than treated as
   pointers;

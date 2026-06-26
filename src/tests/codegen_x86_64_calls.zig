@@ -48,8 +48,8 @@ test "x86_64 codegen argument register model excludes callee-saved GPRs" {
     try std.testing.expectError(error.UnsupportedCodegenAbi, codegen.x86_64.ArgReg.fromIndex(6));
 }
 
-test "x86_64 codegen stack argument cap matches Big128 byval frontier proof" {
-    try std.testing.expectEqual(@as(usize, 128), codegen.x86_64.maxSysVStackCallArgsForTest);
+test "x86_64 codegen stack argument cap matches Big160 byval frontier proof" {
+    try std.testing.expectEqual(@as(usize, 160), codegen.x86_64.maxSysVStackCallArgsForTest);
 }
 
 test "x86_64 codegen rejects unsupported control flow" {

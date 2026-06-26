@@ -324,16 +324,16 @@ unit proof for one-, two-, array-backed three-, and nested three-eightbyte
 payloads, single-`i8`, single-`i16`, single-`i32`, `[3 x i32]`
 tail payloads, composite 3-/5-/6-/7-byte tails, and exact-eightbyte
 payloads beyond the former 40-stack-argument proof through the current
-128-stack-argument planner cap. Source-owned frontier
+160-stack-argument planner cap. Source-owned frontier
 rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`,
-`[9 x i16]`, and flat 32-/40-/48-/64-/80-/81-/96-/128-eightbyte MEMORY byval-to-sret copies through
-direct and function-pointer calls; the 40-/48-/64-/80-/81-/96-/128-eightbyte rows prove disp32
+`[9 x i16]`, and flat 32-/40-/48-/64-/80-/81-/96-/128-/160-eightbyte MEMORY byval-to-sret copies through
+direct and function-pointer calls; the 40-/48-/64-/80-/81-/96-/128-/160-eightbyte rows prove disp32
 source-pointer reloads once payload offsets exceed the byte displacement range,
-and the stack-sourced Big40/Big48/Big64/Big80/Big81/Big96/Big128 rows prove incoming `byval` payload
+and the stack-sourced Big40/Big48/Big64/Big80/Big81/Big96/Big128/Big160 rows prove incoming `byval` payload
 parameters are copied directly from caller stack payload slots rather than
-treated as pointers. Big80/Big81/Big96/Big128 indirect forwarding is now
+treated as pointers. Big80/Big81/Big96/Big128/Big160 indirect forwarding is now
 accepted through the same planner-owned function-pointer byval copy path, with
-Big81 covering a non-qword tail, and Big80/Big81/Big96/Big128 stack-source forwarding is accepted through the same
+Big81 covering a non-qword tail, and Big80/Big81/Big96/Big128/Big160 stack-source forwarding is accepted through the same
 layout-derived stack-copy path. The frontier boundary gate keeps
 `stack_pressure_boundary_rows=0` as a regression guard for unsupported
 forwarding pressure shapes.
