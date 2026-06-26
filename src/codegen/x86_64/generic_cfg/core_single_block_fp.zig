@@ -1411,6 +1411,7 @@ fn frameIndexForFpPreservedCallee(ty: ir.Type, addend_count: usize) !FrameIndex 
         return switch (addend_count) {
             2 => .slot4,
             3, 4 => .slot8,
+            5, 6 => .slot12,
             else => error.UnsupportedLiveAcrossCall,
         };
     }
