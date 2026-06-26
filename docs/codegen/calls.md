@@ -552,7 +552,7 @@ selected one-live f32/f64 SSE spill/reload call frame
 selected two-/three-live f32/f64 no-argument-call spill/reload frames
 selected four-/five-/six-live f32/f64 no-argument-call spill/reload frames
 selected stack-passed f32/f64 post-call reload through disp32 incoming stack offset
-selected post-call f64 sums with six spilled XMM addends plus stack-passed FP addends
+selected post-call f32/f64 sums with six spilled XMM addends plus stack-passed FP addends
 selected direct stack-passed f32/f64 parameter return through disp32 incoming stack offset
 selected ninth-argument f32/f64 stack slots for direct, pointer-callee, and
 constant-argument calls

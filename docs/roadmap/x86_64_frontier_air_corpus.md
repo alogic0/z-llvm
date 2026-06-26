@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=487
-structured_functions=487
-generic_codegen_functions=487
-generic_cfg_functions=487
+discovered_functions=488
+structured_functions=488
+generic_codegen_functions=488
+generic_cfg_functions=488
 structural_matcher_functions=0
-structured_air_v2_functions=487
-typed_air_operand_functions=487
+structured_air_v2_functions=488
+typed_air_operand_functions=488
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=487
+generic_lowering_functions=488
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=487
+object_emitted_functions=488
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -774,12 +774,13 @@ Closed in the current memory/aggregate frontier slice:
   live `f32` or `f64` parameters are spilled from `%xmm0..%xmm5` to aligned
   frame slots across the same no-argument helper shape and reloaded for a
   five-step post-call `fadd` return
-- selected stack-passed SSE live-across-call row in `frontier_sysv_abi.zig`:
-  `frontier_stack_f64_live_sum_after_call` skips the first two XMM parameters,
-  spills the six register-backed `double` addends from `%xmm2..%xmm7`, reloads
-  two additional stack-passed `double` addends through adjusted incoming stack
-  offsets after the no-argument helper call, and returns the eight-value
-  post-call `fadd` sum
+- selected stack-passed SSE live-across-call rows in `frontier_sysv_abi.zig`:
+  `frontier_stack_f32_live_sum_after_call` and
+  `frontier_stack_f64_live_sum_after_call` skip the first two XMM parameters,
+  spill the six register-backed FP addends from `%xmm2..%xmm7`, reload two
+  additional stack-passed FP addends through adjusted incoming stack offsets
+  after the no-argument helper call, and return the eight-value post-call
+  `fadd` sum
 - selected FP-argument SSE live-across-call rows in `frontier_sysv_abi.zig`:
   two live `f32` or `f64` parameters are spilled, `%xmm1` is assigned to the
   helper's first FP argument, and both live values are reloaded for the
@@ -856,7 +857,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   stack-passed live values, and broader SSE live-across-call frames beyond the
   selected one-live through six-live `f32`/`f64` no-argument-call shapes,
   selected direct two-/three-/six-live FP-argument call shapes, selected
-  stack-passed `f64` addend sums after no-argument calls, selected
+  stack-passed `f32`/`f64` addend sums after no-argument calls, selected
   two-live repeated no-argument direct and pointer-callee call shapes, selected
   mixed one-GPR/one-SSE live direct and pointer-callee call shapes, selected
   one-FP-argument pointer-callee call shapes, selected three-/four-/six-live

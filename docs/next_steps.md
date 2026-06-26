@@ -465,12 +465,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=487`,
-`generic_codegen_functions=487`, `generic_cfg_functions=487`,
+frontier gate reports `source_rows=13`, `discovered_functions=488`,
+`generic_codegen_functions=488`, `generic_cfg_functions=488`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=487`, `object_failures=0`,
+`object_emitted_functions=488`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -483,9 +483,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=487`,
-`generic_cfg_functions=487`, `structural_matcher_functions=0`,
-`object_emitted_functions=487`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=488`,
+`generic_cfg_functions=488`, `structural_matcher_functions=0`,
+`object_emitted_functions=488`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -782,7 +782,7 @@ varargs, vectors, stack-passed live-value scheduling beyond the current selected
 model, and
 broader SSE live-across-call frames beyond the selected one-live through
 six-live `f32`/`f64` no-argument-call shapes, selected direct
-two-/three-/six-live FP-argument call shapes, selected stack-passed `f64`
+two-/three-/six-live FP-argument call shapes, selected stack-passed `f32`/`f64`
 addend sums after a no-argument call,
 selected two-live repeated no-argument direct and pointer-callee call shapes,
 selected mixed one-GPR/one-SSE i32/i64 direct and pointer-callee call shapes,

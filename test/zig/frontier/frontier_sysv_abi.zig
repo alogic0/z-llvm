@@ -721,6 +721,13 @@ export fn frontier_stack_f64_live_sum_after_call(skip0: f64, skip1: f64, a: f64,
     return a + b + c + d + e + f + g + h;
 }
 
+export fn frontier_stack_f32_live_sum_after_call(skip0: f32, skip1: f32, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32) f32 {
+    _ = skip0;
+    _ = skip1;
+    frontier_touch_none();
+    return a + b + c + d + e + f + g + h;
+}
+
 export fn frontier_stack_arg_forward(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {
     return frontier_sum12_i32(a, b, c, d, e, f, g, h, i, j, k, l);
 }
