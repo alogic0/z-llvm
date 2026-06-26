@@ -355,7 +355,7 @@ pub fn parseZigArrayType(trimmed: []const u8) ?ZigType {
 pub fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ZigType {
     const prefix = "frontier_sysv_sret_byval.Big";
     if (!std.mem.startsWith(u8, trimmed, prefix)) return null;
-    const field_count = std.fmt.parseInt(u8, trimmed[prefix.len..], 10) catch return null;
+    const field_count = std.fmt.parseInt(u16, trimmed[prefix.len..], 10) catch return null;
     const aggregate: []const u8 = switch (field_count) {
         3 => "{ i64, i64, i64 }",
         4 => "{ i64, i64, i64, i64 }",
@@ -375,18 +375,10 @@ pub fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ZigType {
         18 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
         19 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
         20 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        32 => "{ [32 x i64] }",
-        40 => "{ [40 x i64] }",
-        48 => "{ [48 x i64] }",
-        64 => "{ [64 x i64] }",
-        80 => "{ [80 x i64] }",
-        81 => "{ [81 x i64] }",
-        96 => "{ [96 x i64] }",
-        128 => "{ [128 x i64] }",
-        160 => "{ [160 x i64] }",
-        192 => "{ [192 x i64] }",
-        224 => "{ [224 x i64] }",
-        else => return null,
+        else => if (field_count >= 32)
+            std.fmt.allocPrint(std.heap.page_allocator, "{{ [{d} x i64] }}", .{field_count}) catch return null
+        else
+            return null,
     };
     return .{ .ir_type = .{ .aggregate = aggregate } };
 }
@@ -1167,4 +1159,9 @@ test "parse qualified Zig function types" {
     try std.testing.expectEqual(@as(usize, 7), parsed.params.len);
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed.return_type.ir_type);
     try std.testing.expect(!parsed.c_calling_convention);
+}
+
+test "parse frontier BigN array-backed byval types generically" {
+    const parsed = frontierSysVSretByvalBigType("frontier_sysv_sret_byval.Big240") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqualStrings("{ [240 x i64] }", parsed.ir_type.aggregate);
 }
