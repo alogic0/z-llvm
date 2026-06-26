@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=534`,
-`generic_codegen_functions=534`, `generic_cfg_functions=534`,
+three release modes at `source_rows=13`, `discovered_functions=536`,
+`generic_codegen_functions=536`, `generic_cfg_functions=536`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=534`, `object_failures=0`,
+`object_emitted_functions=536`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -546,8 +546,8 @@ before post-call `fadd` returns, selected two-live pointer-callee
 two-FP-argument, three-FP-argument, and five-FP-argument
 `callq *%rax` shapes, and selected two-live `f32`/`f64` spill/reload across a
 helper call that consumes the second live
-value as its first FP argument. Selected direct f32/f64 call-result rows also
-spill the first result across a later direct FP helper call with a constant
+value as its first FP argument. Selected direct and pointer-callee f32/f64 call-result rows also
+spill the first result across a later FP helper call with a constant
 ninth FP stack argument. The same shared scalar planner now preserves
 live `i32` GPR parameters across direct and pointer-callee `f64`-argument
 `void` calls before the post-call integer add.
@@ -668,7 +668,7 @@ source-backed fail-closed varargs/vector/X87/packed aggregate/tail-call/callconv
 while arbitrary non-selected sret/byval copies,
 full varargs/vector/X87/packed implementation, stack-passed live-value scheduling beyond the current selected model,
 and broader SSE live-across-call frames beyond the selected one-live through
-six-live `f32`/`f64` no-argument-call shapes, selected direct f32/f64 result
+six-live `f32`/`f64` no-argument-call shapes, selected direct/pointer-callee f32/f64 result
 live-across-later constant-stack-argument FP call frames, two-live repeated no-argument
 direct and pointer-callee shapes, selected mixed one-GPR/one-SSE i32/i64
 one-/two-call direct and pointer-callee

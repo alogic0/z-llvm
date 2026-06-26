@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=534
-structured_functions=534
-generic_codegen_functions=534
-generic_cfg_functions=534
+discovered_functions=536
+structured_functions=536
+generic_codegen_functions=536
+generic_cfg_functions=536
 structural_matcher_functions=0
-structured_air_v2_functions=534
-typed_air_operand_functions=534
+structured_air_v2_functions=536
+typed_air_operand_functions=536
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=534
+generic_lowering_functions=536
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=534
+object_emitted_functions=536
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -806,9 +806,13 @@ Closed in the current memory/aggregate frontier slice:
 - selected FP-result live-across-stack-argument rows in `frontier_sysv_abi.zig`:
   `frontier_f64_result_live_across_const_stack_arg_call` and
   `frontier_f32_result_live_across_const_stack_arg_call` spill the first
-  direct FP call result, emit a second direct FP-result helper call with
-  eight constant XMM arguments plus a constant ninth outgoing stack argument,
-  then reload the first result for the final `fadd`
+  direct FP call result, while
+  `frontier_f64_result_live_across_indirect_const_stack_arg_call` and
+  `frontier_f32_result_live_across_indirect_const_stack_arg_call` preserve the
+  function-pointer callee for the same second-call shape. All four rows emit a
+  second FP-result helper call with eight constant XMM arguments plus a
+  constant ninth outgoing stack argument, then reload the first result for the
+  final `fadd`
 - selected indirect SSE live-across-call rows in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled, the pointer callee is moved to
   `%rax`, `callq *%rax` is emitted for both no-argument and one-FP-argument
@@ -882,7 +886,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   selected one-live through six-live `f32`/`f64` no-argument-call shapes,
   selected direct two-/three-/six-live FP-argument call shapes, selected
   stack-passed `f32`/`f64` addend sums after no-argument calls, selected
-  direct f32/f64 result live-across-later constant-stack-argument FP call frames, selected
+  direct/pointer-callee f32/f64 result live-across-later constant-stack-argument FP call frames, selected
   two-live repeated no-argument direct and pointer-callee call shapes, selected
   mixed one-GPR/one-SSE live direct and pointer-callee call shapes, selected
   one-FP-argument pointer-callee call shapes, selected three-/four-/six-live

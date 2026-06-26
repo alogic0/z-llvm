@@ -685,7 +685,6 @@ pub fn lowerGenericCfgFpTwoCallResultsReturn(
     const second_call_needs_general_args = second_call.args.items.len != 1 or sysvScalarCallNeedsStackArgs(second_call);
     var second_arg_index: ?usize = null;
     if (second_call_needs_general_args) {
-        if (second_call.callee_value != null) return error.UnsupportedLiveAcrossCall;
         for (second_call.args.items) |arg| {
             if (!arg.ty.eql(function.ret_ty)) return false;
             switch (arg.value) {
