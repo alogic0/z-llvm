@@ -190,7 +190,8 @@ accepted frontier:
   selected stack-passed register aggregate field reads after GPR exhaustion
   selected nested mixed INTEGER/SSE aggregate field reads/construction
   selected stack-passed nested mixed INTEGER/SSE aggregate helper calls with
-  layout-derived stack `i32` field loads
+  layout-derived stack `i32` field loads and a stack-sourced aggregate
+  pass-through return
   selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double`
   argument field reads, register return including packed adjacent `i32`
   construction returns, and direct helper-call return
@@ -510,6 +511,8 @@ selected shifted in-register reversed mixed aggregate pass-through calls
 selected shifted nested mixed aggregate pass-through calls that move both GPR and SSE halves
 selected direct and pointer-callee nested mixed aggregate pass-through returns
 without sret ABI rewriting
+selected stack-sourced nested mixed aggregate pass-through returns by reloading
+incoming stack eightbytes into `%rax`/`%xmm0`
 selected pointer-callee reversed mixed SSE/INTEGER aggregate pass-through calls
 selected up-to-six-live-i32 spill/reload call frame
 selected live i32 GPR preservation across direct and pointer-callee f64-argument calls

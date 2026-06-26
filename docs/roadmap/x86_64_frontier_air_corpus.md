@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=458
-structured_functions=458
-generic_codegen_functions=458
-generic_cfg_functions=458
+discovered_functions=459
+structured_functions=459
+generic_codegen_functions=459
+generic_cfg_functions=459
 structural_matcher_functions=0
-structured_air_v2_functions=458
-typed_air_operand_functions=458
+structured_air_v2_functions=459
+typed_air_operand_functions=459
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=458
+generic_lowering_functions=459
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=458
+object_emitted_functions=459
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -223,7 +223,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_stack_mixed_call_float_after_pressure` prove the same mixed
   aggregate can be stack-passed into a helper after both the GPR and SSE
   argument streams are exhausted; the helper field returns cover both the
-  INTEGER and SSE stack eightbytes;
+  INTEGER and SSE stack eightbytes; `frontier_stack_nested_mixed_forward_after_pressure`
+  returns the same stack-passed nested mixed aggregate by reloading the caller
+  stack eightbytes into `%rax`/`%xmm0`;
   `frontier_shifted_mixed_call_int` now proves in-register aggregate
   pass-through can move a shifted INTEGER eightbyte from `%rsi` to `%rdi`
   before the helper call instead of requiring exact source/destination slots;

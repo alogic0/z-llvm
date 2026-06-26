@@ -365,8 +365,14 @@ fn lowerRegisterAggregateParamReturn(
         error.UnsupportedCodegenValue, error.UnsupportedCodegenType => return false,
     };
     const needs = sysv_abi.aggregateRegisterNeeds(classification);
-    const source_in_registers = source.gpr + needs.gpr <= 6 and source.sse + needs.sse <= 8 and source.stack_eightbytes == 0;
-    if (!source_in_registers) return error.UnsupportedCodegenAbi;
+    const source_in_registers = source.gpr + needs.gpr <= 6 and source.sse + needs.sse <= 8;
+    const stack_base: u32 = if (source_in_registers)
+        0
+    else blk: {
+        const offset = 8 + source.stack_eightbytes * 8;
+        if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+        break :blk @intCast(offset);
+    };
 
     var gpr_return_index: usize = 0;
     var sse_return_index: usize = 0;
@@ -376,20 +382,34 @@ fn lowerRegisterAggregateParamReturn(
     while (eightbyte_index < classification.eightbyte_count) : (eightbyte_index += 1) {
         switch (classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi) {
             .integer => {
-                const src = try ArgReg.fromIndex(source.gpr + gpr_source_offset);
-                switch (gpr_return_index) {
-                    0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
-                    1 => try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } }),
-                    else => return error.UnsupportedCodegenAbi,
+                if (source_in_registers) {
+                    const src = try ArgReg.fromIndex(source.gpr + gpr_source_offset);
+                    switch (gpr_return_index) {
+                        0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
+                        1 => try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } }),
+                        else => return error.UnsupportedCodegenAbi,
+                    }
+                } else {
+                    const offset = stack_base + @as(u32, @intCast(eightbyte_index * 8));
+                    switch (gpr_return_index) {
+                        0 => try appendLoadStackDispRax(allocator, machine, offset),
+                        1 => try appendLoadStackDispArg64(allocator, machine, .rdx, offset),
+                        else => return error.UnsupportedCodegenAbi,
+                    }
                 }
                 gpr_source_offset += 1;
                 gpr_return_index += 1;
             },
             .sse => {
-                const src = try XmmReg.fromIndex(source.sse + sse_source_offset);
                 const dst = try XmmReg.fromIndex(sse_return_index);
-                if (src != dst) {
-                    try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = src } });
+                if (source_in_registers) {
+                    const src = try XmmReg.fromIndex(source.sse + sse_source_offset);
+                    if (src != dst) {
+                        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = src } });
+                    }
+                } else {
+                    const offset = stack_base + @as(u32, @intCast(eightbyte_index * 8));
+                    try appendLoadStackDispXmm(allocator, machine, dst, offset);
                 }
                 sse_source_offset += 1;
                 sse_return_index += 1;

@@ -74,6 +74,7 @@ selected nested mixed INTEGER/SSE aggregate field reads and construction returns
 selected shifted nested mixed INTEGER/SSE helper calls move both GPR and SSE aggregate halves through the shared register aggregate pass-through helper
 selected nested mixed INTEGER/SSE pass-through returns move incoming GPR/SSE aggregate eightbytes into the SysV return registers for direct and pointer-callee helper forwarding
 selected stack-passed nested mixed INTEGER/SSE aggregate helper calls read nested `i32` fields from caller and callee stack slots through the same layout-derived offsets
+selected stack-passed nested mixed INTEGER/SSE aggregate pass-through returns reload caller-stack eightbytes into `%rax`/`%xmm0`
 selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV GPR/SSE streams
 selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV SSE/GPR streams
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream, including `[2]f64`, nested double leaves, and `[4]f32` split across two SSE eightbytes
@@ -207,6 +208,9 @@ aggregate argument field reads and register aggregate return:
   outgoing stack aggregate slots after both the callee GPR and SSE argument
   streams are exhausted, and helper field returns cover both the INTEGER
   eightbyte and the stack-loaded `double` field
+  stack-passed `{ { i32, i32 }, double }` nested mixed aggregates can also be
+  returned directly by reloading the INTEGER eightbyte into `%rax` and the SSE
+  eightbyte into `%xmm0`
 frontier_sysv_aggregate_classes.SmallMixed and PackedMixed prove selected
 `i32`/`double` mixed INTEGER/SSE field reads:
   low-lane and high-lane `i32` fields are returned from the aggregate's GPR class register
