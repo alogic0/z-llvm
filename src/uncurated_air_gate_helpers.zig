@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 515,
+            .functions = 520,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1780,6 +1780,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big32 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; long long i; long long j; long long k; long long l; long long m; long long n; long long o; long long p; long long q; long long r; long long s; long long t; long long u; long long v; long long w; long long x; long long y; long long z; long long aa; long long ab; long long ac; long long ad; long long ae; long long af; };
     \\struct Big40 { long long values[40]; };
     \\struct Big48 { long long values[48]; };
+    \\struct Big64 { long long values[64]; };
     \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\struct BigMixed { long long a; int b; long long c; int d; };
     \\struct NarrowInner { unsigned short b; int c; };
@@ -1852,6 +1853,11 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big48 z_frontier_indirect_big48_copy(struct Big48 (*)(struct Big48), struct Big48) __asm__("frontier_sysv_sret_byval.frontier_indirect_big48_copy");
     \\extern struct Big48 z_frontier_stack_source_big48_copy(long long, long long, long long, long long, long long, long long, struct Big48) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big48_copy");
     \\extern struct Big48 z_frontier_stack_source_indirect_big48_copy(struct Big48 (*)(struct Big48), long long, long long, long long, long long, long long, long long, struct Big48) __asm__("frontier_sysv_sret_byval.frontier_stack_source_indirect_big48_copy");
+    \\extern struct Big64 z_frontier_big64_copy(struct Big64) __asm__("frontier_sysv_sret_byval.frontier_big64_copy");
+    \\extern struct Big64 z_frontier_direct_big64_copy(struct Big64) __asm__("frontier_sysv_sret_byval.frontier_direct_big64_copy");
+    \\extern struct Big64 z_frontier_indirect_big64_copy(struct Big64 (*)(struct Big64), struct Big64) __asm__("frontier_sysv_sret_byval.frontier_indirect_big64_copy");
+    \\extern struct Big64 z_frontier_stack_source_big64_copy(long long, long long, long long, long long, long long, long long, struct Big64) __asm__("frontier_sysv_sret_byval.frontier_stack_source_big64_copy");
+    \\extern struct Big64 z_frontier_stack_source_indirect_big64_copy(struct Big64 (*)(struct Big64), long long, long long, long long, long long, long long, long long, struct Big64) __asm__("frontier_sysv_sret_byval.frontier_stack_source_indirect_big64_copy");
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern struct BigNested z_frontier_direct_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_direct_big_nested_copy");
     \\extern struct BigNested z_frontier_indirect_big_nested_copy(struct BigNested (*)(struct BigNested), struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_indirect_big_nested_copy");
@@ -2018,6 +2024,17 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (stack_source48.values[0] != 1 || stack_source48.values[34] != 35 || stack_source48.values[43] != 44 || stack_source48.values[47] != 48) return 238;
     \\    struct Big48 stack_source_indirect48 = z_frontier_stack_source_indirect_big48_copy(z_frontier_big48_copy, 10, 20, 30, 40, 50, 60, input48);
     \\    if (stack_source_indirect48.values[0] != 1 || stack_source_indirect48.values[35] != 36 || stack_source_indirect48.values[44] != 45 || stack_source_indirect48.values[47] != 48) return 239;
+    \\    struct Big64 input64 = { .values = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64 } };
+    \\    struct Big64 copied64 = z_frontier_big64_copy(input64);
+    \\    if (copied64.values[0] != 1 || copied64.values[47] != 48 || copied64.values[56] != 57 || copied64.values[63] != 64) return 240;
+    \\    struct Big64 direct64 = z_frontier_direct_big64_copy(input64);
+    \\    if (direct64.values[0] != 1 || direct64.values[48] != 49 || direct64.values[57] != 58 || direct64.values[63] != 64) return 241;
+    \\    struct Big64 indirect64 = z_frontier_indirect_big64_copy(z_frontier_big64_copy, input64);
+    \\    if (indirect64.values[0] != 1 || indirect64.values[49] != 50 || indirect64.values[58] != 59 || indirect64.values[63] != 64) return 242;
+    \\    struct Big64 stack_source64 = z_frontier_stack_source_big64_copy(10, 20, 30, 40, 50, 60, input64);
+    \\    if (stack_source64.values[0] != 1 || stack_source64.values[50] != 51 || stack_source64.values[59] != 60 || stack_source64.values[63] != 64) return 243;
+    \\    struct Big64 stack_source_indirect64 = z_frontier_stack_source_indirect_big64_copy(z_frontier_big64_copy, 10, 20, 30, 40, 50, 60, input64);
+    \\    if (stack_source_indirect64.values[0] != 1 || stack_source_indirect64.values[51] != 52 || stack_source_indirect64.values[60] != 61 || stack_source_indirect64.values[63] != 64) return 244;
     \\    struct BigNested nested = { .left = { .a = 2, .b = 3, .c = 5 }, .right = { .a = 7, .b = 11, .c = 13 } };
     \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 20;
     \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);

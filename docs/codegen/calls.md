@@ -326,10 +326,10 @@ tail payloads, composite 3-/5-/6-/7-byte tails, and exact-eightbyte
 payloads beyond the former 40-stack-argument proof through the current
 64-stack-argument planner cap. Source-owned frontier
 rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`,
-`[9 x i16]`, and flat 32-/40-/48-eightbyte MEMORY byval-to-sret copies through
-direct and function-pointer calls; the 40-/48-eightbyte rows prove disp32
+`[9 x i16]`, and flat 32-/40-/48-/64-eightbyte MEMORY byval-to-sret copies through
+direct and function-pointer calls; the 40-/48-/64-eightbyte rows prove disp32
 source-pointer reloads once payload offsets exceed the byte displacement range,
-and the stack-sourced Big40/Big48 rows prove incoming `byval` payload
+and the stack-sourced Big40/Big48/Big64 rows prove incoming `byval` payload
 parameters are copied directly from caller stack payload slots rather than
 treated as pointers.
 Function-pointer byval calls reload the callee into
