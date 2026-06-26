@@ -502,6 +502,12 @@ export fn frontier_f64_result_live_across_const_stack_arg_call(a: f64) f64 {
     return first + second;
 }
 
+export fn frontier_f32_result_live_across_const_stack_arg_call(a: f32) f32 {
+    const first = frontier_ordered_f32(a);
+    const second = frontier_sum9_f32(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    return first + second;
+}
+
 export fn frontier_two_f32_results_across_calls(a: f32, b: f32) f32 {
     const first = frontier_ordered_f32(a);
     const second = frontier_ordered2_f32(b);

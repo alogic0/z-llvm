@@ -237,7 +237,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 13,
-            .functions = 533,
+            .functions = 534,
             .executable = .{
                 .native_link_accepted_rows = 13,
                 .executable_ok_rows = 13,
@@ -1171,6 +1171,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern float z_frontier_indirect_f32_result_live_across_indirect_void_call(float (*)(float), void (*)(void), float, float) __asm__("frontier_sysv_abi.frontier_indirect_f32_result_live_across_indirect_void_call");
     \\extern double z_frontier_two_f64_results_across_calls(double, double) __asm__("frontier_sysv_abi.frontier_two_f64_results_across_calls");
     \\extern double z_frontier_f64_result_live_across_const_stack_arg_call(double) __asm__("frontier_sysv_abi.frontier_f64_result_live_across_const_stack_arg_call");
+    \\extern float z_frontier_f32_result_live_across_const_stack_arg_call(float) __asm__("frontier_sysv_abi.frontier_f32_result_live_across_const_stack_arg_call");
     \\extern double z_frontier_indirect_first_f64_results_across_calls(double (*)(double), double, double) __asm__("frontier_sysv_abi.frontier_indirect_first_f64_results_across_calls");
     \\extern double z_frontier_indirect_second_f64_results_across_calls(double (*)(double), double, double) __asm__("frontier_sysv_abi.frontier_indirect_second_f64_results_across_calls");
     \\extern float z_frontier_two_f32_results_across_calls(float, float) __asm__("frontier_sysv_abi.frontier_two_f32_results_across_calls");
@@ -1485,6 +1486,8 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_two_f64_results_across_calls(2.0, 3.0) != 9.0 || frontier_order_step != 2) return 130;
     \\    frontier_order_step = 0;
     \\    if (z_frontier_f64_result_live_across_const_stack_arg_call(1.0) != 47.5 || frontier_order_step != 1) return 346;
+    \\    frontier_order_step = 0;
+    \\    if (z_frontier_f32_result_live_across_const_stack_arg_call(1.5f) != 48.0f || frontier_order_step != 1) return 352;
     \\    frontier_order_step = 0;
     \\    if (z_frontier_indirect_first_f64_results_across_calls(frontier_ordered_f64, 6.0, 7.0) != 17.0 || frontier_order_step != 2) return 131;
     \\    frontier_order_step = 0;
