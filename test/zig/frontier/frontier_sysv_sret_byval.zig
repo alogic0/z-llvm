@@ -588,6 +588,16 @@ export fn frontier_indirect_big80_copy(func: Big80CopyFn, value: Big80) Big80 {
     return func(value);
 }
 
+export fn frontier_stack_source_big80_copy(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, value: Big80) Big80 {
+    _ = a;
+    _ = b;
+    _ = c;
+    _ = d;
+    _ = e;
+    _ = f;
+    return frontier_big80_copy(value);
+}
+
 export fn frontier_big81_copy(value: Big81) Big81 {
     return value;
 }

@@ -50,20 +50,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=525
-structured_functions=525
-generic_codegen_functions=525
-generic_cfg_functions=525
+discovered_functions=526
+structured_functions=526
+generic_codegen_functions=526
+generic_cfg_functions=526
 structural_matcher_functions=0
-structured_air_v2_functions=525
-typed_air_operand_functions=525
+structured_air_v2_functions=526
+typed_air_operand_functions=526
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=525
+generic_lowering_functions=526
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=525
+object_emitted_functions=526
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -101,15 +101,15 @@ Source-backed ABI boundary proof is green for all three modes through
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=7
-discovered_functions=11
+source_rows=6
+discovered_functions=10
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
 packed_aggregate_boundary_rows=2
 tail_call_boundary_rows=1
 callconv_boundary_rows=1
-stack_pressure_boundary_rows=1
+stack_pressure_boundary_rows=0
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -118,11 +118,10 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 525-function strict frontier
-executable proof. The remaining stack-pressure row uses the Big80 stack-source
-forwarding shape to prove unsupported forwarding pressure fails closed with
-targeted ABI boundaries instead of
-silently falling back.
+are not counted in the accepted 13-source / 526-function strict frontier
+executable proof. Stack-pressure forwarding for the previous Big80 indirect
+and stack-source rows is now accepted in the frontier corpus; the boundary gate
+keeps `stack_pressure_boundary_rows=0` as a regression guard.
 
 Executable ABI proof is green for all three modes:
 

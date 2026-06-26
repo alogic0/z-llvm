@@ -329,12 +329,13 @@ rows now prove `[17 x i8]`, `[21 x i8]`, `[22 x i8]`, `[23 x i8]`,
 `[9 x i16]`, and flat 32-/40-/48-/64-/80-/81-eightbyte MEMORY byval-to-sret copies through
 direct and function-pointer calls; the 40-/48-/64-/80-/81-eightbyte rows prove disp32
 source-pointer reloads once payload offsets exceed the byte displacement range,
-and the stack-sourced Big40/Big48/Big64 rows prove incoming `byval` payload
+and the stack-sourced Big40/Big48/Big64/Big80 rows prove incoming `byval` payload
 parameters are copied directly from caller stack payload slots rather than
 treated as pointers. Big80 indirect forwarding is now accepted through the
-same planner-owned function-pointer byval copy path; the remaining
-source-backed Big80 stack-source forwarding row proves unsupported forwarding
-byval stack pressure rejects as a targeted ABI boundary.
+same planner-owned function-pointer byval copy path, and Big80 stack-source
+forwarding is accepted through the same layout-derived stack-copy path. The
+frontier boundary gate keeps `stack_pressure_boundary_rows=0` as a regression
+guard for unsupported forwarding pressure shapes.
 Function-pointer byval calls reload the callee into
 `%rax` after byval payload loads before `callq *%rax`; the selected live-`i32`
 spill/reload frame now covers the same indirect byval call shape for both
@@ -437,9 +438,9 @@ packed aggregate ABI call/return forms, including direct planner inputs and
   packed `sret`/`byval` payloads (`UnsupportedPackedAggregateAbi`);
   source-backed fail-closed by `distribution-air-release-frontier-boundaries`
 byval lowering outside supported aggregate payload stack copies and arbitrary sret copy/storage beyond the generated selected normal MEMORY aggregate frontier (`UnsupportedSretByvalAbi`)
-unsupported byval stack-pressure forwarding shapes beyond the current selected
-  scheduling model (`UnsupportedCodegenAbi`); source-backed fail-closed by
-  `distribution-air-release-frontier-boundaries`
+unsupported byval stack-pressure forwarding shapes beyond the accepted Big80
+  stack-source/indirect frontier stay guarded by `stack_pressure_boundary_rows=0`
+  in `distribution-air-release-frontier-boundaries`
 operand bundles
 invoke
 callbr
