@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=469
-structured_functions=469
-generic_codegen_functions=469
-generic_cfg_functions=469
+discovered_functions=471
+structured_functions=471
+generic_codegen_functions=471
+generic_cfg_functions=471
 structural_matcher_functions=0
-structured_air_v2_functions=469
-typed_air_operand_functions=469
+structured_air_v2_functions=471
+typed_air_operand_functions=471
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=469
+generic_lowering_functions=471
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=469
+object_emitted_functions=471
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -385,6 +385,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_mixed_gpr_sse_f32_stack_arg_call` and
   `frontier_indirect_mixed_gpr_sse_f32_stack_arg_call` prove the same direct
   and pointer-callee stack-slot path for ten `float` arguments; and
+  `frontier_mixed_i64_sse_f32_stack_arg_call` plus
+  `frontier_indirect_mixed_i64_sse_f32_stack_arg_call` extend that path to
+  eight `i64` plus ten `float` arguments;
   `frontier_mixed_i64_sse_stack_arg_call` and
   `frontier_indirect_mixed_i64_sse_stack_arg_call` prove the same independent
   cursor/stack-slot assignment for eight `i64` plus ten `double` arguments
