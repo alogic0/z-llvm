@@ -489,7 +489,7 @@ pub fn lowerGenericCfgFpVoidCallBinaryReturn(
     ret: anytype,
 ) !bool {
     if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty) or
-        block.instructions.items.len < 2 or block.instructions.items.len > 8) return false;
+        block.instructions.items.len < 2 or block.instructions.items.len > 9) return false;
     const call_count = try leadingFpVoidCallCount(block);
     if (call_count == 0) return false;
 
