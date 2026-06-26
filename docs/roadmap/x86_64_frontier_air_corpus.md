@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=463
-structured_functions=463
-generic_codegen_functions=463
-generic_cfg_functions=463
+discovered_functions=464
+structured_functions=464
+generic_codegen_functions=464
+generic_cfg_functions=464
 structural_matcher_functions=0
-structured_air_v2_functions=463
-typed_air_operand_functions=463
+structured_air_v2_functions=464
+typed_air_operand_functions=464
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=463
+generic_lowering_functions=464
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=463
+object_emitted_functions=464
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -376,6 +376,10 @@ Closed in the current memory/aggregate frontier slice:
   pointer-callee helper calls; `frontier_nine_f32_const_stack_arg_call` and
   `frontier_nine_f64_const_stack_arg_call` prove the same outgoing stack-slot
   path for immediate FP constants
+- mixed GPR/SSE outgoing stack row in `frontier_sysv_abi.zig`:
+  `frontier_mixed_gpr_sse_stack_arg_call` calls an external C ABI helper with
+  eight `i32` and ten `double` arguments, forcing both the GPR and SSE argument
+  streams to overflow into SysV stack slots in the same call
 - stack-passed live i32 rows in `frontier_sysv_abi.zig`: all six SysV GPR
   `i32` parameters are spilled/reloaded around a direct helper call while more
   than six stack-passed `i32` parameters are read from the restored incoming

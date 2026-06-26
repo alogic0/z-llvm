@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=463
-structured_functions=463
-generic_codegen_functions=463
-generic_cfg_functions=463
+discovered_functions=464
+structured_functions=464
+generic_codegen_functions=464
+generic_cfg_functions=464
 structural_matcher_functions=0
-structured_air_v2_functions=463
-typed_air_operand_functions=463
+structured_air_v2_functions=464
+typed_air_operand_functions=464
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=463
+generic_lowering_functions=464
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=463
+object_emitted_functions=464
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 463-function counters above plus `native_link_accepted_rows=13`,
+13-source / 464-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -710,6 +710,9 @@ The single-eightbyte SSE follow-up covers stack-passed `{ f32, f32 }` by
 reloading the caller-stack eightbyte into `%xmm0`.
 The companion pointer-callee row uses the same stack-source reload before
 `callq *%rax`, proving the indirect SysV planner path for this class.
+The mixed stack-argument row calls an external C ABI helper with both overflowing
+integer and `double` argument streams, proving the GPR and SSE cursors assign
+outgoing stack slots independently in the same call.
 The reversed mixed follow-up covers the opposite SSE/INTEGER order by reloading
 stack-passed `{ double, i64 }` into `%xmm0`/`%rax`.
 

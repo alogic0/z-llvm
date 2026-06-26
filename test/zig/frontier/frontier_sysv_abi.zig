@@ -81,6 +81,7 @@ extern fn frontier_sum12_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: 
 extern fn frontier_sum14_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32) i32;
 extern fn frontier_sum18_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32, o: i32, p: i32, q: i32, r: i32) i32;
 extern fn frontier_sum24_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32, m: i32, n: i32, o: i32, p: i32, q: i32, r: i32, s: i32, t: i32, u: i32, v: i32, w: i32, x: i32) i32;
+extern fn frontier_sum8_i32_10_f64(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, fa: f64, fb: f64, fc: f64, fd: f64, fe: f64, ff: f64, fg: f64, fh: f64, fi: f64, fj: f64) f64;
 extern fn frontier_sub_i32(a: i32, b: i32) i32;
 extern fn frontier_weighted3_i32(a: i32, b: i32, c: i32) i32;
 extern fn frontier_weighted6_i32(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32;
@@ -672,6 +673,10 @@ export fn frontier_twelve_stack_arg_call() i32 {
 
 export fn frontier_eighteen_stack_arg_call() i32 {
     return frontier_sum24_i32(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24);
+}
+
+export fn frontier_mixed_gpr_sse_stack_arg_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, fa: f64, fb: f64, fc: f64, fd: f64, fe: f64, ff: f64, fg: f64, fh: f64, fi: f64, fj: f64) f64 {
+    return frontier_sum8_i32_10_f64(a, b, c, d, e, f, g, h, fa, fb, fc, fd, fe, ff, fg, fh, fi, fj);
 }
 
 export fn frontier_stack_arg_forward(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32, k: i32, l: i32) i32 {
