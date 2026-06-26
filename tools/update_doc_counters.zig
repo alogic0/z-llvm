@@ -70,6 +70,7 @@ const BoundaryCounterSet = struct {
     packed_aggregate_boundary_rows: usize = 0,
     tail_call_boundary_rows: usize = 0,
     callconv_boundary_rows: usize = 0,
+    stack_pressure_boundary_rows: usize = 0,
     unexpected_accept_rows: usize = 0,
     wrong_diagnostic_rows: usize = 0,
     llvm_targetmachine_rows: usize = 0,
@@ -173,6 +174,7 @@ const boundary_fields = [_]BoundaryField{
     .{ .name = "packed_aggregate_boundary_rows", .value = boundaryFieldPackedRows },
     .{ .name = "tail_call_boundary_rows", .value = boundaryFieldTailCallRows },
     .{ .name = "callconv_boundary_rows", .value = boundaryFieldCallConvRows },
+    .{ .name = "stack_pressure_boundary_rows", .value = boundaryFieldStackPressureRows },
     .{ .name = "unexpected_accept_rows", .value = boundaryFieldUnexpectedAcceptRows },
     .{ .name = "wrong_diagnostic_rows", .value = boundaryFieldWrongDiagnosticRows },
     .{ .name = "llvm_targetmachine_rows", .value = boundaryFieldLlvmTargetmachineRows },
@@ -220,7 +222,7 @@ pub fn main(init: std.process.Init) !void {
         var stdout_buffer: [512]u8 = undefined;
         var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
         try stdout_writer.interface.print(
-            "updated-doc-counters gate={s} source_rows={} discovered_functions={} varargs_boundary_rows={} vector_boundary_rows={} x87_boundary_rows={} packed_aggregate_boundary_rows={} tail_call_boundary_rows={} callconv_boundary_rows={} changed_files={}\n",
+            "updated-doc-counters gate={s} source_rows={} discovered_functions={} varargs_boundary_rows={} vector_boundary_rows={} x87_boundary_rows={} packed_aggregate_boundary_rows={} tail_call_boundary_rows={} callconv_boundary_rows={} stack_pressure_boundary_rows={} changed_files={}\n",
             .{
                 options.gate,
                 counters.source_rows,
@@ -231,6 +233,7 @@ pub fn main(init: std.process.Init) !void {
                 counters.packed_aggregate_boundary_rows,
                 counters.tail_call_boundary_rows,
                 counters.callconv_boundary_rows,
+                counters.stack_pressure_boundary_rows,
                 changed_files,
             },
         );
@@ -403,6 +406,7 @@ fn parseBoundaryCounterLine(line: []const u8) BoundaryCounterSet {
         .packed_aggregate_boundary_rows = parseField(line, "packed_aggregate_boundary_rows") orelse 0,
         .tail_call_boundary_rows = parseField(line, "tail_call_boundary_rows") orelse 0,
         .callconv_boundary_rows = parseField(line, "callconv_boundary_rows") orelse 0,
+        .stack_pressure_boundary_rows = parseField(line, "stack_pressure_boundary_rows") orelse 0,
         .unexpected_accept_rows = parseField(line, "unexpected_accept_rows") orelse 0,
         .wrong_diagnostic_rows = parseField(line, "wrong_diagnostic_rows") orelse 0,
         .llvm_targetmachine_rows = parseField(line, "llvm_targetmachine_rows") orelse 0,
@@ -794,6 +798,9 @@ fn boundaryFieldTailCallRows(c: BoundaryCounterSet) usize {
 }
 fn boundaryFieldCallConvRows(c: BoundaryCounterSet) usize {
     return c.callconv_boundary_rows;
+}
+fn boundaryFieldStackPressureRows(c: BoundaryCounterSet) usize {
+    return c.stack_pressure_boundary_rows;
 }
 fn boundaryFieldUnexpectedAcceptRows(c: BoundaryCounterSet) usize {
     return c.unexpected_accept_rows;
