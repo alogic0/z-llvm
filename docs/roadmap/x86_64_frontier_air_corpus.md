@@ -48,20 +48,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=480
-structured_functions=480
-generic_codegen_functions=480
-generic_cfg_functions=480
+discovered_functions=483
+structured_functions=483
+generic_codegen_functions=483
+generic_cfg_functions=483
 structural_matcher_functions=0
-structured_air_v2_functions=480
-typed_air_operand_functions=480
+structured_air_v2_functions=483
+typed_air_operand_functions=483
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=480
+generic_lowering_functions=483
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=480
+object_emitted_functions=483
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -218,7 +218,10 @@ Closed in the current memory/aggregate frontier slice:
   and pointer leaves in one byval-to-sret MEMORY aggregate; the
   `BigNestedArrayMixed` row nests array-contained `f32` and `f64` leaves with
   pointer and `i64` leaves and proves the same direct and pointer-callee
-  byval-to-sret copy path for a deeper supported-leaf MEMORY layout; `Big32` and
+  byval-to-sret copy path for a deeper supported-leaf MEMORY layout; the
+  `BigStructArrayMixed` row proves array elements that are themselves
+  aggregate leaves (`{ i32, double }`) through the same recursive
+  byval-to-sret copy path; `Big32` and
   `Big40` raise the same planner-owned byval-to-sret direct and pointer-callee
   copy path through exact-qword MEMORY payloads beyond byte-offset byval loads
   using disp32 source-pointer reloads; the stack-sourced `Big40` direct and
