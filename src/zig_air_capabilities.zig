@@ -178,7 +178,8 @@ pub fn isStraightLineOpcode(opcode: []const u8) bool {
 
 pub fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
     return isCommonLowerableOpcode(opcode) or
-        std.mem.eql(u8, opcode, "block");
+        std.mem.eql(u8, opcode, "block") or
+        std.mem.eql(u8, opcode, "cond_br");
 }
 
 pub fn typedV2CanLower(capability: OpcodeCapability) bool {
@@ -642,6 +643,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     const block_capability = opcodeCapability("block");
     try std.testing.expectEqual(CapabilityOwner.cfg_lowering, block_capability.owner);
     try std.testing.expectEqual(LowererKind.typed_v2_cfg, block_capability.lowerer);
+    try std.testing.expect(typedV2CanLower(opcodeCapability("cond_br")));
+    try std.testing.expectEqual(CapabilityOwner.cfg_lowering, opcodeCapability("cond_br").owner);
 
     const call_capability = opcodeCapability("call");
     try std.testing.expectEqual(CapabilityOwner.abi_planner, call_capability.owner);

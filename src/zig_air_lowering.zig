@@ -965,7 +965,9 @@ const LoweringContext = struct {
     }
 
     fn lowerTypedInstructionImpl(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
-        if (isIgnoredOpcode(instruction.opcode)) return;
+        const capability = self.typedInstructionCapability(instruction);
+        if (capability.status == .ignored_metadata) return;
+        if (!air_capabilities.typedV2CanLower(capability)) return error.UnsupportedAir;
         if (std.mem.eql(u8, instruction.opcode, "arg")) {
             try self.lowerTypedArg(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "add_with_overflow")) {
@@ -1035,12 +1037,24 @@ const LoweringContext = struct {
     fn recordTypedV2Fallback(self: *LoweringContext, instruction: air_export.TypedInstruction) void {
         const slot = self.typed_v2_fallback orelse return;
         if (slot.* != null) return;
+        const capability = self.typedInstructionCapability(instruction);
         slot.* = .{
             .function = self.air_function.name,
             .opcode = instruction.opcode,
             .data_kind = instruction.data_kind,
-            .reason = "lowering_validation",
+            .reason = if (air_capabilities.typedV2CanLower(capability))
+                "lowering_validation"
+            else
+                air_capabilities.typedV2FallbackReason(capability),
         };
+    }
+
+    fn typedInstructionCapability(
+        self: LoweringContext,
+        instruction: air_export.TypedInstruction,
+    ) air_capabilities.OpcodeCapability {
+        if (self.typed_view) |view| return view.capability(instruction);
+        return air_capabilities.opcodeCapability(instruction.opcode);
     }
 
     fn lowerTypedArg(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
