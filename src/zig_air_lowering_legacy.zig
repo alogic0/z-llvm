@@ -4,34 +4,18 @@ const air_capabilities = @import("zig_air_capabilities.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
+const air_model = @import("zig_air_model.zig");
 const ir = @import("ir.zig");
 
-const FunctionType = @import("zig_air_model.zig").FunctionType;
+const FunctionType = air_model.FunctionType;
 const parseConstant = air_values.parseConstant;
 const parseFunctionType = air_types.parseFunctionType;
 const parseInstructionRef = air_text.instructionRef;
-const shortFunctionName = @import("zig_air_model.zig").shortFunctionName;
-const ownPrint = @import("zig_air_model.zig").ownPrint;
+const shortFunctionName = air_model.shortFunctionName;
+const ownPrint = air_model.ownPrint;
 const splitTopLevel = air_text.splitTopLevel;
 const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
-
-fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) usize {
-    var count: usize = 0;
-    for (structured_air_v2.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, opcode)) count += 1;
-    }
-    return count;
-}
-
-fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
-    return typedOpcodeCount(structured_air_v2, "store") + typedOpcodeCount(structured_air_v2, "store_safe");
-}
-
-fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
-    return typedOpcodeCount(structured_air_v2, "ret") > 0 or
-        typedOpcodeCount(structured_air_v2, "ret_safe") > 0;
-}
 
 pub fn lowerTypedV2ArraySum(
     allocator: std.mem.Allocator,
@@ -116,13 +100,13 @@ pub fn typedV2AggregatePairFirstRecords(
     {
         return false;
     }
-    return typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        typedOpcodeCount(structured_air_v2, "alloc") == 1 and
-        typedStoreOpcodeCount(structured_air_v2) == 1 and
-        typedOpcodeCount(structured_air_v2, "bitcast") == 1 and
-        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
-        typedOpcodeCount(structured_air_v2, "load") == 1 and
-        typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "alloc") == 1 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "bitcast") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
+        air_model.typedHasReturnOpcode(structured_air_v2);
 }
 
 pub fn typedV2AggregateMakePairRecords(
@@ -136,12 +120,12 @@ pub fn typedV2AggregateMakePairRecords(
     {
         return false;
     }
-    return typedOpcodeCount(structured_air_v2, "arg") == 2 and
-        typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
-        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
-        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_1") == 1 and
-        typedStoreOpcodeCount(structured_air_v2) == 2 and
-        typedOpcodeCount(structured_air_v2, "ret_load") == 1;
+    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 2 and
+        air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_1") == 1 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) == 2 and
+        air_model.typedOpcodeCount(structured_air_v2, "ret_load") == 1;
 }
 
 const AccumulatorLoopShape = struct {
