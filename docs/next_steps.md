@@ -159,7 +159,8 @@ Execution order:
    lowering decisions either. Function calling-convention mapping is also
    model-owned. The parser API that remains in active lowerer use is now the
    Zig type/function signature parser, constant parser, symbol pointer parser,
-   pointer-child text parser, and the shared lowering error type.
+   and pointer-child text parser; shared typed value structs and `LowerError`
+   are private/model-owned rather than parser-owned compatibility exports.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
