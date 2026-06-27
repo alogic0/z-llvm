@@ -199,7 +199,11 @@ Execution order:
    operand detail keys directly. Typed pointer-to-pointer bitcast identity now
    uses a capability predicate rather than a local string comparison. Typed
    block-target operand parsing is now normalized through model-local block
-   operand helpers instead of inline `kind`/`value` checks. The
+   operand helpers instead of inline `kind`/`value` checks. Typed result and
+   operand coverage now use a model-owned known-type sentinel helper, typed
+   return-pointer recognition routes through the capability registry, aggregate
+   pointer-path parsing reuses model-owned operand/field helpers, and branch
+   constant/field-index checks no longer duplicate local operand parsing. The
    Zig type/function signature parsing and pointer-child text now live in
    `src/zig_air_types.zig`; AIR constants and symbol pointers live in
    `src/zig_air_values.zig`; instruction-reference parsing and balanced text
