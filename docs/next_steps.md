@@ -103,8 +103,9 @@ Execution order:
    obsolete raw return-body parser helpers removed. The typed lowering context
    now carries the typed view and uses it for block-body lookup, void guard
    checks, return checks, noreturn panic paths, and branch-value extraction.
-   Next work: route error-union/try lowering and optional/pointer lowering
-   through the same view.
+   Terminal error-union conditional checks also use the same model. Next work:
+   route error-union/try lowering and optional/pointer lowering through the
+   view.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.

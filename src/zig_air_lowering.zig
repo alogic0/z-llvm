@@ -914,14 +914,6 @@ fn errorUnionPayloadType(text: []const u8) ?ZigType {
     return parseZigType(trimmed[marker + 2 ..]);
 }
 
-fn typedBodyHasReturn(structured_air_v2: air_export.StructuredAirV2, body: air_export.StructuredBody) bool {
-    for (body.instructions) |instruction_index| {
-        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
-        if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) return true;
-    }
-    return false;
-}
-
 fn isTypedTerminalCondBr(function: air_export.Function, instruction_index: u32) bool {
     if (!functionHasAnyTypedOpcode(function, &.{
         "is_non_err",
@@ -930,13 +922,12 @@ fn isTypedTerminalCondBr(function: air_export.Function, instruction_index: u32) 
         "unwrap_errunion_payload",
         "unwrap_errunion_err",
     })) return false;
-    const structured_air = function.structured_air orelse return false;
-    const structured_air_v2 = function.structured_air_v2 orelse return false;
-    const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
+    const view = air_model.TypedFunctionView.init(function) orelse return false;
+    const instruction = view.instruction(instruction_index) orelse return false;
     if (!std.mem.eql(u8, instruction.opcode, "cond_br") or instruction.operands.len != 1) return false;
-    const then_body = structured_air.body(.then_body, instruction.index) orelse return false;
-    const else_body = structured_air.body(.else_body, instruction.index) orelse return false;
-    return typedBodyHasReturn(structured_air_v2, then_body) and typedBodyHasReturn(structured_air_v2, else_body);
+    const then_body = view.body(.then_body, instruction.index) orelse return false;
+    const else_body = view.body(.else_body, instruction.index) orelse return false;
+    return view.bodyHasReturn(then_body) and view.bodyHasReturn(else_body);
 }
 
 fn functionHasAnyTypedOpcode(function: air_export.Function, opcodes: []const []const u8) bool {
