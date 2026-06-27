@@ -1893,8 +1893,7 @@ const LoweringContext = struct {
         const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
         if (result_type.ir_type != .ptr) return error.UnsupportedAir;
         const field_child = result_type.pointer_child orelse return error.UnsupportedAir;
-        const field_index_text = typedDetail(instruction, "field_index") orelse return error.UnsupportedAir;
-        const field_index = std.fmt.parseInt(i128, field_index_text, 10) catch return error.UnsupportedAir;
+        const field_index = air_model.fieldIndex(instruction) orelse return error.UnsupportedAir;
         const source_ty = aggregate_ptr.ty.pointer_child orelse return error.UnsupportedAir;
         if (aggregateFieldByteOffset(source_ty, field_child, field_index)) |offset| {
             if (offset == 0) {

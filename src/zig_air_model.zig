@@ -440,6 +440,11 @@ pub fn runtimeNavFqn(instruction: air_export.TypedInstruction) ?[]const u8 {
     return detail(instruction, "nav_fqn");
 }
 
+pub fn fieldIndex(instruction: air_export.TypedInstruction) ?i128 {
+    const field_index_text = detail(instruction, "field_index") orelse return null;
+    return std.fmt.parseInt(i128, field_index_text, 10) catch null;
+}
+
 pub fn calleeName(callee_text: []const u8) ?[]const u8 {
     return (callee(callee_text) orelse return null).name;
 }
