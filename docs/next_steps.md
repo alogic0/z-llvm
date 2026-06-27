@@ -77,14 +77,27 @@ Execution order:
 
 1. Registry slice: `src/zig_air_capabilities.zig` now provides the shared AIR
    opcode capability registry for inventory, typed AIR diagnostics, and
-   lowering eligibility. It records category, inventory-known status,
-   metadata-ignore status, straight-line lowering eligibility, typed-v2 lowering
-   eligibility, and first boundary reason. The first local string allowlists
-   were removed from `src/distribution_zig_air_inventory.zig` and
-   `src/zig_air_lowering_parser.zig` without changing accepted row behavior.
-   Next work: extend this registry from opcode capability into data-kind and
-   type-layout capability.
-2. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
+   lowering eligibility. It records category, explicit status
+   (`lowerable`, `boundary`, `inventory-only`, `ignored-metadata`, or
+   `unknown`), owning layer (`semantic-lowering`, `cfg-lowering`,
+   `abi-planner`, `backend`, etc.), lowerer kind, inventory-known status,
+   metadata-ignore status, straight-line lowering eligibility, typed-v2
+   lowering eligibility, and first boundary reason. The first local string
+   allowlists were removed from `src/distribution_zig_air_inventory.zig` and
+   `src/zig_air_lowering_parser.zig`; generic typed-CFG eligibility now reads
+   the registry capability object instead of asking scattered boolean helpers.
+   Next work: extend this registry from opcode capability into data-kind
+   ownership and make lowering dispatch select through the registered lowerer
+   kind directly.
+2. Normalized typed-AIR slice: `src/zig_air_model.zig` now provides the first
+   reusable typed function view over structured-air v1/v2 bodies,
+   instructions, and opcode capabilities. The generic typed-CFG block
+   classifier is the first consumer, so future CFG/semantic lowerers can move
+   from raw opcode/data-kind string checks toward one function/body/instruction
+   model without changing accepted frontier behavior. Next work: route branch
+   bodies, error-union/try lowering, optional/pointer lowering, and typed-v2
+   fallback diagnostics through the same view.
+3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
    `src/distribution_zig_air_inventory.zig` uses it for category reporting,
@@ -96,15 +109,15 @@ Execution order:
    field/leaf layout helpers. Next work: fold the remaining aggregate copy-plan
    and typed-v2 aggregate construction decisions into the same shared
    capability path.
-3. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
+4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
    targeted.
-4. Aggregate ABI slice: route aggregate argument, return, sret, byval, field
+5. Aggregate ABI slice: route aggregate argument, return, sret, byval, field
    offset, and copy decisions through the shared type-layout result plus the
    SysV aggregate classifier. Do not add function-name-specific aggregate
    paths.
-5. Unknown-opcode slice: split the compiler-core `unknown-opcode` inventory
+6. Unknown-opcode slice: split the compiler-core `unknown-opcode` inventory
    bucket into stable subcategories before implementing more lowering. The
    first split is now emitted as `unknown_opcode` and `top_unknown_opcode`
    records by `distribution-zig-air-inventory`: `error-union-try`,
@@ -124,7 +137,7 @@ Execution order:
    `try:pl_op` continuation through typed AIR v2, generic CFG, z_llvm object
    emission, and executable proof. Broader nested/multi-block compiler-core
    `try` forms remain the next error-union sub-slice.
-6. Compiler-core frontier slice: only after the registries are shared, add
+7. Compiler-core frontier slice: only after the registries are shared, add
    small real Zig compiler-core frontier rows that exercise the highest ranked
    categories through typed AIR v2 and generic CFG. Keep the
    `compiler-core-module` gate inventory-only.

@@ -6,11 +6,80 @@ const air_export = @import("zig_air_export.zig");
 
 pub const OpcodeCapability = struct {
     category: air_export.InstructionCategory,
+    status: OpcodeStatus,
+    owner: CapabilityOwner,
+    lowerer: LowererKind,
     inventory_known: bool,
     ignored_metadata: bool,
     straight_line_lowerable: bool,
     typed_v2_lowerable: bool,
     boundary_reason: ?[]const u8 = null,
+};
+
+pub const OpcodeStatus = enum {
+    unknown,
+    inventory_only,
+    boundary,
+    ignored_metadata,
+    lowerable,
+
+    pub fn name(self: OpcodeStatus) []const u8 {
+        return switch (self) {
+            .unknown => "unknown",
+            .inventory_only => "inventory-only",
+            .boundary => "boundary",
+            .ignored_metadata => "ignored-metadata",
+            .lowerable => "lowerable",
+        };
+    }
+};
+
+pub const CapabilityOwner = enum {
+    unknown,
+    inventory,
+    debug_metadata,
+    air_parser,
+    semantic_lowering,
+    cfg_lowering,
+    abi_planner,
+    backend,
+    runtime_boundary,
+
+    pub fn name(self: CapabilityOwner) []const u8 {
+        return switch (self) {
+            .unknown => "unknown",
+            .inventory => "inventory",
+            .debug_metadata => "debug-metadata",
+            .air_parser => "air-parser",
+            .semantic_lowering => "semantic-lowering",
+            .cfg_lowering => "cfg-lowering",
+            .abi_planner => "abi-planner",
+            .backend => "backend",
+            .runtime_boundary => "runtime-boundary",
+        };
+    }
+};
+
+pub const LowererKind = enum {
+    none,
+    ignore,
+    typed_v2_semantic,
+    typed_v2_cfg,
+    call_abi,
+    backend_runtime,
+    boundary,
+
+    pub fn name(self: LowererKind) []const u8 {
+        return switch (self) {
+            .none => "none",
+            .ignore => "ignore",
+            .typed_v2_semantic => "typed-v2-semantic",
+            .typed_v2_cfg => "typed-v2-cfg",
+            .call_abi => "call-abi",
+            .backend_runtime => "backend-runtime",
+            .boundary => "boundary",
+        };
+    }
 };
 
 pub const UnknownOpcodeCategory = enum(u8) {
@@ -71,13 +140,19 @@ pub fn opcodeCapability(opcode: []const u8) OpcodeCapability {
     const ignored_metadata = isIgnoredMetadataOpcode(opcode);
     const straight_line_lowerable = isStraightLineLowerableOpcode(opcode);
     const typed_v2_lowerable = isTypedV2LowerableOpcode(opcode);
+    const boundary_reason = boundaryReasonForOpcode(opcode);
+    const inventory_known = category != .other or isInventoryKnownOtherOpcode(opcode);
+    const status = opcodeStatus(ignored_metadata, typed_v2_lowerable, inventory_known, boundary_reason);
     return .{
         .category = category,
-        .inventory_known = category != .other or isInventoryKnownOtherOpcode(opcode),
+        .status = status,
+        .owner = capabilityOwnerForOpcode(opcode, category, status),
+        .lowerer = lowererForOpcode(opcode, category, status),
+        .inventory_known = inventory_known,
         .ignored_metadata = ignored_metadata,
         .straight_line_lowerable = straight_line_lowerable,
         .typed_v2_lowerable = typed_v2_lowerable,
-        .boundary_reason = boundaryReasonForOpcode(opcode),
+        .boundary_reason = boundary_reason,
     };
 }
 
@@ -96,6 +171,90 @@ pub fn isStraightLineOpcode(opcode: []const u8) bool {
 pub fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
     return isCommonLowerableOpcode(opcode) or
         std.mem.eql(u8, opcode, "block");
+}
+
+pub fn typedV2CanLower(capability: OpcodeCapability) bool {
+    return capability.status == .lowerable and capability.typed_v2_lowerable;
+}
+
+fn opcodeStatus(
+    ignored_metadata: bool,
+    typed_v2_lowerable: bool,
+    inventory_known: bool,
+    boundary_reason: ?[]const u8,
+) OpcodeStatus {
+    if (ignored_metadata) return .ignored_metadata;
+    if (typed_v2_lowerable) return .lowerable;
+    if (boundary_reason != null) return .boundary;
+    if (inventory_known) return .inventory_only;
+    return .unknown;
+}
+
+fn capabilityOwnerForOpcode(
+    opcode: []const u8,
+    category: air_export.InstructionCategory,
+    status: OpcodeStatus,
+) CapabilityOwner {
+    return switch (status) {
+        .ignored_metadata => .debug_metadata,
+        .boundary => .runtime_boundary,
+        .unknown => .unknown,
+        .inventory_only => .inventory,
+        .lowerable => lowerableOwnerForOpcode(opcode, category),
+    };
+}
+
+fn lowerableOwnerForOpcode(opcode: []const u8, category: air_export.InstructionCategory) CapabilityOwner {
+    if (std.mem.eql(u8, opcode, "block") or
+        std.mem.eql(u8, opcode, "br") or
+        std.mem.eql(u8, opcode, "cond_br") or
+        std.mem.eql(u8, opcode, "loop") or
+        std.mem.eql(u8, opcode, "repeat") or
+        std.mem.eql(u8, opcode, "switch_br") or
+        category == .control_flow or
+        category == .return_op)
+    {
+        return .cfg_lowering;
+    }
+    if (category == .call) return .abi_planner;
+    if (std.mem.eql(u8, opcode, "atomic_rmw") or std.mem.eql(u8, opcode, "assembly")) return .backend;
+    if (std.mem.eql(u8, opcode, "add_with_overflow") or
+        std.mem.eql(u8, opcode, "is_non_null") or
+        std.mem.eql(u8, opcode, "is_non_err") or
+        std.mem.eql(u8, opcode, "wrap_optional") or
+        std.mem.eql(u8, opcode, "optional_payload") or
+        std.mem.startsWith(u8, opcode, "wrap_errunion") or
+        std.mem.startsWith(u8, opcode, "unwrap_errunion") or
+        std.mem.eql(u8, opcode, "try") or
+        std.mem.eql(u8, opcode, "slice") or
+        std.mem.eql(u8, opcode, "ptr_add") or
+        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
+        std.mem.eql(u8, opcode, "array_elem_val") or
+        isFieldPtrOpcode(opcode))
+    {
+        return .semantic_lowering;
+    }
+    return .air_parser;
+}
+
+fn lowererForOpcode(
+    opcode: []const u8,
+    category: air_export.InstructionCategory,
+    status: OpcodeStatus,
+) LowererKind {
+    return switch (status) {
+        .ignored_metadata => .ignore,
+        .boundary => .boundary,
+        .unknown, .inventory_only => .none,
+        .lowerable => lowererForLowerableOpcode(opcode, category),
+    };
+}
+
+fn lowererForLowerableOpcode(opcode: []const u8, category: air_export.InstructionCategory) LowererKind {
+    if (category == .call) return .call_abi;
+    if (category == .control_flow or category == .return_op or std.mem.eql(u8, opcode, "block")) return .typed_v2_cfg;
+    if (std.mem.eql(u8, opcode, "atomic_rmw") or std.mem.eql(u8, opcode, "assembly")) return .backend_runtime;
+    return .typed_v2_semantic;
 }
 
 pub fn unknownOpcodeCategory(opcode: []const u8, data_kind: []const u8) UnknownOpcodeCategory {
@@ -429,6 +588,25 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, unknownOpcodeCategory("slice_ptr", "none"));
     try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, unknownOpcodeCategory("try_ptr", "error_union"));
     try std.testing.expectEqual(UnknownOpcodeCategory.safety_runtime, unknownOpcodeCategory("panic_cold", "none"));
+
+    const try_capability = opcodeCapability("try");
+    try std.testing.expectEqual(OpcodeStatus.lowerable, try_capability.status);
+    try std.testing.expectEqual(CapabilityOwner.semantic_lowering, try_capability.owner);
+    try std.testing.expectEqual(LowererKind.typed_v2_semantic, try_capability.lowerer);
+    try std.testing.expect(typedV2CanLower(try_capability));
+
+    const block_capability = opcodeCapability("block");
+    try std.testing.expectEqual(CapabilityOwner.cfg_lowering, block_capability.owner);
+    try std.testing.expectEqual(LowererKind.typed_v2_cfg, block_capability.lowerer);
+
+    const call_capability = opcodeCapability("call");
+    try std.testing.expectEqual(CapabilityOwner.abi_planner, call_capability.owner);
+    try std.testing.expectEqual(LowererKind.call_abi, call_capability.lowerer);
+
+    const asm_capability = opcodeCapability("assembly");
+    try std.testing.expectEqual(OpcodeStatus.boundary, asm_capability.status);
+    try std.testing.expectEqual(LowererKind.boundary, asm_capability.lowerer);
+    try std.testing.expect(!typedV2CanLower(asm_capability));
 }
 
 test "type surface capability classifies inventory and ABI boundary surfaces" {

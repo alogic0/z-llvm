@@ -1,6 +1,7 @@
 const std = @import("std");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
+const air_model = @import("zig_air_model.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const target_mod = @import("target.zig");
@@ -641,13 +642,14 @@ fn typedBodyEndsInReturn(
     var saw_return = false;
     for (body.instructions) |instruction_index| {
         const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
-        if (isIgnoredOpcode(instruction.opcode)) continue;
+        const capability = air_capabilities.opcodeCapability(instruction.opcode);
+        if (capability.status == .ignored_metadata) continue;
         if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) {
             saw_return = true;
             continue;
         }
         if (saw_return) return false;
-        if (!isTypedV2LowerableOpcode(instruction.opcode) or std.mem.eql(u8, instruction.opcode, "block")) return false;
+        if (!air_capabilities.typedV2CanLower(capability) or std.mem.eql(u8, instruction.opcode, "block")) return false;
     }
     return saw_return;
 }
@@ -680,24 +682,24 @@ pub fn typedVoidBranchBody(
 }
 
 pub fn isGenericTypedCfgBlock(function: air_export.Function, block_index: u32) bool {
-    const structured_air = function.structured_air orelse return false;
-    const structured_air_v2 = function.structured_air_v2 orelse return false;
-    const block_body = structured_air.body(.block, block_index) orelse return false;
+    const view = air_model.TypedFunctionView.init(function) orelse return false;
+    const block_body = view.body(.block, block_index) orelse return false;
     var cond_index: ?u32 = null;
     for (block_body.instructions) |instruction_index| {
-        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
-        if (isIgnoredOpcode(instruction.opcode)) continue;
+        const instruction = view.instruction(instruction_index) orelse return false;
+        const capability = view.capability(instruction);
+        if (capability.status == .ignored_metadata) continue;
         if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
             if (cond_index != null or instruction.operands.len != 1) return false;
             cond_index = instruction_index;
             continue;
         }
         if (cond_index != null) return false;
-        if (!isTypedV2LowerableOpcode(instruction.opcode) or std.mem.eql(u8, instruction.opcode, "block")) return false;
+        if (!air_capabilities.typedV2CanLower(capability) or std.mem.eql(u8, instruction.opcode, "block")) return false;
     }
     const cond = cond_index orelse return false;
-    const then_body = structured_air.body(.then_body, cond) orelse return false;
-    const else_body = structured_air.body(.else_body, cond) orelse return false;
+    const then_body = view.body(.then_body, cond) orelse return false;
+    const else_body = view.body(.else_body, cond) orelse return false;
     return isGenericTypedCfgBranchBody(function, block_index, then_body) and
         isGenericTypedCfgBranchBody(function, block_index, else_body);
 }
@@ -714,7 +716,8 @@ pub fn isGenericTypedCfgBranchBody(
     var saw_branch = false;
     for (body.instructions) |instruction_index| {
         const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
-        if (isIgnoredOpcode(instruction.opcode)) continue;
+        const capability = air_capabilities.opcodeCapability(instruction.opcode);
+        if (capability.status == .ignored_metadata) continue;
         if (std.mem.eql(u8, instruction.opcode, "br")) {
             if (saw_branch or instruction.operands.len != 2) return false;
             const target = typedBlockTarget(instruction.operands[0]) orelse return false;
@@ -731,7 +734,7 @@ pub fn isGenericTypedCfgBranchBody(
             }
             continue;
         }
-        if (!isTypedV2LowerableOpcode(instruction.opcode) or
+        if (!air_capabilities.typedV2CanLower(capability) or
             std.mem.eql(u8, instruction.opcode, "ret") or
             std.mem.eql(u8, instruction.opcode, "ret_safe") or
             std.mem.eql(u8, instruction.opcode, "unreach"))
