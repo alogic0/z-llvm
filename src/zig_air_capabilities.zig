@@ -500,6 +500,10 @@ pub fn isAssemblyOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "assembly");
 }
 
+pub fn isAggregateInitOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "aggregate_init");
+}
+
 pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, opcode, "call_always_tail")) return "tail";
     if (std.mem.eql(u8, opcode, "call_never_tail")) return "notail";
@@ -662,7 +666,7 @@ fn isIgnoredMetadataOpcode(opcode: []const u8) bool {
 fn isStraightLineLowerableOpcode(opcode: []const u8) bool {
     return isCommonLowerableOpcode(opcode) or
         isAtomicRmwOpcode(opcode) or
-        std.mem.eql(u8, opcode, "aggregate_init") or
+        isAggregateInitOpcode(opcode) or
         isAssemblyOpcode(opcode);
 }
 
@@ -833,6 +837,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(!isAtomicRmwOpcode("cmpxchg"));
     try std.testing.expect(isAssemblyOpcode("assembly"));
     try std.testing.expect(!isAssemblyOpcode("asm"));
+    try std.testing.expect(isAggregateInitOpcode("aggregate_init"));
+    try std.testing.expect(!isAggregateInitOpcode("aggregate"));
 
     const asm_capability = opcodeCapability("assembly");
     try std.testing.expectEqual(OpcodeStatus.boundary, asm_capability.status);
