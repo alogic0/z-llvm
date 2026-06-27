@@ -653,7 +653,6 @@ fn isIgnoredMetadataOpcode(opcode: []const u8) bool {
 
 fn isStraightLineLowerableOpcode(opcode: []const u8) bool {
     return isCommonLowerableOpcode(opcode) or
-        std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         std.mem.eql(u8, opcode, "atomic_rmw") or
         std.mem.eql(u8, opcode, "aggregate_init") or
         std.mem.eql(u8, opcode, "assembly");
