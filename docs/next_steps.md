@@ -159,7 +159,10 @@ Execution order:
    `cfgLoweringOpForOpcode` now consumes those helpers instead of keeping a
    separate string-dispatch table. Typed-v2 lowerability, lowerer selection,
    and capability-owner routing now use the same predicates for these opcodes,
-   so the registry no longer has duplicate local CFG/return checks.
+   so the registry no longer has duplicate local CFG/return checks. The AIR
+   lowering fallback scanner and legacy typed lowering path now also use these
+   capability predicates for block/branch/return/unreach identity rather than
+   repeating local string comparisons.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
