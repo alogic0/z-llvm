@@ -90,11 +90,11 @@ Execution order:
    instead of reporting a generic local `unsupported_opcode` bucket.
    The first data-kind capability API now classifies opcode/data-kind pairs and
    standalone data-kind surfaces into owner categories, and inventory consumes
-   that object for unknown-opcode reporting. Next work: make lowering dispatch
-   select through the registered lowerer kind directly. The typed-v2 dispatch
-   now treats registry lowerability as the front-door gate and routes accepted
+   that object for unknown-opcode reporting. The typed-v2 dispatch now treats
+   registry lowerability as the front-door gate and routes accepted
    instructions through `LowererKind` groups before reaching local opcode
-   lowerers.
+   lowerers. Next work: keep moving the per-domain lowerers from local
+   opcode checks toward model/capability-owned predicates.
 2. Normalized typed-AIR slice: `src/zig_air_model.zig` now provides the first
    reusable typed function view over structured-air v1/v2 bodies,
    instructions, and opcode capabilities. The generic typed-CFG block
