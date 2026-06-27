@@ -90,6 +90,18 @@ pub const TypedFunctionView = struct {
         return saw_return;
     }
 
+    pub fn bodyHasReturn(self: TypedFunctionView, structured_body: air_export.StructuredBody) bool {
+        for (structured_body.instructions) |instruction_index| {
+            const typed_instruction = self.instruction(instruction_index) orelse return false;
+            if (std.mem.eql(u8, typed_instruction.opcode, "ret") or
+                std.mem.eql(u8, typed_instruction.opcode, "ret_safe"))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     pub fn noreturnBody(self: TypedFunctionView, structured_body: air_export.StructuredBody) bool {
         var saw_call = false;
         var saw_unreach = false;

@@ -79,16 +79,12 @@ const belongsToSimpleSelectBlock = lowering_parser.belongsToSimpleSelectBlock;
 const isTypedVoidGuardBlock = lowering_parser.isTypedVoidGuardBlock;
 const belongsToTypedVoidGuardBlock = lowering_parser.belongsToTypedVoidGuardBlock;
 const instructionPosition = lowering_parser.instructionPosition;
-const singleNonDebugInstruction = lowering_parser.singleNonDebugInstruction;
-const typedVoidGuardBlock = lowering_parser.typedVoidGuardBlock;
-const typedVoidBranchBody = lowering_parser.typedVoidBranchBody;
 const isGenericTypedCfgBlock = lowering_parser.isGenericTypedCfgBlock;
 const isGenericTypedCfgBranchBody = lowering_parser.isGenericTypedCfgBranchBody;
 const belongsToGenericTypedCfgBlock = lowering_parser.belongsToGenericTypedCfgBlock;
 const genericTypedCfgBodyContains = lowering_parser.genericTypedCfgBodyContains;
 const bodyContainsInstruction = lowering_parser.bodyContainsInstruction;
 const typedBlockTarget = lowering_parser.typedBlockTarget;
-const typedNoreturnBody = lowering_parser.typedNoreturnBody;
 const typedInstructionByIndex = lowering_parser.typedInstructionByIndex;
 const typedSingleInstructionByOpcode = lowering_parser.typedSingleInstructionByOpcode;
 const typedDetail = lowering_parser.typedDetail;
@@ -886,6 +882,7 @@ fn lowerFunctionTypedV2(
         .values = values,
         .structured_air = structured_air,
         .structured_air_v2 = structured_air_v2,
+        .typed_view = air_model.TypedFunctionView.init(air_function).?,
         .typed_v2_fallback = typed_v2_fallback,
     };
 
@@ -962,6 +959,7 @@ const LoweringContext = struct {
     values: []?TypedValue,
     structured_air: ?air_export.StructuredAir,
     structured_air_v2: ?air_export.StructuredAirV2,
+    typed_view: ?air_model.TypedFunctionView = null,
     typed_v2_fallback: ?*?TypedV2Fallback = null,
     next_arg_index: usize = 0,
 
@@ -1240,33 +1238,32 @@ const LoweringContext = struct {
     }
 
     fn lowerTypedBlock(self: *LoweringContext, instruction: air_export.TypedInstruction) LowerError!void {
-        const structured_air = self.structured_air orelse return error.UnsupportedAir;
-        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
-        const block_body = structured_air.body(.block, instruction.index) orelse return error.UnsupportedAir;
-        const cond_instruction = try self.lowerTypedBlockBodyUntilCond(structured_air_v2, block_body);
+        const view = self.typed_view orelse return error.UnsupportedAir;
+        const block_body = view.body(.block, instruction.index) orelse return error.UnsupportedAir;
+        const cond_instruction = try self.lowerTypedBlockBodyUntilCond(block_body);
         if (!std.mem.eql(u8, cond_instruction.opcode, "cond_br") or cond_instruction.operands.len != 1) {
             return error.UnsupportedAir;
         }
         const cond = try self.resolveTypedOperand(cond_instruction, 0);
         if (!cond.ty.ir_type.eql(.{ .int = 1 })) return error.UnsupportedAir;
 
-        const then_body = structured_air.body(.then_body, cond_instruction.index) orelse return error.UnsupportedAir;
-        const else_body = structured_air.body(.else_body, cond_instruction.index) orelse return error.UnsupportedAir;
-        if (typedVoidGuardBlock(structured_air_v2, instruction.index, then_body, else_body)) {
-            const panic_body = if (typedNoreturnBody(structured_air_v2, then_body)) then_body else else_body;
-            const panic_is_then = typedNoreturnBody(structured_air_v2, then_body);
+        const then_body = view.body(.then_body, cond_instruction.index) orelse return error.UnsupportedAir;
+        const else_body = view.body(.else_body, cond_instruction.index) orelse return error.UnsupportedAir;
+        if (view.voidGuardBlock(instruction.index, then_body, else_body)) {
+            const panic_body = if (view.noreturnBody(then_body)) then_body else else_body;
+            const panic_is_then = view.noreturnBody(then_body);
             try self.lowerTypedVoidGuard(instruction, cond, panic_body, panic_is_then);
             return;
         }
-        if (typedBodyHasReturn(structured_air_v2, then_body) and typedBodyHasReturn(structured_air_v2, else_body)) {
+        if (view.bodyHasReturn(then_body) and view.bodyHasReturn(else_body)) {
             try self.lowerTypedCondBodiesReturn(cond, cond_instruction.index, then_body, else_body);
             return;
         }
         if (try self.lowerTypedBranchReturnContinueBlock(instruction, cond, then_body, else_body)) {
             return;
         }
-        if (self.typedBlockBranchValue(structured_air_v2, instruction.index, then_body)) |true_value| {
-            if (self.typedBlockBranchValue(structured_air_v2, instruction.index, else_body)) |false_value| {
+        if (self.typedBlockBranchValue(instruction.index, then_body)) |true_value| {
+            if (self.typedBlockBranchValue(instruction.index, else_body)) |false_value| {
                 if (true_value.ty.ir_type.eql(false_value.ty.ir_type)) {
                     const result_name = try self.resultName(instruction.index);
                     try self.block.instructions.append(self.allocator, .{
@@ -1293,13 +1290,12 @@ const LoweringContext = struct {
 
     fn lowerTypedCondBrReturn(self: *LoweringContext, instruction: air_export.TypedInstruction) LowerError!void {
         if (instruction.operands.len != 1) return error.UnsupportedAir;
-        const structured_air = self.structured_air orelse return error.UnsupportedAir;
-        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        const view = self.typed_view orelse return error.UnsupportedAir;
         const cond = try self.resolveTypedOperand(instruction, 0);
         if (!cond.ty.ir_type.eql(.{ .int = 1 })) return error.UnsupportedAir;
-        const then_body = structured_air.body(.then_body, instruction.index) orelse return error.UnsupportedAir;
-        const else_body = structured_air.body(.else_body, instruction.index) orelse return error.UnsupportedAir;
-        if (!typedBodyHasReturn(structured_air_v2, then_body) or !typedBodyHasReturn(structured_air_v2, else_body)) {
+        const then_body = view.body(.then_body, instruction.index) orelse return error.UnsupportedAir;
+        const else_body = view.body(.else_body, instruction.index) orelse return error.UnsupportedAir;
+        if (!view.bodyHasReturn(then_body) or !view.bodyHasReturn(else_body)) {
             return error.UnsupportedAir;
         }
 
@@ -1337,11 +1333,11 @@ const LoweringContext = struct {
         label: []const u8,
         body: air_export.StructuredBody,
     ) LowerError!void {
-        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        const view = self.typed_view orelse return error.UnsupportedAir;
         self.block.* = ir.BasicBlock.init(label);
         for (body.instructions) |instruction_index| {
-            const child = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return error.UnsupportedAir;
-            if (isIgnoredOpcode(child.opcode)) continue;
+            const child = view.instruction(instruction_index) orelse return error.UnsupportedAir;
+            if (view.capability(child).status == .ignored_metadata) continue;
             if (self.block.terminator != null) return error.UnsupportedAir;
             try self.lowerTypedInstruction(child);
         }
@@ -1357,13 +1353,13 @@ const LoweringContext = struct {
         then_body: air_export.StructuredBody,
         else_body: air_export.StructuredBody,
     ) LowerError!bool {
-        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
-        const then_returns = typedBodyReturns(structured_air_v2, then_body);
-        const else_returns = typedBodyReturns(structured_air_v2, else_body);
+        const view = self.typed_view orelse return error.UnsupportedAir;
+        const then_returns = view.bodyHasReturn(then_body);
+        const else_returns = view.bodyHasReturn(else_body);
         if (then_returns == else_returns) return false;
 
         const continue_body = if (then_returns) else_body else then_body;
-        if (!typedVoidBranchBody(structured_air_v2, continue_body, instruction.index)) return false;
+        if (!view.voidBranchBody(continue_body, instruction.index)) return false;
 
         const return_body = if (then_returns) then_body else else_body;
         const return_label = try ownPrint(self.module, "block{}_return", .{instruction.index});
@@ -1380,8 +1376,8 @@ const LoweringContext = struct {
         try self.function.blocks.append(self.allocator, finished);
 
         for (return_body.instructions) |return_index| {
-            const child = typedInstructionByIndex(structured_air_v2, return_index) orelse return error.UnsupportedAir;
-            if (isIgnoredOpcode(child.opcode)) continue;
+            const child = view.instruction(return_index) orelse return error.UnsupportedAir;
+            if (view.capability(child).status == .ignored_metadata) continue;
             try self.lowerTypedInstruction(child);
             if (self.block.terminator != null and !std.mem.eql(u8, child.opcode, "ret") and !std.mem.eql(u8, child.opcode, "ret_safe")) {
                 return error.UnsupportedAir;
@@ -1405,7 +1401,7 @@ const LoweringContext = struct {
         panic_body: air_export.StructuredBody,
         panic_is_then: bool,
     ) LowerError!void {
-        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        const view = self.typed_view orelse return error.UnsupportedAir;
         const panic_label = try ownPrint(self.module, "guard{}_panic", .{instruction.index});
         const cont_label = try ownPrint(self.module, "guard{}_cont", .{instruction.index});
 
@@ -1420,8 +1416,8 @@ const LoweringContext = struct {
         try self.function.blocks.append(self.allocator, finished);
 
         for (panic_body.instructions) |panic_index| {
-            const child = typedInstructionByIndex(structured_air_v2, panic_index) orelse return error.UnsupportedAir;
-            if (isIgnoredOpcode(child.opcode)) continue;
+            const child = view.instruction(panic_index) orelse return error.UnsupportedAir;
+            if (view.capability(child).status == .ignored_metadata) continue;
             if (std.mem.eql(u8, child.opcode, "unreach")) continue;
             try self.lowerTypedInstruction(child);
         }
@@ -1433,13 +1429,12 @@ const LoweringContext = struct {
 
     fn typedBlockBranchValue(
         self: *LoweringContext,
-        structured_air_v2: air_export.StructuredAirV2,
         target_block: u32,
         body: air_export.StructuredBody,
     ) LowerError!TypedValue {
-        const branch_index = singleNonDebugInstruction(structured_air_v2, body) orelse return error.UnsupportedAir;
-        const branch_instruction = typedInstructionByIndex(structured_air_v2, branch_index) orelse
-            return error.UnsupportedAir;
+        const view = self.typed_view orelse return error.UnsupportedAir;
+        const branch_index = view.singleSemanticInstruction(body) orelse return error.UnsupportedAir;
+        const branch_instruction = view.instruction(branch_index) orelse return error.UnsupportedAir;
         if (!std.mem.eql(u8, branch_instruction.opcode, "br") or branch_instruction.operands.len != 2) {
             return error.UnsupportedAir;
         }
@@ -1596,20 +1591,15 @@ const LoweringContext = struct {
         return try self.resolveTypedOperand(instruction, operand_index);
     }
 
-    fn typedBodyReturns(structured_air_v2: air_export.StructuredAirV2, body: air_export.StructuredBody) bool {
-        return typedBodyHasReturn(structured_air_v2, body);
-    }
-
     fn lowerTypedBlockBodyUntilCond(
         self: *LoweringContext,
-        structured_air_v2: air_export.StructuredAirV2,
         body: air_export.StructuredBody,
     ) LowerError!air_export.TypedInstruction {
+        const view = self.typed_view orelse return error.UnsupportedAir;
         var cond_instruction: ?air_export.TypedInstruction = null;
         for (body.instructions) |instruction_index| {
-            const child = typedInstructionByIndex(structured_air_v2, instruction_index) orelse
-                return error.UnsupportedAir;
-            if (isIgnoredOpcode(child.opcode)) continue;
+            const child = view.instruction(instruction_index) orelse return error.UnsupportedAir;
+            if (view.capability(child).status == .ignored_metadata) continue;
             if (std.mem.eql(u8, child.opcode, "cond_br")) {
                 if (cond_instruction != null) return error.UnsupportedAir;
                 cond_instruction = child;
