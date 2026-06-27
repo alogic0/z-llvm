@@ -134,7 +134,7 @@ pub const TypedFunctionView = struct {
             if (self.capability(typed_instruction).status == .ignored_metadata) continue;
             if (!saw_call) {
                 if (!isCallOpcode(typed_instruction.opcode)) return false;
-                const signature = typedDetail(typed_instruction, "call_signature") orelse return false;
+                const signature = detail(typed_instruction, "call_signature") orelse return false;
                 if (!std.mem.endsWith(u8, std.mem.trim(u8, signature, " "), "noreturn")) return false;
                 saw_call = true;
                 continue;
@@ -160,7 +160,7 @@ pub const TypedFunctionView = struct {
         if (target != target_block) return false;
         if (!std.mem.eql(u8, branch.operands[1].kind, "const")) return false;
         return std.mem.eql(u8, branch.operands[1].type_text, "void") and
-            std.mem.eql(u8, typedOperandTextDetail(branch, 1) orelse return false, "@.void_value");
+            std.mem.eql(u8, operandTextDetail(branch, 1) orelse return false, "@.void_value");
     }
 
     pub fn voidGuardBlock(
@@ -178,17 +178,19 @@ fn isCallOpcode(opcode: []const u8) bool {
     return air_export.categoryForOpcode(opcode) == .call;
 }
 
-fn typedDetail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
-    for (instruction.details) |detail| {
-        if (std.mem.eql(u8, detail.key, key)) return detail.value;
+pub fn detail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
+    for (instruction.details) |entry| {
+        if (std.mem.eql(u8, entry.key, key)) return entry.value;
     }
     return null;
 }
 
-fn typedOperandTextDetail(instruction: air_export.TypedInstruction, operand_index: usize) ?[]const u8 {
-    var buffer: [32]u8 = undefined;
-    const key = std.fmt.bufPrint(&buffer, "operand{}_text", .{operand_index}) catch return null;
-    return typedDetail(instruction, key);
+pub fn operandTextDetail(instruction: air_export.TypedInstruction, operand_index: usize) ?[]const u8 {
+    var key_buffer: [32]u8 = undefined;
+    const key = std.fmt.bufPrint(&key_buffer, "operand{}_text", .{operand_index}) catch return null;
+    if (detail(instruction, key)) |value| return value;
+    const legacy_key = std.fmt.bufPrint(&key_buffer, "operand{}", .{operand_index}) catch return null;
+    return detail(instruction, legacy_key);
 }
 
 pub fn blockTarget(operand: air_export.TypedOperand) ?u32 {

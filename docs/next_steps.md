@@ -119,7 +119,9 @@ Execution order:
    lowering loop now resolves instructions through the same view, and terminal
    error-union `cond_br` recognition is owned by `TypedFunctionView`. Typed
    block-target operand parsing now lives in `src/zig_air_model.zig`, with the
-   parser keeping only a compatibility wrapper.
+   parser keeping only a compatibility wrapper. Typed instruction detail and
+   operand-text lookup now follow the same model-owned pattern, including the
+   legacy operand-key fallback.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.

@@ -825,18 +825,11 @@ pub fn typedSingleInstructionByOpcode(structured_air_v2: air_export.StructuredAi
 }
 
 pub fn typedDetail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
-    for (instruction.details) |detail| {
-        if (std.mem.eql(u8, detail.key, key)) return detail.value;
-    }
-    return null;
+    return air_model.detail(instruction, key);
 }
 
 pub fn typedOperandTextDetail(instruction: air_export.TypedInstruction, operand_index: usize) ?[]const u8 {
-    var key_buffer: [32]u8 = undefined;
-    const key = std.fmt.bufPrint(&key_buffer, "operand{}_text", .{operand_index}) catch return null;
-    if (typedDetail(instruction, key)) |value| return value;
-    const legacy_key = std.fmt.bufPrint(&key_buffer, "operand{}", .{operand_index}) catch return null;
-    return typedDetail(instruction, legacy_key);
+    return air_model.operandTextDetail(instruction, operand_index);
 }
 
 pub fn typedCalleeName(callee_text: []const u8) ?[]const u8 {
