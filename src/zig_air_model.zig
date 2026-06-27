@@ -436,6 +436,10 @@ pub fn callDetails(instruction: air_export.TypedInstruction) ?TypedCallDetails {
     };
 }
 
+pub fn runtimeNavFqn(instruction: air_export.TypedInstruction) ?[]const u8 {
+    return detail(instruction, "nav_fqn");
+}
+
 pub fn calleeName(callee_text: []const u8) ?[]const u8 {
     return (callee(callee_text) orelse return null).name;
 }
