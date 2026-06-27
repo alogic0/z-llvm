@@ -54,13 +54,6 @@ pub fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usiz
     return air_model.typedStoreOpcodeCount(structured_air_v2);
 }
 
-fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
-    for (function.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
-    }
-    return false;
-}
-
 fn lowerRegisterAggregateMake(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
