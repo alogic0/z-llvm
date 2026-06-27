@@ -135,7 +135,19 @@ Execution order:
    validation calls the model helpers directly. Typed instruction index/opcode
    lookup is also now model-owned, with typed-v2 helpers reading through
    `src/zig_air_model.zig`; the obsolete parser lookup wrappers have been
-   removed.
+   removed. The next parser-surface cleanup moved the remaining opcode
+   capability facade calls out of `src/zig_air_lowering_parser.zig`: accepted
+   lowering modules now ask `src/zig_air_capabilities.zig` directly, and the
+   parser no longer exports forwarding helpers for ignored, straight-line,
+   arithmetic, shift, cast, field-pointer, call, or typed-v2 lowerable opcode
+   checks. `src/zig_air_model.zig` now also owns the shared typed value
+   structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
+   function naming, raw instruction-position lookup, typed-v2 required-detail
+   validation, and selected typed GEP/field-offset eligibility helpers. The
+   parser still owns text parsing for Zig type spelling, constants, symbol
+   pointers, instruction refs, and top-level comma splitting; those are the
+   remaining planned extraction points before the lowerers can consume one
+   normalized typed-AIR model end to end.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
