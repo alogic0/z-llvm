@@ -935,20 +935,16 @@ const LoweringContext = struct {
     }
 
     fn lowerTypedCfgInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
-        if (std.mem.eql(u8, instruction.opcode, "block")) {
-            try self.lowerTypedBlock(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
-            const view = self.typed_view orelse return error.UnsupportedAir;
-            if (!view.terminalErrorUnionCondBr(instruction.index)) return error.UnsupportedAir;
-            try self.lowerTypedCondBrReturn(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "ret") or
-            std.mem.eql(u8, instruction.opcode, "ret_safe"))
-        {
-            try self.lowerTypedReturn(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "unreach")) {
-            self.block.terminator = .{ .@"unreachable" = {} };
-        } else {
-            return error.UnsupportedAir;
+        switch (air_capabilities.cfgLoweringOpForOpcode(instruction.opcode)) {
+            .block => try self.lowerTypedBlock(instruction),
+            .cond_br => {
+                const view = self.typed_view orelse return error.UnsupportedAir;
+                if (!view.terminalErrorUnionCondBr(instruction.index)) return error.UnsupportedAir;
+                try self.lowerTypedCondBrReturn(instruction);
+            },
+            .ret => try self.lowerTypedReturn(instruction),
+            .unreach => self.block.terminator = .{ .@"unreachable" = {} },
+            .none => return error.UnsupportedAir,
         }
     }
 

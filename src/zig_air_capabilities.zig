@@ -152,6 +152,14 @@ pub const PointerAggregateSemanticOp = enum {
     field_ptr,
 };
 
+pub const CfgLoweringOp = enum {
+    none,
+    block,
+    cond_br,
+    ret,
+    unreach,
+};
+
 pub const UnknownOpcodeCategory = enum(u8) {
     debug_metadata,
     error_union_try,
@@ -342,6 +350,14 @@ pub fn pointerAggregateSemanticOpForOpcode(opcode: []const u8) PointerAggregateS
     if (std.mem.eql(u8, opcode, "runtime_nav_ptr")) return .runtime_nav_ptr;
     if (std.mem.eql(u8, opcode, "array_elem_val")) return .array_elem_val;
     if (isFieldPtrOpcode(opcode)) return .field_ptr;
+    return .none;
+}
+
+pub fn cfgLoweringOpForOpcode(opcode: []const u8) CfgLoweringOp {
+    if (std.mem.eql(u8, opcode, "block")) return .block;
+    if (std.mem.eql(u8, opcode, "cond_br")) return .cond_br;
+    if (std.mem.eql(u8, opcode, "ret") or std.mem.eql(u8, opcode, "ret_safe")) return .ret;
+    if (std.mem.eql(u8, opcode, "unreach")) return .unreach;
     return .none;
 }
 
@@ -827,6 +843,12 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(PointerAggregateSemanticOp.field_ptr, pointerAggregateSemanticOpForOpcode("struct_field_ptr"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("call"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("block"));
+    try std.testing.expectEqual(CfgLoweringOp.block, cfgLoweringOpForOpcode("block"));
+    try std.testing.expectEqual(CfgLoweringOp.cond_br, cfgLoweringOpForOpcode("cond_br"));
+    try std.testing.expectEqual(CfgLoweringOp.ret, cfgLoweringOpForOpcode("ret"));
+    try std.testing.expectEqual(CfgLoweringOp.ret, cfgLoweringOpForOpcode("ret_safe"));
+    try std.testing.expectEqual(CfgLoweringOp.unreach, cfgLoweringOpForOpcode("unreach"));
+    try std.testing.expectEqual(CfgLoweringOp.none, cfgLoweringOpForOpcode("add"));
 
     const asm_capability = opcodeCapability("assembly");
     try std.testing.expectEqual(OpcodeStatus.boundary, asm_capability.status);
