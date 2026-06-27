@@ -679,3 +679,46 @@ fn i32Value(value: i128) !i32 {
     if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
     return @intCast(value);
 }
+
+test "SysV call signature helper accepts default and fastcc" {
+    const default_call: ir.CallInst = .{
+        .ret_ty = .{ .int = 32 },
+        .callee = "callee",
+        .args = .empty,
+    };
+    try rejectUnsupportedCallSignature(default_call);
+
+    const c_call: ir.CallInst = .{
+        .ret_ty = .{ .int = 32 },
+        .callee = "callee",
+        .calling_conv = "ccc",
+        .args = .empty,
+    };
+    try rejectUnsupportedCallSignature(c_call);
+
+    const fast_call: ir.CallInst = .{
+        .ret_ty = .{ .int = 32 },
+        .callee = "callee",
+        .calling_conv = "fastcc",
+        .args = .empty,
+    };
+    try rejectUnsupportedCallSignature(fast_call);
+}
+
+test "SysV call signature helper rejects varargs and non-default callconv" {
+    const varargs_call: ir.CallInst = .{
+        .ret_ty = .{ .int = 32 },
+        .callee = "printf",
+        .callee_function_ty = "ptr, ...",
+        .args = .empty,
+    };
+    try std.testing.expectError(error.UnsupportedVarargsAbi, rejectUnsupportedCallSignature(varargs_call));
+
+    const callconv_call: ir.CallInst = .{
+        .ret_ty = .{ .int = 32 },
+        .callee = "callee",
+        .calling_conv = "coldcc",
+        .args = .empty,
+    };
+    try std.testing.expectError(error.UnsupportedCallConvAbi, rejectUnsupportedCallSignature(callconv_call));
+}
