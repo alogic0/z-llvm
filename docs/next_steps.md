@@ -202,7 +202,8 @@ Execution order:
    live in `src/abi_boundaries.zig`; representative ABI boundary tests also
    use the registry-owned error values. `src/uncurated_air_gate.zig` consumes
    that registry for classification, counting, and local-fail expectations
-   instead of owning ad hoc boundary metadata.
+   instead of owning ad hoc boundary metadata; expected boundary summary
+   matching is registry-owned rather than field-by-field gate code.
 5. Aggregate ABI slice: route aggregate argument, return, sret, byval, field
    offset, and copy decisions through the shared type-layout result plus the
    SysV aggregate classifier. `src/codegen/x86_64/sysv_abi.zig` now also owns
