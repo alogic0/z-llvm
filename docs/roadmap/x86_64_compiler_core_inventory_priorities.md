@@ -187,10 +187,13 @@ families where the inventory does not yet record per-opcode first examples.
 1. Split aggregate inventory into metadata-only type surface versus real ABI
    lowering gaps, then prioritize MEMORY/byval/sret and mixed INTEGER/SSE
    shapes that appear in real compiler bodies.
-2. Implement the first concrete `unknown-opcode` pairs as source-backed
-   compiler-core frontier rows. The measured first targets are
-   `unwrap_errunion_err:ty_op`, `wrap_errunion_err:ty_op`, `try:pl_op`,
-   pointer/slice length forms, and `ptr_add:bin_ty_pl`.
+2. Continue converting concrete `unknown-opcode` pairs into source-backed
+   compiler-core frontier rows. The first error-union slice is now accepted:
+   `frontier_optionals_errors.zig` covers `wrap_errunion_payload`,
+   `wrap_errunion_err`, `is_non_err`, `unwrap_errunion_payload`, and
+   `unwrap_errunion_err` with executable proof. The next measured error-union
+   target is `try:pl_op`; pointer/slice length forms and `ptr_add:bin_ty_pl`
+   remain the next non-error-union targets.
 3. Harden generic CFG for high-volume compiler patterns: nested blocks,
    branch-heavy loops, error-union continuation blocks, and switch dispatch.
 4. Expand call ownership around live-across-call values, indirect/default C

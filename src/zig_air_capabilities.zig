@@ -322,8 +322,14 @@ fn isCommonLowerableOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "is_non_null") or
+        std.mem.eql(u8, opcode, "is_non_err") or
         std.mem.eql(u8, opcode, "wrap_optional") or
         std.mem.eql(u8, opcode, "optional_payload") or
+        std.mem.eql(u8, opcode, "wrap_errunion_payload") or
+        std.mem.eql(u8, opcode, "wrap_errunion_err") or
+        std.mem.eql(u8, opcode, "unwrap_errunion_payload") or
+        std.mem.eql(u8, opcode, "unwrap_errunion_err") or
+        std.mem.eql(u8, opcode, "try") or
         std.mem.eql(u8, opcode, "slice") or
         std.mem.eql(u8, opcode, "ptr_add") or
         std.mem.eql(u8, opcode, "ptr_elem_ptr") or

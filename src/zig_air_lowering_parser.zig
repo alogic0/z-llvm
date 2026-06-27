@@ -400,6 +400,14 @@ pub fn parseConstant(text: []const u8) ?TypedValue {
             .ty = ty,
             .value = if (ty.ir_type == .ptr) .null_value else .{ .int = 0 },
         };
+        if (errorSetConstantCode(type_text, value_text)) |code| return .{
+            .ty = ty,
+            .value = .{ .int = code },
+        };
+        if (errorUnionConstantCode(type_text, value_text)) |code| return .{
+            .ty = ty,
+            .value = .{ .int = code },
+        };
         if (isFpType(ty.ir_type)) return .{ .ty = ty, .value = .{ .fp = canonicalFpLiteral(value_text) orelse value_text } };
         const value = std.fmt.parseInt(i128, value_text, 10) catch return null;
         return .{ .ty = ty, .value = .{ .int = value } };
@@ -436,6 +444,34 @@ pub fn canonicalFpLiteral(text: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, text, "8")) return "8.000000e+00";
     if (std.mem.eql(u8, text, "9")) return "9.000000e+00";
     return null;
+}
+
+fn errorSetConstantCode(type_text: []const u8, value_text: []const u8) ?i128 {
+    const ty = std.mem.trim(u8, type_text, " ");
+    const value = std.mem.trim(u8, value_text, " ");
+    if (!std.mem.startsWith(u8, ty, "error{") or !std.mem.endsWith(u8, ty, "}")) return null;
+    if (!std.mem.startsWith(u8, value, "error.")) return null;
+    const wanted = value["error.".len..];
+    var fields = splitTopLevel(ty["error{".len .. ty.len - 1], ',');
+    var code: i128 = 1;
+    while (fields.next()) |field| : (code += 1) {
+        const name = std.mem.trim(u8, field, " ");
+        if (std.mem.eql(u8, name, wanted)) return code;
+    }
+    return null;
+}
+
+fn errorUnionConstantCode(type_text: []const u8, value_text: []const u8) ?i128 {
+    const ty = std.mem.trim(u8, type_text, " ");
+    const marker = std.mem.indexOf(u8, ty, "}!") orelse return null;
+    if (!std.mem.startsWith(u8, ty, "error{")) return null;
+    const value = std.mem.trim(u8, value_text, " ");
+    if (std.mem.startsWith(u8, value, "error.")) {
+        const error_set_text = ty[0 .. marker + 1];
+        return errorSetConstantCode(error_set_text, value);
+    }
+    const payload = std.fmt.parseInt(i128, value, 10) catch return null;
+    return payload << 16;
 }
 
 pub const SymbolPointer = struct {

@@ -580,6 +580,7 @@ pub fn firstUnsupported(
             if (belongsToSimpleSelectBlock(function, instruction.index)) continue;
             if (belongsToTypedVoidGuardBlock(function, instruction.index)) continue;
             if (belongsToGenericTypedCfgBlock(function, instruction.index)) continue;
+            if (isTypedTerminalCondBr(function, instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         return .{ .function = function.name, .opcode = instruction.opcode, .reason = .opcode };
@@ -902,6 +903,52 @@ fn tailKindForCallOpcode(opcode: []const u8) ?[]const u8 {
     return null;
 }
 
+fn isErrorUnionTypeText(text: []const u8) bool {
+    const trimmed = std.mem.trim(u8, text, " ");
+    return std.mem.startsWith(u8, trimmed, "error{") and std.mem.indexOf(u8, trimmed, "}!") != null;
+}
+
+fn errorUnionPayloadType(text: []const u8) ?ZigType {
+    const trimmed = std.mem.trim(u8, text, " ");
+    const marker = std.mem.indexOf(u8, trimmed, "}!") orelse return null;
+    return parseZigType(trimmed[marker + 2 ..]);
+}
+
+fn typedBodyHasReturn(structured_air_v2: air_export.StructuredAirV2, body: air_export.StructuredBody) bool {
+    for (body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
+        if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) return true;
+    }
+    return false;
+}
+
+fn isTypedTerminalCondBr(function: air_export.Function, instruction_index: u32) bool {
+    if (!functionHasAnyTypedOpcode(function, &.{
+        "is_non_err",
+        "wrap_errunion_payload",
+        "wrap_errunion_err",
+        "unwrap_errunion_payload",
+        "unwrap_errunion_err",
+    })) return false;
+    const structured_air = function.structured_air orelse return false;
+    const structured_air_v2 = function.structured_air_v2 orelse return false;
+    const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
+    if (!std.mem.eql(u8, instruction.opcode, "cond_br") or instruction.operands.len != 1) return false;
+    const then_body = structured_air.body(.then_body, instruction.index) orelse return false;
+    const else_body = structured_air.body(.else_body, instruction.index) orelse return false;
+    return typedBodyHasReturn(structured_air_v2, then_body) and typedBodyHasReturn(structured_air_v2, else_body);
+}
+
+fn functionHasAnyTypedOpcode(function: air_export.Function, opcodes: []const []const u8) bool {
+    const structured_air_v2 = function.structured_air_v2 orelse return false;
+    for (structured_air_v2.instructions) |instruction| {
+        for (opcodes) |opcode| {
+            if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
+        }
+    }
+    return false;
+}
+
 const LoweringContext = struct {
     allocator: std.mem.Allocator,
     module: *ir.Module,
@@ -947,12 +994,27 @@ const LoweringContext = struct {
             try self.lowerTypedStore(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "block")) {
             try self.lowerTypedBlock(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+            if (!isTypedTerminalCondBr(self.air_function, instruction.index)) return error.UnsupportedAir;
+            try self.lowerTypedCondBrReturn(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "is_non_null")) {
             try self.lowerTypedIsNonNull(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "is_non_err")) {
+            try self.lowerTypedIsNonErr(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "wrap_optional")) {
             try self.lowerTypedWrapOptional(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "optional_payload")) {
             try self.lowerTypedOptionalPayload(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "wrap_errunion_payload")) {
+            try self.lowerTypedWrapErrorUnionPayload(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "wrap_errunion_err")) {
+            try self.lowerTypedWrapErrorUnionErr(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "unwrap_errunion_payload")) {
+            try self.lowerTypedUnwrapErrorUnionPayload(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "unwrap_errunion_err")) {
+            try self.lowerTypedUnwrapErrorUnionErr(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "try")) {
+            try self.lowerTypedTry(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "slice")) {
             try self.lowerTypedSlice(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ptr_add")) {
@@ -1220,6 +1282,55 @@ const LoweringContext = struct {
         } else |_| {}
 
         try self.lowerTypedBranchMergeBlock(instruction, cond, then_body, else_body);
+    }
+
+    fn lowerTypedCondBrReturn(self: *LoweringContext, instruction: air_export.TypedInstruction) LowerError!void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const structured_air = self.structured_air orelse return error.UnsupportedAir;
+        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        const cond = try self.resolveTypedOperand(instruction, 0);
+        if (!cond.ty.ir_type.eql(.{ .int = 1 })) return error.UnsupportedAir;
+        const then_body = structured_air.body(.then_body, instruction.index) orelse return error.UnsupportedAir;
+        const else_body = structured_air.body(.else_body, instruction.index) orelse return error.UnsupportedAir;
+        if (!typedBodyHasReturn(structured_air_v2, then_body) or !typedBodyHasReturn(structured_air_v2, else_body)) {
+            return error.UnsupportedAir;
+        }
+
+        const then_label = try ownPrint(self.module, "cond{}_then", .{instruction.index});
+        const else_label = try ownPrint(self.module, "cond{}_else", .{instruction.index});
+        var finished = self.block.*;
+        finished.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = cond.value,
+            .then_target = then_label,
+            .else_target = else_label,
+        } };
+        self.block.* = ir.BasicBlock.init(then_label);
+        try self.function.blocks.append(self.allocator, finished);
+
+        try self.lowerTypedBodyToTerminalBlock(then_label, then_body);
+        try self.lowerTypedBodyToTerminalBlock(else_label, else_body);
+
+        self.block.* = ir.BasicBlock.init(try ownPrint(self.module, "cond{}_after_unreachable", .{instruction.index}));
+        self.block.terminator = .{ .@"unreachable" = {} };
+    }
+
+    fn lowerTypedBodyToTerminalBlock(
+        self: *LoweringContext,
+        label: []const u8,
+        body: air_export.StructuredBody,
+    ) LowerError!void {
+        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        self.block.* = ir.BasicBlock.init(label);
+        for (body.instructions) |instruction_index| {
+            const child = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return error.UnsupportedAir;
+            if (isIgnoredOpcode(child.opcode)) continue;
+            if (self.block.terminator != null) return error.UnsupportedAir;
+            try self.lowerTypedInstruction(child);
+        }
+        if (self.block.terminator == null) return error.UnsupportedAir;
+        const terminal = self.block.*;
+        try self.function.blocks.append(self.allocator, terminal);
     }
 
     fn lowerTypedBranchReturnContinueBlock(
@@ -1506,6 +1617,222 @@ const LoweringContext = struct {
             .ty = payload_type,
             .value = optional.value,
         };
+    }
+
+    fn lowerTypedIsNonErr(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const err_union = try self.resolveTypedOperand(instruction, 0);
+        if (!isErrorUnionTypeText(instruction.operands[0].type_text) or !err_union.ty.ir_type.eql(.{ .int = 64 })) {
+            return error.UnsupportedAir;
+        }
+        const error_bits = try self.emitErrorUnionErrorBits(instruction.index, err_union.value, "errbits");
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .icmp = .{
+                .predicate = .eq,
+                .operand_ty = .{ .int = 64 },
+                .lhs = .{ .named = error_bits },
+                .rhs = .{ .int = 0 },
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = .{ .ir_type = .{ .int = 1 } },
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedWrapErrorUnionPayload(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (!isErrorUnionTypeText(instruction.result_type) or !result_type.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
+        const payload = try self.resolveTypedOperand(instruction, 0);
+        if (!payload.ty.ir_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+        const result_name = try self.encodeErrorUnionPayload(instruction.index, payload.value);
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedWrapErrorUnionErr(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (!isErrorUnionTypeText(instruction.result_type) or !result_type.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
+        const err = try self.resolveTypedOperand(instruction, 0);
+        if (!err.ty.ir_type.eql(.{ .int = 16 })) return error.UnsupportedAir;
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .cast = .{
+                .op = .zext,
+                .from_ty = .{ .int = 16 },
+                .value = err.value,
+                .to_ty = .{ .int = 64 },
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedUnwrapErrorUnionPayload(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const payload_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (!payload_type.ir_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+        const err_union = try self.resolveTypedOperand(instruction, 0);
+        if (!isErrorUnionTypeText(instruction.operands[0].type_text) or !err_union.ty.ir_type.eql(.{ .int = 64 })) {
+            return error.UnsupportedAir;
+        }
+        const result_name = try self.decodeErrorUnionPayload(instruction.index, err_union.value);
+        self.values[instruction.index] = .{
+            .ty = payload_type,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedUnwrapErrorUnionErr(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const err_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (!err_type.ir_type.eql(.{ .int = 16 })) return error.UnsupportedAir;
+        const err_union = try self.resolveTypedOperand(instruction, 0);
+        if (!isErrorUnionTypeText(instruction.operands[0].type_text) or !err_union.ty.ir_type.eql(.{ .int = 64 })) {
+            return error.UnsupportedAir;
+        }
+        const error_bits = try self.emitErrorUnionErrorBits(instruction.index, err_union.value, "errbits");
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .cast = .{
+                .op = .trunc,
+                .from_ty = .{ .int = 64 },
+                .value = .{ .named = error_bits },
+                .to_ty = .{ .int = 16 },
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = err_type,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedTry(self: *LoweringContext, instruction: air_export.TypedInstruction) LowerError!void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const err_union = try self.resolveTypedOperand(instruction, 0);
+        if (!isErrorUnionTypeText(instruction.operands[0].type_text) or
+            !err_union.ty.ir_type.eql(.{ .int = 64 }) or
+            !self.function_type.return_type.ir_type.eql(err_union.ty.ir_type))
+        {
+            return error.UnsupportedAir;
+        }
+        const payload_type = errorUnionPayloadType(instruction.operands[0].type_text) orelse return error.UnsupportedAir;
+        if (!payload_type.ir_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+
+        const error_bits = try self.emitErrorUnionErrorBits(instruction.index, err_union.value, "try_errbits");
+        const ok_name = try ownPrint(self.module, "air{}_try_ok", .{instruction.index});
+        try self.block.instructions.append(self.allocator, .{
+            .result = ok_name,
+            .kind = .{ .icmp = .{
+                .predicate = .eq,
+                .operand_ty = .{ .int = 64 },
+                .lhs = .{ .named = error_bits },
+                .rhs = .{ .int = 0 },
+            } },
+        });
+
+        const err_label = try ownPrint(self.module, "try{}_err", .{instruction.index});
+        const cont_label = try ownPrint(self.module, "try{}_cont", .{instruction.index});
+        var finished = self.block.*;
+        finished.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = ok_name },
+            .then_target = cont_label,
+            .else_target = err_label,
+        } };
+        self.block.* = ir.BasicBlock.init(err_label);
+        try self.function.blocks.append(self.allocator, finished);
+
+        var err_block = self.block.*;
+        err_block.terminator = .{ .ret = .{
+            .ty = self.function_type.return_type.ir_type,
+            .value = err_union.value,
+        } };
+        self.block.* = ir.BasicBlock.init(cont_label);
+        try self.function.blocks.append(self.allocator, err_block);
+
+        const payload_name = try self.decodeErrorUnionPayload(instruction.index, err_union.value);
+        self.values[instruction.index] = .{
+            .ty = payload_type,
+            .value = .{ .named = payload_name },
+        };
+    }
+
+    fn emitErrorUnionErrorBits(
+        self: *LoweringContext,
+        instruction_index: u32,
+        value: ir.Value,
+        suffix: []const u8,
+    ) ![]const u8 {
+        const result_name = try ownPrint(self.module, "air{}_{s}", .{ instruction_index, suffix });
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .binary = .{
+                .op = .@"and",
+                .ty = .{ .int = 64 },
+                .lhs = value,
+                .rhs = .{ .int = 0xffff },
+            } },
+        });
+        return result_name;
+    }
+
+    fn encodeErrorUnionPayload(self: *LoweringContext, instruction_index: u32, payload: ir.Value) ![]const u8 {
+        const wide_name = try ownPrint(self.module, "air{}_payload64", .{instruction_index});
+        try self.block.instructions.append(self.allocator, .{
+            .result = wide_name,
+            .kind = .{ .cast = .{
+                .op = .zext,
+                .from_ty = .{ .int = 32 },
+                .value = payload,
+                .to_ty = .{ .int = 64 },
+            } },
+        });
+        const result_name = try self.resultName(instruction_index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .binary = .{
+                .op = .shl,
+                .ty = .{ .int = 64 },
+                .lhs = .{ .named = wide_name },
+                .rhs = .{ .int = 16 },
+            } },
+        });
+        return result_name;
+    }
+
+    fn decodeErrorUnionPayload(self: *LoweringContext, instruction_index: u32, value: ir.Value) ![]const u8 {
+        const shifted_name = try ownPrint(self.module, "air{}_payload_shift", .{instruction_index});
+        try self.block.instructions.append(self.allocator, .{
+            .result = shifted_name,
+            .kind = .{ .binary = .{
+                .op = .lshr,
+                .ty = .{ .int = 64 },
+                .lhs = value,
+                .rhs = .{ .int = 16 },
+            } },
+        });
+        const result_name = try self.resultName(instruction_index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .cast = .{
+                .op = .trunc,
+                .from_ty = .{ .int = 64 },
+                .value = .{ .named = shifted_name },
+                .to_ty = .{ .int = 32 },
+            } },
+        });
+        return result_name;
     }
 
     fn lowerTypedSlice(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {

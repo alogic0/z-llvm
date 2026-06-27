@@ -1,4 +1,5 @@
 const shared = @import("core_shared.zig");
+const core_cfg_emit = @import("core_cfg_emit.zig");
 const support = @import("core_value_support.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
@@ -10,6 +11,8 @@ const MachineFunction = shared.MachineFunction;
 
 const appendDirectCallWithStackArgs = shared.appendDirectCallWithStackArgs;
 const appendIndirectCallRaxWithStackArgs = shared.appendIndirectCallRaxWithStackArgs;
+const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
+const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
 const callIsFastcc = shared.callIsFastcc;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
@@ -153,21 +156,78 @@ pub fn emitGenericCfgI64ValueIntoRax(
                 return;
             }
             const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
-            const binary = switch (instruction.kind) {
-                .binary => |binary| binary,
+            switch (instruction.kind) {
+                .binary => |binary| {
+                    if (!binary.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+                    const rhs = switch (binary.rhs) {
+                        .int => |int| try i64Value(int),
+                        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                    };
+                    try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, binary.lhs);
+                    switch (binary.op) {
+                        .add => {
+                            if (rhs < 0 or rhs > 127) return error.UnsupportedCodegenValue;
+                            if (rhs != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = @intCast(rhs) });
+                        },
+                        .@"and" => {
+                            if (rhs < std.math.minInt(i32) or rhs > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
+                            try machine.instructions.append(allocator, .{ .and_eax_imm32 = @intCast(rhs) });
+                        },
+                        .lshr => {
+                            if (rhs < 0 or rhs > 63) return error.UnsupportedCodegenValue;
+                            if (rhs != 0) try machine.instructions.append(allocator, .{ .shr_rax_imm6 = @intCast(rhs) });
+                        },
+                        else => return error.UnsupportedCodegenInstruction,
+                    }
+                },
+                .cast => |cast| {
+                    if (cast.op != .zext or !cast.to_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+                    switch (cast.from_ty) {
+                        .int => |bits| if (bits > 32) return error.UnsupportedCodegenType,
+                        else => return error.UnsupportedCodegenType,
+                    }
+                    switch (cast.value) {
+                        .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_rax = try i64Value(int) }),
+                        .named => try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, cast.value),
+                        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                    }
+                },
+                .select => |select| try emitGenericCfgI64SelectIntoRax(allocator, machine, function, block, name, select),
                 else => return error.UnsupportedCodegenInstruction,
-            };
-            if (!binary.ty.eql(.{ .int = 64 }) or binary.op != .add) return error.UnsupportedCodegenInstruction;
-            const rhs = switch (binary.rhs) {
-                .int => |int| try i64Value(int),
-                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-            };
-            if (rhs < 0 or rhs > 127) return error.UnsupportedCodegenValue;
-            try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, binary.lhs);
-            if (rhs != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = @intCast(rhs) });
+            }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
+}
+
+fn emitGenericCfgI64SelectIntoRax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    result_name: []const u8,
+    select: ir.SelectInst,
+) anyerror!void {
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+    const cond_name = switch (select.cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const cond_instruction = findInstruction(block, cond_name) orelse return error.UnsupportedCodegenValue;
+    const icmp = switch (cond_instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    _ = result_name;
+    const true_label = "generic_cfg_i64_select_true";
+    const end_label = "generic_cfg_i64_select_end";
+    const branch_kind = try cabi_call_lowering.emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
+    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, select.false_value);
+    try machine.instructions.append(allocator, .{ .jmp = end_label });
+    try appendGenericCfgBlockLabel(allocator, machine, true_label);
+    try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, select.true_value);
+    try appendGenericCfgBlockLabel(allocator, machine, end_label);
 }
 
 pub fn emitGenericCfgI32AddValueToEax(

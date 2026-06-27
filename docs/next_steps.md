@@ -117,7 +117,13 @@ Execution order:
    `wrap_errunion_err:ty_op`, `try:pl_op`, `ptr_add:bin_ty_pl`,
    `ptr_slice_len_ptr:ty_op`, and `slice_len:ty_op`. Next work: create
    source-backed compiler-core frontier rows for the first measured pair
-   families instead of adding more inventory-only buckets.
+   families instead of adding more inventory-only buckets. The first accepted
+   source-backed slice is now in `frontier_optionals_errors.zig`: it lowers
+   `wrap_errunion_payload`, `wrap_errunion_err`, `is_non_err`,
+   `unwrap_errunion_payload`, and `unwrap_errunion_err` through typed AIR v2,
+   generic CFG, z_llvm object emission, and executable proof. The high-volume
+   `try:pl_op` pair remains the next error-union sub-slice because the current
+   accepted row does not yet cover Zig `try` continuation lowering.
 6. Compiler-core frontier slice: only after the registries are shared, add
    small real Zig compiler-core frontier rows that exercise the highest ranked
    categories through typed AIR v2 and generic CFG. Keep the
@@ -653,12 +659,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=599`,
-`generic_codegen_functions=599`, `generic_cfg_functions=599`,
+frontier gate reports `source_rows=13`, `discovered_functions=600`,
+`generic_codegen_functions=600`, `generic_cfg_functions=600`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=599`, `object_failures=0`,
+`object_emitted_functions=600`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -671,9 +677,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=599`,
-`generic_cfg_functions=599`, `structural_matcher_functions=0`,
-`object_emitted_functions=599`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=600`,
+`generic_cfg_functions=600`, `structural_matcher_functions=0`,
+`object_emitted_functions=600`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
