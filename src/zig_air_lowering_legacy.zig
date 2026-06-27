@@ -447,7 +447,7 @@ pub fn isIntegerSwitchBlock(function: air_export.Function) bool {
     var branch_count: usize = 0;
     for (function.instructions) |instruction| {
         if (isIgnoredOpcode(instruction.opcode) or
-            std.mem.eql(u8, instruction.opcode, "arg") or
+            air_capabilities.isArgOpcode(instruction.opcode) or
             air_capabilities.isReturnOpcode(instruction.opcode))
         {
             continue;
@@ -585,18 +585,18 @@ pub fn conditionalSlotUpdateShape(function: air_export.Function) bool {
     var condition_arg: ?u32 = null;
     var cond_count: usize = 0;
     for (function.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, "arg")) {
+        if (air_capabilities.isArgOpcode(instruction.opcode)) {
             var fields = splitTopLevel(instruction.payload, ',');
             const type_text = std.mem.trim(u8, fields.next() orelse return false, " ");
             const index_text = std.mem.trim(u8, fields.next() orelse return false, " ");
             if (std.mem.eql(u8, type_text, "i32") and std.mem.eql(u8, index_text, "0")) first_arg = instruction.index;
             if (std.mem.eql(u8, type_text, "i32") and std.mem.eql(u8, index_text, "1")) second_arg = instruction.index;
             if (std.mem.eql(u8, type_text, "bool") and std.mem.eql(u8, index_text, "2")) condition_arg = instruction.index;
-        } else if (std.mem.eql(u8, instruction.opcode, "alloc") and
+        } else if (air_capabilities.isAllocOpcode(instruction.opcode) and
             std.mem.eql(u8, std.mem.trim(u8, instruction.payload, " "), "*i32"))
         {
             slot = instruction.index;
-        } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+        } else if (air_capabilities.isCondBrOpcode(instruction.opcode)) {
             cond_count += 1;
             var fields = splitTopLevel(instruction.payload, ',');
             if (parseInstructionRef(fields.next() orelse return false) != condition_arg) return false;
