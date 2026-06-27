@@ -103,7 +103,6 @@ const typed_v2_fallbacks = @import("zig_air_lowering_typed_v2_fallbacks.zig");
 const legacy = @import("zig_air_lowering_legacy.zig");
 
 const runtimeNavSymbol = legacy.runtimeNavSymbol;
-const typedBlockBranchValue = lowering_parser.typedBlockBranchValue;
 const ensureBase64LookupGlobal = typed_v2_fallbacks.ensureBase64LookupGlobal;
 
 const typedV2RegisterAggregateRecords = typed_v2.typedV2RegisterAggregateRecords;
