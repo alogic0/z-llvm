@@ -44,10 +44,12 @@ pass-manager run, skips transform passes from the cached result, reports
 verifier passes. Full salvage is still future work, not an implicit transform
 claim.
 
-The uncurated AIR build topology is generated through one helper over
+The uncurated AIR build topology is generated through one helper over typed
 `mode/corpus/variant` tuples, while preserving the public build step names for
 discovery, object progress, object inspection, native-link progress,
-executable progress, and strict-finish gates. Use focused row/gate commands and
+executable progress, and strict-finish gates. Mode and corpus routing now use
+`build.zig` enums instead of runtime string comparisons, so new gate variants
+must enter through the shared metadata path. Use focused row/gate commands and
 `zig build structural-smoke` during iteration; keep `distribution-all` as a
 milestone confirmation gate.
 
