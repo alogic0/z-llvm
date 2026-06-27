@@ -98,13 +98,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
     var typed_v2_fallback_functions: usize = 0;
     var object_failures: usize = 0;
     var native_link_failures: usize = 0;
-    var varargs_boundary_rows: usize = 0;
-    var vector_boundary_rows: usize = 0;
-    var x87_boundary_rows: usize = 0;
-    var packed_aggregate_boundary_rows: usize = 0;
-    var tail_call_boundary_rows: usize = 0;
-    var callconv_boundary_rows: usize = 0;
-    var stack_pressure_boundary_rows: usize = 0;
+    var boundary_counts: abi_boundaries.Counts = .{};
     var unexpected_accept_rows: usize = 0;
     var wrong_diagnostic_rows: usize = 0;
     var first_unsupported_source: ?[]const u8 = null;
@@ -160,13 +154,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
                         source_rows += 1;
                         const row_count = abi_boundaries.rowCountForSource(source);
                         discovered_functions += row_count;
-                        if (category == .varargs) varargs_boundary_rows += row_count;
-                        if (category == .vector) vector_boundary_rows += row_count;
-                        if (category == .x87) x87_boundary_rows += row_count;
-                        if (category == .packed_aggregate) packed_aggregate_boundary_rows += row_count;
-                        if (category == .tail_call) tail_call_boundary_rows += row_count;
-                        if (category == .non_default_callconv) callconv_boundary_rows += row_count;
-                        if (category == .stack_pressure) stack_pressure_boundary_rows += row_count;
+                        boundary_counts.add(category, row_count);
                         std.debug.print(
                             "abi-boundary source={s} function=module category={s} diagnostic={s} stage=air-export stderr={s}\n",
                             .{ source, category.name(), category.diagnosticName(), firstLine(emit_result.stderr) },
@@ -217,13 +205,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
                 if (abi_boundaries.categoryForLoweringFailure(source, err)) |category| {
                     const row_count = abi_boundaries.rowCountForSource(source);
                     discovered_functions += row_count;
-                    if (category == .varargs) varargs_boundary_rows += row_count;
-                    if (category == .vector) vector_boundary_rows += row_count;
-                    if (category == .x87) x87_boundary_rows += row_count;
-                    if (category == .packed_aggregate) packed_aggregate_boundary_rows += row_count;
-                    if (category == .tail_call) tail_call_boundary_rows += row_count;
-                    if (category == .non_default_callconv) callconv_boundary_rows += row_count;
-                    if (category == .stack_pressure) stack_pressure_boundary_rows += row_count;
+                    boundary_counts.add(category, row_count);
                     std.debug.print(
                         "abi-boundary source={s} function=module category={s} diagnostic={s} stage=lowering error={s}\n",
                         .{ source, category.name(), category.diagnosticName(), @errorName(err) },
@@ -288,13 +270,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
         for (lowered.unsupported) |diagnostic| {
             if (options.abi_boundary_expectations) {
                 if (abi_boundaries.categoryForUnsupported(source, diagnostic)) |category| {
-                    if (category == .varargs) varargs_boundary_rows += 1;
-                    if (category == .vector) vector_boundary_rows += 1;
-                    if (category == .x87) x87_boundary_rows += 1;
-                    if (category == .packed_aggregate) packed_aggregate_boundary_rows += 1;
-                    if (category == .tail_call) tail_call_boundary_rows += 1;
-                    if (category == .non_default_callconv) callconv_boundary_rows += 1;
-                    if (category == .stack_pressure) stack_pressure_boundary_rows += 1;
+                    boundary_counts.add(category, 1);
                     std.debug.print(
                         "abi-boundary source={s} function={s} category={s} diagnostic={s}\n",
                         .{ source, diagnostic.function, category.name(), category.diagnosticName() },
@@ -334,13 +310,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
             ) catch |err| {
                 if (options.abi_boundary_expectations) {
                     if (abi_boundaries.categoryForCodegenFailure(source, err)) |category| {
-                        if (category == .varargs) varargs_boundary_rows += 1;
-                        if (category == .vector) vector_boundary_rows += 1;
-                        if (category == .x87) x87_boundary_rows += 1;
-                        if (category == .packed_aggregate) packed_aggregate_boundary_rows += 1;
-                        if (category == .tail_call) tail_call_boundary_rows += 1;
-                        if (category == .non_default_callconv) callconv_boundary_rows += 1;
-                        if (category == .stack_pressure) stack_pressure_boundary_rows += 1;
+                        boundary_counts.add(category, 1);
                         std.debug.print(
                             "abi-boundary source={s} function={s} category={s} diagnostic={s}\n",
                             .{ source, function.name, category.name(), category.diagnosticName() },
@@ -606,13 +576,13 @@ fn runMode(init: std.process.Init, options: Options) !void {
         const boundary_local_fail: usize = if (options.corpus == .frontier_boundaries and
             source_rows == 6 and
             discovered_functions == 10 and
-            varargs_boundary_rows == 2 and
-            vector_boundary_rows == 2 and
-            x87_boundary_rows == 2 and
-            packed_aggregate_boundary_rows == 2 and
-            tail_call_boundary_rows == 1 and
-            callconv_boundary_rows == 1 and
-            stack_pressure_boundary_rows == 0 and
+            boundary_counts.varargs_rows == 2 and
+            boundary_counts.vector_rows == 2 and
+            boundary_counts.x87_rows == 2 and
+            boundary_counts.packed_aggregate_rows == 2 and
+            boundary_counts.tail_call_rows == 1 and
+            boundary_counts.callconv_rows == 1 and
+            boundary_counts.stack_pressure_rows == 0 and
             unexpected_accept_rows == 0 and
             wrong_diagnostic_rows == 0)
             0
@@ -625,13 +595,13 @@ fn runMode(init: std.process.Init, options: Options) !void {
                 options.corpus.name(),
                 source_rows,
                 discovered_functions,
-                varargs_boundary_rows,
-                vector_boundary_rows,
-                x87_boundary_rows,
-                packed_aggregate_boundary_rows,
-                tail_call_boundary_rows,
-                callconv_boundary_rows,
-                stack_pressure_boundary_rows,
+                boundary_counts.varargs_rows,
+                boundary_counts.vector_rows,
+                boundary_counts.x87_rows,
+                boundary_counts.packed_aggregate_rows,
+                boundary_counts.tail_call_rows,
+                boundary_counts.callconv_rows,
+                boundary_counts.stack_pressure_rows,
                 unexpected_accept_rows,
                 wrong_diagnostic_rows,
                 boundary_local_fail,

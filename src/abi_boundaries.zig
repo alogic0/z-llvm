@@ -35,6 +35,28 @@ pub const Category = enum {
     }
 };
 
+pub const Counts = struct {
+    varargs_rows: usize = 0,
+    vector_rows: usize = 0,
+    x87_rows: usize = 0,
+    packed_aggregate_rows: usize = 0,
+    tail_call_rows: usize = 0,
+    callconv_rows: usize = 0,
+    stack_pressure_rows: usize = 0,
+
+    pub fn add(self: *Counts, category: Category, amount: usize) void {
+        switch (category) {
+            .varargs => self.varargs_rows += amount,
+            .vector => self.vector_rows += amount,
+            .x87 => self.x87_rows += amount,
+            .packed_aggregate => self.packed_aggregate_rows += amount,
+            .tail_call => self.tail_call_rows += amount,
+            .non_default_callconv => self.callconv_rows += amount,
+            .stack_pressure => self.stack_pressure_rows += amount,
+        }
+    }
+};
+
 pub fn categoryForUnsupported(source: []const u8, diagnostic: air_lowering.Diagnostic) ?Category {
     if (contains(source, "frontier_varargs_boundary.zig") and
         std.mem.eql(u8, diagnostic.opcode, "lowering") and
@@ -117,6 +139,18 @@ test "frontier ABI boundary metadata names diagnostics" {
     try std.testing.expectEqualStrings("varargs", Category.varargs.name());
     try std.testing.expectEqualStrings("UnsupportedVectorAbi", Category.vector.diagnosticName());
     try std.testing.expectEqualStrings("packed-aggregate", Category.packed_aggregate.name());
+}
+
+test "frontier ABI boundary counts update by category" {
+    var counts: Counts = .{};
+    counts.add(.varargs, 2);
+    counts.add(.non_default_callconv, 1);
+    counts.add(.stack_pressure, 3);
+
+    try std.testing.expectEqual(@as(usize, 2), counts.varargs_rows);
+    try std.testing.expectEqual(@as(usize, 1), counts.callconv_rows);
+    try std.testing.expectEqual(@as(usize, 3), counts.stack_pressure_rows);
+    try std.testing.expectEqual(@as(usize, 0), counts.vector_rows);
 }
 
 test "frontier ABI boundary source row counts are explicit" {
