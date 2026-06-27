@@ -3,6 +3,7 @@ const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
+const air_types = @import("zig_air_types.zig");
 const ir = @import("ir.zig");
 const lowering_parser = @import("zig_air_lowering_parser.zig");
 const memory_location = @import("analysis/memory_location.zig");
@@ -11,7 +12,7 @@ const legacy = @import("zig_air_lowering_legacy.zig");
 
 const ZigType = air_model.ZigType;
 const FunctionType = air_model.FunctionType;
-const parseZigType = lowering_parser.parseZigType;
+const parseZigType = air_types.parseZigType;
 const parseConstant = lowering_parser.parseConstant;
 const parseInstructionRef = air_text.instructionRef;
 const typedDetail = air_model.detail;
@@ -85,7 +86,7 @@ fn lowerRegisterAggregateMake(
     air_function: air_export.Function,
     structured_air_v2: air_export.StructuredAirV2,
 ) !ir.Function {
-    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     const aggregate_ty = function_type.return_type.ir_type;
     if (!isSysVRegisterAggregateCandidate(aggregate_ty)) return error.UnsupportedAir;
@@ -128,7 +129,7 @@ fn lowerRegisterAggregateMake(
 }
 
 fn lowerMaybeError(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or
         !function_type.return_type.ir_type.eql(.{ .int = 64 }) or
@@ -164,7 +165,7 @@ fn lowerMaybeError(allocator: std.mem.Allocator, air_function: air_export.Functi
 }
 
 fn lowerErrorSwitch(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
         !function_type.return_type.ir_type.eql(.{ .int = 32 }))
@@ -212,7 +213,7 @@ fn lowerErrorSwitch(allocator: std.mem.Allocator, air_function: air_export.Funct
 }
 
 fn lowerErrorClassify(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
         !function_type.return_type.ir_type.eql(.{ .int = 64 }))
@@ -265,7 +266,7 @@ fn lowerMixCAddMayPanicChecked(
     air_function: air_export.Function,
     checked_add: bool,
 ) !ir.Function {
-    const function_type = try lowering_parser.parseFunctionType(allocator, air_function.type_text);
+    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or
         !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
