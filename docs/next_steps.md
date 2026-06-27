@@ -273,7 +273,11 @@ Execution order:
    use the registry-owned error values. `src/uncurated_air_gate.zig` consumes
    that registry for classification, counting, and local-fail expectations
    instead of owning ad hoc boundary metadata; expected boundary summary
-   matching is registry-owned rather than field-by-field gate code.
+   matching is registry-owned rather than field-by-field gate code. The
+   boundary registry is now table-driven by source fragment, category,
+   expected row count, source-level failure row count, and diagnostic policy;
+   the boundary gate was re-run after this change and still reports
+   `wrong_diagnostic_rows=0` across ReleaseFast, ReleaseSafe, and ReleaseSmall.
 5. Aggregate ABI slice: route aggregate argument, return, sret, byval, field
    offset, and copy decisions through the shared type-layout result plus the
    SysV aggregate classifier. `src/codegen/x86_64/sysv_abi.zig` now also owns
