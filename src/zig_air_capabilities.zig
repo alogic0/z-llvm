@@ -248,8 +248,8 @@ pub fn isStraightLineOpcode(opcode: []const u8) bool {
 
 pub fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
     return isCommonLowerableOpcode(opcode) or
-        std.mem.eql(u8, opcode, "block") or
-        std.mem.eql(u8, opcode, "cond_br");
+        isBlockOpcode(opcode) or
+        isCondBrOpcode(opcode);
 }
 
 pub fn typedV2CanLower(capability: OpcodeCapability) bool {
@@ -389,9 +389,9 @@ fn capabilityOwnerForOpcode(
 }
 
 fn lowerableOwnerForOpcode(opcode: []const u8, category: air_export.InstructionCategory) CapabilityOwner {
-    if (std.mem.eql(u8, opcode, "block") or
-        std.mem.eql(u8, opcode, "br") or
-        std.mem.eql(u8, opcode, "cond_br") or
+    if (isBlockOpcode(opcode) or
+        isBrOpcode(opcode) or
+        isCondBrOpcode(opcode) or
         std.mem.eql(u8, opcode, "loop") or
         std.mem.eql(u8, opcode, "repeat") or
         std.mem.eql(u8, opcode, "switch_br") or
@@ -436,7 +436,7 @@ fn lowererForOpcode(
 
 fn lowererForLowerableOpcode(opcode: []const u8, category: air_export.InstructionCategory) LowererKind {
     if (category == .call) return .call_abi;
-    if (category == .control_flow or category == .return_op or std.mem.eql(u8, opcode, "block")) return .typed_v2_cfg;
+    if (category == .control_flow or category == .return_op or isBlockOpcode(opcode)) return .typed_v2_cfg;
     if (std.mem.eql(u8, opcode, "atomic_rmw") or std.mem.eql(u8, opcode, "assembly")) return .backend_runtime;
     return .typed_v2_semantic;
 }
@@ -728,9 +728,8 @@ fn isCommonLowerableOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         isFieldPtrOpcode(opcode) or
         isCallOpcode(opcode) or
-        std.mem.eql(u8, opcode, "ret") or
-        std.mem.eql(u8, opcode, "ret_safe") or
-        std.mem.eql(u8, opcode, "unreach");
+        isReturnOpcode(opcode) or
+        isUnreachOpcode(opcode);
 }
 
 fn isInventoryKnownOtherOpcode(opcode: []const u8) bool {
