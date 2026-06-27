@@ -2,6 +2,8 @@ const std = @import("std");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
 const ir = @import("ir.zig");
+const memory_location = @import("analysis/memory_location.zig");
+const target_mod = @import("target.zig");
 
 pub const ZigType = struct {
     ir_type: ir.Type,
@@ -412,6 +414,41 @@ pub fn instructionMissingRequiredDetail(instruction: air_export.TypedInstruction
         }
     }
     return null;
+}
+
+pub fn plainFieldPointerChild(ty: ir.Type) bool {
+    return switch (ty) {
+        .int => |bits| bits == 1 or bits % 8 == 0,
+        .float, .double, .ptr => true,
+        .aggregate => true,
+        .void, .x86_fp80, .fp128, .metadata, .vector => false,
+    };
+}
+
+pub fn supportedTypedGepElementType(ty: ir.Type) bool {
+    return switch (ty) {
+        .int => |bits| bits == 8 or bits == 32 or bits == 64,
+        .float, .double => true,
+        .void, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+    };
+}
+
+pub fn selectedFieldByteOffset(source_ty: ir.Type, field_child: ir.Type, field_index: i128) ?i128 {
+    if (field_index < 0) return null;
+    if (!plainFieldPointerChild(field_child)) return null;
+    const index: usize = @intCast(field_index);
+    const actual_child = memory_location.aggregateFieldType(source_ty, index) orelse return null;
+    if (!actual_child.eql(field_child)) return null;
+    const layout = target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch return null;
+    return memory_location.aggregateFieldOffsetWithLayout(layout, source_ty, index);
+}
+
+pub fn genericTypedGepIndex(value: ir.Value) bool {
+    return switch (value) {
+        .int => |int| int >= 0,
+        .named => true,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
 }
 
 pub fn blockTarget(operand: air_export.TypedOperand) ?u32 {
