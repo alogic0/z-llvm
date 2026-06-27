@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub fn findMatching(text: []const u8, open_index: usize, open: u8, close: u8) ?usize {
     var depth: usize = 0;
     for (text[open_index..], open_index..) |char, index| {
@@ -65,4 +67,11 @@ pub const TopLevelSplit = struct {
 
 pub fn splitTopLevel(text: []const u8, separator: u8) TopLevelSplit {
     return .{ .text = text, .separator = separator };
+}
+
+pub fn instructionRef(text: []const u8) ?u32 {
+    var trimmed = std.mem.trim(u8, text, " ");
+    if (std.mem.endsWith(u8, trimmed, "!")) trimmed = trimmed[0 .. trimmed.len - 1];
+    if (trimmed.len < 2 or trimmed[0] != '%') return null;
+    return std.fmt.parseInt(u32, trimmed[1..], 10) catch null;
 }

@@ -499,13 +499,6 @@ pub fn parseStaticIntegerType(text: []const u8) ?ZigType {
     return parseZigType(if (std.mem.eql(u8, text, "usize")) "usize" else text);
 }
 
-pub fn parseInstructionRef(text: []const u8) ?u32 {
-    var trimmed = std.mem.trim(u8, text, " ");
-    if (std.mem.endsWith(u8, trimmed, "!")) trimmed = trimmed[0 .. trimmed.len - 1];
-    if (trimmed.len < 2 or trimmed[0] != '%') return null;
-    return std.fmt.parseInt(u32, trimmed[1..], 10) catch null;
-}
-
 pub fn isSimpleSelectBlock(function: air_export.Function, block_index: u32) bool {
     const block_position = air_model.instructionRecordPosition(function, block_index) orelse return false;
     const block_instruction = function.instructions[block_position];
@@ -523,7 +516,7 @@ pub fn isSimpleSelectBlock(function: air_export.Function, block_index: u32) bool
         if (std.mem.eql(u8, instruction.opcode, "br")) {
             var fields = air_text.splitTopLevel(instruction.payload, ',');
             const target = fields.next() orelse return false;
-            if (parseInstructionRef(target) == block_index) matching_br_count += 1;
+            if (air_text.instructionRef(target) == block_index) matching_br_count += 1;
             continue;
         }
         return false;
