@@ -589,19 +589,6 @@ pub fn genericTypedGepIndex(value: ir.Value) bool {
     };
 }
 
-pub fn typedV2InstructionMissingRequiredDetail(instruction: air_export.TypedInstruction) ?[]const u8 {
-    if (air_capabilities.isCallOpcode(instruction.opcode)) {
-        if (air_model.detail(instruction, "callee_text") == null) return "missing_callee_text";
-        if (air_model.detail(instruction, "call_signature") == null) return "missing_call_signature";
-    }
-    for (instruction.operands, 0..) |operand, operand_index| {
-        if (std.mem.eql(u8, operand.kind, "const") and air_model.operandTextDetail(instruction, operand_index) == null) {
-            return "missing_const_text";
-        }
-    }
-    return null;
-}
-
 pub fn binaryOp(opcode: []const u8, ty: ZigType) ?ir.BinaryOp {
     const fp = isFpType(ty.ir_type);
     if (std.mem.startsWith(u8, opcode, "add")) return if (fp) .fadd else .add;
