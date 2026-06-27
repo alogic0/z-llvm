@@ -1,6 +1,7 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const air_lowering = @import("zig_air_lowering.zig");
+const abi_boundaries = @import("abi_boundaries.zig");
 const codegen = @import("codegen.zig");
 const mc = @import("mc.zig");
 
@@ -155,9 +156,9 @@ fn runMode(init: std.process.Init, options: Options) !void {
         switch (emit_result.term) {
             .exited => |code| if (code != 0) {
                 if (options.abi_boundary_expectations) {
-                    if (boundaryCategoryForAirExportFailure(source, emit_result.stderr)) |category| {
+                    if (abi_boundaries.categoryForAirExportFailure(source, emit_result.stderr)) |category| {
                         source_rows += 1;
-                        const row_count = boundaryRowCountForSource(source);
+                        const row_count = abi_boundaries.rowCountForSource(source);
                         discovered_functions += row_count;
                         if (category == .varargs) varargs_boundary_rows += row_count;
                         if (category == .vector) vector_boundary_rows += row_count;
@@ -213,8 +214,8 @@ fn runMode(init: std.process.Init, options: Options) !void {
         defer parsed.deinit();
         var lowered = air_lowering.lowerCompatible(allocator, parsed) catch |err| {
             if (options.abi_boundary_expectations) {
-                if (boundaryCategoryForLoweringFailure(source, err)) |category| {
-                    const row_count = boundaryRowCountForSource(source);
+                if (abi_boundaries.categoryForLoweringFailure(source, err)) |category| {
+                    const row_count = abi_boundaries.rowCountForSource(source);
                     discovered_functions += row_count;
                     if (category == .varargs) varargs_boundary_rows += row_count;
                     if (category == .vector) vector_boundary_rows += row_count;
@@ -286,7 +287,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
         unsupported_functions += lowered.unsupported.len;
         for (lowered.unsupported) |diagnostic| {
             if (options.abi_boundary_expectations) {
-                if (boundaryCategoryForUnsupported(source, diagnostic)) |category| {
+                if (abi_boundaries.categoryForUnsupported(source, diagnostic)) |category| {
                     if (category == .varargs) varargs_boundary_rows += 1;
                     if (category == .vector) vector_boundary_rows += 1;
                     if (category == .x87) x87_boundary_rows += 1;
@@ -332,71 +333,24 @@ fn runMode(init: std.process.Init, options: Options) !void {
                 function,
             ) catch |err| {
                 if (options.abi_boundary_expectations) {
-                    switch (err) {
-                        error.UnsupportedVarargsAbi => {
-                            varargs_boundary_rows += 1;
-                            std.debug.print(
-                                "abi-boundary source={s} function={s} category=varargs diagnostic=UnsupportedVarargsAbi\n",
-                                .{ source, function.name },
-                            );
-                        },
-                        error.UnsupportedVectorAbi => {
-                            vector_boundary_rows += 1;
-                            std.debug.print(
-                                "abi-boundary source={s} function={s} category=vector diagnostic=UnsupportedVectorAbi\n",
-                                .{ source, function.name },
-                            );
-                        },
-                        error.UnsupportedLongDoubleAbi => {
-                            x87_boundary_rows += 1;
-                            std.debug.print(
-                                "abi-boundary source={s} function={s} category=x87 diagnostic=UnsupportedLongDoubleAbi\n",
-                                .{ source, function.name },
-                            );
-                        },
-                        error.UnsupportedPackedAggregateAbi => {
-                            packed_aggregate_boundary_rows += 1;
-                            std.debug.print(
-                                "abi-boundary source={s} function={s} category=packed-aggregate diagnostic=UnsupportedPackedAggregateAbi\n",
-                                .{ source, function.name },
-                            );
-                        },
-                        error.UnsupportedTailCallAbi => {
-                            tail_call_boundary_rows += 1;
-                            std.debug.print(
-                                "abi-boundary source={s} function={s} category=tail-call diagnostic=UnsupportedTailCallAbi\n",
-                                .{ source, function.name },
-                            );
-                        },
-                        error.UnsupportedCallConvAbi => {
-                            callconv_boundary_rows += 1;
-                            std.debug.print(
-                                "abi-boundary source={s} function={s} category=callconv diagnostic=UnsupportedCallConvAbi\n",
-                                .{ source, function.name },
-                            );
-                        },
-                        error.UnsupportedCodegenAbi => {
-                            if (std.mem.indexOf(u8, source, "frontier_stack_pressure_boundary.zig") != null) {
-                                stack_pressure_boundary_rows += 1;
-                                std.debug.print(
-                                    "abi-boundary source={s} function={s} category=stack-pressure diagnostic=UnsupportedCodegenAbi\n",
-                                    .{ source, function.name },
-                                );
-                            } else {
-                                wrong_diagnostic_rows += 1;
-                                std.debug.print(
-                                    "abi-boundary-failure source={s} function={s} expected=targeted-abi-boundary actual={s}\n",
-                                    .{ source, function.name, @errorName(err) },
-                                );
-                            }
-                        },
-                        else => {
-                            wrong_diagnostic_rows += 1;
-                            std.debug.print(
-                                "abi-boundary-failure source={s} function={s} expected=targeted-abi-boundary actual={s}\n",
-                                .{ source, function.name, @errorName(err) },
-                            );
-                        },
+                    if (abi_boundaries.categoryForCodegenFailure(source, err)) |category| {
+                        if (category == .varargs) varargs_boundary_rows += 1;
+                        if (category == .vector) vector_boundary_rows += 1;
+                        if (category == .x87) x87_boundary_rows += 1;
+                        if (category == .packed_aggregate) packed_aggregate_boundary_rows += 1;
+                        if (category == .tail_call) tail_call_boundary_rows += 1;
+                        if (category == .non_default_callconv) callconv_boundary_rows += 1;
+                        if (category == .stack_pressure) stack_pressure_boundary_rows += 1;
+                        std.debug.print(
+                            "abi-boundary source={s} function={s} category={s} diagnostic={s}\n",
+                            .{ source, function.name, category.name(), category.diagnosticName() },
+                        );
+                    } else {
+                        wrong_diagnostic_rows += 1;
+                        std.debug.print(
+                            "abi-boundary-failure source={s} function={s} expected=targeted-abi-boundary actual={s}\n",
+                            .{ source, function.name, @errorName(err) },
+                        );
                     }
                     continue;
                 }
@@ -756,98 +710,4 @@ const cloneEnvironment = helpers.cloneEnvironment;
 const incrementCount = helpers.incrementCount;
 const collectSources = helpers.collectSources;
 
-const BoundaryCategory = enum {
-    varargs,
-    vector,
-    x87,
-    packed_aggregate,
-    tail_call,
-    non_default_callconv,
-    stack_pressure,
-
-    fn name(self: BoundaryCategory) []const u8 {
-        return switch (self) {
-            .varargs => "varargs",
-            .vector => "vector",
-            .x87 => "x87",
-            .packed_aggregate => "packed-aggregate",
-            .tail_call => "tail-call",
-            .non_default_callconv => "callconv",
-            .stack_pressure => "stack-pressure",
-        };
-    }
-
-    fn diagnosticName(self: BoundaryCategory) []const u8 {
-        return switch (self) {
-            .varargs => "UnsupportedVarargsAbi",
-            .vector => "UnsupportedVectorAbi",
-            .x87 => "UnsupportedLongDoubleAbi",
-            .packed_aggregate => "UnsupportedPackedAggregateAbi",
-            .tail_call => "UnsupportedTailCallAbi",
-            .non_default_callconv => "UnsupportedCallConvAbi",
-            .stack_pressure => "UnsupportedCodegenAbi",
-        };
-    }
-};
-
-fn boundaryCategoryForUnsupported(source: []const u8, diagnostic: air_lowering.Diagnostic) ?BoundaryCategory {
-    if (std.mem.indexOf(u8, source, "frontier_varargs_boundary.zig") != null and
-        std.mem.eql(u8, diagnostic.opcode, "lowering") and
-        diagnostic.reason == .instruction_type)
-    {
-        return .varargs;
-    }
-    if (std.mem.indexOf(u8, source, "frontier_vector_boundary.zig") != null and
-        std.mem.eql(u8, diagnostic.opcode, "function-type") and
-        diagnostic.reason == .function_type)
-    {
-        return .vector;
-    }
-    if (std.mem.indexOf(u8, source, "frontier_x87_boundary.zig") != null and
-        std.mem.eql(u8, diagnostic.opcode, "function-type") and
-        diagnostic.reason == .function_type)
-    {
-        return .x87;
-    }
-    if (std.mem.indexOf(u8, source, "frontier_stack_pressure_boundary.zig") != null and
-        std.mem.eql(u8, diagnostic.opcode, "function-type") and
-        diagnostic.reason == .function_type)
-    {
-        return .stack_pressure;
-    }
-    if (std.mem.indexOf(u8, source, "frontier_tail_call_boundary.zig") != null) {
-        return .tail_call;
-    }
-    return null;
-}
-
-fn boundaryCategoryForAirExportFailure(source: []const u8, stderr: []const u8) ?BoundaryCategory {
-    if (std.mem.indexOf(u8, source, "frontier_packed_aggregate_boundary.zig") != null and
-        std.mem.indexOf(u8, stderr, "not allowed in function with calling convention") != null)
-    {
-        return .packed_aggregate;
-    }
-    if (std.mem.indexOf(u8, source, "frontier_x87_boundary.zig") != null and
-        (std.mem.indexOf(u8, stderr, "not allowed in function with calling convention") != null or
-            std.mem.indexOf(u8, stderr, "TODO implement compiler support") != null))
-    {
-        return .x87;
-    }
-    return null;
-}
-
-fn boundaryCategoryForLoweringFailure(source: []const u8, err: anyerror) ?BoundaryCategory {
-    if (std.mem.indexOf(u8, source, "frontier_callconv_boundary.zig") != null and
-        err == error.UnsupportedCallingConvention)
-    {
-        return .non_default_callconv;
-    }
-    return null;
-}
-
-fn boundaryRowCountForSource(source: []const u8) usize {
-    if (std.mem.indexOf(u8, source, "frontier_packed_aggregate_boundary.zig") != null) return 2;
-    if (std.mem.indexOf(u8, source, "frontier_x87_boundary.zig") != null) return 2;
-    return 1;
-}
 const firstLine = helpers.firstLine;
