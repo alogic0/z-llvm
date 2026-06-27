@@ -416,7 +416,7 @@ pub fn typedV2RegisterAggregateLeafPaths(
         const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return false;
         var path: [4]usize = undefined;
         const path_len = typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return false;
-        leaf_paths[store_index] = aggregateIndexPathText(path[0..path_len]) orelse return false;
+        leaf_paths[store_index] = air_model.aggregateIndexPathText(path[0..path_len]) orelse return false;
         store_index += 1;
     }
     return store_index == function_type.params.len;
@@ -433,33 +433,6 @@ pub fn typedAggregatePointerPath(
     path: *[4]usize,
 ) ?usize {
     return air_model.typedAggregatePointerPath(structured_air_v2, instruction_index, ret_ptr_index, path);
-}
-
-pub fn aggregateIndexPathText(path: []const usize) ?[]const u8 {
-    if (path.len == 1) return switch (path[0]) {
-        0 => "0",
-        1 => "1",
-        2 => "2",
-        3 => "3",
-        4 => "4",
-        5 => "5",
-        6 => "6",
-        7 => "7",
-        else => null,
-    };
-    if (path.len == 2) {
-        if (path[0] == 0 and path[1] == 0) return "0, 0";
-        if (path[0] == 0 and path[1] == 1) return "0, 1";
-        if (path[0] == 0 and path[1] == 2) return "0, 2";
-        if (path[0] == 0 and path[1] == 3) return "0, 3";
-        if (path[0] == 0 and path[1] == 4) return "0, 4";
-        if (path[0] == 0 and path[1] == 5) return "0, 5";
-        if (path[0] == 0 and path[1] == 6) return "0, 6";
-        if (path[0] == 0 and path[1] == 7) return "0, 7";
-        if (path[0] == 1 and path[1] == 0) return "1, 0";
-        if (path[0] == 1 and path[1] == 1) return "1, 1";
-    }
-    return null;
 }
 
 pub fn aggregateFieldCount(ty: ir.Type) ?usize {

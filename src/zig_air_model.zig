@@ -594,6 +594,33 @@ pub fn typedAggregatePointerPath(
     return null;
 }
 
+pub fn aggregateIndexPathText(path: []const usize) ?[]const u8 {
+    if (path.len == 1) return switch (path[0]) {
+        0 => "0",
+        1 => "1",
+        2 => "2",
+        3 => "3",
+        4 => "4",
+        5 => "5",
+        6 => "6",
+        7 => "7",
+        else => null,
+    };
+    if (path.len == 2) {
+        if (path[0] == 0 and path[1] == 0) return "0, 0";
+        if (path[0] == 0 and path[1] == 1) return "0, 1";
+        if (path[0] == 0 and path[1] == 2) return "0, 2";
+        if (path[0] == 0 and path[1] == 3) return "0, 3";
+        if (path[0] == 0 and path[1] == 4) return "0, 4";
+        if (path[0] == 0 and path[1] == 5) return "0, 5";
+        if (path[0] == 0 and path[1] == 6) return "0, 6";
+        if (path[0] == 0 and path[1] == 7) return "0, 7";
+        if (path[0] == 1 and path[1] == 0) return "1, 0";
+        if (path[0] == 1 and path[1] == 1) return "1, 1";
+    }
+    return null;
+}
+
 pub fn plainFieldPointerChild(ty: ir.Type) bool {
     return switch (ty) {
         .int => |bits| bits == 1 or bits % 8 == 0,
