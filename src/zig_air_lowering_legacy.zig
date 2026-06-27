@@ -13,6 +13,7 @@ const parseFunctionType = air_types.parseFunctionType;
 const parseInstructionRef = air_text.instructionRef;
 const shortFunctionName = air_model.shortFunctionName;
 const ownPrint = air_model.ownPrint;
+const functionHasOpcode = air_model.functionHasOpcode;
 const splitTopLevel = air_text.splitTopLevel;
 const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
@@ -850,13 +851,6 @@ pub fn mixCAddMayPanicShape(function: air_export.Function) bool {
         functionHasOpcode(function, "load") and
         (functionHasOpcode(function, "add") or functionHasOpcode(function, "add_safe")) and
         functionHasReturnOpcode(function);
-}
-
-fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
-    for (function.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
-    }
-    return false;
 }
 
 fn functionHasReturnOpcode(function: air_export.Function) bool {
