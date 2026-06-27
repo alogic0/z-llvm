@@ -570,16 +570,6 @@ pub fn belongsToSimpleSelectBlock(function: air_export.Function, instruction_ind
     return false;
 }
 
-pub fn isTypedVoidGuardBlock(function: air_export.Function, block_index: u32) bool {
-    const view = air_model.TypedFunctionView.init(function) orelse return false;
-    return view.voidGuardBlockByIndex(block_index);
-}
-
-pub fn belongsToTypedVoidGuardBlock(function: air_export.Function, instruction_index: u32) bool {
-    const view = air_model.TypedFunctionView.init(function) orelse return false;
-    return view.containsVoidGuardBlockInstruction(instruction_index);
-}
-
 pub fn instructionPosition(function: air_export.Function, index: u32) ?usize {
     for (function.instructions, 0..) |instruction, position| {
         if (instruction.index == index) return position;
@@ -587,102 +577,8 @@ pub fn instructionPosition(function: air_export.Function, index: u32) ?usize {
     return null;
 }
 
-pub fn singleNonDebugInstruction(
-    structured_air_v2: air_export.StructuredAirV2,
-    body: air_export.StructuredBody,
-) ?u32 {
-    var result: ?u32 = null;
-    for (body.instructions) |instruction_index| {
-        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return null;
-        if (isIgnoredOpcode(instruction.opcode)) continue;
-        if (result != null) return null;
-        result = instruction_index;
-    }
-    return result;
-}
-
-pub fn typedVoidGuardBlock(
-    structured_air_v2: air_export.StructuredAirV2,
-    target_block: u32,
-    then_body: air_export.StructuredBody,
-    else_body: air_export.StructuredBody,
-) bool {
-    return (typedVoidBranchBody(structured_air_v2, then_body, target_block) and
-        typedNoreturnBody(structured_air_v2, else_body)) or
-        (typedVoidBranchBody(structured_air_v2, else_body, target_block) and
-            typedNoreturnBody(structured_air_v2, then_body));
-}
-
-pub fn typedVoidBranchBody(
-    structured_air_v2: air_export.StructuredAirV2,
-    body: air_export.StructuredBody,
-    target_block: u32,
-) bool {
-    const branch_index = singleNonDebugInstruction(structured_air_v2, body) orelse return false;
-    const branch = typedInstructionByIndex(structured_air_v2, branch_index) orelse return false;
-    if (!std.mem.eql(u8, branch.opcode, "br") or branch.operands.len != 2) return false;
-    const target = typedBlockTarget(branch.operands[0]) orelse return false;
-    if (target != target_block) return false;
-    if (!std.mem.eql(u8, branch.operands[1].kind, "const")) return false;
-    return std.mem.eql(u8, branch.operands[1].type_text, "void") and
-        std.mem.eql(u8, typedOperandTextDetail(branch, 1) orelse return false, "@.void_value");
-}
-
-pub fn isGenericTypedCfgBlock(function: air_export.Function, block_index: u32) bool {
-    const view = air_model.TypedFunctionView.init(function) orelse return false;
-    return view.genericCfgBlock(block_index);
-}
-
-pub fn isGenericTypedCfgBranchBody(
-    function: air_export.Function,
-    target_block: u32,
-    body: air_export.StructuredBody,
-) bool {
-    const view = air_model.TypedFunctionView.init(function) orelse return false;
-    return view.genericCfgBranchBody(target_block, body);
-}
-
-pub fn belongsToGenericTypedCfgBlock(function: air_export.Function, instruction_index: u32) bool {
-    const view = air_model.TypedFunctionView.init(function) orelse return false;
-    return view.containsGenericCfgBlockInstruction(instruction_index);
-}
-
-pub fn genericTypedCfgBodyContains(
-    function: air_export.Function,
-    body: air_export.StructuredBody,
-    instruction_index: u32,
-) bool {
-    const view = air_model.TypedFunctionView.init(function) orelse return false;
-    return view.genericCfgBodyContains(body, instruction_index);
-}
-
 pub fn typedBlockTarget(operand: air_export.TypedOperand) ?u32 {
     return air_model.blockTarget(operand);
-}
-
-pub fn typedNoreturnBody(
-    structured_air_v2: air_export.StructuredAirV2,
-    body: air_export.StructuredBody,
-) bool {
-    var saw_call = false;
-    var saw_unreach = false;
-    for (body.instructions) |instruction_index| {
-        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
-        if (isIgnoredOpcode(instruction.opcode)) continue;
-        if (!saw_call) {
-            if (!isCallOpcode(instruction.opcode)) return false;
-            const signature = typedDetail(instruction, "call_signature") orelse return false;
-            if (!std.mem.endsWith(u8, std.mem.trim(u8, signature, " "), "noreturn")) return false;
-            saw_call = true;
-            continue;
-        }
-        if (!saw_unreach and std.mem.eql(u8, instruction.opcode, "unreach")) {
-            saw_unreach = true;
-            continue;
-        }
-        return false;
-    }
-    return saw_call and saw_unreach;
 }
 
 pub fn typedInstructionByIndex(structured_air_v2: air_export.StructuredAirV2, index: u32) ?air_export.TypedInstruction {
