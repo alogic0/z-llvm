@@ -80,7 +80,6 @@ const isTypedVoidGuardBlock = lowering_parser.isTypedVoidGuardBlock;
 const belongsToTypedVoidGuardBlock = lowering_parser.belongsToTypedVoidGuardBlock;
 const instructionPosition = lowering_parser.instructionPosition;
 const singleNonDebugInstruction = lowering_parser.singleNonDebugInstruction;
-const typedReturnBody = lowering_parser.typedReturnBody;
 const typedVoidGuardBlock = lowering_parser.typedVoidGuardBlock;
 const typedVoidBranchBody = lowering_parser.typedVoidBranchBody;
 const isGenericTypedCfgBlock = lowering_parser.isGenericTypedCfgBlock;

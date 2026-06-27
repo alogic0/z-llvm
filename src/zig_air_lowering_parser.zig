@@ -578,7 +578,7 @@ pub fn isTypedVoidGuardBlock(function: air_export.Function, block_index: u32) bo
     if (!std.mem.eql(u8, cond.opcode, "cond_br")) return false;
     const then_body = view.body(.then_body, cond.index) orelse return false;
     const else_body = view.body(.else_body, cond.index) orelse return false;
-    return typedVoidGuardBlockView(view, block_index, then_body, else_body);
+    return view.voidGuardBlock(block_index, then_body, else_body);
 }
 
 pub fn belongsToTypedVoidGuardBlock(function: air_export.Function, instruction_index: u32) bool {
@@ -624,64 +624,6 @@ pub fn singleNonDebugInstruction(
     return result;
 }
 
-pub fn typedReturnBody(
-    structured_air_v2: air_export.StructuredAirV2,
-    body: air_export.StructuredBody,
-) bool {
-    const return_index = singleNonDebugInstruction(structured_air_v2, body) orelse return false;
-    const return_instruction = typedInstructionByIndex(structured_air_v2, return_index) orelse return false;
-    return std.mem.eql(u8, return_instruction.opcode, "ret") or
-        std.mem.eql(u8, return_instruction.opcode, "ret_safe");
-}
-
-fn typedReturnBodyView(
-    view: air_model.TypedFunctionView,
-    body: air_export.StructuredBody,
-) bool {
-    const return_index = view.singleSemanticInstruction(body) orelse return false;
-    const return_instruction = view.instruction(return_index) orelse return false;
-    return std.mem.eql(u8, return_instruction.opcode, "ret") or
-        std.mem.eql(u8, return_instruction.opcode, "ret_safe");
-}
-
-fn typedBodyEndsInReturn(
-    structured_air_v2: air_export.StructuredAirV2,
-    body: air_export.StructuredBody,
-) bool {
-    var saw_return = false;
-    for (body.instructions) |instruction_index| {
-        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
-        const capability = air_capabilities.opcodeCapability(instruction.opcode);
-        if (capability.status == .ignored_metadata) continue;
-        if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) {
-            saw_return = true;
-            continue;
-        }
-        if (saw_return) return false;
-        if (!air_capabilities.typedV2CanLower(capability) or std.mem.eql(u8, instruction.opcode, "block")) return false;
-    }
-    return saw_return;
-}
-
-fn typedBodyEndsInReturnView(
-    view: air_model.TypedFunctionView,
-    body: air_export.StructuredBody,
-) bool {
-    var saw_return = false;
-    for (body.instructions) |instruction_index| {
-        const instruction = view.instruction(instruction_index) orelse return false;
-        const capability = view.capability(instruction);
-        if (capability.status == .ignored_metadata) continue;
-        if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) {
-            saw_return = true;
-            continue;
-        }
-        if (saw_return) return false;
-        if (!air_capabilities.typedV2CanLower(capability) or std.mem.eql(u8, instruction.opcode, "block")) return false;
-    }
-    return saw_return;
-}
-
 pub fn typedVoidGuardBlock(
     structured_air_v2: air_export.StructuredAirV2,
     target_block: u32,
@@ -694,18 +636,6 @@ pub fn typedVoidGuardBlock(
             typedNoreturnBody(structured_air_v2, then_body));
 }
 
-fn typedVoidGuardBlockView(
-    view: air_model.TypedFunctionView,
-    target_block: u32,
-    then_body: air_export.StructuredBody,
-    else_body: air_export.StructuredBody,
-) bool {
-    return (typedVoidBranchBodyView(view, then_body, target_block) and
-        typedNoreturnBodyView(view, else_body)) or
-        (typedVoidBranchBodyView(view, else_body, target_block) and
-            typedNoreturnBodyView(view, then_body));
-}
-
 pub fn typedVoidBranchBody(
     structured_air_v2: air_export.StructuredAirV2,
     body: air_export.StructuredBody,
@@ -713,21 +643,6 @@ pub fn typedVoidBranchBody(
 ) bool {
     const branch_index = singleNonDebugInstruction(structured_air_v2, body) orelse return false;
     const branch = typedInstructionByIndex(structured_air_v2, branch_index) orelse return false;
-    if (!std.mem.eql(u8, branch.opcode, "br") or branch.operands.len != 2) return false;
-    const target = typedBlockTarget(branch.operands[0]) orelse return false;
-    if (target != target_block) return false;
-    if (!std.mem.eql(u8, branch.operands[1].kind, "const")) return false;
-    return std.mem.eql(u8, branch.operands[1].type_text, "void") and
-        std.mem.eql(u8, typedOperandTextDetail(branch, 1) orelse return false, "@.void_value");
-}
-
-fn typedVoidBranchBodyView(
-    view: air_model.TypedFunctionView,
-    body: air_export.StructuredBody,
-    target_block: u32,
-) bool {
-    const branch_index = view.singleSemanticInstruction(body) orelse return false;
-    const branch = view.instruction(branch_index) orelse return false;
     if (!std.mem.eql(u8, branch.opcode, "br") or branch.operands.len != 2) return false;
     const target = typedBlockTarget(branch.operands[0]) orelse return false;
     if (target != target_block) return false;
@@ -765,9 +680,9 @@ pub fn isGenericTypedCfgBranchBody(
     body: air_export.StructuredBody,
 ) bool {
     const view = air_model.TypedFunctionView.init(function) orelse return false;
-    if (typedReturnBodyView(view, body)) return true;
-    if (typedBodyEndsInReturnView(view, body)) return true;
-    if (typedNoreturnBodyView(view, body)) return true;
+    if (view.returnBody(body)) return true;
+    if (view.bodyEndsInReturn(body)) return true;
+    if (view.noreturnBody(body)) return true;
     var saw_branch = false;
     for (body.instructions) |instruction_index| {
         const instruction = view.instruction(instruction_index) orelse return false;
@@ -880,31 +795,6 @@ pub fn typedNoreturnBody(
     for (body.instructions) |instruction_index| {
         const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
         if (isIgnoredOpcode(instruction.opcode)) continue;
-        if (!saw_call) {
-            if (!isCallOpcode(instruction.opcode)) return false;
-            const signature = typedDetail(instruction, "call_signature") orelse return false;
-            if (!std.mem.endsWith(u8, std.mem.trim(u8, signature, " "), "noreturn")) return false;
-            saw_call = true;
-            continue;
-        }
-        if (!saw_unreach and std.mem.eql(u8, instruction.opcode, "unreach")) {
-            saw_unreach = true;
-            continue;
-        }
-        return false;
-    }
-    return saw_call and saw_unreach;
-}
-
-fn typedNoreturnBodyView(
-    view: air_model.TypedFunctionView,
-    body: air_export.StructuredBody,
-) bool {
-    var saw_call = false;
-    var saw_unreach = false;
-    for (body.instructions) |instruction_index| {
-        const instruction = view.instruction(instruction_index) orelse return false;
-        if (view.capability(instruction).status == .ignored_metadata) continue;
         if (!saw_call) {
             if (!isCallOpcode(instruction.opcode)) return false;
             const signature = typedDetail(instruction, "call_signature") orelse return false;
