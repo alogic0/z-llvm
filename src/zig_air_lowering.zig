@@ -81,8 +81,6 @@ const instructionPosition = air_model.instructionRecordPosition;
 const typedBlockTarget = air_model.blockTarget;
 const typedDetail = air_model.detail;
 const typedOperandTextDetail = air_model.operandTextDetail;
-const typedCalleeName = air_model.calleeName;
-const typedCallee = air_model.callee;
 const irCallingConvention = air_model.irCallingConvention;
 const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const isStraightLineOpcode = air_capabilities.isStraightLineOpcode;
@@ -1914,27 +1912,24 @@ const LoweringContext = struct {
 
     fn lowerTypedCall(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
         if (instruction.operands.len == 0) return error.UnsupportedAir;
-        const signature_text = typedDetail(instruction, "call_signature") orelse return error.UnsupportedAir;
-        const callee_text = typedDetail(instruction, "callee_text") orelse return error.UnsupportedAir;
-        const call_type = try parseFunctionType(self.allocator, signature_text);
+        const call_details = air_model.callDetails(instruction) orelse return error.UnsupportedAir;
+        const call_type = try parseFunctionType(self.allocator, call_details.signature_text);
         defer call_type.deinit(self.allocator);
         if (instruction.operands.len != call_type.params.len + 1) return error.UnsupportedAir;
-        const parsed_callee = typedCallee(callee_text);
-        const callee = if (parsed_callee) |direct|
+        const callee = if (call_details.callee) |direct|
             if (direct.external)
                 direct.name
             else
                 try self.qualifiedCalleeName(direct.name)
         else
             "";
-        const callee_name = typedCalleeName(callee_text);
-        const callee_value: ?ir.Value = if (parsed_callee == null) blk: {
+        const callee_value: ?ir.Value = if (call_details.callee == null) blk: {
             const callee_operand = try self.resolveTypedOperand(instruction, 0);
             if (callee_operand.ty.ir_type != .ptr) return error.UnsupportedAir;
             break :blk callee_operand.value;
         } else null;
 
-        const is_default_panic = callee_name != null and std.mem.eql(u8, callee_name.?, "defaultPanic");
+        const is_default_panic = call_details.callee_name != null and std.mem.eql(u8, call_details.callee_name.?, "defaultPanic");
         var call: ir.CallInst = .{
             .ret_ty = call_type.return_type.ir_type,
             .callee = if (is_default_panic) "debug.defaultPanic" else callee,

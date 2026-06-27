@@ -418,6 +418,24 @@ pub const TypedCallee = struct {
     external: bool,
 };
 
+pub const TypedCallDetails = struct {
+    signature_text: []const u8,
+    callee_text: []const u8,
+    callee: ?TypedCallee,
+    callee_name: ?[]const u8,
+};
+
+pub fn callDetails(instruction: air_export.TypedInstruction) ?TypedCallDetails {
+    const signature_text = detail(instruction, "call_signature") orelse return null;
+    const callee_text = detail(instruction, "callee_text") orelse return null;
+    return .{
+        .signature_text = signature_text,
+        .callee_text = callee_text,
+        .callee = callee(callee_text),
+        .callee_name = calleeName(callee_text),
+    };
+}
+
 pub fn calleeName(callee_text: []const u8) ?[]const u8 {
     return (callee(callee_text) orelse return null).name;
 }
