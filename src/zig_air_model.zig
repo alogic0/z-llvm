@@ -245,9 +245,7 @@ pub const TypedFunctionView = struct {
         if (!air_capabilities.isBrOpcode(branch.opcode) or branch.operands.len != 2) return false;
         const target = blockTarget(branch.operands[0]) orelse return false;
         if (target != target_block) return false;
-        if (!std.mem.eql(u8, branch.operands[1].kind, "const")) return false;
-        return std.mem.eql(u8, branch.operands[1].type_text, "void") and
-            std.mem.eql(u8, operandTextDetail(branch, 1) orelse return false, "@.void_value");
+        return typedVoidConstOperand(branch, 1) orelse false;
     }
 
     pub fn voidGuardBlock(
@@ -580,9 +578,8 @@ pub fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool
 pub fn typedFieldPtrIndexCount(structured_air_v2: air_export.StructuredAirV2, expected_index: usize) usize {
     var count: usize = 0;
     for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.data_kind, "field_ptr")) continue;
-        const field_index_text = detail(instruction, "field_index") orelse continue;
-        const field_index = std.fmt.parseInt(usize, field_index_text, 10) catch continue;
+        if (!isTypedFieldPtrDataKind(instruction.data_kind)) continue;
+        const field_index = fieldIndexUsize(instruction) orelse continue;
         if (field_index == expected_index) count += 1;
     }
     return count;
