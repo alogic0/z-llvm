@@ -1,11 +1,11 @@
 const std = @import("std");
+const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
 const ir = @import("ir.zig");
-const memory_location = @import("analysis/memory_location.zig");
 const target_mod = @import("target.zig");
 const legacy = @import("zig_air_lowering_legacy.zig");
 
@@ -436,9 +436,7 @@ pub fn typedAggregatePointerPath(
 }
 
 pub fn aggregateFieldCount(ty: ir.Type) ?usize {
-    var count: usize = 0;
-    while (memory_location.aggregateFieldType(ty, count)) |_| : (count += 1) {}
-    return count;
+    return air_capabilities.aggregateFieldCount(ty);
 }
 
 pub fn isSysVRegisterAggregateCandidate(ty: ir.Type) bool {
@@ -521,7 +519,7 @@ pub fn supportedScalarAggregateLeafParamCountInner(ty: ir.Type, params: []const 
     var leaf_count: usize = 0;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(ty, field_index) orelse return null;
+        const field_ty = air_capabilities.aggregateFieldType(ty, field_index) orelse return null;
         if (supportedAggregateCopyLeaf(field_ty)) {
             if (param_index.* >= params.len or !params[param_index.*].ir_type.eql(field_ty)) return null;
             param_index.* += 1;
@@ -541,7 +539,7 @@ pub fn supportedAggregateCopyLeafCount(ty: ir.Type) ?usize {
     var count: usize = 0;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(ty, field_index) orelse return null;
+        const field_ty = air_capabilities.aggregateFieldType(ty, field_index) orelse return null;
         if (supportedAggregateCopyLeaf(field_ty)) {
             count += 1;
         } else if (isAggregateIrType(field_ty)) {
@@ -590,10 +588,9 @@ pub fn collectAggregateCopyLeavesInto(
     if (field_count == 0) return error.UnsupportedAir;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedAir;
-        const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return error.UnsupportedAir;
-        if (offset_i < 0) return error.UnsupportedAir;
-        const field_offset = base_offset + @as(u64, @intCast(offset_i));
+        const field_ty = air_capabilities.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedAir;
+        const offset = air_capabilities.aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse return error.UnsupportedAir;
+        const field_offset = base_offset + offset;
         if (supportedAggregateCopyLeaf(field_ty)) {
             try leaves.append(allocator, .{ .offset = field_offset, .ty = field_ty });
         } else if (isAggregateIrType(field_ty)) {
