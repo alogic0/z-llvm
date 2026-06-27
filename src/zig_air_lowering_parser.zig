@@ -1,6 +1,4 @@
 const std = @import("std");
-const air_capabilities = @import("zig_air_capabilities.zig");
-const air_export = @import("zig_air_export.zig");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
 const ir = @import("ir.zig");
@@ -497,46 +495,6 @@ pub fn ptrCastSymbol(text: []const u8) ?[]const u8 {
 
 pub fn parseStaticIntegerType(text: []const u8) ?ZigType {
     return parseZigType(if (std.mem.eql(u8, text, "usize")) "usize" else text);
-}
-
-pub fn isSimpleSelectBlock(function: air_export.Function, block_index: u32) bool {
-    const block_position = air_model.instructionRecordPosition(function, block_index) orelse return false;
-    const block_instruction = function.instructions[block_position];
-    var cond_count: usize = 0;
-    var matching_br_count: usize = 0;
-    var after_cond = false;
-    for (function.instructions[block_position + 1 ..]) |instruction| {
-        if (instruction.indent <= block_instruction.indent) break;
-        if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
-            cond_count += 1;
-            after_cond = true;
-            continue;
-        }
-        if (!after_cond or air_capabilities.isIgnoredOpcode(instruction.opcode)) continue;
-        if (std.mem.eql(u8, instruction.opcode, "br")) {
-            var fields = air_text.splitTopLevel(instruction.payload, ',');
-            const target = fields.next() orelse return false;
-            if (air_text.instructionRef(target) == block_index) matching_br_count += 1;
-            continue;
-        }
-        return false;
-    }
-    return cond_count == 1 and matching_br_count == 2;
-}
-
-pub fn belongsToSimpleSelectBlock(function: air_export.Function, instruction_index: u32) bool {
-    const position = air_model.instructionRecordPosition(function, instruction_index) orelse return false;
-    const instruction = function.instructions[position];
-    var parent_position = position;
-    while (parent_position > 0) {
-        parent_position -= 1;
-        const candidate = function.instructions[parent_position];
-        if (candidate.indent >= instruction.indent) continue;
-        if (std.mem.eql(u8, candidate.opcode, "block")) {
-            return isSimpleSelectBlock(function, candidate.index);
-        }
-    }
-    return false;
 }
 
 pub fn binaryOp(opcode: []const u8, ty: ZigType) ?ir.BinaryOp {
