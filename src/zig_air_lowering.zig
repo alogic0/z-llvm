@@ -6,6 +6,7 @@ const sib = @import("structured_ir_builder.zig");
 const target_mod = @import("target.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
+const air_text = @import("zig_air_text.zig");
 
 pub const UnsupportedReason = enum {
     function_type,
@@ -96,8 +97,8 @@ const shortFunctionName = air_model.shortFunctionName;
 const isPointerType = lowering_parser.isPointerType;
 const pointerChildText = lowering_parser.pointerChildText;
 const ownPrint = lowering_parser.ownPrint;
-const findMatching = lowering_parser.findMatching;
-const splitTopLevel = lowering_parser.splitTopLevel;
+const findMatching = air_text.findMatching;
+const splitTopLevel = air_text.splitTopLevel;
 const typed_v2 = @import("zig_air_lowering_typed_v2.zig");
 const typed_v2_fallbacks = @import("zig_air_lowering_typed_v2_fallbacks.zig");
 const legacy = @import("zig_air_lowering_legacy.zig");

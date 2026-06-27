@@ -1,6 +1,7 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
+const air_text = @import("zig_air_text.zig");
 const ir = @import("ir.zig");
 const lowering_parser = @import("zig_air_lowering_parser.zig");
 
@@ -10,7 +11,7 @@ const parseFunctionType = lowering_parser.parseFunctionType;
 const parseInstructionRef = lowering_parser.parseInstructionRef;
 const shortFunctionName = @import("zig_air_model.zig").shortFunctionName;
 const ownPrint = lowering_parser.ownPrint;
-const splitTopLevel = lowering_parser.splitTopLevel;
+const splitTopLevel = air_text.splitTopLevel;
 const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
 

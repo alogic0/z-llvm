@@ -2,6 +2,7 @@ const std = @import("std");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
 const air_model = @import("zig_air_model.zig");
+const air_text = @import("zig_air_text.zig");
 const ir = @import("ir.zig");
 
 pub const ZigType = air_model.ZigType;
@@ -20,7 +21,7 @@ pub const LowerError = std.mem.Allocator.Error || error{UnsupportedAir};
 pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
     const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
     if (!std.mem.startsWith(u8, trimmed, "fn (")) return error.UnsupportedAir;
-    const params_end = findMatching(trimmed, 3, '(', ')') orelse return error.UnsupportedAir;
+    const params_end = air_text.findMatching(trimmed, 3, '(', ')') orelse return error.UnsupportedAir;
     const params_text = trimmed[4..params_end];
     const suffix = std.mem.trim(u8, trimmed[params_end + 1 ..], " ");
     const c_calling_convention = std.mem.startsWith(u8, suffix, "callconv(.c)");
@@ -30,7 +31,7 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
 
     var params: std.ArrayList(ZigType) = .empty;
     errdefer params.deinit(allocator);
-    var fields = splitTopLevel(params_text, ',');
+    var fields = air_text.splitTopLevel(params_text, ',');
     while (fields.next()) |field| {
         const param_text = std.mem.trim(u8, field, " ");
         if (param_text.len == 0) continue;
@@ -47,7 +48,7 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
 pub fn functionReturnTypeText(text: []const u8) ?[]const u8 {
     const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
     if (!std.mem.startsWith(u8, trimmed, "fn (")) return null;
-    const params_end = findMatching(trimmed, 3, '(', ')') orelse return null;
+    const params_end = air_text.findMatching(trimmed, 3, '(', ')') orelse return null;
     const suffix = std.mem.trim(u8, trimmed[params_end + 1 ..], " ");
     return functionReturnTypeTextFromSuffix(suffix);
 }
@@ -275,7 +276,7 @@ pub fn parseAnonymousStructType(trimmed: []const u8) ?ZigType {
     const body = std.mem.trim(u8, trimmed[prefix.len .. trimmed.len - 1], " ");
     if (body.len == 0) return null;
 
-    var fields = splitTopLevel(body, ',');
+    var fields = air_text.splitTopLevel(body, ',');
     var aggregate: std.ArrayList(u8) = .empty;
     aggregate.appendSlice(std.heap.page_allocator, "{ ") catch return null;
     var count: usize = 0;
@@ -380,7 +381,7 @@ pub fn pointerLoadResultType(text: []const u8) ?ZigType {
 
 pub fn parseConstant(text: []const u8) ?TypedValue {
     if (std.mem.startsWith(u8, text, "<") and std.mem.endsWith(u8, text, ">")) {
-        var fields = splitTopLevel(text[1 .. text.len - 1], ',');
+        var fields = air_text.splitTopLevel(text[1 .. text.len - 1], ',');
         const type_text = fields.next() orelse return null;
         const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
         if (fields.next() != null) return null;
@@ -441,7 +442,7 @@ fn errorSetConstantCode(type_text: []const u8, value_text: []const u8) ?i128 {
     if (!std.mem.startsWith(u8, ty, "error{") or !std.mem.endsWith(u8, ty, "}")) return null;
     if (!std.mem.startsWith(u8, value, "error.")) return null;
     const wanted = value["error.".len..];
-    var fields = splitTopLevel(ty["error{".len .. ty.len - 1], ',');
+    var fields = air_text.splitTopLevel(ty["error{".len .. ty.len - 1], ',');
     var code: i128 = 1;
     while (fields.next()) |field| : (code += 1) {
         const name = std.mem.trim(u8, field, " ");
@@ -470,7 +471,7 @@ pub const SymbolPointer = struct {
 
 pub fn parseSymbolPointer(text: []const u8) ?SymbolPointer {
     if (!std.mem.startsWith(u8, text, "<") or !std.mem.endsWith(u8, text, ">")) return null;
-    var fields = splitTopLevel(text[1 .. text.len - 1], ',');
+    var fields = air_text.splitTopLevel(text[1 .. text.len - 1], ',');
     const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
     const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
     if (fields.next() != null) return null;
@@ -520,7 +521,7 @@ pub fn isSimpleSelectBlock(function: air_export.Function, block_index: u32) bool
         }
         if (!after_cond or air_capabilities.isIgnoredOpcode(instruction.opcode)) continue;
         if (std.mem.eql(u8, instruction.opcode, "br")) {
-            var fields = splitTopLevel(instruction.payload, ',');
+            var fields = air_text.splitTopLevel(instruction.payload, ',');
             const target = fields.next() orelse return false;
             if (parseInstructionRef(target) == block_index) matching_br_count += 1;
             continue;
@@ -651,75 +652,6 @@ pub fn ownPrint(module: *ir.Module, comptime format: []const u8, args: anytype) 
     errdefer module.allocator.free(owned);
     try module.owned_strings.append(module.allocator, owned);
     return owned;
-}
-
-pub fn findMatching(text: []const u8, open_index: usize, open: u8, close: u8) ?usize {
-    var depth: usize = 0;
-    for (text[open_index..], open_index..) |char, index| {
-        if (char == open) depth += 1;
-        if (char == close) {
-            if (depth == 0) return null;
-            depth -= 1;
-            if (depth == 0) return index;
-        }
-    }
-    return null;
-}
-
-pub const TopLevelSplit = struct {
-    text: []const u8,
-    separator: u8,
-    offset: usize = 0,
-
-    pub fn next(self: *TopLevelSplit) ?[]const u8 {
-        if (self.offset > self.text.len) return null;
-        const start = self.offset;
-        var paren_depth: usize = 0;
-        var bracket_depth: usize = 0;
-        var brace_depth: usize = 0;
-        var angle_depth: usize = 0;
-        var quote: ?u8 = null;
-        var index = start;
-        while (index < self.text.len) : (index += 1) {
-            const char = self.text[index];
-            if (quote) |active_quote| {
-                if (char == active_quote and (index == 0 or self.text[index - 1] != '\\')) quote = null;
-                continue;
-            }
-            switch (char) {
-                '\'', '"' => quote = char,
-                '(' => paren_depth += 1,
-                ')' => if (paren_depth > 0) {
-                    paren_depth -= 1;
-                },
-                '[' => bracket_depth += 1,
-                ']' => if (bracket_depth > 0) {
-                    bracket_depth -= 1;
-                },
-                '{' => brace_depth += 1,
-                '}' => if (brace_depth > 0) {
-                    brace_depth -= 1;
-                },
-                '<' => angle_depth += 1,
-                '>' => if (angle_depth > 0) {
-                    angle_depth -= 1;
-                },
-                else => {},
-            }
-            if (char == self.separator and paren_depth == 0 and bracket_depth == 0 and
-                brace_depth == 0 and angle_depth == 0 and quote == null)
-            {
-                self.offset = index + 1;
-                return self.text[start..index];
-            }
-        }
-        self.offset = self.text.len + 1;
-        return self.text[start..];
-    }
-};
-
-pub fn splitTopLevel(text: []const u8, separator: u8) TopLevelSplit {
-    return .{ .text = text, .separator = separator };
 }
 
 test "parse qualified Zig function types" {
