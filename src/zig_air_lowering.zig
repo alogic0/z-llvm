@@ -53,11 +53,11 @@ pub const TypedV2Fallback = struct {
 
 const lowering_parser = @import("zig_air_lowering_parser.zig");
 
-const ZigType = lowering_parser.ZigType;
-const FunctionType = lowering_parser.FunctionType;
-const TypedValue = lowering_parser.TypedValue;
+const ZigType = air_model.ZigType;
+const FunctionType = air_model.FunctionType;
+const TypedValue = air_model.TypedValue;
 const LowerError = lowering_parser.LowerError;
-const TypedBranchMergeResult = lowering_parser.TypedBranchMergeResult;
+const TypedBranchMergeResult = air_model.TypedBranchMergeResult;
 const parseFunctionType = lowering_parser.parseFunctionType;
 const functionReturnTypeText = lowering_parser.functionReturnTypeText;
 const parseZigType = lowering_parser.parseZigType;

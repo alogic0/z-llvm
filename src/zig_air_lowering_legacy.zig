@@ -4,7 +4,7 @@ const air_capabilities = @import("zig_air_capabilities.zig");
 const ir = @import("ir.zig");
 const lowering_parser = @import("zig_air_lowering_parser.zig");
 
-const FunctionType = lowering_parser.FunctionType;
+const FunctionType = @import("zig_air_model.zig").FunctionType;
 const parseConstant = lowering_parser.parseConstant;
 const parseFunctionType = lowering_parser.parseFunctionType;
 const parseInstructionRef = lowering_parser.parseInstructionRef;

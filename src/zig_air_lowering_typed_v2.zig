@@ -8,8 +8,8 @@ const memory_location = @import("analysis/memory_location.zig");
 const target_mod = @import("target.zig");
 const legacy = @import("zig_air_lowering_legacy.zig");
 
-const ZigType = lowering_parser.ZigType;
-const FunctionType = lowering_parser.FunctionType;
+const ZigType = air_model.ZigType;
+const FunctionType = air_model.FunctionType;
 const parseZigType = lowering_parser.parseZigType;
 const parseConstant = lowering_parser.parseConstant;
 const parseInstructionRef = lowering_parser.parseInstructionRef;
