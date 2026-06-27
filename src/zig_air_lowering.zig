@@ -93,7 +93,7 @@ const isFieldPtrOpcode = air_capabilities.isFieldPtrOpcode;
 const isCallOpcode = air_capabilities.isCallOpcode;
 const isPlainFieldPointerChild = air_model.plainFieldPointerChild;
 const isSupportedTypedGepElementType = air_model.supportedTypedGepElementType;
-const selectedFieldByteOffset = air_model.selectedFieldByteOffset;
+const aggregateFieldByteOffset = air_model.aggregateFieldByteOffset;
 const genericTypedGepIndex = air_model.genericTypedGepIndex;
 const typedV2InstructionMissingRequiredDetail = air_model.instructionMissingRequiredDetail;
 const binaryOp = air_semantics.binaryOp;
@@ -1870,7 +1870,7 @@ const LoweringContext = struct {
         const field_index_text = typedDetail(instruction, "field_index") orelse return error.UnsupportedAir;
         const field_index = std.fmt.parseInt(i128, field_index_text, 10) catch return error.UnsupportedAir;
         const source_ty = aggregate_ptr.ty.pointer_child orelse return error.UnsupportedAir;
-        if (selectedFieldByteOffset(source_ty, field_child, field_index)) |offset| {
+        if (aggregateFieldByteOffset(source_ty, field_child, field_index)) |offset| {
             if (offset == 0) {
                 self.values[instruction.index] = .{
                     .ty = result_type,

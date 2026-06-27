@@ -653,7 +653,7 @@ pub fn supportedTypedGepElementType(ty: ir.Type) bool {
     };
 }
 
-pub fn selectedFieldByteOffset(source_ty: ir.Type, field_child: ir.Type, field_index: i128) ?i128 {
+pub fn aggregateFieldByteOffset(source_ty: ir.Type, field_child: ir.Type, field_index: i128) ?i128 {
     if (field_index < 0) return null;
     if (!plainFieldPointerChild(field_child)) return null;
     const index: usize = @intCast(field_index);
