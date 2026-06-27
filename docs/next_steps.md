@@ -200,7 +200,8 @@ Execution order:
    targeted. Frontier ABI boundary category names, diagnostics, source-stage
    classifiers, codegen-error classifiers, and expected boundary row counts now
    live in `src/abi_boundaries.zig`; `src/uncurated_air_gate.zig` consumes that
-   registry instead of owning ad hoc boundary metadata.
+   registry for classification, counting, and local-fail expectations instead
+   of owning ad hoc boundary metadata.
 5. Aggregate ABI slice: route aggregate argument, return, sret, byval, field
    offset, and copy decisions through the shared type-layout result plus the
    SysV aggregate classifier. `src/codegen/x86_64/sysv_abi.zig` now also owns
