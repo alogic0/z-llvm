@@ -236,7 +236,7 @@ pub fn lowerCompatible(
     var typed_air_operand_functions: usize = 0;
     var legacy_air_text_lowering_functions: usize = 0;
     var generic_lowering_functions: usize = 0;
-    var shape_recognizer_functions: usize = 0;
+    const shape_recognizer_functions: usize = 0;
     const root_stem = std.fs.path.stem(air_module.root_source);
     const matched_root_functions = rootFunctionCount(air_module.functions, root_stem);
     for (air_module.functions) |air_function| {
@@ -277,10 +277,7 @@ pub fn lowerCompatible(
             if (air_model.typedOperandCoverage(structured_air_v2)) typed_air_operand_functions += 1;
         }
         if (!lowered_from_typed_v2) legacy_air_text_lowering_functions += 1;
-        switch (loweringPath(air_function)) {
-            .generic_instruction_path => generic_lowering_functions += 1,
-            .shape_recognizer => shape_recognizer_functions += 1,
-        }
+        generic_lowering_functions += 1;
     }
 
     try addMissingCallDeclarations(allocator, &module);
@@ -506,20 +503,7 @@ pub fn firstUnsupported(
     return null;
 }
 
-const LoweringPath = enum {
-    generic_instruction_path,
-    shape_recognizer,
-};
-
 fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
-    if (shapeRecognizerName(function)) |name| {
-        return .{
-            .function = function.name,
-            .opcode = name,
-            .data_kind = "-",
-            .reason = "shape_recognizer",
-        };
-    }
     _ = function.structured_air orelse return .{
         .function = function.name,
         .opcode = "structured_air-v1",
@@ -571,16 +555,6 @@ fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
         .data_kind = "-",
         .reason = "lowering_validation",
     };
-}
-
-fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
-    _ = function;
-    return null;
-}
-
-fn loweringPath(function: air_export.Function) LoweringPath {
-    if (shapeRecognizerName(function) != null) return .shape_recognizer;
-    return .generic_instruction_path;
 }
 
 fn lowerFunction(
@@ -697,7 +671,6 @@ fn lowerFunctionTypedV2(
     air_function: air_export.Function,
     typed_v2_fallback: ?*?TypedV2Fallback,
 ) LowerError!ir.Function {
-    if (loweringPath(air_function) == .shape_recognizer) return error.UnsupportedAir;
     const structured_air = air_function.structured_air orelse return error.UnsupportedAir;
     const structured_air_v2 = air_function.structured_air_v2 orelse return error.UnsupportedAir;
     const main_body = structured_air.body(.main, null) orelse return error.UnsupportedAir;
