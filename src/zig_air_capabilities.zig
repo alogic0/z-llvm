@@ -458,7 +458,7 @@ pub fn isArithmeticOpcode(opcode: []const u8) bool {
 pub fn isCastOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "trunc") or
         std.mem.eql(u8, opcode, "intcast") or
-        std.mem.eql(u8, opcode, "bitcast") or
+        isBitcastOpcode(opcode) or
         std.mem.eql(u8, opcode, "ptrtoint") or
         std.mem.eql(u8, opcode, "inttoptr") or
         std.mem.eql(u8, opcode, "float_from_int") or
@@ -502,6 +502,10 @@ pub fn isAssemblyOpcode(opcode: []const u8) bool {
 
 pub fn isAggregateInitOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "aggregate_init");
+}
+
+pub fn isBitcastOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "bitcast");
 }
 
 pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
@@ -839,6 +843,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(!isAssemblyOpcode("asm"));
     try std.testing.expect(isAggregateInitOpcode("aggregate_init"));
     try std.testing.expect(!isAggregateInitOpcode("aggregate"));
+    try std.testing.expect(isBitcastOpcode("bitcast"));
+    try std.testing.expect(!isBitcastOpcode("intcast"));
 
     const asm_capability = opcodeCapability("assembly");
     try std.testing.expectEqual(OpcodeStatus.boundary, asm_capability.status);

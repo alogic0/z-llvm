@@ -1042,7 +1042,7 @@ const LoweringContext = struct {
         if (instruction.operands.len != 1) return error.UnsupportedAir;
         const source = try self.resolveTypedOperand(instruction, 0);
         const target_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
-        if (std.mem.eql(u8, instruction.opcode, "bitcast") and
+        if (air_capabilities.isBitcastOpcode(instruction.opcode) and
             source.ty.ir_type == .ptr and target_type.ir_type == .ptr)
         {
             self.values[instruction.index] = .{
