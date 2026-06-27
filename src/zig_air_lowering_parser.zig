@@ -4,12 +4,9 @@ const air_semantics = @import("zig_air_semantics.zig");
 const air_text = @import("zig_air_text.zig");
 const ir = @import("ir.zig");
 
-pub const ZigType = air_model.ZigType;
-pub const FunctionType = air_model.FunctionType;
-pub const TypedValue = air_model.TypedValue;
-pub const TypedBranchMergeResult = air_model.TypedBranchMergeResult;
-
-pub const LowerError = air_model.LowerError;
+const ZigType = air_model.ZigType;
+const FunctionType = air_model.FunctionType;
+const TypedValue = air_model.TypedValue;
 
 pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
     const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
