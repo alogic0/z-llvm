@@ -373,7 +373,7 @@ fn lowerableOwnerForOpcode(opcode: []const u8, category: air_export.InstructionC
         return .cfg_lowering;
     }
     if (category == .call) return .abi_planner;
-    if (std.mem.eql(u8, opcode, "atomic_rmw") or std.mem.eql(u8, opcode, "assembly")) return .backend;
+    if (isAtomicRmwOpcode(opcode) or isAssemblyOpcode(opcode)) return .backend;
     if (semanticDomainFromOperationIds(opcode) != .none) return .semantic_lowering;
     return .air_parser;
 }
@@ -394,7 +394,7 @@ fn lowererForOpcode(
 fn lowererForLowerableOpcode(opcode: []const u8, category: air_export.InstructionCategory) LowererKind {
     if (category == .call) return .call_abi;
     if (category == .control_flow or category == .return_op or isBlockOpcode(opcode)) return .typed_v2_cfg;
-    if (std.mem.eql(u8, opcode, "atomic_rmw") or std.mem.eql(u8, opcode, "assembly")) return .backend_runtime;
+    if (isAtomicRmwOpcode(opcode) or isAssemblyOpcode(opcode)) return .backend_runtime;
     return .typed_v2_semantic;
 }
 
@@ -490,6 +490,14 @@ pub fn isBrOpcode(opcode: []const u8) bool {
 
 pub fn isCondBrOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "cond_br");
+}
+
+pub fn isAtomicRmwOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "atomic_rmw");
+}
+
+pub fn isAssemblyOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "assembly");
 }
 
 pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
@@ -653,9 +661,9 @@ fn isIgnoredMetadataOpcode(opcode: []const u8) bool {
 
 fn isStraightLineLowerableOpcode(opcode: []const u8) bool {
     return isCommonLowerableOpcode(opcode) or
-        std.mem.eql(u8, opcode, "atomic_rmw") or
+        isAtomicRmwOpcode(opcode) or
         std.mem.eql(u8, opcode, "aggregate_init") or
-        std.mem.eql(u8, opcode, "assembly");
+        isAssemblyOpcode(opcode);
 }
 
 fn isCommonLowerableOpcode(opcode: []const u8) bool {
@@ -821,6 +829,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(CfgLoweringOp.ret, cfgLoweringOpForOpcode("ret_safe"));
     try std.testing.expectEqual(CfgLoweringOp.unreach, cfgLoweringOpForOpcode("unreach"));
     try std.testing.expectEqual(CfgLoweringOp.none, cfgLoweringOpForOpcode("add"));
+    try std.testing.expect(isAtomicRmwOpcode("atomic_rmw"));
+    try std.testing.expect(!isAtomicRmwOpcode("cmpxchg"));
+    try std.testing.expect(isAssemblyOpcode("assembly"));
+    try std.testing.expect(!isAssemblyOpcode("asm"));
 
     const asm_capability = opcodeCapability("assembly");
     try std.testing.expectEqual(OpcodeStatus.boundary, asm_capability.status);
