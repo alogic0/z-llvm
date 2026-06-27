@@ -107,6 +107,10 @@ pub const TypedFunctionView = struct {
         return typedHasReturnOpcode(self.structured_air_v2);
     }
 
+    pub fn returnOpcodeCount(self: TypedFunctionView) usize {
+        return typedReturnOpcodeCount(self.structured_air_v2);
+    }
+
     pub fn terminalErrorUnionCondBr(self: TypedFunctionView, instruction_index: u32) bool {
         if (!self.hasAnyOpcode(&.{
             "is_non_err",
@@ -533,8 +537,12 @@ pub fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usiz
     return typedOpcodeCount(structured_air_v2, "store") + typedOpcodeCount(structured_air_v2, "store_safe");
 }
 
+pub fn typedReturnOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
+    return typedOpcodeCount(structured_air_v2, "ret") + typedOpcodeCount(structured_air_v2, "ret_safe");
+}
+
 pub fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
-    return typedOpcodeCount(structured_air_v2, "ret") != 0 or typedOpcodeCount(structured_air_v2, "ret_safe") != 0;
+    return typedReturnOpcodeCount(structured_air_v2) != 0;
 }
 
 pub fn plainFieldPointerChild(ty: ir.Type) bool {

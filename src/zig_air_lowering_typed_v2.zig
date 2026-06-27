@@ -890,7 +890,7 @@ pub fn typedV2MaybeErrorRecords(
     {
         return false;
     }
-    const ret_count = typedOpcodeCount(structured_air_v2, "ret") + typedOpcodeCount(structured_air_v2, "ret_safe");
+    const ret_count = air_model.typedReturnOpcodeCount(structured_air_v2);
     return typedOpcodeCount(structured_air_v2, "arg") == 1 and
         typedOpcodeCount(structured_air_v2, "block") == 1 and
         typedOpcodeCount(structured_air_v2, "cmp_neq") == 1 and
@@ -973,7 +973,7 @@ pub fn typedV2OptionalPointerRecords(
     {
         return false;
     }
-    const ret_count = typedOpcodeCount(structured_air_v2, "ret") + typedOpcodeCount(structured_air_v2, "ret_safe");
+    const ret_count = air_model.typedReturnOpcodeCount(structured_air_v2);
     return typedOpcodeCount(structured_air_v2, "arg") == 1 and
         typedOpcodeCount(structured_air_v2, "block") == 1 and
         typedOpcodeCount(structured_air_v2, "is_non_null") == 1 and
