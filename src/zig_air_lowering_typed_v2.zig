@@ -6,8 +6,8 @@ const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
+const sysv_abi = @import("codegen/x86_64/sysv_abi.zig");
 const ir = @import("ir.zig");
-const target_mod = @import("target.zig");
 const legacy = @import("zig_air_lowering_legacy.zig");
 
 const ZigType = air_model.ZigType;
@@ -444,16 +444,9 @@ pub fn aggregateFieldCount(ty: ir.Type) ?usize {
 }
 
 pub fn isSysVRegisterAggregateCandidate(ty: ir.Type) bool {
-    switch (ty) {
-        .aggregate => |text| {
-            const trimmed = std.mem.trim(u8, text, " \t");
-            if (std.mem.startsWith(u8, trimmed, "<{")) return false;
-        },
-        else => return false,
-    }
-    const layout = target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch return false;
-    const size = layout.typeStoreSizeBytes(ty) catch return false;
-    return size > 0 and size <= 16;
+    if (ty != .aggregate) return false;
+    const classification = sysv_abi.classifyAggregate(ty) catch return false;
+    return classification.kind == .register;
 }
 
 pub fn lowerTypedV2SretIntegerAggregateAbi(
