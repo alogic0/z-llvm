@@ -656,6 +656,10 @@ pub fn isTypedNoneOperand(operand: air_export.TypedOperand) bool {
     return std.mem.eql(u8, operand.kind, "none");
 }
 
+pub fn hasKnownTypedText(type_text: []const u8) bool {
+    return !std.mem.eql(u8, type_text, "-");
+}
+
 pub fn isTypedBlockOperand(operand: air_export.TypedOperand) bool {
     return std.mem.eql(u8, operand.kind, "block");
 }
@@ -816,7 +820,7 @@ pub fn typedResultCoverage(
 ) bool {
     if (structured_air_v2.instructions.len != function.instruction_count) return false;
     for (structured_air_v2.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.result_type, "-")) return false;
+        if (!hasKnownTypedText(instruction.result_type)) return false;
     }
     return true;
 }
@@ -824,7 +828,7 @@ pub fn typedResultCoverage(
 pub fn typedOperandCoverage(structured_air_v2: air_export.StructuredAirV2) bool {
     for (structured_air_v2.instructions) |instruction| {
         for (instruction.operands) |operand| {
-            if (std.mem.eql(u8, operand.type_text, "-")) return false;
+            if (!hasKnownTypedText(operand.type_text)) return false;
         }
     }
     return true;
