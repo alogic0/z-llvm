@@ -543,7 +543,7 @@ pub fn isSimpleSelectBlock(function: air_export.Function, block_index: u32) bool
             after_cond = true;
             continue;
         }
-        if (!after_cond or isIgnoredOpcode(instruction.opcode)) continue;
+        if (!after_cond or air_capabilities.isIgnoredOpcode(instruction.opcode)) continue;
         if (std.mem.eql(u8, instruction.opcode, "br")) {
             var fields = splitTopLevel(instruction.payload, ',');
             const target = fields.next() orelse return false;
@@ -575,22 +575,6 @@ pub fn instructionPosition(function: air_export.Function, index: u32) ?usize {
         if (instruction.index == index) return position;
     }
     return null;
-}
-
-pub fn isIgnoredOpcode(opcode: []const u8) bool {
-    return air_capabilities.isIgnoredOpcode(opcode);
-}
-
-pub fn isStraightLineOpcode(opcode: []const u8) bool {
-    return air_capabilities.isStraightLineOpcode(opcode);
-}
-
-pub fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
-    return air_capabilities.isTypedV2LowerableOpcode(opcode);
-}
-
-pub fn isFieldPtrOpcode(opcode: []const u8) bool {
-    return air_capabilities.isFieldPtrOpcode(opcode);
 }
 
 pub fn isPlainFieldPointerChild(ty: ir.Type) bool {
@@ -629,7 +613,7 @@ pub fn genericTypedGepIndex(value: ir.Value) bool {
 }
 
 pub fn typedV2InstructionMissingRequiredDetail(instruction: air_export.TypedInstruction) ?[]const u8 {
-    if (isCallOpcode(instruction.opcode)) {
+    if (air_capabilities.isCallOpcode(instruction.opcode)) {
         if (air_model.detail(instruction, "callee_text") == null) return "missing_callee_text";
         if (air_model.detail(instruction, "call_signature") == null) return "missing_call_signature";
     }
@@ -639,22 +623,6 @@ pub fn typedV2InstructionMissingRequiredDetail(instruction: air_export.TypedInst
         }
     }
     return null;
-}
-
-pub fn isArithmeticOpcode(opcode: []const u8) bool {
-    return air_capabilities.isArithmeticOpcode(opcode);
-}
-
-pub fn isShiftOpcode(opcode: []const u8) bool {
-    return air_capabilities.isShiftOpcode(opcode);
-}
-
-pub fn isCastOpcode(opcode: []const u8) bool {
-    return air_capabilities.isCastOpcode(opcode);
-}
-
-pub fn isCallOpcode(opcode: []const u8) bool {
-    return air_capabilities.isCallOpcode(opcode);
 }
 
 pub fn binaryOp(opcode: []const u8, ty: ZigType) ?ir.BinaryOp {
