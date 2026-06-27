@@ -552,6 +552,14 @@ pub fn isFieldPtrOpcode(opcode: []const u8) bool {
         std.mem.startsWith(u8, opcode, "struct_field_ptr_index_");
 }
 
+pub fn isFieldPtrIndexOpcode(opcode: []const u8, index: usize) bool {
+    const prefix = "struct_field_ptr_index_";
+    if (!std.mem.startsWith(u8, opcode, prefix)) return false;
+    const index_text = opcode[prefix.len..];
+    const parsed = std.fmt.parseInt(usize, index_text, 10) catch return false;
+    return parsed == index;
+}
+
 pub fn isPtrElemPtrOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "ptr_elem_ptr");
 }
@@ -880,6 +888,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(PointerAggregateSemanticOp.runtime_nav_ptr, pointerAggregateSemanticOpForOpcode("runtime_nav_ptr"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.array_elem_val, pointerAggregateSemanticOpForOpcode("array_elem_val"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.field_ptr, pointerAggregateSemanticOpForOpcode("struct_field_ptr"));
+    try std.testing.expect(isFieldPtrIndexOpcode("struct_field_ptr_index_0", 0));
+    try std.testing.expect(isFieldPtrIndexOpcode("struct_field_ptr_index_1", 1));
+    try std.testing.expect(!isFieldPtrIndexOpcode("struct_field_ptr_index_1", 0));
+    try std.testing.expect(!isFieldPtrIndexOpcode("struct_field_ptr", 0));
     try std.testing.expect(isPtrElemPtrOpcode("ptr_elem_ptr"));
     try std.testing.expect(!isPtrElemPtrOpcode("ptr_add"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("call"));

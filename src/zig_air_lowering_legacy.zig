@@ -701,16 +701,16 @@ pub fn arraySumShape(function: air_export.Function) bool {
     var load_count: usize = 0;
     var add_count: usize = 0;
     for (function.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, "aggregate_init")) {
+        if (air_capabilities.isAggregateInitOpcode(instruction.opcode)) {
             aggregate_count += 1;
             if (std.mem.indexOf(u8, instruction.payload, "[3]i32") == null or
                 std.mem.indexOf(u8, instruction.payload, "[%0!, %1!, %2!]") == null)
             {
                 return false;
             }
-        } else if (std.mem.eql(u8, instruction.opcode, "ptr_elem_ptr")) {
+        } else if (air_capabilities.isPtrElemPtrOpcode(instruction.opcode)) {
             elem_ptr_count += 1;
-        } else if (std.mem.eql(u8, instruction.opcode, "load")) {
+        } else if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == .load) {
             load_count += 1;
         } else if (air_capabilities.isAddOpcodeFamily(instruction.opcode)) {
             add_count += 1;
@@ -725,9 +725,9 @@ pub fn structSumShape(function: air_export.Function) bool {
     var i32_loads: usize = 0;
     var adds: usize = 0;
     for (function.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, "struct_field_ptr_index_0")) field_zero = true;
-        if (std.mem.eql(u8, instruction.opcode, "struct_field_ptr_index_1")) field_one = true;
-        if (std.mem.eql(u8, instruction.opcode, "load") and
+        if (air_capabilities.isFieldPtrIndexOpcode(instruction.opcode, 0)) field_zero = true;
+        if (air_capabilities.isFieldPtrIndexOpcode(instruction.opcode, 1)) field_one = true;
+        if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == .load and
             std.mem.startsWith(u8, std.mem.trim(u8, instruction.payload, " "), "i32,"))
         {
             i32_loads += 1;
