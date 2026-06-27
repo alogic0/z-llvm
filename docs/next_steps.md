@@ -155,7 +155,9 @@ Execution order:
    local duplicates. Return-opcode recognition is now capability-registry
    owned and consumed by the AIR model instead of repeated `ret`/`ret_safe`
    string pairs; unreach and CFG opcode recognition (`block`, `br`,
-   `cond_br`) follow the same capability-owned path.
+   `cond_br`) follow the same capability-owned path, and
+   `cfgLoweringOpForOpcode` now consumes those helpers instead of keeping a
+   separate string-dispatch table.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
