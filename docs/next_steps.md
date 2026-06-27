@@ -99,6 +99,8 @@ Execution order:
    `ret`/`ret_safe`, and `unreach`) use the same registry-owned routing. Next
    work: keep moving per-operation validation and value materialization from
    local shape checks into the normalized model and shared capability helpers.
+   Call tail-kind policy and inventory call recognition now also delegate to
+   the shared capability registry instead of local opcode tables.
 2. Normalized typed-AIR slice: `src/zig_air_model.zig` now provides the first
    reusable typed function view over structured-air v1/v2 bodies,
    instructions, and opcode capabilities. The generic typed-CFG block
@@ -111,10 +113,9 @@ Execution order:
    obsolete raw return-body parser helpers removed. The typed lowering context
    now carries the typed view and uses it for block-body lookup, void guard
    checks, return checks, noreturn panic paths, and branch-value extraction.
-   Terminal error-union conditional checks also use the same model. Next work:
-   route error-union/try lowering and optional/pointer lowering through the
-   view. Local typed-opcode scans are moving into `TypedFunctionView` as
-   reusable predicates, and the semantic typed-v2 dispatcher is now split into
+   Terminal error-union conditional checks also use the same model. Local
+   typed-opcode scans are moving into `TypedFunctionView` as reusable
+   predicates, and the semantic typed-v2 dispatcher is now split into
    registry-selected scalar, memory, optional, error-union, and
    pointer/aggregate domains so future model-backed lowering does not grow
    another monolithic opcode chain. Branch-merge body lowering now also uses
@@ -159,8 +160,14 @@ Execution order:
    model-owned. Shared typed value structs and `LowerError` are
    private/model-owned rather than parser-owned compatibility exports. The
    optional/error-union/pointer semantic dispatch now enters through the
-   capability registry; the remaining refactor is deeper normalization of each
-   operation's operand/type validation and lowering inputs.
+   capability registry; error-union type-shape helpers now live in
+   `src/zig_air_types.zig`; typed result/operand coverage checks now live in
+   `src/zig_air_model.zig`; and global initializer/string-literal
+   materialization helpers now live in `src/zig_air_values.zig`. The dead
+   always-null structural-matcher facade has been removed, leaving the accepted
+   release path's `shape_recognizer_functions=0` counter explicit. The
+   remaining refactor is deeper normalization of each operation's operand/type
+   validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
