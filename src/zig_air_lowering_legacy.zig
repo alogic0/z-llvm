@@ -194,11 +194,7 @@ const AirExpectedValue = union(enum) {
 
 fn hasStoreOf(function: air_export.Function, slot: u32, expected: AirExpectedValue) bool {
     for (function.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "store") and
-            !std.mem.eql(u8, instruction.opcode, "store_safe"))
-        {
-            continue;
-        }
+        if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) != .store) continue;
         var fields = splitTopLevel(instruction.payload, ',');
         if (parseInstructionRef(fields.next() orelse continue) != slot) continue;
         const value_text = fields.next() orelse continue;
@@ -229,7 +225,7 @@ fn findCompareAgainstArg(function: air_export.Function, slot: u32, arg: u32) ?u3
 
 fn condBrUses(function: air_export.Function, value: u32) bool {
     for (function.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "cond_br")) continue;
+        if (!air_capabilities.isCondBrOpcode(instruction.opcode)) continue;
         var fields = splitTopLevel(instruction.payload, ',');
         return parseInstructionRef(fields.next() orelse return false) == value;
     }
@@ -316,11 +312,7 @@ fn findBinaryUsingConstant(function: air_export.Function, opcode: []const u8, lh
 
 fn returnUses(function: air_export.Function, value: u32) bool {
     for (function.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "ret") and
-            !std.mem.eql(u8, instruction.opcode, "ret_safe"))
-        {
-            continue;
-        }
+        if (!air_capabilities.isReturnOpcode(instruction.opcode)) continue;
         return parseInstructionRef(instruction.payload) == value;
     }
     return false;
@@ -456,16 +448,15 @@ pub fn isIntegerSwitchBlock(function: air_export.Function) bool {
     for (function.instructions) |instruction| {
         if (isIgnoredOpcode(instruction.opcode) or
             std.mem.eql(u8, instruction.opcode, "arg") or
-            std.mem.eql(u8, instruction.opcode, "ret") or
-            std.mem.eql(u8, instruction.opcode, "ret_safe"))
+            air_capabilities.isReturnOpcode(instruction.opcode))
         {
             continue;
         }
-        if (std.mem.eql(u8, instruction.opcode, "block")) {
+        if (air_capabilities.isBlockOpcode(instruction.opcode)) {
             block_count += 1;
-        } else if (std.mem.eql(u8, instruction.opcode, "switch_br")) {
+        } else if (air_capabilities.isSwitchBrOpcode(instruction.opcode)) {
             switch_count += 1;
-        } else if (std.mem.eql(u8, instruction.opcode, "br")) {
+        } else if (air_capabilities.isBrOpcode(instruction.opcode)) {
             branch_count += 1;
         } else {
             return false;

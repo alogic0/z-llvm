@@ -492,6 +492,10 @@ pub fn isCondBrOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "cond_br");
 }
 
+pub fn isSwitchBrOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "switch_br");
+}
+
 pub fn isAtomicRmwOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "atomic_rmw");
 }
@@ -777,6 +781,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(isBrOpcode("br"));
     try std.testing.expect(isCondBrOpcode("cond_br"));
     try std.testing.expect(!isCondBrOpcode("br"));
+    try std.testing.expect(isSwitchBrOpcode("switch_br"));
+    try std.testing.expect(!isSwitchBrOpcode("cond_br"));
     try std.testing.expect(isStraightLineOpcode("assembly"));
     try std.testing.expect(isInventoryKnownOpcode("assembly"));
     try std.testing.expect(!isTypedV2LowerableOpcode("assembly"));
