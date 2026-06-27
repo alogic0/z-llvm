@@ -504,6 +504,10 @@ pub fn isAggregateInitOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "aggregate_init");
 }
 
+pub fn isRetPtrOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "ret_ptr");
+}
+
 pub fn isBitcastOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "bitcast");
 }
@@ -843,6 +847,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(!isAssemblyOpcode("asm"));
     try std.testing.expect(isAggregateInitOpcode("aggregate_init"));
     try std.testing.expect(!isAggregateInitOpcode("aggregate"));
+    try std.testing.expect(isRetPtrOpcode("ret_ptr"));
+    try std.testing.expect(!isRetPtrOpcode("ret"));
     try std.testing.expect(isBitcastOpcode("bitcast"));
     try std.testing.expect(!isBitcastOpcode("intcast"));
 

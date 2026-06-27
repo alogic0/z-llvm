@@ -607,7 +607,7 @@ pub fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool 
 
 pub fn typedRetPtrIndex(structured_air_v2: air_export.StructuredAirV2) ?u32 {
     for (structured_air_v2.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, "ret_ptr")) return instruction.index;
+        if (air_capabilities.isRetPtrOpcode(instruction.opcode)) return instruction.index;
     }
     return null;
 }
@@ -726,7 +726,7 @@ pub fn typedAggregatePointerPath(
     path: *[4]usize,
 ) ?usize {
     const typed_instruction = instructionByIndex(structured_air_v2, instruction_index) orelse return null;
-    if (typed_instruction.index == ret_ptr_index and std.mem.eql(u8, typed_instruction.opcode, "ret_ptr")) return 0;
+    if (typed_instruction.index == ret_ptr_index and air_capabilities.isRetPtrOpcode(typed_instruction.opcode)) return 0;
     if (std.mem.eql(u8, typed_instruction.data_kind, "field_ptr")) {
         if (typed_instruction.operands.len != 1 or !std.mem.eql(u8, typed_instruction.operands[0].kind, "inst")) return null;
         const base_index = std.fmt.parseInt(u32, typed_instruction.operands[0].value, 10) catch return null;
