@@ -153,7 +153,10 @@ Execution order:
    predicates have also moved to the model, so the parser is no longer the
    owner for CFG-shape decisions. The remaining planned extraction points are
    the actual Zig type/value/reference parsers before the lowerers can consume
-   one normalized typed-AIR model end to end.
+   one normalized typed-AIR model end to end. AIR opcode-to-IR semantic mapping
+   for scalar binary ops, integer/FP predicates, casts, and scalar type helpers
+   now lives in `src/zig_air_semantics.zig`, so the parser no longer owns those
+   lowering decisions either.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
