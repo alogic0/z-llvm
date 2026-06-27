@@ -166,6 +166,9 @@ Execution order:
    materialization helpers now live in `src/zig_air_values.zig`. The dead
    always-null structural-matcher facade has been removed, leaving the accepted
    release path's `shape_recognizer_functions=0` counter explicit. The
+   root-source function ownership predicate now lives in `src/zig_air_roots.zig`
+   so gate helpers do not import the full lowering module just to count root
+   functions. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
