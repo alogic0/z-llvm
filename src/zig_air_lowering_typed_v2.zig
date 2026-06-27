@@ -1348,12 +1348,9 @@ pub fn typedConstantOperandValueText(
     structured_air_v2: air_export.StructuredAirV2,
     opcode: []const u8,
 ) ?[]const u8 {
-    for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
-        const text = typedOperandTextDetail(instruction, 1) orelse return null;
-        return typedAngleConstantValue(text);
-    }
-    return null;
+    const instruction = typedSingleInstructionByOpcode(structured_air_v2, opcode) orelse return null;
+    const text = typedOperandTextDetail(instruction, 1) orelse return null;
+    return typedAngleConstantValue(text);
 }
 
 pub fn typedAngleConstantValue(text: []const u8) ?[]const u8 {
