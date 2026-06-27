@@ -577,14 +577,6 @@ pub fn instructionPosition(function: air_export.Function, index: u32) ?usize {
     return null;
 }
 
-pub fn typedInstructionByIndex(structured_air_v2: air_export.StructuredAirV2, index: u32) ?air_export.TypedInstruction {
-    return air_model.instructionByIndex(structured_air_v2, index);
-}
-
-pub fn typedSingleInstructionByOpcode(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) ?air_export.TypedInstruction {
-    return air_model.singleInstructionByOpcode(structured_air_v2, opcode);
-}
-
 pub fn isIgnoredOpcode(opcode: []const u8) bool {
     return air_capabilities.isIgnoredOpcode(opcode);
 }

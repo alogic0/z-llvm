@@ -134,7 +134,8 @@ Execution order:
    instruction details, operand text, and callees have been removed; parser
    validation calls the model helpers directly. Typed instruction index/opcode
    lookup is also now model-owned, with typed-v2 helpers reading through
-   `src/zig_air_model.zig`.
+   `src/zig_air_model.zig`; the obsolete parser lookup wrappers have been
+   removed.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
