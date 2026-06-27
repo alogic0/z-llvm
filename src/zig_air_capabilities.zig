@@ -318,7 +318,7 @@ pub fn errorUnionSemanticOpForOpcode(opcode: []const u8) ErrorUnionSemanticOp {
 
 pub fn pointerAggregateSemanticOpForOpcode(opcode: []const u8) PointerAggregateSemanticOp {
     if (std.mem.eql(u8, opcode, "slice")) return .slice;
-    if (std.mem.eql(u8, opcode, "ptr_add") or std.mem.eql(u8, opcode, "ptr_elem_ptr")) return .ptr_gep;
+    if (std.mem.eql(u8, opcode, "ptr_add") or isPtrElemPtrOpcode(opcode)) return .ptr_gep;
     if (std.mem.eql(u8, opcode, "runtime_nav_ptr")) return .runtime_nav_ptr;
     if (std.mem.eql(u8, opcode, "array_elem_val")) return .array_elem_val;
     if (isFieldPtrOpcode(opcode)) return .field_ptr;
@@ -522,6 +522,10 @@ pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
 pub fn isFieldPtrOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "struct_field_ptr") or
         std.mem.startsWith(u8, opcode, "struct_field_ptr_index_");
+}
+
+pub fn isPtrElemPtrOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "ptr_elem_ptr");
 }
 
 pub fn isShiftOpcode(opcode: []const u8) bool {
@@ -833,6 +837,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(PointerAggregateSemanticOp.runtime_nav_ptr, pointerAggregateSemanticOpForOpcode("runtime_nav_ptr"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.array_elem_val, pointerAggregateSemanticOpForOpcode("array_elem_val"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.field_ptr, pointerAggregateSemanticOpForOpcode("struct_field_ptr"));
+    try std.testing.expect(isPtrElemPtrOpcode("ptr_elem_ptr"));
+    try std.testing.expect(!isPtrElemPtrOpcode("ptr_add"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("call"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("block"));
     try std.testing.expectEqual(CfgLoweringOp.block, cfgLoweringOpForOpcode("block"));

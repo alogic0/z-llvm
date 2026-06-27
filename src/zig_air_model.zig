@@ -445,6 +445,12 @@ pub fn fieldIndex(instruction: air_export.TypedInstruction) ?i128 {
     return std.fmt.parseInt(i128, field_index_text, 10) catch null;
 }
 
+pub fn fieldIndexUsize(instruction: air_export.TypedInstruction) ?usize {
+    const index = fieldIndex(instruction) orelse return null;
+    if (index < 0) return null;
+    return @intCast(index);
+}
+
 pub fn arrayElemTableText(instruction: air_export.TypedInstruction) ?[]const u8 {
     return operandTextDetail(instruction, 0);
 }
@@ -664,6 +670,10 @@ pub fn isTypedBlockOperand(operand: air_export.TypedOperand) bool {
     return std.mem.eql(u8, operand.kind, "block");
 }
 
+pub fn isTypedFieldPtrDataKind(data_kind: []const u8) bool {
+    return std.mem.eql(u8, data_kind, "field_ptr");
+}
+
 fn typedBlockOperandTargetText(operand: air_export.TypedOperand) ?[]const u8 {
     if (!isTypedBlockOperand(operand)) return null;
     return if (std.mem.eql(u8, operand.value, "block"))
@@ -727,18 +737,17 @@ pub fn typedAggregatePointerPath(
 ) ?usize {
     const typed_instruction = instructionByIndex(structured_air_v2, instruction_index) orelse return null;
     if (typed_instruction.index == ret_ptr_index and air_capabilities.isRetPtrOpcode(typed_instruction.opcode)) return 0;
-    if (std.mem.eql(u8, typed_instruction.data_kind, "field_ptr")) {
-        if (typed_instruction.operands.len != 1 or !std.mem.eql(u8, typed_instruction.operands[0].kind, "inst")) return null;
-        const base_index = std.fmt.parseInt(u32, typed_instruction.operands[0].value, 10) catch return null;
+    if (isTypedFieldPtrDataKind(typed_instruction.data_kind)) {
+        if (typed_instruction.operands.len != 1) return null;
+        const base_index = typedInstOperandIndex(typed_instruction.operands[0]) orelse return null;
         const len = typedAggregatePointerPath(structured_air_v2, base_index, ret_ptr_index, path) orelse return null;
         if (len >= path.len) return null;
-        const field_index_text = detail(typed_instruction, "field_index") orelse return null;
-        path[len] = std.fmt.parseInt(usize, field_index_text, 10) catch return null;
+        path[len] = fieldIndexUsize(typed_instruction) orelse return null;
         return len + 1;
     }
-    if (std.mem.eql(u8, typed_instruction.opcode, "ptr_elem_ptr")) {
-        if (typed_instruction.operands.len != 2 or !std.mem.eql(u8, typed_instruction.operands[0].kind, "inst")) return null;
-        const base_index = std.fmt.parseInt(u32, typed_instruction.operands[0].value, 10) catch return null;
+    if (air_capabilities.isPtrElemPtrOpcode(typed_instruction.opcode)) {
+        if (typed_instruction.operands.len != 2) return null;
+        const base_index = typedInstOperandIndex(typed_instruction.operands[0]) orelse return null;
         const len = typedAggregatePointerPath(structured_air_v2, base_index, ret_ptr_index, path) orelse return null;
         if (len >= path.len) return null;
         path[len] = typedConstUsizeOperand(typed_instruction, 1) orelse return null;
