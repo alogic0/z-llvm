@@ -117,6 +117,16 @@ pub const OptionalSemanticOp = enum {
     optional_payload,
 };
 
+pub const ErrorUnionSemanticOp = enum {
+    none,
+    is_non_err,
+    wrap_payload,
+    wrap_err,
+    unwrap_payload,
+    unwrap_err,
+    try_op,
+};
+
 pub const UnknownOpcodeCategory = enum(u8) {
     debug_metadata,
     error_union_try,
@@ -272,6 +282,16 @@ pub fn optionalSemanticOpForOpcode(opcode: []const u8) OptionalSemanticOp {
     if (std.mem.eql(u8, opcode, "is_non_null")) return .is_non_null;
     if (std.mem.eql(u8, opcode, "wrap_optional")) return .wrap_optional;
     if (std.mem.eql(u8, opcode, "optional_payload")) return .optional_payload;
+    return .none;
+}
+
+pub fn errorUnionSemanticOpForOpcode(opcode: []const u8) ErrorUnionSemanticOp {
+    if (std.mem.eql(u8, opcode, "is_non_err")) return .is_non_err;
+    if (std.mem.eql(u8, opcode, "wrap_errunion_payload")) return .wrap_payload;
+    if (std.mem.eql(u8, opcode, "wrap_errunion_err")) return .wrap_err;
+    if (std.mem.eql(u8, opcode, "unwrap_errunion_payload")) return .unwrap_payload;
+    if (std.mem.eql(u8, opcode, "unwrap_errunion_err")) return .unwrap_err;
+    if (std.mem.eql(u8, opcode, "try")) return .try_op;
     return .none;
 }
 
@@ -733,6 +753,12 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(OptionalSemanticOp.wrap_optional, optionalSemanticOpForOpcode("wrap_optional"));
     try std.testing.expectEqual(OptionalSemanticOp.optional_payload, optionalSemanticOpForOpcode("optional_payload"));
     try std.testing.expectEqual(SemanticDomain.error_union, semanticDomainForOpcode("try"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.is_non_err, errorUnionSemanticOpForOpcode("is_non_err"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.wrap_payload, errorUnionSemanticOpForOpcode("wrap_errunion_payload"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.wrap_err, errorUnionSemanticOpForOpcode("wrap_errunion_err"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.unwrap_payload, errorUnionSemanticOpForOpcode("unwrap_errunion_payload"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.unwrap_err, errorUnionSemanticOpForOpcode("unwrap_errunion_err"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.try_op, errorUnionSemanticOpForOpcode("try"));
     try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("call"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("block"));

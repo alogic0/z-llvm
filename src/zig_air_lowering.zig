@@ -1019,20 +1019,14 @@ const LoweringContext = struct {
         self: *LoweringContext,
         instruction: air_export.TypedInstruction,
     ) !bool {
-        if (std.mem.eql(u8, instruction.opcode, "is_non_err")) {
-            try self.lowerTypedIsNonErr(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "wrap_errunion_payload")) {
-            try self.lowerTypedWrapErrorUnionPayload(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "wrap_errunion_err")) {
-            try self.lowerTypedWrapErrorUnionErr(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "unwrap_errunion_payload")) {
-            try self.lowerTypedUnwrapErrorUnionPayload(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "unwrap_errunion_err")) {
-            try self.lowerTypedUnwrapErrorUnionErr(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "try")) {
-            try self.lowerTypedTry(instruction);
-        } else {
-            return false;
+        switch (air_capabilities.errorUnionSemanticOpForOpcode(instruction.opcode)) {
+            .is_non_err => try self.lowerTypedIsNonErr(instruction),
+            .wrap_payload => try self.lowerTypedWrapErrorUnionPayload(instruction),
+            .wrap_err => try self.lowerTypedWrapErrorUnionErr(instruction),
+            .unwrap_payload => try self.lowerTypedUnwrapErrorUnionPayload(instruction),
+            .unwrap_err => try self.lowerTypedUnwrapErrorUnionErr(instruction),
+            .try_op => try self.lowerTypedTry(instruction),
+            .none => return false,
         }
         return true;
     }
