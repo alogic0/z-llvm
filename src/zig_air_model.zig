@@ -40,6 +40,8 @@ pub const TypedBranchMergeResult = struct {
     predecessor_label: []const u8,
 };
 
+pub const LowerError = std.mem.Allocator.Error || error{UnsupportedAir};
+
 pub const TypedFunctionView = struct {
     function: air_export.Function,
     structured_air: air_export.StructuredAir,

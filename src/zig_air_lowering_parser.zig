@@ -9,7 +9,7 @@ pub const FunctionType = air_model.FunctionType;
 pub const TypedValue = air_model.TypedValue;
 pub const TypedBranchMergeResult = air_model.TypedBranchMergeResult;
 
-pub const LowerError = std.mem.Allocator.Error || error{UnsupportedAir};
+pub const LowerError = air_model.LowerError;
 
 pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
     const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
