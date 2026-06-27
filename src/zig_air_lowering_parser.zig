@@ -647,13 +647,6 @@ pub fn pointerChildText(text: []const u8) ?[]const u8 {
     return std.mem.trim(u8, child, " ");
 }
 
-pub fn ownPrint(module: *ir.Module, comptime format: []const u8, args: anytype) ![]const u8 {
-    const owned = try std.fmt.allocPrint(module.allocator, format, args);
-    errdefer module.allocator.free(owned);
-    try module.owned_strings.append(module.allocator, owned);
-    return owned;
-}
-
 test "parse qualified Zig function types" {
     const parsed = try parseFunctionType(std.testing.allocator, "noinline fn (i32, i32, i32, i32, i32, i32, i32) i32");
     defer parsed.deinit(std.testing.allocator);

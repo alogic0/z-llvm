@@ -395,6 +395,13 @@ pub fn instructionRecordPosition(function: air_export.Function, index: u32) ?usi
     return null;
 }
 
+pub fn ownPrint(module: *ir.Module, comptime format: []const u8, args: anytype) ![]const u8 {
+    const owned = try std.fmt.allocPrint(module.allocator, format, args);
+    errdefer module.allocator.free(owned);
+    try module.owned_strings.append(module.allocator, owned);
+    return owned;
+}
+
 pub fn detail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
     for (instruction.details) |entry| {
         if (std.mem.eql(u8, entry.key, key)) return entry.value;
