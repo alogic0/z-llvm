@@ -127,6 +127,15 @@ pub const ErrorUnionSemanticOp = enum {
     try_op,
 };
 
+pub const PointerAggregateSemanticOp = enum {
+    none,
+    slice,
+    ptr_gep,
+    runtime_nav_ptr,
+    array_elem_val,
+    field_ptr,
+};
+
 pub const UnknownOpcodeCategory = enum(u8) {
     debug_metadata,
     error_union_try,
@@ -292,6 +301,15 @@ pub fn errorUnionSemanticOpForOpcode(opcode: []const u8) ErrorUnionSemanticOp {
     if (std.mem.eql(u8, opcode, "unwrap_errunion_payload")) return .unwrap_payload;
     if (std.mem.eql(u8, opcode, "unwrap_errunion_err")) return .unwrap_err;
     if (std.mem.eql(u8, opcode, "try")) return .try_op;
+    return .none;
+}
+
+pub fn pointerAggregateSemanticOpForOpcode(opcode: []const u8) PointerAggregateSemanticOp {
+    if (std.mem.eql(u8, opcode, "slice")) return .slice;
+    if (std.mem.eql(u8, opcode, "ptr_add") or std.mem.eql(u8, opcode, "ptr_elem_ptr")) return .ptr_gep;
+    if (std.mem.eql(u8, opcode, "runtime_nav_ptr")) return .runtime_nav_ptr;
+    if (std.mem.eql(u8, opcode, "array_elem_val")) return .array_elem_val;
+    if (isFieldPtrOpcode(opcode)) return .field_ptr;
     return .none;
 }
 
@@ -760,6 +778,12 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ErrorUnionSemanticOp.unwrap_err, errorUnionSemanticOpForOpcode("unwrap_errunion_err"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.try_op, errorUnionSemanticOpForOpcode("try"));
     try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));
+    try std.testing.expectEqual(PointerAggregateSemanticOp.slice, pointerAggregateSemanticOpForOpcode("slice"));
+    try std.testing.expectEqual(PointerAggregateSemanticOp.ptr_gep, pointerAggregateSemanticOpForOpcode("ptr_add"));
+    try std.testing.expectEqual(PointerAggregateSemanticOp.ptr_gep, pointerAggregateSemanticOpForOpcode("ptr_elem_ptr"));
+    try std.testing.expectEqual(PointerAggregateSemanticOp.runtime_nav_ptr, pointerAggregateSemanticOpForOpcode("runtime_nav_ptr"));
+    try std.testing.expectEqual(PointerAggregateSemanticOp.array_elem_val, pointerAggregateSemanticOpForOpcode("array_elem_val"));
+    try std.testing.expectEqual(PointerAggregateSemanticOp.field_ptr, pointerAggregateSemanticOpForOpcode("struct_field_ptr"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("call"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("block"));
 

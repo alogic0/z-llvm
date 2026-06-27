@@ -1035,20 +1035,13 @@ const LoweringContext = struct {
         self: *LoweringContext,
         instruction: air_export.TypedInstruction,
     ) !bool {
-        if (std.mem.eql(u8, instruction.opcode, "slice")) {
-            try self.lowerTypedSlice(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "ptr_add")) {
-            try self.lowerTypedPtrGep(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "ptr_elem_ptr")) {
-            try self.lowerTypedPtrGep(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) {
-            try self.lowerTypedRuntimeNavPtr(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "array_elem_val")) {
-            try self.lowerTypedArrayElemVal(instruction);
-        } else if (isFieldPtrOpcode(instruction.opcode)) {
-            try self.lowerTypedFieldPtr(instruction);
-        } else {
-            return false;
+        switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
+            .slice => try self.lowerTypedSlice(instruction),
+            .ptr_gep => try self.lowerTypedPtrGep(instruction),
+            .runtime_nav_ptr => try self.lowerTypedRuntimeNavPtr(instruction),
+            .array_elem_val => try self.lowerTypedArrayElemVal(instruction),
+            .field_ptr => try self.lowerTypedFieldPtr(instruction),
+            .none => return false,
         }
         return true;
     }
