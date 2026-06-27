@@ -660,30 +660,7 @@ fn isStraightLineLowerableOpcode(opcode: []const u8) bool {
 }
 
 fn isCommonLowerableOpcode(opcode: []const u8) bool {
-    return std.mem.eql(u8, opcode, "arg") or
-        isArithmeticOpcode(opcode) or
-        std.mem.eql(u8, opcode, "add_with_overflow") or
-        std.mem.startsWith(u8, opcode, "cmp_") or
-        isCastOpcode(opcode) or
-        std.mem.eql(u8, opcode, "alloc") or
-        std.mem.eql(u8, opcode, "load") or
-        std.mem.eql(u8, opcode, "store") or
-        std.mem.eql(u8, opcode, "store_safe") or
-        std.mem.eql(u8, opcode, "is_non_null") or
-        std.mem.eql(u8, opcode, "is_non_err") or
-        std.mem.eql(u8, opcode, "wrap_optional") or
-        std.mem.eql(u8, opcode, "optional_payload") or
-        std.mem.eql(u8, opcode, "wrap_errunion_payload") or
-        std.mem.eql(u8, opcode, "wrap_errunion_err") or
-        std.mem.eql(u8, opcode, "unwrap_errunion_payload") or
-        std.mem.eql(u8, opcode, "unwrap_errunion_err") or
-        std.mem.eql(u8, opcode, "try") or
-        std.mem.eql(u8, opcode, "slice") or
-        std.mem.eql(u8, opcode, "ptr_add") or
-        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
-        std.mem.eql(u8, opcode, "array_elem_val") or
-        std.mem.eql(u8, opcode, "runtime_nav_ptr") or
-        isFieldPtrOpcode(opcode) or
+    return semanticDomainFromOperationIds(opcode) != .none or
         isCallOpcode(opcode) or
         isReturnOpcode(opcode) or
         isUnreachOpcode(opcode);
