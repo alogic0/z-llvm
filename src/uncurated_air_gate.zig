@@ -575,15 +575,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
     if (options.abi_boundary_expectations) {
         const expected_boundary = abi_boundaries.expectedFrontierBoundarySummary();
         const boundary_local_fail: usize = if (options.corpus == .frontier_boundaries and
-            source_rows == expected_boundary.source_rows and
-            discovered_functions == expected_boundary.discovered_functions and
-            boundary_counts.varargs_rows == expected_boundary.counts.varargs_rows and
-            boundary_counts.vector_rows == expected_boundary.counts.vector_rows and
-            boundary_counts.x87_rows == expected_boundary.counts.x87_rows and
-            boundary_counts.packed_aggregate_rows == expected_boundary.counts.packed_aggregate_rows and
-            boundary_counts.tail_call_rows == expected_boundary.counts.tail_call_rows and
-            boundary_counts.callconv_rows == expected_boundary.counts.callconv_rows and
-            boundary_counts.stack_pressure_rows == expected_boundary.counts.stack_pressure_rows and
+            expected_boundary.matches(source_rows, discovered_functions, boundary_counts) and
             unexpected_accept_rows == 0 and
             wrong_diagnostic_rows == 0)
             0

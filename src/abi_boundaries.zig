@@ -67,12 +67,33 @@ pub const Counts = struct {
             .stack_pressure => self.stack_pressure_rows += amount,
         }
     }
+
+    pub fn eql(self: Counts, other: Counts) bool {
+        return self.varargs_rows == other.varargs_rows and
+            self.vector_rows == other.vector_rows and
+            self.x87_rows == other.x87_rows and
+            self.packed_aggregate_rows == other.packed_aggregate_rows and
+            self.tail_call_rows == other.tail_call_rows and
+            self.callconv_rows == other.callconv_rows and
+            self.stack_pressure_rows == other.stack_pressure_rows;
+    }
 };
 
 pub const ExpectedSummary = struct {
     source_rows: usize,
     discovered_functions: usize,
     counts: Counts,
+
+    pub fn matches(
+        self: ExpectedSummary,
+        source_rows: usize,
+        discovered_functions: usize,
+        counts: Counts,
+    ) bool {
+        return self.source_rows == source_rows and
+            self.discovered_functions == discovered_functions and
+            self.counts.eql(counts);
+    }
 };
 
 pub fn expectedFrontierBoundarySummary() ExpectedSummary {
@@ -186,6 +207,11 @@ test "frontier ABI boundary counts update by category" {
     try std.testing.expectEqual(@as(usize, 1), counts.callconv_rows);
     try std.testing.expectEqual(@as(usize, 3), counts.stack_pressure_rows);
     try std.testing.expectEqual(@as(usize, 0), counts.vector_rows);
+    try std.testing.expect(counts.eql(.{
+        .varargs_rows = 2,
+        .callconv_rows = 1,
+        .stack_pressure_rows = 3,
+    }));
 }
 
 test "frontier ABI boundary expected summary is registry-owned" {
@@ -194,6 +220,8 @@ test "frontier ABI boundary expected summary is registry-owned" {
     try std.testing.expectEqual(@as(usize, 10), expected.discovered_functions);
     try std.testing.expectEqual(@as(usize, 2), expected.counts.varargs_rows);
     try std.testing.expectEqual(@as(usize, 1), expected.counts.tail_call_rows);
+    try std.testing.expect(expected.matches(6, 10, expected.counts));
+    try std.testing.expect(!expected.matches(6, 9, expected.counts));
 }
 
 test "frontier ABI boundary source row counts are explicit" {
