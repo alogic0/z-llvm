@@ -188,7 +188,10 @@ Execution order:
    in the model as well, so `resolveTypedOperand` no longer parses operand
    kind strings directly. Typed call detail extraction (`call_signature`,
    `callee_text`, parsed direct/extern callee, and callee name) now returns a
-   model-owned call-detail object consumed by call lowering. The
+   model-owned call-detail object consumed by call lowering. The legacy
+   non-typed AIR lowering loop now also enters through registry semantic
+   operation IDs for its accepted scalar, memory, and pointer/aggregate subset
+   instead of carrying a second opcode dispatch chain. The
    Zig type/function signature parsing and pointer-child text now live in
    `src/zig_air_types.zig`; AIR constants and symbol pointers live in
    `src/zig_air_values.zig`; instruction-reference parsing and balanced text
