@@ -154,7 +154,7 @@ Execution order:
    compatibility path now uses the same model-owned count helpers rather than
    local duplicates. Return-opcode recognition is now capability-registry
    owned and consumed by the AIR model instead of repeated `ret`/`ret_safe`
-   string pairs.
+   string pairs; unreach recognition follows the same capability-owned path.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
