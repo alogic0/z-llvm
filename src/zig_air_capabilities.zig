@@ -514,6 +514,13 @@ pub fn isCallOpcode(opcode: []const u8) bool {
     return air_export.categoryForOpcode(opcode) == .call;
 }
 
+pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, opcode, "call_always_tail")) return "tail";
+    if (std.mem.eql(u8, opcode, "call_never_tail")) return "notail";
+    if (std.mem.eql(u8, opcode, "call_never_inline")) return "neverinline";
+    return null;
+}
+
 pub fn isFieldPtrOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "struct_field_ptr") or
         std.mem.startsWith(u8, opcode, "struct_field_ptr_index_");
@@ -812,6 +819,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     const call_capability = opcodeCapability("call");
     try std.testing.expectEqual(CapabilityOwner.abi_planner, call_capability.owner);
     try std.testing.expectEqual(LowererKind.call_abi, call_capability.lowerer);
+    try std.testing.expectEqualStrings("tail", callTailKindForOpcode("call_always_tail").?);
+    try std.testing.expectEqualStrings("notail", callTailKindForOpcode("call_never_tail").?);
+    try std.testing.expectEqualStrings("neverinline", callTailKindForOpcode("call_never_inline").?);
+    try std.testing.expect(callTailKindForOpcode("call") == null);
     try std.testing.expectEqual(SemanticDomain.scalar, semanticDomainForOpcode("add"));
     try std.testing.expectEqual(ScalarSemanticOp.arg, scalarSemanticOpForOpcode("arg"));
     try std.testing.expectEqual(ScalarSemanticOp.add_with_overflow, scalarSemanticOpForOpcode("add_with_overflow"));

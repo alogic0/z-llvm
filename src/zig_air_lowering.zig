@@ -879,13 +879,6 @@ fn lowerFunctionTypedV2(
     return function;
 }
 
-fn tailKindForCallOpcode(opcode: []const u8) ?[]const u8 {
-    if (std.mem.eql(u8, opcode, "call_always_tail")) return "tail";
-    if (std.mem.eql(u8, opcode, "call_never_tail")) return "notail";
-    if (std.mem.eql(u8, opcode, "call_never_inline")) return "neverinline";
-    return null;
-}
-
 fn isErrorUnionTypeText(text: []const u8) bool {
     const trimmed = std.mem.trim(u8, text, " ");
     return std.mem.startsWith(u8, trimmed, "error{") and std.mem.indexOf(u8, trimmed, "}!") != null;
@@ -2097,7 +2090,7 @@ const LoweringContext = struct {
             .callee = if (is_default_panic) "debug.defaultPanic" else callee,
             .callee_value = callee_value,
             .calling_conv = irCallingConvention(call_type),
-            .tail_kind = tailKindForCallOpcode(instruction.opcode),
+            .tail_kind = air_capabilities.callTailKindForOpcode(instruction.opcode),
             .args = .empty,
         };
         errdefer call.deinit(self.allocator);
