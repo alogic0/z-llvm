@@ -968,18 +968,13 @@ const LoweringContext = struct {
         self: *LoweringContext,
         instruction: air_export.TypedInstruction,
     ) !bool {
-        if (std.mem.eql(u8, instruction.opcode, "arg")) {
-            try self.lowerTypedArg(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "add_with_overflow")) {
-            try self.lowerTypedAddWithOverflow(instruction);
-        } else if (isArithmeticOpcode(instruction.opcode)) {
-            try self.lowerTypedBinary(instruction);
-        } else if (std.mem.startsWith(u8, instruction.opcode, "cmp_")) {
-            try self.lowerTypedCompare(instruction);
-        } else if (isCastOpcode(instruction.opcode)) {
-            try self.lowerTypedCast(instruction);
-        } else {
-            return false;
+        switch (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode)) {
+            .arg => try self.lowerTypedArg(instruction),
+            .add_with_overflow => try self.lowerTypedAddWithOverflow(instruction),
+            .binary => try self.lowerTypedBinary(instruction),
+            .compare => try self.lowerTypedCompare(instruction),
+            .cast => try self.lowerTypedCast(instruction),
+            .none => return false,
         }
         return true;
     }

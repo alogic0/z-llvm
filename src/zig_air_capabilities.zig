@@ -110,6 +110,15 @@ pub const SemanticDomain = enum {
     }
 };
 
+pub const ScalarSemanticOp = enum {
+    none,
+    arg,
+    add_with_overflow,
+    binary,
+    compare,
+    cast,
+};
+
 pub const OptionalSemanticOp = enum {
     none,
     is_non_null,
@@ -284,6 +293,15 @@ pub fn semanticDomainForOpcode(opcode: []const u8) SemanticDomain {
     {
         return .pointer_aggregate;
     }
+    return .none;
+}
+
+pub fn scalarSemanticOpForOpcode(opcode: []const u8) ScalarSemanticOp {
+    if (std.mem.eql(u8, opcode, "arg")) return .arg;
+    if (std.mem.eql(u8, opcode, "add_with_overflow")) return .add_with_overflow;
+    if (isArithmeticOpcode(opcode)) return .binary;
+    if (std.mem.startsWith(u8, opcode, "cmp_")) return .compare;
+    if (isCastOpcode(opcode)) return .cast;
     return .none;
 }
 
@@ -765,6 +783,11 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(CapabilityOwner.abi_planner, call_capability.owner);
     try std.testing.expectEqual(LowererKind.call_abi, call_capability.lowerer);
     try std.testing.expectEqual(SemanticDomain.scalar, semanticDomainForOpcode("add"));
+    try std.testing.expectEqual(ScalarSemanticOp.arg, scalarSemanticOpForOpcode("arg"));
+    try std.testing.expectEqual(ScalarSemanticOp.add_with_overflow, scalarSemanticOpForOpcode("add_with_overflow"));
+    try std.testing.expectEqual(ScalarSemanticOp.binary, scalarSemanticOpForOpcode("add"));
+    try std.testing.expectEqual(ScalarSemanticOp.compare, scalarSemanticOpForOpcode("cmp_eq"));
+    try std.testing.expectEqual(ScalarSemanticOp.cast, scalarSemanticOpForOpcode("intcast"));
     try std.testing.expectEqual(SemanticDomain.memory, semanticDomainForOpcode("load"));
     try std.testing.expectEqual(SemanticDomain.optional, semanticDomainForOpcode("optional_payload"));
     try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null"));
