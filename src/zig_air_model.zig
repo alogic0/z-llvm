@@ -24,6 +24,12 @@ pub const FunctionType = struct {
     }
 };
 
+pub fn irCallingConvention(function_type: FunctionType) ?[]const u8 {
+    if (function_type.c_calling_convention) return null;
+    if (function_type.non_default_calling_convention) return "unsupported";
+    return "fastcc";
+}
+
 pub const TypedValue = struct {
     ty: ZigType,
     value: ir.Value,

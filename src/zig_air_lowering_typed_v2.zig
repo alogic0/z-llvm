@@ -25,7 +25,7 @@ const isCallOpcode = air_capabilities.isCallOpcode;
 const ownPrint = air_model.ownPrint;
 const splitTopLevel = air_text.splitTopLevel;
 const parseSymbolPointer = lowering_parser.parseSymbolPointer;
-const irCallingConvention = lowering_parser.irCallingConvention;
+const irCallingConvention = air_model.irCallingConvention;
 
 const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
 const lowerConditionalSlotUpdate = legacy.lowerConditionalSlotUpdate;

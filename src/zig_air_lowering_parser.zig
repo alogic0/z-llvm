@@ -9,12 +9,6 @@ pub const FunctionType = air_model.FunctionType;
 pub const TypedValue = air_model.TypedValue;
 pub const TypedBranchMergeResult = air_model.TypedBranchMergeResult;
 
-pub fn irCallingConvention(function_type: FunctionType) ?[]const u8 {
-    if (function_type.c_calling_convention) return null;
-    if (function_type.non_default_calling_convention) return "unsupported";
-    return "fastcc";
-}
-
 pub const LowerError = std.mem.Allocator.Error || error{UnsupportedAir};
 
 pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
