@@ -354,10 +354,10 @@ pub fn pointerAggregateSemanticOpForOpcode(opcode: []const u8) PointerAggregateS
 }
 
 pub fn cfgLoweringOpForOpcode(opcode: []const u8) CfgLoweringOp {
-    if (std.mem.eql(u8, opcode, "block")) return .block;
-    if (std.mem.eql(u8, opcode, "cond_br")) return .cond_br;
-    if (std.mem.eql(u8, opcode, "ret") or std.mem.eql(u8, opcode, "ret_safe")) return .ret;
-    if (std.mem.eql(u8, opcode, "unreach")) return .unreach;
+    if (isBlockOpcode(opcode)) return .block;
+    if (isCondBrOpcode(opcode)) return .cond_br;
+    if (isReturnOpcode(opcode)) return .ret;
+    if (isUnreachOpcode(opcode)) return .unreach;
     return .none;
 }
 
@@ -515,7 +515,8 @@ pub fn isCallOpcode(opcode: []const u8) bool {
 }
 
 pub fn isReturnOpcode(opcode: []const u8) bool {
-    return air_export.categoryForOpcode(opcode) == .return_op;
+    return std.mem.eql(u8, opcode, "ret") or
+        std.mem.eql(u8, opcode, "ret_safe");
 }
 
 pub fn isUnreachOpcode(opcode: []const u8) bool {
