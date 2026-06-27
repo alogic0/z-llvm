@@ -67,11 +67,7 @@ const parseSymbolPointer = lowering_parser.parseSymbolPointer;
 const parseInstructionRef = lowering_parser.parseInstructionRef;
 const isSimpleSelectBlock = lowering_parser.isSimpleSelectBlock;
 const belongsToSimpleSelectBlock = lowering_parser.belongsToSimpleSelectBlock;
-const isTypedVoidGuardBlock = lowering_parser.isTypedVoidGuardBlock;
-const belongsToTypedVoidGuardBlock = lowering_parser.belongsToTypedVoidGuardBlock;
 const instructionPosition = lowering_parser.instructionPosition;
-const isGenericTypedCfgBlock = lowering_parser.isGenericTypedCfgBlock;
-const belongsToGenericTypedCfgBlock = lowering_parser.belongsToGenericTypedCfgBlock;
 const typedBlockTarget = air_model.blockTarget;
 const typedDetail = air_model.detail;
 const typedOperandTextDetail = air_model.operandTextDetail;
@@ -553,16 +549,16 @@ pub fn firstUnsupported(
         if (isIgnoredOpcode(instruction.opcode) or isStraightLineOpcode(instruction.opcode)) continue;
         if (std.mem.eql(u8, instruction.opcode, "block")) {
             if (isSimpleSelectBlock(function, instruction.index)) continue;
-            if (isTypedVoidGuardBlock(function, instruction.index)) continue;
-            if (isGenericTypedCfgBlock(function, instruction.index)) continue;
+            if (typed_view != null and typed_view.?.voidGuardBlockByIndex(instruction.index)) continue;
+            if (typed_view != null and typed_view.?.genericCfgBlock(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         if (std.mem.eql(u8, instruction.opcode, "cond_br") or
             std.mem.eql(u8, instruction.opcode, "br"))
         {
             if (belongsToSimpleSelectBlock(function, instruction.index)) continue;
-            if (belongsToTypedVoidGuardBlock(function, instruction.index)) continue;
-            if (belongsToGenericTypedCfgBlock(function, instruction.index)) continue;
+            if (typed_view != null and typed_view.?.containsVoidGuardBlockInstruction(instruction.index)) continue;
+            if (typed_view != null and typed_view.?.containsGenericCfgBlockInstruction(instruction.index)) continue;
             if (typed_view != null and typed_view.?.terminalErrorUnionCondBr(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }

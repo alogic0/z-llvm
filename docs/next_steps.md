@@ -125,7 +125,8 @@ Execution order:
    lives in the model, with parser wrappers retained for older helper code.
    Typed void-guard and generic CFG block predicates now live on
    `TypedFunctionView`; `src/zig_air_lowering_parser.zig` keeps compatibility
-   wrappers instead of owning those shape checks.
+   wrappers instead of owning those shape checks, and fallback diagnostics in
+   `src/zig_air_lowering.zig` call the model predicates directly.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
