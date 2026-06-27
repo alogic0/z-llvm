@@ -110,6 +110,13 @@ pub const SemanticDomain = enum {
     }
 };
 
+pub const OptionalSemanticOp = enum {
+    none,
+    is_non_null,
+    wrap_optional,
+    optional_payload,
+};
+
 pub const UnknownOpcodeCategory = enum(u8) {
     debug_metadata,
     error_union_try,
@@ -258,6 +265,13 @@ pub fn semanticDomainForOpcode(opcode: []const u8) SemanticDomain {
     {
         return .pointer_aggregate;
     }
+    return .none;
+}
+
+pub fn optionalSemanticOpForOpcode(opcode: []const u8) OptionalSemanticOp {
+    if (std.mem.eql(u8, opcode, "is_non_null")) return .is_non_null;
+    if (std.mem.eql(u8, opcode, "wrap_optional")) return .wrap_optional;
+    if (std.mem.eql(u8, opcode, "optional_payload")) return .optional_payload;
     return .none;
 }
 
@@ -715,6 +729,9 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(SemanticDomain.scalar, semanticDomainForOpcode("add"));
     try std.testing.expectEqual(SemanticDomain.memory, semanticDomainForOpcode("load"));
     try std.testing.expectEqual(SemanticDomain.optional, semanticDomainForOpcode("optional_payload"));
+    try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null"));
+    try std.testing.expectEqual(OptionalSemanticOp.wrap_optional, optionalSemanticOpForOpcode("wrap_optional"));
+    try std.testing.expectEqual(OptionalSemanticOp.optional_payload, optionalSemanticOpForOpcode("optional_payload"));
     try std.testing.expectEqual(SemanticDomain.error_union, semanticDomainForOpcode("try"));
     try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));
     try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("call"));

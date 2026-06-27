@@ -1006,14 +1006,11 @@ const LoweringContext = struct {
         self: *LoweringContext,
         instruction: air_export.TypedInstruction,
     ) !bool {
-        if (std.mem.eql(u8, instruction.opcode, "is_non_null")) {
-            try self.lowerTypedIsNonNull(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "wrap_optional")) {
-            try self.lowerTypedWrapOptional(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "optional_payload")) {
-            try self.lowerTypedOptionalPayload(instruction);
-        } else {
-            return false;
+        switch (air_capabilities.optionalSemanticOpForOpcode(instruction.opcode)) {
+            .is_non_null => try self.lowerTypedIsNonNull(instruction),
+            .wrap_optional => try self.lowerTypedWrapOptional(instruction),
+            .optional_payload => try self.lowerTypedOptionalPayload(instruction),
+            .none => return false,
         }
         return true;
     }
