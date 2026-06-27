@@ -209,7 +209,10 @@ Execution order:
    matchers use shared capability predicates instead of local opcode literals.
    Legacy accumulator-loop and scalar-shape scans now use capability predicates
    for arg/alloc/loop/repeat/branch and exact add/compare families, reducing
-   the compatibility path's remaining local opcode ownership.
+   the compatibility path's remaining local opcode ownership. Array/struct
+   aggregate scans now use shared aggregate/load/field-pointer predicates, and
+   the legacy compatibility module reuses the model-owned opcode query helper
+   instead of carrying its own duplicate implementation.
    The strict frontier gate was re-run after these refactors and still reports
    `generic_cfg_functions=603`, `structural_matcher_functions=0`,
    `legacy_air_text_lowering_functions=0`, and executable proof green across
