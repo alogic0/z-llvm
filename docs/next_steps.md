@@ -186,7 +186,9 @@ Execution order:
    removing another local `kind`/`type_text`/detail parse from lowering.
    Generic typed operand kind checks for `inst`, `const`, and `none` now live
    in the model as well, so `resolveTypedOperand` no longer parses operand
-   kind strings directly. The
+   kind strings directly. Typed call detail extraction (`call_signature`,
+   `callee_text`, parsed direct/extern callee, and callee name) now returns a
+   model-owned call-detail object consumed by call lowering. The
    Zig type/function signature parsing and pointer-child text now live in
    `src/zig_air_types.zig`; AIR constants and symbol pointers live in
    `src/zig_air_values.zig`; instruction-reference parsing and balanced text
