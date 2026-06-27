@@ -192,7 +192,8 @@ Execution order:
    non-typed AIR lowering loop now also enters through registry semantic
    operation IDs for its accepted scalar, memory, and pointer/aggregate subset
    instead of carrying a second opcode dispatch chain. Typed runtime-nav
-   symbol detail extraction is now model-owned as well. The
+   symbol detail extraction and typed field-index parsing are now model-owned
+   as well. The
    Zig type/function signature parsing and pointer-child text now live in
    `src/zig_air_types.zig`; AIR constants and symbol pointers live in
    `src/zig_air_values.zig`; instruction-reference parsing and balanced text
