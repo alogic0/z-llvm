@@ -1488,7 +1488,7 @@ fn isRuntimeSymbol(text: []const u8) bool {
 }
 
 fn isCallOpcode(opcode: []const u8) bool {
-    return contains(opcode, "call");
+    return air_capabilities.isCallOpcode(opcode);
 }
 
 fn maybeOperandCallee(operand: air_export.TypedOperand) ?[]const u8 {
