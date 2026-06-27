@@ -388,6 +388,13 @@ pub fn shortFunctionName(name: []const u8) []const u8 {
     return name;
 }
 
+pub fn instructionRecordPosition(function: air_export.Function, index: u32) ?usize {
+    for (function.instructions, 0..) |instruction, position| {
+        if (instruction.index == index) return position;
+    }
+    return null;
+}
+
 pub fn detail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
     for (instruction.details) |entry| {
         if (std.mem.eql(u8, entry.key, key)) return entry.value;

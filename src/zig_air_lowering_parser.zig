@@ -506,7 +506,7 @@ pub fn parseInstructionRef(text: []const u8) ?u32 {
 }
 
 pub fn isSimpleSelectBlock(function: air_export.Function, block_index: u32) bool {
-    const block_position = instructionPosition(function, block_index) orelse return false;
+    const block_position = air_model.instructionRecordPosition(function, block_index) orelse return false;
     const block_instruction = function.instructions[block_position];
     var cond_count: usize = 0;
     var matching_br_count: usize = 0;
@@ -531,7 +531,7 @@ pub fn isSimpleSelectBlock(function: air_export.Function, block_index: u32) bool
 }
 
 pub fn belongsToSimpleSelectBlock(function: air_export.Function, instruction_index: u32) bool {
-    const position = instructionPosition(function, instruction_index) orelse return false;
+    const position = air_model.instructionRecordPosition(function, instruction_index) orelse return false;
     const instruction = function.instructions[position];
     var parent_position = position;
     while (parent_position > 0) {
@@ -543,13 +543,6 @@ pub fn belongsToSimpleSelectBlock(function: air_export.Function, instruction_ind
         }
     }
     return false;
-}
-
-pub fn instructionPosition(function: air_export.Function, index: u32) ?usize {
-    for (function.instructions, 0..) |instruction, position| {
-        if (instruction.index == index) return position;
-    }
-    return null;
 }
 
 pub fn binaryOp(opcode: []const u8, ty: ZigType) ?ir.BinaryOp {
