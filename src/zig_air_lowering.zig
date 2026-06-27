@@ -4,6 +4,7 @@ const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const sib = @import("structured_ir_builder.zig");
 const target_mod = @import("target.zig");
+const air_capabilities = @import("zig_air_capabilities.zig");
 
 pub const UnsupportedReason = enum {
     function_type,
@@ -101,7 +102,6 @@ const isStraightLineOpcode = lowering_parser.isStraightLineOpcode;
 const isArithmeticOpcode = lowering_parser.isArithmeticOpcode;
 const isShiftOpcode = lowering_parser.isShiftOpcode;
 const isCastOpcode = lowering_parser.isCastOpcode;
-const isTypedV2LowerableOpcode = lowering_parser.isTypedV2LowerableOpcode;
 const isFieldPtrOpcode = lowering_parser.isFieldPtrOpcode;
 const isCallOpcode = lowering_parser.isCallOpcode;
 const isPlainFieldPointerChild = lowering_parser.isPlainFieldPointerChild;
@@ -628,13 +628,14 @@ fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
             .data_kind = "-",
             .reason = "missing_index",
         };
-        if (isIgnoredOpcode(instruction.opcode)) continue;
-        if (!isTypedV2LowerableOpcode(instruction.opcode)) {
+        const capability = air_capabilities.opcodeCapability(instruction.opcode);
+        if (capability.status == .ignored_metadata) continue;
+        if (!air_capabilities.typedV2CanLower(capability)) {
             return .{
                 .function = function.name,
                 .opcode = instruction.opcode,
                 .data_kind = instruction.data_kind,
-                .reason = "unsupported_opcode",
+                .reason = air_capabilities.typedV2FallbackReason(capability),
             };
         }
         if (typedV2InstructionMissingRequiredDetail(instruction)) |detail| {

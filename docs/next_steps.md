@@ -82,10 +82,12 @@ Execution order:
    `unknown`), owning layer (`semantic-lowering`, `cfg-lowering`,
    `abi-planner`, `backend`, etc.), lowerer kind, inventory-known status,
    metadata-ignore status, straight-line lowering eligibility, typed-v2
-   lowering eligibility, and first boundary reason. The first local string
+   lowering eligibility, and first boundary/fallback reason. The first local string
    allowlists were removed from `src/distribution_zig_air_inventory.zig` and
    `src/zig_air_lowering_parser.zig`; generic typed-CFG eligibility now reads
    the registry capability object instead of asking scattered boolean helpers.
+   Typed-v2 fallback diagnostics now also use registry status/boundary reasons
+   instead of reporting a generic local `unsupported_opcode` bucket.
    Next work: extend this registry from opcode capability into data-kind
    ownership and make lowering dispatch select through the registered lowerer
    kind directly.
@@ -95,8 +97,8 @@ Execution order:
    classifier is the first consumer, so future CFG/semantic lowerers can move
    from raw opcode/data-kind string checks toward one function/body/instruction
    model without changing accepted frontier behavior. Next work: route branch
-   bodies, error-union/try lowering, optional/pointer lowering, and typed-v2
-   fallback diagnostics through the same view.
+   bodies, error-union/try lowering, optional/pointer lowering, and the typed-v2
+   fallback scanner through the same view.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.

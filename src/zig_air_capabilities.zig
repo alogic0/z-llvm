@@ -177,6 +177,18 @@ pub fn typedV2CanLower(capability: OpcodeCapability) bool {
     return capability.status == .lowerable and capability.typed_v2_lowerable;
 }
 
+pub fn typedV2FallbackReason(capability: OpcodeCapability) []const u8 {
+    if (typedV2CanLower(capability)) return "lowerable";
+    if (capability.boundary_reason) |reason| return reason;
+    return switch (capability.status) {
+        .unknown => "unknown-opcode",
+        .inventory_only => "inventory-only",
+        .boundary => "boundary",
+        .ignored_metadata => "ignored-metadata",
+        .lowerable => "unsupported-lowerer",
+    };
+}
+
 fn opcodeStatus(
     ignored_metadata: bool,
     typed_v2_lowerable: bool,
@@ -607,6 +619,9 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(OpcodeStatus.boundary, asm_capability.status);
     try std.testing.expectEqual(LowererKind.boundary, asm_capability.lowerer);
     try std.testing.expect(!typedV2CanLower(asm_capability));
+    try std.testing.expectEqualStrings("inline-asm", typedV2FallbackReason(asm_capability));
+    try std.testing.expectEqualStrings("inventory-only", typedV2FallbackReason(opcodeCapability("memcpy")));
+    try std.testing.expectEqualStrings("unknown-opcode", typedV2FallbackReason(opcodeCapability("definitely_unknown_opcode")));
 }
 
 test "type surface capability classifies inventory and ABI boundary surfaces" {
