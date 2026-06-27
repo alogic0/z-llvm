@@ -123,6 +123,9 @@ Execution order:
    operand-text lookup now follow the same model-owned pattern, including the
    legacy operand-key fallback. Typed direct/extern callee parsing now also
    lives in the model, with parser wrappers retained for older helper code.
+   Typed void-guard and generic CFG block predicates now live on
+   `TypedFunctionView`; `src/zig_air_lowering_parser.zig` keeps compatibility
+   wrappers instead of owning those shape checks.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
