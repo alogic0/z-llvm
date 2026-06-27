@@ -248,7 +248,7 @@ fn findLastLoadFromSlot(function: air_export.Function, slot: u32) ?u32 {
 }
 
 fn loadReferencesSlot(instruction: air_export.Instruction, slot: u32) bool {
-    if (!std.mem.eql(u8, instruction.opcode, "load")) return false;
+    if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) != .load) return false;
     var fields = splitTopLevel(instruction.payload, ',');
     _ = fields.next() orelse return false;
     return parseInstructionRef(fields.next() orelse return false) == slot and fields.next() == null;
@@ -327,7 +327,7 @@ fn airInstructionByIndex(function: air_export.Function, index: u32) ?air_export.
 
 pub fn runtimeNavSymbol(function: air_export.Function) ?[]const u8 {
     for (function.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) continue;
+        if (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode) != .runtime_nav_ptr) continue;
         var fields = splitTopLevel(instruction.payload, ',');
         _ = fields.next() orelse return null;
         const symbol_text = std.mem.trim(u8, fields.next() orelse return null, " ");
