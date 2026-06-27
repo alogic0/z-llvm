@@ -64,6 +64,8 @@ const parseFunctionType = air_types.parseFunctionType;
 const functionReturnTypeText = air_types.functionReturnTypeText;
 const parseZigType = air_types.parseZigType;
 const pointerLoadResultType = air_types.pointerLoadResultType;
+const isErrorUnionTypeText = air_types.isErrorUnionTypeText;
+const errorUnionPayloadType = air_types.errorUnionPayloadType;
 const parseConstant = air_values.parseConstant;
 const parseSymbolPointer = air_values.parseSymbolPointer;
 const parseInstructionRef = air_text.instructionRef;
@@ -877,17 +879,6 @@ fn lowerFunctionTypedV2(
     if (block.terminator == null) return error.UnsupportedAir;
     try function.blocks.append(allocator, block);
     return function;
-}
-
-fn isErrorUnionTypeText(text: []const u8) bool {
-    const trimmed = std.mem.trim(u8, text, " ");
-    return std.mem.startsWith(u8, trimmed, "error{") and std.mem.indexOf(u8, trimmed, "}!") != null;
-}
-
-fn errorUnionPayloadType(text: []const u8) ?ZigType {
-    const trimmed = std.mem.trim(u8, text, " ");
-    const marker = std.mem.indexOf(u8, trimmed, "}!") orelse return null;
-    return parseZigType(trimmed[marker + 2 ..]);
 }
 
 const LoweringContext = struct {

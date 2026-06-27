@@ -367,6 +367,17 @@ pub fn pointerLoadResultType(text: []const u8) ?ZigType {
     return parseZigType(child_text);
 }
 
+pub fn isErrorUnionTypeText(text: []const u8) bool {
+    const trimmed = std.mem.trim(u8, text, " ");
+    return std.mem.startsWith(u8, trimmed, "error{") and std.mem.indexOf(u8, trimmed, "}!") != null;
+}
+
+pub fn errorUnionPayloadType(text: []const u8) ?ZigType {
+    const trimmed = std.mem.trim(u8, text, " ");
+    const marker = std.mem.indexOf(u8, trimmed, "}!") orelse return null;
+    return parseZigType(trimmed[marker + 2 ..]);
+}
+
 pub fn parseStaticIntegerType(text: []const u8) ?ZigType {
     return parseZigType(if (std.mem.eql(u8, text, "usize")) "usize" else text);
 }
@@ -419,4 +430,13 @@ test "parse qualified Zig function types" {
 test "parse frontier BigN array-backed byval types generically" {
     const parsed = frontierSysVSretByvalBigType("frontier_sysv_sret_byval.Big240") orelse return error.TestExpectedEqual;
     try std.testing.expectEqualStrings("{ [240 x i64] }", parsed.ir_type.aggregate);
+}
+
+test "classify error union type text and payload type" {
+    try std.testing.expect(isErrorUnionTypeText("error{Bad}!i32"));
+    try std.testing.expect(!isErrorUnionTypeText("error{Bad}"));
+    try std.testing.expect(!isErrorUnionTypeText("i32"));
+
+    const payload = errorUnionPayloadType("error{Bad}!usize") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, payload.ir_type);
 }
