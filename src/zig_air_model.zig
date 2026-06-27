@@ -634,10 +634,14 @@ pub fn typedConstI32Operand(instruction: air_export.TypedInstruction, operand_in
     return std.fmt.parseInt(i32, std.mem.trim(u8, text["<i32, ".len .. text.len - 1], " "), 10) catch null;
 }
 
+pub fn isTypedI32ConstOperand(operand: air_export.TypedOperand) bool {
+    return isTypedConstOperand(operand) and std.mem.eql(u8, operand.type_text, "i32");
+}
+
 pub fn typedVoidConstOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?bool {
     if (operand_index >= instruction.operands.len) return null;
     const operand = instruction.operands[operand_index];
-    if (!std.mem.eql(u8, operand.kind, "const")) return false;
+    if (!isTypedConstOperand(operand)) return false;
     if (!std.mem.eql(u8, operand.type_text, "void")) return false;
     const text = operandTextDetail(instruction, operand_index) orelse return null;
     return std.mem.eql(u8, text, "@.void_value");
@@ -685,8 +689,7 @@ fn typedBlockOperandTargetText(operand: air_export.TypedOperand) ?[]const u8 {
 pub fn typedBranchI32ConstValue(instruction: air_export.TypedInstruction) ?i32 {
     if (!air_capabilities.isBrOpcode(instruction.opcode)) return null;
     if (instruction.operands.len != 2) return null;
-    if (!std.mem.eql(u8, instruction.operands[1].kind, "const") or
-        !std.mem.eql(u8, instruction.operands[1].type_text, "i32")) return null;
+    if (!isTypedI32ConstOperand(instruction.operands[1])) return null;
     return typedConstI32Operand(instruction, 1);
 }
 
