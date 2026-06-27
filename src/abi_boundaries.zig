@@ -57,6 +57,28 @@ pub const Counts = struct {
     }
 };
 
+pub const ExpectedSummary = struct {
+    source_rows: usize,
+    discovered_functions: usize,
+    counts: Counts,
+};
+
+pub fn expectedFrontierBoundarySummary() ExpectedSummary {
+    return .{
+        .source_rows = 6,
+        .discovered_functions = 10,
+        .counts = .{
+            .varargs_rows = 2,
+            .vector_rows = 2,
+            .x87_rows = 2,
+            .packed_aggregate_rows = 2,
+            .tail_call_rows = 1,
+            .callconv_rows = 1,
+            .stack_pressure_rows = 0,
+        },
+    };
+}
+
 pub fn categoryForUnsupported(source: []const u8, diagnostic: air_lowering.Diagnostic) ?Category {
     if (contains(source, "frontier_varargs_boundary.zig") and
         std.mem.eql(u8, diagnostic.opcode, "lowering") and
@@ -151,6 +173,14 @@ test "frontier ABI boundary counts update by category" {
     try std.testing.expectEqual(@as(usize, 1), counts.callconv_rows);
     try std.testing.expectEqual(@as(usize, 3), counts.stack_pressure_rows);
     try std.testing.expectEqual(@as(usize, 0), counts.vector_rows);
+}
+
+test "frontier ABI boundary expected summary is registry-owned" {
+    const expected = expectedFrontierBoundarySummary();
+    try std.testing.expectEqual(@as(usize, 6), expected.source_rows);
+    try std.testing.expectEqual(@as(usize, 10), expected.discovered_functions);
+    try std.testing.expectEqual(@as(usize, 2), expected.counts.varargs_rows);
+    try std.testing.expectEqual(@as(usize, 1), expected.counts.tail_call_rows);
 }
 
 test "frontier ABI boundary source row counts are explicit" {
