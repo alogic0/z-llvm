@@ -439,14 +439,14 @@ pub fn firstUnsupported(
 
     for (function.instructions) |instruction| {
         if (isIgnoredOpcode(instruction.opcode) or isStraightLineOpcode(instruction.opcode)) continue;
-        if (std.mem.eql(u8, instruction.opcode, "block")) {
+        if (air_capabilities.isBlockOpcode(instruction.opcode)) {
             if (isSimpleSelectBlock(function, instruction.index)) continue;
             if (typed_view != null and typed_view.?.voidGuardBlockByIndex(instruction.index)) continue;
             if (typed_view != null and typed_view.?.genericCfgBlock(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
-        if (std.mem.eql(u8, instruction.opcode, "cond_br") or
-            std.mem.eql(u8, instruction.opcode, "br"))
+        if (air_capabilities.isCondBrOpcode(instruction.opcode) or
+            air_capabilities.isBrOpcode(instruction.opcode))
         {
             if (belongsToSimpleSelectBlock(function, instruction.index)) continue;
             if (typed_view != null and typed_view.?.containsVoidGuardBlockInstruction(instruction.index)) continue;
@@ -601,15 +601,13 @@ fn lowerFunction(
             try context.lowerArrayElemVal(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "assembly")) {
             try context.lowerAssembly(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "ret") or
-            std.mem.eql(u8, instruction.opcode, "ret_safe"))
-        {
+        } else if (air_capabilities.isReturnOpcode(instruction.opcode)) {
             try context.lowerReturn(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "unreach")) {
+        } else if (air_capabilities.isUnreachOpcode(instruction.opcode)) {
             block.terminator = .{ .@"unreachable" = {} };
-        } else if (std.mem.eql(u8, instruction.opcode, "block") or
-            std.mem.eql(u8, instruction.opcode, "cond_br") or
-            std.mem.eql(u8, instruction.opcode, "br"))
+        } else if (air_capabilities.isBlockOpcode(instruction.opcode) or
+            air_capabilities.isCondBrOpcode(instruction.opcode) or
+            air_capabilities.isBrOpcode(instruction.opcode))
         {
             continue;
         } else {
