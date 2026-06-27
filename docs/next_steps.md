@@ -148,9 +148,11 @@ Execution order:
    pointers, and instruction refs. Balanced text helpers (`findMatching` and
    top-level comma splitting) now live in `src/zig_air_text.zig`, with parser
    and lowerers consuming the same utility module instead of using the parser
-   as a shared helper bucket. The remaining planned extraction points are the
-   actual Zig type/value/reference parsers before the lowerers can consume one
-   normalized typed-AIR model end to end.
+   as a shared helper bucket. The IR-owned string allocation helper now lives
+   in `src/zig_air_model.zig` as well. The remaining planned extraction points
+   are the actual Zig type/value/reference parsers and the legacy simple-select
+   shape helpers before the lowerers can consume one normalized typed-AIR model
+   end to end.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
