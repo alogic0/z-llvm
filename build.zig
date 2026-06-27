@@ -338,6 +338,14 @@ const UncuratedAirMode = enum {
     ReleaseFast,
     ReleaseSafe,
     ReleaseSmall,
+
+    fn addArg(self: UncuratedAirMode, run_cmd: *std.Build.Step.Run) void {
+        run_cmd.addArg(switch (self) {
+            .ReleaseFast => "--mode=ReleaseFast",
+            .ReleaseSafe => "--mode=ReleaseSafe",
+            .ReleaseSmall => "--mode=ReleaseSmall",
+        });
+    }
 };
 
 const UncuratedAirCorpus = enum {
@@ -346,6 +354,16 @@ const UncuratedAirCorpus = enum {
     scale,
     frontier,
     frontier_boundaries,
+
+    fn addArg(self: UncuratedAirCorpus, run_cmd: *std.Build.Step.Run) void {
+        run_cmd.addArg(switch (self) {
+            .broad => "--corpus=broad",
+            .expanded => "--corpus=expanded",
+            .scale => "--corpus=scale",
+            .frontier => "--corpus=frontier",
+            .frontier_boundaries => "--corpus=frontier-boundaries",
+        });
+    }
 };
 
 const UncuratedAirGateSpec = struct {
@@ -388,25 +406,7 @@ fn addUncuratedAirTripleGate(
 }
 
 fn addUncuratedAirArgs(run_cmd: *std.Build.Step.Run, spec: UncuratedAirGateSpec) void {
-    if (spec.mode) |mode| addUncuratedAirModeArg(run_cmd, mode);
-    if (spec.corpus) |corpus| addUncuratedAirCorpusArg(run_cmd, corpus);
+    if (spec.mode) |mode| mode.addArg(run_cmd);
+    if (spec.corpus) |corpus| corpus.addArg(run_cmd);
     spec.variant.addArgs(run_cmd);
-}
-
-fn addUncuratedAirModeArg(run_cmd: *std.Build.Step.Run, mode: UncuratedAirMode) void {
-    run_cmd.addArg(switch (mode) {
-        .ReleaseFast => "--mode=ReleaseFast",
-        .ReleaseSafe => "--mode=ReleaseSafe",
-        .ReleaseSmall => "--mode=ReleaseSmall",
-    });
-}
-
-fn addUncuratedAirCorpusArg(run_cmd: *std.Build.Step.Run, corpus: UncuratedAirCorpus) void {
-    run_cmd.addArg(switch (corpus) {
-        .broad => "--corpus=broad",
-        .expanded => "--corpus=expanded",
-        .scale => "--corpus=scale",
-        .frontier => "--corpus=frontier",
-        .frontier_boundaries => "--corpus=frontier-boundaries",
-    });
 }
