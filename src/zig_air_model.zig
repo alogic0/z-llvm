@@ -55,6 +55,14 @@ pub const TypedFunctionView = struct {
         };
     }
 
+    pub fn resultCoverage(self: TypedFunctionView) bool {
+        return typedResultCoverage(self.function, self.structured_air_v2);
+    }
+
+    pub fn operandCoverage(self: TypedFunctionView) bool {
+        return typedOperandCoverage(self.structured_air_v2);
+    }
+
     pub fn body(
         self: TypedFunctionView,
         kind: air_export.StructuredBodyKind,
@@ -664,6 +672,26 @@ pub fn blockTarget(operand: air_export.TypedOperand) ?u32 {
     return std.fmt.parseInt(u32, operand.type_text, 10) catch null;
 }
 
+pub fn typedResultCoverage(
+    function: air_export.Function,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (structured_air_v2.instructions.len != function.instruction_count) return false;
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.result_type, "-")) return false;
+    }
+    return true;
+}
+
+pub fn typedOperandCoverage(structured_air_v2: air_export.StructuredAirV2) bool {
+    for (structured_air_v2.instructions) |instruction| {
+        for (instruction.operands) |operand| {
+            if (std.mem.eql(u8, operand.type_text, "-")) return false;
+        }
+    }
+    return true;
+}
+
 pub fn instructionByIndex(
     structured_air_v2: air_export.StructuredAirV2,
     index: u32,
@@ -723,4 +751,72 @@ test "typed AIR model parses direct and extern callees" {
     const external = callee("extern 'debug.defaultPanic'").?;
     try std.testing.expectEqualStrings("debug.defaultPanic", external.name);
     try std.testing.expect(external.external);
+}
+
+test "typed AIR model reports type and operand coverage" {
+    const operand = air_export.TypedOperand{
+        .kind = "ref",
+        .value = "%0",
+        .type_text = "i32",
+    };
+    const instructions = [_]air_export.TypedInstruction{
+        .{
+            .index = 0,
+            .opcode = "arg",
+            .result_type = "i32",
+            .data_kind = "arg",
+            .operands = &.{},
+        },
+        .{
+            .index = 1,
+            .opcode = "ret",
+            .result_type = "void",
+            .data_kind = "un_op",
+            .operands = @constCast(&[_]air_export.TypedOperand{operand}),
+        },
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = @constCast(&instructions) };
+    const function = air_export.Function{
+        .name = "test.main",
+        .type_text = "fn () void",
+        .instruction_count = 2,
+        .main_body_count = 2,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = &.{},
+    };
+    try std.testing.expect(typedResultCoverage(function, structured_air_v2));
+    try std.testing.expect(typedOperandCoverage(structured_air_v2));
+
+    const missing_result_instructions = [_]air_export.TypedInstruction{.{
+        .index = 0,
+        .opcode = "arg",
+        .result_type = "-",
+        .data_kind = "arg",
+        .operands = &.{},
+    }};
+    try std.testing.expect(!typedResultCoverage(
+        function,
+        .{ .instructions = @constCast(&missing_result_instructions) },
+    ));
+
+    const missing_operand = air_export.TypedOperand{
+        .kind = "ref",
+        .value = "%0",
+        .type_text = "-",
+    };
+    const missing_operand_instructions = [_]air_export.TypedInstruction{.{
+        .index = 0,
+        .opcode = "ret",
+        .result_type = "void",
+        .data_kind = "un_op",
+        .operands = @constCast(&[_]air_export.TypedOperand{missing_operand}),
+    }};
+    try std.testing.expect(!typedOperandCoverage(.{
+        .instructions = @constCast(&missing_operand_instructions),
+    }));
 }

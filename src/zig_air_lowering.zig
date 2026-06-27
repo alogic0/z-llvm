@@ -273,8 +273,8 @@ pub fn lowerCompatible(
         if (air_function.structured_air != null) structured_air_v1_functions += 1;
         if (air_function.structured_air_v2) |structured_air_v2| {
             structured_air_v2_functions += 1;
-            if (typedResultCoverage(air_function, structured_air_v2)) typed_air_type_functions += 1;
-            if (typedOperandCoverage(structured_air_v2)) typed_air_operand_functions += 1;
+            if (air_model.typedResultCoverage(air_function, structured_air_v2)) typed_air_type_functions += 1;
+            if (air_model.typedOperandCoverage(structured_air_v2)) typed_air_operand_functions += 1;
         }
         if (!lowered_from_typed_v2) legacy_air_text_lowering_functions += 1;
         switch (loweringPath(air_function)) {
@@ -298,23 +298,6 @@ pub fn lowerCompatible(
         .unsupported = try unsupported.toOwnedSlice(allocator),
         .typed_v2_fallbacks = try typed_v2_fallback_list.toOwnedSlice(allocator),
     };
-}
-
-fn typedResultCoverage(function: air_export.Function, structured_air_v2: air_export.StructuredAirV2) bool {
-    if (structured_air_v2.instructions.len != function.instruction_count) return false;
-    for (structured_air_v2.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.result_type, "-")) return false;
-    }
-    return true;
-}
-
-fn typedOperandCoverage(structured_air_v2: air_export.StructuredAirV2) bool {
-    for (structured_air_v2.instructions) |instruction| {
-        for (instruction.operands) |operand| {
-            if (std.mem.eql(u8, operand.type_text, "-")) return false;
-        }
-    }
-    return true;
 }
 
 pub fn isRootSourceFunction(root_stem: []const u8, function_name: []const u8) bool {
