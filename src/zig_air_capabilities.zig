@@ -271,6 +271,10 @@ pub fn typedV2FallbackReason(capability: OpcodeCapability) []const u8 {
 pub fn semanticDomainForOpcode(opcode: []const u8) SemanticDomain {
     const capability = opcodeCapability(opcode);
     if (capability.lowerer != .typed_v2_semantic) return .none;
+    return semanticDomainFromOperationIds(opcode);
+}
+
+fn semanticDomainFromOperationIds(opcode: []const u8) SemanticDomain {
     if (scalarSemanticOpForOpcode(opcode) != .none) return .scalar;
     if (memorySemanticOpForOpcode(opcode) != .none) return .memory;
     if (optionalSemanticOpForOpcode(opcode) != .none) return .optional;
@@ -370,22 +374,7 @@ fn lowerableOwnerForOpcode(opcode: []const u8, category: air_export.InstructionC
     }
     if (category == .call) return .abi_planner;
     if (std.mem.eql(u8, opcode, "atomic_rmw") or std.mem.eql(u8, opcode, "assembly")) return .backend;
-    if (std.mem.eql(u8, opcode, "add_with_overflow") or
-        std.mem.eql(u8, opcode, "is_non_null") or
-        std.mem.eql(u8, opcode, "is_non_err") or
-        std.mem.eql(u8, opcode, "wrap_optional") or
-        std.mem.eql(u8, opcode, "optional_payload") or
-        std.mem.startsWith(u8, opcode, "wrap_errunion") or
-        std.mem.startsWith(u8, opcode, "unwrap_errunion") or
-        std.mem.eql(u8, opcode, "try") or
-        std.mem.eql(u8, opcode, "slice") or
-        std.mem.eql(u8, opcode, "ptr_add") or
-        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
-        std.mem.eql(u8, opcode, "array_elem_val") or
-        isFieldPtrOpcode(opcode))
-    {
-        return .semantic_lowering;
-    }
+    if (semanticDomainFromOperationIds(opcode) != .none) return .semantic_lowering;
     return .air_parser;
 }
 
