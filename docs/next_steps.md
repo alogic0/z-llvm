@@ -93,8 +93,12 @@ Execution order:
    that object for unknown-opcode reporting. The typed-v2 dispatch now treats
    registry lowerability as the front-door gate and routes accepted
    instructions through `LowererKind` groups before reaching local opcode
-   lowerers. Next work: keep moving the per-domain lowerers from local
-   opcode checks toward model/capability-owned predicates.
+   lowerers. Typed semantic-domain operations are now also selected by
+   registry-owned operation IDs for scalar, memory, optional, error-union, and
+   pointer/aggregate op families; typed CFG operations (`block`, `cond_br`,
+   `ret`/`ret_safe`, and `unreach`) use the same registry-owned routing. Next
+   work: keep moving per-operation validation and value materialization from
+   local shape checks into the normalized model and shared capability helpers.
 2. Normalized typed-AIR slice: `src/zig_air_model.zig` now provides the first
    reusable typed function view over structured-air v1/v2 bodies,
    instructions, and opcode capabilities. The generic typed-CFG block
@@ -154,9 +158,9 @@ Execution order:
    lowering decisions either. Function calling-convention mapping is also
    model-owned. Shared typed value structs and `LowerError` are
    private/model-owned rather than parser-owned compatibility exports. The
-   remaining refactor is no longer parser extraction; it is routing
-   optional/error-union/pointer semantic lowering through the normalized model
-   and capability registry.
+   optional/error-union/pointer semantic dispatch now enters through the
+   capability registry; the remaining refactor is deeper normalization of each
+   operation's operand/type validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
