@@ -98,8 +98,10 @@ Execution order:
    from raw opcode/data-kind string checks toward one function/body/instruction
    model without changing accepted frontier behavior. The typed-v2 fallback
    scanner now also uses this view for body, instruction, and capability
-   lookup. Next work: route branch bodies, error-union/try lowering, and
-   optional/pointer lowering through the same view.
+   lookup. Generic-CFG branch/guard classification now has view-backed helper
+   paths for return, noreturn, void-branch, and branch-body checks. Next work:
+   route error-union/try lowering and optional/pointer lowering through the
+   same view.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
