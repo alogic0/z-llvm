@@ -114,65 +114,65 @@ pub fn build(b: *std.Build) void {
 
     const uncurated_air_specs = [_]UncuratedAirGateSpec{
         .{ .name = "distribution-zig-air-uncurated-releasefast", .description = "Discover and generically lower uncurated x86_64 ReleaseFast Zig AIR" },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe", .description = "Discover and generically lower uncurated x86_64 ReleaseSafe Zig AIR", .mode = "ReleaseSafe" },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall", .description = "Discover and generically lower uncurated x86_64 ReleaseSmall Zig AIR", .mode = "ReleaseSmall" },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe", .description = "Discover and generically lower uncurated x86_64 ReleaseSafe Zig AIR", .mode = .ReleaseSafe },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall", .description = "Discover and generically lower uncurated x86_64 ReleaseSmall Zig AIR", .mode = .ReleaseSmall },
 
-        .{ .name = "distribution-zig-air-uncurated-releasefast-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseFast Zig AIR", .mode = "ReleaseFast", .corpus = "broad" },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseSafe Zig AIR progress", .mode = "ReleaseSafe", .corpus = "broad" },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseSmall Zig AIR progress", .mode = "ReleaseSmall", .corpus = "broad" },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseFast Zig AIR progress accounting", .mode = "ReleaseFast", .corpus = "broad", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSafe Zig AIR progress accounting", .mode = "ReleaseSafe", .corpus = "broad", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSmall Zig AIR progress accounting", .mode = "ReleaseSmall", .corpus = "broad", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = "ReleaseFast", .corpus = "broad", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSafe", .corpus = "broad", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSmall", .corpus = "broad", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-native-link", .description = "Link broad uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseFast", .corpus = "broad", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-native-link", .description = "Link broad uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSmall", .corpus = "broad", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseFast real-AIR objects", .mode = "ReleaseFast", .corpus = "broad", .variant = .executable_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseSafe real-AIR objects", .mode = "ReleaseSafe", .corpus = "broad", .variant = .executable_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseSmall real-AIR objects", .mode = "ReleaseSmall", .corpus = "broad", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseFast Zig AIR", .mode = .ReleaseFast, .corpus = .broad },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseSafe Zig AIR progress", .mode = .ReleaseSafe, .corpus = .broad },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad", .description = "Discover and generically lower broad uncurated x86_64 ReleaseSmall Zig AIR progress", .mode = .ReleaseSmall, .corpus = .broad },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseFast Zig AIR progress accounting", .mode = .ReleaseFast, .corpus = .broad, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSafe Zig AIR progress accounting", .mode = .ReleaseSafe, .corpus = .broad, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-object", .description = "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSmall Zig AIR progress accounting", .mode = .ReleaseSmall, .corpus = .broad, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = .ReleaseFast, .corpus = .broad, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = .ReleaseSafe, .corpus = .broad, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-object-inspection", .description = "Inspect broad uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = .ReleaseSmall, .corpus = .broad, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-native-link", .description = "Link broad uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseFast, .corpus = .broad, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-native-link", .description = "Link broad uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseSmall, .corpus = .broad, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseFast real-AIR objects", .mode = .ReleaseFast, .corpus = .broad, .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseSafe real-AIR objects", .mode = .ReleaseSafe, .corpus = .broad, .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-broad-executable", .description = "Run stable C-ABI executable probes for broad uncurated x86_64 ReleaseSmall real-AIR objects", .mode = .ReleaseSmall, .corpus = .broad, .variant = .executable_progress },
 
-        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded", .description = "Discover and lower the expanded x86_64 ReleaseFast Zig AIR frontier corpus", .mode = "ReleaseFast", .corpus = "expanded" },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded", .description = "Discover and lower the expanded x86_64 ReleaseSafe Zig AIR frontier corpus", .mode = "ReleaseSafe", .corpus = "expanded" },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded", .description = "Discover and lower the expanded x86_64 ReleaseSmall Zig AIR frontier corpus", .mode = "ReleaseSmall", .corpus = "expanded" },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseFast Zig AIR progress accounting", .mode = "ReleaseFast", .corpus = "expanded", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseSafe Zig AIR progress accounting", .mode = "ReleaseSafe", .corpus = "expanded", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseSmall Zig AIR progress accounting", .mode = "ReleaseSmall", .corpus = "expanded", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = "ReleaseFast", .corpus = "expanded", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSafe", .corpus = "expanded", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSmall", .corpus = "expanded", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseFast", .corpus = "expanded", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSafe", .corpus = "expanded", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSmall", .corpus = "expanded", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseFast real-AIR objects", .mode = "ReleaseFast", .corpus = "expanded", .variant = .executable_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseSafe real-AIR objects", .mode = "ReleaseSafe", .corpus = "expanded", .variant = .executable_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseSmall real-AIR objects", .mode = "ReleaseSmall", .corpus = "expanded", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded", .description = "Discover and lower the expanded x86_64 ReleaseFast Zig AIR frontier corpus", .mode = .ReleaseFast, .corpus = .expanded },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded", .description = "Discover and lower the expanded x86_64 ReleaseSafe Zig AIR frontier corpus", .mode = .ReleaseSafe, .corpus = .expanded },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded", .description = "Discover and lower the expanded x86_64 ReleaseSmall Zig AIR frontier corpus", .mode = .ReleaseSmall, .corpus = .expanded },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseFast Zig AIR progress accounting", .mode = .ReleaseFast, .corpus = .expanded, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseSafe Zig AIR progress accounting", .mode = .ReleaseSafe, .corpus = .expanded, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-object", .description = "Emit z_llvm ELF objects for expanded uncurated x86_64 ReleaseSmall Zig AIR progress accounting", .mode = .ReleaseSmall, .corpus = .expanded, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = .ReleaseFast, .corpus = .expanded, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = .ReleaseSafe, .corpus = .expanded, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-object-inspection", .description = "Inspect expanded uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = .ReleaseSmall, .corpus = .expanded, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseFast, .corpus = .expanded, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseSafe, .corpus = .expanded, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-native-link", .description = "Link expanded uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseSmall, .corpus = .expanded, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseFast real-AIR objects", .mode = .ReleaseFast, .corpus = .expanded, .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseSafe real-AIR objects", .mode = .ReleaseSafe, .corpus = .expanded, .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-expanded-executable", .description = "Run stable C-ABI executable probes for expanded uncurated x86_64 ReleaseSmall real-AIR objects", .mode = .ReleaseSmall, .corpus = .expanded, .variant = .executable_progress },
 
-        .{ .name = "distribution-zig-air-uncurated-releasefast-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseFast Zig AIR frontier corpus", .mode = "ReleaseFast", .corpus = "scale", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseSafe Zig AIR frontier corpus", .mode = "ReleaseSafe", .corpus = "scale", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseSmall Zig AIR frontier corpus", .mode = "ReleaseSmall", .corpus = "scale", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = "ReleaseFast", .corpus = "scale", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSafe", .corpus = "scale", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSmall", .corpus = "scale", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseFast", .corpus = "scale", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSafe", .corpus = "scale", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSmall", .corpus = "scale", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseFast real-AIR objects", .mode = "ReleaseFast", .corpus = "scale", .variant = .executable_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseSafe real-AIR objects", .mode = "ReleaseSafe", .corpus = "scale", .variant = .executable_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseSmall real-AIR objects", .mode = "ReleaseSmall", .corpus = "scale", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseFast Zig AIR frontier corpus", .mode = .ReleaseFast, .corpus = .scale, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseSafe Zig AIR frontier corpus", .mode = .ReleaseSafe, .corpus = .scale, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale", .description = "Discover, lower, and emit objects for the scale x86_64 ReleaseSmall Zig AIR frontier corpus", .mode = .ReleaseSmall, .corpus = .scale, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = .ReleaseFast, .corpus = .scale, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = .ReleaseSafe, .corpus = .scale, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-object-inspection", .description = "Inspect scale uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = .ReleaseSmall, .corpus = .scale, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseFast, .corpus = .scale, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseSafe, .corpus = .scale, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-native-link", .description = "Link scale uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseSmall, .corpus = .scale, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseFast real-AIR objects", .mode = .ReleaseFast, .corpus = .scale, .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseSafe real-AIR objects", .mode = .ReleaseSafe, .corpus = .scale, .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-scale-executable", .description = "Run stable C-ABI executable probes for scale uncurated x86_64 ReleaseSmall real-AIR objects", .mode = .ReleaseSmall, .corpus = .scale, .variant = .executable_progress },
 
-        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseFast Zig AIR corpus", .mode = "ReleaseFast", .corpus = "frontier", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseSafe Zig AIR corpus", .mode = "ReleaseSafe", .corpus = "frontier", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseSmall Zig AIR corpus", .mode = "ReleaseSmall", .corpus = "frontier", .variant = .object_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = "ReleaseFast", .corpus = "frontier", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSafe", .corpus = "frontier", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = "ReleaseSmall", .corpus = "frontier", .variant = .object_inspection },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseFast", .corpus = "frontier", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSafe", .corpus = "frontier", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = "ReleaseSmall", .corpus = "frontier", .variant = .native_link_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseFast real-AIR objects", .mode = "ReleaseFast", .corpus = "frontier", .variant = .executable_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseSafe real-AIR objects", .mode = "ReleaseSafe", .corpus = "frontier", .variant = .executable_progress },
-        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseSmall real-AIR objects", .mode = "ReleaseSmall", .corpus = "frontier", .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseFast Zig AIR corpus", .mode = .ReleaseFast, .corpus = .frontier, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseSafe Zig AIR corpus", .mode = .ReleaseSafe, .corpus = .frontier, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier", .description = "Discover, lower, and emit objects for the frontier x86_64 ReleaseSmall Zig AIR corpus", .mode = .ReleaseSmall, .corpus = .frontier, .variant = .object_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump", .mode = .ReleaseFast, .corpus = .frontier, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump", .mode = .ReleaseSafe, .corpus = .frontier, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-object-inspection", .description = "Inspect frontier uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump", .mode = .ReleaseSmall, .corpus = .frontier, .variant = .object_inspection },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseFast, .corpus = .frontier, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseSafe real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseSafe, .corpus = .frontier, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-native-link", .description = "Link frontier uncurated x86_64 ReleaseSmall real-AIR objects with Zig native linker progress accounting", .mode = .ReleaseSmall, .corpus = .frontier, .variant = .native_link_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasefast-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseFast real-AIR objects", .mode = .ReleaseFast, .corpus = .frontier, .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesafe-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseSafe real-AIR objects", .mode = .ReleaseSafe, .corpus = .frontier, .variant = .executable_progress },
+        .{ .name = "distribution-zig-air-uncurated-releasesmall-frontier-executable", .description = "Run stable C-ABI executable probes for frontier uncurated x86_64 ReleaseSmall real-AIR objects", .mode = .ReleaseSmall, .corpus = .frontier, .variant = .executable_progress },
     };
     for (uncurated_air_specs) |spec| _ = addUncuratedAirGate(b, uncurated_air_gate, spec);
 
@@ -183,61 +183,61 @@ pub fn build(b: *std.Build) void {
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-zig-air-uncurated-release-broad-finish",
         .description = "Strict finish-line gate for broad x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR v2 ownership and object emission",
-        .corpus = "broad",
+        .corpus = .broad,
         .variant = .strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-air-release-broad",
         .description = "Strict broad x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
-        .corpus = "broad",
+        .corpus = .broad,
         .variant = .executable_strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-air-release-expanded",
         .description = "Strict expanded x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
-        .corpus = "expanded",
+        .corpus = .expanded,
         .variant = .executable_strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-air-release-scale",
         .description = "Scale x86_64 release real-AIR optimizer/object/native-link/executable progress gate",
-        .corpus = "scale",
+        .corpus = .scale,
         .variant = .object_executable_progress,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-air-release-scale-finish",
         .description = "Strict scale x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
-        .corpus = "scale",
+        .corpus = .scale,
         .variant = .executable_strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-air-release-frontier",
         .description = "Strict frontier x86_64 release real-AIR optimizer/object/native-link/executable milestone gate",
-        .corpus = "frontier",
+        .corpus = .frontier,
         .variant = .executable_strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-air-release-frontier-boundaries",
         .description = "Expected fail-closed x86_64 release frontier ABI boundary gate for varargs and vectors",
-        .corpus = "frontier-boundaries",
+        .corpus = .frontier_boundaries,
         .variant = .abi_boundary_expectations,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-zig-air-uncurated-release-expanded-finish",
         .description = "Strict finish-line gate for expanded x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR v2 ownership and object emission",
-        .corpus = "expanded",
+        .corpus = .expanded,
         .variant = .strict_finish,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-zig-air-uncurated-release-scale",
         .description = "Run scale x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR frontier object-progress gates",
-        .corpus = "scale",
+        .corpus = .scale,
         .variant = .object_progress,
     });
     _ = addUncuratedAirTripleGate(b, uncurated_air_gate, .{
         .name = "distribution-zig-air-uncurated-release-frontier",
         .description = "Run frontier x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall typed AIR object-progress gates",
-        .corpus = "frontier",
+        .corpus = .frontier,
         .variant = .object_progress,
     });
 
@@ -310,11 +310,25 @@ const UncuratedAirVariant = enum {
     abi_boundary_expectations,
 };
 
+const UncuratedAirMode = enum {
+    ReleaseFast,
+    ReleaseSafe,
+    ReleaseSmall,
+};
+
+const UncuratedAirCorpus = enum {
+    broad,
+    expanded,
+    scale,
+    frontier,
+    frontier_boundaries,
+};
+
 const UncuratedAirGateSpec = struct {
     name: []const u8,
     description: []const u8,
-    mode: ?[]const u8 = null,
-    corpus: ?[]const u8 = null,
+    mode: ?UncuratedAirMode = null,
+    corpus: ?UncuratedAirCorpus = null,
     variant: UncuratedAirVariant = .discovery,
 };
 
@@ -375,30 +389,20 @@ fn addUncuratedAirArgs(run_cmd: *std.Build.Step.Run, spec: UncuratedAirGateSpec)
     }
 }
 
-fn addUncuratedAirModeArg(run_cmd: *std.Build.Step.Run, mode: []const u8) void {
-    if (std.mem.eql(u8, mode, "ReleaseFast")) {
-        run_cmd.addArg("--mode=ReleaseFast");
-    } else if (std.mem.eql(u8, mode, "ReleaseSafe")) {
-        run_cmd.addArg("--mode=ReleaseSafe");
-    } else if (std.mem.eql(u8, mode, "ReleaseSmall")) {
-        run_cmd.addArg("--mode=ReleaseSmall");
-    } else {
-        @panic("unknown uncurated AIR mode");
-    }
+fn addUncuratedAirModeArg(run_cmd: *std.Build.Step.Run, mode: UncuratedAirMode) void {
+    run_cmd.addArg(switch (mode) {
+        .ReleaseFast => "--mode=ReleaseFast",
+        .ReleaseSafe => "--mode=ReleaseSafe",
+        .ReleaseSmall => "--mode=ReleaseSmall",
+    });
 }
 
-fn addUncuratedAirCorpusArg(run_cmd: *std.Build.Step.Run, corpus: []const u8) void {
-    if (std.mem.eql(u8, corpus, "broad")) {
-        run_cmd.addArg("--corpus=broad");
-    } else if (std.mem.eql(u8, corpus, "expanded")) {
-        run_cmd.addArg("--corpus=expanded");
-    } else if (std.mem.eql(u8, corpus, "scale")) {
-        run_cmd.addArg("--corpus=scale");
-    } else if (std.mem.eql(u8, corpus, "frontier")) {
-        run_cmd.addArg("--corpus=frontier");
-    } else if (std.mem.eql(u8, corpus, "frontier-boundaries")) {
-        run_cmd.addArg("--corpus=frontier-boundaries");
-    } else {
-        @panic("unknown uncurated AIR corpus");
-    }
+fn addUncuratedAirCorpusArg(run_cmd: *std.Build.Step.Run, corpus: UncuratedAirCorpus) void {
+    run_cmd.addArg(switch (corpus) {
+        .broad => "--corpus=broad",
+        .expanded => "--corpus=expanded",
+        .scale => "--corpus=scale",
+        .frontier => "--corpus=frontier",
+        .frontier_boundaries => "--corpus=frontier-boundaries",
+    });
 }
