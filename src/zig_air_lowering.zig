@@ -1097,7 +1097,7 @@ const LoweringContext = struct {
         const view = self.typed_view orelse return error.UnsupportedAir;
         const block_body = view.body(.block, instruction.index) orelse return error.UnsupportedAir;
         const cond_instruction = try self.lowerTypedBlockBodyUntilCond(block_body);
-        if (!std.mem.eql(u8, cond_instruction.opcode, "cond_br") or cond_instruction.operands.len != 1) {
+        if (!air_capabilities.isCondBrOpcode(cond_instruction.opcode) or cond_instruction.operands.len != 1) {
             return error.UnsupportedAir;
         }
         const cond = try self.resolveTypedOperand(cond_instruction, 0);
@@ -1235,7 +1235,7 @@ const LoweringContext = struct {
             const child = view.instruction(return_index) orelse return error.UnsupportedAir;
             if (view.capability(child).status == .ignored_metadata) continue;
             try self.lowerTypedInstruction(child);
-            if (self.block.terminator != null and !std.mem.eql(u8, child.opcode, "ret") and !std.mem.eql(u8, child.opcode, "ret_safe")) {
+            if (self.block.terminator != null and !air_capabilities.isReturnOpcode(child.opcode)) {
                 return error.UnsupportedAir;
             }
         }
@@ -1274,7 +1274,7 @@ const LoweringContext = struct {
         for (panic_body.instructions) |panic_index| {
             const child = view.instruction(panic_index) orelse return error.UnsupportedAir;
             if (view.capability(child).status == .ignored_metadata) continue;
-            if (std.mem.eql(u8, child.opcode, "unreach")) continue;
+            if (air_capabilities.isUnreachOpcode(child.opcode)) continue;
             try self.lowerTypedInstruction(child);
         }
         var panic_block = self.block.*;
@@ -1291,7 +1291,7 @@ const LoweringContext = struct {
         const view = self.typed_view orelse return error.UnsupportedAir;
         const branch_index = view.singleSemanticInstruction(body) orelse return error.UnsupportedAir;
         const branch_instruction = view.instruction(branch_index) orelse return error.UnsupportedAir;
-        if (!std.mem.eql(u8, branch_instruction.opcode, "br") or branch_instruction.operands.len != 2) {
+        if (!air_capabilities.isBrOpcode(branch_instruction.opcode) or branch_instruction.operands.len != 2) {
             return error.UnsupportedAir;
         }
         const target_operand = branch_instruction.operands[0];
@@ -1370,7 +1370,7 @@ const LoweringContext = struct {
         for (body.instructions) |instruction_index| {
             const child = view.instruction(instruction_index) orelse return error.UnsupportedAir;
             if (view.capability(child).status == .ignored_metadata) continue;
-            if (std.mem.eql(u8, child.opcode, "br")) {
+            if (air_capabilities.isBrOpcode(child.opcode)) {
                 if (child.operands.len != 2) return error.UnsupportedAir;
                 const target = typedBlockTarget(child.operands[0]) orelse return error.UnsupportedAir;
                 if (target != target_block) return error.UnsupportedAir;
@@ -1455,7 +1455,7 @@ const LoweringContext = struct {
         for (body.instructions) |instruction_index| {
             const child = view.instruction(instruction_index) orelse return error.UnsupportedAir;
             if (view.capability(child).status == .ignored_metadata) continue;
-            if (std.mem.eql(u8, child.opcode, "cond_br")) {
+            if (air_capabilities.isCondBrOpcode(child.opcode)) {
                 if (cond_instruction != null) return error.UnsupportedAir;
                 cond_instruction = child;
                 continue;
@@ -2404,7 +2404,7 @@ const LoweringContext = struct {
             if (index >= self.values.len) return error.UnsupportedAir;
             if (self.values[index]) |value| return value;
             if (self.findInstruction(index)) |instruction| {
-                if (std.mem.eql(u8, instruction.opcode, "block") and
+                if (air_capabilities.isBlockOpcode(instruction.opcode) and
                     isSimpleSelectBlock(self.air_function, index))
                 {
                     try self.materializeSelectBlock(instruction);
@@ -2562,10 +2562,10 @@ const LoweringContext = struct {
             return error.UnsupportedAir;
         for (self.air_function.instructions[block_position + 1 ..]) |instruction| {
             if (instruction.indent <= block_instruction.indent) break;
-            if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+            if (air_capabilities.isCondBrOpcode(instruction.opcode)) {
                 var fields = splitTopLevel(instruction.payload, ',');
                 condition = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
-            } else if (std.mem.eql(u8, instruction.opcode, "br")) {
+            } else if (air_capabilities.isBrOpcode(instruction.opcode)) {
                 var fields = splitTopLevel(instruction.payload, ',');
                 const target_text = fields.next() orelse return error.UnsupportedAir;
                 if (parseInstructionRef(target_text) != block_instruction.index) continue;
