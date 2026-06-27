@@ -173,7 +173,9 @@ Execution order:
    semantic-lowering ownership, so semantic domain and owner decisions no
    longer drift independently. Common typed-v2 lowerability is now composed
    from the semantic operation classifier plus call and terminator predicates
-   instead of maintaining a separate broad opcode list.
+   instead of maintaining a separate broad opcode list. Backend-runtime
+   routing for `atomic_rmw` and `assembly` now also uses named capability
+   predicates instead of duplicated owner/lowerer string checks.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
