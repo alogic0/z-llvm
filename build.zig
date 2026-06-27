@@ -308,6 +308,30 @@ const UncuratedAirVariant = enum {
     strict_finish,
     executable_strict_finish,
     abi_boundary_expectations,
+
+    fn addArgs(self: UncuratedAirVariant, run_cmd: *std.Build.Step.Run) void {
+        switch (self) {
+            .discovery => {},
+            .object_progress => run_cmd.addArg("--object-progress"),
+            .object_inspection => run_cmd.addArg("--object-inspection"),
+            .native_link_progress => run_cmd.addArg("--native-link-progress"),
+            .executable_progress => run_cmd.addArg("--executable-progress"),
+            .object_executable_progress => {
+                run_cmd.addArg("--object-progress");
+                run_cmd.addArg("--executable-progress");
+            },
+            .strict_finish => {
+                run_cmd.addArg("--object-progress");
+                run_cmd.addArg("--strict-finish");
+            },
+            .executable_strict_finish => {
+                run_cmd.addArg("--object-progress");
+                run_cmd.addArg("--executable-progress");
+                run_cmd.addArg("--strict-finish");
+            },
+            .abi_boundary_expectations => run_cmd.addArg("--abi-boundary-expectations"),
+        }
+    }
 };
 
 const UncuratedAirMode = enum {
@@ -366,27 +390,7 @@ fn addUncuratedAirTripleGate(
 fn addUncuratedAirArgs(run_cmd: *std.Build.Step.Run, spec: UncuratedAirGateSpec) void {
     if (spec.mode) |mode| addUncuratedAirModeArg(run_cmd, mode);
     if (spec.corpus) |corpus| addUncuratedAirCorpusArg(run_cmd, corpus);
-    switch (spec.variant) {
-        .discovery => {},
-        .object_progress => run_cmd.addArg("--object-progress"),
-        .object_inspection => run_cmd.addArg("--object-inspection"),
-        .native_link_progress => run_cmd.addArg("--native-link-progress"),
-        .executable_progress => run_cmd.addArg("--executable-progress"),
-        .object_executable_progress => {
-            run_cmd.addArg("--object-progress");
-            run_cmd.addArg("--executable-progress");
-        },
-        .strict_finish => {
-            run_cmd.addArg("--object-progress");
-            run_cmd.addArg("--strict-finish");
-        },
-        .executable_strict_finish => {
-            run_cmd.addArg("--object-progress");
-            run_cmd.addArg("--executable-progress");
-            run_cmd.addArg("--strict-finish");
-        },
-        .abi_boundary_expectations => run_cmd.addArg("--abi-boundary-expectations"),
-    }
+    spec.variant.addArgs(run_cmd);
 }
 
 fn addUncuratedAirModeArg(run_cmd: *std.Build.Step.Run, mode: UncuratedAirMode) void {
