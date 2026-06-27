@@ -18,7 +18,6 @@ const typedDetail = air_model.detail;
 const typedOperandTextDetail = air_model.operandTextDetail;
 const typedCallee = air_model.callee;
 const typedCalleeName = air_model.calleeName;
-const typedInstructionByIndex = air_model.instructionByIndex;
 const typedSingleInstructionByOpcode = air_model.singleInstructionByOpcode;
 const shortFunctionName = air_model.shortFunctionName;
 const ownPrint = air_model.ownPrint;
@@ -433,30 +432,7 @@ pub fn typedAggregatePointerPath(
     ret_ptr_index: u32,
     path: *[4]usize,
 ) ?usize {
-    const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return null;
-    if (instruction.index == ret_ptr_index and std.mem.eql(u8, instruction.opcode, "ret_ptr")) return 0;
-    if (std.mem.eql(u8, instruction.data_kind, "field_ptr")) {
-        if (instruction.operands.len != 1 or !std.mem.eql(u8, instruction.operands[0].kind, "inst")) return null;
-        const base_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
-        const len = typedAggregatePointerPath(structured_air_v2, base_index, ret_ptr_index, path) orelse return null;
-        if (len >= path.len) return null;
-        const field_index_text = typedDetail(instruction, "field_index") orelse return null;
-        path[len] = std.fmt.parseInt(usize, field_index_text, 10) catch return null;
-        return len + 1;
-    }
-    if (std.mem.eql(u8, instruction.opcode, "ptr_elem_ptr")) {
-        if (instruction.operands.len != 2 or !std.mem.eql(u8, instruction.operands[0].kind, "inst")) return null;
-        const base_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
-        const len = typedAggregatePointerPath(structured_air_v2, base_index, ret_ptr_index, path) orelse return null;
-        if (len >= path.len) return null;
-        path[len] = typedConstUsizeOperand(instruction, 1) orelse return null;
-        return len + 1;
-    }
-    return null;
-}
-
-pub fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?usize {
-    return air_model.typedConstUsizeOperand(instruction, operand_index);
+    return air_model.typedAggregatePointerPath(structured_air_v2, instruction_index, ret_ptr_index, path);
 }
 
 pub fn aggregateIndexPathText(path: []const usize) ?[]const u8 {

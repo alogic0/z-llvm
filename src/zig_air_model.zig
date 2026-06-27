@@ -566,6 +566,34 @@ pub fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_
     return null;
 }
 
+pub fn typedAggregatePointerPath(
+    structured_air_v2: air_export.StructuredAirV2,
+    instruction_index: u32,
+    ret_ptr_index: u32,
+    path: *[4]usize,
+) ?usize {
+    const typed_instruction = instructionByIndex(structured_air_v2, instruction_index) orelse return null;
+    if (typed_instruction.index == ret_ptr_index and std.mem.eql(u8, typed_instruction.opcode, "ret_ptr")) return 0;
+    if (std.mem.eql(u8, typed_instruction.data_kind, "field_ptr")) {
+        if (typed_instruction.operands.len != 1 or !std.mem.eql(u8, typed_instruction.operands[0].kind, "inst")) return null;
+        const base_index = std.fmt.parseInt(u32, typed_instruction.operands[0].value, 10) catch return null;
+        const len = typedAggregatePointerPath(structured_air_v2, base_index, ret_ptr_index, path) orelse return null;
+        if (len >= path.len) return null;
+        const field_index_text = detail(typed_instruction, "field_index") orelse return null;
+        path[len] = std.fmt.parseInt(usize, field_index_text, 10) catch return null;
+        return len + 1;
+    }
+    if (std.mem.eql(u8, typed_instruction.opcode, "ptr_elem_ptr")) {
+        if (typed_instruction.operands.len != 2 or !std.mem.eql(u8, typed_instruction.operands[0].kind, "inst")) return null;
+        const base_index = std.fmt.parseInt(u32, typed_instruction.operands[0].value, 10) catch return null;
+        const len = typedAggregatePointerPath(structured_air_v2, base_index, ret_ptr_index, path) orelse return null;
+        if (len >= path.len) return null;
+        path[len] = typedConstUsizeOperand(typed_instruction, 1) orelse return null;
+        return len + 1;
+    }
+    return null;
+}
+
 pub fn plainFieldPointerChild(ty: ir.Type) bool {
     return switch (ty) {
         .int => |bits| bits == 1 or bits % 8 == 0,
