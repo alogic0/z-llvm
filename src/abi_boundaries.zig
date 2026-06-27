@@ -96,78 +96,71 @@ pub const ExpectedSummary = struct {
     }
 };
 
+const SourceBoundary = struct {
+    source_fragment: []const u8,
+    category: Category,
+    expected_rows: usize,
+    source_failure_rows: usize = 1,
+};
+
+const source_boundaries = [_]SourceBoundary{
+    .{ .source_fragment = "frontier_varargs_boundary.zig", .category = .varargs, .expected_rows = 2 },
+    .{ .source_fragment = "frontier_vector_boundary.zig", .category = .vector, .expected_rows = 2 },
+    .{ .source_fragment = "frontier_x87_boundary.zig", .category = .x87, .expected_rows = 2, .source_failure_rows = 2 },
+    .{ .source_fragment = "frontier_packed_aggregate_boundary.zig", .category = .packed_aggregate, .expected_rows = 2, .source_failure_rows = 2 },
+    .{ .source_fragment = "frontier_tail_call_boundary.zig", .category = .tail_call, .expected_rows = 1 },
+    .{ .source_fragment = "frontier_callconv_boundary.zig", .category = .non_default_callconv, .expected_rows = 1 },
+};
+
+fn sourceBoundary(source: []const u8) ?SourceBoundary {
+    for (source_boundaries) |boundary| {
+        if (contains(source, boundary.source_fragment)) return boundary;
+    }
+    return null;
+}
+
 pub fn expectedFrontierBoundarySummary() ExpectedSummary {
+    var counts: Counts = .{};
+    for (source_boundaries) |boundary| counts.add(boundary.category, boundary.expected_rows);
     return .{
-        .source_rows = 6,
+        .source_rows = source_boundaries.len,
         .discovered_functions = 10,
-        .counts = .{
-            .varargs_rows = 2,
-            .vector_rows = 2,
-            .x87_rows = 2,
-            .packed_aggregate_rows = 2,
-            .tail_call_rows = 1,
-            .callconv_rows = 1,
-            .stack_pressure_rows = 0,
-        },
+        .counts = counts,
     };
 }
 
 pub fn categoryForUnsupported(source: []const u8, diagnostic: air_lowering.Diagnostic) ?Category {
-    if (contains(source, "frontier_varargs_boundary.zig") and
-        std.mem.eql(u8, diagnostic.opcode, "lowering") and
-        diagnostic.reason == .instruction_type)
-    {
-        return .varargs;
-    }
-    if (contains(source, "frontier_vector_boundary.zig") and
-        std.mem.eql(u8, diagnostic.opcode, "function-type") and
-        diagnostic.reason == .function_type)
-    {
-        return .vector;
-    }
-    if (contains(source, "frontier_x87_boundary.zig") and
-        std.mem.eql(u8, diagnostic.opcode, "function-type") and
-        diagnostic.reason == .function_type)
-    {
-        return .x87;
-    }
-    if (contains(source, "frontier_stack_pressure_boundary.zig") and
-        std.mem.eql(u8, diagnostic.opcode, "function-type") and
-        diagnostic.reason == .function_type)
-    {
-        return .stack_pressure;
-    }
-    if (contains(source, "frontier_tail_call_boundary.zig")) {
-        return .tail_call;
+    const boundary = sourceBoundary(source) orelse return null;
+    switch (boundary.category) {
+        .varargs => if (std.mem.eql(u8, diagnostic.opcode, "lowering") and
+            diagnostic.reason == .instruction_type) return .varargs,
+        .vector, .x87, .stack_pressure => if (std.mem.eql(u8, diagnostic.opcode, "function-type") and
+            diagnostic.reason == .function_type) return boundary.category,
+        .tail_call => return .tail_call,
+        .packed_aggregate, .non_default_callconv => {},
     }
     return null;
 }
 
 pub fn categoryForAirExportFailure(source: []const u8, stderr: []const u8) ?Category {
-    if (contains(source, "frontier_packed_aggregate_boundary.zig") and
-        contains(stderr, "not allowed in function with calling convention"))
-    {
-        return .packed_aggregate;
-    }
-    if (contains(source, "frontier_x87_boundary.zig") and
-        (contains(stderr, "not allowed in function with calling convention") or
-            contains(stderr, "TODO implement compiler support")))
-    {
-        return .x87;
+    const boundary = sourceBoundary(source) orelse return null;
+    switch (boundary.category) {
+        .packed_aggregate => if (contains(stderr, "not allowed in function with calling convention")) return .packed_aggregate,
+        .x87 => if (contains(stderr, "not allowed in function with calling convention") or
+            contains(stderr, "TODO implement compiler support")) return .x87,
+        else => {},
     }
     return null;
 }
 
 pub fn categoryForLoweringFailure(source: []const u8, err: anyerror) ?Category {
-    if (contains(source, "frontier_callconv_boundary.zig") and
-        err == error.UnsupportedCallingConvention)
-    {
-        return .non_default_callconv;
-    }
+    const boundary = sourceBoundary(source) orelse return null;
+    if (boundary.category == .non_default_callconv and err == error.UnsupportedCallingConvention) return .non_default_callconv;
     return null;
 }
 
 pub fn categoryForCodegenFailure(source: []const u8, err: anyerror) ?Category {
+    const boundary = sourceBoundary(source);
     return switch (err) {
         error.UnsupportedVarargsAbi => .varargs,
         error.UnsupportedVectorAbi => .vector,
@@ -175,15 +168,16 @@ pub fn categoryForCodegenFailure(source: []const u8, err: anyerror) ?Category {
         error.UnsupportedPackedAggregateAbi => .packed_aggregate,
         error.UnsupportedTailCallAbi => .tail_call,
         error.UnsupportedCallConvAbi => .non_default_callconv,
-        error.UnsupportedCodegenAbi => if (contains(source, "frontier_stack_pressure_boundary.zig")) .stack_pressure else null,
+        error.UnsupportedCodegenAbi => if (boundary) |entry|
+            if (entry.category == .stack_pressure) .stack_pressure else null
+        else
+            null,
         else => null,
     };
 }
 
 pub fn rowCountForSource(source: []const u8) usize {
-    if (contains(source, "frontier_packed_aggregate_boundary.zig")) return 2;
-    if (contains(source, "frontier_x87_boundary.zig")) return 2;
-    return 1;
+    return if (sourceBoundary(source)) |boundary| boundary.source_failure_rows else 1;
 }
 
 fn contains(haystack: []const u8, needle: []const u8) bool {
