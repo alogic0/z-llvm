@@ -174,7 +174,9 @@ Execution order:
    `src/zig_air_calls.zig`, separate from function-body lowering. The
    runtime/native-link boundary symbol policy now lives in
    `src/runtime_boundaries.zig` as prefix/suffix tables consumed by the
-   uncurated AIR gates. The
+   uncurated AIR gates. The remaining legacy AIR instruction opcode query used
+   by typed-v2 compatibility fallbacks now lives in `src/zig_air_model.zig`
+   instead of the fallback module. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
