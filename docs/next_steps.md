@@ -92,8 +92,9 @@ Execution order:
    standalone data-kind surfaces into owner categories, and inventory consumes
    that object for unknown-opcode reporting. Next work: make lowering dispatch
    select through the registered lowerer kind directly. The typed-v2 dispatch
-   now at least treats registry lowerability as the front-door gate before the
-   local opcode chain runs.
+   now treats registry lowerability as the front-door gate and routes accepted
+   instructions through `LowererKind` groups before reaching local opcode
+   lowerers.
 2. Normalized typed-AIR slice: `src/zig_air_model.zig` now provides the first
    reusable typed function view over structured-air v1/v2 bodies,
    instructions, and opcode capabilities. The generic typed-CFG block

@@ -968,6 +968,33 @@ const LoweringContext = struct {
         const capability = self.typedInstructionCapability(instruction);
         if (capability.status == .ignored_metadata) return;
         if (!air_capabilities.typedV2CanLower(capability)) return error.UnsupportedAir;
+        switch (capability.lowerer) {
+            .typed_v2_cfg => try self.lowerTypedCfgInstruction(instruction),
+            .typed_v2_semantic => try self.lowerTypedSemanticInstruction(instruction),
+            .call_abi => try self.lowerTypedCall(instruction),
+            .backend_runtime => try self.lowerTypedBackendRuntimeInstruction(instruction),
+            .none, .ignore, .boundary => return error.UnsupportedAir,
+        }
+    }
+
+    fn lowerTypedCfgInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (std.mem.eql(u8, instruction.opcode, "block")) {
+            try self.lowerTypedBlock(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+            if (!isTypedTerminalCondBr(self.air_function, instruction.index)) return error.UnsupportedAir;
+            try self.lowerTypedCondBrReturn(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "ret") or
+            std.mem.eql(u8, instruction.opcode, "ret_safe"))
+        {
+            try self.lowerTypedReturn(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "unreach")) {
+            self.block.terminator = .{ .@"unreachable" = {} };
+        } else {
+            return error.UnsupportedAir;
+        }
+    }
+
+    fn lowerTypedSemanticInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
         if (std.mem.eql(u8, instruction.opcode, "arg")) {
             try self.lowerTypedArg(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "add_with_overflow")) {
@@ -986,11 +1013,6 @@ const LoweringContext = struct {
             std.mem.eql(u8, instruction.opcode, "store_safe"))
         {
             try self.lowerTypedStore(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "block")) {
-            try self.lowerTypedBlock(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
-            if (!isTypedTerminalCondBr(self.air_function, instruction.index)) return error.UnsupportedAir;
-            try self.lowerTypedCondBrReturn(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "is_non_null")) {
             try self.lowerTypedIsNonNull(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "is_non_err")) {
@@ -1021,17 +1043,15 @@ const LoweringContext = struct {
             try self.lowerTypedArrayElemVal(instruction);
         } else if (isFieldPtrOpcode(instruction.opcode)) {
             try self.lowerTypedFieldPtr(instruction);
-        } else if (isCallOpcode(instruction.opcode)) {
-            try self.lowerTypedCall(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "ret") or
-            std.mem.eql(u8, instruction.opcode, "ret_safe"))
-        {
-            try self.lowerTypedReturn(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "unreach")) {
-            self.block.terminator = .{ .@"unreachable" = {} };
         } else {
             return error.UnsupportedAir;
         }
+    }
+
+    fn lowerTypedBackendRuntimeInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        _ = self;
+        _ = instruction;
+        return error.UnsupportedAir;
     }
 
     fn recordTypedV2Fallback(self: *LoweringContext, instruction: air_export.TypedInstruction) void {
