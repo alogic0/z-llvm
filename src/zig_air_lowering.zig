@@ -5,6 +5,7 @@ const memory_location = @import("analysis/memory_location.zig");
 const sib = @import("structured_ir_builder.zig");
 const target_mod = @import("target.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
+const air_model = @import("zig_air_model.zig");
 
 pub const UnsupportedReason = enum {
     function_type,
@@ -603,32 +604,33 @@ fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
             .reason = "shape_recognizer",
         };
     }
-    const structured_air = function.structured_air orelse return .{
+    _ = function.structured_air orelse return .{
         .function = function.name,
         .opcode = "structured_air-v1",
         .data_kind = "-",
         .reason = "missing",
     };
-    const structured_air_v2 = function.structured_air_v2 orelse return .{
+    _ = function.structured_air_v2 orelse return .{
         .function = function.name,
         .opcode = "structured_air-v2",
         .data_kind = "-",
         .reason = "missing",
     };
-    const main_body = structured_air.body(.main, null) orelse return .{
+    const view = air_model.TypedFunctionView.init(function).?;
+    const main_body = view.body(.main, null) orelse return .{
         .function = function.name,
         .opcode = "main_body",
         .data_kind = "-",
         .reason = "missing",
     };
     for (main_body.instructions) |instruction_index| {
-        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return .{
+        const instruction = view.instruction(instruction_index) orelse return .{
             .function = function.name,
             .opcode = "typed_inst",
             .data_kind = "-",
             .reason = "missing_index",
         };
-        const capability = air_capabilities.opcodeCapability(instruction.opcode);
+        const capability = view.capability(instruction);
         if (capability.status == .ignored_metadata) continue;
         if (!air_capabilities.typedV2CanLower(capability)) {
             return .{
