@@ -180,8 +180,7 @@ pub const TypedFunctionView = struct {
     pub fn returnBody(self: TypedFunctionView, structured_body: air_export.StructuredBody) bool {
         const return_index = self.singleSemanticInstruction(structured_body) orelse return false;
         const return_instruction = self.instruction(return_index) orelse return false;
-        return std.mem.eql(u8, return_instruction.opcode, "ret") or
-            std.mem.eql(u8, return_instruction.opcode, "ret_safe");
+        return air_capabilities.isReturnOpcode(return_instruction.opcode);
     }
 
     pub fn bodyEndsInReturn(self: TypedFunctionView, structured_body: air_export.StructuredBody) bool {
@@ -190,9 +189,7 @@ pub const TypedFunctionView = struct {
             const typed_instruction = self.instruction(instruction_index) orelse return false;
             const typed_capability = self.capability(typed_instruction);
             if (typed_capability.status == .ignored_metadata) continue;
-            if (std.mem.eql(u8, typed_instruction.opcode, "ret") or
-                std.mem.eql(u8, typed_instruction.opcode, "ret_safe"))
-            {
+            if (air_capabilities.isReturnOpcode(typed_instruction.opcode)) {
                 saw_return = true;
                 continue;
             }
@@ -209,9 +206,7 @@ pub const TypedFunctionView = struct {
     pub fn bodyHasReturn(self: TypedFunctionView, structured_body: air_export.StructuredBody) bool {
         for (structured_body.instructions) |instruction_index| {
             const typed_instruction = self.instruction(instruction_index) orelse return false;
-            if (std.mem.eql(u8, typed_instruction.opcode, "ret") or
-                std.mem.eql(u8, typed_instruction.opcode, "ret_safe"))
-            {
+            if (air_capabilities.isReturnOpcode(typed_instruction.opcode)) {
                 return true;
             }
         }
@@ -347,8 +342,7 @@ pub const TypedFunctionView = struct {
                 continue;
             }
             if (!air_capabilities.typedV2CanLower(typed_capability) or
-                std.mem.eql(u8, typed_instruction.opcode, "ret") or
-                std.mem.eql(u8, typed_instruction.opcode, "ret_safe") or
+                air_capabilities.isReturnOpcode(typed_instruction.opcode) or
                 std.mem.eql(u8, typed_instruction.opcode, "unreach"))
             {
                 return false;
