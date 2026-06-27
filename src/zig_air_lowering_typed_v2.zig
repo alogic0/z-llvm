@@ -705,16 +705,7 @@ pub fn lowerTypedV2OptionalPayload(
 }
 
 pub fn typedV2OptionalPayloadFallback(structured_air_v2: air_export.StructuredAirV2) ?i32 {
-    var fallback: ?i32 = null;
-    for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "br")) continue;
-        if (instruction.operands.len != 2) continue;
-        if (!std.mem.eql(u8, instruction.operands[1].kind, "const") or
-            !std.mem.eql(u8, instruction.operands[1].type_text, "i32")) continue;
-        const value_text = typedOperandTextDetail(instruction, 1) orelse continue;
-        fallback = parseTypedI32Constant(value_text) orelse continue;
-    }
-    return fallback;
+    return air_model.typedLastBranchI32ConstValue(structured_air_v2);
 }
 
 pub fn typedV2OptionalPayloadRecords(
@@ -753,8 +744,7 @@ pub fn typedV2OptionalPointerAddImm(structured_air_v2: air_export.StructuredAirV
     for (structured_air_v2.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, "add") and !std.mem.eql(u8, instruction.opcode, "add_safe")) continue;
         if (instruction.operands.len != 2) return null;
-        const value_text = typedOperandTextDetail(instruction, 1) orelse return null;
-        return parseTypedI32Constant(value_text);
+        return air_model.typedConstI32Operand(instruction, 1);
     }
     return null;
 }
@@ -1155,24 +1145,9 @@ pub fn typedV2DenseIntegerSwitchResults(
         return null;
     }
     var results: [5]i32 = undefined;
-    var result_count: usize = 0;
-    for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "br")) continue;
-        if (instruction.operands.len != 2) return null;
-        if (!std.mem.eql(u8, instruction.operands[1].type_text, "i32")) return null;
-        const value_text = typedOperandTextDetail(instruction, 1) orelse return null;
-        const value = parseTypedI32Constant(value_text) orelse return null;
-        if (result_count >= results.len) return null;
-        results[result_count] = value;
-        result_count += 1;
-    }
+    const result_count = air_model.typedBranchI32ConstValues(structured_air_v2, &results) orelse return null;
     if (result_count != results.len) return null;
     return results;
-}
-
-pub fn parseTypedI32Constant(text: []const u8) ?i32 {
-    if (!std.mem.startsWith(u8, text, "<i32, ") or !std.mem.endsWith(u8, text, ">")) return null;
-    return std.fmt.parseInt(i32, std.mem.trim(u8, text["<i32, ".len .. text.len - 1], " "), 10) catch null;
 }
 
 pub fn lowerTypedV2ErrorSwitch(

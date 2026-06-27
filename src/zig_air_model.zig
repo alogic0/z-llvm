@@ -123,6 +123,14 @@ pub const TypedFunctionView = struct {
         return typedRetPtrIndex(self.structured_air_v2);
     }
 
+    pub fn lastBranchI32ConstValue(self: TypedFunctionView) ?i32 {
+        return typedLastBranchI32ConstValue(self.structured_air_v2);
+    }
+
+    pub fn branchI32ConstValues(self: TypedFunctionView, values: []i32) ?usize {
+        return typedBranchI32ConstValues(self.structured_air_v2, values);
+    }
+
     pub fn terminalErrorUnionCondBr(self: TypedFunctionView, instruction_index: u32) bool {
         if (!self.hasAnyOpcode(&.{
             "is_non_err",
@@ -581,6 +589,39 @@ pub fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_
     return null;
 }
 
+pub fn typedConstI32Operand(instruction: air_export.TypedInstruction, operand_index: usize) ?i32 {
+    const text = operandTextDetail(instruction, operand_index) orelse return null;
+    if (!std.mem.startsWith(u8, text, "<i32, ") or !std.mem.endsWith(u8, text, ">")) return null;
+    return std.fmt.parseInt(i32, std.mem.trim(u8, text["<i32, ".len .. text.len - 1], " "), 10) catch null;
+}
+
+pub fn typedBranchI32ConstValue(instruction: air_export.TypedInstruction) ?i32 {
+    if (!std.mem.eql(u8, instruction.opcode, "br")) return null;
+    if (instruction.operands.len != 2) return null;
+    if (!std.mem.eql(u8, instruction.operands[1].kind, "const") or
+        !std.mem.eql(u8, instruction.operands[1].type_text, "i32")) return null;
+    return typedConstI32Operand(instruction, 1);
+}
+
+pub fn typedLastBranchI32ConstValue(structured_air_v2: air_export.StructuredAirV2) ?i32 {
+    var result: ?i32 = null;
+    for (structured_air_v2.instructions) |instruction_record| {
+        if (typedBranchI32ConstValue(instruction_record)) |value| result = value;
+    }
+    return result;
+}
+
+pub fn typedBranchI32ConstValues(structured_air_v2: air_export.StructuredAirV2, values: []i32) ?usize {
+    var count: usize = 0;
+    for (structured_air_v2.instructions) |instruction_record| {
+        const value = typedBranchI32ConstValue(instruction_record) orelse continue;
+        if (count >= values.len) return null;
+        values[count] = value;
+        count += 1;
+    }
+    return count;
+}
+
 pub fn typedAggregatePointerPath(
     structured_air_v2: air_export.StructuredAirV2,
     instruction_index: u32,
@@ -747,6 +788,40 @@ test "typed AIR model parses instruction details and block operands" {
         .value = "7",
         .type_text = "ignored",
     }).?);
+}
+
+test "typed AIR model collects branch i32 constants" {
+    const br_operands = [_]air_export.TypedOperand{
+        .{ .kind = "block", .value = "0", .type_text = "0" },
+        .{ .kind = "const", .value = "value", .type_text = "i32" },
+    };
+    const instructions = [_]air_export.TypedInstruction{
+        .{
+            .index = 0,
+            .opcode = "br",
+            .result_type = "void",
+            .data_kind = "br",
+            .operands = @constCast(&br_operands),
+            .details = &.{.{ .key = "operand1_text", .value = "<i32, 7>" }},
+        },
+        .{
+            .index = 1,
+            .opcode = "ret",
+            .result_type = "void",
+            .data_kind = "un_op",
+            .operands = &.{},
+        },
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{
+        .version = "structured_air-v2",
+        .instructions = @constCast(&instructions),
+    };
+    var values: [2]i32 = undefined;
+
+    try std.testing.expectEqual(@as(i32, 7), typedBranchI32ConstValue(instructions[0]).?);
+    try std.testing.expectEqual(@as(i32, 7), typedLastBranchI32ConstValue(structured_air_v2).?);
+    try std.testing.expectEqual(@as(usize, 1), typedBranchI32ConstValues(structured_air_v2, &values).?);
+    try std.testing.expectEqual(@as(i32, 7), values[0]);
 }
 
 test "typed AIR model parses direct and extern callees" {
