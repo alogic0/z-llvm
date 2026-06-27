@@ -3,6 +3,7 @@ const air_export = @import("zig_air_export.zig");
 const air_roots = @import("zig_air_roots.zig");
 const codegen = @import("codegen.zig");
 const mc = @import("mc.zig");
+const runtime_boundaries = @import("runtime_boundaries.zig");
 
 pub fn rootFunctionCount(module: air_export.Module) usize {
     return air_roots.moduleRootFunctionCount(module);
@@ -688,25 +689,7 @@ pub fn firstUndefinedSymbol(stderr: []const u8) ?[]const u8 {
 }
 
 pub fn isRuntimeBoundarySymbol(symbol: []const u8) bool {
-    return std.mem.startsWith(u8, symbol, "debug.") or
-        std.mem.endsWith(u8, symbol, ".outOfBounds") or
-        std.mem.endsWith(u8, symbol, ".integerPartOutOfBounds") or
-        std.mem.endsWith(u8, symbol, ".unwrapNull") or
-        std.mem.startsWith(u8, symbol, "panic") or
-        std.mem.startsWith(u8, symbol, "__") or
-        std.mem.startsWith(u8, symbol, "compiler_rt.") or
-        std.mem.startsWith(u8, symbol, "memcpy") or
-        std.mem.startsWith(u8, symbol, "memset") or
-        std.mem.startsWith(u8, symbol, "memcmp") or
-        std.mem.startsWith(u8, symbol, "malloc") or
-        std.mem.startsWith(u8, symbol, "free") or
-        std.mem.startsWith(u8, symbol, "abort") or
-        std.mem.startsWith(u8, symbol, "exit") or
-        std.mem.startsWith(u8, symbol, "posix.") or
-        std.mem.startsWith(u8, symbol, "os.") or
-        std.mem.startsWith(u8, symbol, "Io.") or
-        std.mem.startsWith(u8, symbol, "Thread.") or
-        std.mem.startsWith(u8, symbol, "start.");
+    return runtime_boundaries.isRuntimeBoundarySymbol(symbol);
 }
 
 pub fn firstLine(text: []const u8) []const u8 {
