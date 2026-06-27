@@ -455,6 +455,14 @@ pub fn isArithmeticOpcode(opcode: []const u8) bool {
     return air_export.categoryForOpcode(opcode) == .arithmetic;
 }
 
+pub fn isAddOpcodeFamily(opcode: []const u8) bool {
+    return std.mem.startsWith(u8, opcode, "add");
+}
+
+pub fn isCmpLtOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "cmp_lt");
+}
+
 pub fn isCastOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "trunc") or
         std.mem.eql(u8, opcode, "intcast") or
@@ -789,6 +797,11 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(isIgnoredOpcode("dbg_stmt"));
     try std.testing.expect(isInventoryKnownOpcode("dbg_stmt"));
     try std.testing.expect(isTypedV2LowerableOpcode("block"));
+    try std.testing.expect(isAddOpcodeFamily("add"));
+    try std.testing.expect(isAddOpcodeFamily("add_safe"));
+    try std.testing.expect(!isAddOpcodeFamily("sub"));
+    try std.testing.expect(isCmpLtOpcode("cmp_lt"));
+    try std.testing.expect(!isCmpLtOpcode("cmp_eq"));
     try std.testing.expect(isArgOpcode("arg"));
     try std.testing.expect(!isArgOpcode("alloc"));
     try std.testing.expect(isAllocOpcode("alloc"));

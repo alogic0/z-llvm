@@ -212,7 +212,7 @@ fn hasStoreOf(function: air_export.Function, slot: u32, expected: AirExpectedVal
 
 fn findCompareAgainstArg(function: air_export.Function, slot: u32, arg: u32) ?u32 {
     for (function.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "cmp_lt")) continue;
+        if (!air_capabilities.isCmpLtOpcode(instruction.opcode)) continue;
         var fields = splitTopLevel(instruction.payload, ',');
         const lhs = parseInstructionRef(fields.next() orelse continue) orelse continue;
         const rhs = parseInstructionRef(fields.next() orelse continue) orelse continue;
@@ -712,7 +712,7 @@ pub fn arraySumShape(function: air_export.Function) bool {
             elem_ptr_count += 1;
         } else if (std.mem.eql(u8, instruction.opcode, "load")) {
             load_count += 1;
-        } else if (std.mem.startsWith(u8, instruction.opcode, "add")) {
+        } else if (air_capabilities.isAddOpcodeFamily(instruction.opcode)) {
             add_count += 1;
         }
     }
@@ -732,7 +732,7 @@ pub fn structSumShape(function: air_export.Function) bool {
         {
             i32_loads += 1;
         }
-        if (std.mem.startsWith(u8, instruction.opcode, "add")) adds += 1;
+        if (air_capabilities.isAddOpcodeFamily(instruction.opcode)) adds += 1;
     }
     return field_zero and field_one and i32_loads == 2 and adds == 1;
 }
