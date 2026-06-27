@@ -21,7 +21,6 @@ const isNamed = x86_64_match.isNamed;
 const isInt = x86_64_match.isInt;
 const isFpText = x86_64_match.isFpText;
 const u5Value = x86_64_match.u5Value;
-const callIsFastcc = x86_64_match.callIsFastcc;
 
 const appendAlignedDirectCallPreservingI32Param = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Param;
 const appendAlignedDirectCallPreservingI32Params = x86_64_generic_cfg.appendAlignedDirectCallPreservingI32Params;
@@ -98,18 +97,9 @@ pub fn lowerCall(
         return;
     }
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    if (call.tail_kind != null) return error.UnsupportedTailCallAbi;
-    if (call.operand_bundle != null) return error.UnsupportedCallAttributeAbi;
-    if (!callIsFastcc(call.calling_conv)) {
-        if (call.calling_conv) |calling_conv| {
-            if (!std.mem.eql(u8, calling_conv, "ccc")) return error.UnsupportedCallConvAbi;
-        }
-    }
-    if (call.callee_function_ty) |function_ty| {
-        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedVarargsAbi;
-    }
+    try sysv_abi.rejectUnsupportedCallEnvelope(call);
+    try sysv_abi.rejectUnsupportedCallSignature(call);
     try sysv_abi.rejectUnsupportedAbiType(call.ret_ty);
-    if (call.ret_attrs != null or call.attrs != null) try sysv_abi.rejectUnsupportedCallEnvelope(call);
     if (call.ret_ty != .void and !call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
     if (call.callee_value) |callee_value| {
         const callee_name = switch (callee_value) {

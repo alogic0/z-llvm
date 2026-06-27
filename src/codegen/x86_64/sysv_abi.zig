@@ -331,16 +331,8 @@ pub fn callHasByvalArgAttrs(call: ir.CallInst) bool {
 
 pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !CallPlan {
     try rejectUnsupportedCallEnvelope(call);
+    try rejectUnsupportedCallSignature(call);
     try rejectUnsupportedAbiType(call.ret_ty);
-
-    if (call.calling_conv) |calling_conv| {
-        if (!std.mem.eql(u8, calling_conv, "ccc") and !std.mem.eql(u8, calling_conv, "fastcc")) {
-            return error.UnsupportedCallConvAbi;
-        }
-    }
-    if (call.callee_function_ty) |function_ty| {
-        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedVarargsAbi;
-    }
 
     var plan: CallPlan = .{};
     errdefer plan.deinit(allocator);
@@ -470,6 +462,17 @@ pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {
         return error.UnsupportedCallAttributeAbi;
     }
     if (call.operand_bundle != null) return error.UnsupportedCallAttributeAbi;
+}
+
+pub fn rejectUnsupportedCallSignature(call: ir.CallInst) !void {
+    if (call.calling_conv) |calling_conv| {
+        if (!std.mem.eql(u8, calling_conv, "ccc") and !std.mem.eql(u8, calling_conv, "fastcc")) {
+            return error.UnsupportedCallConvAbi;
+        }
+    }
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedVarargsAbi;
+    }
 }
 
 fn rejectUnsupportedAbiAttrPayload(attrs: []const u8) !void {
