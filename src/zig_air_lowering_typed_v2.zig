@@ -41,18 +41,6 @@ const lowerRuntimePointerLoadStoreMain = legacy.lowerRuntimePointerLoadStoreMain
 const lowerSliceSum = legacy.lowerSliceSum;
 const lowerConditionalSliceSum = legacy.lowerConditionalSliceSum;
 
-pub fn typedFieldPtrIndexCount(structured_air_v2: air_export.StructuredAirV2, expected_index: usize) usize {
-    return air_model.typedFieldPtrIndexCount(structured_air_v2, expected_index);
-}
-
-pub fn typedCalleeNameCount(structured_air_v2: air_export.StructuredAirV2, callee_name: []const u8) usize {
-    return air_model.typedCalleeNameCount(structured_air_v2, callee_name);
-}
-
-pub fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
-    return air_model.typedStoreOpcodeCount(structured_air_v2);
-}
-
 fn lowerRegisterAggregateMake(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
@@ -427,7 +415,7 @@ pub fn typedV2SretIntegerAggregateRecords(
     if (leaf_count < 3) return false;
     return air_model.typedOpcodeCount(structured_air_v2, "arg") == leaf_count and
         air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
-        typedStoreOpcodeCount(structured_air_v2) == leaf_count and
+        air_model.typedStoreOpcodeCount(structured_air_v2) == leaf_count and
         air_model.typedOpcodeCount(structured_air_v2, "ret_load") == 1;
 }
 
@@ -783,7 +771,7 @@ pub fn typedV2PackedReadFlagRecords(
     return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "alloc") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "bitcast") == 2 and
-        typedStoreOpcodeCount(structured_air_v2) == 1 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_2") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
         air_model.typedHasReturnOpcode(structured_air_v2);
@@ -803,7 +791,7 @@ pub fn typedV2PackedReplaceLowRecords(
     return air_model.typedOpcodeCount(structured_air_v2, "arg") == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "alloc") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "bitcast") == 2 and
-        typedStoreOpcodeCount(structured_air_v2) == 2 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "trunc") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
@@ -852,7 +840,7 @@ pub fn typedV2SliceSumRecords(
         air_model.typedOpcodeCount(structured_air_v2, "cmp_lt") >= 1 and
         add_count == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "load") >= 6 and
-        typedStoreOpcodeCount(structured_air_v2) >= 5 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) >= 5 and
         air_model.typedHasReturnOpcode(structured_air_v2);
 }
 
@@ -880,7 +868,7 @@ pub fn typedV2ConditionalSliceSumRecords(
         air_model.typedOpcodeCount(structured_air_v2, "cmp_gt") == 1 and
         add_count == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "load") >= 6 and
-        typedStoreOpcodeCount(structured_air_v2) >= 5 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) >= 5 and
         air_model.typedHasReturnOpcode(structured_air_v2);
 }
 
@@ -1021,7 +1009,7 @@ pub fn typedV2AccumulatorLoopRecords(
         intcast_count == 1 and
         add_count == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "load") >= 4 and
-        typedStoreOpcodeCount(structured_air_v2) >= 4 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) >= 4 and
         air_model.typedHasReturnOpcode(structured_air_v2);
 }
 
@@ -1057,7 +1045,7 @@ pub fn typedV2ConditionalSlotUpdateRecords(
         add_count == 1 and
         sub_count == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "load") >= 3 and
-        typedStoreOpcodeCount(structured_air_v2) >= 4 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) >= 4 and
         air_model.typedHasReturnOpcode(structured_air_v2);
 }
 
@@ -1207,7 +1195,7 @@ pub fn typedV2RuntimeOptionalPointerMainRecords(
     return function_type.params.len == 0 and
         function_type.return_type.ir_type.eql(.{ .int = 32 }) and
         air_model.typedOpcodeCount(structured_air_v2, "call") == 2 and
-        typedCalleeNameCount(structured_air_v2, "optionalPtrValue") == 2 and
+        air_model.typedCalleeNameCount(structured_air_v2, "optionalPtrValue") == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "cmp_eq") == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "block") == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
@@ -1232,7 +1220,7 @@ pub fn typedV2RuntimePointerLoadStoreMainRecords(
     return function_type.params.len == 0 and
         function_type.return_type.ir_type.eql(.{ .int = 32 }) and
         air_model.typedOpcodeCount(structured_air_v2, "call") == 1 and
-        typedCalleeNameCount(structured_air_v2, "loadStore") == 1 and
+        air_model.typedCalleeNameCount(structured_air_v2, "loadStore") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "cmp_eq") == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "block") == 2 and
@@ -1267,7 +1255,7 @@ pub fn typedV2MixCAddMayPanicRecords(
         air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
         add_count == 1 and
-        typedCalleeNameCount(structured_air_v2, "defaultPanic") == 1 and
+        air_model.typedCalleeNameCount(structured_air_v2, "defaultPanic") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "unreach") == 1 and
         air_model.typedHasReturnOpcode(structured_air_v2);
 }
@@ -1287,7 +1275,7 @@ pub fn typedV2CheckedIntFromFloatRecords(
         air_model.typedOpcodeCount(structured_air_v2, "bit_or") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "int_from_float") == 1 and
-        typedCalleeNameCount(structured_air_v2, "integerPartOutOfBounds") == 1 and
+        air_model.typedCalleeNameCount(structured_air_v2, "integerPartOutOfBounds") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "unreach") == 1 and
         air_model.typedHasReturnOpcode(structured_air_v2);
 }
