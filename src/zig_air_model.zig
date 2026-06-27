@@ -133,7 +133,7 @@ pub const TypedFunctionView = struct {
             const typed_instruction = self.instruction(instruction_index) orelse return false;
             if (self.capability(typed_instruction).status == .ignored_metadata) continue;
             if (!saw_call) {
-                if (!isCallOpcode(typed_instruction.opcode)) return false;
+                if (!air_capabilities.isCallOpcode(typed_instruction.opcode)) return false;
                 const signature = detail(typed_instruction, "call_signature") orelse return false;
                 if (!std.mem.endsWith(u8, std.mem.trim(u8, signature, " "), "noreturn")) return false;
                 saw_call = true;
@@ -351,10 +351,6 @@ pub fn calleeWithMarker(callee_text: []const u8, marker: []const u8, external: b
         .name = callee_text[name_start .. name_start + name_end],
         .external = external,
     };
-}
-
-fn isCallOpcode(opcode: []const u8) bool {
-    return air_export.categoryForOpcode(opcode) == .call;
 }
 
 pub fn detail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
