@@ -113,7 +113,9 @@ Execution order:
    reusable predicates, and the semantic typed-v2 dispatcher is now split into
    registry-selected scalar, memory, optional, error-union, and
    pointer/aggregate domains so future model-backed lowering does not grow
-   another monolithic opcode chain.
+   another monolithic opcode chain. Branch-merge body lowering now also uses
+   the view for child instruction lookup and metadata capability checks instead
+   of indexing raw structured-air records directly.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.

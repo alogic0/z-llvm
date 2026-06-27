@@ -1578,14 +1578,13 @@ const LoweringContext = struct {
         merge_label: []const u8,
         merge_type: ?ZigType,
     ) LowerError!TypedBranchMergeResult {
-        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        const view = self.typed_view orelse return error.UnsupportedAir;
         self.block.* = ir.BasicBlock.init(label);
         var branch_value: ?TypedValue = null;
         var saw_branch = false;
         for (body.instructions) |instruction_index| {
-            const child = typedInstructionByIndex(structured_air_v2, instruction_index) orelse
-                return error.UnsupportedAir;
-            if (isIgnoredOpcode(child.opcode)) continue;
+            const child = view.instruction(instruction_index) orelse return error.UnsupportedAir;
+            if (view.capability(child).status == .ignored_metadata) continue;
             if (std.mem.eql(u8, child.opcode, "br")) {
                 if (child.operands.len != 2) return error.UnsupportedAir;
                 const target = typedBlockTarget(child.operands[0]) orelse return error.UnsupportedAir;
