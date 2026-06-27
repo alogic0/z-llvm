@@ -985,6 +985,18 @@ const LoweringContext = struct {
     }
 
     fn lowerTypedSemanticInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (try self.lowerTypedScalarSemanticInstruction(instruction)) return;
+        if (try self.lowerTypedMemorySemanticInstruction(instruction)) return;
+        if (try self.lowerTypedOptionalSemanticInstruction(instruction)) return;
+        if (try self.lowerTypedErrorUnionSemanticInstruction(instruction)) return;
+        if (try self.lowerTypedPointerAggregateSemanticInstruction(instruction)) return;
+        return error.UnsupportedAir;
+    }
+
+    fn lowerTypedScalarSemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+    ) !bool {
         if (std.mem.eql(u8, instruction.opcode, "arg")) {
             try self.lowerTypedArg(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "add_with_overflow")) {
@@ -995,7 +1007,17 @@ const LoweringContext = struct {
             try self.lowerTypedCompare(instruction);
         } else if (isCastOpcode(instruction.opcode)) {
             try self.lowerTypedCast(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "alloc")) {
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    fn lowerTypedMemorySemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+    ) !bool {
+        if (std.mem.eql(u8, instruction.opcode, "alloc")) {
             try self.lowerTypedAlloca(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "load")) {
             try self.lowerTypedLoad(instruction);
@@ -1003,14 +1025,34 @@ const LoweringContext = struct {
             std.mem.eql(u8, instruction.opcode, "store_safe"))
         {
             try self.lowerTypedStore(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "is_non_null")) {
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    fn lowerTypedOptionalSemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+    ) !bool {
+        if (std.mem.eql(u8, instruction.opcode, "is_non_null")) {
             try self.lowerTypedIsNonNull(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "is_non_err")) {
-            try self.lowerTypedIsNonErr(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "wrap_optional")) {
             try self.lowerTypedWrapOptional(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "optional_payload")) {
             try self.lowerTypedOptionalPayload(instruction);
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    fn lowerTypedErrorUnionSemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+    ) !bool {
+        if (std.mem.eql(u8, instruction.opcode, "is_non_err")) {
+            try self.lowerTypedIsNonErr(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "wrap_errunion_payload")) {
             try self.lowerTypedWrapErrorUnionPayload(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "wrap_errunion_err")) {
@@ -1021,7 +1063,17 @@ const LoweringContext = struct {
             try self.lowerTypedUnwrapErrorUnionErr(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "try")) {
             try self.lowerTypedTry(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "slice")) {
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    fn lowerTypedPointerAggregateSemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+    ) !bool {
+        if (std.mem.eql(u8, instruction.opcode, "slice")) {
             try self.lowerTypedSlice(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ptr_add")) {
             try self.lowerTypedPtrGep(instruction);
@@ -1034,8 +1086,9 @@ const LoweringContext = struct {
         } else if (isFieldPtrOpcode(instruction.opcode)) {
             try self.lowerTypedFieldPtr(instruction);
         } else {
-            return error.UnsupportedAir;
+            return false;
         }
+        return true;
     }
 
     fn lowerTypedBackendRuntimeInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
