@@ -195,7 +195,10 @@ Execution order:
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
-   targeted.
+   targeted. Frontier ABI boundary category names, diagnostics, source-stage
+   classifiers, codegen-error classifiers, and expected boundary row counts now
+   live in `src/abi_boundaries.zig`; `src/uncurated_air_gate.zig` consumes that
+   registry instead of owning ad hoc boundary metadata.
 5. Aggregate ABI slice: route aggregate argument, return, sret, byval, field
    offset, and copy decisions through the shared type-layout result plus the
    SysV aggregate classifier. Do not add function-name-specific aggregate
