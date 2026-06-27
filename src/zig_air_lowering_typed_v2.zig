@@ -19,7 +19,7 @@ const typedCallee = air_model.callee;
 const typedCalleeName = air_model.calleeName;
 const typedInstructionByIndex = air_model.instructionByIndex;
 const typedSingleInstructionByOpcode = air_model.singleInstructionByOpcode;
-const shortFunctionName = lowering_parser.shortFunctionName;
+const shortFunctionName = air_model.shortFunctionName;
 const isCallOpcode = air_capabilities.isCallOpcode;
 const ownPrint = lowering_parser.ownPrint;
 const splitTopLevel = lowering_parser.splitTopLevel;
@@ -136,7 +136,7 @@ fn lowerMaybeError(allocator: std.mem.Allocator, air_function: air_export.Functi
         return error.UnsupportedAir;
     }
     const param_ty = function_type.params[0].ir_type;
-    var function = ir.Function.init(lowering_parser.shortFunctionName(air_function.name), .{ .int = 64 });
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 64 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
     function.calling_conv = irCallingConvention(function_type);

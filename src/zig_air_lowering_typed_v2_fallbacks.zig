@@ -8,7 +8,7 @@ const typed_v2 = @import("zig_air_lowering_typed_v2.zig");
 const FunctionType = air_model.FunctionType;
 const parseFunctionType = lowering_parser.parseFunctionType;
 const ownPrint = lowering_parser.ownPrint;
-const shortFunctionName = lowering_parser.shortFunctionName;
+const shortFunctionName = air_model.shortFunctionName;
 
 const isSysVRegisterAggregateCandidate = typed_v2.isSysVRegisterAggregateCandidate;
 const typedV2RegisterAggregateLeafPaths = typed_v2.typedV2RegisterAggregateLeafPaths;

@@ -382,6 +382,10 @@ pub fn calleeWithMarker(callee_text: []const u8, marker: []const u8, external: b
     };
 }
 
+pub fn shortFunctionName(name: []const u8) []const u8 {
+    return name;
+}
+
 pub fn detail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
     for (instruction.details) |entry| {
         if (std.mem.eql(u8, entry.key, key)) return entry.value;

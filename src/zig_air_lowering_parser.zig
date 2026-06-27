@@ -667,10 +667,6 @@ pub fn intBits(ty: ir.Type) ?u16 {
     };
 }
 
-pub fn shortFunctionName(name: []const u8) []const u8 {
-    return name;
-}
-
 pub fn isPointerType(text: []const u8) bool {
     return std.mem.startsWith(u8, text, "*") or
         std.mem.startsWith(u8, text, "[*]") or
