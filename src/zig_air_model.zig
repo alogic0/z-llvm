@@ -148,7 +148,7 @@ pub const TypedFunctionView = struct {
             "unwrap_errunion_err",
         })) return false;
         const cond_br = self.instruction(instruction_index) orelse return false;
-        if (!std.mem.eql(u8, cond_br.opcode, "cond_br") or cond_br.operands.len != 1) return false;
+        if (!air_capabilities.isCondBrOpcode(cond_br.opcode) or cond_br.operands.len != 1) return false;
         const then_body = self.body(.then_body, cond_br.index) orelse return false;
         const else_body = self.body(.else_body, cond_br.index) orelse return false;
         return self.bodyHasReturn(then_body) and self.bodyHasReturn(else_body);
@@ -195,7 +195,7 @@ pub const TypedFunctionView = struct {
             }
             if (saw_return) return false;
             if (!air_capabilities.typedV2CanLower(typed_capability) or
-                std.mem.eql(u8, typed_instruction.opcode, "block"))
+                air_capabilities.isBlockOpcode(typed_instruction.opcode))
             {
                 return false;
             }
@@ -242,7 +242,7 @@ pub const TypedFunctionView = struct {
     ) bool {
         const branch_index = self.singleSemanticInstruction(structured_body) orelse return false;
         const branch = self.instruction(branch_index) orelse return false;
-        if (!std.mem.eql(u8, branch.opcode, "br") or branch.operands.len != 2) return false;
+        if (!air_capabilities.isBrOpcode(branch.opcode) or branch.operands.len != 2) return false;
         const target = blockTarget(branch.operands[0]) orelse return false;
         if (target != target_block) return false;
         if (!std.mem.eql(u8, branch.operands[1].kind, "const")) return false;
@@ -264,7 +264,7 @@ pub const TypedFunctionView = struct {
         const block_body = self.body(.block, block_index) orelse return false;
         const cond_index = self.singleSemanticInstruction(block_body) orelse return false;
         const cond = self.instruction(cond_index) orelse return false;
-        if (!std.mem.eql(u8, cond.opcode, "cond_br")) return false;
+        if (!air_capabilities.isCondBrOpcode(cond.opcode)) return false;
         const then_body = self.body(.then_body, cond.index) orelse return false;
         const else_body = self.body(.else_body, cond.index) orelse return false;
         return self.voidGuardBlock(block_index, then_body, else_body);
@@ -297,13 +297,13 @@ pub const TypedFunctionView = struct {
             const typed_instruction = self.instruction(instruction_index) orelse return false;
             const typed_capability = self.capability(typed_instruction);
             if (typed_capability.status == .ignored_metadata) continue;
-            if (std.mem.eql(u8, typed_instruction.opcode, "cond_br")) {
+            if (air_capabilities.isCondBrOpcode(typed_instruction.opcode)) {
                 if (cond_index != null or typed_instruction.operands.len != 1) return false;
                 cond_index = instruction_index;
                 continue;
             }
             if (cond_index != null) return false;
-            if (!air_capabilities.typedV2CanLower(typed_capability) or std.mem.eql(u8, typed_instruction.opcode, "block")) return false;
+            if (!air_capabilities.typedV2CanLower(typed_capability) or air_capabilities.isBlockOpcode(typed_instruction.opcode)) return false;
         }
         const cond = cond_index orelse return false;
         const then_body = self.body(.then_body, cond) orelse return false;
@@ -325,7 +325,7 @@ pub const TypedFunctionView = struct {
             const typed_instruction = self.instruction(instruction_index) orelse return false;
             const typed_capability = self.capability(typed_instruction);
             if (typed_capability.status == .ignored_metadata) continue;
-            if (std.mem.eql(u8, typed_instruction.opcode, "br")) {
+            if (air_capabilities.isBrOpcode(typed_instruction.opcode)) {
                 if (saw_branch or typed_instruction.operands.len != 2) return false;
                 const target = blockTarget(typed_instruction.operands[0]) orelse return false;
                 if (target != target_block) return false;
@@ -333,7 +333,7 @@ pub const TypedFunctionView = struct {
                 continue;
             }
             if (saw_branch) return false;
-            if (std.mem.eql(u8, typed_instruction.opcode, "block")) {
+            if (air_capabilities.isBlockOpcode(typed_instruction.opcode)) {
                 if (!self.genericCfgBlock(typed_instruction.index) and
                     !self.voidGuardBlockByIndex(typed_instruction.index))
                 {
@@ -353,13 +353,13 @@ pub const TypedFunctionView = struct {
 
     pub fn containsGenericCfgBlockInstruction(self: TypedFunctionView, instruction_index: u32) bool {
         for (self.function.instructions) |instruction_record| {
-            if (!std.mem.eql(u8, instruction_record.opcode, "block")) continue;
+            if (!air_capabilities.isBlockOpcode(instruction_record.opcode)) continue;
             if (!self.genericCfgBlock(instruction_record.index)) continue;
             const block_body = self.body(.block, instruction_record.index) orelse return false;
             if (self.containsInstruction(block_body, instruction_index)) return true;
             for (block_body.instructions) |child_index| {
                 const child = self.instruction(child_index) orelse return false;
-                if (!std.mem.eql(u8, child.opcode, "cond_br")) continue;
+                if (!air_capabilities.isCondBrOpcode(child.opcode)) continue;
                 const then_body = self.body(.then_body, child.index) orelse return false;
                 const else_body = self.body(.else_body, child.index) orelse return false;
                 return self.genericCfgBodyContains(then_body, instruction_index) or
@@ -377,13 +377,13 @@ pub const TypedFunctionView = struct {
         if (self.containsInstruction(structured_body, instruction_index)) return true;
         for (structured_body.instructions) |candidate| {
             const typed_instruction = self.instruction(candidate) orelse return false;
-            if (!std.mem.eql(u8, typed_instruction.opcode, "block")) continue;
+            if (!air_capabilities.isBlockOpcode(typed_instruction.opcode)) continue;
             if (self.voidGuardBlockByIndex(typed_instruction.index)) {
                 const nested_body = self.body(.block, typed_instruction.index) orelse return false;
                 if (self.containsInstruction(nested_body, instruction_index)) return true;
                 for (nested_body.instructions) |nested_candidate| {
                     const nested_instruction = self.instruction(nested_candidate) orelse return false;
-                    if (!std.mem.eql(u8, nested_instruction.opcode, "cond_br")) continue;
+                    if (!air_capabilities.isCondBrOpcode(nested_instruction.opcode)) continue;
                     const then_body = self.body(.then_body, nested_instruction.index) orelse return false;
                     const else_body = self.body(.else_body, nested_instruction.index) orelse return false;
                     if (self.containsInstruction(then_body, instruction_index) or
@@ -399,7 +399,7 @@ pub const TypedFunctionView = struct {
             if (self.containsInstruction(nested_body, instruction_index)) return true;
             for (nested_body.instructions) |nested_candidate| {
                 const nested_instruction = self.instruction(nested_candidate) orelse return false;
-                if (!std.mem.eql(u8, nested_instruction.opcode, "cond_br")) continue;
+                if (!air_capabilities.isCondBrOpcode(nested_instruction.opcode)) continue;
                 const then_body = self.body(.then_body, nested_instruction.index) orelse return false;
                 const else_body = self.body(.else_body, nested_instruction.index) orelse return false;
                 if (self.genericCfgBodyContains(then_body, instruction_index) or
@@ -458,13 +458,13 @@ pub fn simpleSelectBlock(function: air_export.Function, block_index: u32) bool {
     var after_cond = false;
     for (function.instructions[block_position + 1 ..]) |instruction| {
         if (instruction.indent <= block_instruction.indent) break;
-        if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+        if (air_capabilities.isCondBrOpcode(instruction.opcode)) {
             cond_count += 1;
             after_cond = true;
             continue;
         }
         if (!after_cond or air_capabilities.isIgnoredOpcode(instruction.opcode)) continue;
-        if (std.mem.eql(u8, instruction.opcode, "br")) {
+        if (air_capabilities.isBrOpcode(instruction.opcode)) {
             var fields = air_text.splitTopLevel(instruction.payload, ',');
             const target = fields.next() orelse return false;
             if (air_text.instructionRef(target) == block_index) matching_br_count += 1;
@@ -483,7 +483,7 @@ pub fn belongsToSimpleSelectBlock(function: air_export.Function, instruction_ind
         parent_position -= 1;
         const candidate = function.instructions[parent_position];
         if (candidate.indent >= instruction.indent) continue;
-        if (std.mem.eql(u8, candidate.opcode, "block")) {
+        if (air_capabilities.isBlockOpcode(candidate.opcode)) {
             return simpleSelectBlock(function, candidate.index);
         }
     }
@@ -598,7 +598,7 @@ pub fn typedConstI32Operand(instruction: air_export.TypedInstruction, operand_in
 }
 
 pub fn typedBranchI32ConstValue(instruction: air_export.TypedInstruction) ?i32 {
-    if (!std.mem.eql(u8, instruction.opcode, "br")) return null;
+    if (!air_capabilities.isBrOpcode(instruction.opcode)) return null;
     if (instruction.operands.len != 2) return null;
     if (!std.mem.eql(u8, instruction.operands[1].kind, "const") or
         !std.mem.eql(u8, instruction.operands[1].type_text, "i32")) return null;

@@ -522,6 +522,18 @@ pub fn isUnreachOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "unreach");
 }
 
+pub fn isBlockOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "block");
+}
+
+pub fn isBrOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "br");
+}
+
+pub fn isCondBrOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "cond_br");
+}
+
 pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, opcode, "call_always_tail")) return "tail";
     if (std.mem.eql(u8, opcode, "call_never_tail")) return "notail";
@@ -804,6 +816,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(!isReturnOpcode("call"));
     try std.testing.expect(isUnreachOpcode("unreach"));
     try std.testing.expect(!isUnreachOpcode("ret"));
+    try std.testing.expect(isBlockOpcode("block"));
+    try std.testing.expect(isBrOpcode("br"));
+    try std.testing.expect(isCondBrOpcode("cond_br"));
+    try std.testing.expect(!isCondBrOpcode("br"));
     try std.testing.expect(isStraightLineOpcode("assembly"));
     try std.testing.expect(isInventoryKnownOpcode("assembly"));
     try std.testing.expect(!isTypedV2LowerableOpcode("assembly"));
