@@ -445,6 +445,10 @@ pub fn fieldIndex(instruction: air_export.TypedInstruction) ?i128 {
     return std.fmt.parseInt(i128, field_index_text, 10) catch null;
 }
 
+pub fn arrayElemTableText(instruction: air_export.TypedInstruction) ?[]const u8 {
+    return operandTextDetail(instruction, 0);
+}
+
 pub fn calleeName(callee_text: []const u8) ?[]const u8 {
     return (callee(callee_text) orelse return null).name;
 }

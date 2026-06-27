@@ -1856,7 +1856,7 @@ const LoweringContext = struct {
 
     fn lowerTypedArrayElemVal(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
         if (instruction.operands.len != 2) return error.UnsupportedAir;
-        const table_text = typedOperandTextDetail(instruction, 0) orelse return error.UnsupportedAir;
+        const table_text = air_model.arrayElemTableText(instruction) orelse return error.UnsupportedAir;
         const index = try self.resolveTypedOperand(instruction, 1);
         if (!index.ty.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
         if (!std.mem.eql(u8, table_text, "<[4]u8, \"\\x00\\x04\\x08\\x0c\".*>")) return error.UnsupportedAir;
