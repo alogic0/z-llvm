@@ -2,7 +2,6 @@ const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
-const sib = @import("structured_ir_builder.zig");
 const target_mod = @import("target.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
@@ -68,6 +67,8 @@ const isErrorUnionTypeText = air_types.isErrorUnionTypeText;
 const errorUnionPayloadType = air_types.errorUnionPayloadType;
 const parseConstant = air_values.parseConstant;
 const parseSymbolPointer = air_values.parseSymbolPointer;
+const materializedGlobalInitializer = air_values.materializedGlobalInitializer;
+const cStringLiteralByteLen = air_values.cStringLiteralByteLen;
 const parseInstructionRef = air_text.instructionRef;
 const isSimpleSelectBlock = air_model.simpleSelectBlock;
 const belongsToSimpleSelectBlock = air_model.belongsToSimpleSelectBlock;
@@ -314,54 +315,6 @@ fn typedOperandCoverage(structured_air_v2: air_export.StructuredAirV2) bool {
         }
     }
     return true;
-}
-
-fn materializedGlobalInitializer(ty: ir.Type, initializer_text: ?[]const u8) ir.GlobalInitializer {
-    if (initializer_text) |text| {
-        const trimmed = std.mem.trim(u8, text, " \t");
-        if (!std.mem.eql(u8, trimmed, "-")) {
-            const parsed = sib.parseGlobalInitializer(ty, trimmed);
-            if (parsed != .@"opaque") return parsed;
-        }
-    }
-    return switch (ty) {
-        .int => .{ .scalar = .{ .int = 0 } },
-        .ptr => .{ .scalar = .null_value },
-        .float, .double, .x86_fp80, .fp128 => .{ .scalar = .{ .fp = "0.0" } },
-        .void, .metadata, .aggregate, .vector => .none,
-    };
-}
-
-fn cStringLiteralByteLen(body: []const u8) ?usize {
-    var index: usize = 0;
-    var len: usize = 0;
-    while (index < body.len) {
-        if (body[index] != '\\') {
-            len += 1;
-            index += 1;
-            continue;
-        }
-        index += 1;
-        if (index >= body.len) return null;
-        switch (body[index]) {
-            '\\', '"' => {
-                len += 1;
-                index += 1;
-            },
-            'n', 'r', 't', '0' => {
-                len += 1;
-                index += 1;
-            },
-            'x' => {
-                if (index + 2 >= body.len) return null;
-                _ = std.fmt.parseInt(u8, body[index + 1 .. index + 3], 16) catch return null;
-                len += 1;
-                index += 3;
-            },
-            else => return null,
-        }
-    }
-    return len;
 }
 
 pub fn isRootSourceFunction(root_stem: []const u8, function_name: []const u8) bool {

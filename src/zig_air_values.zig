@@ -3,6 +3,8 @@ const air_model = @import("zig_air_model.zig");
 const air_semantics = @import("zig_air_semantics.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
+const ir = @import("ir.zig");
+const sib = @import("structured_ir_builder.zig");
 
 const ZigType = air_model.ZigType;
 const TypedValue = air_model.TypedValue;
@@ -126,6 +128,54 @@ pub fn ptrCastSymbol(text: []const u8) ?[]const u8 {
     return text[symbol_start..symbol_end];
 }
 
+pub fn materializedGlobalInitializer(ty: ir.Type, initializer_text: ?[]const u8) ir.GlobalInitializer {
+    if (initializer_text) |text| {
+        const trimmed = std.mem.trim(u8, text, " \t");
+        if (!std.mem.eql(u8, trimmed, "-")) {
+            const parsed = sib.parseGlobalInitializer(ty, trimmed);
+            if (parsed != .@"opaque") return parsed;
+        }
+    }
+    return switch (ty) {
+        .int => .{ .scalar = .{ .int = 0 } },
+        .ptr => .{ .scalar = .null_value },
+        .float, .double, .x86_fp80, .fp128 => .{ .scalar = .{ .fp = "0.0" } },
+        .void, .metadata, .aggregate, .vector => .none,
+    };
+}
+
+pub fn cStringLiteralByteLen(body: []const u8) ?usize {
+    var index: usize = 0;
+    var len: usize = 0;
+    while (index < body.len) {
+        if (body[index] != '\\') {
+            len += 1;
+            index += 1;
+            continue;
+        }
+        index += 1;
+        if (index >= body.len) return null;
+        switch (body[index]) {
+            '\\', '"' => {
+                len += 1;
+                index += 1;
+            },
+            'n', 'r', 't', '0' => {
+                len += 1;
+                index += 1;
+            },
+            'x' => {
+                if (index + 2 >= body.len) return null;
+                _ = std.fmt.parseInt(u8, body[index + 1 .. index + 3], 16) catch return null;
+                len += 1;
+                index += 3;
+            },
+            else => return null,
+        }
+    }
+    return len;
+}
+
 test "parse static AIR constants" {
     const parsed = parseConstant("<i32, 42>") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(@as(i128, 42), parsed.value.int);
@@ -134,4 +184,13 @@ test "parse static AIR constants" {
 test "parse symbol pointers" {
     const parsed = parseSymbolPointer("<*const i8, &panic_message>") orelse return error.TestExpectedEqual;
     try std.testing.expectEqualStrings("panic_message", parsed.symbol);
+}
+
+test "materialize default global initializers and C string literal lengths" {
+    try std.testing.expectEqual(ir.GlobalInitializer{ .scalar = .{ .int = 0 } }, materializedGlobalInitializer(.{ .int = 32 }, null));
+    try std.testing.expectEqual(ir.GlobalInitializer{ .scalar = .null_value }, materializedGlobalInitializer(.ptr, "-"));
+    try std.testing.expectEqual(@as(?usize, 3), cStringLiteralByteLen("abc"));
+    try std.testing.expectEqual(@as(?usize, 2), cStringLiteralByteLen("a\\n"));
+    try std.testing.expectEqual(@as(?usize, 1), cStringLiteralByteLen("\\x41"));
+    try std.testing.expect(cStringLiteralByteLen("\\x4") == null);
 }
