@@ -145,7 +145,9 @@ Execution order:
    cast, field-pointer, call, or typed-v2 lowerable opcode checks.
    Typed branch-to-i32-constant queries now also live in
    `src/zig_air_model.zig`, so optional-payload fallback and dense-switch
-   result extraction no longer scan raw typed-v2 records locally.
+   result extraction no longer scan raw typed-v2 records locally. The
+   opcode-filtered typed i32 operand query used by optional-pointer add
+   lowering is model-owned as well.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
