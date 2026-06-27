@@ -30,16 +30,15 @@ pub fn lowerTypedV2ArraySum(
 
     var aggregate_init: ?air_export.TypedInstruction = null;
     for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "aggregate_init")) continue;
+        if (!air_capabilities.isAggregateInitOpcode(instruction.opcode)) continue;
         if (!std.mem.eql(u8, instruction.result_type, "[3]i32") or instruction.operands.len != 3) return null;
         if (aggregate_init != null) return null;
         aggregate_init = instruction;
     }
     const init = aggregate_init orelse return null;
     for (init.operands, 0..) |operand, index| {
-        if (!std.mem.eql(u8, operand.kind, "inst") or !std.mem.eql(u8, operand.type_text, "i32")) return null;
-        const operand_index = std.fmt.parseInt(usize, operand.value, 10) catch return null;
-        if (operand_index != index) return null;
+        const operand_index = air_model.typedI32InstOperandIndex(operand) orelse return null;
+        if (@as(usize, operand_index) != index) return null;
     }
 
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });

@@ -653,6 +653,11 @@ pub fn typedInstOperandIndex(operand: air_export.TypedOperand) ?u32 {
     return std.fmt.parseInt(u32, operand.value, 10) catch null;
 }
 
+pub fn typedI32InstOperandIndex(operand: air_export.TypedOperand) ?u32 {
+    if (!std.mem.eql(u8, operand.type_text, "i32")) return null;
+    return typedInstOperandIndex(operand);
+}
+
 pub fn isTypedConstOperand(operand: air_export.TypedOperand) bool {
     return std.mem.eql(u8, operand.kind, "const");
 }
