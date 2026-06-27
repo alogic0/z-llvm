@@ -1,5 +1,6 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
+const air_capabilities = @import("zig_air_capabilities.zig");
 const ir = @import("ir.zig");
 const lowering_parser = @import("zig_air_lowering_parser.zig");
 
@@ -10,7 +11,7 @@ const parseInstructionRef = lowering_parser.parseInstructionRef;
 const shortFunctionName = lowering_parser.shortFunctionName;
 const ownPrint = lowering_parser.ownPrint;
 const splitTopLevel = lowering_parser.splitTopLevel;
-const isIgnoredOpcode = lowering_parser.isIgnoredOpcode;
+const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
 
 fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) usize {
@@ -140,7 +141,6 @@ pub fn typedV2AggregateMakePairRecords(
         typedStoreOpcodeCount(structured_air_v2) == 2 and
         typedOpcodeCount(structured_air_v2, "ret_load") == 1;
 }
-
 
 const AccumulatorLoopShape = struct {
     limit_arg: u32,

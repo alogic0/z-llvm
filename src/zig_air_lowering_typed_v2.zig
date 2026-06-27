@@ -1,5 +1,6 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
+const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
 const ir = @import("ir.zig");
 const lowering_parser = @import("zig_air_lowering_parser.zig");
@@ -19,7 +20,7 @@ const typedCalleeName = air_model.calleeName;
 const typedInstructionByIndex = air_model.instructionByIndex;
 const typedSingleInstructionByOpcode = air_model.singleInstructionByOpcode;
 const shortFunctionName = lowering_parser.shortFunctionName;
-const isCallOpcode = lowering_parser.isCallOpcode;
+const isCallOpcode = air_capabilities.isCallOpcode;
 const ownPrint = lowering_parser.ownPrint;
 const splitTopLevel = lowering_parser.splitTopLevel;
 const parseSymbolPointer = lowering_parser.parseSymbolPointer;
