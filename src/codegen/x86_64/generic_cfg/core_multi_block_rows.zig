@@ -13,6 +13,7 @@ const MachineFunction = shared.MachineFunction;
 const ArgReg = shared.ArgReg;
 
 const appendAlignedDirectCall = shared.appendAlignedDirectCall;
+const appendDirectCallWithStackArgs = shared.appendDirectCallWithStackArgs;
 const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
 const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
 const appendGenericCfgI32Zero = core_cfg_emit.appendGenericCfgI32Zero;
@@ -36,6 +37,7 @@ const isCalleeName = shared.isCalleeName;
 const isInt = shared.isInt;
 const isNamed = shared.isNamed;
 const machineBinaryOp = cabi_call_lowering.machineBinaryOp;
+const appendSysVScalarCallArgsWithBlock = cabi_call_lowering.appendSysVScalarCallArgsWithBlock;
 const paramReg = cabi_abi_helpers.paramReg;
 const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;
 const paramValueReg = cabi_abi_helpers.paramValueReg;
@@ -1876,7 +1878,8 @@ pub fn lowerGenericCfgBranchMergeReturn(allocator: std.mem.Allocator, machine: *
 }
 
 pub fn lowerGenericCfgTerminalBranchReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len < 3 or function.blocks.items.len > 4) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) and !function.ret_ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len < 3 or function.blocks.items.len > 4) return false;
     const entry = function.blocks.items[0];
     const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
         .condbr => |condbr| condbr,
@@ -1901,7 +1904,7 @@ pub fn lowerGenericCfgTerminalBranchReturn(allocator: std.mem.Allocator, machine
         return true;
     }
 
-    try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, entry, condbr.cond, then_block.name);
+    try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, entry, entry, condbr.cond, then_block.name);
     try emitGenericCfgTerminalReturnBlock(allocator, machine, function, entry, else_block);
     try appendGenericCfgBlockLabel(allocator, machine, then_block.name);
     try emitGenericCfgTerminalReturnBlock(allocator, machine, function, entry, then_block);
@@ -1939,30 +1942,34 @@ fn genericCfgSupportsTerminalReturnBlock(function: ir.Function, entry: ir.BasicB
         .ret => |ret| ret,
         else => return false,
     };
-    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (!ret.ty.eql(function.ret_ty)) return false;
     const ret_value = ret.value orelse return false;
-    return genericCfgSupportsI32Value(function, ret_value) or terminalBlockCanMaterializeI32Value(entry, block, ret_value);
+    if (function.ret_ty.eql(.{ .int = 32 })) {
+        return genericCfgSupportsI32Value(function, ret_value) or terminalBlockCanMaterializeI32Value(function, entry, block, ret_value);
+    }
+    return terminalBlockCanMaterializeI64Value(function, entry, block, ret_value);
 }
 
 fn terminalScopeInstruction(entry: ir.BasicBlock, block: ir.BasicBlock, name: []const u8) ?ir.Instruction {
     return findInstruction(block, name) orelse findInstruction(entry, name);
 }
 
-fn terminalBlockCanMaterializeI32Value(entry: ir.BasicBlock, block: ir.BasicBlock, value: ir.Value) bool {
+fn terminalBlockCanMaterializeI32Value(function: ir.Function, entry: ir.BasicBlock, block: ir.BasicBlock, value: ir.Value) bool {
     return switch (value) {
         .int => true,
         .named => |name| blk: {
+            if ((paramRegOrNull(function, name, .{ .int = 32 }) catch null) != null) break :blk true;
             const instruction = terminalScopeInstruction(entry, block, name) orelse break :blk false;
             switch (instruction.kind) {
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 32 })) break :blk false;
                     if (machineBinaryOp(binary.op) == null) break :blk false;
-                    break :blk terminalBlockCanMaterializeI32Value(entry, block, binary.lhs) and
-                        terminalBlockCanMaterializeI32Value(entry, block, binary.rhs);
+                    break :blk terminalBlockCanMaterializeI32Value(function, entry, block, binary.lhs) and
+                        terminalBlockCanMaterializeI32Value(function, entry, block, binary.rhs);
                 },
                 .cast => |cast| {
                     if (cast.op != .trunc or !cast.from_ty.eql(.{ .int = 64 }) or !cast.to_ty.eql(.{ .int = 32 })) break :blk false;
-                    break :blk terminalBlockCanMaterializeI64Value(entry, block, cast.value);
+                    break :blk terminalBlockCanMaterializeI64Value(function, entry, block, cast.value);
                 },
                 else => break :blk false,
             }
@@ -1971,33 +1978,37 @@ fn terminalBlockCanMaterializeI32Value(entry: ir.BasicBlock, block: ir.BasicBloc
     };
 }
 
-fn terminalBlockCanMaterializeI64Value(entry: ir.BasicBlock, block: ir.BasicBlock, value: ir.Value) bool {
+fn terminalBlockCanMaterializeI64Value(function: ir.Function, entry: ir.BasicBlock, block: ir.BasicBlock, value: ir.Value) bool {
     return switch (value) {
         .int => true,
         .named => |name| blk: {
+            if ((paramRegOrNull(function, name, .{ .int = 64 }) catch null) != null) break :blk true;
             const instruction = terminalScopeInstruction(entry, block, name) orelse break :blk false;
             switch (instruction.kind) {
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 64 })) break :blk false;
                     switch (binary.op) {
-                        .add, .@"and", .lshr => {},
+                        .add, .@"and", .lshr, .shl => {},
                         else => break :blk false,
                     }
                     if (binary.rhs != .int) break :blk false;
-                    break :blk terminalBlockCanMaterializeI64Value(entry, block, binary.lhs);
+                    break :blk terminalBlockCanMaterializeI64Value(function, entry, block, binary.lhs);
                 },
                 .cast => |cast| {
                     if (cast.op != .zext or !cast.to_ty.eql(.{ .int = 64 })) break :blk false;
-                    break :blk switch (cast.value) {
-                        .int => true,
-                        .named => |value_name| terminalScopeInstruction(entry, block, value_name) != null,
-                        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-                    };
+                    switch (cast.from_ty) {
+                        .int => |bits| if (bits > 32) break :blk false,
+                        else => break :blk false,
+                    }
+                    break :blk terminalBlockCanMaterializeI32Value(function, entry, block, cast.value);
                 },
                 .select => |select| {
                     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 64 })) break :blk false;
-                    break :blk terminalBlockCanMaterializeI64Value(entry, block, select.true_value) and
-                        terminalBlockCanMaterializeI64Value(entry, block, select.false_value);
+                    break :blk terminalBlockCanMaterializeI64Value(function, entry, block, select.true_value) and
+                        terminalBlockCanMaterializeI64Value(function, entry, block, select.false_value);
+                },
+                .call => |call| {
+                    break :blk call.ret_ty.eql(.{ .int = 64 }) and call.inline_asm == null and call.callee_value == null;
                 },
                 else => break :blk false,
             }
@@ -2010,6 +2021,7 @@ fn emitGenericCfgTerminalConditionTrueBranch(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
+    entry: ir.BasicBlock,
     block: ir.BasicBlock,
     cond: ir.Value,
     true_label: []const u8,
@@ -2028,7 +2040,7 @@ fn emitGenericCfgTerminalConditionTrueBranch(
     };
     if (icmp.operand_ty.eql(.{ .int = 64 }) and (icmp.predicate == .eq or icmp.predicate == .ne)) {
         const value = if (isInt(icmp.rhs, 0)) icmp.lhs else if (isInt(icmp.lhs, 0)) icmp.rhs else return error.UnsupportedCodegenValue;
-        try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, value);
+        try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, entry, block, value);
         try machine.instructions.append(allocator, .test_rax_rax);
         try appendGenericCfgConditionalBranch(allocator, machine, if (icmp.predicate == .eq) .je else .jne, true_label);
         return;
@@ -2047,7 +2059,13 @@ fn emitGenericCfgTerminalReturnBlock(
         .ret => |ret| ret,
         else => return error.UnsupportedCodegenControlFlow,
     };
-    try emitGenericCfgTerminalI32ValueIntoEax(allocator, machine, function, entry, block, ret.value orelse return error.InvalidRet);
+    if (function.ret_ty.eql(.{ .int = 32 })) {
+        try emitGenericCfgTerminalI32ValueIntoEax(allocator, machine, function, entry, block, ret.value orelse return error.InvalidRet);
+    } else if (function.ret_ty.eql(.{ .int = 64 })) {
+        try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, entry, block, ret.value orelse return error.InvalidRet);
+    } else {
+        return error.UnsupportedCodegenType;
+    }
     try appendGenericCfgReturn(allocator, machine);
 }
 
@@ -2130,6 +2148,10 @@ fn emitGenericCfgTerminalI64ValueIntoRax(
                             if (rhs < 0 or rhs > 63) return error.UnsupportedCodegenValue;
                             if (rhs != 0) try machine.instructions.append(allocator, .{ .shr_rax_imm6 = @intCast(rhs) });
                         },
+                        .shl => {
+                            if (rhs < 0 or rhs > 63) return error.UnsupportedCodegenValue;
+                            if (rhs != 0) try machine.instructions.append(allocator, .{ .shl_rax_imm6 = @intCast(rhs) });
+                        },
                         else => return error.UnsupportedCodegenInstruction,
                     }
                 },
@@ -2139,14 +2161,30 @@ fn emitGenericCfgTerminalI64ValueIntoRax(
                         .int => |bits| if (bits > 32) return error.UnsupportedCodegenType,
                         else => return error.UnsupportedCodegenType,
                     }
-                    try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, entry, block, cast.value);
+                    try emitGenericCfgTerminalI32ValueIntoEax(allocator, machine, function, entry, block, cast.value);
                 },
                 .select => |select| try emitGenericCfgTerminalI64SelectIntoRax(allocator, machine, function, entry, block, name, select),
+                .call => |call| try emitGenericCfgTerminalI64CallIntoRax(allocator, machine, function, block, call),
                 else => return error.UnsupportedCodegenInstruction,
             }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
+}
+
+fn emitGenericCfgTerminalI64CallIntoRax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    call: ir.CallInst,
+) !void {
+    if (!call.ret_ty.eql(.{ .int = 64 }) or call.inline_asm != null or call.callee_value != null) {
+        return error.UnsupportedCodegenInstruction;
+    }
+    if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
+    const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
 }
 
 fn emitGenericCfgTerminalI64SelectIntoRax(
@@ -2168,9 +2206,19 @@ fn emitGenericCfgTerminalI64SelectIntoRax(
         .icmp => |icmp| icmp,
         else => return error.UnsupportedCodegenInstruction,
     };
-    _ = result_name;
-    const true_label = "generic_cfg_terminal_i64_select_true";
-    const end_label = "generic_cfg_terminal_i64_select_end";
+    const label_suffix = machine.instructions.items.len;
+    const true_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_terminal_i64_select_{s}_{s}_{}_true",
+        .{ block.name, result_name, label_suffix },
+    );
+    const end_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_terminal_i64_select_{s}_{s}_{}_end",
+        .{ block.name, result_name, label_suffix },
+    );
     const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
     try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
     try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, entry, block, select.false_value);
@@ -2178,6 +2226,18 @@ fn emitGenericCfgTerminalI64SelectIntoRax(
     try appendGenericCfgBlockLabel(allocator, machine, true_label);
     try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, entry, block, select.true_value);
     try appendGenericCfgBlockLabel(allocator, machine, end_label);
+}
+
+fn ownedMachineLabel(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    comptime fmt: []const u8,
+    args: anytype,
+) ![]const u8 {
+    const label = try std.fmt.allocPrint(allocator, fmt, args);
+    errdefer allocator.free(label);
+    try machine.owned_labels.append(allocator, label);
+    return label;
 }
 
 pub fn genericCfgSupportsBranchMergeBlock(

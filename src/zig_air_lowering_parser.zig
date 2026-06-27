@@ -49,10 +49,7 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
     const suffix = std.mem.trim(u8, trimmed[params_end + 1 ..], " ");
     const c_calling_convention = std.mem.startsWith(u8, suffix, "callconv(.c)");
     const non_default_calling_convention = std.mem.startsWith(u8, suffix, "callconv(") and !c_calling_convention;
-    const return_text = if (std.mem.startsWith(u8, suffix, "callconv(")) blk: {
-        const close = std.mem.indexOfScalar(u8, suffix, ')') orelse return error.UnsupportedAir;
-        break :blk std.mem.trim(u8, suffix[close + 1 ..], " ");
-    } else suffix;
+    const return_text = functionReturnTypeTextFromSuffix(suffix) orelse return error.UnsupportedAir;
     const return_type = parseZigType(return_text) orelse return error.UnsupportedAir;
 
     var params: std.ArrayList(ZigType) = .empty;
@@ -69,6 +66,22 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
         .c_calling_convention = c_calling_convention,
         .non_default_calling_convention = non_default_calling_convention,
     };
+}
+
+pub fn functionReturnTypeText(text: []const u8) ?[]const u8 {
+    const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
+    if (!std.mem.startsWith(u8, trimmed, "fn (")) return null;
+    const params_end = findMatching(trimmed, 3, '(', ')') orelse return null;
+    const suffix = std.mem.trim(u8, trimmed[params_end + 1 ..], " ");
+    return functionReturnTypeTextFromSuffix(suffix);
+}
+
+fn functionReturnTypeTextFromSuffix(suffix: []const u8) ?[]const u8 {
+    if (std.mem.startsWith(u8, suffix, "callconv(")) {
+        const close = std.mem.indexOfScalar(u8, suffix, ')') orelse return null;
+        return std.mem.trim(u8, suffix[close + 1 ..], " ");
+    }
+    return suffix;
 }
 
 pub fn stripFunctionTypeQualifiers(text: []const u8) []const u8 {
@@ -621,6 +634,24 @@ pub fn typedReturnBody(
         std.mem.eql(u8, return_instruction.opcode, "ret_safe");
 }
 
+fn typedBodyEndsInReturn(
+    structured_air_v2: air_export.StructuredAirV2,
+    body: air_export.StructuredBody,
+) bool {
+    var saw_return = false;
+    for (body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
+        if (isIgnoredOpcode(instruction.opcode)) continue;
+        if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) {
+            saw_return = true;
+            continue;
+        }
+        if (saw_return) return false;
+        if (!isTypedV2LowerableOpcode(instruction.opcode) or std.mem.eql(u8, instruction.opcode, "block")) return false;
+    }
+    return saw_return;
+}
+
 pub fn typedVoidGuardBlock(
     structured_air_v2: air_export.StructuredAirV2,
     target_block: u32,
@@ -678,6 +709,7 @@ pub fn isGenericTypedCfgBranchBody(
 ) bool {
     const structured_air_v2 = function.structured_air_v2 orelse return false;
     if (typedReturnBody(structured_air_v2, body)) return true;
+    if (typedBodyEndsInReturn(structured_air_v2, body)) return true;
     if (typedNoreturnBody(structured_air_v2, body)) return true;
     var saw_branch = false;
     for (body.instructions) |instruction_index| {

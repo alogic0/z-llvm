@@ -61,6 +61,7 @@ pub const Instruction = union(enum) {
     imul_eax_imm32: i32,
     and_eax_imm32: i32,
     shr_rax_imm6: u6,
+    shl_rax_imm6: u6,
     shl_rdx_imm6: u6,
     or_rdx_rax,
     shl_rcx_imm6: u6,
@@ -399,6 +400,7 @@ pub const MachineFunction = struct {
     name: []const u8,
     ret_ty: ir.Type,
     instructions: std.ArrayList(Instruction),
+    owned_labels: std.ArrayList([]const u8),
     codegen_path: CodegenPath,
 
     pub fn init(name: []const u8, ret_ty: ir.Type) MachineFunction {
@@ -406,11 +408,14 @@ pub const MachineFunction = struct {
             .name = name,
             .ret_ty = ret_ty,
             .instructions = .empty,
+            .owned_labels = .empty,
             .codegen_path = .structural_matcher,
         };
     }
 
     pub fn deinit(function: *MachineFunction, allocator: std.mem.Allocator) void {
+        for (function.owned_labels.items) |label| allocator.free(label);
+        function.owned_labels.deinit(allocator);
         function.instructions.deinit(allocator);
     }
 };

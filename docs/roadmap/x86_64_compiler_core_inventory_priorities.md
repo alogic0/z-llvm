@@ -191,9 +191,12 @@ families where the inventory does not yet record per-opcode first examples.
    compiler-core frontier rows. The first error-union slice is now accepted:
    `frontier_optionals_errors.zig` covers `wrap_errunion_payload`,
    `wrap_errunion_err`, `is_non_err`, `unwrap_errunion_payload`, and
-   `unwrap_errunion_err` with executable proof. The next measured error-union
-   target is `try:pl_op`; pointer/slice length forms and `ptr_add:bin_ty_pl`
-   remain the next non-error-union targets.
+   `unwrap_errunion_err` with executable proof, and the follow-up slice adds
+   selected direct `try:pl_op` propagation for an error-union helper call with
+   payload continuation and error return. Broader nested/multi-block
+   compiler-core `try` forms remain measured error-union work; pointer/slice
+   length forms and `ptr_add:bin_ty_pl` remain the next non-error-union
+   targets.
 3. Harden generic CFG for high-volume compiler patterns: nested blocks,
    branch-heavy loops, error-union continuation blocks, and switch dispatch.
 4. Expand call ownership around live-across-call values, indirect/default C

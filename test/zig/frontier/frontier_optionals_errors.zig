@@ -21,3 +21,21 @@ export fn frontier_error_union_match(tag: i32) i32 {
         return -22;
     }
 }
+
+fn frontierMaybeTryPayload(tag: i32, value: i32) FrontierError!i32 {
+    if (tag == 0) return value;
+    return FrontierError.WorseTag;
+}
+
+fn frontierTryAdd(tag: i32, value: i32) FrontierError!i32 {
+    const payload = try frontierMaybeTryPayload(tag, value);
+    return payload + 7;
+}
+
+export fn frontier_try_match(tag: i32, value: i32) i32 {
+    if (frontierTryAdd(tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -31;
+    }
+}

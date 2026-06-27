@@ -38,10 +38,14 @@ Current frontier seed:
 - `test/zig/frontier/frontier_sysv_sret_byval.zig`
 
 `frontier_optionals_errors.zig` now includes source-backed error-union
-wrap/error/payload matching. It proves typed AIR v2 lowering for
+wrap/error/payload matching and selected direct `try` propagation. It proves
+typed AIR v2 lowering for
 `wrap_errunion_payload`, `wrap_errunion_err`, `is_non_err`,
-`unwrap_errunion_payload`, and `unwrap_errunion_err`; Zig `try` continuation
-lowering remains a separate compiler-core priority.
+`unwrap_errunion_payload`, `unwrap_errunion_err`, and the direct
+`try:pl_op` continuation shape where the error path returns the original
+error-union value and the ok path unwraps, computes, rewraps, and returns.
+Broader nested/multi-block compiler-core `try` forms remain a separate
+compiler-core priority.
 
 Current frontier ABI boundary seed:
 
@@ -56,20 +60,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=600
-structured_functions=600
-generic_codegen_functions=600
-generic_cfg_functions=600
+discovered_functions=603
+structured_functions=603
+generic_codegen_functions=603
+generic_cfg_functions=603
 structural_matcher_functions=0
-structured_air_v2_functions=600
-typed_air_operand_functions=600
+structured_air_v2_functions=603
+typed_air_operand_functions=603
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=600
+generic_lowering_functions=603
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=600
+object_emitted_functions=603
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

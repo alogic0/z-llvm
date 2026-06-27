@@ -53,6 +53,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),
             .and_eax_imm32 => |value| try writer.print("\tandl ${}, %eax\n", .{value}),
             .shr_rax_imm6 => |amount| try writer.print("\tshrq ${}, %rax\n", .{amount}),
+            .shl_rax_imm6 => |amount| try writer.print("\tshlq ${}, %rax\n", .{amount}),
             .shl_rdx_imm6 => |amount| try writer.print("\tshlq ${}, %rdx\n", .{amount}),
             .or_rdx_rax => try writer.writeAll("\torq %rdx, %rax\n"),
             .shl_rcx_imm6 => |amount| try writer.print("\tshlq ${}, %rcx\n", .{amount}),
