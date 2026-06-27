@@ -646,6 +646,12 @@ pub fn isTypedConstOperand(operand: air_export.TypedOperand) bool {
     return std.mem.eql(u8, operand.kind, "const");
 }
 
+pub fn typedConstOperandText(instruction: air_export.TypedInstruction, operand_index: usize) ?[]const u8 {
+    if (operand_index >= instruction.operands.len) return null;
+    if (!isTypedConstOperand(instruction.operands[operand_index])) return null;
+    return operandTextDetail(instruction, operand_index);
+}
+
 pub fn isTypedNoneOperand(operand: air_export.TypedOperand) bool {
     return std.mem.eql(u8, operand.kind, "none");
 }

@@ -80,7 +80,6 @@ const belongsToSimpleSelectBlock = air_model.belongsToSimpleSelectBlock;
 const instructionPosition = air_model.instructionRecordPosition;
 const typedBlockTarget = air_model.blockTarget;
 const typedDetail = air_model.detail;
-const typedOperandTextDetail = air_model.operandTextDetail;
 const irCallingConvention = air_model.irCallingConvention;
 const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const isStraightLineOpcode = air_capabilities.isStraightLineOpcode;
@@ -2457,9 +2456,7 @@ const LoweringContext = struct {
             if (index >= self.values.len) return error.UnsupportedAir;
             return self.values[index] orelse error.UnsupportedAir;
         }
-        if (air_model.isTypedConstOperand(operand)) {
-            const literal = typedOperandTextDetail(instruction, operand_index) orelse
-                return error.UnsupportedAir;
+        if (air_model.typedConstOperandText(instruction, operand_index)) |literal| {
             if (parseSymbolPointer(literal)) |symbol_pointer| {
                 return .{
                     .ty = symbol_pointer.ty,
