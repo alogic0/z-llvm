@@ -181,6 +181,9 @@ Execution order:
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
    validation, and selected typed GEP/field-offset eligibility helpers. The
+   typed void-constant operand check used by branch value lowering is now
+   model-owned too, preserving fail-closed missing-detail behavior while
+   removing another local `kind`/`type_text`/detail parse from lowering. The
    Zig type/function signature parsing and pointer-child text now live in
    `src/zig_air_types.zig`; AIR constants and symbol pointers live in
    `src/zig_air_values.zig`; instruction-reference parsing and balanced text
