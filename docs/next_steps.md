@@ -194,7 +194,9 @@ Execution order:
    instead of carrying a second opcode dispatch chain. Typed runtime-nav
    symbol detail extraction and typed field-index parsing are now model-owned
    as well, and typed array-element table operand access has moved behind a
-   model helper. The
+   model helper. Generic typed constant operand text resolution is model-owned
+   too, leaving `resolveTypedOperand` to materialize values rather than parse
+   operand detail keys directly. The
    Zig type/function signature parsing and pointer-child text now live in
    `src/zig_air_types.zig`; AIR constants and symbol pointers live in
    `src/zig_air_values.zig`; instruction-reference parsing and balanced text
