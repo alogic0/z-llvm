@@ -115,8 +115,9 @@ Execution order:
    pointer/aggregate domains so future model-backed lowering does not grow
    another monolithic opcode chain. Branch-merge body lowering now also uses
    the view for child instruction lookup and metadata capability checks instead
-   of indexing raw structured-air records directly, and the main generic
-   typed-v2 lowering loop now resolves instructions through the same view.
+   of indexing raw structured-air records directly, the main generic typed-v2
+   lowering loop now resolves instructions through the same view, and terminal
+   error-union `cond_br` recognition is owned by `TypedFunctionView`.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.

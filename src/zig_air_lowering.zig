@@ -429,6 +429,7 @@ pub fn firstUnsupported(
     allocator: std.mem.Allocator,
     function: air_export.Function,
 ) ?Diagnostic {
+    const typed_view = air_model.TypedFunctionView.init(function);
     const function_type = parseFunctionType(allocator, function.type_text) catch {
         return .{ .function = function.name, .opcode = "function-type", .reason = .function_type };
     };
@@ -573,7 +574,7 @@ pub fn firstUnsupported(
             if (belongsToSimpleSelectBlock(function, instruction.index)) continue;
             if (belongsToTypedVoidGuardBlock(function, instruction.index)) continue;
             if (belongsToGenericTypedCfgBlock(function, instruction.index)) continue;
-            if (isTypedTerminalCondBr(function, instruction.index)) continue;
+            if (typed_view != null and typed_view.?.terminalErrorUnionCondBr(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         return .{ .function = function.name, .opcode = instruction.opcode, .reason = .opcode };
@@ -910,22 +911,6 @@ fn errorUnionPayloadType(text: []const u8) ?ZigType {
     return parseZigType(trimmed[marker + 2 ..]);
 }
 
-fn isTypedTerminalCondBr(function: air_export.Function, instruction_index: u32) bool {
-    const view = air_model.TypedFunctionView.init(function) orelse return false;
-    if (!view.hasAnyOpcode(&.{
-        "is_non_err",
-        "wrap_errunion_payload",
-        "wrap_errunion_err",
-        "unwrap_errunion_payload",
-        "unwrap_errunion_err",
-    })) return false;
-    const instruction = view.instruction(instruction_index) orelse return false;
-    if (!std.mem.eql(u8, instruction.opcode, "cond_br") or instruction.operands.len != 1) return false;
-    const then_body = view.body(.then_body, instruction.index) orelse return false;
-    const else_body = view.body(.else_body, instruction.index) orelse return false;
-    return view.bodyHasReturn(then_body) and view.bodyHasReturn(else_body);
-}
-
 const LoweringContext = struct {
     allocator: std.mem.Allocator,
     module: *ir.Module,
@@ -967,7 +952,8 @@ const LoweringContext = struct {
         if (std.mem.eql(u8, instruction.opcode, "block")) {
             try self.lowerTypedBlock(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
-            if (!isTypedTerminalCondBr(self.air_function, instruction.index)) return error.UnsupportedAir;
+            const view = self.typed_view orelse return error.UnsupportedAir;
+            if (!view.terminalErrorUnionCondBr(instruction.index)) return error.UnsupportedAir;
             try self.lowerTypedCondBrReturn(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ret") or
             std.mem.eql(u8, instruction.opcode, "ret_safe"))

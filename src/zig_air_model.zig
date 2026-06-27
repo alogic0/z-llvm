@@ -47,6 +47,21 @@ pub const TypedFunctionView = struct {
         return false;
     }
 
+    pub fn terminalErrorUnionCondBr(self: TypedFunctionView, instruction_index: u32) bool {
+        if (!self.hasAnyOpcode(&.{
+            "is_non_err",
+            "wrap_errunion_payload",
+            "wrap_errunion_err",
+            "unwrap_errunion_payload",
+            "unwrap_errunion_err",
+        })) return false;
+        const cond_br = self.instruction(instruction_index) orelse return false;
+        if (!std.mem.eql(u8, cond_br.opcode, "cond_br") or cond_br.operands.len != 1) return false;
+        const then_body = self.body(.then_body, cond_br.index) orelse return false;
+        const else_body = self.body(.else_body, cond_br.index) orelse return false;
+        return self.bodyHasReturn(then_body) and self.bodyHasReturn(else_body);
+    }
+
     pub fn singleSemanticInstruction(self: TypedFunctionView, structured_body: air_export.StructuredBody) ?u32 {
         var result: ?u32 = null;
         for (structured_body.instructions) |instruction_index| {
