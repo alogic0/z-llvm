@@ -109,7 +109,8 @@ Execution order:
    checks, return checks, noreturn panic paths, and branch-value extraction.
    Terminal error-union conditional checks also use the same model. Next work:
    route error-union/try lowering and optional/pointer lowering through the
-   view.
+   view. Local typed-opcode scans are moving into `TypedFunctionView` as
+   reusable predicates.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.

@@ -915,29 +915,19 @@ fn errorUnionPayloadType(text: []const u8) ?ZigType {
 }
 
 fn isTypedTerminalCondBr(function: air_export.Function, instruction_index: u32) bool {
-    if (!functionHasAnyTypedOpcode(function, &.{
+    const view = air_model.TypedFunctionView.init(function) orelse return false;
+    if (!view.hasAnyOpcode(&.{
         "is_non_err",
         "wrap_errunion_payload",
         "wrap_errunion_err",
         "unwrap_errunion_payload",
         "unwrap_errunion_err",
     })) return false;
-    const view = air_model.TypedFunctionView.init(function) orelse return false;
     const instruction = view.instruction(instruction_index) orelse return false;
     if (!std.mem.eql(u8, instruction.opcode, "cond_br") or instruction.operands.len != 1) return false;
     const then_body = view.body(.then_body, instruction.index) orelse return false;
     const else_body = view.body(.else_body, instruction.index) orelse return false;
     return view.bodyHasReturn(then_body) and view.bodyHasReturn(else_body);
-}
-
-fn functionHasAnyTypedOpcode(function: air_export.Function, opcodes: []const []const u8) bool {
-    const structured_air_v2 = function.structured_air_v2 orelse return false;
-    for (structured_air_v2.instructions) |instruction| {
-        for (opcodes) |opcode| {
-            if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
-        }
-    }
-    return false;
 }
 
 const LoweringContext = struct {

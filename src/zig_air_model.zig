@@ -38,6 +38,15 @@ pub const TypedFunctionView = struct {
         return air_capabilities.opcodeCapability(typed_instruction.opcode);
     }
 
+    pub fn hasAnyOpcode(self: TypedFunctionView, opcodes: []const []const u8) bool {
+        for (self.structured_air_v2.instructions) |typed_instruction| {
+            for (opcodes) |opcode| {
+                if (std.mem.eql(u8, typed_instruction.opcode, opcode)) return true;
+            }
+        }
+        return false;
+    }
+
     pub fn singleSemanticInstruction(self: TypedFunctionView, structured_body: air_export.StructuredBody) ?u32 {
         var result: ?u32 = null;
         for (structured_body.instructions) |instruction_index| {
