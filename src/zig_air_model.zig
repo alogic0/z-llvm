@@ -156,7 +156,7 @@ pub const TypedFunctionView = struct {
         const branch_index = self.singleSemanticInstruction(structured_body) orelse return false;
         const branch = self.instruction(branch_index) orelse return false;
         if (!std.mem.eql(u8, branch.opcode, "br") or branch.operands.len != 2) return false;
-        const target = typedBlockTarget(branch.operands[0]) orelse return false;
+        const target = blockTarget(branch.operands[0]) orelse return false;
         if (target != target_block) return false;
         if (!std.mem.eql(u8, branch.operands[1].kind, "const")) return false;
         return std.mem.eql(u8, branch.operands[1].type_text, "void") and
@@ -191,7 +191,7 @@ fn typedOperandTextDetail(instruction: air_export.TypedInstruction, operand_inde
     return typedDetail(instruction, key);
 }
 
-fn typedBlockTarget(operand: air_export.TypedOperand) ?u32 {
+pub fn blockTarget(operand: air_export.TypedOperand) ?u32 {
     if (!std.mem.eql(u8, operand.kind, "block")) return null;
     if (!std.mem.eql(u8, operand.value, "block")) {
         return std.fmt.parseInt(u32, operand.value, 10) catch null;

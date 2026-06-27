@@ -117,7 +117,9 @@ Execution order:
    the view for child instruction lookup and metadata capability checks instead
    of indexing raw structured-air records directly, the main generic typed-v2
    lowering loop now resolves instructions through the same view, and terminal
-   error-union `cond_br` recognition is owned by `TypedFunctionView`.
+   error-union `cond_br` recognition is owned by `TypedFunctionView`. Typed
+   block-target operand parsing now lives in `src/zig_air_model.zig`, with the
+   parser keeping only a compatibility wrapper.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.

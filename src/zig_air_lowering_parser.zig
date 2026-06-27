@@ -779,11 +779,7 @@ pub fn genericTypedCfgBodyContains(
 }
 
 pub fn typedBlockTarget(operand: air_export.TypedOperand) ?u32 {
-    if (!std.mem.eql(u8, operand.kind, "block")) return null;
-    if (!std.mem.eql(u8, operand.value, "block")) {
-        return std.fmt.parseInt(u32, operand.value, 10) catch null;
-    }
-    return std.fmt.parseInt(u32, operand.type_text, 10) catch null;
+    return air_model.blockTarget(operand);
 }
 
 pub fn typedNoreturnBody(
