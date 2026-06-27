@@ -99,6 +99,14 @@ pub const TypedFunctionView = struct {
         return typedCalleeNameCount(self.structured_air_v2, callee_name);
     }
 
+    pub fn storeOpcodeCount(self: TypedFunctionView) usize {
+        return typedStoreOpcodeCount(self.structured_air_v2);
+    }
+
+    pub fn hasReturnOpcode(self: TypedFunctionView) bool {
+        return typedHasReturnOpcode(self.structured_air_v2);
+    }
+
     pub fn terminalErrorUnionCondBr(self: TypedFunctionView, instruction_index: u32) bool {
         if (!self.hasAnyOpcode(&.{
             "is_non_err",
@@ -519,6 +527,14 @@ pub fn typedCalleeNameCount(structured_air_v2: air_export.StructuredAirV2, calle
         if (std.mem.eql(u8, name, callee_name)) count += 1;
     }
     return count;
+}
+
+pub fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
+    return typedOpcodeCount(structured_air_v2, "store") + typedOpcodeCount(structured_air_v2, "store_safe");
+}
+
+pub fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
+    return typedOpcodeCount(structured_air_v2, "ret") != 0 or typedOpcodeCount(structured_air_v2, "ret_safe") != 0;
 }
 
 pub fn plainFieldPointerChild(ty: ir.Type) bool {

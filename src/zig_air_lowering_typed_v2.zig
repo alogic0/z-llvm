@@ -51,7 +51,7 @@ pub fn typedCalleeNameCount(structured_air_v2: air_export.StructuredAirV2, calle
 }
 
 pub fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
-    return typedOpcodeCount(structured_air_v2, "store") + typedOpcodeCount(structured_air_v2, "store_safe");
+    return air_model.typedStoreOpcodeCount(structured_air_v2);
 }
 
 fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
@@ -839,7 +839,7 @@ pub fn aggregateAbiAttrsForAggregate(module: *ir.Module, attr_name: []const u8, 
 }
 
 pub fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
-    return typedOpcodeCount(structured_air_v2, "ret") != 0 or typedOpcodeCount(structured_air_v2, "ret_safe") != 0;
+    return air_model.typedHasReturnOpcode(structured_air_v2);
 }
 
 pub fn lowerTypedV2ErrorUnionPayload(
