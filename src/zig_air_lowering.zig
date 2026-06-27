@@ -2425,12 +2425,11 @@ const LoweringContext = struct {
     ) LowerError!TypedValue {
         if (operand_index >= instruction.operands.len) return error.UnsupportedAir;
         const operand = instruction.operands[operand_index];
-        if (std.mem.eql(u8, operand.kind, "inst")) {
-            const index = std.fmt.parseInt(u32, operand.value, 10) catch return error.UnsupportedAir;
+        if (air_model.typedInstOperandIndex(operand)) |index| {
             if (index >= self.values.len) return error.UnsupportedAir;
             return self.values[index] orelse error.UnsupportedAir;
         }
-        if (std.mem.eql(u8, operand.kind, "const")) {
+        if (air_model.isTypedConstOperand(operand)) {
             const literal = typedOperandTextDetail(instruction, operand_index) orelse
                 return error.UnsupportedAir;
             if (parseSymbolPointer(literal)) |symbol_pointer| {
@@ -2443,7 +2442,7 @@ const LoweringContext = struct {
             if (try self.resolveStringLiteralSlice(instruction, operand_index, literal)) |string_slice| return string_slice;
             return parseConstant(literal) orelse error.UnsupportedAir;
         }
-        if (std.mem.eql(u8, operand.kind, "none")) return error.UnsupportedAir;
+        if (air_model.isTypedNoneOperand(operand)) return error.UnsupportedAir;
         return error.UnsupportedAir;
     }
 
