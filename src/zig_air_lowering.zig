@@ -82,7 +82,6 @@ const instructionPosition = lowering_parser.instructionPosition;
 const isGenericTypedCfgBlock = lowering_parser.isGenericTypedCfgBlock;
 const belongsToGenericTypedCfgBlock = lowering_parser.belongsToGenericTypedCfgBlock;
 const typedBlockTarget = air_model.blockTarget;
-const typedSingleInstructionByOpcode = lowering_parser.typedSingleInstructionByOpcode;
 const typedDetail = air_model.detail;
 const typedOperandTextDetail = air_model.operandTextDetail;
 const typedCalleeName = lowering_parser.typedCalleeName;
