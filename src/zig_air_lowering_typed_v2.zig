@@ -424,10 +424,7 @@ pub fn typedV2RegisterAggregateLeafPaths(
 }
 
 pub fn typedRetPtrIndex(structured_air_v2: air_export.StructuredAirV2) ?u32 {
-    for (structured_air_v2.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, "ret_ptr")) return instruction.index;
-    }
-    return null;
+    return air_model.typedRetPtrIndex(structured_air_v2);
 }
 
 pub fn typedAggregatePointerPath(

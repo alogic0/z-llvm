@@ -111,6 +111,10 @@ pub const TypedFunctionView = struct {
         return typedReturnOpcodeCount(self.structured_air_v2);
     }
 
+    pub fn retPtrIndex(self: TypedFunctionView) ?u32 {
+        return typedRetPtrIndex(self.structured_air_v2);
+    }
+
     pub fn terminalErrorUnionCondBr(self: TypedFunctionView, instruction_index: u32) bool {
         if (!self.hasAnyOpcode(&.{
             "is_non_err",
@@ -543,6 +547,13 @@ pub fn typedReturnOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usi
 
 pub fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
     return typedReturnOpcodeCount(structured_air_v2) != 0;
+}
+
+pub fn typedRetPtrIndex(structured_air_v2: air_export.StructuredAirV2) ?u32 {
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "ret_ptr")) return instruction.index;
+    }
+    return null;
 }
 
 pub fn plainFieldPointerChild(ty: ir.Type) bool {
