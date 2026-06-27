@@ -226,7 +226,7 @@ pub const TypedFunctionView = struct {
                 saw_call = true;
                 continue;
             }
-            if (!saw_unreach and std.mem.eql(u8, typed_instruction.opcode, "unreach")) {
+            if (!saw_unreach and air_capabilities.isUnreachOpcode(typed_instruction.opcode)) {
                 saw_unreach = true;
                 continue;
             }
@@ -343,7 +343,7 @@ pub const TypedFunctionView = struct {
             }
             if (!air_capabilities.typedV2CanLower(typed_capability) or
                 air_capabilities.isReturnOpcode(typed_instruction.opcode) or
-                std.mem.eql(u8, typed_instruction.opcode, "unreach"))
+                air_capabilities.isUnreachOpcode(typed_instruction.opcode))
             {
                 return false;
             }

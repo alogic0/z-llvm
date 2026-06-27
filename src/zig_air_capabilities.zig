@@ -518,6 +518,10 @@ pub fn isReturnOpcode(opcode: []const u8) bool {
     return air_export.categoryForOpcode(opcode) == .return_op;
 }
 
+pub fn isUnreachOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "unreach");
+}
+
 pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, opcode, "call_always_tail")) return "tail";
     if (std.mem.eql(u8, opcode, "call_never_tail")) return "notail";
@@ -798,6 +802,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(isTypedV2LowerableOpcode("block"));
     try std.testing.expect(isReturnOpcode("ret_safe"));
     try std.testing.expect(!isReturnOpcode("call"));
+    try std.testing.expect(isUnreachOpcode("unreach"));
+    try std.testing.expect(!isUnreachOpcode("ret"));
     try std.testing.expect(isStraightLineOpcode("assembly"));
     try std.testing.expect(isInventoryKnownOpcode("assembly"));
     try std.testing.expect(!isTypedV2LowerableOpcode("assembly"));
