@@ -157,7 +157,9 @@ Execution order:
    string pairs; unreach and CFG opcode recognition (`block`, `br`,
    `cond_br`) follow the same capability-owned path, and
    `cfgLoweringOpForOpcode` now consumes those helpers instead of keeping a
-   separate string-dispatch table.
+   separate string-dispatch table. Typed-v2 lowerability, lowerer selection,
+   and capability-owner routing now use the same predicates for these opcodes,
+   so the registry no longer has duplicate local CFG/return checks.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
