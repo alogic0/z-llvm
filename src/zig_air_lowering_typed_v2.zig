@@ -741,12 +741,7 @@ pub fn lowerTypedV2OptionalPointer(
 }
 
 pub fn typedV2OptionalPointerAddImm(structured_air_v2: air_export.StructuredAirV2) ?i32 {
-    for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "add") and !std.mem.eql(u8, instruction.opcode, "add_safe")) continue;
-        if (instruction.operands.len != 2) return null;
-        return air_model.typedConstI32Operand(instruction, 1);
-    }
-    return null;
+    return air_model.typedFirstI32ConstOperandForOpcodes(structured_air_v2, &.{ "add", "add_safe" }, 1);
 }
 
 pub fn typedV2OptionalPointerRecords(

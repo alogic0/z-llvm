@@ -131,6 +131,14 @@ pub const TypedFunctionView = struct {
         return typedBranchI32ConstValues(self.structured_air_v2, values);
     }
 
+    pub fn firstI32ConstOperandForOpcodes(
+        self: TypedFunctionView,
+        opcodes: []const []const u8,
+        operand_index: usize,
+    ) ?i32 {
+        return typedFirstI32ConstOperandForOpcodes(self.structured_air_v2, opcodes, operand_index);
+    }
+
     pub fn terminalErrorUnionCondBr(self: TypedFunctionView, instruction_index: u32) bool {
         if (!self.hasAnyOpcode(&.{
             "is_non_err",
@@ -622,6 +630,26 @@ pub fn typedBranchI32ConstValues(structured_air_v2: air_export.StructuredAirV2, 
     return count;
 }
 
+pub fn typedFirstI32ConstOperandForOpcodes(
+    structured_air_v2: air_export.StructuredAirV2,
+    opcodes: []const []const u8,
+    operand_index: usize,
+) ?i32 {
+    for (structured_air_v2.instructions) |instruction_record| {
+        var opcode_matches = false;
+        for (opcodes) |opcode| {
+            if (std.mem.eql(u8, instruction_record.opcode, opcode)) {
+                opcode_matches = true;
+                break;
+            }
+        }
+        if (!opcode_matches) continue;
+        if (instruction_record.operands.len <= operand_index) return null;
+        return typedConstI32Operand(instruction_record, operand_index);
+    }
+    return null;
+}
+
 pub fn typedAggregatePointerPath(
     structured_air_v2: air_export.StructuredAirV2,
     instruction_index: u32,
@@ -795,6 +823,10 @@ test "typed AIR model collects branch i32 constants" {
         .{ .kind = "block", .value = "0", .type_text = "0" },
         .{ .kind = "const", .value = "value", .type_text = "i32" },
     };
+    const add_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "i32" },
+        .{ .kind = "const", .value = "value", .type_text = "i32" },
+    };
     const instructions = [_]air_export.TypedInstruction{
         .{
             .index = 0,
@@ -806,6 +838,14 @@ test "typed AIR model collects branch i32 constants" {
         },
         .{
             .index = 1,
+            .opcode = "add",
+            .result_type = "i32",
+            .data_kind = "bin_op",
+            .operands = @constCast(&add_operands),
+            .details = &.{.{ .key = "operand1_text", .value = "<i32, 11>" }},
+        },
+        .{
+            .index = 2,
             .opcode = "ret",
             .result_type = "void",
             .data_kind = "un_op",
@@ -822,6 +862,8 @@ test "typed AIR model collects branch i32 constants" {
     try std.testing.expectEqual(@as(i32, 7), typedLastBranchI32ConstValue(structured_air_v2).?);
     try std.testing.expectEqual(@as(usize, 1), typedBranchI32ConstValues(structured_air_v2, &values).?);
     try std.testing.expectEqual(@as(i32, 7), values[0]);
+    try std.testing.expectEqual(@as(i32, 11), typedFirstI32ConstOperandForOpcodes(structured_air_v2, &.{"add"}, 1).?);
+    try std.testing.expect(typedFirstI32ConstOperandForOpcodes(structured_air_v2, &.{"sub"}, 1) == null);
 }
 
 test "typed AIR model parses direct and extern callees" {
