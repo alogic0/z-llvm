@@ -170,6 +170,9 @@ Execution order:
    so gate helpers do not import the full lowering module just to count root
    functions. Direct-call declaration reconciliation now lives in
    `src/zig_air_calls.zig`, separate from function-body lowering. The
+   runtime/native-link boundary symbol policy now lives in
+   `src/runtime_boundaries.zig` as prefix/suffix tables consumed by the
+   uncurated AIR gates. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
