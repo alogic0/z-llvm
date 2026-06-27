@@ -571,29 +571,28 @@ pub fn belongsToSimpleSelectBlock(function: air_export.Function, instruction_ind
 }
 
 pub fn isTypedVoidGuardBlock(function: air_export.Function, block_index: u32) bool {
-    const structured_air = function.structured_air orelse return false;
-    const structured_air_v2 = function.structured_air_v2 orelse return false;
-    const block_body = structured_air.body(.block, block_index) orelse return false;
-    const cond_index = singleNonDebugInstruction(structured_air_v2, block_body) orelse return false;
-    const cond = typedInstructionByIndex(structured_air_v2, cond_index) orelse return false;
+    const view = air_model.TypedFunctionView.init(function) orelse return false;
+    const block_body = view.body(.block, block_index) orelse return false;
+    const cond_index = view.singleSemanticInstruction(block_body) orelse return false;
+    const cond = view.instruction(cond_index) orelse return false;
     if (!std.mem.eql(u8, cond.opcode, "cond_br")) return false;
-    const then_body = structured_air.body(.then_body, cond.index) orelse return false;
-    const else_body = structured_air.body(.else_body, cond.index) orelse return false;
-    return typedVoidGuardBlock(structured_air_v2, block_index, then_body, else_body);
+    const then_body = view.body(.then_body, cond.index) orelse return false;
+    const else_body = view.body(.else_body, cond.index) orelse return false;
+    return typedVoidGuardBlock(view.structured_air_v2, block_index, then_body, else_body);
 }
 
 pub fn belongsToTypedVoidGuardBlock(function: air_export.Function, instruction_index: u32) bool {
-    const structured_air = function.structured_air orelse return false;
-    for (structured_air.bodies) |body| {
+    const view = air_model.TypedFunctionView.init(function) orelse return false;
+    for (view.structured_air.bodies) |body| {
         if (body.kind != .block) continue;
         for (body.instructions) |body_instruction| {
             if (body_instruction == instruction_index and isTypedVoidGuardBlock(function, body.owner.?)) return true;
         }
-        if (structured_air.body(.block, body.owner.?) == null) continue;
+        if (view.body(.block, body.owner.?) == null) continue;
         const block_body = body;
-        const cond_index = singleNonDebugInstruction(function.structured_air_v2 orelse return false, block_body) orelse continue;
-        const then_body = structured_air.body(.then_body, cond_index) orelse continue;
-        const else_body = structured_air.body(.else_body, cond_index) orelse continue;
+        const cond_index = view.singleSemanticInstruction(block_body) orelse continue;
+        const then_body = view.body(.then_body, cond_index) orelse continue;
+        const else_body = view.body(.else_body, cond_index) orelse continue;
         for (then_body.instructions) |then_instruction| {
             if (then_instruction == instruction_index and isTypedVoidGuardBlock(function, body.owner.?)) return true;
         }
@@ -746,18 +745,17 @@ pub fn isGenericTypedCfgBranchBody(
 }
 
 pub fn belongsToGenericTypedCfgBlock(function: air_export.Function, instruction_index: u32) bool {
-    const structured_air = function.structured_air orelse return false;
-    const structured_air_v2 = function.structured_air_v2 orelse return false;
+    const view = air_model.TypedFunctionView.init(function) orelse return false;
     for (function.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, "block")) continue;
         if (!isGenericTypedCfgBlock(function, instruction.index)) continue;
-        const block_body = structured_air.body(.block, instruction.index) orelse return false;
-        if (bodyContainsInstruction(block_body, instruction_index)) return true;
+        const block_body = view.body(.block, instruction.index) orelse return false;
+        if (view.containsInstruction(block_body, instruction_index)) return true;
         for (block_body.instructions) |child_index| {
-            const child = typedInstructionByIndex(structured_air_v2, child_index) orelse return false;
+            const child = view.instruction(child_index) orelse return false;
             if (!std.mem.eql(u8, child.opcode, "cond_br")) continue;
-            const then_body = structured_air.body(.then_body, child.index) orelse return false;
-            const else_body = structured_air.body(.else_body, child.index) orelse return false;
+            const then_body = view.body(.then_body, child.index) orelse return false;
+            const else_body = view.body(.else_body, child.index) orelse return false;
             return genericTypedCfgBodyContains(function, then_body, instruction_index) or
                 genericTypedCfgBodyContains(function, else_body, instruction_index);
         }
@@ -770,22 +768,21 @@ pub fn genericTypedCfgBodyContains(
     body: air_export.StructuredBody,
     instruction_index: u32,
 ) bool {
-    if (bodyContainsInstruction(body, instruction_index)) return true;
-    const structured_air = function.structured_air orelse return false;
-    const structured_air_v2 = function.structured_air_v2 orelse return false;
+    const view = air_model.TypedFunctionView.init(function) orelse return false;
+    if (view.containsInstruction(body, instruction_index)) return true;
     for (body.instructions) |candidate| {
-        const instruction = typedInstructionByIndex(structured_air_v2, candidate) orelse return false;
+        const instruction = view.instruction(candidate) orelse return false;
         if (!std.mem.eql(u8, instruction.opcode, "block")) continue;
         if (isTypedVoidGuardBlock(function, instruction.index)) {
-            const nested_body = structured_air.body(.block, instruction.index) orelse return false;
-            if (bodyContainsInstruction(nested_body, instruction_index)) return true;
+            const nested_body = view.body(.block, instruction.index) orelse return false;
+            if (view.containsInstruction(nested_body, instruction_index)) return true;
             for (nested_body.instructions) |nested_candidate| {
-                const nested_instruction = typedInstructionByIndex(structured_air_v2, nested_candidate) orelse return false;
+                const nested_instruction = view.instruction(nested_candidate) orelse return false;
                 if (!std.mem.eql(u8, nested_instruction.opcode, "cond_br")) continue;
-                const then_body = structured_air.body(.then_body, nested_instruction.index) orelse return false;
-                const else_body = structured_air.body(.else_body, nested_instruction.index) orelse return false;
-                if (bodyContainsInstruction(then_body, instruction_index) or
-                    bodyContainsInstruction(else_body, instruction_index))
+                const then_body = view.body(.then_body, nested_instruction.index) orelse return false;
+                const else_body = view.body(.else_body, nested_instruction.index) orelse return false;
+                if (view.containsInstruction(then_body, instruction_index) or
+                    view.containsInstruction(else_body, instruction_index))
                 {
                     return true;
                 }
@@ -793,26 +790,19 @@ pub fn genericTypedCfgBodyContains(
             continue;
         }
         if (!isGenericTypedCfgBlock(function, instruction.index)) continue;
-        const nested_body = structured_air.body(.block, instruction.index) orelse return false;
-        if (bodyContainsInstruction(nested_body, instruction_index)) return true;
+        const nested_body = view.body(.block, instruction.index) orelse return false;
+        if (view.containsInstruction(nested_body, instruction_index)) return true;
         for (nested_body.instructions) |nested_candidate| {
-            const nested_instruction = typedInstructionByIndex(structured_air_v2, nested_candidate) orelse return false;
+            const nested_instruction = view.instruction(nested_candidate) orelse return false;
             if (!std.mem.eql(u8, nested_instruction.opcode, "cond_br")) continue;
-            const then_body = structured_air.body(.then_body, nested_instruction.index) orelse return false;
-            const else_body = structured_air.body(.else_body, nested_instruction.index) orelse return false;
+            const then_body = view.body(.then_body, nested_instruction.index) orelse return false;
+            const else_body = view.body(.else_body, nested_instruction.index) orelse return false;
             if (genericTypedCfgBodyContains(function, then_body, instruction_index) or
                 genericTypedCfgBodyContains(function, else_body, instruction_index))
             {
                 return true;
             }
         }
-    }
-    return false;
-}
-
-pub fn bodyContainsInstruction(body: air_export.StructuredBody, instruction_index: u32) bool {
-    for (body.instructions) |candidate| {
-        if (candidate == instruction_index) return true;
     }
     return false;
 }

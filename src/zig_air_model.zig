@@ -36,4 +36,27 @@ pub const TypedFunctionView = struct {
         _ = self;
         return air_capabilities.opcodeCapability(typed_instruction.opcode);
     }
+
+    pub fn singleSemanticInstruction(self: TypedFunctionView, structured_body: air_export.StructuredBody) ?u32 {
+        var result: ?u32 = null;
+        for (structured_body.instructions) |instruction_index| {
+            const typed_instruction = self.instruction(instruction_index) orelse return null;
+            if (self.capability(typed_instruction).status == .ignored_metadata) continue;
+            if (result != null) return null;
+            result = instruction_index;
+        }
+        return result;
+    }
+
+    pub fn containsInstruction(
+        self: TypedFunctionView,
+        structured_body: air_export.StructuredBody,
+        instruction_index: u32,
+    ) bool {
+        _ = self;
+        for (structured_body.instructions) |candidate| {
+            if (candidate == instruction_index) return true;
+        }
+        return false;
+    }
 };
