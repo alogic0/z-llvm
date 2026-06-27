@@ -165,10 +165,11 @@ Execution order:
    boundary classifier for vector, long-double, and packed aggregate ABI
    rejection. The first backend consumer slice now routes SysV aggregate
    classification, generic CFG aggregate GEP/field lookup, selected sret/byval
-   leaf lookup, and the compatibility ABI bridge through shared aggregate
-   field/leaf layout helpers. Next work: fold the remaining aggregate copy-plan
-   and typed-v2 aggregate construction decisions into the same shared
-   capability path.
+   leaf lookup, typed-v2 aggregate pointer-path discovery, typed-v2 aggregate
+   field counting, and the compatibility ABI bridge through shared aggregate
+   field/leaf layout helpers. Next work: fold the remaining aggregate
+   copy-plan and typed-v2 aggregate construction decisions into one shared
+   aggregate ABI plan.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
@@ -243,10 +244,12 @@ gate behavior changes.
   mappings; `src/zig_air_lowering_typed_v2.zig` and
   `src/zig_air_lowering_typed_v2_fallbacks.zig` carry overlapping aggregate
   sret/byval construction; the x86_64 aggregate classifier, generic CFG
-  aggregate GEP/field lookup, sret/byval leaf lookup, and compatibility ABI
-  bridge now share aggregate field/leaf layout queries through
-  `src/zig_air_capabilities.zig`, while aggregate copy-plan construction and
-  typed-v2 aggregate construction still need unification.
+  aggregate GEP/field lookup, sret/byval leaf lookup, typed-v2 aggregate
+  pointer-path discovery, typed-v2 aggregate field counting, and compatibility
+  ABI bridge now share aggregate field/leaf layout queries through
+  `src/zig_air_capabilities.zig`/`src/zig_air_model.zig`, while aggregate
+  copy-plan construction and typed-v2 aggregate construction still need
+  unification.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.
