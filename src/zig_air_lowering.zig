@@ -985,12 +985,15 @@ const LoweringContext = struct {
     }
 
     fn lowerTypedSemanticInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
-        if (try self.lowerTypedScalarSemanticInstruction(instruction)) return;
-        if (try self.lowerTypedMemorySemanticInstruction(instruction)) return;
-        if (try self.lowerTypedOptionalSemanticInstruction(instruction)) return;
-        if (try self.lowerTypedErrorUnionSemanticInstruction(instruction)) return;
-        if (try self.lowerTypedPointerAggregateSemanticInstruction(instruction)) return;
-        return error.UnsupportedAir;
+        const lowered = switch (air_capabilities.semanticDomainForOpcode(instruction.opcode)) {
+            .scalar => try self.lowerTypedScalarSemanticInstruction(instruction),
+            .memory => try self.lowerTypedMemorySemanticInstruction(instruction),
+            .optional => try self.lowerTypedOptionalSemanticInstruction(instruction),
+            .error_union => try self.lowerTypedErrorUnionSemanticInstruction(instruction),
+            .pointer_aggregate => try self.lowerTypedPointerAggregateSemanticInstruction(instruction),
+            .none => false,
+        };
+        if (!lowered) return error.UnsupportedAir;
     }
 
     fn lowerTypedScalarSemanticInstruction(

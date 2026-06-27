@@ -90,6 +90,26 @@ pub const LowererKind = enum {
     }
 };
 
+pub const SemanticDomain = enum {
+    none,
+    scalar,
+    memory,
+    optional,
+    error_union,
+    pointer_aggregate,
+
+    pub fn name(self: SemanticDomain) []const u8 {
+        return switch (self) {
+            .none => "none",
+            .scalar => "scalar",
+            .memory => "memory",
+            .optional => "optional",
+            .error_union => "error-union",
+            .pointer_aggregate => "pointer-aggregate",
+        };
+    }
+};
+
 pub const UnknownOpcodeCategory = enum(u8) {
     debug_metadata,
     error_union_try,
@@ -196,6 +216,49 @@ pub fn typedV2FallbackReason(capability: OpcodeCapability) []const u8 {
         .ignored_metadata => "ignored-metadata",
         .lowerable => "unsupported-lowerer",
     };
+}
+
+pub fn semanticDomainForOpcode(opcode: []const u8) SemanticDomain {
+    const capability = opcodeCapability(opcode);
+    if (capability.lowerer != .typed_v2_semantic) return .none;
+    if (std.mem.eql(u8, opcode, "arg") or
+        isArithmeticOpcode(opcode) or
+        std.mem.eql(u8, opcode, "add_with_overflow") or
+        std.mem.startsWith(u8, opcode, "cmp_") or
+        isCastOpcode(opcode))
+    {
+        return .scalar;
+    }
+    if (std.mem.eql(u8, opcode, "alloc") or
+        std.mem.eql(u8, opcode, "load") or
+        std.mem.eql(u8, opcode, "store") or
+        std.mem.eql(u8, opcode, "store_safe"))
+    {
+        return .memory;
+    }
+    if (std.mem.eql(u8, opcode, "is_non_null") or
+        std.mem.eql(u8, opcode, "wrap_optional") or
+        std.mem.eql(u8, opcode, "optional_payload"))
+    {
+        return .optional;
+    }
+    if (std.mem.eql(u8, opcode, "is_non_err") or
+        std.mem.startsWith(u8, opcode, "wrap_errunion") or
+        std.mem.startsWith(u8, opcode, "unwrap_errunion") or
+        std.mem.eql(u8, opcode, "try"))
+    {
+        return .error_union;
+    }
+    if (std.mem.eql(u8, opcode, "slice") or
+        std.mem.eql(u8, opcode, "ptr_add") or
+        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
+        std.mem.eql(u8, opcode, "runtime_nav_ptr") or
+        std.mem.eql(u8, opcode, "array_elem_val") or
+        isFieldPtrOpcode(opcode))
+    {
+        return .pointer_aggregate;
+    }
+    return .none;
 }
 
 fn opcodeStatus(
@@ -649,6 +712,13 @@ test "opcode capability registry covers inventory and lowering policies" {
     const call_capability = opcodeCapability("call");
     try std.testing.expectEqual(CapabilityOwner.abi_planner, call_capability.owner);
     try std.testing.expectEqual(LowererKind.call_abi, call_capability.lowerer);
+    try std.testing.expectEqual(SemanticDomain.scalar, semanticDomainForOpcode("add"));
+    try std.testing.expectEqual(SemanticDomain.memory, semanticDomainForOpcode("load"));
+    try std.testing.expectEqual(SemanticDomain.optional, semanticDomainForOpcode("optional_payload"));
+    try std.testing.expectEqual(SemanticDomain.error_union, semanticDomainForOpcode("try"));
+    try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));
+    try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("call"));
+    try std.testing.expectEqual(SemanticDomain.none, semanticDomainForOpcode("block"));
 
     const asm_capability = opcodeCapability("assembly");
     try std.testing.expectEqual(OpcodeStatus.boundary, asm_capability.status);

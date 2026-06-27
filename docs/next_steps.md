@@ -111,8 +111,9 @@ Execution order:
    route error-union/try lowering and optional/pointer lowering through the
    view. Local typed-opcode scans are moving into `TypedFunctionView` as
    reusable predicates, and the semantic typed-v2 dispatcher is now split into
-   scalar, memory, optional, error-union, and pointer/aggregate domains so
-   future model-backed lowering does not grow another monolithic opcode chain.
+   registry-selected scalar, memory, optional, error-union, and
+   pointer/aggregate domains so future model-backed lowering does not grow
+   another monolithic opcode chain.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
