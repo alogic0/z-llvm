@@ -156,7 +156,10 @@ Execution order:
    one normalized typed-AIR model end to end. AIR opcode-to-IR semantic mapping
    for scalar binary ops, integer/FP predicates, casts, and scalar type helpers
    now lives in `src/zig_air_semantics.zig`, so the parser no longer owns those
-   lowering decisions either.
+   lowering decisions either. Function calling-convention mapping is also
+   model-owned. The parser API that remains in active lowerer use is now the
+   Zig type/function signature parser, constant parser, symbol pointer parser,
+   pointer-child text parser, and the shared lowering error type.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
