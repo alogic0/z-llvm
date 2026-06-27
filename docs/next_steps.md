@@ -171,7 +171,9 @@ Execution order:
    memory, optional, error-union, and pointer/aggregate domains. Capability
    owner routing now uses that same operation-ID classifier for
    semantic-lowering ownership, so semantic domain and owner decisions no
-   longer drift independently.
+   longer drift independently. Common typed-v2 lowerability is now composed
+   from the semantic operation classifier plus call and terminator predicates
+   instead of maintaining a separate broad opcode list.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
