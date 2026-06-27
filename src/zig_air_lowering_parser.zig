@@ -6,23 +6,10 @@ const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const target_mod = @import("target.zig");
 
-pub const ZigType = struct {
-    ir_type: ir.Type,
-    signed: bool = false,
-    pointer_child: ?ir.Type = null,
-    is_volatile_pointer: bool = false,
-};
-
-pub const FunctionType = struct {
-    params: []ZigType,
-    return_type: ZigType,
-    c_calling_convention: bool,
-    non_default_calling_convention: bool,
-
-    pub fn deinit(self: FunctionType, allocator: std.mem.Allocator) void {
-        allocator.free(self.params);
-    }
-};
+pub const ZigType = air_model.ZigType;
+pub const FunctionType = air_model.FunctionType;
+pub const TypedValue = air_model.TypedValue;
+pub const TypedBranchMergeResult = air_model.TypedBranchMergeResult;
 
 pub fn irCallingConvention(function_type: FunctionType) ?[]const u8 {
     if (function_type.c_calling_convention) return null;
@@ -30,17 +17,7 @@ pub fn irCallingConvention(function_type: FunctionType) ?[]const u8 {
     return "fastcc";
 }
 
-pub const TypedValue = struct {
-    ty: ZigType,
-    value: ir.Value,
-};
-
 pub const LowerError = std.mem.Allocator.Error || error{UnsupportedAir};
-
-pub const TypedBranchMergeResult = struct {
-    value: ?TypedValue,
-    predecessor_label: []const u8,
-};
 
 pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
     const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));

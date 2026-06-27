@@ -1,6 +1,35 @@
 const std = @import("std");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
+const ir = @import("ir.zig");
+
+pub const ZigType = struct {
+    ir_type: ir.Type,
+    signed: bool = false,
+    pointer_child: ?ir.Type = null,
+    is_volatile_pointer: bool = false,
+};
+
+pub const FunctionType = struct {
+    params: []ZigType,
+    return_type: ZigType,
+    c_calling_convention: bool,
+    non_default_calling_convention: bool,
+
+    pub fn deinit(self: FunctionType, allocator: std.mem.Allocator) void {
+        allocator.free(self.params);
+    }
+};
+
+pub const TypedValue = struct {
+    ty: ZigType,
+    value: ir.Value,
+};
+
+pub const TypedBranchMergeResult = struct {
+    value: ?TypedValue,
+    predecessor_label: []const u8,
+};
 
 pub const TypedFunctionView = struct {
     function: air_export.Function,
