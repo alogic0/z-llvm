@@ -60,7 +60,7 @@ pub fn lowerRegisterAggregateMake(
 }
 
 pub fn lowerMixCAddMayPanic(allocator: std.mem.Allocator, module: *ir.Module, air_function: air_export.Function) !ir.Function {
-    return lowerMixCAddMayPanicChecked(allocator, module, air_function, functionHasOpcode(air_function, "add_safe"));
+    return lowerMixCAddMayPanicChecked(allocator, module, air_function, air_model.functionHasOpcode(air_function, "add_safe"));
 }
 
 pub fn lowerMixCAddMayPanicChecked(
@@ -331,11 +331,4 @@ pub fn ensureBase64LookupGlobal(allocator: std.mem.Allocator, module: *ir.Module
             .values = values,
         } },
     });
-}
-
-fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
-    for (function.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
-    }
-    return false;
 }

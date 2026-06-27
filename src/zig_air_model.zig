@@ -523,6 +523,13 @@ pub fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: [
     return count;
 }
 
+pub fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
+    for (function.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
+    }
+    return false;
+}
+
 pub fn typedFieldPtrIndexCount(structured_air_v2: air_export.StructuredAirV2, expected_index: usize) usize {
     var count: usize = 0;
     for (structured_air_v2.instructions) |instruction| {
@@ -819,4 +826,41 @@ test "typed AIR model reports type and operand coverage" {
     try std.testing.expect(!typedOperandCoverage(.{
         .instructions = @constCast(&missing_operand_instructions),
     }));
+}
+
+test "AIR model reports legacy instruction opcode presence" {
+    const instructions = [_]air_export.Instruction{
+        .{
+            .index = 0,
+            .indent = 0,
+            .unused = false,
+            .opcode = "arg",
+            .payload = "",
+            .category = .argument,
+        },
+        .{
+            .index = 1,
+            .indent = 0,
+            .unused = false,
+            .opcode = "add_safe",
+            .payload = "",
+            .category = .arithmetic,
+        },
+    };
+    const function = air_export.Function{
+        .name = "test.main",
+        .type_text = "fn (i32) i32",
+        .instruction_count = instructions.len,
+        .main_body_count = instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&instructions),
+    };
+
+    try std.testing.expect(functionHasOpcode(function, "add_safe"));
+    try std.testing.expect(!functionHasOpcode(function, "mul"));
 }
