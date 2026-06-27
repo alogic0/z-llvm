@@ -983,16 +983,11 @@ const LoweringContext = struct {
         self: *LoweringContext,
         instruction: air_export.TypedInstruction,
     ) !bool {
-        if (std.mem.eql(u8, instruction.opcode, "alloc")) {
-            try self.lowerTypedAlloca(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "load")) {
-            try self.lowerTypedLoad(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "store") or
-            std.mem.eql(u8, instruction.opcode, "store_safe"))
-        {
-            try self.lowerTypedStore(instruction);
-        } else {
-            return false;
+        switch (air_capabilities.memorySemanticOpForOpcode(instruction.opcode)) {
+            .alloc => try self.lowerTypedAlloca(instruction),
+            .load => try self.lowerTypedLoad(instruction),
+            .store => try self.lowerTypedStore(instruction),
+            .none => return false,
         }
         return true;
     }

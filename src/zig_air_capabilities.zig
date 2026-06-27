@@ -119,6 +119,13 @@ pub const ScalarSemanticOp = enum {
     cast,
 };
 
+pub const MemorySemanticOp = enum {
+    none,
+    alloc,
+    load,
+    store,
+};
+
 pub const OptionalSemanticOp = enum {
     none,
     is_non_null,
@@ -302,6 +309,13 @@ pub fn scalarSemanticOpForOpcode(opcode: []const u8) ScalarSemanticOp {
     if (isArithmeticOpcode(opcode)) return .binary;
     if (std.mem.startsWith(u8, opcode, "cmp_")) return .compare;
     if (isCastOpcode(opcode)) return .cast;
+    return .none;
+}
+
+pub fn memorySemanticOpForOpcode(opcode: []const u8) MemorySemanticOp {
+    if (std.mem.eql(u8, opcode, "alloc")) return .alloc;
+    if (std.mem.eql(u8, opcode, "load")) return .load;
+    if (std.mem.eql(u8, opcode, "store") or std.mem.eql(u8, opcode, "store_safe")) return .store;
     return .none;
 }
 
@@ -789,6 +803,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ScalarSemanticOp.compare, scalarSemanticOpForOpcode("cmp_eq"));
     try std.testing.expectEqual(ScalarSemanticOp.cast, scalarSemanticOpForOpcode("intcast"));
     try std.testing.expectEqual(SemanticDomain.memory, semanticDomainForOpcode("load"));
+    try std.testing.expectEqual(MemorySemanticOp.alloc, memorySemanticOpForOpcode("alloc"));
+    try std.testing.expectEqual(MemorySemanticOp.load, memorySemanticOpForOpcode("load"));
+    try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("store"));
+    try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("store_safe"));
     try std.testing.expectEqual(SemanticDomain.optional, semanticDomainForOpcode("optional_payload"));
     try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null"));
     try std.testing.expectEqual(OptionalSemanticOp.wrap_optional, optionalSemanticOpForOpcode("wrap_optional"));
