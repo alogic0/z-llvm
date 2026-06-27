@@ -694,7 +694,8 @@ ReleaseSmall and currently reports per mode: `source_rows=6`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries for
 varargs, vectors, long-double/X87, packed aggregates, tail calls, non-default
-call conventions. The prior Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 stack-source forwarding boundary is now
+call conventions. The prior Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256
+stack-source forwarding boundary is now
 accepted in the strict frontier corpus, and the boundary counter remains at
 `stack_pressure_boundary_rows=0` as a regression guard; boundary rows are not
 part of the accepted executable frontier counters.
@@ -784,8 +785,24 @@ broader aggregate lowering beyond selected INTEGER/SSE/MEMORY frontier
 arbitrary non-selected sret/byval copies
 varargs
 vectors
-stack-passed live-value scheduling beyond the current selected direct-call/void-call model
-broader SSE live-across-call helpers beyond selected no-argument-call shapes, selected direct/repeated-direct/pointer-callee/repeated-pointer-callee stack-passed FP addend sums after no-argument calls, selected six-XMM-plus-up-to-twelve-stack FP addend sums after direct/pointer-callee no-argument calls, selected one-FP-argument direct/pointer-callee stack-passed FP addend sums, selected repeated two-live direct/pointer-callee no-argument shapes, selected mixed one-GPR/one-SSE i32/i64 one-/two-call direct/pointer-callee shapes, selected direct two-/three-/six-live FP-argument shapes, pointer-callee shapes through six live values and five FP helper arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call frames, selected direct/pointer-callee f32/f64 result live-across-later constant-stack-argument FP call frames, selected same-width two-result f32/f64 call frames, selected mixed f32/f64 two-result call frames, selected mixed f32/f64 two-result frames with one live double, float, or i64 addend, selected mixed i64/f64, i64/f32, f64/i64, and f32/i64 two-result frames, selected direct/pointer-callee i64 result live-across-later-void frames, and selected direct/pointer-callee two-result i64 live-across-later-void frames
+stack-passed live-value scheduling beyond the current selected direct-call/void-call
+model
+broader SSE live-across-call helpers beyond selected no-argument-call shapes, selected
+direct/repeated-direct/pointer-callee/repeated-pointer-callee stack-passed FP addend
+sums after no-argument calls, selected six-XMM-plus-up-to-twelve-stack FP addend sums
+after direct/pointer-callee no-argument calls, selected one-FP-argument
+direct/pointer-callee stack-passed FP addend sums, selected repeated two-live
+direct/pointer-callee no-argument shapes, selected mixed one-GPR/one-SSE i32/i64
+one-/two-call direct/pointer-callee shapes, selected direct two-/three-/six-live
+FP-argument shapes, pointer-callee shapes through six live values and five FP helper
+arguments, selected direct/pointer-callee f32/f64 call-result live-across-later-call
+frames, selected direct/pointer-callee f32/f64 result live-across-later
+constant-stack-argument FP call frames, selected same-width two-result f32/f64 call
+frames, selected mixed f32/f64 two-result call frames, selected mixed f32/f64 two-result
+frames with one live double, float, or i64 addend, selected mixed i64/f64, i64/f32,
+f64/i64, and f32/i64 two-result frames, selected direct/pointer-callee i64 result
+live-across-later-void frames, and selected direct/pointer-callee two-result i64
+live-across-later-void frames
 alternate safety-guard control flow
 ```
 

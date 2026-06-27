@@ -471,8 +471,11 @@ fn runMode(init: std.process.Init, options: Options) !void {
 
                 const harness = if (options.executable_progress) executableHarnessForSource(source) else null;
                 const link_result = if (harness) |executable_harness| link_result: {
+                    if (executable_harness.c_path) |harness_c| {
+                        break :link_result try linkObjectWithHarnessFile(allocator, io, zig_emitter, mode, object_path, exe_path, harness_c);
+                    }
                     const harness_body = try executableHarnessBody(allocator, executable_harness);
-                    defer if (executable_harness.c_body == null) allocator.free(harness_body);
+                    defer allocator.free(harness_body);
                     break :link_result try linkObjectWithHarness(allocator, io, zig_emitter, mode, object_path, exe_path, harness_body);
                 } else try nativeLinkObject(allocator, io, zig_emitter, mode, object_path, exe_path);
                 defer {
@@ -743,6 +746,7 @@ const executableHarnessForSource = helpers.executableHarnessForSource;
 const executableHarnessBody = helpers.executableHarnessBody;
 const nativeLinkObject = helpers.nativeLinkObject;
 const linkObjectWithHarness = helpers.linkObjectWithHarness;
+const linkObjectWithHarnessFile = helpers.linkObjectWithHarnessFile;
 const runExecutable = helpers.runExecutable;
 const termOk = helpers.termOk;
 const termName = helpers.termName;
