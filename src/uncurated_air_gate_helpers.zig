@@ -1,15 +1,11 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
-const air_lowering = @import("zig_air_lowering.zig");
+const air_roots = @import("zig_air_roots.zig");
 const codegen = @import("codegen.zig");
 const mc = @import("mc.zig");
+
 pub fn rootFunctionCount(module: air_export.Module) usize {
-    const root_stem = std.fs.path.stem(module.root_source);
-    var count: usize = 0;
-    for (module.functions) |function| {
-        if (air_lowering.isRootSourceFunction(root_stem, function.name)) count += 1;
-    }
-    return count;
+    return air_roots.moduleRootFunctionCount(module);
 }
 
 pub const Options = struct {

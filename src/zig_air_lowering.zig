@@ -9,6 +9,7 @@ const air_semantics = @import("zig_air_semantics.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
+const air_roots = @import("zig_air_roots.zig");
 
 pub const UnsupportedReason = enum {
     function_type,
@@ -69,6 +70,8 @@ const parseConstant = air_values.parseConstant;
 const parseSymbolPointer = air_values.parseSymbolPointer;
 const materializedGlobalInitializer = air_values.materializedGlobalInitializer;
 const cStringLiteralByteLen = air_values.cStringLiteralByteLen;
+const isRootSourceFunction = air_roots.isRootSourceFunction;
+const rootFunctionCount = air_roots.rootFunctionCount;
 const parseInstructionRef = air_text.instructionRef;
 const isSimpleSelectBlock = air_model.simpleSelectBlock;
 const belongsToSimpleSelectBlock = air_model.belongsToSimpleSelectBlock;
@@ -295,20 +298,6 @@ pub fn lowerCompatible(
         .unsupported = try unsupported.toOwnedSlice(allocator),
         .typed_v2_fallbacks = try typed_v2_fallback_list.toOwnedSlice(allocator),
     };
-}
-
-pub fn isRootSourceFunction(root_stem: []const u8, function_name: []const u8) bool {
-    return std.mem.eql(u8, function_name, root_stem) or
-        (std.mem.startsWith(u8, function_name, root_stem) and
-            function_name.len > root_stem.len and function_name[root_stem.len] == '.');
-}
-
-fn rootFunctionCount(functions: []const air_export.Function, root_stem: []const u8) usize {
-    var count: usize = 0;
-    for (functions) |function| {
-        if (isRootSourceFunction(root_stem, function.name)) count += 1;
-    }
-    return count;
 }
 
 fn addMissingCallDeclarations(allocator: std.mem.Allocator, module: *ir.Module) !void {
