@@ -166,11 +166,12 @@ Execution order:
    rejection. The first backend consumer slice now routes SysV aggregate
    classification, generic CFG aggregate GEP/field lookup, selected sret/byval
    leaf lookup, typed-v2 aggregate pointer-path discovery, typed-v2 aggregate
-   field counting, typed-v2 aggregate copy-leaf planning, and the compatibility
-   ABI bridge through shared aggregate field/leaf layout helpers. Typed-v2
-   register aggregate eligibility now delegates to the x86_64 SysV aggregate
-   classifier. Next work: fold the remaining typed-v2 aggregate construction
-   decisions into one shared aggregate ABI plan.
+   field counting, typed-v2 aggregate copy-leaf planning, typed-v2 register
+   aggregate construction recognition, and the compatibility ABI bridge through
+   shared aggregate field/leaf layout helpers. Typed-v2 register aggregate
+   eligibility now delegates to the x86_64 SysV aggregate classifier. Next
+   work: fold the remaining sret/byval aggregate construction decisions into
+   one shared aggregate ABI plan.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
@@ -247,11 +248,12 @@ gate behavior changes.
   sret/byval construction; the x86_64 aggregate classifier, generic CFG
   aggregate GEP/field lookup, sret/byval leaf lookup, typed-v2 aggregate
   pointer-path discovery, typed-v2 aggregate field counting, typed-v2 aggregate
-  copy-leaf planning, and compatibility ABI bridge now share aggregate
-  field/leaf layout queries through `src/zig_air_capabilities.zig`,
-  `src/zig_air_model.zig`, `src/zig_air_aggregate_copy.zig`, and
-  `src/codegen/x86_64/sysv_abi.zig`, while typed-v2 aggregate construction
-  still needs unification.
+  copy-leaf planning, typed-v2 register aggregate construction recognition,
+  and compatibility ABI bridge now share aggregate field/leaf layout queries
+  through `src/zig_air_capabilities.zig`, `src/zig_air_model.zig`,
+  `src/zig_air_aggregate_copy.zig`, `src/zig_air_aggregate_construction.zig`,
+  and `src/codegen/x86_64/sysv_abi.zig`, while sret/byval aggregate
+  construction still needs unification.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.
