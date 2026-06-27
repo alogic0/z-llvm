@@ -635,6 +635,10 @@ pub fn isTypedI32ConstOperand(operand: air_export.TypedOperand) bool {
     return isTypedConstOperand(operand) and std.mem.eql(u8, operand.type_text, "i32");
 }
 
+pub fn isTypedPtrU32ConstOperand(operand: air_export.TypedOperand) bool {
+    return isTypedConstOperand(operand) and std.mem.eql(u8, operand.type_text, "*u32");
+}
+
 pub fn typedVoidConstOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?bool {
     if (operand_index >= instruction.operands.len) return null;
     const operand = instruction.operands[operand_index];
@@ -673,6 +677,10 @@ pub fn isTypedBlockOperand(operand: air_export.TypedOperand) bool {
 
 pub fn isTypedFieldPtrDataKind(data_kind: []const u8) bool {
     return std.mem.eql(u8, data_kind, "field_ptr");
+}
+
+pub fn isTypedPayloadOpDataKind(data_kind: []const u8) bool {
+    return std.mem.eql(u8, data_kind, "pl_op");
 }
 
 fn typedBlockOperandTargetText(operand: air_export.TypedOperand) ?[]const u8 {

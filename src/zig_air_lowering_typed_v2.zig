@@ -968,10 +968,9 @@ pub fn typedV2AtomicAddInstruction(
         return null;
     }
     for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "atomic_rmw")) continue;
-        if (!std.mem.eql(u8, instruction.data_kind, "pl_op") or instruction.operands.len != 1) return null;
-        if (!std.mem.eql(u8, instruction.operands[0].kind, "const")) return null;
-        if (!std.mem.eql(u8, instruction.operands[0].type_text, "*u32")) return null;
+        if (!air_capabilities.isAtomicRmwOpcode(instruction.opcode)) continue;
+        if (!air_model.isTypedPayloadOpDataKind(instruction.data_kind) or instruction.operands.len != 1) return null;
+        if (!air_model.isTypedPtrU32ConstOperand(instruction.operands[0])) return null;
         return instruction;
     }
     return null;
