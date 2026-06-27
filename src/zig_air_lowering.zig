@@ -1436,11 +1436,7 @@ const LoweringContext = struct {
         operand_index: usize,
     ) LowerError!?TypedValue {
         if (operand_index >= instruction.operands.len) return error.UnsupportedAir;
-        const operand = instruction.operands[operand_index];
-        if (std.mem.eql(u8, operand.kind, "const") and
-            std.mem.eql(u8, operand.type_text, "void") and
-            std.mem.eql(u8, typedOperandTextDetail(instruction, operand_index) orelse return error.UnsupportedAir, "@.void_value"))
-        {
+        if (air_model.typedVoidConstOperand(instruction, operand_index) orelse return error.UnsupportedAir) {
             return null;
         }
         return try self.resolveTypedOperand(instruction, operand_index);

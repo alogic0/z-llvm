@@ -597,6 +597,15 @@ pub fn typedConstI32Operand(instruction: air_export.TypedInstruction, operand_in
     return std.fmt.parseInt(i32, std.mem.trim(u8, text["<i32, ".len .. text.len - 1], " "), 10) catch null;
 }
 
+pub fn typedVoidConstOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?bool {
+    if (operand_index >= instruction.operands.len) return null;
+    const operand = instruction.operands[operand_index];
+    if (!std.mem.eql(u8, operand.kind, "const")) return false;
+    if (!std.mem.eql(u8, operand.type_text, "void")) return false;
+    const text = operandTextDetail(instruction, operand_index) orelse return null;
+    return std.mem.eql(u8, text, "@.void_value");
+}
+
 pub fn typedBranchI32ConstValue(instruction: air_export.TypedInstruction) ?i32 {
     if (!air_capabilities.isBrOpcode(instruction.opcode)) return null;
     if (instruction.operands.len != 2) return null;
