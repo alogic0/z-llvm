@@ -82,10 +82,10 @@ Execution order:
    `unknown`), owning layer (`semantic-lowering`, `cfg-lowering`,
    `abi-planner`, `backend`, etc.), lowerer kind, inventory-known status,
    metadata-ignore status, straight-line lowering eligibility, typed-v2
-   lowering eligibility, and first boundary/fallback reason. The first local string
-   allowlists were removed from `src/distribution_zig_air_inventory.zig` and
-   `src/zig_air_lowering_parser.zig`; generic typed-CFG eligibility now reads
-   the registry capability object instead of asking scattered boolean helpers.
+   lowering eligibility, and first boundary/fallback reason. The first local
+   string allowlists were removed from inventory and lowering code; generic
+   typed-CFG eligibility now reads the registry capability object instead of
+   asking scattered boolean helpers.
    Typed-v2 fallback diagnostics now also use registry status/boundary reasons
    instead of reporting a generic local `unsupported_opcode` bucket.
    The first data-kind capability API now classifies opcode/data-kind pairs and
@@ -118,49 +118,45 @@ Execution order:
    of indexing raw structured-air records directly, the main generic typed-v2
    lowering loop now resolves instructions through the same view, and terminal
    error-union `cond_br` recognition is owned by `TypedFunctionView`. Typed
-   block-target operand parsing now lives in `src/zig_air_model.zig`, with the
-   parser keeping only a compatibility wrapper. Typed instruction detail and
-   operand-text lookup now follow the same model-owned pattern, including the
-   legacy operand-key fallback. Typed direct/extern callee parsing now also
-   lives in the model, with parser wrappers retained for older helper code.
+   block-target operand parsing now lives in `src/zig_air_model.zig`. Typed
+   instruction detail and operand-text lookup now follow the same model-owned
+   pattern, including the legacy operand-key fallback. Typed direct/extern
+   callee parsing now also lives in the model.
    Typed void-guard and generic CFG block predicates now live on
-   `TypedFunctionView`; `src/zig_air_lowering_parser.zig` keeps compatibility
-   wrappers instead of owning those shape checks, and fallback diagnostics in
-   `src/zig_air_lowering.zig` call the model predicates directly. The unused
+   `TypedFunctionView`; fallback diagnostics in `src/zig_air_lowering.zig`
+   call the model predicates directly. The unused
    parser-side typed CFG/void-guard wrappers and raw helper copies have been
    removed. `src/zig_air_lowering_typed_v2.zig` now also reads typed detail,
    operand text, and callee records from the model helpers instead of parser
    wrappers. The obsolete parser typed-record wrappers for block targets,
-   instruction details, operand text, and callees have been removed; parser
-   validation calls the model helpers directly. Typed instruction index/opcode
+   instruction details, operand text, and callees have been removed. Typed
+   instruction index/opcode
    lookup is also now model-owned, with typed-v2 helpers reading through
    `src/zig_air_model.zig`; the obsolete parser lookup wrappers have been
-   removed. The next parser-surface cleanup moved the remaining opcode
-   capability facade calls out of `src/zig_air_lowering_parser.zig`: accepted
-   lowering modules now ask `src/zig_air_capabilities.zig` directly, and the
-   parser no longer exports forwarding helpers for ignored, straight-line,
-   arithmetic, shift, cast, field-pointer, call, or typed-v2 lowerable opcode
-   checks. `src/zig_air_model.zig` now also owns the shared typed value
+   removed. Lowering modules now ask `src/zig_air_capabilities.zig` directly,
+   so there is no parser facade for ignored, straight-line, arithmetic, shift,
+   cast, field-pointer, call, or typed-v2 lowerable opcode checks.
+   `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
    validation, and selected typed GEP/field-offset eligibility helpers. The
-   parser still owns text parsing for Zig type spelling, constants, symbol
-   pointers, and instruction refs. Balanced text helpers (`findMatching` and
-   top-level comma splitting) now live in `src/zig_air_text.zig`, with parser
-   and lowerers consuming the same utility module instead of using the parser
-   as a shared helper bucket. The IR-owned string allocation helper now lives
-   in `src/zig_air_model.zig` as well. The legacy simple-select shape
+   Zig type/function signature parsing and pointer-child text now live in
+   `src/zig_air_types.zig`; AIR constants and symbol pointers live in
+   `src/zig_air_values.zig`; instruction-reference parsing and balanced text
+   helpers (`findMatching` and top-level comma splitting) live in
+   `src/zig_air_text.zig`. The old `src/zig_air_lowering_parser.zig` facade has
+   been removed. The IR-owned string allocation helper now lives in
+   `src/zig_air_model.zig` as well. The legacy simple-select shape
    predicates have also moved to the model, so the parser is no longer the
-   owner for CFG-shape decisions. The remaining planned extraction points are
-   the actual Zig type/value/reference parsers before the lowerers can consume
-   one normalized typed-AIR model end to end. AIR opcode-to-IR semantic mapping
+   owner for CFG-shape decisions. AIR opcode-to-IR semantic mapping
    for scalar binary ops, integer/FP predicates, casts, and scalar type helpers
    now lives in `src/zig_air_semantics.zig`, so the parser no longer owns those
    lowering decisions either. Function calling-convention mapping is also
-   model-owned. The parser API that remains in active lowerer use is now the
-   Zig type/function signature parser, constant parser, symbol pointer parser,
-   and pointer-child text parser; shared typed value structs and `LowerError`
-   are private/model-owned rather than parser-owned compatibility exports.
+   model-owned. Shared typed value structs and `LowerError` are
+   private/model-owned rather than parser-owned compatibility exports. The
+   remaining refactor is no longer parser extraction; it is routing
+   optional/error-union/pointer semantic lowering through the normalized model
+   and capability registry.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
@@ -243,7 +239,7 @@ gate behavior changes.
   Likely layers: semantic type lowering, SysV ABI planner, x86_64 aggregate
   backend.
   Current duplicated/selected-code location:
-  `src/zig_air_lowering_parser.zig` carries fixture-name aggregate type
+  `src/zig_air_types.zig` currently carries fixture-name aggregate type
   mappings; `src/zig_air_lowering_typed_v2.zig` and
   `src/zig_air_lowering_typed_v2_fallbacks.zig` carry overlapping aggregate
   sret/byval construction; the x86_64 aggregate classifier, generic CFG
@@ -268,8 +264,8 @@ gate behavior changes.
   `src/zig_air_export.zig` owns broad opcode categories,
   `src/zig_air_capabilities.zig` now owns the inventory-known/lowerable opcode
   registry and the first unknown-opcode subcategory classifier, while
-  `src/zig_air_lowering_parser.zig` still consumes lowerability through small
-  compatibility wrappers.
+  accepted lowering modules now consume lowerability directly through
+  `src/zig_air_capabilities.zig`.
   Target reusable abstraction: one AIR opcode registry that records category,
   supported data kinds, lowering status, and boundary reason; inventory,
   diagnostics, and typed lowering should query it instead of maintaining local
