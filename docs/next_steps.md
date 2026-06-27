@@ -162,7 +162,10 @@ Execution order:
    so the registry no longer has duplicate local CFG/return checks. The AIR
    lowering fallback scanner and legacy typed lowering path now also use these
    capability predicates for block/branch/return/unreach identity rather than
-   repeating local string comparisons.
+   repeating local string comparisons. Typed block lowering, branch-merge
+   materialization, void-guard panic blocks, and legacy select block
+   materialization now use the same predicates as well, leaving operand counts
+   and CFG shape validation local but opcode identity registry-owned.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
