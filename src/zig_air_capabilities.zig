@@ -271,43 +271,11 @@ pub fn typedV2FallbackReason(capability: OpcodeCapability) []const u8 {
 pub fn semanticDomainForOpcode(opcode: []const u8) SemanticDomain {
     const capability = opcodeCapability(opcode);
     if (capability.lowerer != .typed_v2_semantic) return .none;
-    if (std.mem.eql(u8, opcode, "arg") or
-        isArithmeticOpcode(opcode) or
-        std.mem.eql(u8, opcode, "add_with_overflow") or
-        std.mem.startsWith(u8, opcode, "cmp_") or
-        isCastOpcode(opcode))
-    {
-        return .scalar;
-    }
-    if (std.mem.eql(u8, opcode, "alloc") or
-        std.mem.eql(u8, opcode, "load") or
-        std.mem.eql(u8, opcode, "store") or
-        std.mem.eql(u8, opcode, "store_safe"))
-    {
-        return .memory;
-    }
-    if (std.mem.eql(u8, opcode, "is_non_null") or
-        std.mem.eql(u8, opcode, "wrap_optional") or
-        std.mem.eql(u8, opcode, "optional_payload"))
-    {
-        return .optional;
-    }
-    if (std.mem.eql(u8, opcode, "is_non_err") or
-        std.mem.startsWith(u8, opcode, "wrap_errunion") or
-        std.mem.startsWith(u8, opcode, "unwrap_errunion") or
-        std.mem.eql(u8, opcode, "try"))
-    {
-        return .error_union;
-    }
-    if (std.mem.eql(u8, opcode, "slice") or
-        std.mem.eql(u8, opcode, "ptr_add") or
-        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
-        std.mem.eql(u8, opcode, "runtime_nav_ptr") or
-        std.mem.eql(u8, opcode, "array_elem_val") or
-        isFieldPtrOpcode(opcode))
-    {
-        return .pointer_aggregate;
-    }
+    if (scalarSemanticOpForOpcode(opcode) != .none) return .scalar;
+    if (memorySemanticOpForOpcode(opcode) != .none) return .memory;
+    if (optionalSemanticOpForOpcode(opcode) != .none) return .optional;
+    if (errorUnionSemanticOpForOpcode(opcode) != .none) return .error_union;
+    if (pointerAggregateSemanticOpForOpcode(opcode) != .none) return .pointer_aggregate;
     return .none;
 }
 
