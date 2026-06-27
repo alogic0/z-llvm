@@ -577,10 +577,6 @@ pub fn instructionPosition(function: air_export.Function, index: u32) ?usize {
     return null;
 }
 
-pub fn typedBlockTarget(operand: air_export.TypedOperand) ?u32 {
-    return air_model.blockTarget(operand);
-}
-
 pub fn typedInstructionByIndex(structured_air_v2: air_export.StructuredAirV2, index: u32) ?air_export.TypedInstruction {
     for (structured_air_v2.instructions) |instruction| {
         if (instruction.index == index) return instruction;
@@ -596,28 +592,6 @@ pub fn typedSingleInstructionByOpcode(structured_air_v2: air_export.StructuredAi
         found = instruction;
     }
     return found;
-}
-
-pub fn typedDetail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
-    return air_model.detail(instruction, key);
-}
-
-pub fn typedOperandTextDetail(instruction: air_export.TypedInstruction, operand_index: usize) ?[]const u8 {
-    return air_model.operandTextDetail(instruction, operand_index);
-}
-
-pub fn typedCalleeName(callee_text: []const u8) ?[]const u8 {
-    return (typedCallee(callee_text) orelse return null).name;
-}
-
-pub const TypedCallee = air_model.TypedCallee;
-
-pub fn typedCallee(callee_text: []const u8) ?TypedCallee {
-    return air_model.callee(callee_text);
-}
-
-pub fn typedCalleeWithMarker(callee_text: []const u8, marker: []const u8, external: bool) ?TypedCallee {
-    return air_model.calleeWithMarker(callee_text, marker, external);
 }
 
 pub fn isIgnoredOpcode(opcode: []const u8) bool {
@@ -673,11 +647,11 @@ pub fn genericTypedGepIndex(value: ir.Value) bool {
 
 pub fn typedV2InstructionMissingRequiredDetail(instruction: air_export.TypedInstruction) ?[]const u8 {
     if (isCallOpcode(instruction.opcode)) {
-        if (typedDetail(instruction, "callee_text") == null) return "missing_callee_text";
-        if (typedDetail(instruction, "call_signature") == null) return "missing_call_signature";
+        if (air_model.detail(instruction, "callee_text") == null) return "missing_callee_text";
+        if (air_model.detail(instruction, "call_signature") == null) return "missing_call_signature";
     }
     for (instruction.operands, 0..) |operand, operand_index| {
-        if (std.mem.eql(u8, operand.kind, "const") and typedOperandTextDetail(instruction, operand_index) == null) {
+        if (std.mem.eql(u8, operand.kind, "const") and air_model.operandTextDetail(instruction, operand_index) == null) {
             return "missing_const_text";
         }
     }

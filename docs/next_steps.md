@@ -130,7 +130,9 @@ Execution order:
    parser-side typed CFG/void-guard wrappers and raw helper copies have been
    removed. `src/zig_air_lowering_typed_v2.zig` now also reads typed detail,
    operand text, and callee records from the model helpers instead of parser
-   wrappers.
+   wrappers. The obsolete parser typed-record wrappers for block targets,
+   instruction details, operand text, and callees have been removed; parser
+   validation calls the model helpers directly.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
