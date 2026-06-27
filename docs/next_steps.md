@@ -121,7 +121,8 @@ Execution order:
    block-target operand parsing now lives in `src/zig_air_model.zig`, with the
    parser keeping only a compatibility wrapper. Typed instruction detail and
    operand-text lookup now follow the same model-owned pattern, including the
-   legacy operand-key fallback.
+   legacy operand-key fallback. Typed direct/extern callee parsing now also
+   lives in the model, with parser wrappers retained for older helper code.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.

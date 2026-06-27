@@ -836,26 +836,14 @@ pub fn typedCalleeName(callee_text: []const u8) ?[]const u8 {
     return (typedCallee(callee_text) orelse return null).name;
 }
 
-pub const TypedCallee = struct {
-    name: []const u8,
-    external: bool,
-};
+pub const TypedCallee = air_model.TypedCallee;
 
 pub fn typedCallee(callee_text: []const u8) ?TypedCallee {
-    if (typedCalleeWithMarker(callee_text, "function '", false)) |callee| return callee;
-    if (typedCalleeWithMarker(callee_text, "extern '", true)) |callee| return callee;
-    return null;
+    return air_model.callee(callee_text);
 }
 
 pub fn typedCalleeWithMarker(callee_text: []const u8, marker: []const u8, external: bool) ?TypedCallee {
-    const start = std.mem.indexOf(u8, callee_text, marker) orelse return null;
-    const name_start = start + marker.len;
-    const name_end = std.mem.indexOf(u8, callee_text[name_start..], "'") orelse return null;
-    if (name_end == 0) return null;
-    return .{
-        .name = callee_text[name_start .. name_start + name_end],
-        .external = external,
-    };
+    return air_model.calleeWithMarker(callee_text, marker, external);
 }
 
 pub fn isIgnoredOpcode(opcode: []const u8) bool {

@@ -174,6 +174,32 @@ pub const TypedFunctionView = struct {
     }
 };
 
+pub const TypedCallee = struct {
+    name: []const u8,
+    external: bool,
+};
+
+pub fn calleeName(callee_text: []const u8) ?[]const u8 {
+    return (callee(callee_text) orelse return null).name;
+}
+
+pub fn callee(callee_text: []const u8) ?TypedCallee {
+    if (calleeWithMarker(callee_text, "function '", false)) |typed_callee| return typed_callee;
+    if (calleeWithMarker(callee_text, "extern '", true)) |typed_callee| return typed_callee;
+    return null;
+}
+
+pub fn calleeWithMarker(callee_text: []const u8, marker: []const u8, external: bool) ?TypedCallee {
+    const start = std.mem.indexOf(u8, callee_text, marker) orelse return null;
+    const name_start = start + marker.len;
+    const name_end = std.mem.indexOf(u8, callee_text[name_start..], "'") orelse return null;
+    if (name_end == 0) return null;
+    return .{
+        .name = callee_text[name_start .. name_start + name_end],
+        .external = external,
+    };
+}
+
 fn isCallOpcode(opcode: []const u8) bool {
     return air_export.categoryForOpcode(opcode) == .call;
 }
