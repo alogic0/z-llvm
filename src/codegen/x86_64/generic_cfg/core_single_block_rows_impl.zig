@@ -11,10 +11,10 @@ const cabi_boundary_rows = @import("cabi_boundary_rows.zig");
 const cabi_tls_global_lowering = @import("cabi_tls_global_lowering.zig");
 const core_single_block_misc = @import("core_single_block_misc.zig");
 const fp_rows = @import("core_single_block_fp.zig");
+const air_capabilities = @import("../../../zig_air_capabilities.zig");
 const std = shared.std;
 const ir = shared.ir;
 const target = shared.target;
-const memory_location = shared.memory_location;
 const MachineFunction = shared.MachineFunction;
 const FrameIndex = shared.FrameIndex;
 const ArgReg = shared.ArgReg;
@@ -2176,10 +2176,7 @@ pub fn lowerGenericCfgScalarSretParamStores(
     return true;
 }
 
-const ScalarSretLeaf = struct {
-    offset: u64,
-    ty: ir.Type,
-};
+const ScalarSretLeaf = air_capabilities.AggregateLeaf;
 
 fn collectScalarSretLeaves(
     layout: target.DataLayout,
@@ -2188,28 +2185,11 @@ fn collectScalarSretLeaves(
     leaves: *[64]ScalarSretLeaf,
     leaf_count: *usize,
 ) !void {
-    const field_count = aggregateFieldCount(aggregate_ty) orelse return error.UnsupportedCodegenAbi;
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi;
-        const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi;
-        if (offset_i < 0) return error.UnsupportedCodegenAbi;
-        const field_offset = base_offset + @as(u64, @intCast(offset_i));
-        if (supportedSretParamStoreLeaf(field_ty)) {
-            if (leaf_count.* >= leaves.len) return error.UnsupportedCodegenAbi;
-            leaves[leaf_count.*] = .{ .offset = field_offset, .ty = field_ty };
-            leaf_count.* += 1;
-        } else if (isAggregateType(field_ty)) {
-            try collectScalarSretLeaves(layout, field_ty, field_offset, leaves, leaf_count);
-        } else {
-            return error.UnsupportedCodegenAbi;
-        }
-    }
+    try air_capabilities.collectSupportedScalarAggregateLeaves(layout, aggregate_ty, base_offset, leaves, leaf_count);
 }
 
 fn supportedSretParamStoreLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
-        ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
+    return air_capabilities.isSupportedScalarAggregateLeaf(ty);
 }
 
 fn emitGenericCfgScalarSretParamStore(
@@ -2371,20 +2351,7 @@ pub fn aggregateCopyGepOffset(instruction: ir.Instruction, aggregate_ty: ir.Type
 }
 
 pub fn aggregateLeafTypeAtOffset(layout: target.DataLayout, aggregate_ty: ir.Type, expected_offset: u64) ?ir.Type {
-    var field_index: usize = 0;
-    while (memory_location.aggregateFieldType(aggregate_ty, field_index)) |field_ty| : (field_index += 1) {
-        const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return null;
-        if (offset_i < 0) return null;
-        const field_offset: u64 = @intCast(offset_i);
-        if (isAggregateType(field_ty)) {
-            if (expected_offset >= field_offset) {
-                if (aggregateLeafTypeAtOffset(layout, field_ty, expected_offset - field_offset)) |nested_ty| return nested_ty;
-            }
-        } else if (field_offset == expected_offset) {
-            return field_ty;
-        }
-    }
-    return null;
+    return air_capabilities.aggregateLeafTypeAtOffset(layout, aggregate_ty, expected_offset);
 }
 
 pub fn sretAggregateType(attrs: ?[]const u8) ?ir.Type {
@@ -2453,18 +2420,18 @@ pub fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
 
 pub fn aggregateFieldOffsetU8(aggregate_ty: ir.Type, field_index: usize) !u8 {
     const layout = try x86_64SysVDataLayout();
-    const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+    const offset = air_capabilities.aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse
         return error.UnsupportedCodegenAbi;
-    if (offset_i < 0 or offset_i > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
-    return @intCast(offset_i);
+    if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+    return @intCast(offset);
 }
 
 pub fn aggregateFieldOffset(aggregate_ty: ir.Type, field_index: usize) !u32 {
     const layout = try x86_64SysVDataLayout();
-    const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+    const offset = air_capabilities.aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse
         return error.UnsupportedCodegenAbi;
-    if (offset_i < 0 or offset_i > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
-    return @intCast(offset_i);
+    if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+    return @intCast(offset);
 }
 
 pub fn aggregateByteOffsetU8(aggregate_ty: ir.Type, field_offset: u64, field_ty: ir.Type) !u8 {

@@ -1,7 +1,7 @@
 const std = @import("std");
+const air_capabilities = @import("../../../zig_air_capabilities.zig");
 const ir = @import("../../../ir.zig");
 const target = @import("../../../target.zig");
-const memory_location = @import("../../../analysis/memory_location.zig");
 const x86_64_types = @import("../types.zig");
 const sysv_abi = @import("../sysv_abi.zig");
 const x86_64_emit = @import("../emit.zig");
@@ -470,11 +470,9 @@ pub fn aggregateInsertByteOffset(aggregate_ty: ir.Type, indices: []const u8, val
         const comma = std.mem.indexOfScalar(u8, rest, ',');
         const part = std.mem.trim(u8, if (comma) |pos| rest[0..pos] else rest, " \t");
         const field_index = std.fmt.parseInt(usize, part, 10) catch return error.UnsupportedCodegenAbi;
-        const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, current_ty, field_index) orelse
+        offset += air_capabilities.aggregateFieldByteOffset(layout, current_ty, field_index) orelse
             return error.UnsupportedCodegenAbi;
-        if (field_offset_i < 0) return error.UnsupportedCodegenAbi;
-        offset += @intCast(field_offset_i);
-        current_ty = memory_location.aggregateFieldType(current_ty, field_index) orelse return error.UnsupportedCodegenAbi;
+        current_ty = air_capabilities.aggregateFieldType(current_ty, field_index) orelse return error.UnsupportedCodegenAbi;
         rest = if (comma) |pos| rest[pos + 1 ..] else "";
     }
     if (!current_ty.eql(value_ty)) return error.UnsupportedCodegenAbi;
@@ -482,17 +480,14 @@ pub fn aggregateInsertByteOffset(aggregate_ty: ir.Type, indices: []const u8, val
 }
 
 pub fn aggregateFieldCount(ty: ir.Type) ?usize {
-    var count: usize = 0;
-    while (memory_location.aggregateFieldType(ty, count)) |_| : (count += 1) {}
-    return count;
+    return air_capabilities.aggregateFieldCount(ty);
 }
 
 pub fn aggregateFieldEightbyte(aggregate_ty: ir.Type, field_index: usize) !usize {
     const layout = try x86_64SysVDataLayout();
-    const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+    const field_offset = air_capabilities.aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse
         return error.UnsupportedCodegenAbi;
-    if (field_offset_i < 0) return error.UnsupportedCodegenAbi;
-    return @intCast(@as(u64, @intCast(field_offset_i)) / 8);
+    return @intCast(field_offset / 8);
 }
 
 pub fn fpParamIndexFromValue(function: ir.Function, value: ir.Value, ty: ir.Type) !usize {
@@ -1008,10 +1003,9 @@ pub fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, 
                 .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
             };
             if (field_index < 0 or field_index > std.math.maxInt(usize)) return null;
-            const offset = memory_location.aggregateFieldOffsetWithLayout(layout, current_ty, @intCast(field_index)) orelse return null;
-            if (offset < 0) return null;
-            byte_offset += @intCast(offset);
-            current_ty = memory_location.aggregateFieldType(current_ty, @intCast(field_index)) orelse return null;
+            const offset = air_capabilities.aggregateFieldByteOffset(layout, current_ty, @intCast(field_index)) orelse return null;
+            byte_offset += offset;
+            current_ty = air_capabilities.aggregateFieldType(current_ty, @intCast(field_index)) orelse return null;
         }
         return byte_offset;
     }
@@ -1020,17 +1014,7 @@ pub fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, 
 
 pub fn aggregateFieldIndexAtOffset(aggregate_ty: ir.Type, expected_offset: u64, expected_ty: ir.Type) ?usize {
     const layout = x86_64SysVDataLayout() catch return null;
-    var field_index: usize = 0;
-    while (memory_location.aggregateFieldType(aggregate_ty, field_index)) |field_ty| : (field_index += 1) {
-        const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return null;
-        if (offset_i < 0) return null;
-        const field_offset: u64 = @intCast(offset_i);
-        if (field_ty.eql(expected_ty) and field_offset == expected_offset) return field_index;
-        if (isAggregateType(field_ty) and expected_offset >= field_offset) {
-            if (aggregateFieldIndexAtOffset(field_ty, expected_offset - field_offset, expected_ty) != null) return field_index;
-        }
-    }
-    return null;
+    return air_capabilities.aggregateFieldIndexAtOffset(layout, aggregate_ty, expected_offset, expected_ty);
 }
 
 pub fn isScalarElementGepType(ty: ir.Type) bool {
@@ -1041,10 +1025,7 @@ pub fn isScalarElementGepType(ty: ir.Type) bool {
 }
 
 pub fn isAggregateType(ty: ir.Type) bool {
-    return switch (ty) {
-        .aggregate => true,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
-    };
+    return air_capabilities.isAggregateType(ty);
 }
 
 pub fn collectAggregateIntegerAddTerms(
@@ -1473,7 +1454,7 @@ pub fn isI64Aggregate(aggregate_ty: ir.Type) bool {
     if (field_count == 0) return false;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return false;
+        const field_ty = air_capabilities.aggregateFieldType(aggregate_ty, field_index) orelse return false;
         if (!field_ty.eql(.{ .int = 64 })) return false;
     }
     return true;
@@ -1484,7 +1465,7 @@ pub fn isI64LeafAggregate(aggregate_ty: ir.Type) bool {
     if (field_count == 0) return false;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return false;
+        const field_ty = air_capabilities.aggregateFieldType(aggregate_ty, field_index) orelse return false;
         if (field_ty.eql(.{ .int = 64 })) continue;
         if (isAggregateType(field_ty) and isI64LeafAggregate(field_ty)) continue;
         return false;
@@ -1493,21 +1474,11 @@ pub fn isI64LeafAggregate(aggregate_ty: ir.Type) bool {
 }
 
 pub fn isSupportedAggregateCopyLeafAggregate(aggregate_ty: ir.Type) bool {
-    const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
-    if (field_count == 0) return false;
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return false;
-        if (supportedAggregateCopyLeaf(field_ty)) continue;
-        if (isAggregateType(field_ty) and isSupportedAggregateCopyLeafAggregate(field_ty)) continue;
-        return false;
-    }
-    return true;
+    return air_capabilities.isSupportedScalarLeafAggregate(aggregate_ty);
 }
 
 pub fn supportedAggregateCopyLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
-        ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
+    return air_capabilities.isSupportedScalarAggregateLeaf(ty);
 }
 
 pub fn aggregateFieldIndexFromGep(instruction: ir.Instruction, aggregate_ty: ir.Type, base_name: []const u8) ?usize {
@@ -1529,10 +1500,9 @@ pub fn aggregateFieldIndexFromGep(instruction: ir.Instruction, aggregate_ty: ir.
 
 pub fn stackAggregateFieldDisp8(aggregate_ty: ir.Type, field_index: usize) !u8 {
     const layout = try x86_64SysVDataLayout();
-    const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+    const field_offset = air_capabilities.aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse
         return error.UnsupportedCodegenAbi;
-    if (offset_i < 0) return error.UnsupportedCodegenAbi;
-    const offset = 8 + @as(u64, @intCast(offset_i));
+    const offset = 8 + field_offset;
     if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
     return @intCast(offset);
 }
@@ -1720,11 +1690,9 @@ pub fn sysvAggregateFieldLocation(
     field_ty: ir.Type,
 ) !SysVAggregateFieldLocation {
     const layout = try x86_64SysVDataLayout();
-    const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+    const field_offset = air_capabilities.aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse
         return error.UnsupportedCodegenAbi;
-    if (field_offset_i < 0) return error.UnsupportedCodegenAbi;
-    const field_offset: u64 = @intCast(field_offset_i);
-    if (!((memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi).eql(field_ty))) {
+    if (!((air_capabilities.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi).eql(field_ty))) {
         return error.UnsupportedCodegenAbi;
     }
     return try sysvAggregateFieldLocationByOffset(function, param_name, aggregate_ty, field_offset, field_ty);

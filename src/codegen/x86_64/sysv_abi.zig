@@ -1,7 +1,7 @@
 const std = @import("std");
+const air_capabilities = @import("../../zig_air_capabilities.zig");
 const ir = @import("../../ir.zig");
 const target = @import("../../target.zig");
-const memory_location = @import("../../analysis/memory_location.zig");
 const types = @import("types.zig");
 
 const ArgReg = types.ArgReg;
@@ -95,17 +95,12 @@ fn classifyAggregateInto(
             }
             var field_index: usize = 0;
             var saw_field = false;
-            while (memory_location.aggregateFieldType(ty, field_index)) |field_ty| : (field_index += 1) {
+            while (air_capabilities.aggregateFieldType(ty, field_index)) |field_ty| : (field_index += 1) {
                 saw_field = true;
-                const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, ty, field_index) orelse {
+                const field_offset = air_capabilities.aggregateFieldByteOffset(layout, ty, field_index) orelse {
                     classification.kind = .memory;
                     return;
                 };
-                if (field_offset_i < 0) {
-                    classification.kind = .memory;
-                    return;
-                }
-                const field_offset: u64 = @intCast(field_offset_i);
                 const field_size = try layout.typeStoreSizeBytes(field_ty);
                 const field_align_bytes = bitsToBytes(try layout.typeAbiAlignmentBits(field_ty));
                 if (field_align_bytes != 0 and field_offset % field_align_bytes != 0) {
@@ -588,19 +583,13 @@ fn abiAttrPayload(attrs: []const u8, name: []const u8) ?[]const u8 {
 }
 
 pub fn rejectUnsupportedAbiType(ty: ir.Type) !void {
-    switch (ty) {
-        .vector => return error.UnsupportedVectorAbi,
-        .x86_fp80, .fp128 => return error.UnsupportedLongDoubleAbi,
-        .aggregate => |text| {
-            const trimmed = std.mem.trim(u8, text, " \t");
-            if (std.mem.startsWith(u8, trimmed, "<{")) return error.UnsupportedPackedAggregateAbi;
-            if (std.mem.indexOfScalar(u8, trimmed, '<') != null) return error.UnsupportedVectorAbi;
-            var field_index: usize = 0;
-            while (memory_location.aggregateFieldType(ty, field_index)) |field_ty| : (field_index += 1) {
-                try rejectUnsupportedAbiType(field_ty);
-            }
-        },
-        .void, .int, .float, .double, .metadata, .ptr => {},
+    if (air_capabilities.boundaryForIrType(ty)) |boundary| {
+        return switch (boundary) {
+            .vector => error.UnsupportedVectorAbi,
+            .x87 => error.UnsupportedLongDoubleAbi,
+            .packed_aggregate => error.UnsupportedPackedAggregateAbi,
+            .varargs => error.UnsupportedVarargsAbi,
+        };
     }
 }
 
