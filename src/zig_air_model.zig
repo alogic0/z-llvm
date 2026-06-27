@@ -656,6 +656,18 @@ pub fn isTypedNoneOperand(operand: air_export.TypedOperand) bool {
     return std.mem.eql(u8, operand.kind, "none");
 }
 
+pub fn isTypedBlockOperand(operand: air_export.TypedOperand) bool {
+    return std.mem.eql(u8, operand.kind, "block");
+}
+
+fn typedBlockOperandTargetText(operand: air_export.TypedOperand) ?[]const u8 {
+    if (!isTypedBlockOperand(operand)) return null;
+    return if (std.mem.eql(u8, operand.value, "block"))
+        operand.type_text
+    else
+        operand.value;
+}
+
 pub fn typedBranchI32ConstValue(instruction: air_export.TypedInstruction) ?i32 {
     if (!air_capabilities.isBrOpcode(instruction.opcode)) return null;
     if (instruction.operands.len != 2) return null;
@@ -794,11 +806,8 @@ pub fn genericTypedGepIndex(value: ir.Value) bool {
 }
 
 pub fn blockTarget(operand: air_export.TypedOperand) ?u32 {
-    if (!std.mem.eql(u8, operand.kind, "block")) return null;
-    if (!std.mem.eql(u8, operand.value, "block")) {
-        return std.fmt.parseInt(u32, operand.value, 10) catch null;
-    }
-    return std.fmt.parseInt(u32, operand.type_text, 10) catch null;
+    const target_text = typedBlockOperandTargetText(operand) orelse return null;
+    return std.fmt.parseInt(u32, target_text, 10) catch null;
 }
 
 pub fn typedResultCoverage(
