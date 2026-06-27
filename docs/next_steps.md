@@ -145,8 +145,11 @@ Execution order:
    function naming, raw instruction-position lookup, typed-v2 required-detail
    validation, and selected typed GEP/field-offset eligibility helpers. The
    parser still owns text parsing for Zig type spelling, constants, symbol
-   pointers, instruction refs, and top-level comma splitting; those are the
-   remaining planned extraction points before the lowerers can consume one
+   pointers, and instruction refs. Balanced text helpers (`findMatching` and
+   top-level comma splitting) now live in `src/zig_air_text.zig`, with parser
+   and lowerers consuming the same utility module instead of using the parser
+   as a shared helper bucket. The remaining planned extraction points are the
+   actual Zig type/value/reference parsers before the lowerers can consume one
    normalized typed-AIR model end to end.
 3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
