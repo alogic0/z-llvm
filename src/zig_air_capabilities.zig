@@ -471,6 +471,14 @@ pub fn isCallOpcode(opcode: []const u8) bool {
     return air_export.categoryForOpcode(opcode) == .call;
 }
 
+pub fn isArgOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "arg");
+}
+
+pub fn isAllocOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "alloc");
+}
+
 pub fn isReturnOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "ret") or
         std.mem.eql(u8, opcode, "ret_safe");
@@ -494,6 +502,14 @@ pub fn isCondBrOpcode(opcode: []const u8) bool {
 
 pub fn isSwitchBrOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "switch_br");
+}
+
+pub fn isLoopOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "loop");
+}
+
+pub fn isRepeatOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "repeat");
 }
 
 pub fn isAtomicRmwOpcode(opcode: []const u8) bool {
@@ -773,6 +789,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(isIgnoredOpcode("dbg_stmt"));
     try std.testing.expect(isInventoryKnownOpcode("dbg_stmt"));
     try std.testing.expect(isTypedV2LowerableOpcode("block"));
+    try std.testing.expect(isArgOpcode("arg"));
+    try std.testing.expect(!isArgOpcode("alloc"));
+    try std.testing.expect(isAllocOpcode("alloc"));
+    try std.testing.expect(!isAllocOpcode("arg"));
     try std.testing.expect(isReturnOpcode("ret_safe"));
     try std.testing.expect(!isReturnOpcode("call"));
     try std.testing.expect(isUnreachOpcode("unreach"));
@@ -783,6 +803,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(!isCondBrOpcode("br"));
     try std.testing.expect(isSwitchBrOpcode("switch_br"));
     try std.testing.expect(!isSwitchBrOpcode("cond_br"));
+    try std.testing.expect(isLoopOpcode("loop"));
+    try std.testing.expect(!isLoopOpcode("repeat"));
+    try std.testing.expect(isRepeatOpcode("repeat"));
+    try std.testing.expect(!isRepeatOpcode("loop"));
     try std.testing.expect(isStraightLineOpcode("assembly"));
     try std.testing.expect(isInventoryKnownOpcode("assembly"));
     try std.testing.expect(!isTypedV2LowerableOpcode("assembly"));

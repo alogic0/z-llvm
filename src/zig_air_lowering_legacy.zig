@@ -141,7 +141,7 @@ pub fn accumulatorLoopShape(function: air_export.Function) ?AccumulatorLoopShape
     var branch_count: usize = 0;
 
     for (function.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, "arg")) {
+        if (air_capabilities.isArgOpcode(instruction.opcode)) {
             var fields = splitTopLevel(instruction.payload, ',');
             const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
             const param_index = std.mem.trim(u8, fields.next() orelse return null, " ");
@@ -149,20 +149,20 @@ pub fn accumulatorLoopShape(function: air_export.Function) ?AccumulatorLoopShape
             if (std.mem.eql(u8, type_text, "u32") and std.mem.eql(u8, param_index, "0")) {
                 limit_arg = instruction.index;
             }
-        } else if (std.mem.eql(u8, instruction.opcode, "alloc")) {
+        } else if (air_capabilities.isAllocOpcode(instruction.opcode)) {
             const allocated = std.mem.trim(u8, instruction.payload, " ");
             if (std.mem.eql(u8, allocated, "*u32")) {
                 index_slot = instruction.index;
             } else if (std.mem.eql(u8, allocated, "*i32")) {
                 sum_slot = instruction.index;
             }
-        } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+        } else if (air_capabilities.isCondBrOpcode(instruction.opcode)) {
             condition_count += 1;
-        } else if (std.mem.eql(u8, instruction.opcode, "loop")) {
+        } else if (air_capabilities.isLoopOpcode(instruction.opcode)) {
             loop_count += 1;
-        } else if (std.mem.eql(u8, instruction.opcode, "repeat")) {
+        } else if (air_capabilities.isRepeatOpcode(instruction.opcode)) {
             repeat_count += 1;
-        } else if (std.mem.eql(u8, instruction.opcode, "br")) {
+        } else if (air_capabilities.isBrOpcode(instruction.opcode)) {
             branch_count += 1;
         }
     }
