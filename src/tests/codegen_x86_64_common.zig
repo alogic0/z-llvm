@@ -1,5 +1,6 @@
 pub const std = @import("std");
 pub const air_bridge = @import("../air_bridge.zig");
+pub const abi_boundaries = @import("../abi_boundaries.zig");
 pub const alias = @import("../analysis/alias.zig");
 pub const call_graph = @import("../analysis/call_graph.zig");
 pub const cfg = @import("../analysis/cfg.zig");
@@ -45,6 +46,7 @@ pub fn expectMachineInstruction(instructions: []const codegen.x86_64.Instruction
 test {
     _ = std;
     _ = air_bridge;
+    _ = abi_boundaries;
     _ = alias;
     _ = call_graph;
     _ = cfg;

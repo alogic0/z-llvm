@@ -33,6 +33,18 @@ pub const Category = enum {
             .stack_pressure => "UnsupportedCodegenAbi",
         };
     }
+
+    pub fn errorValue(self: Category) anyerror {
+        return switch (self) {
+            .varargs => error.UnsupportedVarargsAbi,
+            .vector => error.UnsupportedVectorAbi,
+            .x87 => error.UnsupportedLongDoubleAbi,
+            .packed_aggregate => error.UnsupportedPackedAggregateAbi,
+            .tail_call => error.UnsupportedTailCallAbi,
+            .non_default_callconv => error.UnsupportedCallConvAbi,
+            .stack_pressure => error.UnsupportedCodegenAbi,
+        };
+    }
 };
 
 pub const Counts = struct {
@@ -161,6 +173,7 @@ test "frontier ABI boundary metadata names diagnostics" {
     try std.testing.expectEqualStrings("varargs", Category.varargs.name());
     try std.testing.expectEqualStrings("UnsupportedVectorAbi", Category.vector.diagnosticName());
     try std.testing.expectEqualStrings("packed-aggregate", Category.packed_aggregate.name());
+    try std.testing.expectEqual(error.UnsupportedLongDoubleAbi, Category.x87.errorValue());
 }
 
 test "frontier ABI boundary counts update by category" {
