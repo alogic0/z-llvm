@@ -166,6 +166,9 @@ Execution order:
    materialization, void-guard panic blocks, and legacy select block
    materialization now use the same predicates as well, leaving operand counts
    and CFG shape validation local but opcode identity registry-owned.
+   Semantic-domain routing now delegates to the registry's per-domain
+   operation IDs instead of carrying a second opcode allowlist for scalar,
+   memory, optional, error-union, and pointer/aggregate domains.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
