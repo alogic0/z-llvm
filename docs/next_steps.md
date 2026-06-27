@@ -204,6 +204,13 @@ Execution order:
    return-pointer recognition routes through the capability registry, aggregate
    pointer-path parsing reuses model-owned operand/field helpers, and branch
    constant/field-index checks no longer duplicate local operand parsing. The
+   typed atomic payload checks and legacy aggregate-init validation now also
+   enter through capability/model predicates, and legacy CFG/store/return
+   matchers use shared capability predicates instead of local opcode literals.
+   The strict frontier gate was re-run after these refactors and still reports
+   `generic_cfg_functions=603`, `structural_matcher_functions=0`,
+   `legacy_air_text_lowering_functions=0`, and executable proof green across
+   ReleaseFast, ReleaseSafe, and ReleaseSmall. The
    Zig type/function signature parsing and pointer-child text now live in
    `src/zig_air_types.zig`; AIR constants and symbol pointers live in
    `src/zig_air_values.zig`; instruction-reference parsing and balanced text
