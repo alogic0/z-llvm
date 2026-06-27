@@ -143,6 +143,9 @@ Execution order:
    removed. Lowering modules now ask `src/zig_air_capabilities.zig` directly,
    so there is no parser facade for ignored, straight-line, arithmetic, shift,
    cast, field-pointer, call, or typed-v2 lowerable opcode checks.
+   Typed branch-to-i32-constant queries now also live in
+   `src/zig_air_model.zig`, so optional-payload fallback and dense-switch
+   result extraction no longer scan raw typed-v2 records locally.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
