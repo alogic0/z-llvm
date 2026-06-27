@@ -203,8 +203,10 @@ Execution order:
    registry instead of owning ad hoc boundary metadata.
 5. Aggregate ABI slice: route aggregate argument, return, sret, byval, field
    offset, and copy decisions through the shared type-layout result plus the
-   SysV aggregate classifier. Do not add function-name-specific aggregate
-   paths.
+   SysV aggregate classifier. `src/codegen/x86_64/sysv_abi.zig` now also owns
+   shared call signature rejection for callconv and varargs surfaces, and both
+   the planner and older direct-call lowerer consume that helper. Do not add
+   function-name-specific aggregate paths.
 6. Unknown-opcode slice: split the compiler-core `unknown-opcode` inventory
    bucket into stable subcategories before implementing more lowering. The
    first split is now emitted as `unknown_opcode` and `top_unknown_opcode`
