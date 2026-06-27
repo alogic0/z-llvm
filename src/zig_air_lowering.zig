@@ -9,6 +9,7 @@ const air_model = @import("zig_air_model.zig");
 const air_semantics = @import("zig_air_semantics.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
+const air_values = @import("zig_air_values.zig");
 
 pub const UnsupportedReason = enum {
     function_type,
@@ -54,8 +55,6 @@ pub const TypedV2Fallback = struct {
     reason: []const u8,
 };
 
-const lowering_parser = @import("zig_air_lowering_parser.zig");
-
 const ZigType = air_model.ZigType;
 const FunctionType = air_model.FunctionType;
 const TypedValue = air_model.TypedValue;
@@ -65,8 +64,8 @@ const parseFunctionType = air_types.parseFunctionType;
 const functionReturnTypeText = air_types.functionReturnTypeText;
 const parseZigType = air_types.parseZigType;
 const pointerLoadResultType = air_types.pointerLoadResultType;
-const parseConstant = lowering_parser.parseConstant;
-const parseSymbolPointer = lowering_parser.parseSymbolPointer;
+const parseConstant = air_values.parseConstant;
+const parseSymbolPointer = air_values.parseSymbolPointer;
 const parseInstructionRef = air_text.instructionRef;
 const isSimpleSelectBlock = air_model.simpleSelectBlock;
 const belongsToSimpleSelectBlock = air_model.belongsToSimpleSelectBlock;

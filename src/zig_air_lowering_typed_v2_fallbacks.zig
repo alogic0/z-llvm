@@ -3,7 +3,6 @@ const air_export = @import("zig_air_export.zig");
 const air_model = @import("zig_air_model.zig");
 const air_types = @import("zig_air_types.zig");
 const ir = @import("ir.zig");
-const lowering_parser = @import("zig_air_lowering_parser.zig");
 const typed_v2 = @import("zig_air_lowering_typed_v2.zig");
 
 const FunctionType = air_model.FunctionType;

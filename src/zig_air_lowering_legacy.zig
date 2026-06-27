@@ -3,11 +3,11 @@ const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
+const air_values = @import("zig_air_values.zig");
 const ir = @import("ir.zig");
-const lowering_parser = @import("zig_air_lowering_parser.zig");
 
 const FunctionType = @import("zig_air_model.zig").FunctionType;
-const parseConstant = lowering_parser.parseConstant;
+const parseConstant = air_values.parseConstant;
 const parseFunctionType = air_types.parseFunctionType;
 const parseInstructionRef = air_text.instructionRef;
 const shortFunctionName = @import("zig_air_model.zig").shortFunctionName;

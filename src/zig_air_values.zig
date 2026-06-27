@@ -125,3 +125,13 @@ pub fn ptrCastSymbol(text: []const u8) ?[]const u8 {
     if (symbol_end == symbol_start) return null;
     return text[symbol_start..symbol_end];
 }
+
+test "parse static AIR constants" {
+    const parsed = parseConstant("<i32, 42>") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(@as(i128, 42), parsed.value.int);
+}
+
+test "parse symbol pointers" {
+    const parsed = parseSymbolPointer("<*const i8, &panic_message>") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqualStrings("panic_message", parsed.symbol);
+}
