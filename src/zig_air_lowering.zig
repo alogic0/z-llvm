@@ -85,7 +85,6 @@ const belongsToGenericTypedCfgBlock = lowering_parser.belongsToGenericTypedCfgBl
 const genericTypedCfgBodyContains = lowering_parser.genericTypedCfgBodyContains;
 const bodyContainsInstruction = lowering_parser.bodyContainsInstruction;
 const typedBlockTarget = lowering_parser.typedBlockTarget;
-const typedInstructionByIndex = lowering_parser.typedInstructionByIndex;
 const typedSingleInstructionByOpcode = lowering_parser.typedSingleInstructionByOpcode;
 const typedDetail = lowering_parser.typedDetail;
 const typedOperandTextDetail = lowering_parser.typedOperandTextDetail;
@@ -871,6 +870,7 @@ fn lowerFunctionTypedV2(
     const values = try allocator.alloc(?TypedValue, air_function.instruction_count);
     defer allocator.free(values);
     @memset(values, null);
+    const typed_view = air_model.TypedFunctionView.init(air_function) orelse return error.UnsupportedAir;
 
     var context: LoweringContext = .{
         .allocator = allocator,
@@ -882,13 +882,12 @@ fn lowerFunctionTypedV2(
         .values = values,
         .structured_air = structured_air,
         .structured_air_v2 = structured_air_v2,
-        .typed_view = air_model.TypedFunctionView.init(air_function).?,
+        .typed_view = typed_view,
         .typed_v2_fallback = typed_v2_fallback,
     };
 
     for (main_body.instructions) |instruction_index| {
-        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse
-            return error.UnsupportedAir;
+        const instruction = typed_view.instruction(instruction_index) orelse return error.UnsupportedAir;
         try context.lowerTypedInstruction(instruction);
     }
     if (block.terminator == null) return error.UnsupportedAir;
