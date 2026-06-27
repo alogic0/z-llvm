@@ -87,6 +87,18 @@ pub const TypedFunctionView = struct {
         return false;
     }
 
+    pub fn opcodeCount(self: TypedFunctionView, opcode: []const u8) usize {
+        return typedOpcodeCount(self.structured_air_v2, opcode);
+    }
+
+    pub fn fieldPtrIndexCount(self: TypedFunctionView, expected_index: usize) usize {
+        return typedFieldPtrIndexCount(self.structured_air_v2, expected_index);
+    }
+
+    pub fn calleeNameCount(self: TypedFunctionView, callee_name: []const u8) usize {
+        return typedCalleeNameCount(self.structured_air_v2, callee_name);
+    }
+
     pub fn terminalErrorUnionCondBr(self: TypedFunctionView, instruction_index: u32) bool {
         if (!self.hasAnyOpcode(&.{
             "is_non_err",
@@ -477,6 +489,36 @@ pub fn instructionMissingRequiredDetail(instruction: air_export.TypedInstruction
         }
     }
     return null;
+}
+
+pub fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) usize {
+    var count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, opcode)) count += 1;
+    }
+    return count;
+}
+
+pub fn typedFieldPtrIndexCount(structured_air_v2: air_export.StructuredAirV2, expected_index: usize) usize {
+    var count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.data_kind, "field_ptr")) continue;
+        const field_index_text = detail(instruction, "field_index") orelse continue;
+        const field_index = std.fmt.parseInt(usize, field_index_text, 10) catch continue;
+        if (field_index == expected_index) count += 1;
+    }
+    return count;
+}
+
+pub fn typedCalleeNameCount(structured_air_v2: air_export.StructuredAirV2, callee_name: []const u8) usize {
+    var count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isCallOpcode(instruction.opcode)) continue;
+        const callee_text = detail(instruction, "callee_text") orelse continue;
+        const name = calleeName(callee_text) orelse continue;
+        if (std.mem.eql(u8, name, callee_name)) count += 1;
+    }
+    return count;
 }
 
 pub fn plainFieldPointerChild(ty: ir.Type) bool {

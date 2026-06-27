@@ -1,6 +1,5 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
-const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
@@ -22,7 +21,6 @@ const typedCalleeName = air_model.calleeName;
 const typedInstructionByIndex = air_model.instructionByIndex;
 const typedSingleInstructionByOpcode = air_model.singleInstructionByOpcode;
 const shortFunctionName = air_model.shortFunctionName;
-const isCallOpcode = air_capabilities.isCallOpcode;
 const ownPrint = air_model.ownPrint;
 const splitTopLevel = air_text.splitTopLevel;
 const parseSymbolPointer = air_values.parseSymbolPointer;
@@ -41,33 +39,15 @@ const lowerSliceSum = legacy.lowerSliceSum;
 const lowerConditionalSliceSum = legacy.lowerConditionalSliceSum;
 
 pub fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) usize {
-    var count: usize = 0;
-    for (structured_air_v2.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, opcode)) count += 1;
-    }
-    return count;
+    return air_model.typedOpcodeCount(structured_air_v2, opcode);
 }
 
 pub fn typedFieldPtrIndexCount(structured_air_v2: air_export.StructuredAirV2, expected_index: usize) usize {
-    var count: usize = 0;
-    for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.data_kind, "field_ptr")) continue;
-        const field_index_text = typedDetail(instruction, "field_index") orelse continue;
-        const field_index = std.fmt.parseInt(usize, field_index_text, 10) catch continue;
-        if (field_index == expected_index) count += 1;
-    }
-    return count;
+    return air_model.typedFieldPtrIndexCount(structured_air_v2, expected_index);
 }
 
 pub fn typedCalleeNameCount(structured_air_v2: air_export.StructuredAirV2, callee_name: []const u8) usize {
-    var count: usize = 0;
-    for (structured_air_v2.instructions) |instruction| {
-        if (!isCallOpcode(instruction.opcode)) continue;
-        const callee_text = typedDetail(instruction, "callee_text") orelse continue;
-        const name = typedCalleeName(callee_text) orelse continue;
-        if (std.mem.eql(u8, name, callee_name)) count += 1;
-    }
-    return count;
+    return air_model.typedCalleeNameCount(structured_air_v2, callee_name);
 }
 
 pub fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
