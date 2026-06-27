@@ -226,3 +226,41 @@ pub fn blockTarget(operand: air_export.TypedOperand) ?u32 {
     }
     return std.fmt.parseInt(u32, operand.type_text, 10) catch null;
 }
+
+test "typed AIR model parses instruction details and block operands" {
+    const instruction = air_export.TypedInstruction{
+        .index = 4,
+        .opcode = "br",
+        .result_type = "void",
+        .data_kind = "br",
+        .operands = &.{},
+        .details = &.{
+            .{ .key = "callee_text", .value = "function 'helper'" },
+            .{ .key = "operand1", .value = "@.void_value" },
+        },
+    };
+    try std.testing.expectEqualStrings("function 'helper'", detail(instruction, "callee_text").?);
+    try std.testing.expectEqualStrings("@.void_value", operandTextDetail(instruction, 1).?);
+
+    try std.testing.expectEqual(@as(u32, 12), blockTarget(.{
+        .kind = "block",
+        .value = "block",
+        .type_text = "12",
+    }).?);
+    try std.testing.expectEqual(@as(u32, 7), blockTarget(.{
+        .kind = "block",
+        .value = "7",
+        .type_text = "ignored",
+    }).?);
+}
+
+test "typed AIR model parses direct and extern callees" {
+    const direct = callee("function 'local_helper'").?;
+    try std.testing.expectEqualStrings("local_helper", direct.name);
+    try std.testing.expect(!direct.external);
+    try std.testing.expectEqualStrings("local_helper", calleeName("function 'local_helper'").?);
+
+    const external = callee("extern 'debug.defaultPanic'").?;
+    try std.testing.expectEqualStrings("debug.defaultPanic", external.name);
+    try std.testing.expect(external.external);
+}
