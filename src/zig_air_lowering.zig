@@ -573,31 +573,13 @@ fn lowerFunction(
 
     for (air_function.instructions) |instruction| {
         if (isIgnoredOpcode(instruction.opcode)) continue;
-        if (std.mem.eql(u8, instruction.opcode, "arg")) {
-            try context.lowerArg(instruction);
-        } else if (isArithmeticOpcode(instruction.opcode)) {
-            try context.lowerBinary(instruction);
-        } else if (std.mem.startsWith(u8, instruction.opcode, "cmp_")) {
-            try context.lowerCompare(instruction);
-        } else if (isCastOpcode(instruction.opcode)) {
-            try context.lowerCast(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "alloc")) {
-            try context.lowerAlloca(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "load")) {
-            try context.lowerLoad(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "store") or
-            std.mem.eql(u8, instruction.opcode, "store_safe"))
-        {
-            try context.lowerStore(instruction);
+        if (try context.lowerLegacySemanticInstruction(instruction)) {
+            continue;
         } else if (isCallOpcode(instruction.opcode)) {
             try context.lowerCall(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) {
-            try context.lowerRuntimeNavPtr(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "atomic_rmw")) {
+        } else if (air_capabilities.isAtomicRmwOpcode(instruction.opcode)) {
             try context.lowerAtomicRmw(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "array_elem_val")) {
-            try context.lowerArrayElemVal(instruction);
-        } else if (std.mem.eql(u8, instruction.opcode, "assembly")) {
+        } else if (air_capabilities.isAssemblyOpcode(instruction.opcode)) {
             try context.lowerAssembly(instruction);
         } else if (air_capabilities.isReturnOpcode(instruction.opcode)) {
             try context.lowerReturn(instruction);
@@ -803,6 +785,58 @@ const LoweringContext = struct {
             .none => false,
         };
         if (!lowered) return error.UnsupportedAir;
+    }
+
+    fn lowerLegacySemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.Instruction,
+    ) !bool {
+        const lowered = switch (air_capabilities.semanticDomainForOpcode(instruction.opcode)) {
+            .scalar => try self.lowerLegacyScalarSemanticInstruction(instruction),
+            .memory => try self.lowerLegacyMemorySemanticInstruction(instruction),
+            .pointer_aggregate => try self.lowerLegacyPointerAggregateSemanticInstruction(instruction),
+            .optional, .error_union, .none => false,
+        };
+        return lowered;
+    }
+
+    fn lowerLegacyScalarSemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.Instruction,
+    ) !bool {
+        switch (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode)) {
+            .arg => try self.lowerArg(instruction),
+            .binary => try self.lowerBinary(instruction),
+            .compare => try self.lowerCompare(instruction),
+            .cast => try self.lowerCast(instruction),
+            .add_with_overflow, .none => return false,
+        }
+        return true;
+    }
+
+    fn lowerLegacyMemorySemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.Instruction,
+    ) !bool {
+        switch (air_capabilities.memorySemanticOpForOpcode(instruction.opcode)) {
+            .alloc => try self.lowerAlloca(instruction),
+            .load => try self.lowerLoad(instruction),
+            .store => try self.lowerStore(instruction),
+            .none => return false,
+        }
+        return true;
+    }
+
+    fn lowerLegacyPointerAggregateSemanticInstruction(
+        self: *LoweringContext,
+        instruction: air_export.Instruction,
+    ) !bool {
+        switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
+            .runtime_nav_ptr => try self.lowerRuntimeNavPtr(instruction),
+            .array_elem_val => try self.lowerArrayElemVal(instruction),
+            .slice, .ptr_gep, .field_ptr, .none => return false,
+        }
+        return true;
     }
 
     fn lowerTypedScalarSemanticInstruction(
