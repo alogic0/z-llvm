@@ -1,10 +1,11 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
+const air_model = @import("zig_air_model.zig");
 const ir = @import("ir.zig");
 const lowering_parser = @import("zig_air_lowering_parser.zig");
 const typed_v2 = @import("zig_air_lowering_typed_v2.zig");
 
-const FunctionType = lowering_parser.FunctionType;
+const FunctionType = air_model.FunctionType;
 const parseFunctionType = lowering_parser.parseFunctionType;
 const ownPrint = lowering_parser.ownPrint;
 const shortFunctionName = lowering_parser.shortFunctionName;
