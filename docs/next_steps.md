@@ -149,7 +149,8 @@ Execution order:
    opcode-filtered typed i32 operand query used by optional-pointer add
    lowering is model-owned as well. Typed-v2 lowering now also calls the
    model-owned opcode and return-opcode count helpers directly instead of
-   keeping pass-through wrappers.
+   keeping pass-through wrappers, and the remaining typed-v2 field-pointer,
+   callee-name, and store-count wrappers have been removed.
    `src/zig_air_model.zig` now also owns the shared typed value
    structs (`ZigType`, `FunctionType`, `TypedValue`, and branch-merge values),
    function naming, raw instruction-position lookup, typed-v2 required-detail
