@@ -980,9 +980,9 @@ fn accountOpcode(
     if (!air_capabilities.isInventoryKnownOpcode(opcode)) {
         counters.unsupported_opcodes += 1;
         try noteUnsupported(allocator, counters, .unknown_opcode, source, function);
-        const unknown_category = air_capabilities.unknownOpcodeCategory(opcode, data_kind);
-        try noteUnknownOpcodeCategory(allocator, counters, unknown_category, source, function);
-        try noteUnknownOpcodePair(allocator, counters, unknown_category, opcode, data_kind, source, function);
+        const data_kind_capability = air_capabilities.opcodeDataKindCapability(opcode, data_kind);
+        try noteUnknownOpcodeCategory(allocator, counters, data_kind_capability.category, source, function);
+        try noteUnknownOpcodePair(allocator, counters, data_kind_capability.category, opcode, data_kind, source, function);
         unsupported_in_function.* = true;
     }
     try accountTextFeatures(allocator, counters, source, function, data_kind, unsupported_in_function);

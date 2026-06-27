@@ -88,9 +88,10 @@ Execution order:
    the registry capability object instead of asking scattered boolean helpers.
    Typed-v2 fallback diagnostics now also use registry status/boundary reasons
    instead of reporting a generic local `unsupported_opcode` bucket.
-   Next work: extend this registry from opcode capability into data-kind
-   ownership and make lowering dispatch select through the registered lowerer
-   kind directly.
+   The first data-kind capability API now classifies opcode/data-kind pairs and
+   standalone data-kind surfaces into owner categories, and inventory consumes
+   that object for unknown-opcode reporting. Next work: make lowering dispatch
+   select through the registered lowerer kind directly.
 2. Normalized typed-AIR slice: `src/zig_air_model.zig` now provides the first
    reusable typed function view over structured-air v1/v2 bodies,
    instructions, and opcode capabilities. The generic typed-CFG block

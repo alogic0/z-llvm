@@ -16,6 +16,14 @@ pub const OpcodeCapability = struct {
     boundary_reason: ?[]const u8 = null,
 };
 
+pub const DataKindCapability = struct {
+    category: UnknownOpcodeCategory,
+    status: OpcodeStatus,
+    owner: CapabilityOwner,
+    lowerer: LowererKind,
+    inventory_known: bool,
+};
+
 pub const OpcodeStatus = enum {
     unknown,
     inventory_only,
@@ -270,36 +278,56 @@ fn lowererForLowerableOpcode(opcode: []const u8, category: air_export.Instructio
 }
 
 pub fn unknownOpcodeCategory(opcode: []const u8, data_kind: []const u8) UnknownOpcodeCategory {
-    const combined = if (data_kind.len == 0) opcode else data_kind;
-    if (containsAny(opcode, &.{ "dbg", "debug" }) or containsAny(combined, &.{ "dbg", "debug" })) return .debug_metadata;
-    if (containsAny(opcode, &.{ "try", "err", "error", "unwrap_err", "errunion" }) or
-        containsAny(combined, &.{ "try", "err", "error", "errunion" }))
-    {
-        return .error_union_try;
-    }
-    if (containsAny(opcode, &.{ "ptr", "addr", "gep", "nav", "field_ptr" }) or
-        containsAny(combined, &.{ "ptr", "addr", "gep", "nav", "field_ptr" }))
-    {
-        return .pointer_address;
-    }
-    if (containsAny(opcode, &.{ "switch", "dispatch" }) or containsAny(combined, &.{ "switch", "dispatch" })) return .switch_dispatch;
-    if (containsAny(opcode, &.{ "safe", "panic", "overflow", "bounds", "trap", "sentinel" }) or
-        containsAny(combined, &.{ "safe", "panic", "overflow", "bounds", "trap", "sentinel" }))
-    {
-        return .safety_runtime;
-    }
-    if (containsAny(opcode, &.{ "aggregate", "struct", "field", "elem", "array", "slice" }) or
-        containsAny(combined, &.{ "aggregate", "struct", "field", "elem", "array", "slice" }))
-    {
-        return .aggregate_shape;
-    }
-    if (containsAny(opcode, &.{ "call", "invoke" }) or containsAny(combined, &.{ "call", "invoke" })) return .call_shape;
-    if (containsAny(opcode, &.{ "load", "store", "alloc", "memcpy", "memset", "memmove", "atomic", "cmpxchg", "fence" }) or
-        containsAny(combined, &.{ "load", "store", "alloc", "memcpy", "memset", "memmove", "atomic", "cmpxchg", "fence" }))
-    {
-        return .memory_shape;
-    }
+    return opcodeDataKindCapability(opcode, data_kind).category;
+}
+
+pub fn opcodeDataKindCapability(opcode: []const u8, data_kind: []const u8) DataKindCapability {
+    const opcode_category = dataKindCategoryFromText(opcode);
+    const data_kind_category = dataKindCategoryFromText(data_kind);
+    const category = if (opcode_category != .other) opcode_category else data_kind_category;
+    const inventory_known = category != .other;
+    return .{
+        .category = category,
+        .status = if (inventory_known) .inventory_only else .unknown,
+        .owner = ownerForDataKindCategory(category),
+        .lowerer = .none,
+        .inventory_known = inventory_known,
+    };
+}
+
+pub fn dataKindCapability(data_kind: []const u8) DataKindCapability {
+    const category = dataKindCategoryFromText(data_kind);
+    const inventory_known = category != .other;
+    return .{
+        .category = category,
+        .status = if (inventory_known) .inventory_only else .unknown,
+        .owner = ownerForDataKindCategory(category),
+        .lowerer = .none,
+        .inventory_known = inventory_known,
+    };
+}
+
+fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
+    if (containsAny(text, &.{ "dbg", "debug" })) return .debug_metadata;
+    if (containsAny(text, &.{ "try", "err", "error", "unwrap_err", "errunion" })) return .error_union_try;
+    if (containsAny(text, &.{ "ptr", "addr", "gep", "nav", "field_ptr" })) return .pointer_address;
+    if (containsAny(text, &.{ "switch", "dispatch" })) return .switch_dispatch;
+    if (containsAny(text, &.{ "safe", "panic", "overflow", "bounds", "trap", "sentinel" })) return .safety_runtime;
+    if (containsAny(text, &.{ "aggregate", "struct", "field", "elem", "array", "slice" })) return .aggregate_shape;
+    if (containsAny(text, &.{ "call", "invoke" })) return .call_shape;
+    if (containsAny(text, &.{ "load", "store", "alloc", "memcpy", "memset", "memmove", "atomic", "cmpxchg", "fence" })) return .memory_shape;
     return .other;
+}
+
+fn ownerForDataKindCategory(category: UnknownOpcodeCategory) CapabilityOwner {
+    return switch (category) {
+        .debug_metadata => .debug_metadata,
+        .error_union_try, .pointer_address, .aggregate_shape => .semantic_lowering,
+        .switch_dispatch, .safety_runtime => .cfg_lowering,
+        .call_shape => .abi_planner,
+        .memory_shape => .backend,
+        .other => .unknown,
+    };
 }
 
 pub fn isArithmeticOpcode(opcode: []const u8) bool {
@@ -600,6 +628,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, unknownOpcodeCategory("slice_ptr", "none"));
     try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, unknownOpcodeCategory("try_ptr", "error_union"));
     try std.testing.expectEqual(UnknownOpcodeCategory.safety_runtime, unknownOpcodeCategory("panic_cold", "none"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, opcodeDataKindCapability("try", "pl_op").category);
+    try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("try", "pl_op").owner);
+    try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, dataKindCapability("ptr_slice_len_ptr:ty_op").category);
+    try std.testing.expectEqual(CapabilityOwner.semantic_lowering, dataKindCapability("ptr_slice_len_ptr:ty_op").owner);
 
     const try_capability = opcodeCapability("try");
     try std.testing.expectEqual(OpcodeStatus.lowerable, try_capability.status);
