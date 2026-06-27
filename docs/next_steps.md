@@ -62,6 +62,194 @@ IR-writer case routing lives under `src/main_flow_ir_writer*.zig`.
 
 ## Active Cycle
 
+Compiler-core refactor plan:
+The body-aware compiler-core inventory shows the five highest repeated
+unsupported categories are `aggregate-abi`, `unknown-opcode`, `vector`, `x87`,
+and `packed-aggregate`. Treat this as a refactor slice before expanding more
+compiler-core lowering. The goal is to remove duplicated classifiers and
+selected fixture logic in the layers that will receive the next implementation
+work.
+The ranked inventory report is
+`docs/roadmap/x86_64_compiler_core_inventory_priorities.md`; it is count-only
+evidence, not a replacement claim.
+
+Execution order:
+
+1. Registry slice: `src/zig_air_capabilities.zig` now provides the shared AIR
+   opcode capability registry for inventory, typed AIR diagnostics, and
+   lowering eligibility. It records category, inventory-known status,
+   metadata-ignore status, straight-line lowering eligibility, typed-v2 lowering
+   eligibility, and first boundary reason. The first local string allowlists
+   were removed from `src/distribution_zig_air_inventory.zig` and
+   `src/zig_air_lowering_parser.zig` without changing accepted row behavior.
+   Next work: extend this registry from opcode capability into data-kind and
+   type-layout capability.
+2. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
+   shared type/surface capability API for aggregate, pointer, slice, optional,
+   error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
+   `src/distribution_zig_air_inventory.zig` uses it for category reporting,
+   and `src/codegen/x86_64/sysv_abi.zig` uses the same recursive IR-type
+   boundary classifier for vector, long-double, and packed aggregate ABI
+   rejection. The first backend consumer slice now routes SysV aggregate
+   classification, generic CFG aggregate GEP/field lookup, selected sret/byval
+   leaf lookup, and the compatibility ABI bridge through shared aggregate
+   field/leaf layout helpers. Next work: fold the remaining aggregate copy-plan
+   and typed-v2 aggregate construction decisions into the same shared
+   capability path.
+3. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
+   and inline-asm rejection policy behind shared boundary classifiers. The
+   dedicated frontier boundary gate should prove these remain fail-closed and
+   targeted.
+4. Aggregate ABI slice: route aggregate argument, return, sret, byval, field
+   offset, and copy decisions through the shared type-layout result plus the
+   SysV aggregate classifier. Do not add function-name-specific aggregate
+   paths.
+5. Unknown-opcode slice: split the compiler-core `unknown-opcode` inventory
+   bucket into stable subcategories before implementing more lowering. The
+   first split is now emitted as `unknown_opcode` and `top_unknown_opcode`
+   records by `distribution-zig-air-inventory`: `error-union-try`,
+   `pointer-address`, `aggregate-shape`, `safety-runtime`, call/memory/switch
+   shape buckets, debug metadata, and `other`. The measured compiler-core
+   module graph shows `error-union-try` as the dominant unknown-opcode
+   subcategory in all three release modes. The second split now emits
+   `top_unknown_opcode_pair` records keyed by `subcategory:opcode:data_kind`;
+   the leading pairs are `unwrap_errunion_err:ty_op`,
+   `wrap_errunion_err:ty_op`, `try:pl_op`, `ptr_add:bin_ty_pl`,
+   `ptr_slice_len_ptr:ty_op`, and `slice_len:ty_op`. Next work: create
+   source-backed compiler-core frontier rows for the first measured pair
+   families instead of adding more inventory-only buckets.
+6. Compiler-core frontier slice: only after the registries are shared, add
+   small real Zig compiler-core frontier rows that exercise the highest ranked
+   categories through typed AIR v2 and generic CFG. Keep the
+   `compiler-core-module` gate inventory-only.
+
+Acceptance criteria for this refactor:
+
+- inventory, typed lowering, generic CFG eligibility, ABI planning, and
+  boundary gates consult shared capability data instead of parallel string
+  lists;
+- existing strict broad/expanded/scale/frontier gates keep their current
+  counters;
+- no case IDs, source tags, wrapper/body maps, shape recognizers, legacy AIR
+  text lowering, LLVM optimizer, LLVM TargetMachine, or LLD are introduced;
+- the existing saved compiler-core inventory log remains the baseline until a
+  capability classifier or lowering change can affect its counters;
+- after such a change, `distribution-zig-air-inventory --
+  --slice=compiler-core-module` still reports `instruction_payload_scan=1` and
+  ranked top categories;
+- implementation work remains separate from inventory claims.
+
+Validation ladder for the refactor:
+
+```text
+# Baseline: use the existing saved compiler-core inventory log.
+# Rerun this only after classifier/lowering changes can affect inventory:
+# zig build distribution-zig-air-inventory -- --slice=compiler-core-module
+zig build distribution-air-release-frontier-boundaries
+zig build distribution-air-release-frontier
+zig build test
+git diff --check
+```
+
+Run broader distribution gates only if public build wiring or accepted release
+gate behavior changes.
+
+- Category: `aggregate-abi`.
+  Inventory counts: ReleaseFast 2255777, ReleaseSafe 2338212,
+  ReleaseSmall 2206792.
+  Likely layers: semantic type lowering, SysV ABI planner, x86_64 aggregate
+  backend.
+  Current duplicated/selected-code location:
+  `src/zig_air_lowering_parser.zig` carries fixture-name aggregate type
+  mappings; `src/zig_air_lowering_typed_v2.zig` and
+  `src/zig_air_lowering_typed_v2_fallbacks.zig` carry overlapping aggregate
+  sret/byval construction; the x86_64 aggregate classifier, generic CFG
+  aggregate GEP/field lookup, sret/byval leaf lookup, and compatibility ABI
+  bridge now share aggregate field/leaf layout queries through
+  `src/zig_air_capabilities.zig`, while aggregate copy-plan construction and
+  typed-v2 aggregate construction still need unification.
+  Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
+  existing SysV aggregate classifier, with one aggregate ABI plan consumed by
+  typed lowering, call planning, return lowering, and inventory classification.
+  Validation gate: compare against the saved compiler-core inventory baseline;
+  rerun `zig build distribution-zig-air-inventory` with
+  `-- --slice=compiler-core-module` only after classifier/lowering changes
+  that can change inventory counters, then run focused aggregate rows through
+  `zig build distribution-air-release-frontier`.
+
+- Category: `unknown-opcode`.
+  Inventory counts: ReleaseFast 340808, ReleaseSafe 407240,
+  ReleaseSmall 333877.
+  Likely layers: AIR export parser, semantic lowering, generic CFG lowering.
+  Current duplicated/selected-code location:
+  `src/zig_air_export.zig` owns broad opcode categories,
+  `src/zig_air_capabilities.zig` now owns the inventory-known/lowerable opcode
+  registry and the first unknown-opcode subcategory classifier, while
+  `src/zig_air_lowering_parser.zig` still consumes lowerability through small
+  compatibility wrappers.
+  Target reusable abstraction: one AIR opcode registry that records category,
+  supported data kinds, lowering status, and boundary reason; inventory,
+  diagnostics, and typed lowering should query it instead of maintaining local
+  string lists.
+  Current subcategory counts:
+  `error-union-try` 236716/238174/231997,
+  `pointer-address` 50414/59226/49313,
+  `aggregate-shape` 30597/64537/29881,
+  `other` 22937/33949/22545, and
+  `safety-runtime` 144/11354/141 for
+  ReleaseFast/ReleaseSafe/ReleaseSmall. The concrete top-pair split identifies
+  `unwrap_errunion_err:ty_op` 84331/84913/82350,
+  `wrap_errunion_err:ty_op` 76578/77020/75165,
+  `try:pl_op` 73577/73993/72265,
+  `ptr_add:bin_ty_pl` 14273/19156/13966, and
+  `slice_len:ty_op` 13766/47605/13459 as the first implementation families.
+  Validation gate: compare against the saved compiler-core inventory baseline;
+  rerun `zig build distribution-zig-air-inventory` with
+  `-- --slice=compiler-core-module` only after registry/classifier changes,
+  plus `zig build distribution-zig-air-uncurated-release`.
+
+- Category: `vector`.
+  Inventory counts: ReleaseFast 15820, ReleaseSafe 16024,
+  ReleaseSmall 15808.
+  Likely layers: type classification, SysV ABI planner, x86_64 backend.
+  Current duplicated/selected-code location:
+  `.vector` is rejected in multiple parser, lowering, and codegen switches,
+  while `src/uncurated_air_gate.zig` maps vector boundaries through
+  source-name-specific checks.
+  Target reusable abstraction: a shared unsupported-type/boundary classifier
+  for vector values, parameters, returns, and opcodes, later replaceable by a
+  vector ABI/lowering plan without changing inventory or gate diagnostics.
+  Validation gate: `zig build distribution-air-release-frontier-boundaries`.
+
+- Category: `x87`.
+  Inventory counts: ReleaseFast 6194, ReleaseSafe 6220, ReleaseSmall 6550.
+  Likely layers: SysV ABI planner and x86_64 floating-point backend.
+  Current duplicated/selected-code location:
+  `x86_fp80` and `fp128` are rejected in parser/lowering/codegen switches, and
+  frontier x87 rows are classified separately in
+  `src/uncurated_air_gate.zig`.
+  Target reusable abstraction: one long-double boundary policy shared by type
+  parsing, ABI planning, diagnostics, and future x87/f128 lowering.
+  Validation gate: `zig build distribution-air-release-frontier-boundaries`.
+
+- Category: `packed-aggregate`.
+  Inventory counts: ReleaseFast 5039, ReleaseSafe 5548, ReleaseSmall 4863.
+  Likely layers: type layout, aggregate ABI planner, object/backend memory
+  lowering.
+  Current duplicated/selected-code location:
+  inventory detects packed/unaligned aggregate text through
+  `src/zig_air_capabilities.zig`; selected boundary accounting lives in
+  `src/uncurated_air_gate.zig`; aggregate field offset and leaf lookup now use
+  shared layout helpers in the classifier, generic CFG aggregate lowering, and
+  compatibility ABI bridge, while aggregate copy planning remains split across
+  the aggregate lowering files.
+  Target reusable abstraction: a layout-capability result for aggregate fields
+  that records aligned, packed, and unsupported offsets once, then feeds both
+  inventory category reporting and backend load/store/copy lowering.
+  Validation gate: `zig build distribution-air-release-frontier-boundaries`,
+  followed by aggregate object/executable proof through
+  `zig build distribution-air-release-frontier`.
+
 Replacement goal:
 Freeze the completed ReleaseSmall no-exclusion boundary. The x86_64 selected
 146-row external IR-writer gate is green under `zig build distribution-all`, and

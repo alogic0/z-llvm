@@ -88,6 +88,21 @@ pub fn build(b: *std.Build) void {
     addToolStepWithFixedAndUserArgs(b, "distribution-x86_64-source-backed-structured", "Run broad x86_64 release source-backed structured-direct gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--source-backed-broad"});
     addToolStepWithFixedAndUserArgs(b, "distribution-zig-source-structured-direct", "Run x86_64 release source-wrapper structured-direct gate without case-id ownership", "tools/run_distribution_zig_integrated_object.zig", &.{"--source-wrapper-dispatch"});
     addToolStepWithFixedAndUserArgs(b, "distribution-x86_64-release-source-owned", "Run x86_64 release source-owned semantic structured-direct gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--release-source-owned"});
+    const distribution_zig_air_inventory = b.addExecutable(.{
+        .name = "distribution_zig_air_inventory",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/distribution_zig_air_inventory.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const distribution_zig_air_inventory_step = b.step(
+        "distribution-zig-air-inventory",
+        "Inventory x86_64 release Zig distribution AIR visibility without requiring lowering or codegen",
+    );
+    const distribution_zig_air_inventory_run = b.addRunArtifact(distribution_zig_air_inventory);
+    if (b.args) |args| distribution_zig_air_inventory_run.addArgs(args);
+    distribution_zig_air_inventory_step.dependOn(&distribution_zig_air_inventory_run.step);
     const uncurated_air_gate = b.addExecutable(.{
         .name = "uncurated_air_gate",
         .root_module = b.createModule(.{

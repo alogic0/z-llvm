@@ -1,4 +1,5 @@
 const std = @import("std");
+const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
@@ -837,66 +838,19 @@ pub fn typedCalleeWithMarker(callee_text: []const u8, marker: []const u8, extern
 }
 
 pub fn isIgnoredOpcode(opcode: []const u8) bool {
-    return std.mem.startsWith(u8, opcode, "dbg_");
+    return air_capabilities.isIgnoredOpcode(opcode);
 }
 
 pub fn isStraightLineOpcode(opcode: []const u8) bool {
-    return std.mem.eql(u8, opcode, "arg") or
-        isArithmeticOpcode(opcode) or
-        std.mem.eql(u8, opcode, "add_with_overflow") or
-        std.mem.startsWith(u8, opcode, "cmp_") or
-        isCastOpcode(opcode) or
-        std.mem.eql(u8, opcode, "alloc") or
-        std.mem.eql(u8, opcode, "load") or
-        std.mem.eql(u8, opcode, "store") or
-        std.mem.eql(u8, opcode, "store_safe") or
-        std.mem.eql(u8, opcode, "is_non_null") or
-        std.mem.eql(u8, opcode, "wrap_optional") or
-        std.mem.eql(u8, opcode, "optional_payload") or
-        std.mem.eql(u8, opcode, "slice") or
-        std.mem.eql(u8, opcode, "runtime_nav_ptr") or
-        std.mem.eql(u8, opcode, "atomic_rmw") or
-        std.mem.eql(u8, opcode, "array_elem_val") or
-        std.mem.eql(u8, opcode, "aggregate_init") or
-        std.mem.eql(u8, opcode, "ptr_add") or
-        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
-        std.mem.eql(u8, opcode, "assembly") or
-        isFieldPtrOpcode(opcode) or
-        isCallOpcode(opcode) or
-        std.mem.eql(u8, opcode, "ret") or
-        std.mem.eql(u8, opcode, "ret_safe") or
-        std.mem.eql(u8, opcode, "unreach");
+    return air_capabilities.isStraightLineOpcode(opcode);
 }
 
 pub fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
-    return std.mem.eql(u8, opcode, "arg") or
-        isArithmeticOpcode(opcode) or
-        std.mem.eql(u8, opcode, "add_with_overflow") or
-        std.mem.startsWith(u8, opcode, "cmp_") or
-        isCastOpcode(opcode) or
-        std.mem.eql(u8, opcode, "alloc") or
-        std.mem.eql(u8, opcode, "load") or
-        std.mem.eql(u8, opcode, "store") or
-        std.mem.eql(u8, opcode, "store_safe") or
-        std.mem.eql(u8, opcode, "block") or
-        std.mem.eql(u8, opcode, "is_non_null") or
-        std.mem.eql(u8, opcode, "wrap_optional") or
-        std.mem.eql(u8, opcode, "optional_payload") or
-        std.mem.eql(u8, opcode, "slice") or
-        std.mem.eql(u8, opcode, "ptr_add") or
-        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
-        std.mem.eql(u8, opcode, "array_elem_val") or
-        std.mem.eql(u8, opcode, "runtime_nav_ptr") or
-        isFieldPtrOpcode(opcode) or
-        isCallOpcode(opcode) or
-        std.mem.eql(u8, opcode, "ret") or
-        std.mem.eql(u8, opcode, "ret_safe") or
-        std.mem.eql(u8, opcode, "unreach");
+    return air_capabilities.isTypedV2LowerableOpcode(opcode);
 }
 
 pub fn isFieldPtrOpcode(opcode: []const u8) bool {
-    return std.mem.eql(u8, opcode, "struct_field_ptr") or
-        std.mem.startsWith(u8, opcode, "struct_field_ptr_index_");
+    return air_capabilities.isFieldPtrOpcode(opcode);
 }
 
 pub fn isPlainFieldPointerChild(ty: ir.Type) bool {
@@ -948,27 +902,19 @@ pub fn typedV2InstructionMissingRequiredDetail(instruction: air_export.TypedInst
 }
 
 pub fn isArithmeticOpcode(opcode: []const u8) bool {
-    return air_export.categoryForOpcode(opcode) == .arithmetic;
+    return air_capabilities.isArithmeticOpcode(opcode);
 }
 
 pub fn isShiftOpcode(opcode: []const u8) bool {
-    return std.mem.startsWith(u8, opcode, "shl") or std.mem.startsWith(u8, opcode, "shr");
+    return air_capabilities.isShiftOpcode(opcode);
 }
 
 pub fn isCastOpcode(opcode: []const u8) bool {
-    return std.mem.eql(u8, opcode, "trunc") or
-        std.mem.eql(u8, opcode, "intcast") or
-        std.mem.eql(u8, opcode, "bitcast") or
-        std.mem.eql(u8, opcode, "ptrtoint") or
-        std.mem.eql(u8, opcode, "inttoptr") or
-        std.mem.eql(u8, opcode, "float_from_int") or
-        std.mem.eql(u8, opcode, "int_from_float") or
-        std.mem.eql(u8, opcode, "fpext") or
-        std.mem.eql(u8, opcode, "fptrunc");
+    return air_capabilities.isCastOpcode(opcode);
 }
 
 pub fn isCallOpcode(opcode: []const u8) bool {
-    return air_export.categoryForOpcode(opcode) == .call;
+    return air_capabilities.isCallOpcode(opcode);
 }
 
 pub fn binaryOp(opcode: []const u8, ty: ZigType) ?ir.BinaryOp {
