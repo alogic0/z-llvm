@@ -47,11 +47,11 @@ claim.
 The uncurated AIR build topology is generated through one helper over typed
 `mode/corpus/variant` tuples, while preserving the public build step names for
 discovery, object progress, object inspection, native-link progress,
-executable progress, and strict-finish gates. Mode and corpus routing now use
-`build.zig` enums instead of runtime string comparisons, so new gate variants
-must enter through the shared metadata path. Use focused row/gate commands and
-`zig build structural-smoke` during iteration; keep `distribution-all` as a
-milestone confirmation gate.
+executable progress, and strict-finish gates. Mode, corpus, and variant
+routing now use `build.zig` enums instead of runtime string comparisons, so new
+gate variants must enter through the shared metadata path. Use focused row/gate
+commands and `zig build structural-smoke` during iteration; keep
+`distribution-all` as a milestone confirmation gate.
 
 Remaining intentional facade surfaces are now explicit tables instead of
 scattered string comparisons where practical. Structured-direct surfaces that
