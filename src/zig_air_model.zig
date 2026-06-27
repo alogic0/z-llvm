@@ -380,6 +380,29 @@ pub fn blockTarget(operand: air_export.TypedOperand) ?u32 {
     return std.fmt.parseInt(u32, operand.type_text, 10) catch null;
 }
 
+pub fn instructionByIndex(
+    structured_air_v2: air_export.StructuredAirV2,
+    index: u32,
+) ?air_export.TypedInstruction {
+    for (structured_air_v2.instructions) |instruction| {
+        if (instruction.index == index) return instruction;
+    }
+    return null;
+}
+
+pub fn singleInstructionByOpcode(
+    structured_air_v2: air_export.StructuredAirV2,
+    opcode: []const u8,
+) ?air_export.TypedInstruction {
+    var found: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
+        if (found != null) return null;
+        found = instruction;
+    }
+    return found;
+}
+
 test "typed AIR model parses instruction details and block operands" {
     const instruction = air_export.TypedInstruction{
         .index = 4,
