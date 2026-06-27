@@ -556,6 +556,16 @@ pub fn typedRetPtrIndex(structured_air_v2: air_export.StructuredAirV2) ?u32 {
     return null;
 }
 
+pub fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?usize {
+    const text = operandTextDetail(instruction, operand_index) orelse return null;
+    if (std.mem.eql(u8, text, "@.zero_usize")) return 0;
+    if (std.mem.eql(u8, text, "@.one_usize")) return 1;
+    if (std.mem.startsWith(u8, text, "<usize, ") and std.mem.endsWith(u8, text, ">")) {
+        return std.fmt.parseInt(usize, text["<usize, ".len .. text.len - 1], 10) catch null;
+    }
+    return null;
+}
+
 pub fn plainFieldPointerChild(ty: ir.Type) bool {
     return switch (ty) {
         .int => |bits| bits == 1 or bits % 8 == 0,

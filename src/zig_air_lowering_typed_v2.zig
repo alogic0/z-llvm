@@ -456,13 +456,7 @@ pub fn typedAggregatePointerPath(
 }
 
 pub fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?usize {
-    const text = typedOperandTextDetail(instruction, operand_index) orelse return null;
-    if (std.mem.eql(u8, text, "@.zero_usize")) return 0;
-    if (std.mem.eql(u8, text, "@.one_usize")) return 1;
-    if (std.mem.startsWith(u8, text, "<usize, ") and std.mem.endsWith(u8, text, ">")) {
-        return std.fmt.parseInt(usize, text["<usize, ".len .. text.len - 1], 10) catch null;
-    }
-    return null;
+    return air_model.typedConstUsizeOperand(instruction, operand_index);
 }
 
 pub fn aggregateIndexPathText(path: []const usize) ?[]const u8 {
