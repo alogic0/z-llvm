@@ -883,7 +883,7 @@ pub fn maybeErrorSummary(function: air_export.Function) ?ErrorSwitchSummary {
             if (functionHasOpcode(function, "switch_br")) return null;
             const returned = for (function.instructions) |ret| {
                 if (untypedReturnRef(ret)) |value| break value;
-            } else null;
+            } else continue;
             return .{
                 .kind = .maybe_error,
                 .condition = compare.index,
@@ -910,9 +910,7 @@ pub fn errorSwitchSummary(function: air_export.Function) ?ErrorSwitchSummary {
                 if (errorUnionSource(payload) != call.index) continue;
                 for (function.instructions) |switch_br| {
                     if (untypedSwitchInput(switch_br) != payload.index) continue;
-                    const returned = for (function.instructions) |ret| {
-                        if (untypedReturnRef(ret)) |value| break value;
-                    } else null;
+                    const returned = untypedValueFeedsReturn(function, payload.index) orelse continue;
                     return .{
                         .kind = .switch_dispatch,
                         .condition = is_non_err.index,
@@ -943,7 +941,7 @@ pub fn errorClassifySummary(function: air_export.Function) ?ErrorSwitchSummary {
         const switch_input = untypedSwitchInput(switch_br) orelse continue;
         const returned = for (function.instructions) |ret| {
             if (untypedReturnRef(ret)) |value| break value;
-        } else null;
+        } else continue;
         return .{
             .kind = .classify,
             .extracted_value = switch_input,
@@ -978,34 +976,32 @@ fn findCondBrUsingValue(function: air_export.Function, value: u32) ?u32 {
     return null;
 }
 
-fn findFirstBlock(function: air_export.Function) ?u32 {
+fn findBlockBefore(function: air_export.Function, instruction_index: u32) ?u32 {
+    var result: ?u32 = null;
     for (function.instructions) |instruction| {
-        if (air_capabilities.isBlockOpcode(instruction.opcode)) return instruction.index;
+        if (instruction.index >= instruction_index) continue;
+        if (air_capabilities.isBlockOpcode(instruction.opcode)) result = instruction.index;
     }
-    return null;
-}
-
-fn findFirstCall(function: air_export.Function) ?u32 {
-    for (function.instructions) |instruction| {
-        if (air_capabilities.isCallOpcode(instruction.opcode)) return instruction.index;
-    }
-    return null;
+    return result;
 }
 
 pub fn runtimeOptionalPointerMainSummary(function: air_export.Function) ?RuntimeWrapperSummary {
-    const call = findFirstCall(function) orelse return null;
-    const compare = findCmpEqUsingValue(function, call) orelse return null;
-    const cond_br = findCondBrUsingValue(function, compare) orelse return null;
     if (functionHasMemoryOp(function, .load)) return null;
-    const returned = untypedValueFeedsReturn(function, call) orelse return null;
-    return .{
-        .kind = .optional_pointer_main,
-        .call = call,
-        .compare = compare,
-        .cond_br = cond_br,
-        .block = findFirstBlock(function) orelse return null,
-        .return_value = returned,
-    };
+    for (function.instructions) |call_instruction| {
+        if (!air_capabilities.isCallOpcode(call_instruction.opcode)) continue;
+        const compare = findCmpEqUsingValue(function, call_instruction.index) orelse continue;
+        const cond_br = findCondBrUsingValue(function, compare) orelse continue;
+        const returned = untypedValueFeedsReturn(function, call_instruction.index) orelse continue;
+        return .{
+            .kind = .optional_pointer_main,
+            .call = call_instruction.index,
+            .compare = compare,
+            .cond_br = cond_br,
+            .block = findBlockBefore(function, cond_br) orelse return null,
+            .return_value = returned,
+        };
+    }
+    return null;
 }
 
 pub fn selectedRuntimeOptionalPointerMainShape(function: air_export.Function) bool {
@@ -1013,25 +1009,23 @@ pub fn selectedRuntimeOptionalPointerMainShape(function: air_export.Function) bo
 }
 
 pub fn runtimePointerLoadStoreMainSummary(function: air_export.Function) ?RuntimeWrapperSummary {
-    const call = findFirstCall(function) orelse return null;
-    const load = untypedFindAnyLoadFromSlot(function, call) orelse blk: {
-        for (function.instructions) |instruction| {
-            if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == .load) break :blk instruction.index;
-        }
-        return null;
-    };
-    const compare = findCmpEqUsingValue(function, load) orelse return null;
-    const cond_br = findCondBrUsingValue(function, compare) orelse return null;
-    const returned = untypedValueFeedsReturn(function, load) orelse return null;
-    return .{
-        .kind = .pointer_load_store_main,
-        .call = call,
-        .compare = compare,
-        .cond_br = cond_br,
-        .block = findFirstBlock(function) orelse return null,
-        .load = load,
-        .return_value = returned,
-    };
+    for (function.instructions) |call_instruction| {
+        if (!air_capabilities.isCallOpcode(call_instruction.opcode)) continue;
+        const load = untypedFindAnyLoadFromSlot(function, call_instruction.index) orelse continue;
+        const compare = findCmpEqUsingValue(function, load) orelse continue;
+        const cond_br = findCondBrUsingValue(function, compare) orelse continue;
+        const returned = untypedValueFeedsReturn(function, load) orelse continue;
+        return .{
+            .kind = .pointer_load_store_main,
+            .call = call_instruction.index,
+            .compare = compare,
+            .cond_br = cond_br,
+            .block = findBlockBefore(function, cond_br) orelse return null,
+            .load = load,
+            .return_value = returned,
+        };
+    }
+    return null;
 }
 
 pub fn selectedRuntimePointerLoadStoreMainShape(function: air_export.Function) bool {
@@ -1982,6 +1976,28 @@ test "AIR model recognizes selected error and switch shapes structurally" {
     };
     try std.testing.expect(errorSwitchSummary(unrelated_switch) == null);
 
+    const unrelated_return_switch_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "is_non_err", .payload = "%0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "unwrap_errunion_payload", .payload = "%0!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "switch_br", .payload = "%2!", .category = .control_flow },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%1!", .category = .return_op },
+    };
+    const unrelated_return_switch = air_export.Function{
+        .name = "not_named_unrelated_return_error_switch",
+        .type_text = "fn () i32",
+        .instruction_count = unrelated_return_switch_instructions.len,
+        .main_body_count = unrelated_return_switch_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&unrelated_return_switch_instructions),
+    };
+    try std.testing.expect(errorSwitchSummary(unrelated_return_switch) == null);
+
     const classify_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "u16, 0", .category = .argument },
         .{ .index = 1, .indent = 0, .unused = false, .opcode = "switch_br", .payload = "%0!", .category = .control_flow },
@@ -2003,6 +2019,25 @@ test "AIR model recognizes selected error and switch shapes structurally" {
     try std.testing.expect(selectedErrorClassifyShape(classify));
     try std.testing.expect(!selectedErrorSwitchShape(classify));
 
+    const classify_no_return_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "u16, 0", .category = .argument },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "switch_br", .payload = "%0!", .category = .control_flow },
+    };
+    const classify_no_return = air_export.Function{
+        .name = "not_named_classify_no_return",
+        .type_text = "fn () i32",
+        .instruction_count = classify_no_return_instructions.len,
+        .main_body_count = classify_no_return_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&classify_no_return_instructions),
+    };
+    try std.testing.expect(errorClassifySummary(classify_no_return) == null);
+
     const maybe_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "cmp_neq", .payload = "%arg0!, <i32, 0>", .category = .comparison },
         .{ .index = 1, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%0!, then_body, else_body", .category = .control_flow },
@@ -2022,6 +2057,25 @@ test "AIR model recognizes selected error and switch shapes structurally" {
         .instructions = @constCast(&maybe_instructions),
     };
     try std.testing.expect(selectedMaybeErrorShape(maybe));
+
+    const maybe_no_return_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "cmp_neq", .payload = "%arg0!, <i32, 0>", .category = .comparison },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%0!, then_body, else_body", .category = .control_flow },
+    };
+    const maybe_no_return = air_export.Function{
+        .name = "not_named_maybe_no_return",
+        .type_text = "fn () i32",
+        .instruction_count = maybe_no_return_instructions.len,
+        .main_body_count = maybe_no_return_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&maybe_no_return_instructions),
+    };
+    try std.testing.expect(maybeErrorSummary(maybe_no_return) == null);
 }
 
 test "AIR model recognizes selected table lookup and runtime wrapper shapes structurally" {
@@ -2122,6 +2176,28 @@ test "AIR model recognizes selected table lookup and runtime wrapper shapes stru
     };
     try std.testing.expect(runtimeOptionalPointerMainSummary(unrelated_wrapper) == null);
 
+    const unrelated_block_return_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "cmp_eq", .payload = "%0!, <i32, 0>", .category = .comparison },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%1!, then_body, else_body", .category = .control_flow },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "block", .payload = "", .category = .control_flow },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%1!", .category = .return_op },
+    };
+    const unrelated_block_return = air_export.Function{
+        .name = "not_named_unrelated_block_return",
+        .type_text = "fn () i32",
+        .instruction_count = unrelated_block_return_instructions.len,
+        .main_body_count = unrelated_block_return_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&unrelated_block_return_instructions),
+    };
+    try std.testing.expect(runtimeOptionalPointerMainSummary(unrelated_block_return) == null);
+
     const load_store_wrapper_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
         .{ .index = 1, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %0!", .category = .memory },
@@ -2176,6 +2252,30 @@ test "AIR model recognizes selected table lookup and runtime wrapper shapes stru
     try std.testing.expectEqual(@as(u32, 3), panic_summary.panic_call);
     try std.testing.expectEqual(@as(u32, 5), panic_summary.add);
     try std.testing.expect(selectedMixCAddMayPanicShape(panic_edge));
+
+    const panic_edge_no_cold_unreach_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %arg0!", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "cmp_lt", .payload = "%0!, <i32, 0>", .category = .comparison },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%1!, then_body, else_body", .category = .control_flow },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "unreach", .payload = "", .category = .control_flow },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "call", .payload = "debug.defaultPanic", .category = .call },
+        .{ .index = 5, .indent = 0, .unused = false, .opcode = "add_safe", .payload = "%0!, %1!", .category = .arithmetic },
+        .{ .index = 6, .indent = 0, .unused = false, .opcode = "ret", .payload = "%5!", .category = .return_op },
+    };
+    const panic_edge_no_cold_unreach = air_export.Function{
+        .name = "not_named_add_may_panic_without_cold_unreach",
+        .type_text = "fn () i32",
+        .instruction_count = panic_edge_no_cold_unreach_instructions.len,
+        .main_body_count = panic_edge_no_cold_unreach_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&panic_edge_no_cold_unreach_instructions),
+    };
+    try std.testing.expect(panicEdgeSummary(panic_edge_no_cold_unreach) == null);
 }
 
 test "AIR model parses untyped AIR value query shapes" {
