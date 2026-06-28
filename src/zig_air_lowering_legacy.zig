@@ -578,15 +578,11 @@ fn sliceSumShape(function: air_export.Function) bool {
 }
 
 fn packedReadFlagShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "struct_field_ptr_index_2") and
-        functionHasOpcode(function, "load") and
-        functionHasOpcode(function, "bitcast");
+    return air_model.packedReadFlagSummary(function) != null;
 }
 
 fn packedReplaceLowShape(function: air_export.Function) bool {
-    return air_model.functionHasFieldPtrIndex(function, 0) and
-        functionHasOpcode(function, "trunc") and
-        air_model.functionHasStoreOp(function);
+    return air_model.packedReplaceLowSummary(function) != null;
 }
 
 fn aggregatePairFirstShape(function: air_export.Function) bool {

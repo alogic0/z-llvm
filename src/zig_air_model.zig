@@ -710,6 +710,15 @@ pub const StructSumSummary = struct {
     add_count: usize,
 };
 
+pub const PackedFieldSummary = struct {
+    kind: enum { read_flag, replace_low },
+    field_ptr: u32,
+    load: ?u32 = null,
+    bitcast: ?u32 = null,
+    trunc: ?u32 = null,
+    store: ?u32 = null,
+};
+
 pub const PointerSliceAddressSummary = struct {
     ptr_add_count: usize = 0,
     ptr_sub_count: usize = 0,
@@ -1010,6 +1019,47 @@ fn untypedLoadResultType(instruction: air_export.Instruction) ?[]const u8 {
 
 pub fn selectedStructSumShape(function: air_export.Function) bool {
     return structSumSummary(function) != null;
+}
+
+pub fn packedReadFlagSummary(function: air_export.Function) ?PackedFieldSummary {
+    const field2 = functionFieldPtrIndex(function, 2) orelse return null;
+    const load = untypedFindAnyLoadFromSlot(function, field2) orelse return null;
+    const bitcast = untypedFindCastOf(function, "bitcast", load) orelse return null;
+    return .{
+        .kind = .read_flag,
+        .field_ptr = field2,
+        .load = load,
+        .bitcast = bitcast,
+    };
+}
+
+pub fn selectedPackedReadFlagShape(function: air_export.Function) bool {
+    return packedReadFlagSummary(function) != null;
+}
+
+pub fn packedReplaceLowSummary(function: air_export.Function) ?PackedFieldSummary {
+    const field0 = functionFieldPtrIndex(function, 0) orelse return null;
+    const trunc = for (function.instructions) |instruction| {
+        if (std.mem.startsWith(u8, instruction.opcode, "trunc")) break instruction.index;
+    } else return null;
+    const store = for (function.instructions) |instruction| {
+        const candidate = untypedStore(instruction) orelse continue;
+        if (candidate.slot != field0) continue;
+        switch (candidate.value) {
+            .ref => |value| if (value == trunc) break instruction.index,
+            .int => {},
+        }
+    } else return null;
+    return .{
+        .kind = .replace_low,
+        .field_ptr = field0,
+        .trunc = trunc,
+        .store = store,
+    };
+}
+
+pub fn selectedPackedReplaceLowShape(function: air_export.Function) bool {
+    return packedReplaceLowSummary(function) != null;
 }
 
 pub fn aggregateMakePairSummary(function: air_export.Function) ?AggregatePairSummary {
@@ -2268,6 +2318,94 @@ test "AIR model recognizes selected aggregate shapes structurally" {
         .instructions = @constCast(&bad_struct_sum_instructions),
     };
     try std.testing.expect(structSumSummary(bad_struct_sum) == null);
+
+    const packed_read_flag_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_2", .payload = "%arg0!", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "load", .payload = "i8, %0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "bitcast", .payload = "i1, %1!", .category = .other },
+    };
+    const packed_read_flag = air_export.Function{
+        .name = "not_named_packed_read_flag",
+        .type_text = "fn () bool",
+        .instruction_count = packed_read_flag_instructions.len,
+        .main_body_count = packed_read_flag_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&packed_read_flag_instructions),
+    };
+    const packed_read_summary = packedReadFlagSummary(packed_read_flag).?;
+    try std.testing.expectEqual(.read_flag, packed_read_summary.kind);
+    try std.testing.expectEqual(@as(u32, 0), packed_read_summary.field_ptr);
+    try std.testing.expectEqual(@as(u32, 1), packed_read_summary.load.?);
+    try std.testing.expectEqual(@as(u32, 2), packed_read_summary.bitcast.?);
+    try std.testing.expect(selectedPackedReadFlagShape(packed_read_flag));
+
+    const bad_packed_read_flag_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_2", .payload = "%arg0!", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "load", .payload = "i8, %0!", .category = .memory },
+    };
+    const bad_packed_read_flag = air_export.Function{
+        .name = "not_named_bad_packed_read_flag",
+        .type_text = "fn () bool",
+        .instruction_count = bad_packed_read_flag_instructions.len,
+        .main_body_count = bad_packed_read_flag_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&bad_packed_read_flag_instructions),
+    };
+    try std.testing.expect(packedReadFlagSummary(bad_packed_read_flag) == null);
+
+    const packed_replace_low_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_0", .payload = "%arg0!", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "trunc", .payload = "i4, %arg1!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "store", .payload = "%0!, %1!", .category = .memory },
+    };
+    const packed_replace_low = air_export.Function{
+        .name = "not_named_packed_replace_low",
+        .type_text = "fn () u8",
+        .instruction_count = packed_replace_low_instructions.len,
+        .main_body_count = packed_replace_low_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&packed_replace_low_instructions),
+    };
+    const packed_replace_summary = packedReplaceLowSummary(packed_replace_low).?;
+    try std.testing.expectEqual(.replace_low, packed_replace_summary.kind);
+    try std.testing.expectEqual(@as(u32, 0), packed_replace_summary.field_ptr);
+    try std.testing.expectEqual(@as(u32, 1), packed_replace_summary.trunc.?);
+    try std.testing.expectEqual(@as(u32, 2), packed_replace_summary.store.?);
+    try std.testing.expect(selectedPackedReplaceLowShape(packed_replace_low));
+
+    const bad_packed_replace_low_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_0", .payload = "%arg0!", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "trunc", .payload = "i4, %arg1!", .category = .other },
+    };
+    const bad_packed_replace_low = air_export.Function{
+        .name = "not_named_bad_packed_replace_low",
+        .type_text = "fn () u8",
+        .instruction_count = bad_packed_replace_low_instructions.len,
+        .main_body_count = bad_packed_replace_low_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&bad_packed_replace_low_instructions),
+    };
+    try std.testing.expect(packedReplaceLowSummary(bad_packed_replace_low) == null);
 
     const pair_first_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "alloc", .payload = "*struct", .category = .memory },
