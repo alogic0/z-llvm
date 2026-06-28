@@ -281,7 +281,8 @@ Execution order:
    source, field count, scalar leaves, and construction/store/load evidence.
    It is consulted before the basename compatibility table, so
    the first broad easy-layout slice is no longer fallback-table-owned. The
-   owned side now has 42 static source layout facts plus generated
+   owned side now has 45 static source layout facts in
+   `src/zig_air_aggregate_layout_facts.zig` plus generated
    `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
    Big3..Big20 forms and the 12 current Big32..Big256 array-leaf rows. The
    fallback side is empty; `PackedMixed` and `PackedReverseMixed` are
@@ -511,9 +512,10 @@ Aggregate/type-layout ownership start:
   exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
   static source facts, generated inference, fallback-table layouts, and
   boundary-owned layouts. Owned layout lookup goes through a provider registry:
-  generated inference first, then the current static source-fact provider. The
-  static source-fact table still has 42 named facts and is now an explicit
-  provider to replace with exported Zig field facts later. Generated inference
+  generated inference first, then the static source-fact provider in
+  `src/zig_air_aggregate_layout_facts.zig`. That provider currently has 45
+  named facts and is now an explicit module to replace with exported Zig field
+  facts later. Generated inference
   covers the scalar-BigN rule for
   Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 and the large-BigN
   array-leaf rule covering Big32, Big40, Big48, Big64, Big80, Big81, Big96,
@@ -592,8 +594,8 @@ Validation after these refactor slices is saved in
   checks. `AggregateLayoutSummary` now records whether a layout came from
   static source facts, generated inference, a boundary, or the compatibility
   table; owned layout lookup now goes through a provider registry so future
-  exported Zig field facts can replace the static source-fact provider without
-  changing lowering callers. The generated inference side has scalar-BigN and
+  exported Zig field facts can replace the static source-fact provider module
+  without changing lowering callers. The generated inference side has scalar-BigN and
   large-BigN rules, and mismatch checking compares owned field/leaf counts
   against any remaining fallback entry. Register aggregate construction now also has
   mechanical typed-AIR

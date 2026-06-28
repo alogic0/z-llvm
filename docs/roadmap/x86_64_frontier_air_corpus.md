@@ -83,12 +83,13 @@ construction admission validates operands against the same plan before using
 typed AIR pointer paths for insertvalue indices. SysV classification consumes
 the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
 of the basename compatibility table and records layout source, field count,
-scalar leaves, and construction/store/load evidence. The owned slice has 42
-static source layout facts plus generated `frontier_sysv_sret_byval.BigN`
-inference rules for the 9 scalar Big3..Big20 rows and the 12 current
-Big32..Big256 array-leaf rows; those rows no longer depend on the fallback
-table. Owned lookup now runs through a provider registry: generated inference
-first, then the current static source-fact provider. Owned summaries are
+scalar leaves, and construction/store/load evidence. The owned slice has 45
+static source layout facts in `src/zig_air_aggregate_layout_facts.zig` plus
+generated `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
+Big3..Big20 rows and the 12 current Big32..Big256 array-leaf rows; those rows
+no longer depend on the fallback table. Owned lookup now runs through a
+provider registry: generated inference first, then the current static
+source-fact provider. Owned summaries are
 checked against any still-present fallback
 equivalent and fail closed on field/leaf-count mismatch. Remaining aggregate
 layout debt is explicit: the compatibility fallback table is empty, while

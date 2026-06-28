@@ -755,7 +755,8 @@ operands against the same plan before using typed AIR pointer paths for
 insertvalue indices, and SysV classification consumes the same normalized
 aggregate type. `AggregateLayoutSummary` now records whether a layout came from
 static source facts, generated inference, a boundary, or the compatibility
-table. The owned side now has 42 static source layout facts plus generated
+table. The owned side now has 45 static source layout facts in
+`src/zig_air_aggregate_layout_facts.zig` plus generated
 `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar Big3..Big20
 rows and the 12 current Big32..Big256 array-leaf rows; those accepted aggregate
 rows no longer depend on the basename fallback table. Owned lookup now runs
