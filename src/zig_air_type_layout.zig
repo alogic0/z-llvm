@@ -163,7 +163,6 @@ fn sourceFactAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary
 fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
     const basename = typeBasename(nominal);
     if (std.mem.eql(u8, basename, "Pair")) return aggregate("{ i32, i32 }");
-    if (std.mem.eql(u8, basename, "Inner")) return aggregate("{ i32, i32 }");
     return null;
 }
 
@@ -507,6 +506,7 @@ test "type layout infers representative frontier aggregate rows" {
     try std.testing.expectEqual(@as(usize, 2), inner.leaf_count);
     try std.testing.expect(inner.leafSlice()[0].ty.eql(.{ .int = 32 }));
     try std.testing.expect(inner.leafSlice()[1].ty.eql(.{ .int = 32 }));
+    try std.testing.expect(aggregateLayoutSummary("other.Inner") == null);
 
     const pair32 = aggregateLayoutSummary("frontier_sysv_aggregate_classes.Pair32").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, pair32.source);

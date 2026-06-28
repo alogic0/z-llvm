@@ -89,9 +89,9 @@ inference rules for the 9 scalar Big3..Big20 rows and the 12 current
 Big32..Big256 array-leaf rows; those rows no longer depend on the fallback
 table. Owned summaries are checked against any still-present fallback
 equivalent and fail closed on field/leaf-count mismatch. Remaining aggregate
-layout debt is explicit: 2 compatibility fallback entries still stand in for
+layout debt is explicit: 1 compatibility fallback entry still stands in for
 future Zig-exported field facts or broader construction/store/load inference
-(`Pair`, `Inner`), while the 2 packed/unaligned targeted entries are
+(`Pair`), while the 2 packed/unaligned targeted entries are
 boundary-owned rather than fallback-owned.
 Register aggregate
 construction and sret/byval make rows now add function-local typed AIR
