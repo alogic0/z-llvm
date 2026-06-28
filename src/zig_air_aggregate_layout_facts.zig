@@ -29,10 +29,6 @@ const facts = [_]Fact{
     .{ .name = "Pair64", .aggregate_text = "{ i64, i64 }" },
     .{ .name = "BigNested", .aggregate_text = "{ { i64, i64, i64 }, { i64, i64, i64 } }" },
     .{ .name = "BigMixed", .aggregate_text = "{ i64, i32, i64, i32 }" },
-    .{ .name = "ScalarMixed", .aggregate_text = "{ i8, i16, i32, i64, ptr, float, double }" },
-    .{ .name = "ScalarNestedInner", .aggregate_text = "{ i8, i16 }" },
-    .{ .name = "ScalarNested", .aggregate_text = "{ { i8, i16 }, i32, double, ptr }" },
-    .{ .name = "ScalarArray", .aggregate_text = "{ [3 x i32], [2 x double], ptr }" },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {

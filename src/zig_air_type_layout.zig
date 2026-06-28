@@ -507,7 +507,11 @@ fn installTestExportedAggregateProvider() !exported_aggregate_layout_facts.Provi
         "fact nominal=\"frontier_sysv_sret_byval.BigByteTail5\" aggregate=\"{ [21 x i8] }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.BigByteTail6\" aggregate=\"{ [22 x i8] }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.BigByteTail7\" aggregate=\"{ [23 x i8] }\" construction=1 store=1 load=1\n" ++
-        "fact nominal=\"frontier_sysv_sret_byval.BigWordTail\" aggregate=\"{ [9 x i16] }\" construction=1 store=1 load=1\n";
+        "fact nominal=\"frontier_sysv_sret_byval.BigWordTail\" aggregate=\"{ [9 x i16] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.ScalarMixed\" aggregate=\"{ i8, i16, i32, i64, ptr, float, double }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.ScalarNestedInner\" aggregate=\"{ i8, i16 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.ScalarNested\" aggregate=\"{ { i8, i16 }, i32, double, ptr }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.ScalarArray\" aggregate=\"{ [3 x i32], [2 x double], ptr }\" construction=1 store=1 load=1\n";
     return exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
 }
 
