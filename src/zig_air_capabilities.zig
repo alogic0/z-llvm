@@ -3,6 +3,7 @@ const ir = @import("ir.zig");
 const target = @import("target.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const air_export = @import("zig_air_export.zig");
+const type_layout = @import("zig_air_type_layout.zig");
 
 pub const OpcodeCapability = struct {
     category: air_export.InstructionCategory,
@@ -612,19 +613,15 @@ pub fn boundaryForIrType(ty: ir.Type) ?TypeBoundary {
 }
 
 pub fn aggregateFieldType(aggregate_ty: ir.Type, field_index: usize) ?ir.Type {
-    return memory_location.aggregateFieldType(aggregate_ty, field_index);
+    return type_layout.fieldType(aggregate_ty, field_index);
 }
 
 pub fn aggregateFieldCount(aggregate_ty: ir.Type) usize {
-    var count: usize = 0;
-    while (aggregateFieldType(aggregate_ty, count)) |_| : (count += 1) {}
-    return count;
+    return type_layout.fieldCount(aggregate_ty);
 }
 
 pub fn aggregateFieldByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, field_index: usize) ?u64 {
-    const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return null;
-    if (offset_i < 0) return null;
-    return @intCast(offset_i);
+    return type_layout.fieldByteOffset(layout, aggregate_ty, field_index);
 }
 
 pub fn aggregateFieldIndexAtOffset(
@@ -633,55 +630,21 @@ pub fn aggregateFieldIndexAtOffset(
     expected_offset: u64,
     expected_ty: ir.Type,
 ) ?usize {
-    var field_index: usize = 0;
-    while (aggregateFieldType(aggregate_ty, field_index)) |field_ty| : (field_index += 1) {
-        const field_offset = aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse return null;
-        if (field_ty.eql(expected_ty) and field_offset == expected_offset) return field_index;
-        if (isAggregateType(field_ty) and expected_offset >= field_offset) {
-            if (aggregateFieldIndexAtOffset(layout, field_ty, expected_offset - field_offset, expected_ty) != null) {
-                return field_index;
-            }
-        }
-    }
-    return null;
+    return type_layout.fieldIndexAtOffset(layout, aggregate_ty, expected_offset, expected_ty);
 }
 
 pub fn aggregateLeafTypeAtOffset(layout: target.DataLayout, aggregate_ty: ir.Type, expected_offset: u64) ?ir.Type {
-    var field_index: usize = 0;
-    while (aggregateFieldType(aggregate_ty, field_index)) |field_ty| : (field_index += 1) {
-        const field_offset = aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse return null;
-        if (isAggregateType(field_ty)) {
-            if (expected_offset >= field_offset) {
-                if (aggregateLeafTypeAtOffset(layout, field_ty, expected_offset - field_offset)) |nested_ty| return nested_ty;
-            }
-        } else if (field_offset == expected_offset) {
-            return field_ty;
-        }
-    }
-    return null;
+    return type_layout.leafTypeAtOffset(layout, aggregate_ty, expected_offset);
 }
 
-pub const AggregateLeaf = struct {
-    offset: u64,
-    ty: ir.Type,
-};
+pub const AggregateLeaf = type_layout.AggregateLeaf;
 
 pub fn isSupportedScalarAggregateLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
-        ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
+    return type_layout.isSupportedScalarLeaf(ty);
 }
 
 pub fn isSupportedScalarLeafAggregate(aggregate_ty: ir.Type) bool {
-    const field_count = aggregateFieldCount(aggregate_ty);
-    if (field_count == 0) return false;
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_ty = aggregateFieldType(aggregate_ty, field_index) orelse return false;
-        if (isSupportedScalarAggregateLeaf(field_ty)) continue;
-        if (isAggregateType(field_ty) and isSupportedScalarLeafAggregate(field_ty)) continue;
-        return false;
-    }
-    return true;
+    return type_layout.isSupportedScalarLeafAggregate(aggregate_ty);
 }
 
 pub fn collectSupportedScalarAggregateLeaves(
@@ -691,30 +654,11 @@ pub fn collectSupportedScalarAggregateLeaves(
     leaves: []AggregateLeaf,
     leaf_count: *usize,
 ) !void {
-    const field_count = aggregateFieldCount(aggregate_ty);
-    if (field_count == 0) return error.UnsupportedCodegenAbi;
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_ty = aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi;
-        const field_offset = base_offset + (aggregateFieldByteOffset(layout, aggregate_ty, field_index) orelse
-            return error.UnsupportedCodegenAbi);
-        if (isSupportedScalarAggregateLeaf(field_ty)) {
-            if (leaf_count.* >= leaves.len) return error.UnsupportedCodegenAbi;
-            leaves[leaf_count.*] = .{ .offset = field_offset, .ty = field_ty };
-            leaf_count.* += 1;
-        } else if (isAggregateType(field_ty)) {
-            try collectSupportedScalarAggregateLeaves(layout, field_ty, field_offset, leaves, leaf_count);
-        } else {
-            return error.UnsupportedCodegenAbi;
-        }
-    }
+    try type_layout.collectSupportedScalarLeaves(layout, aggregate_ty, base_offset, leaves, leaf_count);
 }
 
 pub fn isAggregateType(ty: ir.Type) bool {
-    return switch (ty) {
-        .aggregate => true,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
-    };
+    return type_layout.isAggregateType(ty);
 }
 
 fn isIgnoredMetadataOpcode(opcode: []const u8) bool {

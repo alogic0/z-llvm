@@ -739,6 +739,16 @@ streams, proving the GPR and SSE cursors assign outgoing stack slots
 independently in the same call.
 The reversed mixed follow-up covers the opposite SSE/INTEGER order by reloading
 stack-passed `{ double, i64 }` into `%xmm0`/`%rax`.
+The aggregate/type-layout refactor starts the next ownership phase: named
+aggregate decoding, field offsets, recursive leaf lookup, supported scalar-leaf
+collection, generic CFG aggregate field/copy lowering, and SysV aggregate
+classification now share `src/zig_air_type_layout.zig`. This preserves the
+strict 13-source / 626-function frontier executable proof while removing the
+former long fixture-path mapping block from `src/zig_air_types.zig`. Remaining
+aggregate layout debt is explicit: ambiguous nominal `Pair` compatibility still
+requires Zig-exported field layout facts or a structural aggregate summary, and
+runtime aggregate-pair compatibility lowerers still contain selected symbol
+checks.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

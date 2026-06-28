@@ -469,7 +469,11 @@ The memory and
 aggregate frontier slice closes selected nested loop-memory CFG, nested
 extern-struct field GEP, dynamic pointer-element GEP, branch-local
 global/TLS add/sub updates, and nested INTEGER aggregate add-chain field
-reads. The first SysV ABI closure-wave slice adds small
+reads. Aggregate field offsets, recursive leaf lookup, supported scalar-leaf
+copy planning, construction/return lowering inputs, and SysV aggregate
+classification now consume the shared `src/zig_air_type_layout.zig` decoder
+instead of the former `src/zig_air_types.zig` fixture-path mapping block.
+The first SysV ABI closure-wave slice adds small
 INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate argument
 field reads from the SysV integer register pair, nested INTEGER aggregate
 field add-chain reads, nested mixed aggregate field reads/construction,

@@ -2,6 +2,7 @@ const std = @import("std");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
 const ir = @import("ir.zig");
+const type_layout = @import("zig_air_type_layout.zig");
 
 pub const ZigType = air_model.ZigType;
 pub const FunctionType = air_model.FunctionType;
@@ -82,151 +83,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "extern struct { a: f64, b: i32 }")) {
         return .{ .ir_type = .{ .aggregate = "{ double, i32 }" } };
     }
-    if (std.mem.eql(u8, trimmed, "aggregate_abi.Pair") or
-        std.mem.eql(u8, trimmed, "runtime_aggregate_pair_main.Pair") or
-        std.mem.eql(u8, trimmed, "expanded_records_memory.Pair") or
-        std.mem.eql(u8, trimmed, "expanded_abi_frontier.Pair"))
-    {
-        return .{ .ir_type = .{ .int = 64 } };
-    }
-    if (std.mem.eql(u8, trimmed, "aggregates.Pair") or
-        std.mem.eql(u8, trimmed, "runtime_struct_sum_main.Pair") or
-        std.mem.eql(u8, trimmed, "expanded_cfg_memory_aggregates.Pair") or
-        std.mem.eql(u8, trimmed, "scale_records_globals.Pair") or
-        std.mem.eql(u8, trimmed, "frontier_nested_records.Inner"))
-    {
-        return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_nested_records.Outer")) {
-        return .{ .ir_type = .{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_abi.Pair64")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.Mixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.DoublePair")) {
-        return .{ .ir_type = .{ .aggregate = "{ double, double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.FloatPair")) {
-        return .{ .ir_type = .{ .aggregate = "{ float, float }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.FloatArray")) {
-        return .{ .ir_type = .{ .aggregate = "{ [4 x float] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.ReverseMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ double, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.Pair32")) {
-        return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.NestedPair")) {
-        return .{ .ir_type = .{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.ArrayPair")) {
-        return .{ .ir_type = .{ .aggregate = "{ [2 x i64] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.ArrayDouble")) {
-        return .{ .ir_type = .{ .aggregate = "{ [2 x double] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.DoubleBox")) {
-        return .{ .ir_type = .{ .aggregate = "{ double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.NestedDouble")) {
-        return .{ .ir_type = .{ .aggregate = "{ { double }, { double } }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.NestedMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ { i32, i32 }, double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.SmallMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ i32, double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.SmallReverseMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ double, i32 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.PackedMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ i32, i32, double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.PackedReverseMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ double, i32, i32 }" } };
-    }
-    if (frontierSysVSretByvalBigType(trimmed)) |ty| return ty;
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigNested")) {
-        return .{ .ir_type = .{ .aggregate = "{ { i64, i64, i64 }, { i64, i64, i64 } }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ i64, i32, i64, i32 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.NarrowInner")) {
-        return .{ .ir_type = .{ .aggregate = "{ i16, i32 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigNarrow")) {
-        return .{ .ir_type = .{ .aggregate = "{ i8, { i16, i32 }, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigArray")) {
-        return .{ .ir_type = .{ .aggregate = "{ [5 x i64] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigDouble")) {
-        return .{ .ir_type = .{ .aggregate = "{ double, double, double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigDoubleArray")) {
-        return .{ .ir_type = .{ .aggregate = "{ [3 x double] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigFloat")) {
-        return .{ .ir_type = .{ .aggregate = "{ float, float, float, float, float }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigFloatArray")) {
-        return .{ .ir_type = .{ .aggregate = "{ [5 x float] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigPtrDouble")) {
-        return .{ .ir_type = .{ .aggregate = "{ ptr, double, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigPtrFloat")) {
-        return .{ .ir_type = .{ .aggregate = "{ ptr, float, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigArrayMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ [2 x i32], [2 x double], ptr }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigNestedArrayMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ { [5 x float] }, { [3 x double] }, ptr, i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.MixedArrayLeaf")) {
-        return .{ .ir_type = .{ .aggregate = "{ i32, double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigStructArrayMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ [3 x { i32, double }], i64 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigDeepMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ { { [5 x float] }, { [3 x double] }, ptr, i64 }, [2 x { i32, double }], { { i8, i16 }, i32, double, ptr }, [2 x ptr], i32 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail")) {
-        return .{ .ir_type = .{ .aggregate = "{ [17 x i8] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail5")) {
-        return .{ .ir_type = .{ .aggregate = "{ [21 x i8] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail6")) {
-        return .{ .ir_type = .{ .aggregate = "{ [22 x i8] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigByteTail7")) {
-        return .{ .ir_type = .{ .aggregate = "{ [23 x i8] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigWordTail")) {
-        return .{ .ir_type = .{ .aggregate = "{ [9 x i16] }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarMixed")) {
-        return .{ .ir_type = .{ .aggregate = "{ i8, i16, i32, i64, ptr, float, double }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarNestedInner")) {
-        return .{ .ir_type = .{ .aggregate = "{ i8, i16 }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarNested")) {
-        return .{ .ir_type = .{ .aggregate = "{ { i8, i16 }, i32, double, ptr }" } };
-    }
-    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.ScalarArray")) {
-        return .{ .ir_type = .{ .aggregate = "{ [3 x i32], [2 x double], ptr }" } };
-    }
+    if (type_layout.parseNamedAggregateType(trimmed)) |ty| return .{ .ir_type = ty };
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
         return .{ .ir_type = .{ .int = 16 } };
@@ -331,37 +188,6 @@ pub fn parseZigArrayType(trimmed: []const u8) ?ZigType {
     return .{ .ir_type = .{ .aggregate = aggregate_text } };
 }
 
-pub fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ZigType {
-    const prefix = "frontier_sysv_sret_byval.Big";
-    if (!std.mem.startsWith(u8, trimmed, prefix)) return null;
-    const field_count = std.fmt.parseInt(u16, trimmed[prefix.len..], 10) catch return null;
-    const aggregate: []const u8 = switch (field_count) {
-        3 => "{ i64, i64, i64 }",
-        4 => "{ i64, i64, i64, i64 }",
-        5 => "{ i64, i64, i64, i64, i64 }",
-        6 => "{ i64, i64, i64, i64, i64, i64 }",
-        7 => "{ i64, i64, i64, i64, i64, i64, i64 }",
-        8 => "{ i64, i64, i64, i64, i64, i64, i64, i64 }",
-        9 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        10 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        11 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        12 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        13 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        14 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        15 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        16 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        17 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        18 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        19 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        20 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        else => if (field_count >= 32)
-            std.fmt.allocPrint(std.heap.page_allocator, "{{ [{d} x i64] }}", .{field_count}) catch return null
-        else
-            return null,
-    };
-    return .{ .ir_type = .{ .aggregate = aggregate } };
-}
-
 pub fn pointerLoadResultType(text: []const u8) ?ZigType {
     const child_text = pointerChildText(std.mem.trim(u8, text, " ")) orelse return null;
     return parseZigType(child_text);
@@ -428,7 +254,7 @@ test "parse qualified Zig function types" {
 }
 
 test "parse frontier BigN array-backed byval types generically" {
-    const parsed = frontierSysVSretByvalBigType("frontier_sysv_sret_byval.Big240") orelse return error.TestExpectedEqual;
+    const parsed = parseZigType("frontier_sysv_sret_byval.Big240") orelse return error.TestExpectedEqual;
     try std.testing.expectEqualStrings("{ [240 x i64] }", parsed.ir_type.aggregate);
 }
 

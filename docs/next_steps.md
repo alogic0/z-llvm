@@ -249,7 +249,12 @@ Execution order:
    instead of the fallback module. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
-3. Type-layout slice: `src/zig_air_capabilities.zig` now also provides a
+3. Type-layout slice: `src/zig_air_type_layout.zig` is now the shared
+   aggregate layout decoder for accepted x86_64 release rows. `src/zig_air_types.zig`
+   delegates named aggregate parsing to it instead of carrying the long
+   fixture-path mapping block, and both direct aggregate values and nominal
+   `%Type` names are normalized before lookup while pointer/function-pointer
+   surfaces stay in normal pointer parsing. `src/zig_air_capabilities.zig` now also provides a
    shared type/surface capability API for aggregate, pointer, slice, optional,
    error-union, vector, X87/f128, varargs, and packed/unaligned surfaces.
    `src/distribution_zig_air_inventory.zig` uses it for category reporting,
@@ -262,8 +267,11 @@ Execution order:
    aggregate construction recognition, and the compatibility ABI bridge through
    shared aggregate field/leaf layout helpers. Typed-v2 register aggregate
    eligibility now delegates to the x86_64 SysV aggregate classifier. Next
-   work: fold the remaining sret/byval aggregate construction decisions into
-   one shared aggregate ABI plan.
+   work: replace the remaining ambiguous nominal `Pair` compatibility rule and
+   runtime aggregate-pair compatibility lowerers with exported nominal field
+   layout facts or a fully structural aggregate construction/call summary, then
+   fold the remaining sret/byval aggregate construction decisions into one
+   shared aggregate ABI plan.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
@@ -453,6 +461,26 @@ Pointer/slice frontier exit:
   failure. The next milestone should move on unless that precise boundary is
   selected explicitly.
 
+Aggregate/type-layout ownership start:
+
+- `src/zig_air_type_layout.zig` now owns named aggregate decoding, field
+  counting, field byte offsets, recursive leaf lookup, supported scalar-leaf
+  collection, and aggregate-kind checks. The decoder is shared by
+  `src/zig_air_types.zig`, `src/zig_air_capabilities.zig`,
+  `src/codegen/x86_64/sysv_abi.zig`, and generic CFG C ABI aggregate lowering.
+- Representative existing source-backed aggregate rows in
+  `frontier_nested_records.zig`, `frontier_sysv_abi.zig`,
+  `frontier_sysv_aggregate_classes.zig`, and
+  `frontier_sysv_sret_byval.zig` continue to prove field access, construction,
+  return lowering, sret/byval copies, and SysV ABI classification through
+  object/native-link/executable proof across all release modes.
+- Remaining aggregate/type-layout debt is narrower and explicit: ambiguous
+  nominal `Pair` still has a compatibility rule until Zig exports field layout
+  facts for all nominal aggregates, and the runtime aggregate-pair compatibility
+  lowerers still contain selected symbol-name checks. Packed/unaligned
+  aggregate ABI stays a targeted fail-closed boundary with
+  `packed_aggregate_boundary_rows=2`.
+
 Validation after these refactor slices:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
@@ -477,8 +505,9 @@ Validation after these refactor slices:
   Likely layers: semantic type lowering, SysV ABI planner, x86_64 aggregate
   backend.
   Current duplicated/selected-code location:
-  `src/zig_air_types.zig` currently carries fixture-name aggregate type
-  mappings; `src/zig_air_lowering_typed_v2.zig` and
+  `src/zig_air_type_layout.zig` now carries the shared named aggregate decoder
+  and the former `src/zig_air_types.zig` fixture-path mapping block has been
+  removed. `src/zig_air_lowering_typed_v2.zig` and
   `src/zig_air_lowering_typed_v2_fallbacks.zig` carry overlapping aggregate
   sret/byval construction; the x86_64 aggregate classifier, generic CFG
   aggregate GEP/field lookup, sret/byval leaf lookup, typed-v2 aggregate
@@ -488,7 +517,9 @@ Validation after these refactor slices:
   through `src/zig_air_capabilities.zig`, `src/zig_air_model.zig`,
   `src/zig_air_aggregate_copy.zig`, `src/zig_air_aggregate_construction.zig`,
   and `src/codegen/x86_64/sysv_abi.zig`, while sret/byval aggregate
-  construction still needs unification.
+  construction still needs unification. The remaining compatibility debt is the
+  centralized ambiguous `Pair` rule plus selected runtime aggregate-pair
+  lowerers that still use exact symbol names.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

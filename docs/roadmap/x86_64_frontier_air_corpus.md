@@ -62,6 +62,23 @@ address model, the cold path preserves the `outOfBounds(index, len)` noreturn
 runtime call, and the C harness proves both the in-bounds result and
 child-process trap behavior.
 
+The aggregate/type-layout ownership milestone has started without changing the
+strict frontier counters. `src/zig_air_type_layout.zig` now owns named aggregate
+decoding, recursive field/leaf queries, field byte offsets, and supported
+scalar-leaf collection. `src/zig_air_types.zig` delegates nominal aggregate
+parsing to that decoder, while `src/zig_air_capabilities.zig`,
+`src/codegen/x86_64/sysv_abi.zig`, and generic CFG C ABI aggregate lowering
+consume the same layout model for field access, aggregate copy planning,
+construction/return paths, and SysV aggregate classification. Existing
+source-backed rows in `frontier_nested_records.zig`, `frontier_sysv_abi.zig`,
+`frontier_sysv_aggregate_classes.zig`, and `frontier_sysv_sret_byval.zig` are
+the representative object/native-link/executable proof for the first slice.
+Remaining aggregate layout debt is explicit: ambiguous nominal `Pair` still has
+a centralized compatibility rule until Zig exports complete nominal field
+facts, runtime aggregate-pair compatibility lowerers still contain selected
+symbol checks, and packed/unaligned aggregate ABI remains a targeted boundary
+row.
+
 Current frontier ABI boundary seed:
 
 - `test/zig/frontier_boundaries/frontier_varargs_boundary.zig`
