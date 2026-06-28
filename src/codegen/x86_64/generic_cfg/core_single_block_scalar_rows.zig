@@ -4,4 +4,5 @@ pub const lowerGenericCfgSingleBlockScalar = impl.lowerGenericCfgSingleBlockScal
 pub const lowerGenericCfgSingleBlockFp = impl.lowerGenericCfgSingleBlockFp;
 pub const lowerGenericCfgSingleBlockAggregateAbi = impl.lowerGenericCfgSingleBlockAggregateAbi;
 pub const lowerGenericCfgSingleBlockI64 = impl.lowerGenericCfgSingleBlockI64;
+pub const lowerGenericCfgSingleBlockPointerLoadStore = impl.lowerGenericCfgSingleBlockPointerLoadStore;
 pub const lowerGenericCfgSingleBlockSliceLen = impl.lowerGenericCfgSingleBlockSliceLen;

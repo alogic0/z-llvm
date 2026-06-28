@@ -1840,8 +1840,8 @@ fn isMakePairSretCall(call: ir.CallInst, pair_slot_name: []const u8) bool {
         call.args.items[2].ty.eql(.{ .int = 32 }) and isInt(call.args.items[2].value, 2);
 }
 
-fn isMakePairI64Call(call: ir.CallInst) bool {
-    return callIsFastcc(call.calling_conv) and call.ret_ty.eql(.{ .int = 64 }) and
+fn isMakePairRegisterAggregateCall(call: ir.CallInst) bool {
+    return callIsFastcc(call.calling_conv) and isTwoI32PairAggregate(call.ret_ty) and
         call.callee_value == null and call.inline_asm == null and
         call.args.items.len == 2 and
         call.args.items[0].ty.eql(.{ .int = 32 }) and isInt(call.args.items[0].value, 1) and
@@ -1855,11 +1855,11 @@ fn isPairFirstPtrCall(call: ir.CallInst, pair_slot_name: []const u8) bool {
         call.args.items[0].ty.eql(.ptr) and isNamed(call.args.items[0].value, pair_slot_name);
 }
 
-fn isPairFirstI64Call(call: ir.CallInst, pair_value_name: []const u8) bool {
+fn isPairFirstRegisterAggregateCall(call: ir.CallInst, pair_value_name: []const u8, pair_ty: ir.Type) bool {
     return callIsFastcc(call.calling_conv) and call.ret_ty.eql(.{ .int = 32 }) and
         call.callee_value == null and call.inline_asm == null and
         call.args.items.len == 1 and
-        call.args.items[0].ty.eql(.{ .int = 64 }) and isNamed(call.args.items[0].value, pair_value_name);
+        call.args.items[0].ty.eql(pair_ty) and isNamed(call.args.items[0].value, pair_value_name);
 }
 
 pub fn lowerRuntimeAggregatePairMainReturn(
@@ -1925,13 +1925,13 @@ pub fn lowerRuntimeAggregatePairDirectMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!isMakePairI64Call(make_pair)) return false;
+    if (!isMakePairRegisterAggregateCall(make_pair)) return false;
 
     const pair_first = switch (pair_first_inst.kind) {
         .call => |call| call,
         else => return false,
     };
-    if (!isPairFirstI64Call(pair_first, make_pair_name)) return false;
+    if (!isPairFirstRegisterAggregateCall(pair_first, make_pair_name, make_pair.ret_ty)) return false;
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);

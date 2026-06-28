@@ -8,6 +8,7 @@ pub const lowerGenericCfgSingleBlockScalar = scalar.lowerGenericCfgSingleBlockSc
 pub const lowerGenericCfgSingleBlockFp = scalar.lowerGenericCfgSingleBlockFp;
 pub const lowerGenericCfgSingleBlockAggregateAbi = scalar.lowerGenericCfgSingleBlockAggregateAbi;
 pub const lowerGenericCfgSingleBlockI64 = scalar.lowerGenericCfgSingleBlockI64;
+pub const lowerGenericCfgSingleBlockPointerLoadStore = scalar.lowerGenericCfgSingleBlockPointerLoadStore;
 pub const lowerGenericCfgSingleBlockSliceLen = scalar.lowerGenericCfgSingleBlockSliceLen;
 pub const lowerGenericCfgSingleBlockPtr = pointer.lowerGenericCfgSingleBlockPtr;
 pub const lowerGenericCfgSingleBlockEffectBarrier = calls.lowerGenericCfgSingleBlockEffectBarrier;

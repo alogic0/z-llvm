@@ -756,16 +756,16 @@ insertvalue indices, and SysV classification consumes the same normalized
 aggregate type. `AggregateLayoutSummary` records descriptor-exported facts,
 sidecar-exported facts, static-source facts, or boundary-provider ownership.
 The compatibility fallback table has been removed, the temporary static source
-fact provider is empty, and the frontier sidecar is header-only. The patched
+fact provider is empty, and the sidecar files are header-only. The patched
 Zig stage4 emitter writes `zllvm-aggregate-layout-facts-v1` directly into AIR
 descriptors for supported aggregate semantic layouts; z_llvm parses the
 optional `aggregate_layout_facts_bytes` section and gives descriptor facts
-precedence over compatibility sidecars. The current provider audit reports
-`exported_facts=3`, `static_source_facts=0`, `boundary_provider=2`, and
-`generated_examples=0`; the 3 sidecar facts are non-frontier compatibility
-coverage. Packed/unaligned aggregate ABI remains a 2-row targeted boundary
-through `src/zig_air_aggregate_layout_boundaries.zig` rather than a fallback
-layout.
+precedence over compatibility sidecars. The current empty-sidecar provider
+audit reports `exported_facts=0`, `static_source_facts=0`,
+`boundary_provider=2`, and `generated_examples=0`; the former 3 non-frontier
+sidecar compatibility facts have been retired. Packed/unaligned aggregate ABI
+remains a 2-row targeted boundary through
+`src/zig_air_aggregate_layout_boundaries.zig` rather than a fallback layout.
 Register
 aggregate construction and sret/byval make rows now perform mechanical typed
 AIR inference from ret_ptr, field/element pointer stores, and ret_load before

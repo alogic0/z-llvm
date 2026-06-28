@@ -281,7 +281,7 @@ Execution order:
    source, field count, scalar leaves, and construction/store/load evidence.
    The basename compatibility table has been removed, so no accepted aggregate
    row can enter through fallback-table ownership. The
-   owned side now has descriptor-exported frontier facts, 3 remaining
+   owned side now has descriptor-exported frontier facts, 0 remaining
    compatibility sidecar facts, and 0 temporary static source layout facts in
    `src/zig_air_aggregate_layout_facts.zig`. The finite
    `frontier_sysv_sret_byval.BigN` rows are descriptor-fact owned rather than
@@ -529,25 +529,29 @@ Aggregate/type-layout ownership start:
   is active. The z_llvm parser accepts an optional
   `aggregate_layout_facts_bytes` section, and the uncurated AIR gate installs
   descriptor facts ahead of the temporary sidecar provider for each source.
-  The frontier sidecar is now header-only; the strict frontier gate stayed
-  green from descriptor-emitted facts for nested records, SysV aggregate
-  classes, and sret/byval BigN rows.
+  The sidecar files are now header-only; the strict frontier gate stayed green
+  from descriptor-emitted facts for nested records, SysV aggregate classes,
+  and sret/byval BigN rows, and the broad pointer-memory rows no longer depend
+  on sidecar aggregate facts.
 - Current aggregate provider audit:
   `zig run tools/audit_aggregate_layout_providers.zig >
-  tmp/aggregate_layout_provider_audit.log` now reports
-  `exported_facts=3`, `static_source_facts=0`, `boundary_provider=2`, and
-  `generated_examples=0`. The 3 remaining sidecar facts are compatibility
-  coverage for non-frontier roots (`aggregate_abi.Pair`,
-  `runtime_aggregate_pair_main.Pair`, and `expanded_abi_frontier.Pair`).
-  Packed/unaligned aggregate layouts remain the 2 explicit boundary-provider
-  rows.
+  tmp/aggregate_layout_provider_audit_empty_sidecar.log` now reports
+  `exported_facts=0`, `static_source_facts=0`, `boundary_provider=2`, and
+  `generated_examples=0` after retiring the final non-frontier sidecar facts.
+  The prior broad failure was not a missing aggregate fact: `pointers_memory.load_store`
+  and `runtime_pointer_load_store_main.loadStore` were plain pointer-memory rows
+  hitting aggregate ABI routing, and `runtime_aggregate_pair_main.main` needed
+  register-aggregate pair lowering for `{ i32, i32 }`. Packed/unaligned
+  aggregate layouts remain the 2 explicit boundary-provider rows.
 - Function-local typed AIR construction evidence still validates register
   aggregate construction and sret/byval make admission on top of provider
   facts. Copy rows must return the typed aggregate argument, and call-wrapper
   rows must pass that aggregate argument to the single call and return that
-  call result. The next ownership slice is to retire the 3 non-frontier sidecar
-  facts from direct Zig-emitted descriptor facts or a narrower Zig field-fact
-  hook.
+  call result. The next ownership slice is to fix the pre-existing strict broad
+  executable blocker in `test/zig/inputs/aggregates.zig`: the dumped
+  `aggregates.slice_sum` IR currently returns `0` on both loop and zero paths,
+  so `distribution-air-release-broad` still exits with `NativeLinkLocalFailure`
+  even though lowering/object counters are clean.
 
 Validation after these refactor slices is saved in
 `tmp/frontier_counter_update.log` and

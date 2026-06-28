@@ -104,6 +104,7 @@ const lowerMulConstReturn = core_misc_rows.lowerMulConstReturn;
 const lowerPointerVolatileRoundtripReturn = cabi_boundary_rows.lowerPointerVolatileRoundtripReturn;
 const lowerRuntimeArraySumPreoptHelper = cabi_aggregate_lowering.lowerRuntimeArraySumPreoptHelper;
 const lowerRuntimeStructSumPreoptHelper = cabi_aggregate_lowering.lowerRuntimeStructSumPreoptHelper;
+const lowerAggregatePairAbiFamilyReturn = cabi_aggregate_lowering.lowerAggregatePairAbiFamilyReturn;
 const lowerScalarFpCastReturn = cabi_boundary_rows.lowerScalarFpCastReturn;
 const lowerSelectedI64ConstReturn = cabi_call_lowering.lowerSelectedI64ConstReturn;
 const lowerStructSumReturn = cabi_aggregate_lowering.lowerStructSumReturn;
@@ -131,6 +132,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
     }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
+        if (try lowerGenericCfgPointerLoadStoreReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
         if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) {
             machine.codegen_path = .generic_cfg;
             return true;
@@ -211,6 +216,94 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
     }
     try appendGenericCfgReturn(allocator, machine);
     machine.codegen_path = .generic_cfg;
+    return true;
+}
+
+pub fn lowerGenericCfgSingleBlockPointerLoadStore(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (try lowerGenericCfgPointerLoadStoreReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    return false;
+}
+
+fn lowerGenericCfgPointerLoadStoreReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;
+    const reload_result = block.instructions.items.len == 4;
+    if (block.instructions.items.len != 3 and !reload_result) return false;
+
+    const load_inst = block.instructions.items[0];
+    const add_inst = block.instructions.items[1];
+    const store_inst = block.instructions.items[2];
+    const reload_inst = if (reload_result) block.instructions.items[3] else null;
+    if (load_inst.removed or add_inst.removed or store_inst.removed) return false;
+    if (reload_inst) |instruction| if (instruction.removed) return false;
+
+    const load_result = load_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!reload_result and !std.mem.eql(u8, ret_name, add_result)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    if (!isNamed(load.ptr, function.params.items[0].name)) return false;
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    const add_imm = if (isNamed(add.lhs, load_result)) switch (add.rhs) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    } else if (isNamed(add.rhs, load_result)) switch (add.lhs) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    } else return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
+    if (!isNamed(store.ptr, function.params.items[1].name) or !isNamed(store.value, add_result)) return false;
+
+    const src_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const dst_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = src_reg });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = add_imm });
+    try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = dst_reg });
+    if (reload_inst) |instruction| {
+        const reload_name = instruction.result orelse return false;
+        if (!std.mem.eql(u8, ret_name, reload_name)) return false;
+        const reload = switch (instruction.kind) {
+            .load => |load_value| load_value,
+            else => return false,
+        };
+        if (!reload.ty.eql(.{ .int = 32 }) or reload.attrs.isBarrier()) return false;
+        if (!isNamed(reload.ptr, function.params.items[1].name)) return false;
+        try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = dst_reg });
+    }
+    try appendGenericCfgReturn(allocator, machine);
     return true;
 }
 
@@ -736,6 +829,10 @@ pub fn lowerGenericCfgSingleBlockAggregateAbi(allocator: std.mem.Allocator, mach
         else => return false,
     };
     if (try lowerGenericCfgSliceLenReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerAggregatePairAbiFamilyReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
