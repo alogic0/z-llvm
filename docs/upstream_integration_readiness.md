@@ -754,16 +754,17 @@ and make planning. Typed-v2 register aggregate construction admission validates
 operands against the same plan before using typed AIR pointer paths for
 insertvalue indices, and SysV classification consumes the same normalized
 aggregate type. `AggregateLayoutSummary` now records whether a layout came from
-source/AIR inference or from the compatibility table. The inferred side now has
-42 named layout facts plus generated `frontier_sysv_sret_byval.BigN` rules for
-the 9 scalar Big3..Big20 rows and the 12 current Big32..Big256 array-leaf rows;
-those accepted aggregate rows no longer depend on the basename fallback table.
-Inferred summaries fail closed if their field/leaf counts disagree with any
-remaining fallback equivalent. Remaining aggregate layout debt is explicit: 5
-compatibility fallback entries still stand in for future Zig-exported field
-layout facts or broader construction/store/load inference (`Outer`, `Pair`,
-`Inner`, and the 2 packed boundary rows), and packed/unaligned aggregate ABI
-remains a 2-row targeted boundary. Register
+static source facts, generated inference, a boundary, or the compatibility
+table. The owned side now has 42 static source layout facts plus generated
+`frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar Big3..Big20
+rows and the 12 current Big32..Big256 array-leaf rows; those accepted aggregate
+rows no longer depend on the basename fallback table. Owned summaries fail
+closed if their field/leaf counts disagree with any remaining fallback
+equivalent. Remaining aggregate layout debt is explicit: 3 compatibility
+fallback entries still stand in for future Zig-exported field layout facts or
+broader construction/store/load inference (`Outer`, `Pair`, `Inner`), and
+packed/unaligned aggregate ABI remains a 2-row targeted boundary rather than a
+fallback layout. Register
 aggregate construction and sret/byval make rows now perform mechanical typed
 AIR inference from ret_ptr, field/element pointer stores, and ret_load before
 admission, so those rows are checked by function-local construction evidence

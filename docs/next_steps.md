@@ -280,13 +280,14 @@ Execution order:
    than AIR instruction paths. `AggregateLayoutSummary` now records layout
    source, field count, scalar leaves, and construction/store/load evidence.
    It is consulted before the basename compatibility table, so
-   the first broad easy-layout slice is source/AIR-inferred instead of
-   fallback-table-owned. The inferred side now has 42 named layout facts plus
-   generated `frontier_sysv_sret_byval.BigN` rules for the 9 scalar
+   the first broad easy-layout slice is no longer fallback-table-owned. The
+   owned side now has 42 static source layout facts plus generated
+   `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
    Big3..Big20 forms and the 12 current Big32..Big256 array-leaf rows. The
-   fallback side is reduced to 5 compatibility entries: `Outer`, `Pair`,
-   `Inner`, and the 2 packed/unaligned boundary entries.
-   Inferred summaries are compared against any still-present compatibility
+   fallback side is reduced to 3 compatibility entries: `Outer`, `Pair`, and
+   `Inner`; `PackedMixed` and `PackedReverseMixed` are boundary-owned, not
+   fallback-owned.
+   Owned summaries are compared against any still-present compatibility
    fallback; a disagreement fails closed with nominal name, field-count,
    leaf-count, and construction/store/load evidence available through
    `aggregateLayoutMismatch`. Register aggregate construction no longer admits
@@ -509,12 +510,13 @@ Aggregate/type-layout ownership start:
   is layout-owned as `{ i32, i32 }`, the runtime aggregate-pair compatibility
   lowerers now admit by normalized layout and data-flow structure instead of
   exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
-  source/AIR-inferred layouts from fallback-table layouts. The inferred set has
-  42 named source-owned facts, a generated scalar-BigN rule covering
-  Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20, and a reusable large-BigN
+  static source facts, generated inference, fallback-table layouts, and
+  boundary-owned layouts. The static source-fact table still has 42 named
+  facts. Generated inference covers the scalar-BigN rule for
+  Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 and the large-BigN
   array-leaf rule covering Big32, Big40, Big48, Big64, Big80, Big81, Big96,
   Big128, Big160, Big192, Big224, and Big256. The fallback table is reduced to
-  5 compatibility entries, including the 2 packed/unaligned boundary entries.
+  3 compatibility entries; the 2 packed/unaligned entries are boundary-owned.
   Function-local typed AIR construction evidence now feeds register aggregate
   and sret/byval make admission: the inference path derives struct fields and
   single-field array leaves from concrete store paths, then validates that
@@ -523,17 +525,20 @@ Aggregate/type-layout ownership start:
   return the typed aggregate argument, while wrappers must pass that aggregate
   argument to the single call and return that call result.
 - Nominal aggregate layout source audit:
-  - Source/AIR-inferred before fallback table:
+  - Static source layout facts before fallback table:
     `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
     `Pair64`, `Mixed`, `ReverseMixed`, `DoublePair`, `FloatPair`,
     `FloatArray`, `NestedPair`, `ArrayPair`, `ArrayDouble`, `DoubleBox`,
     `NestedDouble`, `NestedMixed`, `Pair32`, `SmallMixed`,
     `SmallReverseMixed`, all non-packed sret/byval frontier basenames from
-    `BigNested` through `ScalarArray`, the scalar-BigN generated rule for the
-    current Big3..Big20 rows, and the large-BigN array rule for BigN >= 32.
+    `BigNested` through `ScalarArray`.
+  - Generated inference before fallback table:
+    the scalar-BigN rule for the current Big3..Big20 rows and the large-BigN
+    array rule for BigN >= 32.
   - Remaining fallback-table compatibility entries:
-    `Outer`, `Pair`, `Inner`, `PackedMixed`, `PackedReverseMixed`, and the
-    two packed entries are boundary-owned rather than accepted layout facts.
+    `Outer`, `Pair`, and `Inner`.
+  - Boundary-owned aggregate layouts:
+    `PackedMixed` and `PackedReverseMixed`.
   - `PackedMixed` and `PackedReverseMixed` stay boundary-owned until
     packed/unaligned field layout and ABI facts are exported or implemented
     explicitly.
@@ -583,10 +588,10 @@ Validation after these refactor slices is saved in
   `Pair` rule and exact runtime aggregate-pair symbol-name admission have been
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
   checks. `AggregateLayoutSummary` now records whether a layout came from
-  source/AIR inference or from the compatibility table; the inferred side has
-  42 named source-owned facts plus generated scalar-BigN and large-BigN rules,
-  and mismatch checking compares inferred field/leaf counts against any
-  remaining fallback entry. Register aggregate construction now also has
+  static source facts, generated inference, a boundary, or the compatibility
+  table; the generated inference side has scalar-BigN and large-BigN rules,
+  and mismatch checking compares owned field/leaf counts against any remaining
+  fallback entry. Register aggregate construction now also has
   mechanical typed-AIR
   inference for ret_ptr/field-or-element pointer/store/ret_load rows, including
   single-field array leaf reconstruction; the same leaf/path validation now
