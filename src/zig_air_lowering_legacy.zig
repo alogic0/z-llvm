@@ -302,17 +302,6 @@ pub fn lowerAccumulatorLoop(
     return function;
 }
 
-const SwitchArm = struct {
-    first: u8,
-    last: u8,
-    result: i32,
-};
-
-const SwitchRange = struct {
-    first: u8,
-    last: u8,
-};
-
 pub fn isIntegerSwitchBlock(function: air_export.Function) bool {
     return air_model.integerSwitchSummary(function) != null;
 }
@@ -331,34 +320,8 @@ pub fn lowerIntegerSwitch(
         return error.UnsupportedAir;
     }
 
-    var arms: std.ArrayList(SwitchArm) = .empty;
-    defer arms.deinit(allocator);
-    var default_result: ?i32 = null;
-    var pending_range: ?SwitchRange = null;
-    var pending_default = false;
-    var lines = std.mem.splitScalar(u8, air_function.air_text, '\n');
-    while (lines.next()) |raw_line| {
-        const line = std.mem.trim(u8, raw_line, " ");
-        if (std.mem.indexOf(u8, line, "=> {") != null) {
-            if (std.mem.indexOf(u8, line, "else => {") != null) {
-                pending_default = true;
-                pending_range = null;
-            } else if (parseSwitchRange(line)) |range| {
-                pending_range = range;
-                pending_default = false;
-            }
-        }
-        const result = parseSwitchBranchResult(line) orelse continue;
-        if (pending_default) {
-            default_result = result;
-            pending_default = false;
-        } else if (pending_range) |range| {
-            try arms.append(allocator, .{ .first = range.first, .last = range.last, .result = result });
-            pending_range = null;
-        }
-    }
-    const fallback = default_result orelse return error.UnsupportedAir;
-    if (arms.items.len == 0) return error.UnsupportedAir;
+    const switch_plan = try air_model.integerSwitchPlan(allocator, air_function) orelse return error.UnsupportedAir;
+    defer switch_plan.deinit(allocator);
 
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
@@ -374,7 +337,7 @@ pub fn lowerIntegerSwitch(
         .cases = .empty,
     };
     errdefer switch_term.cases.deinit(allocator);
-    for (arms.items, 0..) |arm, arm_index| {
+    for (switch_plan.arms, 0..) |arm, arm_index| {
         var value = arm.first;
         while (true) {
             const target = try ownPrint(module, "case{}_{}", .{ arm_index, value });
@@ -399,34 +362,10 @@ pub fn lowerIntegerSwitch(
     var default_block = ir.BasicBlock.init("default");
     default_block.terminator = .{ .ret = .{
         .ty = .{ .int = 32 },
-        .value = .{ .int = fallback },
+        .value = .{ .int = switch_plan.default_result },
     } };
     try function.blocks.append(allocator, default_block);
     return function;
-}
-
-fn parseSwitchRange(line: []const u8) ?SwitchRange {
-    if (std.mem.indexOf(u8, line, "@.zero_u8") != null) return .{ .first = 0, .last = 0 };
-    if (std.mem.indexOf(u8, line, "@.one_u8") != null) return .{ .first = 1, .last = 1 };
-    const first_marker = std.mem.indexOf(u8, line, "<u8, ") orelse return null;
-    const first_start = first_marker + "<u8, ".len;
-    const first_end = std.mem.indexOfScalarPos(u8, line, first_start, '>') orelse return null;
-    const first = std.fmt.parseInt(u8, std.mem.trim(u8, line[first_start..first_end], " "), 10) catch return null;
-    const range_marker = std.mem.indexOfPos(u8, line, first_end, "...<u8, ") orelse
-        return .{ .first = first, .last = first };
-    const last_start = range_marker + "...<u8, ".len;
-    const last_end = std.mem.indexOfScalarPos(u8, line, last_start, '>') orelse return null;
-    const last = std.fmt.parseInt(u8, std.mem.trim(u8, line[last_start..last_end], " "), 10) catch return null;
-    if (last < first) return null;
-    return .{ .first = first, .last = last };
-}
-
-fn parseSwitchBranchResult(line: []const u8) ?i32 {
-    if (std.mem.indexOf(u8, line, "br(") == null) return null;
-    const marker = std.mem.lastIndexOf(u8, line, "<i32, ") orelse return null;
-    const value_start = marker + "<i32, ".len;
-    const value_end = std.mem.indexOfScalarPos(u8, line, value_start, '>') orelse return null;
-    return std.fmt.parseInt(i32, std.mem.trim(u8, line[value_start..value_end], " "), 10) catch null;
 }
 
 pub fn conditionalSlotUpdateShape(function: air_export.Function) bool {

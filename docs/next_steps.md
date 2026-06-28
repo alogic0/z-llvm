@@ -398,8 +398,7 @@ Remaining selected recognizer ownership to normalize:
 
 | Rank | Current location | Duplicated parsing/checking | Target reusable helper |
 | --- | --- | --- | --- |
-| 1 | `src/zig_air_lowering_legacy.zig::lowerIntegerSwitch` | legacy AIR text line parsing for dense switch ranges and branch constants during IR construction | typed/model-owned switch summary with block targets, ranges, default, and terminal return values |
-| 2 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerer bodies | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
+| 1 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerer bodies | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
 
 This inventory is refactor-only: it does not expand accepted rows or weaken the
 strict frontier counters. Each slice should move one recognizer family behind
@@ -427,10 +426,10 @@ Completed slices from this inventory:
   summary additionally records connected load and terminal return indexes; the
   legacy lowerer no longer owns optional opcode-presence admission.
 - Integer-switch compatibility admission now uses the model-owned
-  `integerSwitchSummary` helper. The legacy lowerer no longer owns the
-  block/switch/branch/default-shape predicate, but `lowerIntegerSwitch` still
-  parses AIR text lines for range and branch-result extraction; that is the
-  next switch cleanup slice.
+  `integerSwitchSummary` helper, and integer-switch construction now consumes
+  a model-owned `integerSwitchPlan` for parsed case ranges, branch result
+  values, and default result. The legacy lowerer no longer owns the
+  block/switch/branch/default predicate or dense-switch range/result parsing.
 - Aggregate/store/return selected recognizers now use model-owned return,
   store, memory-op, return-pointer, and field-index presence helpers. The
   aggregate pair/read/make compatibility recognizers now use model-owned
@@ -469,8 +468,6 @@ Completed slices from this inventory:
 - Current scan status: `src/zig_air_lowering_legacy.zig` has no
   function-name-specific accepted recognizer gates for the aggregate,
   error/switch, table-lookup, runtime-wrapper, or panic-edge selected shapes.
-  The remaining switch debt is not admission but `lowerIntegerSwitch` AIR-text
-  result extraction for dense ranges and branch constants.
   Compatibility runtime-wrapper lowerer bodies still emit fixed helper/global
   symbol names even though admission is now model/data-flow owned.
 - Accepted model summaries are now fail-closed on terminal value paths:

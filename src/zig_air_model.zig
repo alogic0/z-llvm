@@ -743,6 +743,27 @@ pub const IntegerSwitchSummary = struct {
     has_default_arm_text: bool,
 };
 
+pub const IntegerSwitchArm = struct {
+    first: u8,
+    last: u8,
+    result: i32,
+};
+
+const IntegerSwitchRange = struct {
+    first: u8,
+    last: u8,
+};
+
+pub const IntegerSwitchPlan = struct {
+    switch_br: u32,
+    arms: []IntegerSwitchArm,
+    default_result: i32,
+
+    pub fn deinit(self: IntegerSwitchPlan, allocator: std.mem.Allocator) void {
+        allocator.free(self.arms);
+    }
+};
+
 pub const PointerSliceAddressSummary = struct {
     ptr_add_count: usize = 0,
     ptr_sub_count: usize = 0,
@@ -1208,6 +1229,70 @@ pub fn integerSwitchSummary(function: air_export.Function) ?IntegerSwitchSummary
 
 pub fn selectedIntegerSwitchShape(function: air_export.Function) bool {
     return integerSwitchSummary(function) != null;
+}
+
+pub fn integerSwitchPlan(
+    allocator: std.mem.Allocator,
+    function: air_export.Function,
+) std.mem.Allocator.Error!?IntegerSwitchPlan {
+    const summary = integerSwitchSummary(function) orelse return null;
+    var arms: std.ArrayList(IntegerSwitchArm) = .empty;
+    errdefer arms.deinit(allocator);
+    var default_result: ?i32 = null;
+    var pending_range: ?IntegerSwitchRange = null;
+    var pending_default = false;
+    var lines = std.mem.splitScalar(u8, function.air_text, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " ");
+        if (std.mem.indexOf(u8, line, "=> {") != null) {
+            if (std.mem.indexOf(u8, line, "else => {") != null) {
+                pending_default = true;
+                pending_range = null;
+            } else if (parseIntegerSwitchRange(line)) |range| {
+                pending_range = range;
+                pending_default = false;
+            }
+        }
+        const result = parseIntegerSwitchBranchResult(line) orelse continue;
+        if (pending_default) {
+            default_result = result;
+            pending_default = false;
+        } else if (pending_range) |range| {
+            try arms.append(allocator, .{ .first = range.first, .last = range.last, .result = result });
+            pending_range = null;
+        }
+    }
+    const fallback = default_result orelse return null;
+    if (arms.items.len == 0) return null;
+    return .{
+        .switch_br = summary.switch_br,
+        .arms = try arms.toOwnedSlice(allocator),
+        .default_result = fallback,
+    };
+}
+
+fn parseIntegerSwitchRange(line: []const u8) ?IntegerSwitchRange {
+    if (std.mem.indexOf(u8, line, "@.zero_u8") != null) return .{ .first = 0, .last = 0 };
+    if (std.mem.indexOf(u8, line, "@.one_u8") != null) return .{ .first = 1, .last = 1 };
+    const first_marker = std.mem.indexOf(u8, line, "<u8, ") orelse return null;
+    const first_start = first_marker + "<u8, ".len;
+    const first_end = std.mem.indexOfScalarPos(u8, line, first_start, '>') orelse return null;
+    const first = std.fmt.parseInt(u8, std.mem.trim(u8, line[first_start..first_end], " "), 10) catch return null;
+    const range_marker = std.mem.indexOfPos(u8, line, first_end, "...<u8, ") orelse
+        return .{ .first = first, .last = first };
+    const last_start = range_marker + "...<u8, ".len;
+    const last_end = std.mem.indexOfScalarPos(u8, line, last_start, '>') orelse return null;
+    const last = std.fmt.parseInt(u8, std.mem.trim(u8, line[last_start..last_end], " "), 10) catch return null;
+    if (last < first) return null;
+    return .{ .first = first, .last = last };
+}
+
+fn parseIntegerSwitchBranchResult(line: []const u8) ?i32 {
+    if (std.mem.indexOf(u8, line, "br(") == null) return null;
+    const marker = std.mem.lastIndexOf(u8, line, "<i32, ") orelse return null;
+    const value_start = marker + "<i32, ".len;
+    const value_end = std.mem.indexOfScalarPos(u8, line, value_start, '>') orelse return null;
+    return std.fmt.parseInt(i32, std.mem.trim(u8, line[value_start..value_end], " "), 10) catch null;
 }
 
 pub fn aggregateMakePairSummary(function: air_export.Function) ?AggregatePairSummary {
@@ -2381,7 +2466,7 @@ test "AIR model recognizes selected integer switch admission structurally" {
         .instruction_count = switch_instructions.len,
         .main_body_count = switch_instructions.len,
         .has_liveness = true,
-        .air_text = "switch_br %0\n  else => {\n    br(<i32, 20>)\n  }",
+        .air_text = "switch_br %0\n  <u8, 0> => {\n    br(<i32, 10>)\n  }\n  <u8, 1>...<u8, 3> => {\n    br(<i32, 11>)\n  }\n  else => {\n    br(<i32, 20>)\n  }",
         .structured_air_text = null,
         .structured_air = null,
         .structured_air_v2_text = null,
@@ -2394,6 +2479,17 @@ test "AIR model recognizes selected integer switch admission structurally" {
     try std.testing.expectEqual(@as(usize, 2), summary.branch_count);
     try std.testing.expect(summary.has_default_arm_text);
     try std.testing.expect(selectedIntegerSwitchShape(switch_function));
+    const plan = (try integerSwitchPlan(std.testing.allocator, switch_function)).?;
+    defer plan.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(u32, 2), plan.switch_br);
+    try std.testing.expectEqual(@as(i32, 20), plan.default_result);
+    try std.testing.expectEqual(@as(usize, 2), plan.arms.len);
+    try std.testing.expectEqual(@as(u8, 0), plan.arms[0].first);
+    try std.testing.expectEqual(@as(u8, 0), plan.arms[0].last);
+    try std.testing.expectEqual(@as(i32, 10), plan.arms[0].result);
+    try std.testing.expectEqual(@as(u8, 1), plan.arms[1].first);
+    try std.testing.expectEqual(@as(u8, 3), plan.arms[1].last);
+    try std.testing.expectEqual(@as(i32, 11), plan.arms[1].result);
 
     const missing_default = air_export.Function{
         .name = "not_named_integer_switch_without_default",
@@ -2409,6 +2505,7 @@ test "AIR model recognizes selected integer switch admission structurally" {
         .instructions = @constCast(&switch_instructions),
     };
     try std.testing.expect(integerSwitchSummary(missing_default) == null);
+    try std.testing.expect((try integerSwitchPlan(std.testing.allocator, missing_default)) == null);
 }
 
 test "AIR model recognizes selected optional shapes structurally" {
