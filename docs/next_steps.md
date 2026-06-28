@@ -400,8 +400,7 @@ Remaining selected recognizer ownership to normalize:
 | --- | --- | --- | --- |
 | 1 | `src/zig_air_lowering_legacy.zig::isIntegerSwitchBlock` and `lowerIntegerSwitch` | legacy AIR text line parsing for dense switch ranges and branch constants | typed/model-owned switch summary with block targets, ranges, default, and terminal return values |
 | 2 | `src/zig_air_lowering_legacy.zig` optional/slice/packed predicates | opcode-presence sets for optional pointer/payload, slice sum, packed read/replace, and array/struct sum predicates | normalized typed-AIR CFG/value summaries and aggregate/pointer helpers consumed by generic CFG lowering |
-| 3 | `src/zig_air_lowering_legacy.zig` array/struct aggregate predicates | selected load/add/field-count checks and local payload prefix checks for `i32` loads | aggregate layout/query helpers shared by typed-v2 aggregate construction, copy planning, and legacy compatibility predicates |
-| 4 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerers | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
+| 3 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerers | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
 
 This inventory is refactor-only: it does not expand accepted rows or weaken the
 strict frontier counters. Each slice should move one recognizer family behind
@@ -428,6 +427,10 @@ Completed slices from this inventory:
   aggregate pair/read/make compatibility recognizers now use model-owned
   structural summaries instead of `.pair_first`, `.pairFirst`, `.make_pair`,
   or `.makePair` suffix gates.
+- Array/struct aggregate-sum compatibility predicates now use model-owned
+  `arraySumSummary` and `structSumSummary` helpers. The legacy lowerer no
+  longer parses aggregate-init payload text, field-index presence, `i32` load
+  payload prefixes, or add/load counts locally for those selected rows.
 - Base64 table lookup, runtime optional-pointer wrapper, runtime
   pointer-load/store wrapper, and mixed C/Zig add-may-panic compatibility
   recognizers now use model-owned structural summaries. Legacy recognizer
@@ -449,10 +452,9 @@ Completed slices from this inventory:
   function-name-specific accepted recognizer gates for the aggregate,
   error/switch, table-lookup, runtime-wrapper, or panic-edge selected shapes.
   Remaining presence-based compatibility predicates are integer-switch text
-  parsing, optional pointer/payload, slice sum, packed read/replace, and
-  array/struct aggregate sum checks. Compatibility runtime-wrapper lowerer
-  bodies still emit fixed helper/global symbol names even though admission is
-  now model/data-flow owned.
+  parsing, optional pointer/payload, slice sum, and packed read/replace.
+  Compatibility runtime-wrapper lowerer bodies still emit fixed helper/global
+  symbol names even though admission is now model/data-flow owned.
 - Accepted model summaries are now fail-closed on terminal value paths:
   maybe-error, error-switch, error-classify, runtime optional-pointer wrapper,
   and runtime pointer load/store summaries require a proven terminal return or

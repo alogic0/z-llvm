@@ -696,6 +696,20 @@ pub const AggregatePairSummary = struct {
     return_value: u32,
 };
 
+pub const ArraySumSummary = struct {
+    aggregate_init: u32,
+    elem_ptr_count: usize,
+    load_count: usize,
+    add_count: usize,
+};
+
+pub const StructSumSummary = struct {
+    field0_ptr: u32,
+    field1_ptr: u32,
+    load_count: usize,
+    add_count: usize,
+};
+
 pub const PointerSliceAddressSummary = struct {
     ptr_add_count: usize = 0,
     ptr_sub_count: usize = 0,
@@ -923,6 +937,79 @@ pub fn aggregatePairFirstSummary(function: air_export.Function) ?AggregatePairSu
         };
     }
     return null;
+}
+
+pub fn arraySumSummary(function: air_export.Function) ?ArraySumSummary {
+    var aggregate_init: ?u32 = null;
+    var elem_ptr_count: usize = 0;
+    var load_count: usize = 0;
+    var add_count: usize = 0;
+    for (function.instructions) |instruction| {
+        if (air_capabilities.isAggregateInitOpcode(instruction.opcode)) {
+            if (aggregate_init != null or !selectedThreeI32AggregateInit(instruction)) return null;
+            aggregate_init = instruction.index;
+        } else if (air_capabilities.isPtrElemPtrOpcode(instruction.opcode)) {
+            elem_ptr_count += 1;
+        } else if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == .load) {
+            load_count += 1;
+        } else if (air_capabilities.isAddOpcodeFamily(instruction.opcode)) {
+            add_count += 1;
+        }
+    }
+    const init = aggregate_init orelse return null;
+    if (elem_ptr_count != 3 or load_count != 3 or add_count != 2) return null;
+    return .{
+        .aggregate_init = init,
+        .elem_ptr_count = elem_ptr_count,
+        .load_count = load_count,
+        .add_count = add_count,
+    };
+}
+
+fn selectedThreeI32AggregateInit(instruction: air_export.Instruction) bool {
+    return std.mem.indexOf(u8, instruction.payload, "[3]i32") != null and
+        std.mem.indexOf(u8, instruction.payload, "[%0!, %1!, %2!]") != null;
+}
+
+pub fn selectedArraySumShape(function: air_export.Function) bool {
+    return arraySumSummary(function) != null;
+}
+
+pub fn structSumSummary(function: air_export.Function) ?StructSumSummary {
+    const field_zero = functionFieldPtrIndex(function, 0) orelse return null;
+    const field_one = functionFieldPtrIndex(function, 1) orelse return null;
+    var i32_loads: usize = 0;
+    var adds: usize = 0;
+    for (function.instructions) |instruction| {
+        if (untypedLoadResultType(instruction)) |ty| {
+            if (std.mem.eql(u8, ty, "i32")) i32_loads += 1;
+        }
+        if (air_capabilities.isAddOpcodeFamily(instruction.opcode)) adds += 1;
+    }
+    if (i32_loads != 2 or adds != 1) return null;
+    return .{
+        .field0_ptr = field_zero,
+        .field1_ptr = field_one,
+        .load_count = i32_loads,
+        .add_count = adds,
+    };
+}
+
+fn functionFieldPtrIndex(function: air_export.Function, expected_index: usize) ?u32 {
+    for (function.instructions) |instruction| {
+        if (untypedFieldPtrIndex(instruction) == expected_index) return instruction.index;
+    }
+    return null;
+}
+
+fn untypedLoadResultType(instruction: air_export.Instruction) ?[]const u8 {
+    if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) != .load) return null;
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    return std.mem.trim(u8, fields.next() orelse return null, " ");
+}
+
+pub fn selectedStructSumShape(function: air_export.Function) bool {
+    return structSumSummary(function) != null;
 }
 
 pub fn aggregateMakePairSummary(function: air_export.Function) ?AggregatePairSummary {
@@ -2082,6 +2169,106 @@ test "AIR model reports semantic operation presence" {
 }
 
 test "AIR model recognizes selected aggregate shapes structurally" {
+    const array_sum_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "aggregate_init", .payload = "[3]i32, [%0!, %1!, %2!]", .category = .other },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "ptr_elem_ptr", .payload = "", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %1!", .category = .memory },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "ptr_elem_ptr", .payload = "", .category = .memory },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %3!", .category = .memory },
+        .{ .index = 5, .indent = 0, .unused = false, .opcode = "add", .payload = "%2!, %4!", .category = .other },
+        .{ .index = 6, .indent = 0, .unused = false, .opcode = "ptr_elem_ptr", .payload = "", .category = .memory },
+        .{ .index = 7, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %6!", .category = .memory },
+        .{ .index = 8, .indent = 0, .unused = false, .opcode = "add", .payload = "%5!, %7!", .category = .other },
+    };
+    const array_sum = air_export.Function{
+        .name = "not_named_array_sum",
+        .type_text = "fn () i32",
+        .instruction_count = array_sum_instructions.len,
+        .main_body_count = array_sum_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&array_sum_instructions),
+    };
+    const array_summary = arraySumSummary(array_sum).?;
+    try std.testing.expectEqual(@as(u32, 0), array_summary.aggregate_init);
+    try std.testing.expectEqual(@as(usize, 3), array_summary.elem_ptr_count);
+    try std.testing.expectEqual(@as(usize, 3), array_summary.load_count);
+    try std.testing.expectEqual(@as(usize, 2), array_summary.add_count);
+    try std.testing.expect(selectedArraySumShape(array_sum));
+
+    const bad_array_sum_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "aggregate_init", .payload = "[2]i32, [%0!, %1!]", .category = .other },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "ptr_elem_ptr", .payload = "", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %1!", .category = .memory },
+    };
+    const bad_array_sum = air_export.Function{
+        .name = "not_named_bad_array_sum",
+        .type_text = "fn () i32",
+        .instruction_count = bad_array_sum_instructions.len,
+        .main_body_count = bad_array_sum_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&bad_array_sum_instructions),
+    };
+    try std.testing.expect(arraySumSummary(bad_array_sum) == null);
+
+    const struct_sum_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_0", .payload = "%0!", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_1", .payload = "%0!", .category = .memory },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %2!", .category = .memory },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "add", .payload = "%1!, %3!", .category = .other },
+    };
+    const struct_sum = air_export.Function{
+        .name = "not_named_struct_sum",
+        .type_text = "fn () i32",
+        .instruction_count = struct_sum_instructions.len,
+        .main_body_count = struct_sum_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&struct_sum_instructions),
+    };
+    const struct_summary = structSumSummary(struct_sum).?;
+    try std.testing.expectEqual(@as(u32, 0), struct_summary.field0_ptr);
+    try std.testing.expectEqual(@as(u32, 2), struct_summary.field1_ptr);
+    try std.testing.expectEqual(@as(usize, 2), struct_summary.load_count);
+    try std.testing.expectEqual(@as(usize, 1), struct_summary.add_count);
+    try std.testing.expect(selectedStructSumShape(struct_sum));
+
+    const bad_struct_sum_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_0", .payload = "%0!", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "load", .payload = "i64, %0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_1", .payload = "%0!", .category = .memory },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "load", .payload = "i64, %2!", .category = .memory },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "add", .payload = "%1!, %3!", .category = .other },
+    };
+    const bad_struct_sum = air_export.Function{
+        .name = "not_named_bad_struct_sum",
+        .type_text = "fn () i64",
+        .instruction_count = bad_struct_sum_instructions.len,
+        .main_body_count = bad_struct_sum_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&bad_struct_sum_instructions),
+    };
+    try std.testing.expect(structSumSummary(bad_struct_sum) == null);
+
     const pair_first_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "alloc", .payload = "*struct", .category = .memory },
         .{ .index = 1, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_0", .payload = "%0!", .category = .memory },

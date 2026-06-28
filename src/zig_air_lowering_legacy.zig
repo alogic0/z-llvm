@@ -546,43 +546,11 @@ pub fn lowerConditionalSlotUpdate(
 }
 
 pub fn arraySumShape(function: air_export.Function) bool {
-    var aggregate_count: usize = 0;
-    var elem_ptr_count: usize = 0;
-    var load_count: usize = 0;
-    var add_count: usize = 0;
-    for (function.instructions) |instruction| {
-        if (air_capabilities.isAggregateInitOpcode(instruction.opcode)) {
-            aggregate_count += 1;
-            if (std.mem.indexOf(u8, instruction.payload, "[3]i32") == null or
-                std.mem.indexOf(u8, instruction.payload, "[%0!, %1!, %2!]") == null)
-            {
-                return false;
-            }
-        } else if (air_capabilities.isPtrElemPtrOpcode(instruction.opcode)) {
-            elem_ptr_count += 1;
-        } else if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == .load) {
-            load_count += 1;
-        } else if (air_capabilities.isAddOpcodeFamily(instruction.opcode)) {
-            add_count += 1;
-        }
-    }
-    return aggregate_count == 1 and elem_ptr_count == 3 and load_count == 3 and add_count == 2;
+    return air_model.selectedArraySumShape(function);
 }
 
 pub fn structSumShape(function: air_export.Function) bool {
-    const field_zero = air_model.functionHasFieldPtrIndex(function, 0);
-    const field_one = air_model.functionHasFieldPtrIndex(function, 1);
-    var i32_loads: usize = 0;
-    var adds: usize = 0;
-    for (function.instructions) |instruction| {
-        if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == .load and
-            std.mem.startsWith(u8, std.mem.trim(u8, instruction.payload, " "), "i32,"))
-        {
-            i32_loads += 1;
-        }
-        if (air_capabilities.isAddOpcodeFamily(instruction.opcode)) adds += 1;
-    }
-    return field_zero and field_one and i32_loads == 2 and adds == 1;
+    return air_model.selectedStructSumShape(function);
 }
 
 fn optionalPointerShape(function: air_export.Function) bool {
