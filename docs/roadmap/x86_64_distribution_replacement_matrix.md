@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=610`,
-`generic_codegen_functions=610`, `generic_cfg_functions=610`,
+three release modes at `source_rows=13`, `discovered_functions=617`,
+`generic_codegen_functions=617`, `generic_cfg_functions=617`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=610`, `object_failures=0`,
+`object_emitted_functions=617`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -446,10 +446,14 @@ baselines are split by corpus topology: broad is inputs + integrated,
 expanded adds `test/zig/expanded`, scale adds `test/zig/scale`, and frontier
 is isolated to `test/zig/frontier`. The frontier pointer/slice proof now covers
 runtime and comptime `ptr_add`, chained `ptr_add`, `slice_len`, `slice_ptr`,
-`ptr_slice_ptr_ptr`, `slice_elem_ptr`, and load/store through derived i32
-pointers. The `slice_elem_ptr` rows intentionally disable runtime safety to
-prove pointer-address lowering across all release modes; checked
-slice-element bounds CFG remains future safety-edge work. The selected
+`ptr_slice_ptr_ptr`, `slice_elem_ptr`, and load/store through derived scalar
+pointers. A reusable typed address model now carries base pointer, optional
+dynamic index, constant byte offset, scalar width, and element-size checks for
+i8, i16, i32, and i64 loads/stores. The accepted `slice_elem_ptr` rows
+intentionally disable runtime safety to prove pointer-address lowering across
+all release modes; the checked slice-element row is source-backed in the
+frontier boundary gate as `safety_edge_boundary_rows=1` until the checked
+bounds panic CFG is generalized for that shape. The selected
 slice-panic runtime-call row
 inside this proof now uses the release generic CFG slice runtime-call helper
 subset, deriving supported direct integer, `{ ptr, i64 }` aggregate-constant,
@@ -672,7 +676,7 @@ source-backed fail-closed varargs/vector/X87/packed aggregate/tail-call/callconv
 `varargs_boundary_rows=2`, `vector_boundary_rows=2`,
 `x87_boundary_rows=2`, `packed_aggregate_boundary_rows=2`,
 `tail_call_boundary_rows=1`, `callconv_boundary_rows=1`,
-`stack_pressure_boundary_rows=0`,
+`stack_pressure_boundary_rows=0`, `safety_edge_boundary_rows=1`,
 `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0`,
 while arbitrary non-selected sret/byval copies,
 full varargs/vector/X87/packed implementation, stack-passed live-value scheduling beyond the current selected model,

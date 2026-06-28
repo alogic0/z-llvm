@@ -51,11 +51,15 @@ compiler-core priority.
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
 `slice_elem_ptr`, runtime and comptime `ptr_add`, chained `ptr_add`,
 pointer-add-fed loads, pointer-add-fed stores, and load/store through derived
-slice element pointers. The `slice_elem_ptr` rows disable runtime safety inside
-the row so ReleaseSafe proves pointer-address lowering rather than adding
-another bounds-panic CFG shape; checked bounds panic ownership remains covered
-by `frontier_safety_edges.zig`, and broader checked slice-element CFG remains
-future work.
+slice element pointers. The x86_64 generic CFG path now uses a reusable typed
+address model with a base pointer, optional dynamic index, constant byte
+offset, scalar width, and conservative element-size checks. Accepted rows prove
+i8, i16, i32, and i64 scalar pointer loads/stores, including dynamic-index and
+constant-offset forms. The accepted `slice_elem_ptr` rows still disable runtime
+safety inside the row so ReleaseSafe proves pointer-address lowering rather
+than bounds-panic CFG ownership. The checked slice-element row is now a
+source-backed fail-closed safety-edge boundary until the checked bounds panic
+CFG is generalized for that shape.
 
 Current frontier ABI boundary seed:
 
@@ -65,25 +69,26 @@ Current frontier ABI boundary seed:
 - `test/zig/frontier_boundaries/frontier_packed_aggregate_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_tail_call_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_callconv_boundary.zig`
+- `test/zig/frontier_boundaries/frontier_checked_slice_boundary.zig`
 
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=610
-structured_functions=610
-generic_codegen_functions=610
-generic_cfg_functions=610
+discovered_functions=617
+structured_functions=617
+generic_codegen_functions=617
+generic_cfg_functions=617
 structural_matcher_functions=0
-structured_air_v2_functions=610
-typed_air_operand_functions=610
+structured_air_v2_functions=617
+typed_air_operand_functions=617
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=610
+generic_lowering_functions=617
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=610
+object_emitted_functions=617
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -121,8 +126,8 @@ Source-backed ABI boundary proof is green for all three modes through
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=6
-discovered_functions=10
+source_rows=7
+discovered_functions=11
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
@@ -130,6 +135,7 @@ packed_aggregate_boundary_rows=2
 tail_call_boundary_rows=1
 callconv_boundary_rows=1
 stack_pressure_boundary_rows=0
+safety_edge_boundary_rows=1
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -137,11 +143,14 @@ lld_rows=0
 local_fail=0
 ```
 
-These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 590-function strict frontier
-executable proof. Stack-pressure forwarding for the previous Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256
-indirect and stack-source rows is now accepted in the frontier corpus; the
-boundary gate keeps `stack_pressure_boundary_rows=0` as a regression guard.
+These boundary rows are expected unsupported source-backed ABI and safety-edge
+surfaces. They are not counted in the accepted 13-source / 617-function strict
+frontier executable proof. Stack-pressure forwarding for the previous
+Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 indirect and stack-source
+rows is now accepted in the frontier corpus; the boundary gate keeps
+`stack_pressure_boundary_rows=0` as a regression guard. Checked
+slice-element bounds CFG remains a targeted safety-edge boundary with
+`safety_edge_boundary_rows=1`.
 
 Executable ABI proof is green for all three modes:
 
@@ -191,11 +200,14 @@ Closed in the current memory/aggregate frontier slice:
 - selected nested extern-struct field GEP paths through
   `frontier_nested_field_left_b` and `frontier_nested_field_right_a`
 - selected dynamic/comptime/chained pointer addition and pointer-element GEP
-  loads/stores through `frontier_dynamic_ptr_add`,
-  `frontier_dynamic_ptr_pair_sum`, `frontier_comptime_ptr_add`,
-  `frontier_chained_ptr_add`, `frontier_ptr_add_store`,
-  `frontier_slice_ptr_load`, `frontier_slice_elem_ptr_load`, and
-  `frontier_slice_elem_ptr_store`
+  loads/stores through a reusable typed address model in
+  `frontier_dynamic_ptr_add`, `frontier_dynamic_ptr_pair_sum`,
+  `frontier_comptime_ptr_add`, `frontier_chained_ptr_add`,
+  `frontier_ptr_add_store`, `frontier_slice_ptr_load`,
+  `frontier_slice_elem_ptr_load`, `frontier_slice_elem_ptr_store`,
+  `frontier_ptr_add_load_u8`, `frontier_ptr_add_load_u16`,
+  `frontier_ptr_add_load_u64`, `frontier_ptr_add_store_u8`,
+  `frontier_ptr_add_store_u16`, and `frontier_ptr_add_store_u64`
 - branch-local global/TLS add/sub updates through
   `frontier_global_branch` and `frontier_tls_branch`
 - first SysV ABI closure-wave rows in `frontier_sysv_abi.zig`: small

@@ -214,7 +214,7 @@ Execution order:
    the legacy compatibility module reuses the model-owned opcode query helper
    instead of carrying its own duplicate implementation.
    The strict frontier gate was re-run after these refactors and still reports
-   `generic_cfg_functions=610`, `structural_matcher_functions=0`,
+   `generic_cfg_functions=617`, `structural_matcher_functions=0`,
    `legacy_air_text_lowering_functions=0`, and executable proof green across
    ReleaseFast, ReleaseSafe, and ReleaseSmall. The
    Zig type/function signature parsing and pointer-child text now live in
@@ -415,26 +415,31 @@ Completed slices from this inventory:
   `frontier_slice_pointer_arith` now exports real rows for runtime and
   comptime pointer addition, chained pointer addition, loads/stores through
   derived pointers, slice pointer extraction, slice element pointer
-  load/store, and slice length from a pointer-backed slice. These rows lower
-  through typed AIR v2 pointer/aggregate semantics, generic CFG pointer/slice
-  return/load/store codegen, z_llvm object emission, Zig native link, and
-  executable proof. This closes the selected frontier address forms only; the
-  `slice_elem_ptr` rows intentionally disable runtime safety so broader
-  checked bounds-panic CFG ownership remains a future safety-edge sub-slice.
+  load/store, and slice length from a pointer-backed slice. The x86_64 generic
+  CFG path now uses a reusable typed address model with base pointer, optional
+  dynamic index, constant byte offset, scalar width, and element-size checks;
+  accepted rows prove i8, i16, i32, and i64 scalar pointer loads/stores. These
+  rows lower through typed AIR v2 pointer/aggregate semantics, generic CFG
+  pointer/slice return/load/store codegen, z_llvm object emission, Zig native
+  link, and executable proof. This closes the selected frontier address forms
+  only; the accepted `slice_elem_ptr` rows intentionally disable runtime safety,
+  while the checked slice-element row is source-backed in the boundary gate as
+  `safety_edge_boundary_rows=1`.
 
 Validation after these refactor slices:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
-  ReleaseSmall all report `source_rows=13`, `discovered_functions=610`,
-  `generic_cfg_functions=610`, `structural_matcher_functions=0`,
+  ReleaseSmall all report `source_rows=13`, `discovered_functions=617`,
+  `generic_cfg_functions=617`, `structural_matcher_functions=0`,
   `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
-  `object_emitted_functions=610`, `native_link_accepted_rows=13`,
+  `object_emitted_functions=617`, `native_link_accepted_rows=13`,
   `executable_ok_rows=13`, and `local_fail=0`.
 - `zig build distribution-air-release-frontier-boundaries`: ReleaseFast,
   ReleaseSafe, and ReleaseSmall all report `varargs_boundary_rows=2`,
   `vector_boundary_rows=2`, `x87_boundary_rows=2`,
   `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
-  `callconv_boundary_rows=1`, `unexpected_accept_rows=0`,
+  `callconv_boundary_rows=1`, `safety_edge_boundary_rows=1`,
+  `unexpected_accept_rows=0`,
   `wrong_diagnostic_rows=0`, and `local_fail=0`.
 - `zig build test` and `git diff --check` pass.
 
@@ -941,12 +946,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=610`,
-`generic_codegen_functions=610`, `generic_cfg_functions=610`,
+frontier gate reports `source_rows=13`, `discovered_functions=617`,
+`generic_codegen_functions=617`, `generic_cfg_functions=617`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=610`, `object_failures=0`,
+`object_emitted_functions=617`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -959,9 +964,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=610`,
-`generic_cfg_functions=610`, `structural_matcher_functions=0`,
-`object_emitted_functions=610`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=617`,
+`generic_cfg_functions=617`, `structural_matcher_functions=0`,
+`object_emitted_functions=617`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -1069,9 +1074,11 @@ ReleaseSafe, and ReleaseSmall and currently reports `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
+`safety_edge_boundary_rows=1`,
 `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0` per
 mode. Varargs, vectors, X87/long double, packed/unaligned aggregates, tail
-calls, and non-default call conventions are therefore source-backed
+calls, non-default call conventions, and checked slice-element safety edges are
+therefore source-backed
 fail-closed boundaries, not vague docs-only gaps and not accepted executable
 proof. Stack-pressure byval forwarding is currently accepted for the Big80
 frontier rows, with the boundary counter held at zero as a regression guard.

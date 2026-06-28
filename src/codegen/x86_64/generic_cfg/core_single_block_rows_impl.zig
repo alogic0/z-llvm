@@ -119,12 +119,17 @@ const supportedAggregateCopyLeaf = cabi_aggregate_lowering.supportedAggregateCop
 const validateAggregateFieldGep = cabi_aggregate_lowering.validateAggregateFieldGep;
 
 pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 1) return false;
+    if (function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
     const single_ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
         .ret => |ret| ret,
         else => null,
     };
+    if (try lowerGenericCfgDynamicPointerLoadReturn(allocator, machine, function, block)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
         if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) {
             machine.codegen_path = .generic_cfg;
@@ -132,10 +137,6 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
         }
     }
     if (try lowerGenericCfgPointerSelectLoadReturn(allocator, machine, function, block)) {
-        machine.codegen_path = .generic_cfg;
-        return true;
-    }
-    if (try lowerGenericCfgDynamicPointerLoadReturn(allocator, machine, function, block)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
