@@ -760,10 +760,13 @@ table. The owned side now has 45 static source layout facts in
 `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar Big3..Big20
 rows and the 12 current Big32..Big256 array-leaf rows; those accepted aggregate
 rows no longer depend on the basename fallback table. Owned lookup now runs
-through a provider registry: generated inference first, then the current static
-source-fact provider. `AggregateLayoutSummary.provider_kind` records generated
-inference, static source-fact provider, or boundary-provider ownership
-directly. Owned summaries fail
+through a provider registry: exported aggregate layout facts first, generated
+inference second, then the temporary static source-fact provider. The exported
+fact contract is `zllvm-aggregate-layout-facts-v1` in
+`src/zig_air_exported_aggregate_layout_facts.zig`; the default provider is
+empty until sidecar ingestion is wired. `AggregateLayoutSummary.provider_kind`
+records exported-fact, generated-inference, static-source-fact, or
+boundary-provider ownership directly. Owned summaries fail
 closed if their field/leaf counts disagree with any remaining fallback
 equivalent. Remaining aggregate layout debt is explicit: the compatibility
 fallback table is empty, while static source facts still stand in for future

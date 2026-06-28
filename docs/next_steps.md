@@ -513,12 +513,16 @@ Aggregate/type-layout ownership start:
   exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
   static source facts, generated inference, fallback-table layouts, and
   boundary-owned layouts. Owned layout lookup goes through a provider registry:
-  generated inference first, then the static source-fact provider in
-  `src/zig_air_aggregate_layout_facts.zig`. That provider currently has 45
-  named facts and is now an explicit module to replace with exported Zig field
-  facts later. `AggregateLayoutSummary.provider_kind` records generated
-  inference, static source-fact provider, or boundary-provider ownership
-  directly. Generated inference
+  exported aggregate layout facts first, generated inference second, then the
+  temporary static source-fact provider in
+  `src/zig_air_aggregate_layout_facts.zig`. The exported fact contract lives in
+  `src/zig_air_exported_aggregate_layout_facts.zig` as
+  `zllvm-aggregate-layout-facts-v1`; sidecar ingestion is intentionally the
+  next slice, so the exported provider count is currently zero. The temporary
+  static provider currently has 45 named facts and exists only until equivalent
+  Zig-owned field facts are available. `AggregateLayoutSummary.provider_kind`
+  records exported-fact, generated-inference, static-source-fact, or
+  boundary-provider ownership directly. Generated inference
   covers the scalar-BigN rule for
   Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 and the large-BigN
   array-leaf rule covering Big32, Big40, Big48, Big64, Big80, Big81, Big96,
@@ -547,6 +551,12 @@ Aggregate/type-layout ownership start:
   - Generated inference before fallback table:
     the scalar-BigN rule for the current Big3..Big20 rows and the large-BigN
     array rule for BigN >= 32.
+  - Exported aggregate layout fact contract:
+    `src/zig_air_exported_aggregate_layout_facts.zig` defines
+    `zllvm-aggregate-layout-facts-v1`, exact nominal fact matching, aggregate
+    text, and construction/store/load evidence. The default provider is empty
+    until the sidecar ingestion slice wires checked-in facts into this
+    contract.
   - Remaining fallback-table compatibility entries:
     none.
   - Boundary-owned aggregate layouts:
@@ -606,8 +616,9 @@ Validation after these refactor slices is saved in
   `Pair` rule and exact runtime aggregate-pair symbol-name admission have been
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
   checks. `AggregateLayoutSummary` now records whether a layout came from
-  static source facts, generated inference, a boundary, or the compatibility
-  table; owned layout lookup now goes through a provider registry, and
+  exported aggregate facts, static source facts, generated inference, a
+  boundary, or the compatibility table; owned layout lookup now goes through a
+  provider registry, and
   `AggregateLayoutSummary.provider_kind` records the provider that supplied the
   layout so future exported Zig field facts can replace the static
   source-fact provider module without changing lowering callers. The generated

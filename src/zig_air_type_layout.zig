@@ -1,6 +1,7 @@
 const std = @import("std");
 const aggregate_layout_boundaries = @import("zig_air_aggregate_layout_boundaries.zig");
 const aggregate_layout_facts = @import("zig_air_aggregate_layout_facts.zig");
+const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const target = @import("target.zig");
@@ -53,6 +54,7 @@ pub const AggregateLayoutSummary = struct {
 };
 
 pub const AggregateLayoutProviderKind = enum {
+    exported_aggregate_facts,
     generated_inference,
     static_source_facts,
     boundary_provider,
@@ -63,6 +65,7 @@ const AggregateLayoutProvider = struct {
 
     fn lookup(provider: AggregateLayoutProvider, nominal: []const u8) ?AggregateLayoutSummary {
         return switch (provider.kind) {
+            .exported_aggregate_facts => exportedFactAggregateLayoutSummary(nominal),
             .generated_inference => generatedAggregateLayoutSummary(nominal),
             .static_source_facts => sourceFactAggregateLayoutSummary(nominal),
             .boundary_provider => null,
@@ -71,6 +74,7 @@ const AggregateLayoutProvider = struct {
 };
 
 const aggregate_layout_providers = [_]AggregateLayoutProvider{
+    .{ .kind = .exported_aggregate_facts },
     .{ .kind = .generated_inference },
     .{ .kind = .static_source_facts },
 };
@@ -162,6 +166,15 @@ fn generatedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary 
     if (inferredBigScalarLayoutSummary(nominal)) |summary| return withProviderKind(summary, .generated_inference);
     if (inferredBigArrayLayoutSummary(nominal)) |summary| return withProviderKind(summary, .generated_inference);
     return null;
+}
+
+fn exportedFactAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
+    const fact = exported_aggregate_layout_facts.empty_provider.lookup(nominal) orelse return null;
+    return withProviderKind(summarizeAggregateLayout(nominal, aggregate(fact.aggregate_text), .facts, .{
+        .construction = fact.evidence.construction,
+        .store = fact.evidence.store,
+        .load = fact.evidence.load,
+    }), .exported_aggregate_facts);
 }
 
 fn sourceFactAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
