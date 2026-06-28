@@ -65,6 +65,27 @@ const SourceAggregateLayoutFact = struct {
     },
 };
 
+const AggregateLayoutProviderKind = enum {
+    generated_inference,
+    static_source_facts,
+};
+
+const AggregateLayoutProvider = struct {
+    kind: AggregateLayoutProviderKind,
+
+    fn lookup(provider: AggregateLayoutProvider, nominal: []const u8) ?AggregateLayoutSummary {
+        return switch (provider.kind) {
+            .generated_inference => generatedAggregateLayoutSummary(nominal),
+            .static_source_facts => sourceFactAggregateLayoutSummary(nominal),
+        };
+    }
+};
+
+const aggregate_layout_providers = [_]AggregateLayoutProvider{
+    .{ .kind = .generated_inference },
+    .{ .kind = .static_source_facts },
+};
+
 pub const AggregateLayoutMismatch = struct {
     nominal_type_name: []const u8,
     inferred_field_count: usize,
@@ -142,11 +163,13 @@ fn aggregateLayoutSummaryForNominal(nominal: []const u8) error{AggregateLayoutMi
 }
 
 fn ownedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
-    if (inferredAggregateLayoutSummary(nominal)) |summary| return summary;
-    return sourceFactAggregateLayoutSummary(nominal);
+    for (aggregate_layout_providers) |provider| {
+        if (provider.lookup(nominal)) |summary| return summary;
+    }
+    return null;
 }
 
-fn inferredAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
+fn generatedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
     if (inferredBigScalarLayoutSummary(nominal)) |summary| return summary;
     if (inferredBigArrayLayoutSummary(nominal)) |summary| return summary;
     return null;

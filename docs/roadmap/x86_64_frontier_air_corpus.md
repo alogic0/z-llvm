@@ -87,7 +87,9 @@ scalar leaves, and construction/store/load evidence. The owned slice has 42
 static source layout facts plus generated `frontier_sysv_sret_byval.BigN`
 inference rules for the 9 scalar Big3..Big20 rows and the 12 current
 Big32..Big256 array-leaf rows; those rows no longer depend on the fallback
-table. Owned summaries are checked against any still-present fallback
+table. Owned lookup now runs through a provider registry: generated inference
+first, then the current static source-fact provider. Owned summaries are
+checked against any still-present fallback
 equivalent and fail closed on field/leaf-count mismatch. Remaining aggregate
 layout debt is explicit: the compatibility fallback table is empty, while
 static source facts still stand in for future Zig-exported field facts or

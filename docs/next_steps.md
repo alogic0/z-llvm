@@ -510,8 +510,11 @@ Aggregate/type-layout ownership start:
   lowerers now admit by normalized layout and data-flow structure instead of
   exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
   static source facts, generated inference, fallback-table layouts, and
-  boundary-owned layouts. The static source-fact table still has 42 named
-  facts. Generated inference covers the scalar-BigN rule for
+  boundary-owned layouts. Owned layout lookup goes through a provider registry:
+  generated inference first, then the current static source-fact provider. The
+  static source-fact table still has 42 named facts and is now an explicit
+  provider to replace with exported Zig field facts later. Generated inference
+  covers the scalar-BigN rule for
   Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 and the large-BigN
   array-leaf rule covering Big32, Big40, Big48, Big64, Big80, Big81, Big96,
   Big128, Big160, Big192, Big224, and Big256. The fallback table is empty; the
@@ -588,9 +591,11 @@ Validation after these refactor slices is saved in
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
   checks. `AggregateLayoutSummary` now records whether a layout came from
   static source facts, generated inference, a boundary, or the compatibility
-  table; the generated inference side has scalar-BigN and large-BigN rules,
-  and mismatch checking compares owned field/leaf counts against any remaining
-  fallback entry. Register aggregate construction now also has
+  table; owned layout lookup now goes through a provider registry so future
+  exported Zig field facts can replace the static source-fact provider without
+  changing lowering callers. The generated inference side has scalar-BigN and
+  large-BigN rules, and mismatch checking compares owned field/leaf counts
+  against any remaining fallback entry. Register aggregate construction now also has
   mechanical typed-AIR
   inference for ret_ptr/field-or-element pointer/store/ret_load rows, including
   single-field array leaf reconstruction; the same leaf/path validation now

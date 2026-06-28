@@ -758,7 +758,9 @@ static source facts, generated inference, a boundary, or the compatibility
 table. The owned side now has 42 static source layout facts plus generated
 `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar Big3..Big20
 rows and the 12 current Big32..Big256 array-leaf rows; those accepted aggregate
-rows no longer depend on the basename fallback table. Owned summaries fail
+rows no longer depend on the basename fallback table. Owned lookup now runs
+through a provider registry: generated inference first, then the current static
+source-fact provider. Owned summaries fail
 closed if their field/leaf counts disagree with any remaining fallback
 equivalent. Remaining aggregate layout debt is explicit: the compatibility
 fallback table is empty, while static source facts still stand in for future
