@@ -479,13 +479,18 @@ fn installTestExportedAggregateProvider() !exported_aggregate_layout_facts.Provi
         exported_aggregate_layout_facts.section_name ++ "\n" ++
         "fact nominal=\"frontier_nested_records.Inner\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_nested_records.Outer\" aggregate=\"{ { i32, i32 }, { i32, i32 } }\" construction=1 store=1 load=1\n" ++
-        "fact nominal=\"frontier_sysv_aggregate_classes.Pair32\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n";
+        "fact nominal=\"frontier_sysv_aggregate_classes.Pair32\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_aggregate_classes.Mixed\" aggregate=\"{ i64, double }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_aggregate_classes.ReverseMixed\" aggregate=\"{ double, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_aggregate_classes.DoublePair\" aggregate=\"{ double, double }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_aggregate_classes.FloatPair\" aggregate=\"{ float, float }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_aggregate_classes.FloatArray\" aggregate=\"{ [4 x float] }\" construction=1 store=1 load=1\n";
     return exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
 }
 
 test "type layout decodes nominal aggregate basenames without fixture module names" {
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, double }" }, parseNamedAggregateType("any_module.Mixed").?);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, double }" }, parseNamedAggregateType("%Mixed").?);
+    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, i64 }" }, parseNamedAggregateType("any_module.Pair64").?);
+    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, i64 }" }, parseNamedAggregateType("%Pair64").?);
     try std.testing.expect(parseNamedAggregateType("*frontier_sysv_aggregate_classes.Mixed") == null);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ [2 x double] }" }, parseNamedAggregateType("frontier_sysv_aggregate_classes.ArrayDouble").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }, parseNamedAggregateType("other.NestedPair").?);
@@ -514,9 +519,9 @@ test "type layout prefers exported facts and inference before fallback table" {
 
     try std.testing.expect(aggregateLayoutSummary("other.Outer") == null);
 
-    const mixed = aggregateLayoutSummary("any_module.Mixed").?;
-    try std.testing.expectEqual(AggregateLayoutSource.facts, mixed.source);
-    try std.testing.expect(aggregateLayoutMismatch("any_module.Mixed") == null);
+    const array_double = aggregateLayoutSummary("any_module.ArrayDouble").?;
+    try std.testing.expectEqual(AggregateLayoutSource.facts, array_double.source);
+    try std.testing.expect(aggregateLayoutMismatch("any_module.ArrayDouble") == null);
 }
 
 test "type layout prefers active exported facts before temporary static source facts" {
@@ -534,14 +539,14 @@ test "type layout prefers active exported facts before temporary static source f
 test "type layout fails closed when exported fact conflicts with lower-priority evidence" {
     const contents =
         exported_aggregate_layout_facts.section_name ++ "\n" ++
-        "fact nominal=\"Mixed\" aggregate=\"{ i64, i64 }\" construction=1 store=1 load=1\n";
+        "fact nominal=\"Pair64\" aggregate=\"{ i64, double }\" construction=1 store=1 load=1\n";
     const provider = try exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
     exported_aggregate_layout_facts.setActiveProvider(provider);
     defer provider.deinit(std.testing.allocator);
     defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
 
-    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("Mixed"));
-    const mismatch = aggregateLayoutMismatch("Mixed").?;
+    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("Pair64"));
+    const mismatch = aggregateLayoutMismatch("Pair64").?;
     try std.testing.expectEqual(@as(usize, 2), mismatch.inferred_leaf_count);
     try std.testing.expectEqual(@as(usize, 2), mismatch.fallback_leaf_count);
 }
@@ -564,6 +569,11 @@ test "type layout infers representative frontier aggregate rows" {
     try std.testing.expectEqual(AggregateLayoutSource.facts, pair32.source);
     try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, pair32.provider_kind.?);
     try std.testing.expect(pair32.ty.eql(.{ .aggregate = "{ i32, i32 }" }));
+
+    const exported_mixed = aggregateLayoutSummary("frontier_sysv_aggregate_classes.Mixed").?;
+    try std.testing.expectEqual(AggregateLayoutSource.facts, exported_mixed.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, exported_mixed.provider_kind.?);
+    try std.testing.expect(exported_mixed.ty.eql(.{ .aggregate = "{ i64, double }" }));
 
     const mixed = aggregateLayoutSummary("frontier_sysv_aggregate_classes.SmallMixed").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, mixed.source);
