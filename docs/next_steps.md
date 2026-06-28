@@ -399,7 +399,7 @@ Remaining selected recognizer ownership to normalize:
 | Rank | Current location | Duplicated parsing/checking | Target reusable helper |
 | --- | --- | --- | --- |
 | 1 | `src/zig_air_lowering_legacy.zig::isIntegerSwitchBlock` and `lowerIntegerSwitch` | legacy AIR text line parsing for dense switch ranges and branch constants | typed/model-owned switch summary with block targets, ranges, default, and terminal return values |
-| 2 | `src/zig_air_lowering_legacy.zig` optional/slice predicates | opcode-presence sets for optional pointer/payload and slice sum predicates | normalized typed-AIR CFG/value summaries and pointer helpers consumed by generic CFG lowering |
+| 2 | `src/zig_air_lowering_legacy.zig` optional predicates | opcode-presence sets for optional pointer/payload predicates | normalized typed-AIR CFG/value summaries and pointer helpers consumed by generic CFG lowering |
 | 3 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerers | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
 
 This inventory is refactor-only: it does not expand accepted rows or weaken the
@@ -436,6 +436,10 @@ Completed slices from this inventory:
   record the selected field pointer plus connected load/bitcast or store/trunc
   instruction indexes, so the legacy lowerer no longer owns the packed
   opcode-presence admission checks.
+- Slice-sum compatibility admission now uses the model-owned `sliceSumSummary`
+  helper. The summary records the selected slice construction, slice length
+  pointer, slice element pointer, and loop instruction indexes; the legacy
+  lowerer no longer owns the local slice opcode-presence check.
 - Base64 table lookup, runtime optional-pointer wrapper, runtime
   pointer-load/store wrapper, and mixed C/Zig add-may-panic compatibility
   recognizers now use model-owned structural summaries. Legacy recognizer
@@ -457,7 +461,7 @@ Completed slices from this inventory:
   function-name-specific accepted recognizer gates for the aggregate,
   error/switch, table-lookup, runtime-wrapper, or panic-edge selected shapes.
   Remaining presence-based compatibility predicates are integer-switch text
-  parsing, optional pointer/payload, and slice sum.
+  parsing and optional pointer/payload.
   Compatibility runtime-wrapper lowerer bodies still emit fixed helper/global
   symbol names even though admission is now model/data-flow owned.
 - Accepted model summaries are now fail-closed on terminal value paths:

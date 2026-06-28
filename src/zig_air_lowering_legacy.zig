@@ -11,7 +11,6 @@ const FunctionType = air_model.FunctionType;
 const parseFunctionType = air_types.parseFunctionType;
 const shortFunctionName = air_model.shortFunctionName;
 const ownPrint = air_model.ownPrint;
-const functionHasOpcode = air_model.functionHasOpcode;
 const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
 
@@ -571,10 +570,7 @@ fn errorUnionPayloadShape(function: air_export.Function) bool {
 }
 
 fn sliceSumShape(function: air_export.Function) bool {
-    return air_model.functionHasPointerAggregateOp(function, .slice) and
-        functionHasOpcode(function, "slice_elem_ptr") and
-        functionHasOpcode(function, "ptr_slice_len_ptr") and
-        functionHasOpcode(function, "loop");
+    return air_model.sliceSumSummary(function) != null;
 }
 
 fn packedReadFlagShape(function: air_export.Function) bool {

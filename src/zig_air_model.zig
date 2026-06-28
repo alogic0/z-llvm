@@ -719,6 +719,13 @@ pub const PackedFieldSummary = struct {
     store: ?u32 = null,
 };
 
+pub const SliceSumSummary = struct {
+    slice: u32,
+    slice_elem_ptr: u32,
+    ptr_slice_len_ptr: u32,
+    loop: u32,
+};
+
 pub const PointerSliceAddressSummary = struct {
     ptr_add_count: usize = 0,
     ptr_sub_count: usize = 0,
@@ -1060,6 +1067,34 @@ pub fn packedReplaceLowSummary(function: air_export.Function) ?PackedFieldSummar
 
 pub fn selectedPackedReplaceLowShape(function: air_export.Function) bool {
     return packedReplaceLowSummary(function) != null;
+}
+
+pub fn sliceSumSummary(function: air_export.Function) ?SliceSumSummary {
+    var slice: ?u32 = null;
+    var slice_elem_ptr: ?u32 = null;
+    var ptr_slice_len_ptr: ?u32 = null;
+    var loop: ?u32 = null;
+    for (function.instructions) |instruction| {
+        switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
+            .slice => slice = slice orelse instruction.index,
+            .slice_elem_ptr => slice_elem_ptr = slice_elem_ptr orelse instruction.index,
+            .slice_len_ptr => ptr_slice_len_ptr = ptr_slice_len_ptr orelse instruction.index,
+            .none, .runtime_nav_ptr, .array_elem_val, .field_ptr, .ptr_gep, .slice_ptr, .slice_ptr_ptr, .slice_len => {},
+        }
+        if (loop == null and std.mem.eql(u8, instruction.opcode, "loop")) {
+            loop = instruction.index;
+        }
+    }
+    return .{
+        .slice = slice orelse return null,
+        .slice_elem_ptr = slice_elem_ptr orelse return null,
+        .ptr_slice_len_ptr = ptr_slice_len_ptr orelse return null,
+        .loop = loop orelse return null,
+    };
+}
+
+pub fn selectedSliceSumShape(function: air_export.Function) bool {
+    return sliceSumSummary(function) != null;
 }
 
 pub fn aggregateMakePairSummary(function: air_export.Function) ?AggregatePairSummary {
@@ -2318,6 +2353,52 @@ test "AIR model recognizes selected aggregate shapes structurally" {
         .instructions = @constCast(&bad_struct_sum_instructions),
     };
     try std.testing.expect(structSumSummary(bad_struct_sum) == null);
+
+    const slice_sum_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "slice", .payload = "%arg0!, %arg1!", .category = .other },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "ptr_slice_len_ptr", .payload = "%0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "loop", .payload = "", .category = .control_flow },
+        .{ .index = 3, .indent = 1, .unused = false, .opcode = "slice_elem_ptr", .payload = "%0!, %idx!", .category = .memory },
+    };
+    const slice_sum = air_export.Function{
+        .name = "not_named_slice_sum",
+        .type_text = "fn ([*]const i32, usize) i32",
+        .instruction_count = slice_sum_instructions.len,
+        .main_body_count = slice_sum_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&slice_sum_instructions),
+    };
+    const slice_summary = sliceSumSummary(slice_sum).?;
+    try std.testing.expectEqual(@as(u32, 0), slice_summary.slice);
+    try std.testing.expectEqual(@as(u32, 1), slice_summary.ptr_slice_len_ptr);
+    try std.testing.expectEqual(@as(u32, 2), slice_summary.loop);
+    try std.testing.expectEqual(@as(u32, 3), slice_summary.slice_elem_ptr);
+    try std.testing.expect(selectedSliceSumShape(slice_sum));
+
+    const bad_slice_sum_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "slice", .payload = "%arg0!, %arg1!", .category = .other },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "ptr_slice_len_ptr", .payload = "%0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "slice_elem_ptr", .payload = "%0!, %idx!", .category = .memory },
+    };
+    const bad_slice_sum = air_export.Function{
+        .name = "not_named_bad_slice_sum",
+        .type_text = "fn ([*]const i32, usize) i32",
+        .instruction_count = bad_slice_sum_instructions.len,
+        .main_body_count = bad_slice_sum_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&bad_slice_sum_instructions),
+    };
+    try std.testing.expect(sliceSumSummary(bad_slice_sum) == null);
 
     const packed_read_flag_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_2", .payload = "%arg0!", .category = .memory },
