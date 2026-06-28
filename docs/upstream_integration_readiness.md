@@ -753,96 +753,19 @@ normalized field/leaf plan for pair admission and sret/byval aggregate copy
 and make planning. Typed-v2 register aggregate construction admission validates
 operands against the same plan before using typed AIR pointer paths for
 insertvalue indices, and SysV classification consumes the same normalized
-aggregate type. `AggregateLayoutSummary` now records whether a layout came from
-static source facts, a boundary, or the compatibility table. The owned side now
-has 66 exported sidecar facts and 0 temporary static source layout facts. The
-finite `frontier_sysv_sret_byval.BigN` rows are source-owned sidecar facts
-rather than generated nominal inference. Owned lookup now runs through a
-provider registry: exported aggregate layout facts first, then the temporary
-static source-fact provider. The exported
-fact contract is `zllvm-aggregate-layout-facts-v1` in
-`src/zig_air_exported_aggregate_layout_facts.zig`; gates now load checked-in
-sidecars for the source roots included by the selected corpus. Those sidecars
-own `aggregate_abi.Pair`, `runtime_aggregate_pair_main.Pair`,
-`expanded_abi_frontier.Pair`, `frontier_nested_records.Inner`,
-`frontier_nested_records.Outer`, `frontier_sysv_aggregate_classes.Pair32`,
-`frontier_sysv_aggregate_classes.Mixed`,
-`frontier_sysv_aggregate_classes.ReverseMixed`,
-`frontier_sysv_aggregate_classes.DoublePair`,
-`frontier_sysv_aggregate_classes.FloatPair`,
-`frontier_sysv_aggregate_classes.FloatArray`,
-`frontier_sysv_aggregate_classes.NestedPair`,
-`frontier_sysv_aggregate_classes.ArrayPair`,
-`frontier_sysv_aggregate_classes.ArrayDouble`,
-`frontier_sysv_aggregate_classes.DoubleBox`,
-`frontier_sysv_aggregate_classes.NestedDouble`,
-`frontier_sysv_aggregate_classes.NestedMixed`,
-`frontier_sysv_aggregate_classes.SmallMixed`,
-`frontier_sysv_aggregate_classes.SmallReverseMixed`,
-`frontier_sysv_abi.Pair64`,
-`frontier_sysv_sret_byval.NarrowInner`,
-`frontier_sysv_sret_byval.BigNested`,
-`frontier_sysv_sret_byval.BigMixed`,
-`frontier_sysv_sret_byval.BigNarrow`,
-`frontier_sysv_sret_byval.BigDouble`, and
-`frontier_sysv_sret_byval.BigFloat`,
-`frontier_sysv_sret_byval.BigArray`,
-`frontier_sysv_sret_byval.BigDoubleArray`,
-`frontier_sysv_sret_byval.BigFloatArray`,
-`frontier_sysv_sret_byval.BigPtrDouble`, and
-`frontier_sysv_sret_byval.BigPtrFloat`,
-`frontier_sysv_sret_byval.BigArrayMixed`,
-`frontier_sysv_sret_byval.BigNestedArrayMixed`,
-`frontier_sysv_sret_byval.MixedArrayLeaf`,
-`frontier_sysv_sret_byval.BigStructArrayMixed`, and
-`frontier_sysv_sret_byval.BigDeepMixed`,
-`frontier_sysv_sret_byval.BigByteTail`,
-`frontier_sysv_sret_byval.BigByteTail5`,
-`frontier_sysv_sret_byval.BigByteTail6`,
-`frontier_sysv_sret_byval.BigByteTail7`, and
-`frontier_sysv_sret_byval.BigWordTail`,
-`frontier_sysv_sret_byval.ScalarMixed`,
-`frontier_sysv_sret_byval.ScalarNestedInner`,
-`frontier_sysv_sret_byval.ScalarNested`, and
-`frontier_sysv_sret_byval.ScalarArray`,
-`frontier_sysv_sret_byval.Big3`,
-`frontier_sysv_sret_byval.Big4`,
-`frontier_sysv_sret_byval.Big5`,
-`frontier_sysv_sret_byval.Big6`,
-`frontier_sysv_sret_byval.Big7`,
-`frontier_sysv_sret_byval.Big8`,
-`frontier_sysv_sret_byval.Big12`,
-`frontier_sysv_sret_byval.Big16`,
-`frontier_sysv_sret_byval.Big20`,
-`frontier_sysv_sret_byval.Big32`,
-`frontier_sysv_sret_byval.Big40`,
-`frontier_sysv_sret_byval.Big48`,
-`frontier_sysv_sret_byval.Big64`,
-`frontier_sysv_sret_byval.Big80`,
-`frontier_sysv_sret_byval.Big81`,
-`frontier_sysv_sret_byval.Big96`,
-`frontier_sysv_sret_byval.Big128`,
-`frontier_sysv_sret_byval.Big160`,
-`frontier_sysv_sret_byval.Big192`,
-`frontier_sysv_sret_byval.Big224`, and
-`frontier_sysv_sret_byval.Big256`; those duplicate entries were
-removed from the temporary static provider after the strict frontier gate stayed
-green. The contract has fail-closed sidecar parsing and an active provider hook.
-The patched Zig stage4 emitter also writes the same
-`zllvm-aggregate-layout-facts-v1` contract directly into AIR descriptors for
-supported aggregate semantic layouts. z_llvm parses the optional
-`aggregate_layout_facts_bytes` section and gives descriptor facts precedence
-over checked-in sidecars, while sidecars remain temporary compatibility
-coverage until rows are retired from them with matching descriptor evidence.
-`AggregateLayoutSummary.provider_kind` records exported-fact,
-static-source-fact, or boundary-provider ownership
-directly. Exported facts are checked against lower-priority static or boundary
-evidence for the same nominal layout, and owned summaries fail closed if their
-field/leaf counts disagree with lower-priority static or boundary evidence.
-Remaining aggregate layout debt is explicit: the compatibility fallback table
-has been removed, and the temporary static source fact provider is empty.
-Packed/unaligned aggregate ABI remains a 2-row targeted boundary through
-`src/zig_air_aggregate_layout_boundaries.zig` rather than a fallback layout.
+aggregate type. `AggregateLayoutSummary` records descriptor-exported facts,
+sidecar-exported facts, static-source facts, or boundary-provider ownership.
+The compatibility fallback table has been removed, the temporary static source
+fact provider is empty, and the frontier sidecar is header-only. The patched
+Zig stage4 emitter writes `zllvm-aggregate-layout-facts-v1` directly into AIR
+descriptors for supported aggregate semantic layouts; z_llvm parses the
+optional `aggregate_layout_facts_bytes` section and gives descriptor facts
+precedence over compatibility sidecars. The current provider audit reports
+`exported_facts=3`, `static_source_facts=0`, `boundary_provider=2`, and
+`generated_examples=0`; the 3 sidecar facts are non-frontier compatibility
+coverage. Packed/unaligned aggregate ABI remains a 2-row targeted boundary
+through `src/zig_air_aggregate_layout_boundaries.zig` rather than a fallback
+layout.
 Register
 aggregate construction and sret/byval make rows now perform mechanical typed
 AIR inference from ret_ptr, field/element pointer stores, and ret_load before
