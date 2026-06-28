@@ -528,10 +528,11 @@ Aggregate/type-layout ownership start:
   Function-local typed AIR construction evidence now feeds register aggregate
   and sret/byval make admission: the inference path derives struct fields and
   single-field array leaves from concrete store paths, then validates that
-  derived layout against the shared plan. Register aggregate construction now
-  classifies and plans from that inferred layout first, so an otherwise
-  unknown nominal return type can be accepted when store paths mechanically
-  prove the aggregate shape. Sret/byval copy and call-wrapper
+  derived layout against the shared plan. Register aggregate construction and
+  direct sret aggregate make validation now classify/plan from that inferred
+  layout first, so an otherwise unknown nominal return type can be accepted
+  when store paths mechanically prove the aggregate shape. Sret/byval copy and
+  call-wrapper
   rows now add mechanical typed AIR path validation as well: copy rows must
   return the typed aggregate argument, while wrappers must pass that aggregate
   argument to the single call and return that call result.
@@ -615,10 +616,10 @@ Validation after these refactor slices is saved in
   against any remaining fallback entry. Register aggregate construction now also has
   mechanical typed-AIR
   inference for ret_ptr/field-or-element pointer/store/ret_load rows, including
-  single-field array leaf reconstruction; it classifies and plans from that
-  inferred layout before provider facts when the store paths prove the shape.
-  The same leaf/path validation now gates sret/byval make rows. Sret/byval copy
-  rows mechanically validate that
+  single-field array leaf reconstruction; register construction and direct sret
+  make validation classify and plan from that inferred layout before provider
+  facts when the store paths prove the shape. The same leaf/path validation now
+  gates sret/byval make rows. Sret/byval copy rows mechanically validate that
   the terminal return is the typed aggregate argument, and sret/byval
   call-wrapper rows validate that the aggregate argument feeds the call and the
   aggregate terminal return is produced by that call. The remaining nominal

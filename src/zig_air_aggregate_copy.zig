@@ -1,4 +1,5 @@
 const std = @import("std");
+const aggregate_construction = @import("zig_air_aggregate_construction.zig");
 const air_export = @import("zig_air_export.zig");
 const air_model = @import("zig_air_model.zig");
 const air_types = @import("zig_air_types.zig");
@@ -51,7 +52,8 @@ pub fn validateSretAggregateMakeRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    const plan = aggregateCopyLayoutPlan(function_type.return_type.ir_type) orelse return false;
+    const aggregate_ty = inferSretAggregateMakeType(function_type, structured_air_v2) orelse function_type.return_type.ir_type;
+    const plan = aggregateCopyLayoutPlan(aggregate_ty) orelse return false;
     const leaves = plan.leafSlice();
     if (leaves.len < 3 or leaves.len != function_type.params.len) return false;
     for (leaves, function_type.params) |leaf, param| {
@@ -77,7 +79,7 @@ pub fn validateSretAggregateMakeRecords(
         const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return false;
         var path: [4]usize = undefined;
         const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return false;
-        const leaf = type_layout.leafAtIndexPath(layout, function_type.return_type.ir_type, path[0..path_len]) orelse return false;
+        const leaf = type_layout.leafAtIndexPath(layout, plan.ty, path[0..path_len]) orelse return false;
         if (leaf.offset != leaves[arg_inst_index].offset or !leaf.ty.eql(leaves[arg_inst_index].ty)) return false;
         seen[arg_inst_index] = true;
     }
@@ -85,6 +87,42 @@ pub fn validateSretAggregateMakeRecords(
         if (!was_seen) return false;
     }
     return true;
+}
+
+fn inferSretAggregateMakeType(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?ir.Type {
+    if (function_type.return_type.ir_type != .aggregate or function_type.params.len == 0) return null;
+    if (function_type.params.len > max_mechanical_leaf_validation) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return null;
+    if (air_model.typedStoreOpcodeCount(structured_air_v2) != function_type.params.len) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return null;
+    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return null;
+    var stores: [max_mechanical_leaf_validation]aggregate_construction.StorePath = undefined;
+    var store_count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
+        if (store_count >= function_type.params.len) return null;
+        if (instruction.operands.len != 2) return null;
+        if (!std.mem.eql(u8, instruction.operands[1].kind, "inst")) return null;
+        const arg_inst_index = std.fmt.parseInt(usize, instruction.operands[1].value, 10) catch return null;
+        if (arg_inst_index >= function_type.params.len) return null;
+        const operand_type = parseZigType(instruction.operands[1].type_text) orelse return null;
+        if (!function_type.params[arg_inst_index].ir_type.eql(operand_type.ir_type)) return null;
+        const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
+        var path: [4]usize = undefined;
+        const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return null;
+        stores[store_count] = .{
+            .path = path,
+            .path_len = path_len,
+            .ty = operand_type.ir_type,
+        };
+        store_count += 1;
+    }
+    if (store_count != function_type.params.len) return null;
+    return aggregate_construction.inferAggregateTypeFromStorePaths(stores[0..store_count]);
 }
 
 pub fn validateSretAggregateCopyRecords(
@@ -251,6 +289,14 @@ test "aggregate copy validates sret make stores against layout leaves" {
     };
     const structured_air_v2 = air_export.StructuredAirV2{ .instructions = instructions[0..] };
     try std.testing.expect(validateSretAggregateMakeRecords(function_type, structured_air_v2));
+
+    const unknown_nominal_function_type = FunctionType{
+        .params = params[0..],
+        .return_type = .{ .ir_type = .{ .aggregate = "%AdHocBig3" } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    try std.testing.expect(validateSretAggregateMakeRecords(unknown_nominal_function_type, structured_air_v2));
 }
 
 test "aggregate copy validates returned aggregate argument" {

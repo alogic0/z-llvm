@@ -10,7 +10,7 @@ const type_layout = @import("zig_air_type_layout.zig");
 const FunctionType = air_model.FunctionType;
 const parseZigType = air_types.parseZigType;
 
-const StorePath = struct {
+pub const StorePath = struct {
     path: [4]usize = undefined,
     path_len: usize = 0,
     ty: ir.Type,
@@ -122,7 +122,7 @@ pub fn inferRegisterAggregateConstructionLayout(
     });
 }
 
-fn inferAggregateTypeFromStorePaths(stores: []const StorePath) ?ir.Type {
+pub fn inferAggregateTypeFromStorePaths(stores: []const StorePath) ?ir.Type {
     var max_top: usize = 0;
     for (stores) |store| {
         if (store.path_len == 0 or store.path_len > 2) return null;
