@@ -695,13 +695,11 @@ pub fn arraySumShape(function: air_export.Function) bool {
 }
 
 pub fn structSumShape(function: air_export.Function) bool {
-    var field_zero = false;
-    var field_one = false;
+    const field_zero = air_model.functionHasFieldPtrIndex(function, 0);
+    const field_one = air_model.functionHasFieldPtrIndex(function, 1);
     var i32_loads: usize = 0;
     var adds: usize = 0;
     for (function.instructions) |instruction| {
-        if (air_capabilities.isFieldPtrIndexOpcode(instruction.opcode, 0)) field_zero = true;
-        if (air_capabilities.isFieldPtrIndexOpcode(instruction.opcode, 1)) field_one = true;
         if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == .load and
             std.mem.startsWith(u8, std.mem.trim(u8, instruction.payload, " "), "i32,"))
         {
@@ -716,7 +714,7 @@ fn optionalPointerShape(function: air_export.Function) bool {
     return air_model.functionHasOptionalOp(function, .is_non_null) and
         air_model.functionHasOptionalOp(function, .optional_payload) and
         air_model.functionHasMemoryOp(function, .load) and
-        functionHasReturnOpcode(function);
+        air_model.functionHasReturnOp(function);
 }
 
 fn optionalPayloadShape(function: air_export.Function) bool {
@@ -745,26 +743,26 @@ fn packedReadFlagShape(function: air_export.Function) bool {
 }
 
 fn packedReplaceLowShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "struct_field_ptr_index_0") and
+    return air_model.functionHasFieldPtrIndex(function, 0) and
         functionHasOpcode(function, "trunc") and
-        functionHasStoreOpcode(function);
+        air_model.functionHasStoreOp(function);
 }
 
 fn aggregatePairFirstShape(function: air_export.Function) bool {
     return (std.mem.endsWith(u8, function.name, ".pair_first") or
         std.mem.endsWith(u8, function.name, ".pairFirst")) and
-        functionHasOpcode(function, "alloc") and
-        functionHasOpcode(function, "struct_field_ptr_index_0") and
-        functionHasOpcode(function, "load") and
-        functionHasReturnOpcode(function);
+        air_model.functionHasMemoryOp(function, .alloc) and
+        air_model.functionHasFieldPtrIndex(function, 0) and
+        air_model.functionHasMemoryOp(function, .load) and
+        air_model.functionHasReturnOp(function);
 }
 
 fn aggregateMakePairShape(function: air_export.Function) bool {
     return (std.mem.endsWith(u8, function.name, ".make_pair") or
         std.mem.endsWith(u8, function.name, ".makePair")) and
         functionHasOpcode(function, "ret_ptr") and
-        functionHasOpcode(function, "struct_field_ptr_index_0") and
-        functionHasOpcode(function, "struct_field_ptr_index_1") and
+        air_model.functionHasFieldPtrIndex(function, 0) and
+        air_model.functionHasFieldPtrIndex(function, 1) and
         functionHasOpcode(function, "ret_load");
 }
 
@@ -772,7 +770,7 @@ fn maybeErrorShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".maybeError") and
         functionHasOpcode(function, "cmp_neq") and
         functionHasOpcode(function, "cond_br") and
-        functionHasReturnOpcode(function);
+        air_model.functionHasReturnOp(function);
 }
 
 pub fn errorSwitchShape(function: air_export.Function) bool {
@@ -786,7 +784,7 @@ pub fn errorSwitchShape(function: air_export.Function) bool {
 pub fn errorClassifyShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".classify") and
         functionHasOpcode(function, "switch_br") and
-        functionHasReturnOpcode(function);
+        air_model.functionHasReturnOp(function);
 }
 
 pub fn base64TableLookupShape(function: air_export.Function) bool {
@@ -794,7 +792,7 @@ pub fn base64TableLookupShape(function: air_export.Function) bool {
         functionHasOpcode(function, "bit_and") and
         (functionHasOpcode(function, "intcast") or functionHasOpcode(function, "intcast_safe")) and
         functionHasOpcode(function, "array_elem_val") and
-        functionHasReturnOpcode(function);
+        air_model.functionHasReturnOp(function);
 }
 
 pub fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
@@ -803,7 +801,7 @@ pub fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
         functionHasOpcode(function, "cmp_eq") and
         functionHasOpcode(function, "block") and
         functionHasOpcode(function, "cond_br") and
-        functionHasReturnOpcode(function);
+        air_model.functionHasReturnOp(function);
 }
 
 pub fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
@@ -813,7 +811,7 @@ pub fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
         functionHasOpcode(function, "cmp_eq") and
         functionHasOpcode(function, "block") and
         functionHasOpcode(function, "cond_br") and
-        functionHasReturnOpcode(function);
+        air_model.functionHasReturnOp(function);
 }
 
 pub fn mixCAddMayPanicShape(function: air_export.Function) bool {
@@ -824,15 +822,7 @@ pub fn mixCAddMayPanicShape(function: air_export.Function) bool {
         functionHasOpcode(function, "unreach") and
         functionHasOpcode(function, "load") and
         (functionHasOpcode(function, "add") or functionHasOpcode(function, "add_safe")) and
-        functionHasReturnOpcode(function);
-}
-
-fn functionHasReturnOpcode(function: air_export.Function) bool {
-    return functionHasOpcode(function, "ret") or functionHasOpcode(function, "ret_safe");
-}
-
-fn functionHasStoreOpcode(function: air_export.Function) bool {
-    return functionHasOpcode(function, "store") or functionHasOpcode(function, "store_safe");
+        air_model.functionHasReturnOp(function);
 }
 
 pub fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {

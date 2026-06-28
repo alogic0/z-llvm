@@ -610,6 +610,24 @@ pub fn functionHasPointerAggregateOp(function: air_export.Function, op: air_capa
     return false;
 }
 
+pub fn functionHasReturnOp(function: air_export.Function) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.isReturnOpcode(instruction.opcode)) return true;
+    }
+    return false;
+}
+
+pub fn functionHasStoreOp(function: air_export.Function) bool {
+    return functionHasMemoryOp(function, .store);
+}
+
+pub fn functionHasFieldPtrIndex(function: air_export.Function, index: usize) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.isFieldPtrIndexOpcode(instruction.opcode, index)) return true;
+    }
+    return false;
+}
+
 pub const UntypedValueSource = union(enum) {
     int: i128,
     ref: u32,
@@ -1207,6 +1225,9 @@ test "AIR model reports semantic operation presence" {
         .{ .index = 3, .indent = 0, .unused = false, .opcode = "is_non_err", .payload = "", .category = .other },
         .{ .index = 4, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %0!", .category = .memory },
         .{ .index = 5, .indent = 0, .unused = false, .opcode = "slice", .payload = "", .category = .other },
+        .{ .index = 6, .indent = 0, .unused = false, .opcode = "store_safe", .payload = "%0!, %1!", .category = .memory },
+        .{ .index = 7, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_1", .payload = "", .category = .memory },
+        .{ .index = 8, .indent = 0, .unused = false, .opcode = "ret_safe", .payload = "%1!", .category = .return_op },
     };
     const function = air_export.Function{
         .name = "test.main",
@@ -1229,6 +1250,10 @@ test "AIR model reports semantic operation presence" {
     try std.testing.expect(functionHasErrorUnionOp(function, .is_non_err));
     try std.testing.expect(functionHasMemoryOp(function, .load));
     try std.testing.expect(functionHasPointerAggregateOp(function, .slice));
+    try std.testing.expect(functionHasStoreOp(function));
+    try std.testing.expect(functionHasFieldPtrIndex(function, 1));
+    try std.testing.expect(!functionHasFieldPtrIndex(function, 0));
+    try std.testing.expect(functionHasReturnOp(function));
 }
 
 test "AIR model parses untyped AIR value query shapes" {
