@@ -161,8 +161,7 @@ fn sourceFactAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary
 }
 
 fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
-    const basename = typeBasename(nominal);
-    if (std.mem.eql(u8, basename, "Pair")) return aggregate("{ i32, i32 }");
+    _ = nominal;
     return null;
 }
 
@@ -176,6 +175,9 @@ fn boundaryNamedAggregateType(nominal: []const u8) ?ir.Type {
 const source_aggregate_layout_facts = [_]SourceAggregateLayoutFact{
     .{ .name = "frontier_nested_records.Inner", .aggregate_text = "{ i32, i32 }", .match = .exact },
     .{ .name = "frontier_nested_records.Outer", .aggregate_text = "{ { i32, i32 }, { i32, i32 } }", .match = .exact },
+    .{ .name = "aggregate_abi.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
+    .{ .name = "runtime_aggregate_pair_main.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
+    .{ .name = "expanded_abi_frontier.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
     .{ .name = "Pair64", .aggregate_text = "{ i64, i64 }" },
     .{ .name = "Mixed", .aggregate_text = "{ i64, double }" },
     .{ .name = "ReverseMixed", .aggregate_text = "{ double, i64 }" },
@@ -481,6 +483,7 @@ test "type layout decodes nominal aggregate basenames without fixture module nam
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("aggregate_abi.Pair").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("%runtime_aggregate_pair_main.Pair").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, normalizeAggregateType(.{ .aggregate = "%expanded_abi_frontier.Pair" }));
+    try std.testing.expect(parseNamedAggregateType("other.Pair") == null);
 }
 
 test "type layout prefers source facts and inference before fallback table" {

@@ -760,10 +760,10 @@ table. The owned side now has 42 static source layout facts plus generated
 rows and the 12 current Big32..Big256 array-leaf rows; those accepted aggregate
 rows no longer depend on the basename fallback table. Owned summaries fail
 closed if their field/leaf counts disagree with any remaining fallback
-equivalent. Remaining aggregate layout debt is explicit: 1 compatibility
-fallback entry still stands in for future Zig-exported field layout facts or
-broader construction/store/load inference (`Pair`), and
-packed/unaligned aggregate ABI remains a 2-row targeted boundary rather than a
+equivalent. Remaining aggregate layout debt is explicit: the compatibility
+fallback table is empty, while static source facts still stand in for future
+Zig-exported field layout facts or broader construction/store/load inference.
+Packed/unaligned aggregate ABI remains a 2-row targeted boundary rather than a
 fallback layout. Register
 aggregate construction and sret/byval make rows now perform mechanical typed
 AIR inference from ret_ptr, field/element pointer stores, and ret_load before
