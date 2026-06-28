@@ -60,6 +60,23 @@ Prefer goals in this order:
 Do not choose docs-only work while clear implementation debt remains.
 Do not bundle unrelated goals into one commit.
 
+## Reference Policy
+
+This file controls worker goal selection and cycle mechanics. For detailed
+technical policy, use [development_cycle.md](development_cycle.md),
+especially:
+
+- evidence freshness;
+- validation scope;
+- compiler/stage4 selection;
+- linker ownership;
+- upstream LLVM mapping;
+- replacement matrix rules.
+
+If the two documents conflict, follow this file for active worker goal
+selection and cycle mechanics, and `development_cycle.md` for technical
+policy.
+
 ## Initial Target Policy
 
 The active replacement milestone is x86_64. Validate and claim progress only
@@ -165,6 +182,10 @@ Measurable forward progress means:
 - `boundary_unexpected_accept_rows` stays `0`;
 - `boundary_wrong_diagnostic_rows` stays `0`;
 - accepted rows use stronger ownership, not broader name matching.
+
+For non-aggregate cycles, report replacement-matrix movement instead:
+mode/target/stage/status before and after, fallback rows removed, boundary
+rows clarified, and focused gate health.
 
 Example cycle result:
 

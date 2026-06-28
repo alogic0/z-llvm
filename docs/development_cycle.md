@@ -8,7 +8,11 @@ from Zig's actual LLVM use: Zig-emitted IR, Zig's PassBuilder configuration,
 target/backend handoff requirements, or a measured gap in the current local
 replacement.
 
-For every future step that reproduces LLVM behavior, completion requires an upstream mapping before the step is committed.
+For every future step that reproduces LLVM behavior, completion requires an
+upstream mapping before the step is committed.
+
+`docs/working-cycle.md` may narrow this general policy for the active worker
+milestone. Use that file for worker cycle mechanics and active goal selection.
 
 ## Work Selection Priority
 
@@ -139,15 +143,18 @@ Use this ladder:
 6. zig build distribution-native-link-object-inspection -- --release-source-owned  # milestone object-boundary proof
 7. zig build distribution-native-link -- --release-source-owned  # milestone native-link executable proof
 8. zig build probe-native-linker -- --release-source-owned  # milestone native-link acceptance probe
+```
 
 For real AIR work, keep the loop source-driven and release-mode focused:
 
+```text
 1. export or run one source through `ZLLVM_AIR_EXPORT_PATH`
 2. run `zig build test`
 3. run `zig build distribution-zig-air-uncurated-releasefast` or
    `zig build distribution-zig-air-uncurated-releasesafe`
 4. run `zig build distribution-zig-air-uncurated-release` after a mode-shared
    AIR lowering change
+```
 
 The uncurated gate discovers `test/zig/inputs/*.zig`; it does not use selected
 case IDs or source-fact body classification. Its current hook contract is
@@ -155,15 +162,20 @@ case IDs or source-fact body classification. Its current hook contract is
 iterate in z_llvm unless that generic contract is missing a real compiler fact.
 Do not add `distribution-all`, ELF inspection, or native-link probes to this
 inner loop.
-9. zig build distribution-all          # milestone confirmation only
+
+For milestone confirmation only:
+
+```text
+zig build distribution-all
 ```
 
 Run step 5 only when the Zig hook contract or patched Zig source changed. Run
 steps 6-8 when confirming the full 100-row source-owned object/link boundary,
 not for ordinary row iteration; they check the patched stage4 hook and run
 `zig build` before object inspection or native-link handoff. Run
-step 9 only before handoff, before committing a broad evidence/matrix claim, or
-when a change affects several distribution gates at once.
+`distribution-all` only before handoff, before committing a broad
+evidence/matrix claim, or when a change affects several distribution gates at
+once.
 
 Do not rebuild stage4 for every row. Patch `../ziglang` only when the hook
 contract changes. The stable accepted hook emits generic `zllvm-source-facts-v1`
@@ -451,11 +463,12 @@ The mapping belongs in the relevant document:
 ```text
 docs/passes/<pass>.md
 docs/analysis/<analysis>.md
-docs/ir.md
-docs/codegen.md
+docs/ir_*.md
+docs/codegen/*.md
 ```
 
-If the upstream mapping is incomplete, the implementation can land only if the doc explicitly says what still needs to be checked.
+If the upstream mapping is incomplete, the implementation can land only if the
+doc explicitly says what still needs to be checked.
 
 ## LLVM-Shaped Fix Rule
 
