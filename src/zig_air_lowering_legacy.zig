@@ -5,6 +5,7 @@ const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
 const air_model = @import("zig_air_model.zig");
+const runtime_wrappers = @import("zig_air_runtime_wrappers.zig");
 const ir = @import("ir.zig");
 
 const FunctionType = air_model.FunctionType;
@@ -676,9 +677,9 @@ pub fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_functio
 
     var entry = ir.BasicBlock.init("0");
     errdefer entry.deinit(allocator);
-    var first_call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = "runtime_optional_pointer_main.optionalPtrValue", .calling_conv = "fastcc", .args = .empty };
+    var first_call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = runtime_wrappers.OptionalPointerMain.callee, .calling_conv = "fastcc", .args = .empty };
     errdefer first_call.deinit(allocator);
-    try first_call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = "@runtime_optional_pointer_main.value" } });
+    try first_call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = runtime_wrappers.OptionalPointerMain.value_global } });
     try entry.instructions.append(allocator, .{ .result = "first", .kind = .{ .call = first_call } });
     try entry.instructions.append(allocator, .{
         .result = "first.ok",
@@ -709,7 +710,7 @@ pub fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_functio
 
     var null_check = ir.BasicBlock.init("7");
     errdefer null_check.deinit(allocator);
-    var second_call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = "runtime_optional_pointer_main.optionalPtrValue", .calling_conv = "fastcc", .args = .empty };
+    var second_call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = runtime_wrappers.OptionalPointerMain.callee, .calling_conv = "fastcc", .args = .empty };
     errdefer second_call.deinit(allocator);
     try second_call.args.append(allocator, .{ .ty = .ptr, .value = .null_value });
     try null_check.instructions.append(allocator, .{ .result = "second", .kind = .{ .call = second_call } });
@@ -802,10 +803,10 @@ pub fn lowerRuntimePointerLoadStoreMain(allocator: std.mem.Allocator, air_functi
 
     var entry = ir.BasicBlock.init("0");
     errdefer entry.deinit(allocator);
-    var call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = "runtime_pointer_load_store_main.loadStore", .calling_conv = "fastcc", .args = .empty };
+    var call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = runtime_wrappers.PointerLoadStoreMain.callee, .calling_conv = "fastcc", .args = .empty };
     errdefer call.deinit(allocator);
-    try call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = "@runtime_pointer_load_store_main.input" } });
-    try call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = "@runtime_pointer_load_store_main.output" } });
+    try call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = runtime_wrappers.PointerLoadStoreMain.input_global } });
+    try call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = runtime_wrappers.PointerLoadStoreMain.output_global } });
     try entry.instructions.append(allocator, .{ .result = "call", .kind = .{ .call = call } });
     try entry.instructions.append(allocator, .{
         .result = "first.ok",
@@ -838,7 +839,7 @@ pub fn lowerRuntimePointerLoadStoreMain(allocator: std.mem.Allocator, air_functi
     errdefer output_check.deinit(allocator);
     try output_check.instructions.append(allocator, .{
         .result = "output",
-        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "@runtime_pointer_load_store_main.output" } } },
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = runtime_wrappers.PointerLoadStoreMain.output_global } } },
     });
     try output_check.instructions.append(allocator, .{
         .result = "output.ok",

@@ -454,9 +454,9 @@ Completed slices from this inventory:
   admission no longer depends on `.base64_table_lookup`,
   `runtime_optional_pointer_main.main`,
   `runtime_pointer_load_store_main.main`, or `.add_may_panic` names. The old
-  lowerer bodies still emit selected compatibility helper/global symbol names;
-  that is a separate runtime-symbol cleanup, not accepted recognizer
-  admission.
+  lowerer bodies still construct selected compatibility CFGs, but their
+  runtime wrapper callee/global symbol names are registry-owned in
+  `src/zig_air_runtime_wrappers.zig` rather than embedded at each use site.
 - The selected aggregate pair, error-switch/classify, maybe-error,
   error-union payload, table-lookup, runtime-wrapper, and panic-edge
   compatibility recognizers now use model-owned data-flow summaries rather
@@ -468,8 +468,9 @@ Completed slices from this inventory:
 - Current scan status: `src/zig_air_lowering_legacy.zig` has no
   function-name-specific accepted recognizer gates for the aggregate,
   error/switch, table-lookup, runtime-wrapper, or panic-edge selected shapes.
-  Compatibility runtime-wrapper lowerer bodies still emit fixed helper/global
-  symbol names even though admission is now model/data-flow owned.
+  Compatibility runtime-wrapper lowerer bodies still emit selected CFG shapes
+  even though admission is model/data-flow owned and helper/global symbol
+  spelling is centralized.
 - Accepted model summaries are now fail-closed on terminal value paths:
   maybe-error, error-switch, error-classify, runtime optional-pointer wrapper,
   and runtime pointer load/store summaries require a proven terminal return or
