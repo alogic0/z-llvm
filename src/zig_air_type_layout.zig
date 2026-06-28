@@ -162,7 +162,6 @@ fn sourceFactAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary
 
 fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
     const basename = typeBasename(nominal);
-    if (std.mem.eql(u8, basename, "Outer")) return aggregate("{ { i32, i32 }, { i32, i32 } }");
     if (std.mem.eql(u8, basename, "Pair")) return aggregate("{ i32, i32 }");
     if (std.mem.eql(u8, basename, "Inner")) return aggregate("{ i32, i32 }");
     return null;
@@ -495,9 +494,7 @@ test "type layout prefers source facts and inference before fallback table" {
     try std.testing.expect(outer.evidence.store);
     try std.testing.expect(outer.evidence.load);
 
-    const fallback_outer = aggregateLayoutSummary("other.Outer").?;
-    try std.testing.expectEqual(AggregateLayoutSource.fallback_table, fallback_outer.source);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }, fallback_outer.ty);
+    try std.testing.expect(aggregateLayoutSummary("other.Outer") == null);
 
     const mixed = aggregateLayoutSummary("any_module.Mixed").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, mixed.source);

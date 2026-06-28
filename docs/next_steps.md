@@ -284,8 +284,8 @@ Execution order:
    owned side now has 42 static source layout facts plus generated
    `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
    Big3..Big20 forms and the 12 current Big32..Big256 array-leaf rows. The
-   fallback side is reduced to 3 compatibility entries: `Outer`, `Pair`, and
-   `Inner`; `PackedMixed` and `PackedReverseMixed` are boundary-owned, not
+   fallback side is reduced to 2 compatibility entries: `Pair` and `Inner`;
+   `PackedMixed` and `PackedReverseMixed` are boundary-owned, not
    fallback-owned.
    Owned summaries are compared against any still-present compatibility
    fallback; a disagreement fails closed with nominal name, field-count,
@@ -516,7 +516,7 @@ Aggregate/type-layout ownership start:
   Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 and the large-BigN
   array-leaf rule covering Big32, Big40, Big48, Big64, Big80, Big81, Big96,
   Big128, Big160, Big192, Big224, and Big256. The fallback table is reduced to
-  3 compatibility entries; the 2 packed/unaligned entries are boundary-owned.
+  2 compatibility entries; the 2 packed/unaligned entries are boundary-owned.
   Function-local typed AIR construction evidence now feeds register aggregate
   and sret/byval make admission: the inference path derives struct fields and
   single-field array leaves from concrete store paths, then validates that
@@ -536,7 +536,7 @@ Aggregate/type-layout ownership start:
     the scalar-BigN rule for the current Big3..Big20 rows and the large-BigN
     array rule for BigN >= 32.
   - Remaining fallback-table compatibility entries:
-    `Outer`, `Pair`, and `Inner`.
+    `Pair` and `Inner`.
   - Boundary-owned aggregate layouts:
     `PackedMixed` and `PackedReverseMixed`.
   - `PackedMixed` and `PackedReverseMixed` stay boundary-owned until
