@@ -8,6 +8,20 @@ pub const AggregateLeaf = struct {
     ty: ir.Type,
 };
 
+pub const max_aggregate_layout_leaves = 64;
+
+pub const AggregateLayoutPlan = struct {
+    ty: ir.Type,
+    size_bytes: u64,
+    field_count: usize,
+    leaves: [max_aggregate_layout_leaves]AggregateLeaf = undefined,
+    leaf_count: usize = 0,
+
+    pub fn leafSlice(plan: *const AggregateLayoutPlan) []const AggregateLeaf {
+        return plan.leaves[0..plan.leaf_count];
+    }
+};
+
 pub fn parseNamedAggregateType(text: []const u8) ?ir.Type {
     const trimmed = std.mem.trim(u8, text, " ");
     if (isPointerOrSliceSurface(trimmed) or std.mem.startsWith(u8, trimmed, "fn ")) return null;
@@ -180,6 +194,20 @@ pub fn collectSupportedScalarLeaves(
     }
 }
 
+pub fn aggregateLayoutPlan(layout: target.DataLayout, aggregate_ty: ir.Type) !AggregateLayoutPlan {
+    const normalized_ty = normalizeAggregateType(aggregate_ty);
+    if (!isAggregateType(normalized_ty)) return error.UnsupportedCodegenAbi;
+    const count = fieldCount(normalized_ty);
+    if (count == 0) return error.UnsupportedCodegenAbi;
+    var plan = AggregateLayoutPlan{
+        .ty = normalized_ty,
+        .size_bytes = try layout.typeStoreSizeBytes(normalized_ty),
+        .field_count = count,
+    };
+    try collectSupportedScalarLeaves(layout, normalized_ty, 0, &plan.leaves, &plan.leaf_count);
+    return plan;
+}
+
 pub fn isAggregateType(ty: ir.Type) bool {
     return switch (ty) {
         .aggregate => true,
@@ -242,4 +270,16 @@ test "type layout owns aggregate field and leaf queries" {
     try std.testing.expectEqual(@as(u64, 8), fieldByteOffset(layout, ty, 1).?);
     try std.testing.expectEqual(@as(usize, 1), fieldIndexAtOffset(layout, ty, 8, .double).?);
     try std.testing.expectEqual(ir.Type.double, leafTypeAtOffset(layout, ty, 8).?);
+}
+
+test "type layout builds reusable aggregate layout plan" {
+    const layout = try target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    const plan = try aggregateLayoutPlan(layout, .{ .aggregate = "%runtime_aggregate_pair_main.Pair" });
+    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, plan.ty);
+    try std.testing.expectEqual(@as(usize, 2), plan.field_count);
+    try std.testing.expectEqual(@as(usize, 2), plan.leaf_count);
+    try std.testing.expectEqual(@as(u64, 0), plan.leafSlice()[0].offset);
+    try std.testing.expectEqual(@as(u64, 4), plan.leafSlice()[1].offset);
+    try std.testing.expect(plan.leafSlice()[0].ty.eql(.{ .int = 32 }));
+    try std.testing.expect(plan.leafSlice()[1].ty.eql(.{ .int = 32 }));
 }

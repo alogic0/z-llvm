@@ -271,8 +271,10 @@ Execution order:
    `Pair` now normalizes to the two-`i32` field layout, and the remaining
    runtime aggregate-pair compatibility lowerers admit rows from normalized
    layout plus construction/call/return data flow rather than exact runtime
-   aggregate-pair symbol names. Next work: fold the remaining sret/byval
-   aggregate construction decisions into one shared aggregate ABI plan and
+   aggregate-pair symbol names. `AggregateLayoutPlan` is now the normalized
+   field/leaf plan used by pair layout admission, while the SysV classifier
+   consumes the same normalized aggregate type. Next work: fold the remaining
+   sret/byval aggregate copy/construction decisions into the shared plan and
    replace the remaining nominal layout table with Zig-exported field facts
    when the AIR contract exposes them.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
@@ -478,10 +480,10 @@ Aggregate/type-layout ownership start:
   return lowering, sret/byval copies, and SysV ABI classification through
   object/native-link/executable proof across all release modes.
 - Remaining aggregate/type-layout debt is narrower and explicit: nominal `Pair`
-  is layout-owned as `{ i32, i32 }`, and the runtime aggregate-pair
-  compatibility lowerers now admit by normalized layout and data-flow structure
-  instead of exact aggregate-pair symbol names. Packed/unaligned aggregate ABI
-  stays a targeted fail-closed boundary with
+  is layout-owned as `{ i32, i32 }`, the runtime aggregate-pair compatibility
+  lowerers now admit by normalized layout and data-flow structure instead of
+  exact aggregate-pair symbol names. Packed/unaligned aggregate ABI stays a
+  targeted fail-closed boundary with
   `packed_aggregate_boundary_rows=2`.
 
 Validation after these refactor slices:
@@ -523,7 +525,9 @@ Validation after these refactor slices:
   construction still needs unification. The former centralized ambiguous
   `Pair` rule and exact runtime aggregate-pair symbol-name admission have been
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
-  checks.
+  checks. Remaining sret/byval copy planning still uses its proven recursive
+  walker until it can be folded into `AggregateLayoutPlan` without strict-gate
+  counter drift.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

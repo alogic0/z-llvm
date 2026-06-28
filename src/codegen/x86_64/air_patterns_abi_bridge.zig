@@ -1855,13 +1855,12 @@ fn lowerRuntimeAggregatePairMainReturn(
 }
 
 fn isTwoI32PairAggregate(ty: ir.Type) bool {
-    const normalized_ty = type_layout.normalizeAggregateType(ty);
     const layout = x86_64SysVDataLayout() catch return false;
-    return type_layout.fieldCount(normalized_ty) == 2 and
-        (type_layout.fieldType(normalized_ty, 0) orelse return false).eql(.{ .int = 32 }) and
-        (type_layout.fieldType(normalized_ty, 1) orelse return false).eql(.{ .int = 32 }) and
-        (type_layout.fieldByteOffset(layout, normalized_ty, 0) orelse return false) == 0 and
-        (type_layout.fieldByteOffset(layout, normalized_ty, 1) orelse return false) == 4;
+    const plan = type_layout.aggregateLayoutPlan(layout, ty) catch return false;
+    const leaves = plan.leafSlice();
+    return plan.field_count == 2 and leaves.len == 2 and
+        leaves[0].offset == 0 and leaves[0].ty.eql(.{ .int = 32 }) and
+        leaves[1].offset == 4 and leaves[1].ty.eql(.{ .int = 32 });
 }
 
 fn isSretPairSlotArg(arg: ir.CallArg, slot_name: []const u8) bool {

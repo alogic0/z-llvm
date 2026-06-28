@@ -76,10 +76,13 @@ the representative object/native-link/executable proof for the first slice.
 The follow-up slice removes the former ambiguous nominal `Pair` compatibility:
 nominal `Pair` is normalized as `{ i32, i32 }`, and runtime aggregate-pair
 compatibility lowerers admit by normalized layout plus construction/call/return
-data flow rather than exact aggregate-pair symbol names. Remaining aggregate
+data flow rather than exact aggregate-pair symbol names. `AggregateLayoutPlan`
+now supplies the shared normalized field/leaf plan for pair admission, and SysV
+classification consumes the same normalized aggregate type. Remaining aggregate
 layout debt is explicit: the broader nominal layout table still stands in for
-future Zig-exported field facts, and packed/unaligned aggregate ABI remains a
-targeted boundary row.
+future Zig-exported field facts, sret/byval copy planning still needs to fold
+into the shared plan without strict-gate drift, and packed/unaligned aggregate
+ABI remains a targeted boundary row.
 
 Current frontier ABI boundary seed:
 
