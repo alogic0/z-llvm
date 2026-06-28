@@ -29,3 +29,8 @@ fact nominal="frontier_sysv_sret_byval.BigNestedArrayMixed" aggregate="{ { [5 x 
 fact nominal="frontier_sysv_sret_byval.MixedArrayLeaf" aggregate="{ i32, double }" construction=1 store=1 load=1
 fact nominal="frontier_sysv_sret_byval.BigStructArrayMixed" aggregate="{ [3 x { i32, double }], i64 }" construction=1 store=1 load=1
 fact nominal="frontier_sysv_sret_byval.BigDeepMixed" aggregate="{ { { [5 x float] }, { [3 x double] }, ptr, i64 }, [2 x { i32, double }], { { i8, i16 }, i32, double, ptr }, [2 x ptr], i32 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigByteTail" aggregate="{ [17 x i8] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigByteTail5" aggregate="{ [21 x i8] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigByteTail6" aggregate="{ [22 x i8] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigByteTail7" aggregate="{ [23 x i8] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigWordTail" aggregate="{ [9 x i16] }" construction=1 store=1 load=1
