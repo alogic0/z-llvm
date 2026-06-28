@@ -266,12 +266,15 @@ Execution order:
    field counting, typed-v2 aggregate copy-leaf planning, typed-v2 register
    aggregate construction recognition, and the compatibility ABI bridge through
    shared aggregate field/leaf layout helpers. Typed-v2 register aggregate
-   eligibility now delegates to the x86_64 SysV aggregate classifier. Next
-   work: replace the remaining ambiguous nominal `Pair` compatibility rule and
-   runtime aggregate-pair compatibility lowerers with exported nominal field
-   layout facts or a fully structural aggregate construction/call summary, then
-   fold the remaining sret/byval aggregate construction decisions into one
-   shared aggregate ABI plan.
+   eligibility now delegates to the x86_64 SysV aggregate classifier. The
+   former ambiguous nominal `Pair` compatibility rule is removed: nominal
+   `Pair` now normalizes to the two-`i32` field layout, and the remaining
+   runtime aggregate-pair compatibility lowerers admit rows from normalized
+   layout plus construction/call/return data flow rather than exact runtime
+   aggregate-pair symbol names. Next work: fold the remaining sret/byval
+   aggregate construction decisions into one shared aggregate ABI plan and
+   replace the remaining nominal layout table with Zig-exported field facts
+   when the AIR contract exposes them.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
@@ -474,11 +477,11 @@ Aggregate/type-layout ownership start:
   `frontier_sysv_sret_byval.zig` continue to prove field access, construction,
   return lowering, sret/byval copies, and SysV ABI classification through
   object/native-link/executable proof across all release modes.
-- Remaining aggregate/type-layout debt is narrower and explicit: ambiguous
-  nominal `Pair` still has a compatibility rule until Zig exports field layout
-  facts for all nominal aggregates, and the runtime aggregate-pair compatibility
-  lowerers still contain selected symbol-name checks. Packed/unaligned
-  aggregate ABI stays a targeted fail-closed boundary with
+- Remaining aggregate/type-layout debt is narrower and explicit: nominal `Pair`
+  is layout-owned as `{ i32, i32 }`, and the runtime aggregate-pair
+  compatibility lowerers now admit by normalized layout and data-flow structure
+  instead of exact aggregate-pair symbol names. Packed/unaligned aggregate ABI
+  stays a targeted fail-closed boundary with
   `packed_aggregate_boundary_rows=2`.
 
 Validation after these refactor slices:
@@ -517,9 +520,10 @@ Validation after these refactor slices:
   through `src/zig_air_capabilities.zig`, `src/zig_air_model.zig`,
   `src/zig_air_aggregate_copy.zig`, `src/zig_air_aggregate_construction.zig`,
   and `src/codegen/x86_64/sysv_abi.zig`, while sret/byval aggregate
-  construction still needs unification. The remaining compatibility debt is the
-  centralized ambiguous `Pair` rule plus selected runtime aggregate-pair
-  lowerers that still use exact symbol names.
+  construction still needs unification. The former centralized ambiguous
+  `Pair` rule and exact runtime aggregate-pair symbol-name admission have been
+  replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
+  checks.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

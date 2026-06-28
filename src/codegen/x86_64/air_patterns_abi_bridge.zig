@@ -2,6 +2,7 @@ const std = @import("std");
 const air_capabilities = @import("../../zig_air_capabilities.zig");
 const ir = @import("../../ir.zig");
 const target = @import("../../target.zig");
+const type_layout = @import("../../zig_air_type_layout.zig");
 const x86_64_types = @import("types.zig");
 const sysv_abi = @import("sysv_abi.zig");
 const x86_64_verify = @import("verify.zig");
@@ -1818,7 +1819,6 @@ fn lowerRuntimeAggregatePairMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "runtime_aggregate_pair_main.main")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (try lowerRuntimeAggregatePairDirectMainReturn(allocator, machine, block, ret)) return true;
     if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 3) return false;
@@ -1835,34 +1835,72 @@ fn lowerRuntimeAggregatePairMainReturn(
         .alloca => |alloca| alloca,
         else => return false,
     };
-    if (!alloca.allocated_ty.eql(.{ .aggregate = "%runtime_aggregate_pair_main.Pair" })) return false;
+    if (!isTwoI32PairAggregate(alloca.allocated_ty)) return false;
 
     const make_pair = switch (make_pair_inst.kind) {
         .call => |call| call,
         else => return false,
     };
-    if (!callIsFastcc(make_pair.calling_conv) or make_pair.ret_ty != .void) return false;
-    if (make_pair.callee_value != null or make_pair.inline_asm != null) return false;
-    if (!std.mem.eql(u8, make_pair.callee, "runtime_aggregate_pair_main.makePair")) return false;
-    if (make_pair.args.items.len != 3) return false;
-    if (!make_pair.args.items[0].ty.eql(.ptr) or !callArgAttrsContain(make_pair.args.items[0], "sret(%runtime_aggregate_pair_main.Pair)") or
-        !isNamed(make_pair.args.items[0].value, pair_slot_name)) return false;
-    if (!make_pair.args.items[1].ty.eql(.{ .int = 32 }) or !isInt(make_pair.args.items[1].value, 1)) return false;
-    if (!make_pair.args.items[2].ty.eql(.{ .int = 32 }) or !isInt(make_pair.args.items[2].value, 2)) return false;
+    if (!isMakePairSretCall(make_pair, pair_slot_name)) return false;
 
     const pair_first = switch (pair_first_inst.kind) {
         .call => |call| call,
         else => return false,
     };
-    if (!callIsFastcc(pair_first.calling_conv) or !pair_first.ret_ty.eql(.{ .int = 32 })) return false;
-    if (pair_first.callee_value != null or pair_first.inline_asm != null) return false;
-    if (!std.mem.eql(u8, pair_first.callee, "runtime_aggregate_pair_main.pairFirst")) return false;
-    if (pair_first.args.items.len != 1) return false;
-    if (!pair_first.args.items[0].ty.eql(.ptr) or !isNamed(pair_first.args.items[0].value, pair_slot_name)) return false;
+    if (!isPairFirstPtrCall(pair_first, pair_slot_name)) return false;
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn isTwoI32PairAggregate(ty: ir.Type) bool {
+    const normalized_ty = type_layout.normalizeAggregateType(ty);
+    const layout = x86_64SysVDataLayout() catch return false;
+    return type_layout.fieldCount(normalized_ty) == 2 and
+        (type_layout.fieldType(normalized_ty, 0) orelse return false).eql(.{ .int = 32 }) and
+        (type_layout.fieldType(normalized_ty, 1) orelse return false).eql(.{ .int = 32 }) and
+        (type_layout.fieldByteOffset(layout, normalized_ty, 0) orelse return false) == 0 and
+        (type_layout.fieldByteOffset(layout, normalized_ty, 1) orelse return false) == 4;
+}
+
+fn isSretPairSlotArg(arg: ir.CallArg, slot_name: []const u8) bool {
+    return arg.ty.eql(.ptr) and callArgAttrsContain(arg, "sret(") and isNamed(arg.value, slot_name);
+}
+
+fn isSretPairParam(param: ir.Param) bool {
+    return param.ty.eql(.ptr) and paramAttrsContain(param, "sret(");
+}
+
+fn isMakePairSretCall(call: ir.CallInst, pair_slot_name: []const u8) bool {
+    return callIsFastcc(call.calling_conv) and call.ret_ty == .void and
+        call.callee_value == null and call.inline_asm == null and
+        call.args.items.len == 3 and
+        isSretPairSlotArg(call.args.items[0], pair_slot_name) and
+        call.args.items[1].ty.eql(.{ .int = 32 }) and isInt(call.args.items[1].value, 1) and
+        call.args.items[2].ty.eql(.{ .int = 32 }) and isInt(call.args.items[2].value, 2);
+}
+
+fn isMakePairI64Call(call: ir.CallInst) bool {
+    return callIsFastcc(call.calling_conv) and call.ret_ty.eql(.{ .int = 64 }) and
+        call.callee_value == null and call.inline_asm == null and
+        call.args.items.len == 2 and
+        call.args.items[0].ty.eql(.{ .int = 32 }) and isInt(call.args.items[0].value, 1) and
+        call.args.items[1].ty.eql(.{ .int = 32 }) and isInt(call.args.items[1].value, 2);
+}
+
+fn isPairFirstPtrCall(call: ir.CallInst, pair_slot_name: []const u8) bool {
+    return callIsFastcc(call.calling_conv) and call.ret_ty.eql(.{ .int = 32 }) and
+        call.callee_value == null and call.inline_asm == null and
+        call.args.items.len == 1 and
+        call.args.items[0].ty.eql(.ptr) and isNamed(call.args.items[0].value, pair_slot_name);
+}
+
+fn isPairFirstI64Call(call: ir.CallInst, pair_value_name: []const u8) bool {
+    return callIsFastcc(call.calling_conv) and call.ret_ty.eql(.{ .int = 32 }) and
+        call.callee_value == null and call.inline_asm == null and
+        call.args.items.len == 1 and
+        call.args.items[0].ty.eql(.{ .int = 64 }) and isNamed(call.args.items[0].value, pair_value_name);
 }
 
 fn lowerRuntimeAggregatePairDirectMainReturn(
@@ -1886,22 +1924,13 @@ fn lowerRuntimeAggregatePairDirectMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!callIsFastcc(make_pair.calling_conv) or !make_pair.ret_ty.eql(.{ .int = 64 })) return false;
-    if (make_pair.callee_value != null or make_pair.inline_asm != null) return false;
-    if (!std.mem.eql(u8, make_pair.callee, "runtime_aggregate_pair_main.makePair")) return false;
-    if (make_pair.args.items.len != 2) return false;
-    if (!make_pair.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(make_pair.args.items[0].value, 1)) return false;
-    if (!make_pair.args.items[1].ty.eql(.{ .int = 32 }) or !isInt(make_pair.args.items[1].value, 2)) return false;
+    if (!isMakePairI64Call(make_pair)) return false;
 
     const pair_first = switch (pair_first_inst.kind) {
         .call => |call| call,
         else => return false,
     };
-    if (!callIsFastcc(pair_first.calling_conv) or !pair_first.ret_ty.eql(.{ .int = 32 })) return false;
-    if (pair_first.callee_value != null or pair_first.inline_asm != null) return false;
-    if (!std.mem.eql(u8, pair_first.callee, "runtime_aggregate_pair_main.pairFirst")) return false;
-    if (pair_first.args.items.len != 1) return false;
-    if (!pair_first.args.items[0].ty.eql(.{ .int = 64 }) or !isNamed(pair_first.args.items[0].value, make_pair_name)) return false;
+    if (!isPairFirstI64Call(pair_first, make_pair_name)) return false;
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
@@ -1915,10 +1944,9 @@ fn lowerRuntimeAggregatePairMakePairReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "runtime_aggregate_pair_main.makePair")) return false;
     if (!callIsFastcc(function.calling_conv) or function.ret_ty != .void or ret.ty != .void) return false;
     if (function.params.items.len != 3) return false;
-    if (!function.params.items[0].ty.eql(.ptr) or !paramAttrsContain(function.params.items[0], "sret(%runtime_aggregate_pair_main.Pair)")) return false;
+    if (!isSretPairParam(function.params.items[0])) return false;
     if (!function.params.items[1].ty.eql(.{ .int = 32 }) or !function.params.items[2].ty.eql(.{ .int = 32 })) return false;
     if (block.instructions.items.len != 3) return false;
 
@@ -1968,7 +1996,6 @@ fn lowerRuntimeAggregatePairPairFirstReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "runtime_aggregate_pair_main.pairFirst")) return false;
     if (!callIsFastcc(function.calling_conv) or !function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.ptr)) return false;
     if (block.instructions.items.len != 3) return false;
@@ -1985,7 +2012,7 @@ fn lowerRuntimeAggregatePairPairFirstReturn(
         .alloca => |alloca| alloca,
         else => return false,
     };
-    if (!alloca.allocated_ty.eql(.{ .aggregate = "%runtime_aggregate_pair_main.Pair" })) return false;
+    if (!isTwoI32PairAggregate(alloca.allocated_ty)) return false;
 
     const memcpy_call = switch (memcpy_inst.kind) {
         .call => |call| call,

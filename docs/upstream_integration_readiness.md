@@ -744,11 +744,13 @@ aggregate decoding, field offsets, recursive leaf lookup, supported scalar-leaf
 collection, generic CFG aggregate field/copy lowering, and SysV aggregate
 classification now share `src/zig_air_type_layout.zig`. This preserves the
 strict 13-source / 626-function frontier executable proof while removing the
-former long fixture-path mapping block from `src/zig_air_types.zig`. Remaining
-aggregate layout debt is explicit: ambiguous nominal `Pair` compatibility still
-requires Zig-exported field layout facts or a structural aggregate summary, and
-runtime aggregate-pair compatibility lowerers still contain selected symbol
-checks.
+former long fixture-path mapping block from `src/zig_air_types.zig`. The
+follow-up removes the former ambiguous nominal `Pair` compatibility rule:
+nominal `Pair` normalizes as `{ i32, i32 }`, and runtime aggregate-pair
+compatibility lowerers now admit by normalized layout and data-flow structure
+rather than exact symbol names. Remaining aggregate layout debt is explicit:
+the broader nominal layout table still stands in for future Zig-exported field
+layout facts, and packed/unaligned aggregate ABI remains a targeted boundary.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

@@ -52,7 +52,8 @@ pub fn classifyAggregateForTest(ty: ir.Type) !AggregateClassification {
 }
 
 pub fn classifyAggregate(ty: ir.Type) !AggregateClassification {
-    switch (ty) {
+    const normalized_ty = type_layout.normalizeAggregateType(ty);
+    switch (normalized_ty) {
         .aggregate => |text| {
             const trimmed = std.mem.trim(u8, text, " \t");
             if (std.mem.startsWith(u8, trimmed, "<{")) return .{ .kind = .memory };
@@ -60,10 +61,10 @@ pub fn classifyAggregate(ty: ir.Type) !AggregateClassification {
         else => {},
     }
     const layout = try dataLayout();
-    const size = try layout.typeStoreSizeBytes(ty);
+    const size = try layout.typeStoreSizeBytes(normalized_ty);
     if (size == 0 or size > 16) return .{ .kind = .memory, .size_bytes = size };
 
-    const classification = try classifyAggregateSized(layout, ty, size);
+    const classification = try classifyAggregateSized(layout, normalized_ty, size);
     return if (classification.kind == .register and classification.eightbyte_count == 0)
         .{ .kind = .memory, .size_bytes = size }
     else

@@ -59,20 +59,16 @@ pub fn parseNamedAggregateType(text: []const u8) ?ir.Type {
     if (std.mem.eql(u8, basename, "ScalarNested")) return aggregate("{ { i8, i16 }, i32, double, ptr }");
     if (std.mem.eql(u8, basename, "ScalarArray")) return aggregate("{ [3 x i32], [2 x double], ptr }");
 
-    // Pair has two current ABI meanings. Keep this ambiguity explicit until
-    // Zig exports nominal field layout facts for all source-owned aggregates.
-    if (std.mem.eql(u8, basename, "Pair")) {
-        if (std.mem.indexOf(u8, trimmed, "aggregate_abi.") != null or
-            std.mem.indexOf(u8, trimmed, "runtime_aggregate_pair_main.") != null or
-            std.mem.indexOf(u8, trimmed, "expanded_records_memory.") != null or
-            std.mem.indexOf(u8, trimmed, "expanded_abi_frontier.") != null)
-        {
-            return .{ .int = 64 };
-        }
-        return aggregate("{ i32, i32 }");
-    }
+    if (std.mem.eql(u8, basename, "Pair")) return aggregate("{ i32, i32 }");
     if (std.mem.eql(u8, basename, "Inner")) return aggregate("{ i32, i32 }");
     return null;
+}
+
+pub fn normalizeAggregateType(ty: ir.Type) ir.Type {
+    return switch (ty) {
+        .aggregate => |text| parseNamedAggregateType(text) orelse ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => ty,
+    };
 }
 
 pub fn typeBasename(text: []const u8) []const u8 {
@@ -94,7 +90,7 @@ fn isPointerOrSliceSurface(text: []const u8) bool {
 }
 
 pub fn fieldType(aggregate_ty: ir.Type, field_index: usize) ?ir.Type {
-    return memory_location.aggregateFieldType(aggregate_ty, field_index);
+    return memory_location.aggregateFieldType(normalizeAggregateType(aggregate_ty), field_index);
 }
 
 pub fn fieldCount(aggregate_ty: ir.Type) usize {
@@ -104,7 +100,7 @@ pub fn fieldCount(aggregate_ty: ir.Type) usize {
 }
 
 pub fn fieldByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, field_index: usize) ?u64 {
-    const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return null;
+    const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, normalizeAggregateType(aggregate_ty), field_index) orelse return null;
     if (offset_i < 0) return null;
     return @intCast(offset_i);
 }
@@ -233,6 +229,9 @@ test "type layout decodes nominal aggregate basenames without fixture module nam
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ [2 x double] }" }, parseNamedAggregateType("frontier_sysv_aggregate_classes.ArrayDouble").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }, parseNamedAggregateType("other.NestedPair").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, i64, i64 }" }, parseNamedAggregateType("%frontier_sysv_sret_byval.Big3").?);
+    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("aggregate_abi.Pair").?);
+    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("%runtime_aggregate_pair_main.Pair").?);
+    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, normalizeAggregateType(.{ .aggregate = "%expanded_abi_frontier.Pair" }));
 }
 
 test "type layout owns aggregate field and leaf queries" {

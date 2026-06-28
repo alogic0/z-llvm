@@ -73,11 +73,13 @@ construction/return paths, and SysV aggregate classification. Existing
 source-backed rows in `frontier_nested_records.zig`, `frontier_sysv_abi.zig`,
 `frontier_sysv_aggregate_classes.zig`, and `frontier_sysv_sret_byval.zig` are
 the representative object/native-link/executable proof for the first slice.
-Remaining aggregate layout debt is explicit: ambiguous nominal `Pair` still has
-a centralized compatibility rule until Zig exports complete nominal field
-facts, runtime aggregate-pair compatibility lowerers still contain selected
-symbol checks, and packed/unaligned aggregate ABI remains a targeted boundary
-row.
+The follow-up slice removes the former ambiguous nominal `Pair` compatibility:
+nominal `Pair` is normalized as `{ i32, i32 }`, and runtime aggregate-pair
+compatibility lowerers admit by normalized layout plus construction/call/return
+data flow rather than exact aggregate-pair symbol names. Remaining aggregate
+layout debt is explicit: the broader nominal layout table still stands in for
+future Zig-exported field facts, and packed/unaligned aggregate ABI remains a
+targeted boundary row.
 
 Current frontier ABI boundary seed:
 
