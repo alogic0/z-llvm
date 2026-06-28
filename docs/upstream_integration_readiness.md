@@ -761,7 +761,9 @@ table. The owned side now has 45 static source layout facts in
 rows and the 12 current Big32..Big256 array-leaf rows; those accepted aggregate
 rows no longer depend on the basename fallback table. Owned lookup now runs
 through a provider registry: generated inference first, then the current static
-source-fact provider. Owned summaries fail
+source-fact provider. `AggregateLayoutSummary.provider_kind` records generated
+inference, static source-fact provider, or boundary-provider ownership
+directly. Owned summaries fail
 closed if their field/leaf counts disagree with any remaining fallback
 equivalent. Remaining aggregate layout debt is explicit: the compatibility
 fallback table is empty, while static source facts still stand in for future

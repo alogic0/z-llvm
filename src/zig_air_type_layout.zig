@@ -41,6 +41,7 @@ pub const AggregateLayoutSummary = struct {
     nominal_type_name: []const u8,
     ty: ir.Type,
     source: AggregateLayoutSource,
+    provider_kind: ?AggregateLayoutProviderKind = null,
     field_count: usize,
     evidence: AggregateLayoutEvidence = .{},
     leaves: [max_aggregate_layout_leaves]AggregateLeaf = undefined,
@@ -51,9 +52,10 @@ pub const AggregateLayoutSummary = struct {
     }
 };
 
-const AggregateLayoutProviderKind = enum {
+pub const AggregateLayoutProviderKind = enum {
     generated_inference,
     static_source_facts,
+    boundary_provider,
 };
 
 const AggregateLayoutProvider = struct {
@@ -63,6 +65,7 @@ const AggregateLayoutProvider = struct {
         return switch (provider.kind) {
             .generated_inference => generatedAggregateLayoutSummary(nominal),
             .static_source_facts => sourceFactAggregateLayoutSummary(nominal),
+            .boundary_provider => null,
         };
     }
 };
@@ -140,7 +143,7 @@ fn aggregateLayoutSummaryForNominal(nominal: []const u8) error{AggregateLayoutMi
         return summary;
     }
     if (boundaryNamedAggregateType(nominal)) |ty| {
-        return summarizeAggregateLayout(nominal, ty, .boundary, .{});
+        return boundaryAggregateLayoutSummary(nominal, ty);
     }
     if (fallbackNamedAggregateType(nominal)) |ty| {
         return summarizeAggregateLayout(nominal, ty, .fallback_table, .{});
@@ -156,18 +159,18 @@ fn ownedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
 }
 
 fn generatedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
-    if (inferredBigScalarLayoutSummary(nominal)) |summary| return summary;
-    if (inferredBigArrayLayoutSummary(nominal)) |summary| return summary;
+    if (inferredBigScalarLayoutSummary(nominal)) |summary| return withProviderKind(summary, .generated_inference);
+    if (inferredBigArrayLayoutSummary(nominal)) |summary| return withProviderKind(summary, .generated_inference);
     return null;
 }
 
 fn sourceFactAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
     const fact = aggregate_layout_facts.lookup(nominal) orelse return null;
-    return summarizeAggregateLayout(nominal, aggregate(fact.aggregate_text), .facts, .{
+    return withProviderKind(summarizeAggregateLayout(nominal, aggregate(fact.aggregate_text), .facts, .{
         .construction = fact.evidence.construction,
         .store = fact.evidence.store,
         .load = fact.evidence.load,
-    });
+    }), .static_source_facts);
 }
 
 fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
@@ -178,6 +181,16 @@ fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
 fn boundaryNamedAggregateType(nominal: []const u8) ?ir.Type {
     const boundary = aggregate_layout_boundaries.lookup(nominal) orelse return null;
     return aggregate(boundary.aggregate_text);
+}
+
+fn boundaryAggregateLayoutSummary(nominal: []const u8, ty: ir.Type) AggregateLayoutSummary {
+    return withProviderKind(summarizeAggregateLayout(nominal, ty, .boundary, .{}), .boundary_provider);
+}
+
+fn withProviderKind(summary: AggregateLayoutSummary, provider_kind: AggregateLayoutProviderKind) AggregateLayoutSummary {
+    var result = summary;
+    result.provider_kind = provider_kind;
+    return result;
 }
 
 fn inferredBigArrayLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
@@ -442,6 +455,7 @@ test "type layout decodes nominal aggregate basenames without fixture module nam
 test "type layout prefers source facts and inference before fallback table" {
     const outer = aggregateLayoutSummary("frontier_nested_records.Outer").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, outer.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.static_source_facts, outer.provider_kind.?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }, outer.ty);
     try std.testing.expectEqual(@as(usize, 2), outer.field_count);
     try std.testing.expectEqual(@as(usize, 4), outer.leaf_count);
@@ -481,6 +495,7 @@ test "type layout infers representative frontier aggregate rows" {
 
     const big3 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big3").?;
     try std.testing.expectEqual(AggregateLayoutSource.inference, big3.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.generated_inference, big3.provider_kind.?);
     try std.testing.expect(big3.ty.eql(.{ .aggregate = "{ i64, i64, i64 }" }));
     try std.testing.expectEqual(@as(usize, 3), big3.leaf_count);
 
@@ -498,6 +513,7 @@ test "type layout infers representative frontier aggregate rows" {
 test "type layout keeps packed aggregates compatibility boundary owned" {
     const packed_summary = aggregateLayoutSummary("frontier_sysv_aggregate_classes.PackedMixed").?;
     try std.testing.expectEqual(AggregateLayoutSource.boundary, packed_summary.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.boundary_provider, packed_summary.provider_kind.?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32, double }" }, packed_summary.ty);
 
     const big_mixed = aggregateLayoutSummary("frontier_sysv_sret_byval.BigMixed").?;
