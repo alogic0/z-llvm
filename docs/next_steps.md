@@ -281,7 +281,7 @@ Execution order:
    source, field count, scalar leaves, and construction/store/load evidence.
    It is consulted before the basename compatibility table, so
    the first broad easy-layout slice is no longer fallback-table-owned. The
-   owned side now has 25 exported sidecar facts, 20 temporary static source
+   owned side now has 30 exported sidecar facts, 15 temporary static source
    layout facts in `src/zig_air_aggregate_layout_facts.zig`, plus generated
    `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
    Big3..Big20 forms and the 12 current Big32..Big256 array-leaf rows. The
@@ -519,7 +519,7 @@ Aggregate/type-layout ownership start:
   `src/zig_air_exported_aggregate_layout_facts.zig` as
   `zllvm-aggregate-layout-facts-v1`; the frontier gate now loads the checked-in
   `test/zig/frontier/aggregate_layout_facts.sidecar` sidecar as the active
-  exported-fact provider. That sidecar now owns 25 representative frontier facts
+  exported-fact provider. That sidecar now owns 30 representative frontier facts
   (`frontier_nested_records.Inner`,
   `frontier_nested_records.Outer`,
   `frontier_sysv_aggregate_classes.Pair32`,
@@ -544,9 +544,14 @@ Aggregate/type-layout ownership start:
   `frontier_sysv_sret_byval.BigDoubleArray`,
   `frontier_sysv_sret_byval.BigFloatArray`,
   `frontier_sysv_sret_byval.BigPtrDouble`, and
-  `frontier_sysv_sret_byval.BigPtrFloat`) that were removed from the
+  `frontier_sysv_sret_byval.BigPtrFloat`,
+  `frontier_sysv_sret_byval.BigArrayMixed`,
+  `frontier_sysv_sret_byval.BigNestedArrayMixed`,
+  `frontier_sysv_sret_byval.MixedArrayLeaf`,
+  `frontier_sysv_sret_byval.BigStructArrayMixed`, and
+  `frontier_sysv_sret_byval.BigDeepMixed`) that were removed from the
   temporary static provider after the frontier gate stayed green. The temporary
-  static provider currently has 20 named facts and exists only until equivalent
+  static provider currently has 15 named facts and exists only until equivalent
   Zig-owned field facts are
   available. `AggregateLayoutSummary.provider_kind`
   records exported-fact, generated-inference, static-source-fact, or
@@ -574,9 +579,7 @@ Aggregate/type-layout ownership start:
 - Nominal aggregate layout source audit:
   - Static source layout facts before fallback table:
     `Pair64` plus the remaining non-packed sret/byval frontier basenames
-    `BigNested`, `BigMixed`, `BigArrayMixed`, `BigNestedArrayMixed`,
-    `MixedArrayLeaf`, `BigStructArrayMixed`,
-    `BigDeepMixed`, `BigByteTail`, `BigByteTail5`, `BigByteTail6`,
+    `BigNested`, `BigMixed`, `BigByteTail`, `BigByteTail5`, `BigByteTail6`,
     `BigByteTail7`, `BigWordTail`, `ScalarMixed`, `ScalarNestedInner`,
     `ScalarNested`, and `ScalarArray`.
   - Generated inference before fallback table:
@@ -612,7 +615,12 @@ Aggregate/type-layout ownership start:
     `frontier_sysv_sret_byval.BigDoubleArray`,
     `frontier_sysv_sret_byval.BigFloatArray`,
     `frontier_sysv_sret_byval.BigPtrDouble`, and
-    `frontier_sysv_sret_byval.BigPtrFloat`.
+    `frontier_sysv_sret_byval.BigPtrFloat`,
+    `frontier_sysv_sret_byval.BigArrayMixed`,
+    `frontier_sysv_sret_byval.BigNestedArrayMixed`,
+    `frontier_sysv_sret_byval.MixedArrayLeaf`,
+    `frontier_sysv_sret_byval.BigStructArrayMixed`, and
+    `frontier_sysv_sret_byval.BigDeepMixed`.
   - Remaining fallback-table compatibility entries:
     none.
   - Boundary-owned aggregate layouts:
@@ -625,7 +633,7 @@ Aggregate/type-layout ownership start:
     tmp/aggregate_layout_provider_audit.log` prints exported sidecar facts,
     current static facts, generated inference samples, and boundary provider
     rows with aggregate text. The current saved audit reports
-    `exported_facts=25`, `static_source_facts=20`, `boundary_provider=2`, and
+    `exported_facts=30`, `static_source_facts=15`, `boundary_provider=2`, and
     `generated_examples=4`. Use this before removing more static facts so the
     next ownership slice is driven by provider evidence rather than manual
     table scanning.

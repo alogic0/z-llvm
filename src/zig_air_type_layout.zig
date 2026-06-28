@@ -497,7 +497,12 @@ fn installTestExportedAggregateProvider() !exported_aggregate_layout_facts.Provi
         "fact nominal=\"frontier_sysv_sret_byval.BigDoubleArray\" aggregate=\"{ [3 x double] }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.BigFloatArray\" aggregate=\"{ [5 x float] }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.BigPtrDouble\" aggregate=\"{ ptr, double, i64 }\" construction=1 store=1 load=1\n" ++
-        "fact nominal=\"frontier_sysv_sret_byval.BigPtrFloat\" aggregate=\"{ ptr, float, i64 }\" construction=1 store=1 load=1\n";
+        "fact nominal=\"frontier_sysv_sret_byval.BigPtrFloat\" aggregate=\"{ ptr, float, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.BigArrayMixed\" aggregate=\"{ [2 x i32], [2 x double], ptr }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.BigNestedArrayMixed\" aggregate=\"{ { [5 x float] }, { [3 x double] }, ptr, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.MixedArrayLeaf\" aggregate=\"{ i32, double }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.BigStructArrayMixed\" aggregate=\"{ [3 x { i32, double }], i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.BigDeepMixed\" aggregate=\"{ { { [5 x float] }, { [3 x double] }, ptr, i64 }, [2 x { i32, double }], { { i8, i16 }, i32, double, ptr }, [2 x ptr], i32 }\" construction=1 store=1 load=1\n";
     return exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
 }
 
