@@ -805,6 +805,141 @@ pub fn untypedBranchConditionRef(instruction: air_export.Instruction) ?u32 {
     return air_text.instructionRef(fields.next() orelse return null);
 }
 
+pub fn untypedInstructionByIndex(function: air_export.Function, index: u32) ?air_export.Instruction {
+    for (function.instructions) |instruction| {
+        if (instruction.index == index) return instruction;
+    }
+    return null;
+}
+
+pub fn untypedLoadReferencesSlot(instruction: air_export.Instruction, slot: u32) bool {
+    return untypedLoadSourceSlot(instruction) == slot;
+}
+
+pub fn untypedFindCompareAgainstArg(function: air_export.Function, slot: u32, arg: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!air_capabilities.isCmpLtOpcode(instruction.opcode)) continue;
+        var fields = air_text.splitTopLevel(instruction.payload, ',');
+        const lhs = air_text.instructionRef(fields.next() orelse continue) orelse continue;
+        const rhs = air_text.instructionRef(fields.next() orelse continue) orelse continue;
+        if (fields.next() != null or rhs != arg) continue;
+        const load = untypedInstructionByIndex(function, lhs) orelse continue;
+        if (untypedLoadReferencesSlot(load, slot)) return instruction.index;
+    }
+    return null;
+}
+
+pub fn untypedFindAnyLoadFromSlot(function: air_export.Function, slot: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (untypedLoadReferencesSlot(instruction, slot)) return instruction.index;
+    }
+    return null;
+}
+
+pub fn untypedFindLastLoadFromSlot(function: air_export.Function, slot: u32) ?u32 {
+    var result: ?u32 = null;
+    for (function.instructions) |instruction| {
+        if (untypedLoadReferencesSlot(instruction, slot)) result = instruction.index;
+    }
+    return result;
+}
+
+pub fn untypedFindCastOf(function: air_export.Function, opcode: []const u8, source: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
+        var fields = air_text.splitTopLevel(instruction.payload, ',');
+        _ = fields.next() orelse continue;
+        if (air_text.instructionRef(fields.next() orelse continue) == source and fields.next() == null) {
+            return instruction.index;
+        }
+    }
+    return null;
+}
+
+pub fn untypedFindCastFromSlot(function: air_export.Function, opcode: []const u8, slot: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!untypedLoadReferencesSlot(instruction, slot)) continue;
+        if (untypedFindCastOf(function, opcode, instruction.index)) |cast| return cast;
+    }
+    return null;
+}
+
+pub fn untypedFindBinaryUsing(function: air_export.Function, opcode: []const u8, lhs: u32, rhs: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
+        const refs = untypedBinaryRefs(instruction) orelse continue;
+        const first = refs.lhs;
+        const second = refs.rhs;
+        if ((first == lhs and second == rhs) or (first == rhs and second == lhs)) return instruction.index;
+    }
+    return null;
+}
+
+pub fn untypedFindBinaryUsingConstant(function: air_export.Function, opcode: []const u8, lhs: u32, value: i128) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
+        const ref_and_int = untypedBinaryRefAndInt(instruction) orelse continue;
+        if (ref_and_int.lhs == lhs and ref_and_int.value == value) return instruction.index;
+    }
+    return null;
+}
+
+pub fn untypedFindBinaryFromSlotUsingConstant(
+    function: air_export.Function,
+    opcode: []const u8,
+    slot: u32,
+    value: i128,
+) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!untypedLoadReferencesSlot(instruction, slot)) continue;
+        if (untypedFindBinaryUsingConstant(function, opcode, instruction.index, value)) |binary| return binary;
+    }
+    return null;
+}
+
+pub fn untypedFindSlotBinaryUpdate(
+    function: air_export.Function,
+    opcode: []const u8,
+    slot: u32,
+    rhs: u32,
+) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!untypedLoadReferencesSlot(instruction, slot)) continue;
+        for (function.instructions) |candidate| {
+            if (!std.mem.startsWith(u8, candidate.opcode, opcode)) continue;
+            var fields = air_text.splitTopLevel(candidate.payload, ',');
+            if (air_text.instructionRef(fields.next() orelse continue) != instruction.index) continue;
+            if (air_text.instructionRef(fields.next() orelse continue) == rhs and fields.next() == null) {
+                return candidate.index;
+            }
+        }
+    }
+    return null;
+}
+
+pub fn untypedReturnUses(function: air_export.Function, value: u32) bool {
+    for (function.instructions) |instruction| {
+        if (untypedReturnRef(instruction)) |returned| return returned == value;
+    }
+    return false;
+}
+
+pub fn runtimeNavSymbol(function: air_export.Function) ?[]const u8 {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode) != .runtime_nav_ptr) continue;
+        var fields = air_text.splitTopLevel(instruction.payload, ',');
+        _ = fields.next() orelse return null;
+        const symbol_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+        if (fields.next() != null or symbol_text.len < 3 or
+            symbol_text[0] != '\'' or symbol_text[symbol_text.len - 1] != '\'')
+        {
+            return null;
+        }
+        return symbol_text[1 .. symbol_text.len - 1];
+    }
+    return null;
+}
+
 fn parseUntypedValueSource(text: []const u8) ?UntypedValueSource {
     if (air_text.instructionRef(text)) |index| return .{ .ref = index };
     if (parseUntypedIntConstant(text)) |value| return .{ .int = value };
@@ -1600,6 +1735,24 @@ test "AIR model parses untyped AIR value query shapes" {
     const add = air_export.Instruction{ .index = 4, .indent = 0, .unused = false, .opcode = "add", .payload = "%3!, <i32, 1>", .category = .arithmetic };
     const cond = air_export.Instruction{ .index = 5, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%4!, then_body, else_body", .category = .control_flow };
     const ret = air_export.Instruction{ .index = 6, .indent = 0, .unused = false, .opcode = "ret", .payload = "%4!", .category = .return_op };
+    const cmp = air_export.Instruction{ .index = 7, .indent = 0, .unused = false, .opcode = "cmp_lt", .payload = "%3!, %0!", .category = .comparison };
+    const cast = air_export.Instruction{ .index = 8, .indent = 0, .unused = false, .opcode = "intcast", .payload = "i32, %3!", .category = .other };
+    const add_refs = air_export.Instruction{ .index = 9, .indent = 0, .unused = false, .opcode = "add", .payload = "%3!, %0!", .category = .arithmetic };
+    const nav = air_export.Instruction{ .index = 10, .indent = 0, .unused = false, .opcode = "runtime_nav_ptr", .payload = "ptr, 'runtime.symbol'", .category = .other };
+    const instructions = [_]air_export.Instruction{ arg, alloc, store_const, load, add, cond, ret, cmp, cast, add_refs, nav };
+    const function = air_export.Function{
+        .name = "test.value_queries",
+        .type_text = "fn () i32",
+        .instruction_count = instructions.len,
+        .main_body_count = instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&instructions),
+    };
 
     try std.testing.expect(untypedArgIndexOfType(arg, "i32", "0"));
     try std.testing.expectEqualStrings("*i32", untypedAllocType(alloc).?);
@@ -1614,4 +1767,15 @@ test "AIR model parses untyped AIR value query shapes" {
     try std.testing.expectEqual(@as(i128, 1), binary.value);
     try std.testing.expectEqual(@as(u32, 4), untypedBranchConditionRef(cond).?);
     try std.testing.expectEqual(@as(u32, 4), untypedReturnRef(ret).?);
+    try std.testing.expectEqual(@as(u32, 7), untypedFindCompareAgainstArg(function, 1, 0).?);
+    try std.testing.expectEqual(@as(u32, 3), untypedFindAnyLoadFromSlot(function, 1).?);
+    try std.testing.expectEqual(@as(u32, 3), untypedFindLastLoadFromSlot(function, 1).?);
+    try std.testing.expectEqual(@as(u32, 8), untypedFindCastOf(function, "intcast", 3).?);
+    try std.testing.expectEqual(@as(u32, 8), untypedFindCastFromSlot(function, "intcast", 1).?);
+    try std.testing.expectEqual(@as(u32, 9), untypedFindBinaryUsing(function, "add", 3, 0).?);
+    try std.testing.expectEqual(@as(u32, 4), untypedFindBinaryUsingConstant(function, "add", 3, 1).?);
+    try std.testing.expectEqual(@as(u32, 4), untypedFindBinaryFromSlotUsingConstant(function, "add", 1, 1).?);
+    try std.testing.expectEqual(@as(u32, 9), untypedFindSlotBinaryUpdate(function, "add", 1, 0).?);
+    try std.testing.expect(untypedReturnUses(function, 4));
+    try std.testing.expectEqualStrings("runtime.symbol", runtimeNavSymbol(function).?);
 }

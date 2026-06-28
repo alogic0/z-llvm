@@ -9,11 +9,9 @@ const ir = @import("ir.zig");
 
 const FunctionType = air_model.FunctionType;
 const parseFunctionType = air_types.parseFunctionType;
-const parseInstructionRef = air_text.instructionRef;
 const shortFunctionName = air_model.shortFunctionName;
 const ownPrint = air_model.ownPrint;
 const functionHasOpcode = air_model.functionHasOpcode;
-const splitTopLevel = air_text.splitTopLevel;
 const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
 
@@ -167,15 +165,15 @@ pub fn accumulatorLoopShape(function: air_export.Function) ?AccumulatorLoopShape
     if (condition_count != 1 or loop_count != 1 or repeat_count != 1 or branch_count < 2) return null;
     if (!hasStoreOf(function, index, .{ .int = 0 }) or !hasStoreOf(function, sum, .{ .int = 0 })) return null;
 
-    const compare = findCompareAgainstArg(function, index, arg) orelse return null;
+    const compare = air_model.untypedFindCompareAgainstArg(function, index, arg) orelse return null;
     if (!condBrUses(function, compare)) return null;
-    const cast = findCastFromSlot(function, "intcast", index) orelse return null;
-    const sum_load = findAnyLoadFromSlot(function, sum) orelse return null;
-    const sum_add = findBinaryUsing(function, "add", sum_load, cast) orelse return null;
+    const cast = air_model.untypedFindCastFromSlot(function, "intcast", index) orelse return null;
+    const sum_load = air_model.untypedFindAnyLoadFromSlot(function, sum) orelse return null;
+    const sum_add = air_model.untypedFindBinaryUsing(function, "add", sum_load, cast) orelse return null;
     if (!hasStoreOf(function, sum, .{ .ref = sum_add })) return null;
-    const index_add = findBinaryFromSlotUsingConstant(function, "add", index, 1) orelse return null;
+    const index_add = air_model.untypedFindBinaryFromSlotUsingConstant(function, "add", index, 1) orelse return null;
     if (!hasStoreOf(function, index, .{ .ref = index_add })) return null;
-    const result_load = findLastLoadFromSlot(function, sum) orelse return null;
+    const result_load = air_model.untypedFindLastLoadFromSlot(function, sum) orelse return null;
     if (!returnUses(function, result_load)) return null;
 
     return .{ .limit_arg = arg };
@@ -198,19 +196,6 @@ fn hasStoreOf(function: air_export.Function, slot: u32, expected: AirExpectedVal
     return false;
 }
 
-fn findCompareAgainstArg(function: air_export.Function, slot: u32, arg: u32) ?u32 {
-    for (function.instructions) |instruction| {
-        if (!air_capabilities.isCmpLtOpcode(instruction.opcode)) continue;
-        var fields = splitTopLevel(instruction.payload, ',');
-        const lhs = parseInstructionRef(fields.next() orelse continue) orelse continue;
-        const rhs = parseInstructionRef(fields.next() orelse continue) orelse continue;
-        if (fields.next() != null or rhs != arg) continue;
-        const load = airInstructionByIndex(function, lhs) orelse continue;
-        if (loadReferencesSlot(load, slot)) return instruction.index;
-    }
-    return null;
-}
-
 fn condBrUses(function: air_export.Function, value: u32) bool {
     for (function.instructions) |instruction| {
         if (air_model.untypedBranchConditionRef(instruction)) |condition| return condition == value;
@@ -218,106 +203,16 @@ fn condBrUses(function: air_export.Function, value: u32) bool {
     return false;
 }
 
-fn findAnyLoadFromSlot(function: air_export.Function, slot: u32) ?u32 {
-    for (function.instructions) |instruction| {
-        if (loadReferencesSlot(instruction, slot)) return instruction.index;
-    }
-    return null;
-}
-
-fn findLastLoadFromSlot(function: air_export.Function, slot: u32) ?u32 {
-    var result: ?u32 = null;
-    for (function.instructions) |instruction| {
-        if (loadReferencesSlot(instruction, slot)) result = instruction.index;
-    }
-    return result;
-}
-
 fn loadReferencesSlot(instruction: air_export.Instruction, slot: u32) bool {
-    return air_model.untypedLoadSourceSlot(instruction) == slot;
-}
-
-fn findCastOf(function: air_export.Function, opcode: []const u8, source: u32) ?u32 {
-    for (function.instructions) |instruction| {
-        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
-        var fields = splitTopLevel(instruction.payload, ',');
-        _ = fields.next() orelse continue;
-        if (parseInstructionRef(fields.next() orelse continue) == source and fields.next() == null) {
-            return instruction.index;
-        }
-    }
-    return null;
-}
-
-fn findCastFromSlot(function: air_export.Function, opcode: []const u8, slot: u32) ?u32 {
-    for (function.instructions) |instruction| {
-        if (!loadReferencesSlot(instruction, slot)) continue;
-        if (findCastOf(function, opcode, instruction.index)) |cast| return cast;
-    }
-    return null;
-}
-
-fn findBinaryUsing(function: air_export.Function, opcode: []const u8, lhs: u32, rhs: u32) ?u32 {
-    for (function.instructions) |instruction| {
-        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
-        const refs = air_model.untypedBinaryRefs(instruction) orelse continue;
-        const first = refs.lhs;
-        const second = refs.rhs;
-        if ((first == lhs and second == rhs) or (first == rhs and second == lhs)) return instruction.index;
-    }
-    return null;
-}
-
-fn findBinaryFromSlotUsingConstant(
-    function: air_export.Function,
-    opcode: []const u8,
-    slot: u32,
-    value: i128,
-) ?u32 {
-    for (function.instructions) |instruction| {
-        if (!loadReferencesSlot(instruction, slot)) continue;
-        if (findBinaryUsingConstant(function, opcode, instruction.index, value)) |binary| return binary;
-    }
-    return null;
-}
-
-fn findBinaryUsingConstant(function: air_export.Function, opcode: []const u8, lhs: u32, value: i128) ?u32 {
-    for (function.instructions) |instruction| {
-        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
-        const ref_and_int = air_model.untypedBinaryRefAndInt(instruction) orelse continue;
-        if (ref_and_int.lhs == lhs and ref_and_int.value == value) return instruction.index;
-    }
-    return null;
+    return air_model.untypedLoadReferencesSlot(instruction, slot);
 }
 
 fn returnUses(function: air_export.Function, value: u32) bool {
-    for (function.instructions) |instruction| {
-        if (air_model.untypedReturnRef(instruction)) |returned| return returned == value;
-    }
-    return false;
-}
-
-fn airInstructionByIndex(function: air_export.Function, index: u32) ?air_export.Instruction {
-    for (function.instructions) |instruction| {
-        if (instruction.index == index) return instruction;
-    }
-    return null;
+    return air_model.untypedReturnUses(function, value);
 }
 
 pub fn runtimeNavSymbol(function: air_export.Function) ?[]const u8 {
-    for (function.instructions) |instruction| {
-        if (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode) != .runtime_nav_ptr) continue;
-        var fields = splitTopLevel(instruction.payload, ',');
-        _ = fields.next() orelse return null;
-        const symbol_text = std.mem.trim(u8, fields.next() orelse return null, " ");
-        if (fields.next() != null or symbol_text.len < 3 or
-            symbol_text[0] != '\'' or symbol_text[symbol_text.len - 1] != '\'')
-        {
-            return null;
-        }
-        return symbol_text[1 .. symbol_text.len - 1];
-    }
-    return null;
+    return air_model.runtimeNavSymbol(function);
 }
 
 pub fn lowerAccumulatorLoop(
@@ -581,35 +476,15 @@ pub fn conditionalSlotUpdateShape(function: air_export.Function) bool {
     const base = first_arg orelse return false;
     const delta = second_arg orelse return false;
     if (condition_arg == null or cond_count != 1 or !hasStoreOf(function, result_slot, .{ .ref = base })) return false;
-    const add = findSlotBinaryUpdate(function, "add", result_slot, delta) orelse return false;
-    const sub = findSlotBinaryUpdate(function, "sub", result_slot, delta) orelse return false;
+    const add = air_model.untypedFindSlotBinaryUpdate(function, "add", result_slot, delta) orelse return false;
+    const sub = air_model.untypedFindSlotBinaryUpdate(function, "sub", result_slot, delta) orelse return false;
     if (!hasStoreOf(function, result_slot, .{ .ref = add }) or
         !hasStoreOf(function, result_slot, .{ .ref = sub }))
     {
         return false;
     }
-    const result_load = findLastLoadFromSlot(function, result_slot) orelse return false;
+    const result_load = air_model.untypedFindLastLoadFromSlot(function, result_slot) orelse return false;
     return returnUses(function, result_load);
-}
-
-fn findSlotBinaryUpdate(
-    function: air_export.Function,
-    opcode: []const u8,
-    slot: u32,
-    rhs: u32,
-) ?u32 {
-    for (function.instructions) |instruction| {
-        if (!loadReferencesSlot(instruction, slot)) continue;
-        for (function.instructions) |candidate| {
-            if (!std.mem.startsWith(u8, candidate.opcode, opcode)) continue;
-            var fields = splitTopLevel(candidate.payload, ',');
-            if (parseInstructionRef(fields.next() orelse continue) != instruction.index) continue;
-            if (parseInstructionRef(fields.next() orelse continue) == rhs and fields.next() == null) {
-                return candidate.index;
-            }
-        }
-    }
-    return null;
 }
 
 pub fn lowerConditionalSlotUpdate(
