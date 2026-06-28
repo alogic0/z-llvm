@@ -437,6 +437,22 @@ Completed slices from this inventory:
   `pointer_slice_boundary_rows=1` until the store-side bounds/panic CFG path is
   accepted.
 
+Pointer/slice frontier exit:
+
+- The pointer/slice frontier phase meets the exit condition for the current
+  x86_64 release claim. Semantic recognition has a model-owned
+  `PointerSliceAddressSummary`; representative source-backed rows cover
+  pointer addition, slice pointer/length extraction, derived scalar loads and
+  stores, and checked slice-element load.
+- Accepted rows have strict object/native-link/executable proof across
+  ReleaseFast, ReleaseSafe, and ReleaseSmall. The checked slice load proves both
+  the in-bounds hot path and the cold `outOfBounds(index, len)` trap path.
+- Checked slice-element store is intentionally left as the remaining
+  pointer/slice frontier boundary. It is source-backed and counted as
+  `pointer_slice_boundary_rows=1`, not folded into a generic control-flow
+  failure. The next milestone should move on unless that precise boundary is
+  selected explicitly.
+
 Validation after these refactor slices:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and

@@ -211,13 +211,13 @@ pub fn main(init: std.process.Init) !void {
             "`zig build distribution-air-release-frontier-boundaries`",
         });
         changed_files += try updateBoundarySectionFile(allocator, io, "docs/roadmap/x86_64_frontier_air_corpus.md", counters, &.{
-            .{ .start = "Source-backed ABI boundary proof is green", .end = "Executable ABI proof" },
+            .{ .start = "Source-backed ABI and pointer/slice boundary proof is green", .end = "Executable ABI proof" },
         });
         changed_files += try updateBoundarySectionFile(allocator, io, "docs/upstream_integration_readiness.md", counters, &.{
-            .{ .start = "Source-backed ABI boundary proof is tracked separately", .end = "The selected slice-panic" },
+            .{ .start = "Source-backed ABI and pointer/slice boundary proof is tracked separately", .end = "The selected slice-panic" },
         });
         changed_files += try updateBoundarySectionFile(allocator, io, "docs/next_steps.md", counters, &.{
-            .{ .start = "Source-backed ABI boundaries are now measured separately", .end = "Typed AIR v2 pointer-callee" },
+            .{ .start = "Source-backed ABI and pointer/slice boundaries are now measured separately", .end = "Typed AIR v2 pointer-callee" },
         });
         changed_files += try updateBoundarySectionFile(allocator, io, "docs/roadmap/x86_64_distribution_replacement_matrix.md", counters, &.{
             .{ .start = "source-backed fail-closed varargs/vector/X87/packed aggregate/tail-call/callconv boundary proof", .end = "while arbitrary" },
@@ -252,7 +252,7 @@ pub fn main(init: std.process.Init) !void {
     changed_files += try updateSectionFile(allocator, io, "docs/roadmap/x86_64_frontier_air_corpus.md", counters, &.{
         .{ .start = "Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:", .end = "Object inspection is green" },
         .{ .start = "Object inspection is green", .end = "Native-link progress is green" },
-        .{ .start = "Native-link progress is green", .end = "Source-backed ABI boundary proof" },
+        .{ .start = "Native-link progress is green", .end = "Source-backed ABI and pointer/slice boundary proof" },
         .{ .start = "Executable ABI proof is green", .end = "Closed in the current runtime/safety-edge slice:" },
     });
     changed_files += try updateLineFilteredFile(allocator, io, "docs/build_steps.md", counters, &.{
@@ -266,7 +266,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .start = "Next corpus frontier:", .end = "Strict release baselines" },
     });
     changed_files += try updateSectionFile(allocator, io, "docs/upstream_integration_readiness.md", counters, &.{
-        .{ .start = "`distribution-zig-air-uncurated-release-frontier` covers only", .end = "Source-backed ABI boundary proof" },
+        .{ .start = "`distribution-zig-air-uncurated-release-frontier` covers only", .end = "Source-backed ABI and pointer/slice boundary proof" },
     });
     changed_files += try updateSectionFile(allocator, io, "docs/roadmap/x86_64_distribution_replacement_matrix.md", counters, &.{
         .{ .start = "The next corpus frontier is isolated", .end = "source-backed fail-closed" },

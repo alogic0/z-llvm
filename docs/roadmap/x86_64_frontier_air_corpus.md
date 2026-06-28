@@ -123,7 +123,7 @@ lld_rows=0
 local_fail=0
 ```
 
-Source-backed ABI boundary proof is green for all three modes through
+Source-backed ABI and pointer/slice boundary proof is green for all three modes through
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
