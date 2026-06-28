@@ -553,16 +553,11 @@ pub fn structSumShape(function: air_export.Function) bool {
 }
 
 fn optionalPointerShape(function: air_export.Function) bool {
-    return air_model.functionHasOptionalOp(function, .is_non_null) and
-        air_model.functionHasOptionalOp(function, .optional_payload) and
-        air_model.functionHasMemoryOp(function, .load) and
-        air_model.functionHasReturnOp(function);
+    return air_model.optionalPointerSummary(function) != null;
 }
 
 fn optionalPayloadShape(function: air_export.Function) bool {
-    return air_model.functionHasOptionalOp(function, .wrap_optional) and
-        air_model.functionHasOptionalOp(function, .optional_payload) and
-        air_model.functionHasOptionalOp(function, .is_non_null);
+    return air_model.optionalPayloadSummary(function) != null;
 }
 
 fn errorUnionPayloadShape(function: air_export.Function) bool {

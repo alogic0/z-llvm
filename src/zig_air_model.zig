@@ -726,6 +726,16 @@ pub const SliceSumSummary = struct {
     loop: u32,
 };
 
+pub const OptionalShapeSummary = struct {
+    kind: enum { pointer_payload, scalar_payload },
+    optional_value: ?u32 = null,
+    condition: u32,
+    payload: u32,
+    wrap: ?u32 = null,
+    load: ?u32 = null,
+    return_value: ?u32 = null,
+};
+
 pub const PointerSliceAddressSummary = struct {
     ptr_add_count: usize = 0,
     ptr_sub_count: usize = 0,
@@ -1095,6 +1105,65 @@ pub fn sliceSumSummary(function: air_export.Function) ?SliceSumSummary {
 
 pub fn selectedSliceSumShape(function: air_export.Function) bool {
     return sliceSumSummary(function) != null;
+}
+
+fn optionalSource(instruction: air_export.Instruction) ?u32 {
+    if (air_capabilities.optionalSemanticOpForOpcode(instruction.opcode) == .none) return null;
+    return untypedFirstRefOperand(instruction);
+}
+
+pub fn optionalPointerSummary(function: air_export.Function) ?OptionalShapeSummary {
+    for (function.instructions) |condition| {
+        if (air_capabilities.optionalSemanticOpForOpcode(condition.opcode) != .is_non_null) continue;
+        const source = optionalSource(condition);
+        for (function.instructions) |payload| {
+            if (air_capabilities.optionalSemanticOpForOpcode(payload.opcode) != .optional_payload) continue;
+            if (source != null and optionalSource(payload) != source) continue;
+            const load = untypedFindAnyLoadFromSlot(function, payload.index) orelse continue;
+            const returned = for (function.instructions) |ret| {
+                if (untypedReturnRef(ret)) |value| break value;
+            } else continue;
+            return .{
+                .kind = .pointer_payload,
+                .optional_value = source,
+                .condition = condition.index,
+                .payload = payload.index,
+                .load = load,
+                .return_value = returned,
+            };
+        }
+    }
+    return null;
+}
+
+pub fn selectedOptionalPointerShape(function: air_export.Function) bool {
+    return optionalPointerSummary(function) != null;
+}
+
+pub fn optionalPayloadSummary(function: air_export.Function) ?OptionalShapeSummary {
+    for (function.instructions) |wrap| {
+        if (air_capabilities.optionalSemanticOpForOpcode(wrap.opcode) != .wrap_optional) continue;
+        for (function.instructions) |condition| {
+            if (air_capabilities.optionalSemanticOpForOpcode(condition.opcode) != .is_non_null) continue;
+            if (optionalSource(condition) != wrap.index) continue;
+            for (function.instructions) |payload| {
+                if (air_capabilities.optionalSemanticOpForOpcode(payload.opcode) != .optional_payload) continue;
+                if (optionalSource(payload) != wrap.index) continue;
+                return .{
+                    .kind = .scalar_payload,
+                    .optional_value = wrap.index,
+                    .condition = condition.index,
+                    .payload = payload.index,
+                    .wrap = wrap.index,
+                };
+            }
+        }
+    }
+    return null;
+}
+
+pub fn selectedOptionalPayloadShape(function: air_export.Function) bool {
+    return optionalPayloadSummary(function) != null;
 }
 
 pub fn aggregateMakePairSummary(function: air_export.Function) ?AggregatePairSummary {
@@ -2251,6 +2320,103 @@ test "AIR model reports semantic operation presence" {
     try std.testing.expect(functionHasCfgOp(function, .block));
     try std.testing.expect(functionHasCfgOp(function, .unreach));
     try std.testing.expect(!functionHasCfgOp(function, .cond_br));
+}
+
+test "AIR model recognizes selected optional shapes structurally" {
+    const optional_pointer_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "?*const i32, 0", .category = .argument },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "is_non_null", .payload = "%0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "optional_payload", .payload = "%0!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %2!", .category = .memory },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%3!", .category = .return_op },
+    };
+    const optional_pointer = air_export.Function{
+        .name = "not_named_optional_pointer",
+        .type_text = "fn (?*const i32) i32",
+        .instruction_count = optional_pointer_instructions.len,
+        .main_body_count = optional_pointer_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&optional_pointer_instructions),
+    };
+    const pointer_summary = optionalPointerSummary(optional_pointer).?;
+    try std.testing.expectEqual(.pointer_payload, pointer_summary.kind);
+    try std.testing.expectEqual(@as(u32, 0), pointer_summary.optional_value.?);
+    try std.testing.expectEqual(@as(u32, 1), pointer_summary.condition);
+    try std.testing.expectEqual(@as(u32, 2), pointer_summary.payload);
+    try std.testing.expectEqual(@as(u32, 3), pointer_summary.load.?);
+    try std.testing.expectEqual(@as(u32, 3), pointer_summary.return_value.?);
+    try std.testing.expect(selectedOptionalPointerShape(optional_pointer));
+
+    const bad_optional_pointer_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "?*const i32, 0", .category = .argument },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "is_non_null", .payload = "%0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "optional_payload", .payload = "%0!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "ret", .payload = "%2!", .category = .return_op },
+    };
+    const bad_optional_pointer = air_export.Function{
+        .name = "not_named_bad_optional_pointer",
+        .type_text = "fn (?*const i32) i32",
+        .instruction_count = bad_optional_pointer_instructions.len,
+        .main_body_count = bad_optional_pointer_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&bad_optional_pointer_instructions),
+    };
+    try std.testing.expect(optionalPointerSummary(bad_optional_pointer) == null);
+
+    const optional_payload_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "wrap_optional", .payload = "%arg1!", .category = .other },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "is_non_null", .payload = "%0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "optional_payload", .payload = "%0!", .category = .other },
+    };
+    const optional_payload = air_export.Function{
+        .name = "not_named_optional_payload",
+        .type_text = "fn (i32, i32) i32",
+        .instruction_count = optional_payload_instructions.len,
+        .main_body_count = optional_payload_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&optional_payload_instructions),
+    };
+    const payload_summary = optionalPayloadSummary(optional_payload).?;
+    try std.testing.expectEqual(.scalar_payload, payload_summary.kind);
+    try std.testing.expectEqual(@as(u32, 0), payload_summary.wrap.?);
+    try std.testing.expectEqual(@as(u32, 1), payload_summary.condition);
+    try std.testing.expectEqual(@as(u32, 2), payload_summary.payload);
+    try std.testing.expect(selectedOptionalPayloadShape(optional_payload));
+
+    const unrelated_optional_payload_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "wrap_optional", .payload = "%arg1!", .category = .other },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "is_non_null", .payload = "%99!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "optional_payload", .payload = "%0!", .category = .other },
+    };
+    const unrelated_optional_payload = air_export.Function{
+        .name = "not_named_unrelated_optional_payload",
+        .type_text = "fn (i32, i32) i32",
+        .instruction_count = unrelated_optional_payload_instructions.len,
+        .main_body_count = unrelated_optional_payload_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&unrelated_optional_payload_instructions),
+    };
+    try std.testing.expect(optionalPayloadSummary(unrelated_optional_payload) == null);
 }
 
 test "AIR model recognizes selected aggregate shapes structurally" {

@@ -399,8 +399,7 @@ Remaining selected recognizer ownership to normalize:
 | Rank | Current location | Duplicated parsing/checking | Target reusable helper |
 | --- | --- | --- | --- |
 | 1 | `src/zig_air_lowering_legacy.zig::isIntegerSwitchBlock` and `lowerIntegerSwitch` | legacy AIR text line parsing for dense switch ranges and branch constants | typed/model-owned switch summary with block targets, ranges, default, and terminal return values |
-| 2 | `src/zig_air_lowering_legacy.zig` optional predicates | opcode-presence sets for optional pointer/payload predicates | normalized typed-AIR CFG/value summaries and pointer helpers consumed by generic CFG lowering |
-| 3 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerers | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
+| 2 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerers | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
 
 This inventory is refactor-only: it does not expand accepted rows or weaken the
 strict frontier counters. Each slice should move one recognizer family behind
@@ -422,6 +421,11 @@ Completed slices from this inventory:
   error-switch, and error-classifier compatibility recognizers now use
   model-owned structural summaries rather than function names such as
   `error_switch.error_switch`, `.maybeError`, or `.classify`.
+- Optional pointer/payload compatibility predicates now use model-owned
+  `optionalPointerSummary` and `optionalPayloadSummary` helpers. The summaries
+  record selected optional condition/payload/wrap indexes, and the pointer
+  summary additionally records connected load and terminal return indexes; the
+  legacy lowerer no longer owns optional opcode-presence admission.
 - Aggregate/store/return selected recognizers now use model-owned return,
   store, memory-op, return-pointer, and field-index presence helpers. The
   aggregate pair/read/make compatibility recognizers now use model-owned
@@ -460,8 +464,8 @@ Completed slices from this inventory:
 - Current scan status: `src/zig_air_lowering_legacy.zig` has no
   function-name-specific accepted recognizer gates for the aggregate,
   error/switch, table-lookup, runtime-wrapper, or panic-edge selected shapes.
-  Remaining presence-based compatibility predicates are integer-switch text
-  parsing and optional pointer/payload.
+  Remaining presence-based compatibility predicate/text ownership is
+  integer-switch text parsing.
   Compatibility runtime-wrapper lowerer bodies still emit fixed helper/global
   symbol names even though admission is now model/data-flow owned.
 - Accepted model summaries are now fail-closed on terminal value paths:
