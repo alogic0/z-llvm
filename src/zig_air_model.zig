@@ -610,6 +610,20 @@ pub fn functionHasPointerAggregateOp(function: air_export.Function, op: air_capa
     return false;
 }
 
+pub fn functionHasCallOp(function: air_export.Function) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.isCallOpcode(instruction.opcode)) return true;
+    }
+    return false;
+}
+
+pub fn functionHasCfgOp(function: air_export.Function, op: air_capabilities.CfgLoweringOp) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.cfgLoweringOpForOpcode(instruction.opcode) == op) return true;
+    }
+    return false;
+}
+
 pub fn functionHasReturnOp(function: air_export.Function) bool {
     for (function.instructions) |instruction| {
         if (air_capabilities.isReturnOpcode(instruction.opcode)) return true;
@@ -1228,6 +1242,9 @@ test "AIR model reports semantic operation presence" {
         .{ .index = 6, .indent = 0, .unused = false, .opcode = "store_safe", .payload = "%0!, %1!", .category = .memory },
         .{ .index = 7, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_1", .payload = "", .category = .memory },
         .{ .index = 8, .indent = 0, .unused = false, .opcode = "ret_safe", .payload = "%1!", .category = .return_op },
+        .{ .index = 9, .indent = 0, .unused = false, .opcode = "call", .payload = "", .category = .call },
+        .{ .index = 10, .indent = 0, .unused = false, .opcode = "block", .payload = "", .category = .control_flow },
+        .{ .index = 11, .indent = 0, .unused = false, .opcode = "unreach", .payload = "", .category = .control_flow },
     };
     const function = air_export.Function{
         .name = "test.main",
@@ -1254,6 +1271,10 @@ test "AIR model reports semantic operation presence" {
     try std.testing.expect(functionHasFieldPtrIndex(function, 1));
     try std.testing.expect(!functionHasFieldPtrIndex(function, 0));
     try std.testing.expect(functionHasReturnOp(function));
+    try std.testing.expect(functionHasCallOp(function));
+    try std.testing.expect(functionHasCfgOp(function, .block));
+    try std.testing.expect(functionHasCfgOp(function, .unreach));
+    try std.testing.expect(!functionHasCfgOp(function, .cond_br));
 }
 
 test "AIR model parses untyped AIR value query shapes" {

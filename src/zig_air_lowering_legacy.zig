@@ -775,7 +775,7 @@ fn maybeErrorShape(function: air_export.Function) bool {
 
 pub fn errorSwitchShape(function: air_export.Function) bool {
     return std.mem.eql(u8, function.name, "error_switch.error_switch") and
-        functionHasOpcode(function, "call") and
+        air_model.functionHasCallOp(function) and
         air_model.functionHasErrorUnionOp(function, .is_non_err) and
         air_model.functionHasErrorUnionOp(function, .unwrap_payload) and
         functionHasOpcode(function, "switch_br");
@@ -797,30 +797,30 @@ pub fn base64TableLookupShape(function: air_export.Function) bool {
 
 pub fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
     return std.mem.eql(u8, function.name, "runtime_optional_pointer_main.main") and
-        functionHasOpcode(function, "call") and
+        air_model.functionHasCallOp(function) and
         functionHasOpcode(function, "cmp_eq") and
-        functionHasOpcode(function, "block") and
-        functionHasOpcode(function, "cond_br") and
+        air_model.functionHasCfgOp(function, .block) and
+        air_model.functionHasCfgOp(function, .cond_br) and
         air_model.functionHasReturnOp(function);
 }
 
 pub fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
     return std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.main") and
-        functionHasOpcode(function, "call") and
-        functionHasOpcode(function, "load") and
+        air_model.functionHasCallOp(function) and
+        air_model.functionHasMemoryOp(function, .load) and
         functionHasOpcode(function, "cmp_eq") and
-        functionHasOpcode(function, "block") and
-        functionHasOpcode(function, "cond_br") and
+        air_model.functionHasCfgOp(function, .block) and
+        air_model.functionHasCfgOp(function, .cond_br) and
         air_model.functionHasReturnOp(function);
 }
 
 pub fn mixCAddMayPanicShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".add_may_panic") and
         functionHasOpcode(function, "cmp_lt") and
-        functionHasOpcode(function, "cond_br") and
-        functionHasOpcode(function, "call") and
-        functionHasOpcode(function, "unreach") and
-        functionHasOpcode(function, "load") and
+        air_model.functionHasCfgOp(function, .cond_br) and
+        air_model.functionHasCallOp(function) and
+        air_model.functionHasCfgOp(function, .unreach) and
+        air_model.functionHasMemoryOp(function, .load) and
         (functionHasOpcode(function, "add") or functionHasOpcode(function, "add_safe")) and
         air_model.functionHasReturnOp(function);
 }
