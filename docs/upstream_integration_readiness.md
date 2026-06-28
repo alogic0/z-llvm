@@ -772,9 +772,10 @@ the strict frontier gate stayed green. The contract has fail-closed sidecar
 parsing and an active provider hook.
 `AggregateLayoutSummary.provider_kind` records exported-fact,
 generated-inference, static-source-fact, or boundary-provider ownership
-directly. Owned summaries fail
-closed if their field/leaf counts disagree with any remaining fallback
-equivalent. Remaining aggregate layout debt is explicit: the compatibility
+directly. Exported facts are checked against lower-priority static/generated
+evidence for the same nominal layout, and owned summaries fail closed if their
+field/leaf counts disagree with any remaining fallback equivalent. Remaining
+aggregate layout debt is explicit: the compatibility
 fallback table is empty, while 42 temporary static source facts still stand in
 for future Zig-exported field layout facts or broader construction/store/load
 inference.

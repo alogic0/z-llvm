@@ -125,21 +125,18 @@ pub fn aggregateLayoutMismatch(text: []const u8) ?AggregateLayoutMismatch {
     if (isPointerOrSliceSurface(trimmed) or std.mem.startsWith(u8, trimmed, "fn ")) return null;
     const nominal = stripNominalSigil(trimmed);
     const inferred = ownedAggregateLayoutSummary(nominal) orelse return null;
+    if (conflictingOwnedAggregateLayoutSummary(nominal, inferred)) |conflict| {
+        return aggregateLayoutMismatchFromSummaries(nominal, inferred, conflict);
+    }
     const fallback_ty = fallbackNamedAggregateType(nominal) orelse return null;
     const fallback = summarizeAggregateLayout(nominal, fallback_ty, .fallback_table, .{});
     if (aggregateLayoutSummariesEquivalent(inferred, fallback)) return null;
-    return .{
-        .nominal_type_name = nominal,
-        .inferred_field_count = inferred.field_count,
-        .fallback_field_count = fallback.field_count,
-        .inferred_leaf_count = inferred.leaf_count,
-        .fallback_leaf_count = fallback.leaf_count,
-        .evidence = inferred.evidence,
-    };
+    return aggregateLayoutMismatchFromSummaries(nominal, inferred, fallback);
 }
 
 fn aggregateLayoutSummaryForNominal(nominal: []const u8) error{AggregateLayoutMismatch}!?AggregateLayoutSummary {
     if (ownedAggregateLayoutSummary(nominal)) |summary| {
+        if (conflictingOwnedAggregateLayoutSummary(nominal, summary) != null) return error.AggregateLayoutMismatch;
         if (fallbackNamedAggregateType(nominal)) |fallback_ty| {
             const fallback = summarizeAggregateLayout(nominal, fallback_ty, .fallback_table, .{});
             if (!aggregateLayoutSummariesEquivalent(summary, fallback)) return error.AggregateLayoutMismatch;
@@ -153,6 +150,31 @@ fn aggregateLayoutSummaryForNominal(nominal: []const u8) error{AggregateLayoutMi
         return summarizeAggregateLayout(nominal, ty, .fallback_table, .{});
     }
     return null;
+}
+
+fn conflictingOwnedAggregateLayoutSummary(nominal: []const u8, selected: AggregateLayoutSummary) ?AggregateLayoutSummary {
+    const selected_provider = selected.provider_kind orelse return null;
+    for (aggregate_layout_providers) |provider| {
+        if (provider.kind == selected_provider) continue;
+        const candidate = provider.lookup(nominal) orelse continue;
+        if (!aggregateLayoutSummariesEquivalent(selected, candidate)) return candidate;
+    }
+    return null;
+}
+
+fn aggregateLayoutMismatchFromSummaries(
+    nominal: []const u8,
+    inferred: AggregateLayoutSummary,
+    fallback: AggregateLayoutSummary,
+) AggregateLayoutMismatch {
+    return .{
+        .nominal_type_name = nominal,
+        .inferred_field_count = inferred.field_count,
+        .fallback_field_count = fallback.field_count,
+        .inferred_leaf_count = inferred.leaf_count,
+        .fallback_leaf_count = fallback.leaf_count,
+        .evidence = inferred.evidence,
+    };
 }
 
 fn ownedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
@@ -507,6 +529,21 @@ test "type layout prefers active exported facts before temporary static source f
     try std.testing.expectEqual(AggregateLayoutSource.facts, summary.source);
     try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, summary.provider_kind.?);
     try std.testing.expectEqual(@as(usize, 2), summary.field_count);
+}
+
+test "type layout fails closed when exported fact conflicts with lower-priority evidence" {
+    const contents =
+        exported_aggregate_layout_facts.section_name ++ "\n" ++
+        "fact nominal=\"Mixed\" aggregate=\"{ i64, i64 }\" construction=1 store=1 load=1\n";
+    const provider = try exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
+    exported_aggregate_layout_facts.setActiveProvider(provider);
+    defer provider.deinit(std.testing.allocator);
+    defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+
+    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("Mixed"));
+    const mismatch = aggregateLayoutMismatch("Mixed").?;
+    try std.testing.expectEqual(@as(usize, 2), mismatch.inferred_leaf_count);
+    try std.testing.expectEqual(@as(usize, 2), mismatch.fallback_leaf_count);
 }
 
 test "type layout infers representative frontier aggregate rows" {

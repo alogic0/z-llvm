@@ -528,7 +528,10 @@ Aggregate/type-layout ownership start:
   Zig-owned field facts are
   available. `AggregateLayoutSummary.provider_kind`
   records exported-fact, generated-inference, static-source-fact, or
-  boundary-provider ownership directly. Generated inference
+  boundary-provider ownership directly. Exported facts now fail closed if they
+  disagree with lower-priority static or generated evidence for the same
+  nominal layout, so sidecar migration cannot silently override a conflicting
+  existing plan. Generated inference
   covers the scalar-BigN rule for
   Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 and the large-BigN
   array-leaf rule covering Big32, Big40, Big48, Big64, Big80, Big81, Big96,
