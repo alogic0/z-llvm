@@ -132,9 +132,6 @@ fn aggregateLayoutSummaryForNominal(nominal: []const u8) error{AggregateLayoutMi
         }
         return summary;
     }
-    if (frontierSysVSretByvalBigType(nominal)) |ty| {
-        return summarizeAggregateLayout(nominal, ty, .fallback_table, .{});
-    }
     if (fallbackNamedAggregateType(nominal)) |ty| {
         return summarizeAggregateLayout(nominal, ty, .fallback_table, .{});
     }
@@ -142,6 +139,7 @@ fn aggregateLayoutSummaryForNominal(nominal: []const u8) error{AggregateLayoutMi
 }
 
 fn inferredAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
+    if (inferredBigScalarLayoutSummary(nominal)) |summary| return summary;
     if (inferredBigArrayLayoutSummary(nominal)) |summary| return summary;
     for (source_aggregate_layout_facts) |fact| {
         if (!sourceAggregateLayoutFactMatches(nominal, fact)) continue;
@@ -223,6 +221,32 @@ fn inferredBigArrayLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
         .store = true,
         .load = true,
     });
+}
+
+fn inferredBigScalarLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
+    const prefix = "frontier_sysv_sret_byval.Big";
+    if (!std.mem.startsWith(u8, nominal, prefix)) return null;
+    const field_count = std.fmt.parseInt(u16, nominal[prefix.len..], 10) catch return null;
+    if (field_count < 3 or field_count > 20) return null;
+    const aggregate_text = repeatedScalarAggregateText(field_count, "i64") orelse return null;
+    return summarizeAggregateLayout(nominal, aggregate(aggregate_text), .inference, .{
+        .construction = true,
+        .store = true,
+        .load = true,
+    });
+}
+
+fn repeatedScalarAggregateText(field_count: usize, scalar_text: []const u8) ?[]const u8 {
+    if (field_count == 0) return null;
+    var aggregate_text: std.ArrayList(u8) = .empty;
+    aggregate_text.appendSlice(std.heap.page_allocator, "{ ") catch return null;
+    var index: usize = 0;
+    while (index < field_count) : (index += 1) {
+        if (index != 0) aggregate_text.appendSlice(std.heap.page_allocator, ", ") catch return null;
+        aggregate_text.appendSlice(std.heap.page_allocator, scalar_text) catch return null;
+    }
+    aggregate_text.appendSlice(std.heap.page_allocator, " }") catch return null;
+    return aggregate_text.toOwnedSlice(std.heap.page_allocator) catch return null;
 }
 
 fn aggregateLayoutSummariesEquivalent(lhs: AggregateLayoutSummary, rhs: AggregateLayoutSummary) bool {
@@ -425,31 +449,7 @@ pub fn isAggregateType(ty: ir.Type) bool {
 }
 
 pub fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ir.Type {
-    const prefix = "frontier_sysv_sret_byval.Big";
-    if (!std.mem.startsWith(u8, trimmed, prefix)) return null;
-    const field_count = std.fmt.parseInt(u16, trimmed[prefix.len..], 10) catch return null;
-    const aggregate_text: []const u8 = switch (field_count) {
-        3 => "{ i64, i64, i64 }",
-        4 => "{ i64, i64, i64, i64 }",
-        5 => "{ i64, i64, i64, i64, i64 }",
-        6 => "{ i64, i64, i64, i64, i64, i64 }",
-        7 => "{ i64, i64, i64, i64, i64, i64, i64 }",
-        8 => "{ i64, i64, i64, i64, i64, i64, i64, i64 }",
-        9 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        10 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        11 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        12 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        13 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        14 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        15 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        16 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        17 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        18 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        19 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        20 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        else => return null,
-    };
-    return aggregate(aggregate_text);
+    return if (inferredBigScalarLayoutSummary(trimmed)) |summary| summary.ty else null;
 }
 
 fn aggregate(text: []const u8) ir.Type {
@@ -462,7 +462,7 @@ test "type layout decodes nominal aggregate basenames without fixture module nam
     try std.testing.expect(parseNamedAggregateType("*frontier_sysv_aggregate_classes.Mixed") == null);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ [2 x double] }" }, parseNamedAggregateType("frontier_sysv_aggregate_classes.ArrayDouble").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }, parseNamedAggregateType("other.NestedPair").?);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, i64, i64 }" }, parseNamedAggregateType("%frontier_sysv_sret_byval.Big3").?);
+    try std.testing.expect(parseNamedAggregateType("%frontier_sysv_sret_byval.Big3").?.eql(.{ .aggregate = "{ i64, i64, i64 }" }));
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("aggregate_abi.Pair").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("%runtime_aggregate_pair_main.Pair").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, normalizeAggregateType(.{ .aggregate = "%expanded_abi_frontier.Pair" }));
@@ -508,6 +508,16 @@ test "type layout infers representative frontier aggregate rows" {
     try std.testing.expectEqual(AggregateLayoutSource.inference, big_array.source);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ [5 x i64] }" }, big_array.ty);
     try std.testing.expectEqual(@as(usize, 5), big_array.leaf_count);
+
+    const big3 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big3").?;
+    try std.testing.expectEqual(AggregateLayoutSource.inference, big3.source);
+    try std.testing.expect(big3.ty.eql(.{ .aggregate = "{ i64, i64, i64 }" }));
+    try std.testing.expectEqual(@as(usize, 3), big3.leaf_count);
+
+    const big20 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big20").?;
+    try std.testing.expectEqual(AggregateLayoutSource.inference, big20.source);
+    try std.testing.expectEqual(@as(usize, 20), big20.leaf_count);
+    try std.testing.expect(big20.leafSlice()[19].ty.eql(.{ .int = 64 }));
 
     const big256 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big256").?;
     try std.testing.expectEqual(AggregateLayoutSource.inference, big256.source);

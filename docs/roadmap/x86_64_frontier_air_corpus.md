@@ -84,14 +84,15 @@ typed AIR pointer paths for insertvalue indices. SysV classification consumes
 the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
 of the basename compatibility table and records layout source, field count,
 scalar leaves, and construction/store/load evidence. The source/AIR inferred
-slice has 42 named layout facts plus a reusable
-`frontier_sysv_sret_byval.BigN` array-leaf rule covering the 12 current
-Big32..Big256 rows; those rows no longer depend on the fallback table.
+slice has 42 named layout facts plus generated `frontier_sysv_sret_byval.BigN`
+rules for the 9 scalar Big3..Big20 rows and the 12 current Big32..Big256
+array-leaf rows; those rows no longer depend on the fallback table.
 Inferred summaries are checked against any still-present fallback equivalent
 and fail closed on field/leaf-count mismatch. Remaining aggregate layout debt
-is explicit: 14 compatibility fallback entries still stand in for future
-Zig-exported field facts or broader construction/store/load inference,
-including the 2 packed/unaligned targeted boundary entries. Register aggregate
+is explicit: 5 compatibility fallback entries still stand in for future
+Zig-exported field facts or broader construction/store/load inference:
+`Outer`, `Pair`, `Inner`, and the 2 packed/unaligned targeted boundary entries.
+Register aggregate
 construction and sret/byval make rows now add function-local typed AIR
 inference on top of the nominal summaries: `ret_ptr` plus field/element pointer
 stores and `ret_load` are used to validate the aggregate shape, including the
