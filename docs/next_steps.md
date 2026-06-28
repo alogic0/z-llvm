@@ -281,11 +281,11 @@ Execution order:
    source, field count, scalar leaves, and construction/store/load evidence.
    It is consulted before the basename compatibility table, so
    the first broad easy-layout slice is source/AIR-inferred instead of
-   fallback-table-owned. The inferred side now has 18 named layout facts plus a
+   fallback-table-owned. The inferred side now has 42 named layout facts plus a
    reusable `frontier_sysv_sret_byval.BigN` array-leaf rule that covers the 12
-   current Big32..Big256 rows. The fallback side is reduced to 37 compatibility
-   entries: 28 non-packed nominal basenames plus the 9 scalar Big3..Big20 sret/
-   byval forms. Packed/unaligned aggregate layout remains a 2-row boundary.
+   current Big32..Big256 rows. The fallback side is reduced to 14 compatibility
+   entries: `Outer`, `Pair`, `Inner`, the 9 scalar Big3..Big20 sret/byval
+   forms, and the 2 packed/unaligned boundary entries.
    Inferred summaries are compared against any still-present compatibility
    fallback; a disagreement fails closed with nominal name, field-count,
    leaf-count, and construction/store/load evidence available through
@@ -503,32 +503,26 @@ Aggregate/type-layout ownership start:
   lowerers now admit by normalized layout and data-flow structure instead of
   exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
   source/AIR-inferred layouts from fallback-table layouts. The inferred set has
-  18 named source-owned facts and a reusable large-BigN array-leaf rule
+  42 named source-owned facts and a reusable large-BigN array-leaf rule
   covering Big32, Big40, Big48, Big64, Big80, Big81, Big96, Big128, Big160,
-  Big192, Big224, and Big256. The fallback table is reduced to 37
-  compatibility entries, and packed/unaligned aggregate ABI stays a targeted
-  fail-closed boundary with `packed_aggregate_boundary_rows=2`. Function-local
-  typed AIR construction evidence now feeds register aggregate admission:
-  the inference path derives struct fields and single-field array leaves from
-  concrete store paths, then validates that derived layout against the shared
-  plan.
+  Big192, Big224, and Big256. The fallback table is reduced to 14
+  compatibility entries, including the 2 packed/unaligned boundary entries.
+  Function-local typed AIR construction evidence now feeds register aggregate
+  and sret/byval make admission: the inference path derives struct fields and
+  single-field array leaves from concrete store paths, then validates that
+  derived layout against the shared plan.
 - Nominal aggregate layout source audit:
   - Source/AIR-inferred before fallback table:
     `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
     `Pair64`, `Mixed`, `ReverseMixed`, `DoublePair`, `FloatPair`,
     `FloatArray`, `NestedPair`, `ArrayPair`, `ArrayDouble`, `DoubleBox`,
     `NestedDouble`, `NestedMixed`, `Pair32`, `SmallMixed`,
-    `SmallReverseMixed`, `frontier_sysv_sret_byval.BigArray`, and the
-    large-BigN array rule for BigN >= 32.
+    `SmallReverseMixed`, all non-packed sret/byval frontier basenames from
+    `BigNested` through `ScalarArray`, and the large-BigN array rule for
+    BigN >= 32.
   - Remaining fallback-table compatibility entries:
-    `Outer`, `BigNested`, `BigMixed`, `NarrowInner`, `BigNarrow`, `BigArray`,
-    `BigDouble`, `BigDoubleArray`, `BigFloat`, `BigFloatArray`,
-    `BigPtrDouble`, `BigPtrFloat`, `BigArrayMixed`,
-    `BigNestedArrayMixed`, `MixedArrayLeaf`, `BigStructArrayMixed`,
-    `BigDeepMixed`, `BigByteTail`, `BigByteTail5`, `BigByteTail6`,
-    `BigByteTail7`, `BigWordTail`, `ScalarMixed`, `ScalarNestedInner`,
-    `ScalarNested`, `ScalarArray`, `Pair`, `Inner`, and the scalar
-    Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 generated forms.
+    `Outer`, `Pair`, `Inner`, `PackedMixed`, `PackedReverseMixed`, and the
+    scalar Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 generated forms.
   - Remaining dynamic `frontier_sysv_sret_byval.BigN` scalar forms below 32
     stay compatibility-owned until they can be proven from exported field
     layout facts or a generalized scalar-field inference path.
@@ -582,13 +576,14 @@ Validation after these refactor slices is saved in
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
   checks. `AggregateLayoutSummary` now records whether a layout came from
   source/AIR inference or from the compatibility table; the inferred side has
-  18 named source-owned facts plus a large-BigN array rule, and mismatch
+  42 named source-owned facts plus a large-BigN array rule, and mismatch
   checking compares inferred field/leaf counts against any remaining fallback
   entry. Register aggregate construction now also has mechanical typed-AIR
   inference for ret_ptr/field-or-element pointer/store/ret_load rows, including
-  single-field array leaf reconstruction. The remaining nominal table entries
-  require exported field-layout facts or broader construction/store/load
-  inference before they can leave compatibility ownership.
+  single-field array leaf reconstruction; the same leaf/path validation now
+  gates sret/byval make rows. The remaining nominal table entries require
+  exported field-layout facts or broader construction/store/load inference
+  before they can leave compatibility ownership.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

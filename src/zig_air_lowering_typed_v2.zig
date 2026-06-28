@@ -25,9 +25,10 @@ const ownPrint = air_model.ownPrint;
 const splitTopLevel = air_text.splitTopLevel;
 const parseSymbolPointer = air_values.parseSymbolPointer;
 const irCallingConvention = air_model.irCallingConvention;
-const supportedScalarAggregateLeafParamCount = air_aggregate_copy.supportedScalarAggregateLeafParamCount;
-const supportedAggregateCopyLeafCount = air_aggregate_copy.supportedAggregateCopyLeafCount;
 const collectAggregateCopyLeaves = air_aggregate_copy.collectAggregateCopyLeaves;
+const validateSretAggregateMakeRecords = air_aggregate_copy.validateSretAggregateMakeRecords;
+const validateSretAggregateCopyRecords = air_aggregate_copy.validateSretAggregateCopyRecords;
+const validateSretAggregateCallWrapperRecords = air_aggregate_copy.validateSretAggregateCallWrapperRecords;
 const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegisterAggregateCandidate;
 
 const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
@@ -412,12 +413,7 @@ pub fn typedV2SretIntegerAggregateRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
-    const leaf_count = supportedScalarAggregateLeafParamCount(function_type.return_type.ir_type, function_type.params) orelse return false;
-    if (leaf_count < 3) return false;
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == leaf_count and
-        air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
-        air_model.typedStoreOpcodeCount(structured_air_v2) == leaf_count and
-        air_model.typedOpcodeCount(structured_air_v2, "ret_load") == 1;
+    return validateSretAggregateMakeRecords(function_type, structured_air_v2);
 }
 
 pub fn typedV2SretIntegerAggregateCopyRecords(
@@ -425,11 +421,7 @@ pub fn typedV2SretIntegerAggregateCopyRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
-    const leaf_count = supportedAggregateCopyLeafCount(function_type.return_type.ir_type) orelse return false;
-    if (leaf_count < 3 or function_type.params.len != 1) return false;
-    if (!function_type.params[0].ir_type.eql(function_type.return_type.ir_type)) return false;
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return validateSretAggregateCopyRecords(function_type, structured_air_v2);
 }
 
 pub fn typedV2SretIntegerAggregateCallWrapperRecords(
@@ -437,11 +429,7 @@ pub fn typedV2SretIntegerAggregateCallWrapperRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
-    const leaf_count = supportedAggregateCopyLeafCount(function_type.return_type.ir_type) orelse return false;
-    if (leaf_count < 3 or function_type.params.len < 2) return false;
-    if (!function_type.params[function_type.params.len - 1].ir_type.eql(function_type.return_type.ir_type)) return false;
-    if (air_model.typedOpcodeCount(structured_air_v2, "call") != 1 or !air_model.typedHasReturnOpcode(structured_air_v2)) return false;
-    return true;
+    return validateSretAggregateCallWrapperRecords(function_type, structured_air_v2);
 }
 
 pub fn lowerSretIntegerAggregateMake(

@@ -83,19 +83,19 @@ construction admission validates operands against the same plan before using
 typed AIR pointer paths for insertvalue indices. SysV classification consumes
 the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
 of the basename compatibility table and records layout source, field count,
-scalar leaves, and construction/store/load evidence. The first source/AIR
-inferred slice has 18 named layout facts plus a reusable
+scalar leaves, and construction/store/load evidence. The source/AIR inferred
+slice has 42 named layout facts plus a reusable
 `frontier_sysv_sret_byval.BigN` array-leaf rule covering the 12 current
 Big32..Big256 rows; those rows no longer depend on the fallback table.
 Inferred summaries are checked against any still-present fallback equivalent
 and fail closed on field/leaf-count mismatch. Remaining aggregate layout debt
-is explicit: 37 compatibility fallback entries still stand in for future
-Zig-exported field facts or broader construction/store/load inference, and
-packed/unaligned aggregate ABI remains a 2-row targeted boundary. Register
-aggregate construction now adds function-local typed AIR inference on top of
-the nominal summaries: `ret_ptr` plus field/element pointer stores and
-`ret_load` are used to rebuild the aggregate shape, including the selected
-single-field array-leaf form, before the row is admitted.
+is explicit: 14 compatibility fallback entries still stand in for future
+Zig-exported field facts or broader construction/store/load inference,
+including the 2 packed/unaligned targeted boundary entries. Register aggregate
+construction and sret/byval make rows now add function-local typed AIR
+inference on top of the nominal summaries: `ret_ptr` plus field/element pointer
+stores and `ret_load` are used to validate the aggregate shape, including the
+selected single-field array-leaf form, before the row is admitted.
 
 Current frontier ABI boundary seed:
 

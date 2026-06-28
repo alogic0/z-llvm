@@ -755,18 +755,18 @@ operands against the same plan before using typed AIR pointer paths for
 insertvalue indices, and SysV classification consumes the same normalized
 aggregate type. `AggregateLayoutSummary` now records whether a layout came from
 source/AIR inference or from the compatibility table. The inferred side now has
-18 named layout facts plus a reusable `frontier_sysv_sret_byval.BigN`
+42 named layout facts plus a reusable `frontier_sysv_sret_byval.BigN`
 array-leaf rule covering the 12 current Big32..Big256 rows; those accepted
 aggregate rows no longer depend on the basename fallback table. Inferred
 summaries fail closed if their field/leaf counts disagree with any remaining
-fallback equivalent. Remaining aggregate layout debt is explicit: 37
+fallback equivalent. Remaining aggregate layout debt is explicit: 14
 compatibility fallback entries still stand in for future Zig-exported field
 layout facts or broader construction/store/load inference, and
 packed/unaligned aggregate ABI remains a 2-row targeted boundary. Register
-aggregate construction now performs mechanical typed AIR inference from
-ret_ptr, field/element pointer stores, and ret_load before admission, so those
-rows are checked by function-local construction evidence rather than nominal
-layout facts alone.
+aggregate construction and sret/byval make rows now perform mechanical typed
+AIR inference from ret_ptr, field/element pointer stores, and ret_load before
+admission, so those rows are checked by function-local construction evidence
+rather than nominal layout facts alone.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

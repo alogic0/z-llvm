@@ -155,32 +155,6 @@ fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
     if (std.mem.eql(u8, basename, "Outer")) return aggregate("{ { i32, i32 }, { i32, i32 } }");
     if (std.mem.eql(u8, basename, "PackedMixed")) return aggregate("{ i32, i32, double }");
     if (std.mem.eql(u8, basename, "PackedReverseMixed")) return aggregate("{ double, i32, i32 }");
-    if (std.mem.eql(u8, basename, "BigNested")) return aggregate("{ { i64, i64, i64 }, { i64, i64, i64 } }");
-    if (std.mem.eql(u8, basename, "BigMixed")) return aggregate("{ i64, i32, i64, i32 }");
-    if (std.mem.eql(u8, basename, "NarrowInner")) return aggregate("{ i16, i32 }");
-    if (std.mem.eql(u8, basename, "BigNarrow")) return aggregate("{ i8, { i16, i32 }, i64 }");
-    if (std.mem.eql(u8, basename, "BigArray")) return aggregate("{ [5 x i64] }");
-    if (std.mem.eql(u8, basename, "BigDouble")) return aggregate("{ double, double, double }");
-    if (std.mem.eql(u8, basename, "BigDoubleArray")) return aggregate("{ [3 x double] }");
-    if (std.mem.eql(u8, basename, "BigFloat")) return aggregate("{ float, float, float, float, float }");
-    if (std.mem.eql(u8, basename, "BigFloatArray")) return aggregate("{ [5 x float] }");
-    if (std.mem.eql(u8, basename, "BigPtrDouble")) return aggregate("{ ptr, double, i64 }");
-    if (std.mem.eql(u8, basename, "BigPtrFloat")) return aggregate("{ ptr, float, i64 }");
-    if (std.mem.eql(u8, basename, "BigArrayMixed")) return aggregate("{ [2 x i32], [2 x double], ptr }");
-    if (std.mem.eql(u8, basename, "BigNestedArrayMixed")) return aggregate("{ { [5 x float] }, { [3 x double] }, ptr, i64 }");
-    if (std.mem.eql(u8, basename, "MixedArrayLeaf")) return aggregate("{ i32, double }");
-    if (std.mem.eql(u8, basename, "BigStructArrayMixed")) return aggregate("{ [3 x { i32, double }], i64 }");
-    if (std.mem.eql(u8, basename, "BigDeepMixed")) return aggregate("{ { { [5 x float] }, { [3 x double] }, ptr, i64 }, [2 x { i32, double }], { { i8, i16 }, i32, double, ptr }, [2 x ptr], i32 }");
-    if (std.mem.eql(u8, basename, "BigByteTail")) return aggregate("{ [17 x i8] }");
-    if (std.mem.eql(u8, basename, "BigByteTail5")) return aggregate("{ [21 x i8] }");
-    if (std.mem.eql(u8, basename, "BigByteTail6")) return aggregate("{ [22 x i8] }");
-    if (std.mem.eql(u8, basename, "BigByteTail7")) return aggregate("{ [23 x i8] }");
-    if (std.mem.eql(u8, basename, "BigWordTail")) return aggregate("{ [9 x i16] }");
-    if (std.mem.eql(u8, basename, "ScalarMixed")) return aggregate("{ i8, i16, i32, i64, ptr, float, double }");
-    if (std.mem.eql(u8, basename, "ScalarNestedInner")) return aggregate("{ i8, i16 }");
-    if (std.mem.eql(u8, basename, "ScalarNested")) return aggregate("{ { i8, i16 }, i32, double, ptr }");
-    if (std.mem.eql(u8, basename, "ScalarArray")) return aggregate("{ [3 x i32], [2 x double], ptr }");
-
     if (std.mem.eql(u8, basename, "Pair")) return aggregate("{ i32, i32 }");
     if (std.mem.eql(u8, basename, "Inner")) return aggregate("{ i32, i32 }");
     return null;
@@ -204,7 +178,31 @@ const source_aggregate_layout_facts = [_]SourceAggregateLayoutFact{
     .{ .name = "NestedMixed", .aggregate_text = "{ { i32, i32 }, double }" },
     .{ .name = "SmallMixed", .aggregate_text = "{ i32, double }" },
     .{ .name = "SmallReverseMixed", .aggregate_text = "{ double, i32 }" },
-    .{ .name = "frontier_sysv_sret_byval.BigArray", .aggregate_text = "{ [5 x i64] }", .match = .exact },
+    .{ .name = "BigNested", .aggregate_text = "{ { i64, i64, i64 }, { i64, i64, i64 } }" },
+    .{ .name = "BigMixed", .aggregate_text = "{ i64, i32, i64, i32 }" },
+    .{ .name = "NarrowInner", .aggregate_text = "{ i16, i32 }" },
+    .{ .name = "BigNarrow", .aggregate_text = "{ i8, { i16, i32 }, i64 }" },
+    .{ .name = "BigArray", .aggregate_text = "{ [5 x i64] }" },
+    .{ .name = "BigDouble", .aggregate_text = "{ double, double, double }" },
+    .{ .name = "BigDoubleArray", .aggregate_text = "{ [3 x double] }" },
+    .{ .name = "BigFloat", .aggregate_text = "{ float, float, float, float, float }" },
+    .{ .name = "BigFloatArray", .aggregate_text = "{ [5 x float] }" },
+    .{ .name = "BigPtrDouble", .aggregate_text = "{ ptr, double, i64 }" },
+    .{ .name = "BigPtrFloat", .aggregate_text = "{ ptr, float, i64 }" },
+    .{ .name = "BigArrayMixed", .aggregate_text = "{ [2 x i32], [2 x double], ptr }" },
+    .{ .name = "BigNestedArrayMixed", .aggregate_text = "{ { [5 x float] }, { [3 x double] }, ptr, i64 }" },
+    .{ .name = "MixedArrayLeaf", .aggregate_text = "{ i32, double }" },
+    .{ .name = "BigStructArrayMixed", .aggregate_text = "{ [3 x { i32, double }], i64 }" },
+    .{ .name = "BigDeepMixed", .aggregate_text = "{ { { [5 x float] }, { [3 x double] }, ptr, i64 }, [2 x { i32, double }], { { i8, i16 }, i32, double, ptr }, [2 x ptr], i32 }" },
+    .{ .name = "BigByteTail", .aggregate_text = "{ [17 x i8] }" },
+    .{ .name = "BigByteTail5", .aggregate_text = "{ [21 x i8] }" },
+    .{ .name = "BigByteTail6", .aggregate_text = "{ [22 x i8] }" },
+    .{ .name = "BigByteTail7", .aggregate_text = "{ [23 x i8] }" },
+    .{ .name = "BigWordTail", .aggregate_text = "{ [9 x i16] }" },
+    .{ .name = "ScalarMixed", .aggregate_text = "{ i8, i16, i32, i64, ptr, float, double }" },
+    .{ .name = "ScalarNestedInner", .aggregate_text = "{ i8, i16 }" },
+    .{ .name = "ScalarNested", .aggregate_text = "{ { i8, i16 }, i32, double, ptr }" },
+    .{ .name = "ScalarArray", .aggregate_text = "{ [3 x i32], [2 x double], ptr }" },
 };
 
 fn sourceAggregateLayoutFactMatches(nominal: []const u8, fact: SourceAggregateLayoutFact) bool {
@@ -310,6 +308,24 @@ pub fn fieldByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, field_i
     const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, normalizeAggregateType(aggregate_ty), field_index) orelse return null;
     if (offset_i < 0) return null;
     return @intCast(offset_i);
+}
+
+pub fn leafAtIndexPath(layout: target.DataLayout, aggregate_ty: ir.Type, path: []const usize) ?AggregateLeaf {
+    if (path.len == 0) return null;
+    var current_ty = normalizeAggregateType(aggregate_ty);
+    var offset: u64 = 0;
+    for (path, 0..) |field_index, position| {
+        const field_ty = fieldType(current_ty, field_index) orelse return null;
+        offset += fieldByteOffset(layout, current_ty, field_index) orelse return null;
+        if (position == path.len - 1) {
+            const normalized_field_ty = normalizeAggregateType(field_ty);
+            if (isAggregateType(normalized_field_ty)) return null;
+            return .{ .offset = offset, .ty = normalized_field_ty };
+        }
+        current_ty = normalizeAggregateType(field_ty);
+        if (!isAggregateType(current_ty)) return null;
+    }
+    return null;
 }
 
 pub fn fieldIndexAtOffset(
@@ -503,6 +519,23 @@ test "type layout keeps packed aggregates compatibility boundary owned" {
     const packed_summary = aggregateLayoutSummary("frontier_sysv_aggregate_classes.PackedMixed").?;
     try std.testing.expectEqual(AggregateLayoutSource.fallback_table, packed_summary.source);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32, double }" }, packed_summary.ty);
+
+    const big_mixed = aggregateLayoutSummary("frontier_sysv_sret_byval.BigMixed").?;
+    try std.testing.expectEqual(AggregateLayoutSource.inference, big_mixed.source);
+    try std.testing.expectEqual(@as(usize, 4), big_mixed.leaf_count);
+}
+
+test "type layout resolves leaf by aggregate index path" {
+    const layout = try target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    const nested = parseNamedAggregateType("frontier_sysv_sret_byval.BigNested").?;
+    const leaf = leafAtIndexPath(layout, nested, &.{ 1, 2 }).?;
+    try std.testing.expectEqual(@as(u64, 40), leaf.offset);
+    try std.testing.expect(leaf.ty.eql(.{ .int = 64 }));
+
+    const array = parseNamedAggregateType("frontier_sysv_sret_byval.BigArray").?;
+    const array_leaf = leafAtIndexPath(layout, array, &.{ 0, 4 }).?;
+    try std.testing.expectEqual(@as(u64, 32), array_leaf.offset);
+    try std.testing.expect(array_leaf.ty.eql(.{ .int = 64 }));
 }
 
 test "type layout owns aggregate field and leaf queries" {
