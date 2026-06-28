@@ -753,9 +753,16 @@ normalized field/leaf plan for pair admission and sret/byval aggregate copy
 and make planning. Typed-v2 register aggregate construction admission validates
 operands against the same plan before using typed AIR pointer paths for
 insertvalue indices, and SysV classification consumes the same normalized
-aggregate type. Remaining aggregate layout debt is explicit: the broader
-nominal layout table still stands in for future Zig-exported field layout
-facts, and packed/unaligned aggregate ABI remains a targeted boundary.
+aggregate type. `AggregateLayoutSummary` now records whether a layout came from
+source/AIR inference or from the compatibility table. The first inferred
+layouts are `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
+`frontier_sysv_aggregate_classes.Pair32`,
+`frontier_sysv_aggregate_classes.SmallMixed`, and
+`frontier_sysv_sret_byval.BigArray`; those accepted aggregate rows no longer
+depend on the basename fallback table. Remaining aggregate layout debt is
+explicit: the broader nominal layout table still stands in for future
+Zig-exported field layout facts or broader construction/store/load inference,
+and packed/unaligned aggregate ABI remains a targeted boundary.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

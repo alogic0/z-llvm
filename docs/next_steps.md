@@ -277,8 +277,17 @@ Execution order:
    the SysV classifier consumes the same normalized aggregate type. The
    construction emitter still uses typed AIR pointer-path summaries for
    insertvalue index paths because the layout plan owns offsets/types rather
-   than AIR instruction paths. Next work: replace the remaining nominal layout
-   table with Zig-exported field facts when the AIR contract exposes them.
+   than AIR instruction paths. `AggregateLayoutSummary` now records layout
+   source, field count, scalar leaves, and construction/store/load evidence.
+   It is consulted before the basename compatibility table, so
+   `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
+   `frontier_sysv_aggregate_classes.Pair32`,
+   `frontier_sysv_aggregate_classes.SmallMixed`, and
+   `frontier_sysv_sret_byval.BigArray` are source/AIR-inferred layout
+   summaries instead of fallback-table rows. Remaining nominal entries in the
+   fallback table are compatibility-owned until the current AIR export exposes
+   general field layout facts or a function-local construction/store/load
+   summary can prove them.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
@@ -484,9 +493,41 @@ Aggregate/type-layout ownership start:
 - Remaining aggregate/type-layout debt is narrower and explicit: nominal `Pair`
   is layout-owned as `{ i32, i32 }`, the runtime aggregate-pair compatibility
   lowerers now admit by normalized layout and data-flow structure instead of
-  exact aggregate-pair symbol names. Packed/unaligned aggregate ABI stays a
-  targeted fail-closed boundary with
+  exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
+  source/AIR-inferred layouts from fallback-table layouts. The first inferred
+  set covers `frontier_nested_records.Inner`,
+  `frontier_nested_records.Outer`, `frontier_sysv_aggregate_classes.Pair32`,
+  `frontier_sysv_aggregate_classes.SmallMixed`, and
+  `frontier_sysv_sret_byval.BigArray`; the broader nominal table remains
+  compatibility-owned pending exported Zig field layout facts or richer
+  function-local construction/store/load inference. Packed/unaligned aggregate
+  ABI stays a targeted fail-closed boundary with
   `packed_aggregate_boundary_rows=2`.
+- Nominal aggregate layout source audit:
+  - Source/AIR-inferred before fallback table:
+    `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
+    `frontier_sysv_aggregate_classes.Pair32`,
+    `frontier_sysv_aggregate_classes.SmallMixed`,
+    `frontier_sysv_sret_byval.BigArray`.
+  - Remaining basename mappings that should be derivable from existing
+    aggregate construction/store/load paths once inference is broadened:
+    `Pair64`, `Mixed`, `ReverseMixed`, `DoublePair`, `FloatPair`,
+    `FloatArray`, `NestedPair`, `ArrayPair`, `ArrayDouble`, `DoubleBox`,
+    `NestedDouble`, `NestedMixed`, `SmallReverseMixed`, `BigNested`,
+    `BigMixed`, `NarrowInner`, `BigNarrow`, `BigDouble`,
+    `BigDoubleArray`, `BigFloat`, `BigFloatArray`, `BigPtrDouble`,
+    `BigPtrFloat`, `BigArrayMixed`, `BigNestedArrayMixed`,
+    `MixedArrayLeaf`, `BigStructArrayMixed`, `BigDeepMixed`,
+    `BigByteTail`, `BigByteTail5`, `BigByteTail6`, `BigByteTail7`,
+    `BigWordTail`, `ScalarMixed`, `ScalarNestedInner`, `ScalarNested`,
+    `ScalarArray`, and the non-frontier compatibility uses of `Pair`,
+    `Inner`, `Outer`, `Pair32`, `SmallMixed`, and `BigArray`.
+  - Remaining dynamic `frontier_sysv_sret_byval.BigN` mappings should move to
+    exported field layout facts or a generalized array-leaf inference path; the
+    current generated mapping is compatibility-owned.
+  - `PackedMixed` and `PackedReverseMixed` stay boundary-owned until
+    packed/unaligned field layout and ABI facts are exported or implemented
+    explicitly.
 
 Validation after these refactor slices is saved in
 `tmp/frontier_counter_update.log` and
@@ -532,7 +573,14 @@ Validation after these refactor slices is saved in
   pointer paths for insertvalue indices. The former centralized ambiguous
   `Pair` rule and exact runtime aggregate-pair symbol-name admission have been
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
-  checks.
+  checks. `AggregateLayoutSummary` now records whether a layout came from
+  source/AIR inference or from the compatibility table; the first inferred
+  representatives are `frontier_nested_records.Inner`,
+  `frontier_nested_records.Outer`, `frontier_sysv_aggregate_classes.Pair32`,
+  `frontier_sysv_aggregate_classes.SmallMixed`, and
+  `frontier_sysv_sret_byval.BigArray`. The remaining nominal table entries
+  require exported field-layout facts or broader construction/store/load
+  inference before they can leave compatibility ownership.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

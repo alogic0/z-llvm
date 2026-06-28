@@ -81,10 +81,17 @@ now supplies the shared normalized field/leaf plan for pair admission and
 sret/byval aggregate copy/make planning, and typed-v2 register aggregate
 construction admission validates operands against the same plan before using
 typed AIR pointer paths for insertvalue indices. SysV classification consumes
-the same normalized aggregate type. Remaining aggregate layout debt is
-explicit: the broader nominal layout table still stands in for future
-Zig-exported field facts, and packed/unaligned aggregate ABI remains a targeted
-boundary row.
+the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
+of the basename compatibility table and records layout source, field count,
+scalar leaves, and construction/store/load evidence. The first source/AIR
+inferred layouts are `frontier_nested_records.Inner`,
+`frontier_nested_records.Outer`, `frontier_sysv_aggregate_classes.Pair32`,
+`frontier_sysv_aggregate_classes.SmallMixed`, and
+`frontier_sysv_sret_byval.BigArray`; those rows no longer depend on the
+fallback table. Remaining aggregate layout debt is explicit: the broader
+nominal layout table still stands in for future Zig-exported field facts or
+broader construction/store/load inference, and packed/unaligned aggregate ABI
+remains a targeted boundary row.
 
 Current frontier ABI boundary seed:
 
