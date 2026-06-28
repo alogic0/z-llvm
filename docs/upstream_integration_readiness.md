@@ -682,21 +682,23 @@ progress, executable progress, and strict counter checks. It requires the
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
 
-Source-backed ABI boundary proof is tracked separately by
+Source-backed ABI and pointer/slice boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs
 `test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
-ReleaseSmall and currently reports per mode: `source_rows=6`,
-`discovered_functions=10`, `varargs_boundary_rows=2`,
+ReleaseSmall and currently reports per mode: `source_rows=13`,
+`discovered_functions=626`, `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
 `safety_edge_boundary_rows=0`,
+`pointer_slice_boundary_rows=1`,
 `unexpected_accept_rows=0`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries for
 varargs, vectors, long-double/X87, packed aggregates, tail calls, and
-non-default call conventions. Checked slice-element bounds moved into the
-accepted strict frontier corpus with executable hot/trap-path proof. The prior
+non-default call conventions, plus a precise pointer/slice boundary for checked
+slice-element store. Checked slice-element loads moved into the accepted strict
+frontier corpus with executable hot/trap-path proof. The prior
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 stack-source forwarding
 boundary is now
 accepted in the strict frontier corpus, and the boundary counter remains at

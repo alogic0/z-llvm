@@ -70,6 +70,7 @@ Current frontier ABI boundary seed:
 - `test/zig/frontier_boundaries/frontier_packed_aggregate_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_tail_call_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_callconv_boundary.zig`
+- `test/zig/frontier_boundaries/frontier_pointer_slice_boundary.zig`
 
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
@@ -126,8 +127,8 @@ Source-backed ABI boundary proof is green for all three modes through
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=6
-discovered_functions=10
+source_rows=7
+discovered_functions=11
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
@@ -136,6 +137,7 @@ tail_call_boundary_rows=1
 callconv_boundary_rows=1
 stack_pressure_boundary_rows=0
 safety_edge_boundary_rows=0
+pointer_slice_boundary_rows=1
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -151,7 +153,8 @@ rows is now accepted in the frontier corpus; the boundary gate keeps
 `stack_pressure_boundary_rows=0` as a regression guard. Checked slice-element
 bounds CFG is accepted in the strict frontier corpus, so
 `safety_edge_boundary_rows=0` is now a regression guard rather than an active
-boundary.
+boundary. Checked slice-element stores remain a source-backed pointer/slice
+boundary until the store-side bounds/panic CFG path is implemented.
 
 Executable ABI proof is green for all three modes:
 

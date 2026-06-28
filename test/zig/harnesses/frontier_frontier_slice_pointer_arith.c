@@ -29,7 +29,10 @@ extern int z_frontier_slice_elem_ptr_store(int *, unsigned long, unsigned long, 
 extern int z_frontier_slice_ptr_const_runtime_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_ptr_const_runtime_load");
 extern int z_frontier_checked_slice_elem_ptr_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_checked_slice_elem_ptr_load");
 void z_frontier_slice_out_of_bounds(unsigned long index, unsigned long len) __asm__("frontier_slice_pointer_arith.outOfBounds");
-void z_frontier_slice_out_of_bounds(unsigned long index, unsigned long len) { (void)index; (void)len; __builtin_trap(); }
+void z_frontier_slice_out_of_bounds(unsigned long index, unsigned long len) {
+    if (index != 5UL || len != 3UL) _exit(104);
+    __builtin_trap();
+}
 
 static int expect_death(void (*fn)(void)) {
     int status = 0;

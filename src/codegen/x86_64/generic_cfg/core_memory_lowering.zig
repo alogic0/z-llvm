@@ -79,6 +79,12 @@ pub const GenericCfgTypedAddress = struct {
     width: GenericCfgScalarWidth,
 };
 
+const GenericCfgAddressResolverOptions = struct {
+    entry: ?ir.BasicBlock = null,
+    allow_loaded_pointer_slots: bool = true,
+    allow_slice_aggregate_extraction: bool = true,
+};
+
 pub const GenericCfgAddress = union(enum) {
     param: []const u8,
     global: []const u8,
@@ -171,6 +177,22 @@ pub fn genericCfgI64ParamRegThroughIdentityCast(function: ir.Function, block: ir
     return genericCfgI64ParamRegThroughIdentityCast(function, block, cast.value);
 }
 
+fn findInstructionInAddressScope(block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, name: []const u8) ?ir.Instruction {
+    return findInstruction(block, name) orelse if (options.entry) |entry| findInstruction(entry, name) else null;
+}
+
+fn genericCfgStoredValueInAddressScope(block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, slot_name: []const u8, ty: ir.Type) ?ir.Value {
+    return genericCfgStoredValue(block, slot_name, ty) orelse if (options.entry) |entry| genericCfgStoredValue(entry, slot_name, ty) else null;
+}
+
+fn genericCfgStoredPointerValueInAddressScope(block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, slot_name: []const u8) ?ir.Value {
+    return genericCfgStoredPointerValue(block, slot_name) orelse if (options.entry) |entry| genericCfgStoredPointerValue(entry, slot_name) else null;
+}
+
+fn genericCfgI64ParamRegThroughAddressScope(function: ir.Function, block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, value: ir.Value) ?ArgReg {
+    return genericCfgI64ParamRegThroughIdentityCast(function, block, value) orelse if (options.entry) |entry| genericCfgI64ParamRegThroughIdentityCast(function, entry, value) else null;
+}
+
 pub fn genericCfgDynamicI32LoadValueAddress(function: ir.Function, block: ir.BasicBlock, value: ir.Value) ?GenericCfgDynamicI32Address {
     const name = switch (value) {
         .named => |name| name,
@@ -227,53 +249,24 @@ pub fn genericCfgTypedScalarLoadAddress(function: ir.Function, block: ir.BasicBl
 
 pub fn genericCfgTypedScalarLoadAddressAcrossBlocks(function: ir.Function, entry: ir.BasicBlock, block: ir.BasicBlock, load: ir.LoadInst, width: GenericCfgScalarWidth) ?GenericCfgTypedAddress {
     if (!load.ty.eql(width.ty()) or load.attrs.isBarrier()) return null;
-    return genericCfgTypedScalarAddressAcrossBlocks(function, entry, block, load.ptr, width);
+    return genericCfgTypedScalarAddressResolved(function, block, load.ptr, width, .{ .entry = entry });
 }
 
 pub fn genericCfgTypedScalarAddress(function: ir.Function, block: ir.BasicBlock, ptr: ir.Value, width: GenericCfgScalarWidth) ?GenericCfgTypedAddress {
-    const name = switch (ptr) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
-        return .{ .base_reg = reg, .index_reg = null, .offset_bytes = 0, .width = width };
-    }
-    const instruction = findInstruction(block, name) orelse return null;
-    switch (instruction.kind) {
-        .gep => |gep| {
-            if (!gep.source_ty.eql(width.ty()) or gep.indices.items.len != 1) return null;
-            var address = genericCfgTypedScalarAddress(function, block, gep.ptr, width) orelse return null;
-            const index = gep.indices.items[0];
-            if (!index.ty.eql(.{ .int = 64 })) return null;
-            switch (index.value) {
-                .int => |int| address.offset_bytes += int * width.bytes(),
-                .named => |index_name| {
-                    if (address.index_reg != null) return null;
-                    address.index_reg = (paramRegOrNull(function, index_name, .{ .int = 64 }) catch null) orelse return null;
-                },
-                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-            }
-            return address;
-        },
-        .load => |load| {
-            if (!load.ty.eql(.ptr) or load.attrs.isBarrier()) return null;
-            const slot_name = switch (load.ptr) {
-                .named => |slot| slot,
-                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-            };
-            const stored = genericCfgStoredPointerValue(block, slot_name) orelse return null;
-            return genericCfgTypedScalarAddress(function, block, stored, width);
-        },
-        .extractvalue => |extract| {
-            if (!extract.aggregate_ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or !std.mem.eql(u8, extract.indices, "0") or extract.result_ty != .ptr) return null;
-            const slice_ptr = genericCfgSlicePointerValue(block, extract.aggregate) orelse return null;
-            return genericCfgTypedScalarAddress(function, block, slice_ptr, width);
-        },
-        else => return null,
-    }
+    return genericCfgTypedScalarAddressResolved(function, block, ptr, width, .{});
 }
 
 pub fn genericCfgTypedScalarAddressAcrossBlocks(function: ir.Function, entry: ir.BasicBlock, block: ir.BasicBlock, ptr: ir.Value, width: GenericCfgScalarWidth) ?GenericCfgTypedAddress {
+    return genericCfgTypedScalarAddressResolved(function, block, ptr, width, .{ .entry = entry });
+}
+
+fn genericCfgTypedScalarAddressResolved(
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ptr: ir.Value,
+    width: GenericCfgScalarWidth,
+    options: GenericCfgAddressResolverOptions,
+) ?GenericCfgTypedAddress {
     const name = switch (ptr) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
@@ -281,42 +274,42 @@ pub fn genericCfgTypedScalarAddressAcrossBlocks(function: ir.Function, entry: ir
     if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
         return .{ .base_reg = reg, .index_reg = null, .offset_bytes = 0, .width = width };
     }
-    const instruction = findInstruction(block, name) orelse findInstruction(entry, name) orelse return null;
+    const instruction = findInstructionInAddressScope(block, options, name) orelse return null;
     switch (instruction.kind) {
         .gep => |gep| {
             if (!gep.source_ty.eql(width.ty()) or gep.indices.items.len != 1) return null;
-            var address = genericCfgTypedScalarAddressAcrossBlocks(function, entry, block, gep.ptr, width) orelse return null;
+            var address = genericCfgTypedScalarAddressResolved(function, block, gep.ptr, width, options) orelse return null;
             const index = gep.indices.items[0];
             if (!index.ty.eql(.{ .int = 64 })) return null;
             switch (index.value) {
                 .int => |int| address.offset_bytes += int * width.bytes(),
                 .named => |index_name| {
                     if (address.index_reg != null) return null;
-                    address.index_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, .{ .named = index_name }) orelse
-                        genericCfgI64ParamRegThroughIdentityCast(function, block, .{ .named = index_name }) orelse return null;
+                    address.index_reg = genericCfgI64ParamRegThroughAddressScope(function, block, options, .{ .named = index_name }) orelse return null;
                 },
                 .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
             }
             return address;
         },
         .load => |load| {
+            if (!options.allow_loaded_pointer_slots) return null;
             if (!load.ty.eql(.ptr) or load.attrs.isBarrier()) return null;
             const slot_name = switch (load.ptr) {
                 .named => |slot| slot,
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
             };
-            const stored = genericCfgStoredPointerValue(block, slot_name) orelse
-                genericCfgStoredPointerValue(entry, slot_name) orelse return null;
-            return genericCfgTypedScalarAddressAcrossBlocks(function, entry, block, stored, width);
+            const stored = genericCfgStoredPointerValueInAddressScope(block, options, slot_name) orelse return null;
+            return genericCfgTypedScalarAddressResolved(function, block, stored, width, options);
         },
         .extractvalue => |extract| {
+            if (!options.allow_slice_aggregate_extraction) return null;
             if (!extract.aggregate_ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or !std.mem.eql(u8, extract.indices, "0") or extract.result_ty != .ptr) return null;
-            const slice_ptr = genericCfgSlicePointerValueAcrossBlocks(entry, block, extract.aggregate) orelse return null;
-            return genericCfgTypedScalarAddressAcrossBlocks(function, entry, block, slice_ptr, width);
+            const slice_ptr = genericCfgSlicePointerValueResolved(block, options, extract.aggregate) orelse return null;
+            return genericCfgTypedScalarAddressResolved(function, block, slice_ptr, width, options);
         },
         .cast => |cast| {
             if (cast.op != .bitcast or !cast.to_ty.eql(.ptr)) return null;
-            return genericCfgTypedScalarAddressAcrossBlocks(function, entry, block, cast.value, width);
+            return genericCfgTypedScalarAddressResolved(function, block, cast.value, width, options);
         },
         else => return null,
     }
@@ -464,11 +457,15 @@ pub fn genericCfgDynamicI32Address(function: ir.Function, block: ir.BasicBlock, 
 }
 
 fn genericCfgSlicePointerValue(block: ir.BasicBlock, aggregate: ir.Value) ?ir.Value {
+    return genericCfgSlicePointerValueResolved(block, .{}, aggregate);
+}
+
+fn genericCfgSlicePointerValueResolved(block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, aggregate: ir.Value) ?ir.Value {
     const name = switch (aggregate) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    const instruction = findInstruction(block, name) orelse return null;
+    const instruction = findInstructionInAddressScope(block, options, name) orelse return null;
     const insert = switch (instruction.kind) {
         .insertvalue => |insert| insert,
         .load => |load| {
@@ -477,8 +474,8 @@ fn genericCfgSlicePointerValue(block: ir.BasicBlock, aggregate: ir.Value) ?ir.Va
                 .named => |slot| slot,
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
             };
-            const stored = genericCfgStoredValue(block, slot_name, .{ .aggregate = "{ ptr, i64 }" }) orelse return null;
-            return genericCfgSlicePointerValue(block, stored);
+            const stored = genericCfgStoredValueInAddressScope(block, options, slot_name, .{ .aggregate = "{ ptr, i64 }" }) orelse return null;
+            return genericCfgSlicePointerValueResolved(block, options, stored);
         },
         else => return null,
     };
@@ -488,39 +485,9 @@ fn genericCfgSlicePointerValue(block: ir.BasicBlock, aggregate: ir.Value) ?ir.Va
         return insert.value;
     }
     if (std.mem.eql(u8, insert.indices, "1")) {
-        return genericCfgSlicePointerValue(block, insert.aggregate);
+        return genericCfgSlicePointerValueResolved(block, options, insert.aggregate);
     }
     return null;
-}
-
-fn genericCfgSlicePointerValueAcrossBlocks(entry: ir.BasicBlock, block: ir.BasicBlock, aggregate: ir.Value) ?ir.Value {
-    const aggregate_name = switch (aggregate) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const instruction = findInstruction(block, aggregate_name) orelse findInstruction(entry, aggregate_name) orelse return null;
-    switch (instruction.kind) {
-        .insertvalue => |insert| {
-            if (!insert.aggregate_ty.eql(.{ .aggregate = "{ ptr, i64 }" })) return null;
-            if (std.mem.eql(u8, insert.indices, "0")) {
-                if (insert.value_ty != .ptr) return null;
-                return insert.value;
-            }
-            if (std.mem.eql(u8, insert.indices, "1")) return genericCfgSlicePointerValueAcrossBlocks(entry, block, insert.aggregate);
-            return null;
-        },
-        .load => |load| {
-            if (!load.ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or load.attrs.isBarrier()) return null;
-            const slot_name = switch (load.ptr) {
-                .named => |slot| slot,
-                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-            };
-            const stored = genericCfgStoredValue(block, slot_name, .{ .aggregate = "{ ptr, i64 }" }) orelse
-                genericCfgStoredValue(entry, slot_name, .{ .aggregate = "{ ptr, i64 }" }) orelse return null;
-            return genericCfgSlicePointerValueAcrossBlocks(entry, block, stored);
-        },
-        else => return null,
-    }
 }
 
 fn genericCfgStoredValue(block: ir.BasicBlock, slot_name: []const u8, ty: ir.Type) ?ir.Value {

@@ -696,6 +696,151 @@ pub const AggregatePairSummary = struct {
     return_value: u32,
 };
 
+pub const PointerSliceAddressSummary = struct {
+    ptr_add_count: usize = 0,
+    ptr_sub_count: usize = 0,
+    slice_count: usize = 0,
+    slice_ptr_count: usize = 0,
+    slice_len_count: usize = 0,
+    slice_elem_ptr_count: usize = 0,
+    ptr_slice_len_ptr_count: usize = 0,
+    ptr_slice_ptr_ptr_count: usize = 0,
+    load_count: usize = 0,
+    store_count: usize = 0,
+    bounds_check_count: usize = 0,
+    base_pointer_operand: ?[]const u8 = null,
+    dynamic_index_operand: ?[]const u8 = null,
+    constant_index: ?i128 = null,
+    scalar_width_bits: ?u16 = null,
+    slice_source_index: ?u32 = null,
+
+    pub fn hasPointerOrSliceAddress(self: PointerSliceAddressSummary) bool {
+        return self.ptr_add_count != 0 or
+            self.ptr_sub_count != 0 or
+            self.slice_count != 0 or
+            self.slice_ptr_count != 0 or
+            self.slice_len_count != 0 or
+            self.slice_elem_ptr_count != 0 or
+            self.ptr_slice_len_ptr_count != 0 or
+            self.ptr_slice_ptr_ptr_count != 0;
+    }
+};
+
+pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
+    const view = TypedFunctionView.init(function) orelse return null;
+    if (!view.operandCoverage()) return null;
+    var summary: PointerSliceAddressSummary = .{};
+    for (view.structured_air_v2.instructions) |instruction| {
+        switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
+            .ptr_gep => {
+                summary.ptr_add_count += 1;
+                updatePointerSliceAddressOperands(&summary, instruction);
+            },
+            .slice => {
+                summary.slice_count += 1;
+                summary.slice_source_index = instruction.index;
+                updatePointerSliceAddressOperands(&summary, instruction);
+            },
+            .slice_ptr => {
+                summary.slice_ptr_count += 1;
+                updatePointerSliceAddressOperands(&summary, instruction);
+            },
+            .slice_ptr_ptr => {
+                summary.ptr_slice_ptr_ptr_count += 1;
+                updatePointerSliceAddressOperands(&summary, instruction);
+            },
+            .slice_elem_ptr => {
+                summary.slice_elem_ptr_count += 1;
+                updatePointerSliceAddressOperands(&summary, instruction);
+            },
+            .slice_len => {
+                summary.slice_len_count += 1;
+                updatePointerSliceAddressOperands(&summary, instruction);
+            },
+            .slice_len_ptr => {
+                summary.ptr_slice_len_ptr_count += 1;
+                updatePointerSliceAddressOperands(&summary, instruction);
+            },
+            .none, .runtime_nav_ptr, .array_elem_val, .field_ptr => {},
+        }
+        if (std.mem.eql(u8, instruction.opcode, "ptr_sub")) {
+            summary.ptr_sub_count += 1;
+            updatePointerSliceAddressOperands(&summary, instruction);
+        }
+        switch (air_capabilities.memorySemanticOpForOpcode(instruction.opcode)) {
+            .load => {
+                summary.load_count += 1;
+                summary.scalar_width_bits = summary.scalar_width_bits orelse scalarWidthFromText(instruction.result_type);
+            },
+            .store => summary.store_count += 1,
+            .alloc, .none => {},
+        }
+        if (air_capabilities.isCondBrOpcode(instruction.opcode)) {
+            summary.bounds_check_count += pointerSliceBoundsCheckOperandCount(instruction);
+        }
+    }
+    return if (summary.hasPointerOrSliceAddress()) summary else null;
+}
+
+fn updatePointerSliceAddressOperands(summary: *PointerSliceAddressSummary, instruction: air_export.TypedInstruction) void {
+    summary.scalar_width_bits = summary.scalar_width_bits orelse scalarWidthFromText(instruction.result_type);
+    for (instruction.operands, 0..) |operand, operand_index| {
+        if (summary.base_pointer_operand == null and operandLooksPointer(operand)) {
+            summary.base_pointer_operand = operandTextDetail(instruction, operand_index) orelse operand.value;
+        }
+        if (summary.dynamic_index_operand == null and operandLooksRuntimeIndex(operand)) {
+            summary.dynamic_index_operand = operandTextDetail(instruction, operand_index) orelse operand.value;
+        }
+        if (summary.constant_index == null and operandLooksIntegerConst(operand)) {
+            const text = operandTextDetail(instruction, operand_index) orelse operand.value;
+            summary.constant_index = parseIntegerText(text);
+        }
+    }
+}
+
+fn pointerSliceBoundsCheckOperandCount(instruction: air_export.TypedInstruction) usize {
+    var count: usize = 0;
+    for (instruction.operands) |operand| {
+        if (operandLooksPointer(operand) or operandLooksRuntimeIndex(operand)) count += 1;
+    }
+    return count;
+}
+
+fn operandLooksPointer(operand: air_export.TypedOperand) bool {
+    return std.mem.indexOf(u8, operand.type_text, "*") != null or
+        std.mem.indexOf(u8, operand.type_text, "ptr") != null or
+        std.mem.indexOf(u8, operand.kind, "ptr") != null;
+}
+
+fn operandLooksRuntimeIndex(operand: air_export.TypedOperand) bool {
+    if (!isIntegerTypeText(operand.type_text)) return false;
+    return !operandLooksIntegerConst(operand);
+}
+
+fn operandLooksIntegerConst(operand: air_export.TypedOperand) bool {
+    return std.mem.eql(u8, operand.kind, "int") or
+        std.mem.eql(u8, operand.kind, "comptime_int") or
+        std.mem.eql(u8, operand.kind, "constant");
+}
+
+fn parseIntegerText(text: []const u8) ?i128 {
+    const trimmed = std.mem.trim(u8, text, " ");
+    if (trimmed.len == 0) return null;
+    return std.fmt.parseInt(i128, trimmed, 10) catch null;
+}
+
+fn scalarWidthFromText(text: []const u8) ?u16 {
+    if (std.mem.indexOf(u8, text, "i8") != null or std.mem.indexOf(u8, text, "u8") != null) return 8;
+    if (std.mem.indexOf(u8, text, "i16") != null or std.mem.indexOf(u8, text, "u16") != null) return 16;
+    if (std.mem.indexOf(u8, text, "i32") != null or std.mem.indexOf(u8, text, "u32") != null) return 32;
+    if (std.mem.indexOf(u8, text, "i64") != null or std.mem.indexOf(u8, text, "u64") != null or std.mem.indexOf(u8, text, "usize") != null) return 64;
+    return null;
+}
+
+fn isIntegerTypeText(text: []const u8) bool {
+    return scalarWidthFromText(text) != null or std.mem.indexOf(u8, text, "comptime_int") != null;
+}
+
 fn untypedFieldPtrIndex(instruction: air_export.Instruction) ?usize {
     const prefix = "struct_field_ptr_index_";
     if (!std.mem.startsWith(u8, instruction.opcode, prefix)) return null;
@@ -1759,6 +1904,98 @@ test "typed AIR model reports type and operand coverage" {
     try std.testing.expect(!typedOperandCoverage(.{
         .instructions = @constCast(&missing_operand_instructions),
     }));
+}
+
+test "typed AIR model summarizes pointer and slice address expressions" {
+    const ptr_operand = air_export.TypedOperand{ .kind = "inst", .value = "%ptr", .type_text = "ptr" };
+    const idx_operand = air_export.TypedOperand{ .kind = "inst", .value = "%idx", .type_text = "usize" };
+    const const_operand = air_export.TypedOperand{ .kind = "int", .value = "2", .type_text = "usize" };
+    const load_operand = air_export.TypedOperand{ .kind = "inst", .value = "%gep", .type_text = "ptr" };
+    const instructions = [_]air_export.TypedInstruction{
+        .{
+            .index = 0,
+            .opcode = "slice",
+            .result_type = "{ ptr, i64 }",
+            .data_kind = "ty_pl",
+            .operands = @constCast(&[_]air_export.TypedOperand{ ptr_operand, idx_operand }),
+        },
+        .{
+            .index = 1,
+            .opcode = "slice_ptr",
+            .result_type = "ptr",
+            .data_kind = "ty_op",
+            .operands = @constCast(&[_]air_export.TypedOperand{ptr_operand}),
+        },
+        .{
+            .index = 2,
+            .opcode = "ptr_add",
+            .result_type = "ptr",
+            .data_kind = "bin_ty_pl",
+            .operands = @constCast(&[_]air_export.TypedOperand{ ptr_operand, const_operand }),
+        },
+        .{
+            .index = 3,
+            .opcode = "slice_elem_ptr",
+            .result_type = "ptr",
+            .data_kind = "ty_pl",
+            .operands = @constCast(&[_]air_export.TypedOperand{ ptr_operand, idx_operand }),
+        },
+        .{
+            .index = 4,
+            .opcode = "load",
+            .result_type = "i32",
+            .data_kind = "ty_op",
+            .operands = @constCast(&[_]air_export.TypedOperand{load_operand}),
+        },
+        .{
+            .index = 5,
+            .opcode = "store",
+            .result_type = "void",
+            .data_kind = "bin_op",
+            .operands = @constCast(&[_]air_export.TypedOperand{ load_operand, .{ .kind = "inst", .value = "%value", .type_text = "i32" } }),
+        },
+        .{
+            .index = 6,
+            .opcode = "cond_br",
+            .result_type = "void",
+            .data_kind = "pl_op",
+            .operands = @constCast(&[_]air_export.TypedOperand{idx_operand}),
+        },
+    };
+    const structured_air = air_export.StructuredAir{
+        .instructions = &.{},
+        .bodies = &.{},
+        .branches = &.{},
+        .cond_branches = &.{},
+        .repeats = &.{},
+    };
+    const function = air_export.Function{
+        .name = "test.pointer_slice",
+        .type_text = "fn ([*]i32, usize) i32",
+        .instruction_count = instructions.len,
+        .main_body_count = instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = structured_air,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = @constCast(&instructions) },
+        .instructions = &.{},
+    };
+    const summary = pointerSliceAddressSummary(function).?;
+
+    try std.testing.expectEqual(@as(usize, 1), summary.ptr_add_count);
+    try std.testing.expectEqual(@as(usize, 1), summary.slice_count);
+    try std.testing.expectEqual(@as(usize, 1), summary.slice_ptr_count);
+    try std.testing.expectEqual(@as(usize, 1), summary.slice_elem_ptr_count);
+    try std.testing.expectEqual(@as(usize, 1), summary.load_count);
+    try std.testing.expectEqual(@as(usize, 1), summary.store_count);
+    try std.testing.expect(summary.bounds_check_count != 0);
+    try std.testing.expectEqualStrings("%ptr", summary.base_pointer_operand.?);
+    try std.testing.expectEqualStrings("%idx", summary.dynamic_index_operand.?);
+    try std.testing.expectEqual(@as(i128, 2), summary.constant_index.?);
+    try std.testing.expectEqual(@as(u16, 32), summary.scalar_width_bits.?);
+    try std.testing.expectEqual(@as(u32, 0), summary.slice_source_index.?);
 }
 
 test "AIR model reports legacy instruction opcode presence" {

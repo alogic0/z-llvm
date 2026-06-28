@@ -430,6 +430,12 @@ Completed slices from this inventory:
   multi-load i32 forms such as pair-sum rows where the typed address model still
   needs a reusable "load two addresses then combine" operation; scalar
   load/store and checked-slice hot paths route through `GenericCfgTypedAddress`.
+  Pointer/slice semantic recognition now has a model-owned
+  `PointerSliceAddressSummary` for pointer/slice op counts, base pointer,
+  dynamic index, constant offset, scalar width, slice source, and
+  bounds-check-like branch presence. Checked slice-element store is tracked as
+  `pointer_slice_boundary_rows=1` until the store-side bounds/panic CFG path is
+  accepted.
 
 Validation after these refactor slices:
 
@@ -444,6 +450,7 @@ Validation after these refactor slices:
   `vector_boundary_rows=2`, `x87_boundary_rows=2`,
   `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
   `callconv_boundary_rows=1`, `safety_edge_boundary_rows=0`,
+  `pointer_slice_boundary_rows=1`,
   `unexpected_accept_rows=0`,
   `wrong_diagnostic_rows=0`, and `local_fail=0`.
 - `zig build test` and `git diff --check` pass.
@@ -1072,7 +1079,7 @@ BigNarrow, BigArray, ScalarMixed, ScalarNested, and ScalarArray by preserving
 the hidden sret pointer, forwarding pointer callees through `%rax`, and copying
 incoming by-value stack slots to outgoing stack slots before the call.
 
-Source-backed ABI boundaries are now measured separately from accepted
+Source-backed ABI and pointer/slice boundaries are now measured separately from accepted
 frontier rows. `zig build distribution-air-release-frontier-boundaries` runs
 the dedicated `test/zig/frontier_boundaries/*.zig` rows in ReleaseFast,
 ReleaseSafe, and ReleaseSmall and currently reports `varargs_boundary_rows=2`,
@@ -1080,12 +1087,14 @@ ReleaseSafe, and ReleaseSmall and currently reports `varargs_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
 `safety_edge_boundary_rows=0`,
+`pointer_slice_boundary_rows=1`,
 `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0` per
 mode. Varargs, vectors, X87/long double, packed/unaligned aggregates, tail
 calls, and non-default call conventions are therefore source-backed fail-closed
 boundaries, not vague docs-only gaps and not accepted executable proof. Checked
 slice-element bounds have moved into the accepted frontier with executable hot
-and trap-path proof. Stack-pressure byval forwarding is currently accepted for the Big80
+and trap-path proof; checked slice-element store is a precise pointer/slice
+boundary. Stack-pressure byval forwarding is currently accepted for the Big80
 frontier rows, with the boundary counter held at zero as a regression guard.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads
