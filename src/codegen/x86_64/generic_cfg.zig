@@ -129,6 +129,7 @@ pub const lowerGenericCfgSingleBlockDirectCallMain = impl.lowerGenericCfgSingleB
 pub const lowerGenericCfgSingleBlockEffectBarrier = impl.lowerGenericCfgSingleBlockEffectBarrier;
 pub const lowerGenericCfgSingleBlockFp = impl.lowerGenericCfgSingleBlockFp;
 pub const lowerGenericCfgSingleBlockI64 = impl.lowerGenericCfgSingleBlockI64;
+pub const lowerGenericCfgSingleBlockSliceLen = impl.lowerGenericCfgSingleBlockSliceLen;
 pub const lowerGenericCfgSingleBlockPackedBits = impl.lowerGenericCfgSingleBlockPackedBits;
 pub const lowerGenericCfgSingleBlockPtr = impl.lowerGenericCfgSingleBlockPtr;
 pub const lowerGenericCfgSingleBlockScalar = impl.lowerGenericCfgSingleBlockScalar;

@@ -113,6 +113,41 @@ test "x86_64 codegen lowers canonical accumulator loops without function-name di
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen lowers slice length extracted from typed AIR slice stack" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @slice_len_from_ptr(ptr %arg0, i64 %arg1) {
+        \\entry:
+        \\  %air2 = alloca ptr
+        \\  store ptr %arg0, ptr %air2
+        \\  %air6 = load ptr, ptr %air2
+        \\  %air8 = sub i64 %arg1, 0
+        \\  %air9_slice_ptr = insertvalue { ptr, i64 } undef, ptr %air6, 0
+        \\  %air9 = insertvalue { ptr, i64 } %air9_slice_ptr, i64 %air8, 1
+        \\  %air10 = alloca { ptr, i64 }
+        \\  store { ptr, i64 } %air9, ptr %air10
+        \\  %air15_slice_len_aggregate = load { ptr, i64 }, ptr %air10
+        \\  %air16 = extractvalue { ptr, i64 } %air15_slice_len_aggregate, 1
+        \\  ret i64 %air16
+        \\}
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 codegen routes checked guard cfg through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

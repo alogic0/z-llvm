@@ -734,6 +734,10 @@ pub fn lowerGenericCfgSingleBlockAggregateAbi(allocator: std.mem.Allocator, mach
         .ret => |ret| ret,
         else => return false,
     };
+    if (try lowerGenericCfgSliceLenReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -774,6 +778,10 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgSliceLenReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgGprVoidCallStackParamReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -807,6 +815,78 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         return true;
     }
     return false;
+}
+
+pub fn lowerGenericCfgSingleBlockSliceLen(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (try lowerGenericCfgSliceLenReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    return false;
+}
+
+fn lowerGenericCfgSliceLenReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const extract_instruction = findInstruction(block, ret_name) orelse return false;
+    const extract = switch (extract_instruction.kind) {
+        .extractvalue => |extract| extract,
+        else => return false,
+    };
+    if (!extract.aggregate_ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or
+        !extract.result_ty.eql(.{ .int = 64 }) or
+        !std.mem.eql(u8, extract.indices, "1"))
+    {
+        return false;
+    }
+    const len_value = sliceAggregateLenValue(block, extract.aggregate, 0) orelse return false;
+    try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, len_value);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn sliceAggregateLenValue(block: ir.BasicBlock, aggregate: ir.Value, depth: u3) ?ir.Value {
+    if (depth == 4) return null;
+    const aggregate_name = switch (aggregate) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const aggregate_instruction = findInstruction(block, aggregate_name) orelse return null;
+    switch (aggregate_instruction.kind) {
+        .insertvalue => |insert| {
+            if (!insert.aggregate_ty.eql(.{ .aggregate = "{ ptr, i64 }" })) return null;
+            if (insert.value_ty.eql(.{ .int = 64 }) and std.mem.eql(u8, insert.indices, "1")) return insert.value;
+            return sliceAggregateLenValue(block, insert.aggregate, depth + 1);
+        },
+        .load => |load| {
+            if (!load.ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or load.attrs.isBarrier()) return null;
+            for (block.instructions.items) |instruction| {
+                const store = switch (instruction.kind) {
+                    .store => |store| store,
+                    else => continue,
+                };
+                if (!store.ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or store.attrs.isBarrier()) continue;
+                if (store.ptr.eql(load.ptr)) return sliceAggregateLenValue(block, store.value, depth + 1);
+            }
+            return null;
+        },
+        else => return null,
+    }
 }
 
 fn lowerGenericCfgGprVoidCallStackParamReturn(

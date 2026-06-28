@@ -146,6 +146,7 @@ pub const ErrorUnionSemanticOp = enum {
 pub const PointerAggregateSemanticOp = enum {
     none,
     slice,
+    slice_len_ptr,
     ptr_gep,
     runtime_nav_ptr,
     array_elem_val,
@@ -318,6 +319,7 @@ pub fn errorUnionSemanticOpForOpcode(opcode: []const u8) ErrorUnionSemanticOp {
 
 pub fn pointerAggregateSemanticOpForOpcode(opcode: []const u8) PointerAggregateSemanticOp {
     if (std.mem.eql(u8, opcode, "slice")) return .slice;
+    if (std.mem.eql(u8, opcode, "ptr_slice_len_ptr")) return .slice_len_ptr;
     if (std.mem.eql(u8, opcode, "ptr_add") or isPtrElemPtrOpcode(opcode)) return .ptr_gep;
     if (std.mem.eql(u8, opcode, "runtime_nav_ptr")) return .runtime_nav_ptr;
     if (std.mem.eql(u8, opcode, "array_elem_val")) return .array_elem_val;
@@ -883,6 +885,7 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ErrorUnionSemanticOp.try_op, errorUnionSemanticOpForOpcode("try"));
     try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.slice, pointerAggregateSemanticOpForOpcode("slice"));
+    try std.testing.expectEqual(PointerAggregateSemanticOp.slice_len_ptr, pointerAggregateSemanticOpForOpcode("ptr_slice_len_ptr"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.ptr_gep, pointerAggregateSemanticOpForOpcode("ptr_add"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.ptr_gep, pointerAggregateSemanticOpForOpcode("ptr_elem_ptr"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.runtime_nav_ptr, pointerAggregateSemanticOpForOpcode("runtime_nav_ptr"));

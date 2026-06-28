@@ -106,6 +106,7 @@ pub const lowerGenericCfgSingleBlockDirectCallMain = single_block_rows.lowerGene
 pub const lowerGenericCfgSingleBlockEffectBarrier = single_block_rows.lowerGenericCfgSingleBlockEffectBarrier;
 pub const lowerGenericCfgSingleBlockFp = single_block_rows.lowerGenericCfgSingleBlockFp;
 pub const lowerGenericCfgSingleBlockI64 = single_block_rows.lowerGenericCfgSingleBlockI64;
+pub const lowerGenericCfgSingleBlockSliceLen = single_block_rows.lowerGenericCfgSingleBlockSliceLen;
 pub const lowerGenericCfgSingleBlockPackedBits = single_block_rows.lowerGenericCfgSingleBlockPackedBits;
 pub const lowerGenericCfgSingleBlockPtr = single_block_rows.lowerGenericCfgSingleBlockPtr;
 pub const lowerGenericCfgSingleBlockScalar = single_block_rows.lowerGenericCfgSingleBlockScalar;

@@ -829,7 +829,7 @@ const LoweringContext = struct {
         switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
             .runtime_nav_ptr => try self.lowerRuntimeNavPtr(instruction),
             .array_elem_val => try self.lowerArrayElemVal(instruction),
-            .slice, .ptr_gep, .field_ptr, .none => return false,
+            .slice, .slice_len_ptr, .ptr_gep, .field_ptr, .none => return false,
         }
         return true;
     }
@@ -897,6 +897,7 @@ const LoweringContext = struct {
     ) !bool {
         switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
             .slice => try self.lowerTypedSlice(instruction),
+            .slice_len_ptr => try self.lowerTypedSliceLenPtr(instruction),
             .ptr_gep => try self.lowerTypedPtrGep(instruction),
             .runtime_nav_ptr => try self.lowerTypedRuntimeNavPtr(instruction),
             .array_elem_val => try self.lowerTypedArrayElemVal(instruction),
@@ -1081,6 +1082,7 @@ const LoweringContext = struct {
 
     fn lowerTypedLoad(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
         if (instruction.operands.len != 1) return error.UnsupportedAir;
+        if (try self.lowerTypedLoadFromSliceLenPtr(instruction)) return;
         const pointer = try self.resolveTypedOperand(instruction, 0);
         if (pointer.ty.ir_type != .ptr) return error.UnsupportedAir;
         const result_type = parseZigType(instruction.result_type) orelse blk: {
@@ -1102,6 +1104,39 @@ const LoweringContext = struct {
             .ty = result_type,
             .value = .{ .named = result_name },
         };
+    }
+
+    fn lowerTypedLoadFromSliceLenPtr(self: *LoweringContext, instruction: air_export.TypedInstruction) !bool {
+        const view = self.typed_view orelse return false;
+        const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+        const pointer_instruction = view.instruction(pointer_index) orelse return error.UnsupportedAir;
+        if (air_capabilities.pointerAggregateSemanticOpForOpcode(pointer_instruction.opcode) != .slice_len_ptr) return false;
+        if (pointer_instruction.operands.len != 1) return error.UnsupportedAir;
+
+        const slice = try self.resolveTypedOperand(pointer_instruction, 0);
+        const slice_value = try self.materializeSliceAggregateForLen(pointer_instruction.index, slice);
+        const result_type = parseZigType(instruction.result_type) orelse blk: {
+            const typed_child = pointerLoadResultType(instruction.operands[0].type_text);
+            if (typed_child) |child| break :blk child;
+            break :blk ZigType{ .ir_type = .{ .int = 64 } };
+        };
+        if (!result_type.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
+
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .extractvalue = .{
+                .aggregate_ty = .{ .aggregate = "{ ptr, i64 }" },
+                .aggregate = slice_value,
+                .indices = "1",
+                .result_ty = .{ .int = 64 },
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+        return true;
     }
 
     fn lowerTypedStore(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
@@ -1803,6 +1838,41 @@ const LoweringContext = struct {
             .ty = result_type,
             .value = .{ .named = result_name },
         };
+    }
+
+    fn lowerTypedSliceLenPtr(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const slice = try self.resolveTypedOperand(instruction, 0);
+        if (!slice.ty.ir_type.eql(.{ .aggregate = "{ ptr, i64 }" }) and
+            !(slice.ty.ir_type == .ptr and (slice.ty.pointer_child orelse return error.UnsupportedAir).eql(.{ .aggregate = "{ ptr, i64 }" })))
+        {
+            return error.UnsupportedAir;
+        }
+        const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (result_type.ir_type != .ptr) return error.UnsupportedAir;
+        if (result_type.pointer_child) |child| {
+            if (!child.eql(.{ .int = 64 })) return error.UnsupportedAir;
+        }
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .poison,
+        };
+    }
+
+    fn materializeSliceAggregateForLen(self: *LoweringContext, instruction_index: u32, slice: TypedValue) !ir.Value {
+        if (slice.ty.ir_type.eql(.{ .aggregate = "{ ptr, i64 }" })) return slice.value;
+        if (slice.ty.ir_type == .ptr and (slice.ty.pointer_child orelse return error.UnsupportedAir).eql(.{ .aggregate = "{ ptr, i64 }" })) {
+            const aggregate_name = try ownPrint(self.module, "air{}_slice_len_aggregate", .{instruction_index});
+            try self.block.instructions.append(self.allocator, .{
+                .result = aggregate_name,
+                .kind = .{ .load = .{
+                    .ty = .{ .aggregate = "{ ptr, i64 }" },
+                    .ptr = slice.value,
+                } },
+            });
+            return .{ .named = aggregate_name };
+        }
+        return error.UnsupportedAir;
     }
 
     fn lowerTypedPtrGep(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {

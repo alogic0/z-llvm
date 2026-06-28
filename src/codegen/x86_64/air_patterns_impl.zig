@@ -293,6 +293,7 @@ const lowerGenericCfgSingleBlockDirectCallMain = x86_64_generic_cfg.lowerGeneric
 const lowerGenericCfgSingleBlockEffectBarrier = x86_64_generic_cfg.lowerGenericCfgSingleBlockEffectBarrier;
 const lowerGenericCfgSingleBlockFp = x86_64_generic_cfg.lowerGenericCfgSingleBlockFp;
 const lowerGenericCfgSingleBlockI64 = x86_64_generic_cfg.lowerGenericCfgSingleBlockI64;
+const lowerGenericCfgSingleBlockSliceLen = x86_64_generic_cfg.lowerGenericCfgSingleBlockSliceLen;
 const lowerGenericCfgSingleBlockPackedBits = x86_64_generic_cfg.lowerGenericCfgSingleBlockPackedBits;
 const lowerGenericCfgSingleBlockPtr = x86_64_generic_cfg.lowerGenericCfgSingleBlockPtr;
 const lowerGenericCfgSingleBlockScalar = x86_64_generic_cfg.lowerGenericCfgSingleBlockScalar;
@@ -343,6 +344,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
 
     var machine = MachineFunction.init(symbolName(function.name), function.ret_ty);
     errdefer machine.deinit(allocator);
+
+    if (try lowerGenericCfgSingleBlockSliceLen(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
 
     if (try lowerVolatileAbsoluteStore(allocator, &machine, function)) {
         try verifyFunction(machine);

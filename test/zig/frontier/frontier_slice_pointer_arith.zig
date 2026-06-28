@@ -15,3 +15,8 @@ export fn frontier_dynamic_ptr_pair_sum(values: [*]const i32, index: usize) i32 
     const ptr = values + index;
     return ptr[0] + ptr[1];
 }
+
+export fn frontier_slice_len_from_ptr(values: [*]const i32, len: usize) usize {
+    const slice = values[0..len];
+    return slice.len;
+}

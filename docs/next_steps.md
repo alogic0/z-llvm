@@ -214,7 +214,7 @@ Execution order:
    the legacy compatibility module reuses the model-owned opcode query helper
    instead of carrying its own duplicate implementation.
    The strict frontier gate was re-run after these refactors and still reports
-   `generic_cfg_functions=603`, `structural_matcher_functions=0`,
+   `generic_cfg_functions=604`, `structural_matcher_functions=0`,
    `legacy_air_text_lowering_functions=0`, and executable proof green across
    ReleaseFast, ReleaseSafe, and ReleaseSmall. The
    Zig type/function signature parsing and pointer-child text now live in
@@ -399,14 +399,28 @@ Completed slices from this inventory:
   array/struct aggregate sum checks. Compatibility runtime-wrapper lowerer
   bodies still emit fixed helper/global symbol names even though admission is
   now model/data-flow owned.
+- Accepted model summaries are now fail-closed on terminal value paths:
+  maybe-error, error-switch, error-classify, runtime optional-pointer wrapper,
+  and runtime pointer load/store summaries require a proven terminal return or
+  connected call/compare/branch/return path before admission. The unsafe
+  first-call/first-block probes were narrowed to connected model queries, with
+  negative tests for unrelated returns, unrelated call/compare/block paths, and
+  panic calls whose `unreach` is not on the cold panic path.
+- The next measured compiler-core source-backed slice is
+  `ptr_slice_len_ptr:ty_op` / `slice_len:ty_op`: `frontier_slice_pointer_arith`
+  now exports a real slice-length-from-pointer row that lowers through typed
+  AIR v2 pointer/aggregate semantics, generic CFG slice-length return
+  codegen, z_llvm object emission, Zig native link, and executable proof. This
+  closes the selected frontier form only; broader pointer-address and slice
+  value forms from compiler-core inventory remain future sub-slices.
 
 Validation after these refactor slices:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
-  ReleaseSmall all report `source_rows=13`, `discovered_functions=603`,
-  `generic_cfg_functions=603`, `structural_matcher_functions=0`,
+  ReleaseSmall all report `source_rows=13`, `discovered_functions=604`,
+  `generic_cfg_functions=604`, `structural_matcher_functions=0`,
   `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
-  `object_emitted_functions=603`, `native_link_accepted_rows=13`,
+  `object_emitted_functions=604`, `native_link_accepted_rows=13`,
   `executable_ok_rows=13`, and `local_fail=0`.
 - `zig build distribution-air-release-frontier-boundaries`: ReleaseFast,
   ReleaseSafe, and ReleaseSmall all report `varargs_boundary_rows=2`,
@@ -919,12 +933,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=603`,
-`generic_codegen_functions=603`, `generic_cfg_functions=603`,
+frontier gate reports `source_rows=13`, `discovered_functions=604`,
+`generic_codegen_functions=604`, `generic_cfg_functions=604`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=603`, `object_failures=0`,
+`object_emitted_functions=604`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -937,9 +951,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=603`,
-`generic_cfg_functions=603`, `structural_matcher_functions=0`,
-`object_emitted_functions=603`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=604`,
+`generic_cfg_functions=604`, `structural_matcher_functions=0`,
+`object_emitted_functions=604`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
