@@ -766,7 +766,13 @@ packed/unaligned aggregate ABI remains a 2-row targeted boundary. Register
 aggregate construction and sret/byval make rows now perform mechanical typed
 AIR inference from ret_ptr, field/element pointer stores, and ret_load before
 admission, so those rows are checked by function-local construction evidence
-rather than nominal layout facts alone.
+rather than nominal layout facts alone. Sret/byval copy rows now also prove the
+terminal return is the typed aggregate argument, and sret/byval call-wrapper
+rows prove that the typed aggregate argument feeds the single call and that the
+aggregate terminal return is produced by that call. The static
+source-aggregate facts table and the smaller compatibility fallback table still
+remain; replacing those entries with exported Zig field facts or broader
+function-local inference is the next ownership step.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

@@ -293,6 +293,13 @@ Execution order:
    rows from nominal layout alone: it mechanically rebuilds a layout summary
    from typed AIR `ret_ptr`/field-or-element pointer/store/`ret_load` paths and
    compares that summary with `AggregateLayoutPlan` before accepting the row.
+   Sret/byval aggregate copy and call-wrapper compatibility now also requires
+   typed AIR data-flow evidence: copy rows must return the typed aggregate
+   argument, and call-wrapper rows must prove that the typed aggregate argument
+   feeds the single call and that the terminal aggregate return is the call
+   result. This covers both one-aggregate-parameter direct wrappers and the
+   existing multi-parameter stack-pressure wrappers without exact symbol-name
+   admission.
    `aggregateLayoutPlan` now uses the checked summary path, so layout mismatch
    reaches plan-based lowerers as `AggregateLayoutMismatch` instead of being
    silently converted to an optional miss.
@@ -510,7 +517,10 @@ Aggregate/type-layout ownership start:
   Function-local typed AIR construction evidence now feeds register aggregate
   and sret/byval make admission: the inference path derives struct fields and
   single-field array leaves from concrete store paths, then validates that
-  derived layout against the shared plan.
+  derived layout against the shared plan. Sret/byval copy and call-wrapper
+  rows now add mechanical typed AIR path validation as well: copy rows must
+  return the typed aggregate argument, while wrappers must pass that aggregate
+  argument to the single call and return that call result.
 - Nominal aggregate layout source audit:
   - Source/AIR-inferred before fallback table:
     `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
@@ -581,9 +591,13 @@ Validation after these refactor slices is saved in
   entry. Register aggregate construction now also has mechanical typed-AIR
   inference for ret_ptr/field-or-element pointer/store/ret_load rows, including
   single-field array leaf reconstruction; the same leaf/path validation now
-  gates sret/byval make rows. The remaining nominal table entries require
-  exported field-layout facts or broader construction/store/load inference
-  before they can leave compatibility ownership.
+  gates sret/byval make rows. Sret/byval copy rows mechanically validate that
+  the terminal return is the typed aggregate argument, and sret/byval
+  call-wrapper rows validate that the aggregate argument feeds the call and the
+  aggregate terminal return is produced by that call. The remaining nominal
+  table entries require exported field-layout facts or broader
+  construction/store/load inference before they can leave compatibility
+  ownership.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

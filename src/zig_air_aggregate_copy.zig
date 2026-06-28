@@ -91,22 +91,31 @@ pub fn validateSretAggregateCopyRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    const leaf_count = supportedAggregateCopyLeafCount(function_type.return_type.ir_type) orelse return false;
-    if (leaf_count < 3 or function_type.params.len != 1) return false;
+    const plan = aggregateCopyLayoutPlan(function_type.return_type.ir_type) orelse return false;
+    if (plan.leaf_count < 3 or function_type.params.len != 1) return false;
     if (!function_type.params[0].ir_type.eql(function_type.return_type.ir_type)) return false;
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    var arg_indices: [max_mechanical_arg_validation]u32 = undefined;
+    const arg_count = typedArgInstructionIndices(function_type, structured_air_v2, &arg_indices) orelse return false;
+    if (arg_count != 1) return false;
+    const returned = singleReturnedInst(structured_air_v2) orelse return false;
+    return returned == arg_indices[0];
 }
 
 pub fn validateSretAggregateCallWrapperRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    const leaf_count = supportedAggregateCopyLeafCount(function_type.return_type.ir_type) orelse return false;
-    if (leaf_count < 3 or function_type.params.len < 2) return false;
-    if (!function_type.params[function_type.params.len - 1].ir_type.eql(function_type.return_type.ir_type)) return false;
-    return air_model.typedOpcodeCount(structured_air_v2, "call") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    const plan = aggregateCopyLayoutPlan(function_type.return_type.ir_type) orelse return false;
+    if (plan.leaf_count < 3 or function_type.params.len < 1) return false;
+    const aggregate_param_index = function_type.params.len - 1;
+    if (!function_type.params[aggregate_param_index].ir_type.eql(function_type.return_type.ir_type)) return false;
+    var arg_indices: [max_mechanical_arg_validation]u32 = undefined;
+    const arg_count = typedArgInstructionIndices(function_type, structured_air_v2, &arg_indices) orelse return false;
+    if (arg_count != function_type.params.len) return false;
+    const call = singleCallInstruction(structured_air_v2) orelse return false;
+    if (!typedCallUsesInst(call, arg_indices[aggregate_param_index])) return false;
+    const returned = singleReturnedAggregateInst(structured_air_v2, function_type.return_type.ir_type) orelse return false;
+    return returned == call.index;
 }
 
 fn aggregateCopyLayoutPlan(aggregate_ty: ir.Type) ?type_layout.AggregateLayoutPlan {
@@ -115,6 +124,67 @@ fn aggregateCopyLayoutPlan(aggregate_ty: ir.Type) ?type_layout.AggregateLayoutPl
 }
 
 const max_mechanical_leaf_validation = type_layout.max_aggregate_layout_leaves;
+const max_mechanical_arg_validation = 64;
+
+fn typedArgInstructionIndices(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+    out: *[max_mechanical_arg_validation]u32,
+) ?usize {
+    if (function_type.params.len > out.len) return null;
+    var count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "arg")) continue;
+        if (count >= function_type.params.len) return null;
+        const arg_type = parseZigType(instruction.result_type) orelse return null;
+        if (!arg_type.ir_type.eql(function_type.params[count].ir_type)) return null;
+        out[count] = instruction.index;
+        count += 1;
+    }
+    return count;
+}
+
+fn singleReturnedInst(structured_air_v2: air_export.StructuredAirV2) ?u32 {
+    return singleReturnedAggregateInst(structured_air_v2, null);
+}
+
+fn singleReturnedAggregateInst(structured_air_v2: air_export.StructuredAirV2, expected_ty: ?ir.Type) ?u32 {
+    var returned: ?u32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "ret") and !std.mem.eql(u8, instruction.opcode, "ret_safe")) continue;
+        if (returned != null or instruction.operands.len != 1) return null;
+        if (expected_ty) |ty| {
+            const operand_type = parseZigType(instruction.operands[0].type_text) orelse return null;
+            if (!operand_type.ir_type.eql(ty)) return null;
+        }
+        returned = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return null;
+    }
+    return returned;
+}
+
+fn singleCallInstruction(structured_air_v2: air_export.StructuredAirV2) ?air_export.TypedInstruction {
+    var call: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!isCallOpcode(instruction.opcode)) continue;
+        if (call != null) return null;
+        call = instruction;
+    }
+    return call;
+}
+
+fn typedCallUsesInst(call: air_export.TypedInstruction, inst_index: u32) bool {
+    for (call.operands) |operand| {
+        if ((air_model.typedInstOperandIndex(operand) orelse continue) == inst_index) return true;
+    }
+    return false;
+}
+
+fn isCallOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "call") or
+        std.mem.eql(u8, opcode, "call_always_tail") or
+        std.mem.eql(u8, opcode, "call_never_tail") or
+        std.mem.eql(u8, opcode, "call_never_inline");
+}
 
 fn x86_64SysVDataLayout() ?target_mod.DataLayout {
     return target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch null;
@@ -181,4 +251,95 @@ test "aggregate copy validates sret make stores against layout leaves" {
     };
     const structured_air_v2 = air_export.StructuredAirV2{ .instructions = instructions[0..] };
     try std.testing.expect(validateSretAggregateMakeRecords(function_type, structured_air_v2));
+}
+
+test "aggregate copy validates returned aggregate argument" {
+    var params = [_]ZigType{.{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } }};
+    const function_type = FunctionType{
+        .params = params[0..],
+        .return_type = .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    const ret_ops = [_]air_export.TypedOperand{testInstOperand("0", "Big3")};
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "Big3", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "ret", .result_type = "noreturn", .data_kind = "ret", .operands = @constCast(&ret_ops) },
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = instructions[0..] };
+    try std.testing.expect(validateSretAggregateCopyRecords(function_type, structured_air_v2));
+
+    const wrong_ret_ops = [_]air_export.TypedOperand{testInstOperand("1", "Big3")};
+    var wrong_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "Big3", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "ret", .result_type = "noreturn", .data_kind = "ret", .operands = @constCast(&wrong_ret_ops) },
+    };
+    try std.testing.expect(!validateSretAggregateCopyRecords(function_type, .{ .instructions = wrong_instructions[0..] }));
+}
+
+test "aggregate copy validates call wrapper aggregate data flow" {
+    var params = [_]ZigType{
+        .{ .ir_type = .ptr },
+        .{ .ir_type = .{ .int = 64 } },
+        .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } },
+    };
+    const function_type = FunctionType{
+        .params = params[0..],
+        .return_type = .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    const call_ops = [_]air_export.TypedOperand{
+        testInstOperand("0", "fn"),
+        testInstOperand("1", "i64"),
+        testInstOperand("2", "Big3"),
+    };
+    const ret_ops = [_]air_export.TypedOperand{testInstOperand("3", "Big3")};
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "fn", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "arg", .result_type = "i64", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 2, .opcode = "arg", .result_type = "Big3", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 3, .opcode = "call", .result_type = "Big3", .data_kind = "call", .operands = @constCast(&call_ops) },
+        .{ .index = 4, .opcode = "ret", .result_type = "noreturn", .data_kind = "ret", .operands = @constCast(&ret_ops) },
+    };
+    try std.testing.expect(validateSretAggregateCallWrapperRecords(function_type, .{ .instructions = instructions[0..] }));
+
+    const wrong_call_ops = [_]air_export.TypedOperand{
+        testInstOperand("0", "fn"),
+        testInstOperand("1", "i64"),
+    };
+    var wrong_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "fn", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "arg", .result_type = "i64", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 2, .opcode = "arg", .result_type = "Big3", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 3, .opcode = "call", .result_type = "Big3", .data_kind = "call", .operands = @constCast(&wrong_call_ops) },
+        .{ .index = 4, .opcode = "ret", .result_type = "noreturn", .data_kind = "ret", .operands = @constCast(&ret_ops) },
+    };
+    try std.testing.expect(!validateSretAggregateCallWrapperRecords(function_type, .{ .instructions = wrong_instructions[0..] }));
+}
+
+test "aggregate copy validates direct call wrapper aggregate data flow" {
+    var params = [_]ZigType{.{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } }};
+    const function_type = FunctionType{
+        .params = params[0..],
+        .return_type = .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    const call_ops = [_]air_export.TypedOperand{testInstOperand("0", "Big3")};
+    const ret_ops = [_]air_export.TypedOperand{testInstOperand("1", "Big3")};
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "Big3", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "call", .result_type = "Big3", .data_kind = "call", .operands = @constCast(&call_ops) },
+        .{ .index = 2, .opcode = "ret", .result_type = "noreturn", .data_kind = "ret", .operands = @constCast(&ret_ops) },
+    };
+    try std.testing.expect(validateSretAggregateCallWrapperRecords(function_type, .{ .instructions = instructions[0..] }));
+
+    const wrong_ret_ops = [_]air_export.TypedOperand{testInstOperand("0", "Big3")};
+    var wrong_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "Big3", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "call", .result_type = "Big3", .data_kind = "call", .operands = @constCast(&call_ops) },
+        .{ .index = 2, .opcode = "ret", .result_type = "noreturn", .data_kind = "ret", .operands = @constCast(&wrong_ret_ops) },
+    };
+    try std.testing.expect(!validateSretAggregateCallWrapperRecords(function_type, .{ .instructions = wrong_instructions[0..] }));
 }

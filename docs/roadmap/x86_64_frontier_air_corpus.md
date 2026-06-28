@@ -95,7 +95,13 @@ including the 2 packed/unaligned targeted boundary entries. Register aggregate
 construction and sret/byval make rows now add function-local typed AIR
 inference on top of the nominal summaries: `ret_ptr` plus field/element pointer
 stores and `ret_load` are used to validate the aggregate shape, including the
-selected single-field array-leaf form, before the row is admitted.
+selected single-field array-leaf form, before the row is admitted. Sret/byval
+copy rows now mechanically validate that the terminal return is the typed
+aggregate argument, and sret/byval call-wrapper rows validate that the typed
+aggregate argument feeds the single call and that the aggregate terminal return
+is produced by that call. The remaining source-fact table is still static, so
+the next aggregate ownership step is to derive more of those layouts from
+exported Zig field facts or broader function-local construction/copy evidence.
 
 Current frontier ABI boundary seed:
 
