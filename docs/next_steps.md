@@ -272,10 +272,12 @@ Execution order:
    runtime aggregate-pair compatibility lowerers admit rows from normalized
    layout plus construction/call/return data flow rather than exact runtime
    aggregate-pair symbol names. `AggregateLayoutPlan` is now the normalized
-   field/leaf plan used by pair layout admission and sret/byval aggregate copy
-   planning, while the SysV classifier consumes the same normalized aggregate
-   type. Next work: fold the remaining sret/byval aggregate construction
-   decisions into the shared plan and replace the remaining nominal layout
+   field/leaf plan used by pair layout admission, typed-v2 register aggregate
+   construction admission, and sret/byval aggregate copy/make planning, while
+   the SysV classifier consumes the same normalized aggregate type. The
+   construction emitter still uses typed AIR pointer-path summaries for
+   insertvalue index paths because the layout plan owns offsets/types rather
+   than AIR instruction paths. Next work: replace the remaining nominal layout
    table with Zig-exported field facts when the AIR contract exposes them.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
@@ -486,7 +488,9 @@ Aggregate/type-layout ownership start:
   targeted fail-closed boundary with
   `packed_aggregate_boundary_rows=2`.
 
-Validation after these refactor slices:
+Validation after these refactor slices is saved in
+`tmp/frontier_counter_update.log` and
+`tmp/frontier_boundary_counter_update.log`:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
   ReleaseSmall all report `source_rows=13`, `discovered_functions=626`,
@@ -521,10 +525,11 @@ Validation after these refactor slices:
   and compatibility ABI bridge now share aggregate field/leaf layout queries
   through `src/zig_air_capabilities.zig`, `src/zig_air_model.zig`,
   `src/zig_air_aggregate_copy.zig`, `src/zig_air_aggregate_construction.zig`,
-  and `src/codegen/x86_64/sysv_abi.zig`, while sret/byval aggregate
-  construction still needs unification. The sret/byval aggregate copy planner
-  now uses `AggregateLayoutPlan` for leaf counts, parameter matching, and copy
-  offsets. The former centralized ambiguous
+  and `src/codegen/x86_64/sysv_abi.zig`. The sret/byval aggregate copy/make
+  planner now uses `AggregateLayoutPlan` for leaf counts, parameter matching,
+  and copy/store offsets; typed-v2 register aggregate construction admission
+  validates its source operands against the same plan before using typed AIR
+  pointer paths for insertvalue indices. The former centralized ambiguous
   `Pair` rule and exact runtime aggregate-pair symbol-name admission have been
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
   checks.
@@ -599,10 +604,9 @@ Validation after these refactor slices:
   Current duplicated/selected-code location:
   inventory detects packed/unaligned aggregate text through
   `src/zig_air_capabilities.zig`; selected boundary accounting lives in
-  `src/uncurated_air_gate.zig`; aggregate field offset and leaf lookup now use
-  shared layout helpers in the classifier, generic CFG aggregate lowering, and
-  compatibility ABI bridge, while aggregate copy planning remains split across
-  the aggregate lowering files.
+  `src/uncurated_air_gate.zig`; aggregate field offset, leaf lookup, copy
+  planning, construction admission, classifier queries, generic CFG aggregate
+  lowering, and compatibility ABI bridge checks now use shared layout helpers.
   Target reusable abstraction: a layout-capability result for aggregate fields
   that records aligned, packed, and unsupported offsets once, then feeds both
   inventory category reporting and backend load/store/copy lowering.

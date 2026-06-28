@@ -9,6 +9,7 @@ const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
 const ir = @import("ir.zig");
 const legacy = @import("zig_air_lowering_legacy.zig");
+const type_layout = @import("zig_air_type_layout.zig");
 
 const ZigType = air_model.ZigType;
 const FunctionType = air_model.FunctionType;
@@ -386,7 +387,7 @@ pub fn typedV2RegisterAggregateLeafPaths(
 }
 
 pub fn aggregateFieldCount(ty: ir.Type) ?usize {
-    return air_capabilities.aggregateFieldCount(ty);
+    return type_layout.fieldCount(ty);
 }
 
 pub fn lowerTypedV2SretIntegerAggregateAbi(

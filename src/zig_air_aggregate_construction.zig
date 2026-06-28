@@ -4,9 +4,15 @@ const air_model = @import("zig_air_model.zig");
 const air_types = @import("zig_air_types.zig");
 const sysv_abi = @import("codegen/x86_64/sysv_abi.zig");
 const ir = @import("ir.zig");
+const target = @import("target.zig");
+const type_layout = @import("zig_air_type_layout.zig");
 
 const FunctionType = air_model.FunctionType;
 const parseZigType = air_types.parseZigType;
+
+fn x86_64SysVDataLayout() ?target.DataLayout {
+    return target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch null;
+}
 
 pub fn isSysVRegisterAggregateCandidate(ty: ir.Type) bool {
     if (ty != .aggregate) return false;
@@ -30,6 +36,13 @@ pub fn registerAggregateLeafPaths(
     if (function_type.return_type.ir_type != .aggregate) return false;
     if (!isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     if (function_type.params.len == 0 or function_type.params.len > leaf_paths.len) return false;
+    const layout = x86_64SysVDataLayout() orelse return false;
+    const plan = type_layout.aggregateLayoutPlan(layout, function_type.return_type.ir_type) catch return false;
+    const leaves = plan.leafSlice();
+    if (leaves.len != function_type.params.len) return false;
+    for (leaves, function_type.params) |leaf, param| {
+        if (!leaf.ty.eql(param.ir_type)) return false;
+    }
     if (air_model.typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return false;
     if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return false;
     if (air_model.typedStoreOpcodeCount(structured_air_v2) != function_type.params.len) return false;
