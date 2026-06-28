@@ -91,9 +91,12 @@ no longer depend on the fallback table. Owned lookup now runs through a
 provider registry: exported aggregate layout facts first, generated inference
 second, then the temporary static source-fact provider. The exported fact
 contract is `zllvm-aggregate-layout-facts-v1` in
-`src/zig_air_exported_aggregate_layout_facts.zig`; the default provider is
-empty until sidecar facts are wired into the frontier gate. The contract now
-has fail-closed sidecar parsing and an active provider hook.
+`src/zig_air_exported_aggregate_layout_facts.zig`; the strict frontier gate now
+loads `test/zig/frontier/aggregate_layout_facts.sidecar` as the active exported
+provider. That sidecar currently mirrors `frontier_nested_records.Inner`,
+`frontier_nested_records.Outer`, and `frontier_sysv_aggregate_classes.Pair32`
+while the next migration slice removes their duplicate temporary static facts.
+The contract has fail-closed sidecar parsing and an active provider hook.
 `AggregateLayoutSummary.provider_kind` records exported-fact,
 generated-inference, static-source-fact, or boundary-provider ownership
 directly. Owned summaries are

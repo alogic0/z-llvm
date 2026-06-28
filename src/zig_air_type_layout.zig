@@ -483,6 +483,21 @@ test "type layout prefers source facts and inference before fallback table" {
     try std.testing.expect(aggregateLayoutMismatch("any_module.Mixed") == null);
 }
 
+test "type layout prefers active exported facts before temporary static source facts" {
+    const contents =
+        exported_aggregate_layout_facts.section_name ++ "\n" ++
+        "fact nominal=\"frontier_nested_records.Inner\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n";
+    const provider = try exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
+    exported_aggregate_layout_facts.setActiveProvider(provider);
+    defer provider.deinit(std.testing.allocator);
+    defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+
+    const summary = aggregateLayoutSummary("frontier_nested_records.Inner").?;
+    try std.testing.expectEqual(AggregateLayoutSource.facts, summary.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, summary.provider_kind.?);
+    try std.testing.expectEqual(@as(usize, 2), summary.field_count);
+}
+
 test "type layout infers representative frontier aggregate rows" {
     const inner = aggregateLayoutSummary("frontier_nested_records.Inner").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, inner.source);

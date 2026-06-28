@@ -517,10 +517,16 @@ Aggregate/type-layout ownership start:
   temporary static source-fact provider in
   `src/zig_air_aggregate_layout_facts.zig`. The exported fact contract lives in
   `src/zig_air_exported_aggregate_layout_facts.zig` as
-  `zllvm-aggregate-layout-facts-v1`; sidecar ingestion is intentionally the
-  next slice, so the exported provider count is currently zero. The temporary
-  static provider currently has 45 named facts and exists only until equivalent
-  Zig-owned field facts are available. `AggregateLayoutSummary.provider_kind`
+  `zllvm-aggregate-layout-facts-v1`; the frontier gate now loads the checked-in
+  `test/zig/frontier/aggregate_layout_facts.sidecar` sidecar as the active
+  exported-fact provider. That sidecar currently mirrors 3 representative
+  frontier facts (`frontier_nested_records.Inner`,
+  `frontier_nested_records.Outer`, and
+  `frontier_sysv_aggregate_classes.Pair32`) while they remain in the temporary
+  static provider until the next migration slice proves the gate stays green
+  without the duplicate static entries. The temporary static provider currently
+  has 45 named facts and exists only until equivalent Zig-owned field facts are
+  available. `AggregateLayoutSummary.provider_kind`
   records exported-fact, generated-inference, static-source-fact, or
   boundary-provider ownership directly. Generated inference
   covers the scalar-BigN rule for
@@ -555,9 +561,11 @@ Aggregate/type-layout ownership start:
     `src/zig_air_exported_aggregate_layout_facts.zig` defines
     `zllvm-aggregate-layout-facts-v1`, exact nominal fact matching, aggregate
     text, and construction/store/load evidence. It now includes fail-closed
-    sidecar parsing and an active provider hook. The default provider remains
-    empty until the next slice wires checked-in sidecar facts into the frontier
-    gate.
+    sidecar parsing and an active provider hook. The strict frontier gate loads
+    `test/zig/frontier/aggregate_layout_facts.sidecar`, proving the exported
+    provider precedence path for `frontier_nested_records.Inner`,
+    `frontier_nested_records.Outer`, and
+    `frontier_sysv_aggregate_classes.Pair32`.
   - Remaining fallback-table compatibility entries:
     none.
   - Boundary-owned aggregate layouts:

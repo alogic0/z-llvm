@@ -1,0 +1,4 @@
+zllvm-aggregate-layout-facts-v1
+fact nominal="frontier_nested_records.Inner" aggregate="{ i32, i32 }" construction=1 store=1 load=1
+fact nominal="frontier_nested_records.Outer" aggregate="{ { i32, i32 }, { i32, i32 } }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_aggregate_classes.Pair32" aggregate="{ i32, i32 }" construction=1 store=1 load=1

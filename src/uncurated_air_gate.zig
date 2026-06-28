@@ -3,6 +3,7 @@ const air_export = @import("zig_air_export.zig");
 const air_lowering = @import("zig_air_lowering.zig");
 const abi_boundaries = @import("abi_boundaries.zig");
 const codegen = @import("codegen.zig");
+const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const mc = @import("mc.zig");
 
 pub fn main(init: std.process.Init) !void {
@@ -24,6 +25,13 @@ fn runMode(init: std.process.Init, options: Options) !void {
     const allocator = init.gpa;
     const io = init.io;
     const mode = options.mode;
+
+    const aggregate_layout_provider = try loadAggregateLayoutFactProvider(allocator, io, options.corpus);
+    if (aggregate_layout_provider) |provider| {
+        exported_aggregate_layout_facts.setActiveProvider(provider);
+        defer provider.deinit(allocator);
+        defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+    }
 
     const debug_dump_ir_source = init.minimal.environ.getAlloc(allocator, "ZLLVM_DEBUG_DUMP_IR_SOURCE") catch |err| switch (err) {
         error.EnvironmentVariableMissing => null,
@@ -642,6 +650,24 @@ fn runMode(init: std.process.Init, options: Options) !void {
             .native_link_failures = native_link_failures,
         });
     }
+}
+
+const frontier_aggregate_layout_fact_sidecar = "test/zig/frontier/aggregate_layout_facts.sidecar";
+
+fn loadAggregateLayoutFactProvider(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    corpus: Corpus,
+) !?exported_aggregate_layout_facts.Provider {
+    if (corpus != .frontier) return null;
+    const contents = try std.Io.Dir.cwd().readFileAlloc(
+        io,
+        frontier_aggregate_layout_fact_sidecar,
+        allocator,
+        .limited(1024 * 1024),
+    );
+    defer allocator.free(contents);
+    return try exported_aggregate_layout_facts.parseSidecar(allocator, contents);
 }
 
 const helpers = @import("uncurated_air_gate_helpers.zig");
