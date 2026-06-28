@@ -368,8 +368,11 @@ Completed slices from this inventory:
 - Aggregate/store/return selected recognizers now use model-owned return,
   store, memory-op, and field-index presence helpers. The legacy lowerer still
   owns selected function-name gates for pair/read/make wrappers, runtime main
-  wrappers, base64 table lookup, and panic-edge rows; those remain the next
-  normalization targets.
+  wrappers, base64 table lookup, and panic-edge rows; common call and CFG
+  presence checks inside those runtime/panic wrapper recognizers now use
+  model-owned call/control-flow helpers. Remaining normalization targets are
+  the selected function-name gates themselves plus table-load/base64 and
+  panic-edge value summaries.
 
 Validation after these refactor slices:
 
