@@ -766,8 +766,9 @@ closed if their field/leaf counts disagree with any remaining fallback
 equivalent. Remaining aggregate layout debt is explicit: the compatibility
 fallback table is empty, while static source facts still stand in for future
 Zig-exported field layout facts or broader construction/store/load inference.
-Packed/unaligned aggregate ABI remains a 2-row targeted boundary rather than a
-fallback layout. Register
+Packed/unaligned aggregate ABI remains a 2-row targeted boundary through
+`src/zig_air_aggregate_layout_boundaries.zig` rather than a fallback layout.
+Register
 aggregate construction and sret/byval make rows now perform mechanical typed
 AIR inference from ret_ptr, field/element pointer stores, and ret_load before
 admission, so those rows are checked by function-local construction evidence

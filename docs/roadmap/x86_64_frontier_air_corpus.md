@@ -95,7 +95,8 @@ equivalent and fail closed on field/leaf-count mismatch. Remaining aggregate
 layout debt is explicit: the compatibility fallback table is empty, while
 static source facts still stand in for future Zig-exported field facts or
 broader construction/store/load inference. The 2 packed/unaligned targeted
-entries are boundary-owned rather than fallback-owned.
+entries are boundary-owned through `src/zig_air_aggregate_layout_boundaries.zig`
+rather than fallback-owned.
 Register aggregate
 construction and sret/byval make rows now add function-local typed AIR
 inference on top of the nominal summaries: `ret_ptr` plus field/element pointer

@@ -1,4 +1,5 @@
 const std = @import("std");
+const aggregate_layout_boundaries = @import("zig_air_aggregate_layout_boundaries.zig");
 const aggregate_layout_facts = @import("zig_air_aggregate_layout_facts.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
@@ -175,10 +176,8 @@ fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
 }
 
 fn boundaryNamedAggregateType(nominal: []const u8) ?ir.Type {
-    const basename = typeBasename(nominal);
-    if (std.mem.eql(u8, basename, "PackedMixed")) return aggregate("{ i32, i32, double }");
-    if (std.mem.eql(u8, basename, "PackedReverseMixed")) return aggregate("{ double, i32, i32 }");
-    return null;
+    const boundary = aggregate_layout_boundaries.lookup(nominal) orelse return null;
+    return aggregate(boundary.aggregate_text);
 }
 
 fn inferredBigArrayLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
