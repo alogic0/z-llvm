@@ -736,63 +736,7 @@ pub fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_expo
 }
 
 pub fn lowerRuntimePointerLoadStoreMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try parseFunctionType(allocator, air_function.type_text);
-    defer function_type.deinit(allocator);
-    if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
-        return error.UnsupportedAir;
-    }
-
-    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
-    errdefer function.deinit(allocator);
-    function.linkage = .default;
-
-    var entry = ir.BasicBlock.init("0");
-    errdefer entry.deinit(allocator);
-    var call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = runtime_wrappers.PointerLoadStoreMain.callee, .calling_conv = "fastcc", .args = .empty };
-    errdefer call.deinit(allocator);
-    try call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = runtime_wrappers.PointerLoadStoreMain.input_global } });
-    try call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = runtime_wrappers.PointerLoadStoreMain.output_global } });
-    try entry.instructions.append(allocator, .{ .result = "call", .kind = .{ .call = call } });
-    try entry.instructions.append(allocator, .{
-        .result = "first.ok",
-        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "call" }, .rhs = .{ .int = 42 } } },
-    });
-    entry.terminator = .{ .condbr = .{ .cond_ty = .{ .int = 1 }, .cond = .{ .named = "first.ok" }, .then_target = "7", .else_target = "5" } };
-    try function.blocks.append(allocator, entry);
-
-    var merge = ir.BasicBlock.init("5");
-    errdefer merge.deinit(allocator);
-    var phi: ir.PhiInst = .{ .ty = .{ .int = 1 }, .incoming = .empty };
-    errdefer phi.deinit(allocator);
-    try phi.incoming.append(allocator, .{ .value = .{ .named = "output.ok" }, .block = "7" });
-    try phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "0" });
-    try merge.instructions.append(allocator, .{ .result = "both.ok", .kind = .{ .phi = phi } });
-    try merge.instructions.append(allocator, .{
-        .result = "result",
-        .kind = .{ .select = .{
-            .cond_ty = .{ .int = 1 },
-            .cond = .{ .named = "both.ok" },
-            .ty = .{ .int = 32 },
-            .true_value = .{ .int = 0 },
-            .false_value = .{ .int = 1 },
-        } },
-    });
-    merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
-    try function.blocks.append(allocator, merge);
-
-    var output_check = ir.BasicBlock.init("7");
-    errdefer output_check.deinit(allocator);
-    try output_check.instructions.append(allocator, .{
-        .result = "output",
-        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = runtime_wrappers.PointerLoadStoreMain.output_global } } },
-    });
-    try output_check.instructions.append(allocator, .{
-        .result = "output.ok",
-        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "output" }, .rhs = .{ .int = 42 } } },
-    });
-    output_check.terminator = .{ .br = .{ .target = "5" } };
-    try function.blocks.append(allocator, output_check);
-    return function;
+    return runtime_wrappers.lowerPointerLoadStoreMain(allocator, air_function);
 }
 
 pub fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_export.Function, fallback: i32) !ir.Function {

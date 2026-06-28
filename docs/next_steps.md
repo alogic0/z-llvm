@@ -396,9 +396,10 @@ gate behavior changes.
 
 Remaining selected recognizer ownership to normalize:
 
-| Rank | Current location | Duplicated parsing/checking | Target reusable helper |
-| --- | --- | --- | --- |
-| 1 | `src/zig_air_lowering_legacy.zig` runtime pointer-load/store wrapper lowerer body | selected compatibility CFG construction remains in the legacy lowerer body; helper/global symbol spelling is centralized in `src/zig_air_runtime_wrappers.zig` | generic CFG/runtime-call construction helpers consuming model summaries and runtime-wrapper symbol registry |
+The currently tracked recognizer families in this inventory have been moved
+behind model summaries or helper modules. Further work should start from the
+next measured compiler-core/frontier gap rather than adding new selected
+compatibility bodies here.
 
 This inventory is refactor-only: it does not expand accepted rows or weaken the
 strict frontier counters. Each slice should move one recognizer family behind
@@ -456,8 +457,8 @@ Completed slices from this inventory:
   `runtime_pointer_load_store_main.main`, or `.add_may_panic` names. The old
   runtime wrapper callee/global symbol names are registry-owned in
   `src/zig_air_runtime_wrappers.zig` rather than embedded at each use site,
-  and the optional-pointer wrapper CFG construction now lives in that helper
-  module behind the legacy compatibility adapter.
+  and both runtime-wrapper CFG construction bodies now live in that helper
+  module behind legacy compatibility adapters.
 - The selected aggregate pair, error-switch/classify, maybe-error,
   error-union payload, table-lookup, runtime-wrapper, and panic-edge
   compatibility recognizers now use model-owned data-flow summaries rather
@@ -469,9 +470,9 @@ Completed slices from this inventory:
 - Current scan status: `src/zig_air_lowering_legacy.zig` has no
   function-name-specific accepted recognizer gates for the aggregate,
   error/switch, table-lookup, runtime-wrapper, or panic-edge selected shapes.
-  The runtime pointer-load/store compatibility lowerer body still emits a
-  selected CFG shape even though admission is model/data-flow owned and
-  helper/global symbol spelling is centralized.
+  Runtime-wrapper CFG construction is helper-owned in
+  `src/zig_air_runtime_wrappers.zig`; the legacy file keeps only compatibility
+  adapters for those wrappers.
 - Accepted model summaries are now fail-closed on terminal value paths:
   maybe-error, error-switch, error-classify, runtime optional-pointer wrapper,
   and runtime pointer load/store summaries require a proven terminal return or
