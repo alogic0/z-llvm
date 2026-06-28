@@ -65,6 +65,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .xor_ebp_ebp => try writer.writeAll("\txorl %ebp, %ebp\n"),
             .add_rdi_rcx4_ptr_eax => try writer.writeAll("\taddl (%rdi,%rcx,4), %eax\n"),
             .load_rdi_rcx4_ptr_r8d => try writer.writeAll("\tmovl (%rdi,%rcx,4), %r8d\n"),
+            .store_eax_rdi_rcx4_ptr => try writer.writeAll("\tmovl %eax, (%rdi,%rcx,4)\n"),
             .cmp_r8d_arg32 => |reg| try writer.print("\tcmpl {s}, %r8d\n", .{reg.name32()}),
             .add_r8d_eax => try writer.writeAll("\taddl %r8d, %eax\n"),
             .inc_rcx => try writer.writeAll("\tincq %rcx\n"),

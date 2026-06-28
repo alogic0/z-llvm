@@ -73,6 +73,7 @@ pub const Instruction = union(enum) {
     xor_ebp_ebp,
     add_rdi_rcx4_ptr_eax,
     load_rdi_rcx4_ptr_r8d,
+    store_eax_rdi_rcx4_ptr,
     cmp_r8d_arg32: ArgReg,
     add_r8d_eax,
     inc_rcx,

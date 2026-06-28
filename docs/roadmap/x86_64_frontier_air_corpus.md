@@ -47,6 +47,16 @@ error-union value and the ok path unwraps, computes, rewraps, and returns.
 Broader nested/multi-block compiler-core `try` forms remain a separate
 compiler-core priority.
 
+`frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
+after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
+`slice_elem_ptr`, runtime and comptime `ptr_add`, chained `ptr_add`,
+pointer-add-fed loads, pointer-add-fed stores, and load/store through derived
+slice element pointers. The `slice_elem_ptr` rows disable runtime safety inside
+the row so ReleaseSafe proves pointer-address lowering rather than adding
+another bounds-panic CFG shape; checked bounds panic ownership remains covered
+by `frontier_safety_edges.zig`, and broader checked slice-element CFG remains
+future work.
+
 Current frontier ABI boundary seed:
 
 - `test/zig/frontier_boundaries/frontier_varargs_boundary.zig`
@@ -60,20 +70,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=604
-structured_functions=604
-generic_codegen_functions=604
-generic_cfg_functions=604
+discovered_functions=610
+structured_functions=610
+generic_codegen_functions=610
+generic_cfg_functions=610
 structural_matcher_functions=0
-structured_air_v2_functions=604
-typed_air_operand_functions=604
+structured_air_v2_functions=610
+typed_air_operand_functions=610
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=604
+generic_lowering_functions=610
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=604
+object_emitted_functions=610
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -180,8 +190,12 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_nested_memory_sum`
 - selected nested extern-struct field GEP paths through
   `frontier_nested_field_left_b` and `frontier_nested_field_right_a`
-- selected dynamic pointer addition and pointer-element GEP loads through
-  `frontier_dynamic_ptr_add` and `frontier_dynamic_ptr_pair_sum`
+- selected dynamic/comptime/chained pointer addition and pointer-element GEP
+  loads/stores through `frontier_dynamic_ptr_add`,
+  `frontier_dynamic_ptr_pair_sum`, `frontier_comptime_ptr_add`,
+  `frontier_chained_ptr_add`, `frontier_ptr_add_store`,
+  `frontier_slice_ptr_load`, `frontier_slice_elem_ptr_load`, and
+  `frontier_slice_elem_ptr_store`
 - branch-local global/TLS add/sub updates through
   `frontier_global_branch` and `frontier_tls_branch`
 - first SysV ABI closure-wave rows in `frontier_sysv_abi.zig`: small
