@@ -8,7 +8,6 @@ const air_model = @import("zig_air_model.zig");
 const ir = @import("ir.zig");
 
 const FunctionType = air_model.FunctionType;
-const parseConstant = air_values.parseConstant;
 const parseFunctionType = air_types.parseFunctionType;
 const parseInstructionRef = air_text.instructionRef;
 const shortFunctionName = air_model.shortFunctionName;
@@ -142,16 +141,10 @@ pub fn accumulatorLoopShape(function: air_export.Function) ?AccumulatorLoopShape
     var branch_count: usize = 0;
 
     for (function.instructions) |instruction| {
-        if (air_capabilities.isArgOpcode(instruction.opcode)) {
-            var fields = splitTopLevel(instruction.payload, ',');
-            const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
-            const param_index = std.mem.trim(u8, fields.next() orelse return null, " ");
-            if (fields.next() != null) return null;
-            if (std.mem.eql(u8, type_text, "u32") and std.mem.eql(u8, param_index, "0")) {
-                limit_arg = instruction.index;
-            }
+        if (air_model.untypedArgIndexOfType(instruction, "u32", "0")) {
+            limit_arg = instruction.index;
         } else if (air_capabilities.isAllocOpcode(instruction.opcode)) {
-            const allocated = std.mem.trim(u8, instruction.payload, " ");
+            const allocated = air_model.untypedAllocType(instruction) orelse return null;
             if (std.mem.eql(u8, allocated, "*u32")) {
                 index_slot = instruction.index;
             } else if (std.mem.eql(u8, allocated, "*i32")) {
@@ -195,17 +188,11 @@ const AirExpectedValue = union(enum) {
 
 fn hasStoreOf(function: air_export.Function, slot: u32, expected: AirExpectedValue) bool {
     for (function.instructions) |instruction| {
-        if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) != .store) continue;
-        var fields = splitTopLevel(instruction.payload, ',');
-        if (parseInstructionRef(fields.next() orelse continue) != slot) continue;
-        const value_text = fields.next() orelse continue;
-        if (fields.next() != null) continue;
+        const store = air_model.untypedStore(instruction) orelse continue;
+        if (store.slot != slot) continue;
         switch (expected) {
-            .int => |value| {
-                const constant = parseConstant(std.mem.trim(u8, value_text, " ")) orelse continue;
-                if (constant.value == .int and constant.value.int == value) return true;
-            },
-            .ref => |index| if (parseInstructionRef(value_text) == index) return true,
+            .int => |value| if (store.value == .int and store.value.int == value) return true,
+            .ref => |index| if (store.value == .ref and store.value.ref == index) return true,
         }
     }
     return false;
@@ -226,9 +213,7 @@ fn findCompareAgainstArg(function: air_export.Function, slot: u32, arg: u32) ?u3
 
 fn condBrUses(function: air_export.Function, value: u32) bool {
     for (function.instructions) |instruction| {
-        if (!air_capabilities.isCondBrOpcode(instruction.opcode)) continue;
-        var fields = splitTopLevel(instruction.payload, ',');
-        return parseInstructionRef(fields.next() orelse return false) == value;
+        if (air_model.untypedBranchConditionRef(instruction)) |condition| return condition == value;
     }
     return false;
 }
@@ -249,10 +234,7 @@ fn findLastLoadFromSlot(function: air_export.Function, slot: u32) ?u32 {
 }
 
 fn loadReferencesSlot(instruction: air_export.Instruction, slot: u32) bool {
-    if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) != .load) return false;
-    var fields = splitTopLevel(instruction.payload, ',');
-    _ = fields.next() orelse return false;
-    return parseInstructionRef(fields.next() orelse return false) == slot and fields.next() == null;
+    return air_model.untypedLoadSourceSlot(instruction) == slot;
 }
 
 fn findCastOf(function: air_export.Function, opcode: []const u8, source: u32) ?u32 {
@@ -278,10 +260,9 @@ fn findCastFromSlot(function: air_export.Function, opcode: []const u8, slot: u32
 fn findBinaryUsing(function: air_export.Function, opcode: []const u8, lhs: u32, rhs: u32) ?u32 {
     for (function.instructions) |instruction| {
         if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
-        var fields = splitTopLevel(instruction.payload, ',');
-        const first = parseInstructionRef(fields.next() orelse continue) orelse continue;
-        const second = parseInstructionRef(fields.next() orelse continue) orelse continue;
-        if (fields.next() != null) continue;
+        const refs = air_model.untypedBinaryRefs(instruction) orelse continue;
+        const first = refs.lhs;
+        const second = refs.rhs;
         if ((first == lhs and second == rhs) or (first == rhs and second == lhs)) return instruction.index;
     }
     return null;
@@ -303,18 +284,15 @@ fn findBinaryFromSlotUsingConstant(
 fn findBinaryUsingConstant(function: air_export.Function, opcode: []const u8, lhs: u32, value: i128) ?u32 {
     for (function.instructions) |instruction| {
         if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
-        var fields = splitTopLevel(instruction.payload, ',');
-        if (parseInstructionRef(fields.next() orelse continue) != lhs) continue;
-        const constant = parseConstant(std.mem.trim(u8, fields.next() orelse continue, " ")) orelse continue;
-        if (fields.next() == null and constant.value == .int and constant.value.int == value) return instruction.index;
+        const ref_and_int = air_model.untypedBinaryRefAndInt(instruction) orelse continue;
+        if (ref_and_int.lhs == lhs and ref_and_int.value == value) return instruction.index;
     }
     return null;
 }
 
 fn returnUses(function: air_export.Function, value: u32) bool {
     for (function.instructions) |instruction| {
-        if (!air_capabilities.isReturnOpcode(instruction.opcode)) continue;
-        return parseInstructionRef(instruction.payload) == value;
+        if (air_model.untypedReturnRef(instruction)) |returned| return returned == value;
     }
     return false;
 }
@@ -587,20 +565,16 @@ pub fn conditionalSlotUpdateShape(function: air_export.Function) bool {
     var cond_count: usize = 0;
     for (function.instructions) |instruction| {
         if (air_capabilities.isArgOpcode(instruction.opcode)) {
-            var fields = splitTopLevel(instruction.payload, ',');
-            const type_text = std.mem.trim(u8, fields.next() orelse return false, " ");
-            const index_text = std.mem.trim(u8, fields.next() orelse return false, " ");
-            if (std.mem.eql(u8, type_text, "i32") and std.mem.eql(u8, index_text, "0")) first_arg = instruction.index;
-            if (std.mem.eql(u8, type_text, "i32") and std.mem.eql(u8, index_text, "1")) second_arg = instruction.index;
-            if (std.mem.eql(u8, type_text, "bool") and std.mem.eql(u8, index_text, "2")) condition_arg = instruction.index;
+            if (air_model.untypedArgIndexOfType(instruction, "i32", "0")) first_arg = instruction.index;
+            if (air_model.untypedArgIndexOfType(instruction, "i32", "1")) second_arg = instruction.index;
+            if (air_model.untypedArgIndexOfType(instruction, "bool", "2")) condition_arg = instruction.index;
         } else if (air_capabilities.isAllocOpcode(instruction.opcode) and
-            std.mem.eql(u8, std.mem.trim(u8, instruction.payload, " "), "*i32"))
+            std.mem.eql(u8, air_model.untypedAllocType(instruction) orelse return false, "*i32"))
         {
             slot = instruction.index;
         } else if (air_capabilities.isCondBrOpcode(instruction.opcode)) {
             cond_count += 1;
-            var fields = splitTopLevel(instruction.payload, ',');
-            if (parseInstructionRef(fields.next() orelse return false) != condition_arg) return false;
+            if (air_model.untypedBranchConditionRef(instruction) != condition_arg) return false;
         }
     }
     const result_slot = slot orelse return false;

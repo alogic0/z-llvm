@@ -575,6 +575,100 @@ pub fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool
     return false;
 }
 
+pub const UntypedValueSource = union(enum) {
+    int: i128,
+    ref: u32,
+};
+
+pub const UntypedStore = struct {
+    slot: u32,
+    value: UntypedValueSource,
+};
+
+pub const UntypedBinaryRefs = struct {
+    lhs: u32,
+    rhs: u32,
+};
+
+pub fn untypedArgIndexOfType(instruction: air_export.Instruction, expected_type: []const u8, expected_index: []const u8) bool {
+    if (!air_capabilities.isArgOpcode(instruction.opcode)) return false;
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    const type_text = std.mem.trim(u8, fields.next() orelse return false, " ");
+    const param_index = std.mem.trim(u8, fields.next() orelse return false, " ");
+    return fields.next() == null and
+        std.mem.eql(u8, type_text, expected_type) and
+        std.mem.eql(u8, param_index, expected_index);
+}
+
+pub fn untypedAllocType(instruction: air_export.Instruction) ?[]const u8 {
+    if (!air_capabilities.isAllocOpcode(instruction.opcode)) return null;
+    return std.mem.trim(u8, instruction.payload, " ");
+}
+
+pub fn untypedLoadSourceSlot(instruction: air_export.Instruction) ?u32 {
+    if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) != .load) return null;
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    _ = fields.next() orelse return null;
+    const slot = air_text.instructionRef(fields.next() orelse return null) orelse return null;
+    return if (fields.next() == null) slot else null;
+}
+
+pub fn untypedStore(instruction: air_export.Instruction) ?UntypedStore {
+    if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) != .store) return null;
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    const slot = air_text.instructionRef(fields.next() orelse return null) orelse return null;
+    const value_text = fields.next() orelse return null;
+    if (fields.next() != null) return null;
+    return .{
+        .slot = slot,
+        .value = parseUntypedValueSource(std.mem.trim(u8, value_text, " ")) orelse return null,
+    };
+}
+
+pub fn untypedBinaryRefs(instruction: air_export.Instruction) ?UntypedBinaryRefs {
+    if (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode) != .binary) return null;
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    const lhs = air_text.instructionRef(fields.next() orelse return null) orelse return null;
+    const rhs = air_text.instructionRef(fields.next() orelse return null) orelse return null;
+    return if (fields.next() == null) .{ .lhs = lhs, .rhs = rhs } else null;
+}
+
+pub fn untypedBinaryRefAndInt(instruction: air_export.Instruction) ?struct { lhs: u32, value: i128 } {
+    if (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode) != .binary) return null;
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    const lhs = air_text.instructionRef(fields.next() orelse return null) orelse return null;
+    const value = parseUntypedIntConstant(std.mem.trim(u8, fields.next() orelse return null, " ")) orelse return null;
+    return if (fields.next() == null) .{ .lhs = lhs, .value = value } else null;
+}
+
+pub fn untypedReturnRef(instruction: air_export.Instruction) ?u32 {
+    if (!air_capabilities.isReturnOpcode(instruction.opcode)) return null;
+    return air_text.instructionRef(instruction.payload);
+}
+
+pub fn untypedBranchConditionRef(instruction: air_export.Instruction) ?u32 {
+    if (!air_capabilities.isCondBrOpcode(instruction.opcode)) return null;
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    return air_text.instructionRef(fields.next() orelse return null);
+}
+
+fn parseUntypedValueSource(text: []const u8) ?UntypedValueSource {
+    if (air_text.instructionRef(text)) |index| return .{ .ref = index };
+    if (parseUntypedIntConstant(text)) |value| return .{ .int = value };
+    return null;
+}
+
+fn parseUntypedIntConstant(text: []const u8) ?i128 {
+    if (std.mem.startsWith(u8, text, "<") and std.mem.endsWith(u8, text, ">")) {
+        var fields = air_text.splitTopLevel(text[1 .. text.len - 1], ',');
+        _ = fields.next() orelse return null;
+        const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+        if (fields.next() != null) return null;
+        return std.fmt.parseInt(i128, value_text, 10) catch null;
+    }
+    return std.fmt.parseInt(i128, text, 10) catch null;
+}
+
 pub fn typedFieldPtrIndexCount(structured_air_v2: air_export.StructuredAirV2, expected_index: usize) usize {
     var count: usize = 0;
     for (structured_air_v2.instructions) |instruction| {
@@ -1068,4 +1162,28 @@ test "AIR model reports legacy instruction opcode presence" {
 
     try std.testing.expect(functionHasOpcode(function, "add_safe"));
     try std.testing.expect(!functionHasOpcode(function, "mul"));
+}
+
+test "AIR model parses untyped AIR value query shapes" {
+    const arg = air_export.Instruction{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "i32, 0", .category = .argument };
+    const alloc = air_export.Instruction{ .index = 1, .indent = 0, .unused = false, .opcode = "alloc", .payload = "*i32", .category = .memory };
+    const store_const = air_export.Instruction{ .index = 2, .indent = 0, .unused = false, .opcode = "store", .payload = "%1!, <i32, 7>", .category = .memory };
+    const load = air_export.Instruction{ .index = 3, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %1!", .category = .memory };
+    const add = air_export.Instruction{ .index = 4, .indent = 0, .unused = false, .opcode = "add", .payload = "%3!, <i32, 1>", .category = .arithmetic };
+    const cond = air_export.Instruction{ .index = 5, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%4!, then_body, else_body", .category = .control_flow };
+    const ret = air_export.Instruction{ .index = 6, .indent = 0, .unused = false, .opcode = "ret", .payload = "%4!", .category = .return_op };
+
+    try std.testing.expect(untypedArgIndexOfType(arg, "i32", "0"));
+    try std.testing.expectEqualStrings("*i32", untypedAllocType(alloc).?);
+
+    const store = untypedStore(store_const).?;
+    try std.testing.expectEqual(@as(u32, 1), store.slot);
+    try std.testing.expectEqual(@as(i128, 7), store.value.int);
+
+    try std.testing.expectEqual(@as(u32, 1), untypedLoadSourceSlot(load).?);
+    const binary = untypedBinaryRefAndInt(add).?;
+    try std.testing.expectEqual(@as(u32, 3), binary.lhs);
+    try std.testing.expectEqual(@as(i128, 1), binary.value);
+    try std.testing.expectEqual(@as(u32, 4), untypedBranchConditionRef(cond).?);
+    try std.testing.expectEqual(@as(u32, 4), untypedReturnRef(ret).?);
 }
