@@ -29,8 +29,12 @@ fn runMode(init: std.process.Init, options: Options) !void {
     const aggregate_layout_provider = try loadAggregateLayoutFactProvider(allocator, io, options.corpus);
     if (aggregate_layout_provider) |provider| {
         exported_aggregate_layout_facts.setActiveProvider(provider);
-        defer provider.deinit(allocator);
-        defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+    }
+    defer {
+        if (aggregate_layout_provider) |provider| {
+            exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+            provider.deinit(allocator);
+        }
     }
 
     const debug_dump_ir_source = init.minimal.environ.getAlloc(allocator, "ZLLVM_DEBUG_DUMP_IR_SOURCE") catch |err| switch (err) {

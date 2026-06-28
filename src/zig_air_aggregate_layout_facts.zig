@@ -23,8 +23,6 @@ pub const Fact = struct {
 };
 
 const facts = [_]Fact{
-    .{ .name = "frontier_nested_records.Inner", .aggregate_text = "{ i32, i32 }", .match = .exact },
-    .{ .name = "frontier_nested_records.Outer", .aggregate_text = "{ { i32, i32 }, { i32, i32 } }", .match = .exact },
     .{ .name = "aggregate_abi.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
     .{ .name = "runtime_aggregate_pair_main.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
     .{ .name = "expanded_abi_frontier.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
@@ -34,7 +32,6 @@ const facts = [_]Fact{
     .{ .name = "DoublePair", .aggregate_text = "{ double, double }" },
     .{ .name = "FloatPair", .aggregate_text = "{ float, float }" },
     .{ .name = "FloatArray", .aggregate_text = "{ [4 x float] }" },
-    .{ .name = "Pair32", .aggregate_text = "{ i32, i32 }" },
     .{ .name = "NestedPair", .aggregate_text = "{ { i32, i32 }, { i32, i32 } }" },
     .{ .name = "ArrayPair", .aggregate_text = "{ [2 x i64] }" },
     .{ .name = "ArrayDouble", .aggregate_text = "{ [2 x double] }" },

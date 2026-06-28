@@ -452,6 +452,15 @@ fn aggregate(text: []const u8) ir.Type {
     return .{ .aggregate = text };
 }
 
+fn installTestExportedAggregateProvider() !exported_aggregate_layout_facts.Provider {
+    const contents =
+        exported_aggregate_layout_facts.section_name ++ "\n" ++
+        "fact nominal=\"frontier_nested_records.Inner\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_nested_records.Outer\" aggregate=\"{ { i32, i32 }, { i32, i32 } }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_aggregate_classes.Pair32\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n";
+    return exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
+}
+
 test "type layout decodes nominal aggregate basenames without fixture module names" {
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, double }" }, parseNamedAggregateType("any_module.Mixed").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, double }" }, parseNamedAggregateType("%Mixed").?);
@@ -465,11 +474,16 @@ test "type layout decodes nominal aggregate basenames without fixture module nam
     try std.testing.expect(parseNamedAggregateType("other.Pair") == null);
 }
 
-test "type layout prefers source facts and inference before fallback table" {
+test "type layout prefers exported facts and inference before fallback table" {
+    const provider = try installTestExportedAggregateProvider();
+    exported_aggregate_layout_facts.setActiveProvider(provider);
+    defer provider.deinit(std.testing.allocator);
+    defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+
     const outer = aggregateLayoutSummary("frontier_nested_records.Outer").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, outer.source);
-    try std.testing.expectEqual(AggregateLayoutProviderKind.static_source_facts, outer.provider_kind.?);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }, outer.ty);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, outer.provider_kind.?);
+    try std.testing.expect(outer.ty.eql(.{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }));
     try std.testing.expectEqual(@as(usize, 2), outer.field_count);
     try std.testing.expectEqual(@as(usize, 4), outer.leaf_count);
     try std.testing.expect(outer.evidence.construction);
@@ -484,10 +498,7 @@ test "type layout prefers source facts and inference before fallback table" {
 }
 
 test "type layout prefers active exported facts before temporary static source facts" {
-    const contents =
-        exported_aggregate_layout_facts.section_name ++ "\n" ++
-        "fact nominal=\"frontier_nested_records.Inner\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n";
-    const provider = try exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
+    const provider = try installTestExportedAggregateProvider();
     exported_aggregate_layout_facts.setActiveProvider(provider);
     defer provider.deinit(std.testing.allocator);
     defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
@@ -499,8 +510,14 @@ test "type layout prefers active exported facts before temporary static source f
 }
 
 test "type layout infers representative frontier aggregate rows" {
+    const provider = try installTestExportedAggregateProvider();
+    exported_aggregate_layout_facts.setActiveProvider(provider);
+    defer provider.deinit(std.testing.allocator);
+    defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+
     const inner = aggregateLayoutSummary("frontier_nested_records.Inner").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, inner.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, inner.provider_kind.?);
     try std.testing.expectEqual(@as(usize, 2), inner.leaf_count);
     try std.testing.expect(inner.leafSlice()[0].ty.eql(.{ .int = 32 }));
     try std.testing.expect(inner.leafSlice()[1].ty.eql(.{ .int = 32 }));
@@ -508,7 +525,8 @@ test "type layout infers representative frontier aggregate rows" {
 
     const pair32 = aggregateLayoutSummary("frontier_sysv_aggregate_classes.Pair32").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, pair32.source);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, pair32.ty);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, pair32.provider_kind.?);
+    try std.testing.expect(pair32.ty.eql(.{ .aggregate = "{ i32, i32 }" }));
 
     const mixed = aggregateLayoutSummary("frontier_sysv_aggregate_classes.SmallMixed").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, mixed.source);

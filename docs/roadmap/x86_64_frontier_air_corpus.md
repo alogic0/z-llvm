@@ -83,9 +83,10 @@ construction admission validates operands against the same plan before using
 typed AIR pointer paths for insertvalue indices. SysV classification consumes
 the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
 of the basename compatibility table and records layout source, field count,
-scalar leaves, and construction/store/load evidence. The owned slice has 45
-static source layout facts in `src/zig_air_aggregate_layout_facts.zig` plus
-generated `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
+scalar leaves, and construction/store/load evidence. The owned slice has 3
+exported sidecar facts, 42 temporary static source layout facts in
+`src/zig_air_aggregate_layout_facts.zig`, plus generated
+`frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
 Big3..Big20 rows and the 12 current Big32..Big256 array-leaf rows; those rows
 no longer depend on the fallback table. Owned lookup now runs through a
 provider registry: exported aggregate layout facts first, generated inference
@@ -93,18 +94,19 @@ second, then the temporary static source-fact provider. The exported fact
 contract is `zllvm-aggregate-layout-facts-v1` in
 `src/zig_air_exported_aggregate_layout_facts.zig`; the strict frontier gate now
 loads `test/zig/frontier/aggregate_layout_facts.sidecar` as the active exported
-provider. That sidecar currently mirrors `frontier_nested_records.Inner`,
-`frontier_nested_records.Outer`, and `frontier_sysv_aggregate_classes.Pair32`
-while the next migration slice removes their duplicate temporary static facts.
-The contract has fail-closed sidecar parsing and an active provider hook.
+provider. That sidecar now owns `frontier_nested_records.Inner`,
+`frontier_nested_records.Outer`, and `frontier_sysv_aggregate_classes.Pair32`;
+those duplicate entries were removed from the temporary static provider after
+the strict frontier gate stayed green. The contract has fail-closed sidecar
+parsing and an active provider hook.
 `AggregateLayoutSummary.provider_kind` records exported-fact,
 generated-inference, static-source-fact, or boundary-provider ownership
 directly. Owned summaries are
 checked against any still-present fallback
 equivalent and fail closed on field/leaf-count mismatch. Remaining aggregate
-layout debt is explicit: the compatibility fallback table is empty, while
-static source facts still stand in for future Zig-exported field facts or
-broader construction/store/load inference. The 2 packed/unaligned targeted
+layout debt is explicit: the compatibility fallback table is empty, while 42
+temporary static source facts still stand in for future Zig-exported field
+facts or broader construction/store/load inference. The 2 packed/unaligned targeted
 entries are boundary-owned through `src/zig_air_aggregate_layout_boundaries.zig`
 rather than fallback-owned.
 Register aggregate
