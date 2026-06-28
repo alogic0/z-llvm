@@ -289,7 +289,13 @@ Execution order:
    Inferred summaries are compared against any still-present compatibility
    fallback; a disagreement fails closed with nominal name, field-count,
    leaf-count, and construction/store/load evidence available through
-   `aggregateLayoutMismatch`.
+   `aggregateLayoutMismatch`. Register aggregate construction no longer admits
+   rows from nominal layout alone: it mechanically rebuilds a layout summary
+   from typed AIR `ret_ptr`/field-or-element pointer/store/`ret_load` paths and
+   compares that summary with `AggregateLayoutPlan` before accepting the row.
+   `aggregateLayoutPlan` now uses the checked summary path, so layout mismatch
+   reaches plan-based lowerers as `AggregateLayoutMismatch` instead of being
+   silently converted to an optional miss.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
@@ -501,7 +507,11 @@ Aggregate/type-layout ownership start:
   covering Big32, Big40, Big48, Big64, Big80, Big81, Big96, Big128, Big160,
   Big192, Big224, and Big256. The fallback table is reduced to 37
   compatibility entries, and packed/unaligned aggregate ABI stays a targeted
-  fail-closed boundary with `packed_aggregate_boundary_rows=2`.
+  fail-closed boundary with `packed_aggregate_boundary_rows=2`. Function-local
+  typed AIR construction evidence now feeds register aggregate admission:
+  the inference path derives struct fields and single-field array leaves from
+  concrete store paths, then validates that derived layout against the shared
+  plan.
 - Nominal aggregate layout source audit:
   - Source/AIR-inferred before fallback table:
     `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
@@ -574,9 +584,11 @@ Validation after these refactor slices is saved in
   source/AIR inference or from the compatibility table; the inferred side has
   18 named source-owned facts plus a large-BigN array rule, and mismatch
   checking compares inferred field/leaf counts against any remaining fallback
-  entry. The remaining nominal table entries require exported field-layout
-  facts or broader construction/store/load inference before they can leave
-  compatibility ownership.
+  entry. Register aggregate construction now also has mechanical typed-AIR
+  inference for ret_ptr/field-or-element pointer/store/ret_load rows, including
+  single-field array leaf reconstruction. The remaining nominal table entries
+  require exported field-layout facts or broader construction/store/load
+  inference before they can leave compatibility ownership.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

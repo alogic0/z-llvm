@@ -762,7 +762,11 @@ summaries fail closed if their field/leaf counts disagree with any remaining
 fallback equivalent. Remaining aggregate layout debt is explicit: 37
 compatibility fallback entries still stand in for future Zig-exported field
 layout facts or broader construction/store/load inference, and
-packed/unaligned aggregate ABI remains a 2-row targeted boundary.
+packed/unaligned aggregate ABI remains a 2-row targeted boundary. Register
+aggregate construction now performs mechanical typed AIR inference from
+ret_ptr, field/element pointer stores, and ret_load before admission, so those
+rows are checked by function-local construction evidence rather than nominal
+layout facts alone.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

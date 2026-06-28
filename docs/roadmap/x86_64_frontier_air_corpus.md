@@ -91,7 +91,11 @@ Inferred summaries are checked against any still-present fallback equivalent
 and fail closed on field/leaf-count mismatch. Remaining aggregate layout debt
 is explicit: 37 compatibility fallback entries still stand in for future
 Zig-exported field facts or broader construction/store/load inference, and
-packed/unaligned aggregate ABI remains a 2-row targeted boundary.
+packed/unaligned aggregate ABI remains a 2-row targeted boundary. Register
+aggregate construction now adds function-local typed AIR inference on top of
+the nominal summaries: `ret_ptr` plus field/element pointer stores and
+`ret_load` are used to rebuild the aggregate shape, including the selected
+single-field array-leaf form, before the row is admitted.
 
 Current frontier ABI boundary seed:
 

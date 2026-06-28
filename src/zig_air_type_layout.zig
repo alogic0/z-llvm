@@ -74,6 +74,18 @@ pub const AggregateLayoutMismatch = struct {
     evidence: AggregateLayoutEvidence,
 };
 
+pub fn summarizeInferredAggregateLayout(
+    nominal: []const u8,
+    ty: ir.Type,
+    evidence: AggregateLayoutEvidence,
+) AggregateLayoutSummary {
+    return summarizeAggregateLayout(nominal, ty, .inference, evidence);
+}
+
+pub fn aggregateLayoutSummariesMatch(lhs: AggregateLayoutSummary, rhs: AggregateLayoutSummary) bool {
+    return aggregateLayoutSummariesEquivalent(lhs, rhs);
+}
+
 pub fn parseNamedAggregateType(text: []const u8) ?ir.Type {
     const trimmed = std.mem.trim(u8, text, " ");
     if (isPointerOrSliceSurface(trimmed) or std.mem.startsWith(u8, trimmed, "fn ")) return null;
@@ -259,6 +271,13 @@ pub fn normalizeAggregateType(ty: ir.Type) ir.Type {
     };
 }
 
+pub fn normalizeAggregateTypeChecked(ty: ir.Type) error{AggregateLayoutMismatch}!ir.Type {
+    return switch (ty) {
+        .aggregate => |text| if (try aggregateLayoutSummaryChecked(text)) |summary| summary.ty else ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => ty,
+    };
+}
+
 pub fn typeBasename(text: []const u8) []const u8 {
     const trimmed = stripNominalSigil(std.mem.trim(u8, text, " "));
     if (std.mem.lastIndexOfScalar(u8, trimmed, '.')) |dot| return trimmed[dot + 1 ..];
@@ -369,7 +388,7 @@ pub fn collectSupportedScalarLeaves(
 }
 
 pub fn aggregateLayoutPlan(layout: target.DataLayout, aggregate_ty: ir.Type) !AggregateLayoutPlan {
-    const normalized_ty = normalizeAggregateType(aggregate_ty);
+    const normalized_ty = try normalizeAggregateTypeChecked(aggregate_ty);
     if (!isAggregateType(normalized_ty)) return error.UnsupportedCodegenAbi;
     const count = fieldCount(normalized_ty);
     if (count == 0) return error.UnsupportedCodegenAbi;
