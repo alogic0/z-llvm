@@ -340,6 +340,21 @@ git diff --check
 Run broader distribution gates only if public build wiring or accepted release
 gate behavior changes.
 
+Remaining selected recognizer ownership to normalize:
+
+| Rank | Current location | Duplicated parsing/checking | Target reusable helper |
+| --- | --- | --- | --- |
+| 1 | `src/zig_air_lowering_legacy.zig::accumulatorLoopShape` | raw AIR payload parsing for `arg`, `alloc`, store/load slot refs, binary refs/constants, compare/cond-br, and return source | model-owned untyped AIR value queries for arg index/type, slot load/store, binary-use, branch condition, and return source |
+| 2 | `src/zig_air_lowering_legacy.zig::conditionalSlotUpdateShape` | raw arg/alloc/cond-br payload parsing plus store/binary update scans | same slot/value query helpers as accumulator loops, reused by conditional slot update |
+| 3 | `src/zig_air_lowering_legacy.zig` optional/error-union shape predicates | opcode-presence sets for optional payload, optional pointer, error-union payload, error switch/classifier, and maybe-error branches | capability/model predicates for optional and error-union semantic-op presence and selected terminal branch shapes |
+| 4 | `src/zig_air_lowering_legacy.zig` aggregate pair/array/struct predicates | selected aggregate opcode-count and field-index checks, with some name suffix gates for pair make/read | aggregate layout/query helpers shared by typed-v2 aggregate construction, copy planning, and legacy compatibility predicates |
+| 5 | `src/zig_air_lowering_legacy.zig` slice/base64/runtime wrapper predicates | selected opcode-presence and function-name gates for slice sums, table lookup, optional pointer main, pointer load/store main, and add-may-panic | normalized typed-AIR CFG/value summaries, runtime-boundary call descriptors, and table-load helpers consumed by generic CFG lowering |
+
+This inventory is refactor-only: it does not expand accepted rows or weaken the
+strict frontier counters. Each slice should move one recognizer family behind
+model/capability helpers, then rerun `zig build test`; rerun
+`distribution-air-release-frontier` when lowering dispatch behavior changes.
+
 - Category: `aggregate-abi`.
   Inventory counts: ReleaseFast 2255777, ReleaseSafe 2338212,
   ReleaseSmall 2206792.
