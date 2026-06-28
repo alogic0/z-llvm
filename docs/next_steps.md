@@ -280,14 +280,16 @@ Execution order:
    than AIR instruction paths. `AggregateLayoutSummary` now records layout
    source, field count, scalar leaves, and construction/store/load evidence.
    It is consulted before the basename compatibility table, so
-   `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
-   `frontier_sysv_aggregate_classes.Pair32`,
-   `frontier_sysv_aggregate_classes.SmallMixed`, and
-   `frontier_sysv_sret_byval.BigArray` are source/AIR-inferred layout
-   summaries instead of fallback-table rows. Remaining nominal entries in the
-   fallback table are compatibility-owned until the current AIR export exposes
-   general field layout facts or a function-local construction/store/load
-   summary can prove them.
+   the first broad easy-layout slice is source/AIR-inferred instead of
+   fallback-table-owned. The inferred side now has 18 named layout facts plus a
+   reusable `frontier_sysv_sret_byval.BigN` array-leaf rule that covers the 12
+   current Big32..Big256 rows. The fallback side is reduced to 37 compatibility
+   entries: 28 non-packed nominal basenames plus the 9 scalar Big3..Big20 sret/
+   byval forms. Packed/unaligned aggregate layout remains a 2-row boundary.
+   Inferred summaries are compared against any still-present compatibility
+   fallback; a disagreement fails closed with nominal name, field-count,
+   leaf-count, and construction/store/load evidence available through
+   `aggregateLayoutMismatch`.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
@@ -494,37 +496,32 @@ Aggregate/type-layout ownership start:
   is layout-owned as `{ i32, i32 }`, the runtime aggregate-pair compatibility
   lowerers now admit by normalized layout and data-flow structure instead of
   exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
-  source/AIR-inferred layouts from fallback-table layouts. The first inferred
-  set covers `frontier_nested_records.Inner`,
-  `frontier_nested_records.Outer`, `frontier_sysv_aggregate_classes.Pair32`,
-  `frontier_sysv_aggregate_classes.SmallMixed`, and
-  `frontier_sysv_sret_byval.BigArray`; the broader nominal table remains
-  compatibility-owned pending exported Zig field layout facts or richer
-  function-local construction/store/load inference. Packed/unaligned aggregate
-  ABI stays a targeted fail-closed boundary with
-  `packed_aggregate_boundary_rows=2`.
+  source/AIR-inferred layouts from fallback-table layouts. The inferred set has
+  18 named source-owned facts and a reusable large-BigN array-leaf rule
+  covering Big32, Big40, Big48, Big64, Big80, Big81, Big96, Big128, Big160,
+  Big192, Big224, and Big256. The fallback table is reduced to 37
+  compatibility entries, and packed/unaligned aggregate ABI stays a targeted
+  fail-closed boundary with `packed_aggregate_boundary_rows=2`.
 - Nominal aggregate layout source audit:
   - Source/AIR-inferred before fallback table:
     `frontier_nested_records.Inner`, `frontier_nested_records.Outer`,
-    `frontier_sysv_aggregate_classes.Pair32`,
-    `frontier_sysv_aggregate_classes.SmallMixed`,
-    `frontier_sysv_sret_byval.BigArray`.
-  - Remaining basename mappings that should be derivable from existing
-    aggregate construction/store/load paths once inference is broadened:
     `Pair64`, `Mixed`, `ReverseMixed`, `DoublePair`, `FloatPair`,
     `FloatArray`, `NestedPair`, `ArrayPair`, `ArrayDouble`, `DoubleBox`,
-    `NestedDouble`, `NestedMixed`, `SmallReverseMixed`, `BigNested`,
-    `BigMixed`, `NarrowInner`, `BigNarrow`, `BigDouble`,
-    `BigDoubleArray`, `BigFloat`, `BigFloatArray`, `BigPtrDouble`,
-    `BigPtrFloat`, `BigArrayMixed`, `BigNestedArrayMixed`,
-    `MixedArrayLeaf`, `BigStructArrayMixed`, `BigDeepMixed`,
-    `BigByteTail`, `BigByteTail5`, `BigByteTail6`, `BigByteTail7`,
-    `BigWordTail`, `ScalarMixed`, `ScalarNestedInner`, `ScalarNested`,
-    `ScalarArray`, and the non-frontier compatibility uses of `Pair`,
-    `Inner`, `Outer`, `Pair32`, `SmallMixed`, and `BigArray`.
-  - Remaining dynamic `frontier_sysv_sret_byval.BigN` mappings should move to
-    exported field layout facts or a generalized array-leaf inference path; the
-    current generated mapping is compatibility-owned.
+    `NestedDouble`, `NestedMixed`, `Pair32`, `SmallMixed`,
+    `SmallReverseMixed`, `frontier_sysv_sret_byval.BigArray`, and the
+    large-BigN array rule for BigN >= 32.
+  - Remaining fallback-table compatibility entries:
+    `Outer`, `BigNested`, `BigMixed`, `NarrowInner`, `BigNarrow`, `BigArray`,
+    `BigDouble`, `BigDoubleArray`, `BigFloat`, `BigFloatArray`,
+    `BigPtrDouble`, `BigPtrFloat`, `BigArrayMixed`,
+    `BigNestedArrayMixed`, `MixedArrayLeaf`, `BigStructArrayMixed`,
+    `BigDeepMixed`, `BigByteTail`, `BigByteTail5`, `BigByteTail6`,
+    `BigByteTail7`, `BigWordTail`, `ScalarMixed`, `ScalarNestedInner`,
+    `ScalarNested`, `ScalarArray`, `Pair`, `Inner`, and the scalar
+    Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 generated forms.
+  - Remaining dynamic `frontier_sysv_sret_byval.BigN` scalar forms below 32
+    stay compatibility-owned until they can be proven from exported field
+    layout facts or a generalized scalar-field inference path.
   - `PackedMixed` and `PackedReverseMixed` stay boundary-owned until
     packed/unaligned field layout and ABI facts are exported or implemented
     explicitly.
@@ -574,13 +571,12 @@ Validation after these refactor slices is saved in
   `Pair` rule and exact runtime aggregate-pair symbol-name admission have been
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
   checks. `AggregateLayoutSummary` now records whether a layout came from
-  source/AIR inference or from the compatibility table; the first inferred
-  representatives are `frontier_nested_records.Inner`,
-  `frontier_nested_records.Outer`, `frontier_sysv_aggregate_classes.Pair32`,
-  `frontier_sysv_aggregate_classes.SmallMixed`, and
-  `frontier_sysv_sret_byval.BigArray`. The remaining nominal table entries
-  require exported field-layout facts or broader construction/store/load
-  inference before they can leave compatibility ownership.
+  source/AIR inference or from the compatibility table; the inferred side has
+  18 named source-owned facts plus a large-BigN array rule, and mismatch
+  checking compares inferred field/leaf counts against any remaining fallback
+  entry. The remaining nominal table entries require exported field-layout
+  facts or broader construction/store/load inference before they can leave
+  compatibility ownership.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

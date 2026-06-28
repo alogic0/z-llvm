@@ -84,14 +84,14 @@ typed AIR pointer paths for insertvalue indices. SysV classification consumes
 the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
 of the basename compatibility table and records layout source, field count,
 scalar leaves, and construction/store/load evidence. The first source/AIR
-inferred layouts are `frontier_nested_records.Inner`,
-`frontier_nested_records.Outer`, `frontier_sysv_aggregate_classes.Pair32`,
-`frontier_sysv_aggregate_classes.SmallMixed`, and
-`frontier_sysv_sret_byval.BigArray`; those rows no longer depend on the
-fallback table. Remaining aggregate layout debt is explicit: the broader
-nominal layout table still stands in for future Zig-exported field facts or
-broader construction/store/load inference, and packed/unaligned aggregate ABI
-remains a targeted boundary row.
+inferred slice has 18 named layout facts plus a reusable
+`frontier_sysv_sret_byval.BigN` array-leaf rule covering the 12 current
+Big32..Big256 rows; those rows no longer depend on the fallback table.
+Inferred summaries are checked against any still-present fallback equivalent
+and fail closed on field/leaf-count mismatch. Remaining aggregate layout debt
+is explicit: 37 compatibility fallback entries still stand in for future
+Zig-exported field facts or broader construction/store/load inference, and
+packed/unaligned aggregate ABI remains a 2-row targeted boundary.
 
 Current frontier ABI boundary seed:
 

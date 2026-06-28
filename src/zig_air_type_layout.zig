@@ -49,22 +49,77 @@ pub const AggregateLayoutSummary = struct {
     }
 };
 
+const AggregateLayoutMatch = enum {
+    exact,
+    basename,
+};
+
+const SourceAggregateLayoutFact = struct {
+    name: []const u8,
+    aggregate_text: []const u8,
+    match: AggregateLayoutMatch = .basename,
+    evidence: AggregateLayoutEvidence = .{
+        .construction = true,
+        .store = true,
+        .load = true,
+    },
+};
+
+pub const AggregateLayoutMismatch = struct {
+    nominal_type_name: []const u8,
+    inferred_field_count: usize,
+    fallback_field_count: usize,
+    inferred_leaf_count: usize,
+    fallback_leaf_count: usize,
+    evidence: AggregateLayoutEvidence,
+};
+
 pub fn parseNamedAggregateType(text: []const u8) ?ir.Type {
     const trimmed = std.mem.trim(u8, text, " ");
     if (isPointerOrSliceSurface(trimmed) or std.mem.startsWith(u8, trimmed, "fn ")) return null;
     const nominal = stripNominalSigil(trimmed);
-    if (aggregateLayoutSummaryForNominal(nominal)) |summary| return summary.ty;
+    if (aggregateLayoutSummaryForNominal(nominal) catch null) |summary| return summary.ty;
     return null;
 }
 
 pub fn aggregateLayoutSummary(text: []const u8) ?AggregateLayoutSummary {
     const trimmed = std.mem.trim(u8, text, " ");
     if (isPointerOrSliceSurface(trimmed) or std.mem.startsWith(u8, trimmed, "fn ")) return null;
+    return aggregateLayoutSummaryChecked(trimmed) catch null;
+}
+
+pub fn aggregateLayoutSummaryChecked(text: []const u8) error{AggregateLayoutMismatch}!?AggregateLayoutSummary {
+    const trimmed = std.mem.trim(u8, text, " ");
+    if (isPointerOrSliceSurface(trimmed) or std.mem.startsWith(u8, trimmed, "fn ")) return null;
     return aggregateLayoutSummaryForNominal(stripNominalSigil(trimmed));
 }
 
-fn aggregateLayoutSummaryForNominal(nominal: []const u8) ?AggregateLayoutSummary {
-    if (inferredAggregateLayoutSummary(nominal)) |summary| return summary;
+pub fn aggregateLayoutMismatch(text: []const u8) ?AggregateLayoutMismatch {
+    const trimmed = std.mem.trim(u8, text, " ");
+    if (isPointerOrSliceSurface(trimmed) or std.mem.startsWith(u8, trimmed, "fn ")) return null;
+    const nominal = stripNominalSigil(trimmed);
+    const inferred = inferredAggregateLayoutSummary(nominal) orelse return null;
+    const fallback_ty = fallbackNamedAggregateType(nominal) orelse return null;
+    const fallback = summarizeAggregateLayout(nominal, fallback_ty, .fallback_table, .{});
+    if (aggregateLayoutSummariesEquivalent(inferred, fallback)) return null;
+    return .{
+        .nominal_type_name = nominal,
+        .inferred_field_count = inferred.field_count,
+        .fallback_field_count = fallback.field_count,
+        .inferred_leaf_count = inferred.leaf_count,
+        .fallback_leaf_count = fallback.leaf_count,
+        .evidence = inferred.evidence,
+    };
+}
+
+fn aggregateLayoutSummaryForNominal(nominal: []const u8) error{AggregateLayoutMismatch}!?AggregateLayoutSummary {
+    if (inferredAggregateLayoutSummary(nominal)) |summary| {
+        if (fallbackNamedAggregateType(nominal)) |fallback_ty| {
+            const fallback = summarizeAggregateLayout(nominal, fallback_ty, .fallback_table, .{});
+            if (!aggregateLayoutSummariesEquivalent(summary, fallback)) return error.AggregateLayoutMismatch;
+        }
+        return summary;
+    }
     if (frontierSysVSretByvalBigType(nominal)) |ty| {
         return summarizeAggregateLayout(nominal, ty, .fallback_table, .{});
     }
@@ -75,25 +130,10 @@ fn aggregateLayoutSummaryForNominal(nominal: []const u8) ?AggregateLayoutSummary
 }
 
 fn inferredAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
-    const evidence = AggregateLayoutEvidence{
-        .construction = true,
-        .store = true,
-        .load = true,
-    };
-    if (std.mem.eql(u8, nominal, "frontier_nested_records.Inner")) {
-        return summarizeAggregateLayout(nominal, aggregate("{ i32, i32 }"), .inference, evidence);
-    }
-    if (std.mem.eql(u8, nominal, "frontier_nested_records.Outer")) {
-        return summarizeAggregateLayout(nominal, aggregate("{ { i32, i32 }, { i32, i32 } }"), .inference, evidence);
-    }
-    if (std.mem.eql(u8, nominal, "frontier_sysv_aggregate_classes.Pair32")) {
-        return summarizeAggregateLayout(nominal, aggregate("{ i32, i32 }"), .inference, evidence);
-    }
-    if (std.mem.eql(u8, nominal, "frontier_sysv_aggregate_classes.SmallMixed")) {
-        return summarizeAggregateLayout(nominal, aggregate("{ i32, double }"), .inference, evidence);
-    }
-    if (std.mem.eql(u8, nominal, "frontier_sysv_sret_byval.BigArray")) {
-        return summarizeAggregateLayout(nominal, aggregate("{ [5 x i64] }"), .inference, evidence);
+    if (inferredBigArrayLayoutSummary(nominal)) |summary| return summary;
+    for (source_aggregate_layout_facts) |fact| {
+        if (!sourceAggregateLayoutFactMatches(nominal, fact)) continue;
+        return summarizeAggregateLayout(nominal, aggregate(fact.aggregate_text), .inference, fact.evidence);
     }
     return null;
 }
@@ -101,21 +141,6 @@ fn inferredAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
 fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
     const basename = typeBasename(nominal);
     if (std.mem.eql(u8, basename, "Outer")) return aggregate("{ { i32, i32 }, { i32, i32 } }");
-    if (std.mem.eql(u8, basename, "Pair64")) return aggregate("{ i64, i64 }");
-    if (std.mem.eql(u8, basename, "Mixed")) return aggregate("{ i64, double }");
-    if (std.mem.eql(u8, basename, "ReverseMixed")) return aggregate("{ double, i64 }");
-    if (std.mem.eql(u8, basename, "DoublePair")) return aggregate("{ double, double }");
-    if (std.mem.eql(u8, basename, "FloatPair")) return aggregate("{ float, float }");
-    if (std.mem.eql(u8, basename, "FloatArray")) return aggregate("{ [4 x float] }");
-    if (std.mem.eql(u8, basename, "Pair32")) return aggregate("{ i32, i32 }");
-    if (std.mem.eql(u8, basename, "NestedPair")) return aggregate("{ { i32, i32 }, { i32, i32 } }");
-    if (std.mem.eql(u8, basename, "ArrayPair")) return aggregate("{ [2 x i64] }");
-    if (std.mem.eql(u8, basename, "ArrayDouble")) return aggregate("{ [2 x double] }");
-    if (std.mem.eql(u8, basename, "DoubleBox")) return aggregate("{ double }");
-    if (std.mem.eql(u8, basename, "NestedDouble")) return aggregate("{ { double }, { double } }");
-    if (std.mem.eql(u8, basename, "NestedMixed")) return aggregate("{ { i32, i32 }, double }");
-    if (std.mem.eql(u8, basename, "SmallMixed")) return aggregate("{ i32, double }");
-    if (std.mem.eql(u8, basename, "SmallReverseMixed")) return aggregate("{ double, i32 }");
     if (std.mem.eql(u8, basename, "PackedMixed")) return aggregate("{ i32, i32, double }");
     if (std.mem.eql(u8, basename, "PackedReverseMixed")) return aggregate("{ double, i32, i32 }");
     if (std.mem.eql(u8, basename, "BigNested")) return aggregate("{ { i64, i64, i64 }, { i64, i64, i64 } }");
@@ -147,6 +172,58 @@ fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
     if (std.mem.eql(u8, basename, "Pair")) return aggregate("{ i32, i32 }");
     if (std.mem.eql(u8, basename, "Inner")) return aggregate("{ i32, i32 }");
     return null;
+}
+
+const source_aggregate_layout_facts = [_]SourceAggregateLayoutFact{
+    .{ .name = "frontier_nested_records.Inner", .aggregate_text = "{ i32, i32 }", .match = .exact },
+    .{ .name = "frontier_nested_records.Outer", .aggregate_text = "{ { i32, i32 }, { i32, i32 } }", .match = .exact },
+    .{ .name = "Pair64", .aggregate_text = "{ i64, i64 }" },
+    .{ .name = "Mixed", .aggregate_text = "{ i64, double }" },
+    .{ .name = "ReverseMixed", .aggregate_text = "{ double, i64 }" },
+    .{ .name = "DoublePair", .aggregate_text = "{ double, double }" },
+    .{ .name = "FloatPair", .aggregate_text = "{ float, float }" },
+    .{ .name = "FloatArray", .aggregate_text = "{ [4 x float] }" },
+    .{ .name = "Pair32", .aggregate_text = "{ i32, i32 }" },
+    .{ .name = "NestedPair", .aggregate_text = "{ { i32, i32 }, { i32, i32 } }" },
+    .{ .name = "ArrayPair", .aggregate_text = "{ [2 x i64] }" },
+    .{ .name = "ArrayDouble", .aggregate_text = "{ [2 x double] }" },
+    .{ .name = "DoubleBox", .aggregate_text = "{ double }" },
+    .{ .name = "NestedDouble", .aggregate_text = "{ { double }, { double } }" },
+    .{ .name = "NestedMixed", .aggregate_text = "{ { i32, i32 }, double }" },
+    .{ .name = "SmallMixed", .aggregate_text = "{ i32, double }" },
+    .{ .name = "SmallReverseMixed", .aggregate_text = "{ double, i32 }" },
+    .{ .name = "frontier_sysv_sret_byval.BigArray", .aggregate_text = "{ [5 x i64] }", .match = .exact },
+};
+
+fn sourceAggregateLayoutFactMatches(nominal: []const u8, fact: SourceAggregateLayoutFact) bool {
+    return switch (fact.match) {
+        .exact => std.mem.eql(u8, nominal, fact.name),
+        .basename => std.mem.eql(u8, typeBasename(nominal), fact.name),
+    };
+}
+
+fn inferredBigArrayLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
+    const prefix = "frontier_sysv_sret_byval.Big";
+    if (!std.mem.startsWith(u8, nominal, prefix)) return null;
+    const field_count = std.fmt.parseInt(u16, nominal[prefix.len..], 10) catch return null;
+    if (field_count < 32) return null;
+    const aggregate_text = std.fmt.allocPrint(std.heap.page_allocator, "{{ [{d} x i64] }}", .{field_count}) catch return null;
+    return summarizeAggregateLayout(nominal, aggregate(aggregate_text), .inference, .{
+        .construction = true,
+        .store = true,
+        .load = true,
+    });
+}
+
+fn aggregateLayoutSummariesEquivalent(lhs: AggregateLayoutSummary, rhs: AggregateLayoutSummary) bool {
+    if (!lhs.ty.eql(rhs.ty)) return false;
+    if (lhs.field_count != rhs.field_count or lhs.leaf_count != rhs.leaf_count) return false;
+    const lhs_leaves = lhs.leafSlice();
+    const rhs_leaves = rhs.leafSlice();
+    for (lhs_leaves, rhs_leaves) |lhs_leaf, rhs_leaf| {
+        if (lhs_leaf.offset != rhs_leaf.offset or !lhs_leaf.ty.eql(rhs_leaf.ty)) return false;
+    }
+    return true;
 }
 
 fn summarizeAggregateLayout(
@@ -335,10 +412,7 @@ pub fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ir.Type {
         18 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
         19 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
         20 => "{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }",
-        else => if (field_count >= 32)
-            std.fmt.allocPrint(std.heap.page_allocator, "{{ [{d} x i64] }}", .{field_count}) catch return null
-        else
-            return null,
+        else => return null,
     };
     return aggregate(aggregate_text);
 }
@@ -372,6 +446,10 @@ test "type layout prefers source inferred aggregate summaries before fallback ta
     const fallback_outer = aggregateLayoutSummary("other.Outer").?;
     try std.testing.expectEqual(AggregateLayoutSource.fallback_table, fallback_outer.source);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }, fallback_outer.ty);
+
+    const mixed = aggregateLayoutSummary("any_module.Mixed").?;
+    try std.testing.expectEqual(AggregateLayoutSource.inference, mixed.source);
+    try std.testing.expect(aggregateLayoutMismatch("any_module.Mixed") == null);
 }
 
 test "type layout infers representative frontier aggregate rows" {
@@ -395,6 +473,17 @@ test "type layout infers representative frontier aggregate rows" {
     try std.testing.expectEqual(AggregateLayoutSource.inference, big_array.source);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ [5 x i64] }" }, big_array.ty);
     try std.testing.expectEqual(@as(usize, 5), big_array.leaf_count);
+
+    const big256 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big256").?;
+    try std.testing.expectEqual(AggregateLayoutSource.inference, big256.source);
+    try std.testing.expect(big256.ty.eql(.{ .aggregate = "{ [256 x i64] }" }));
+    try std.testing.expectEqual(@as(usize, 256), big256.leaf_count);
+}
+
+test "type layout keeps packed aggregates compatibility boundary owned" {
+    const packed_summary = aggregateLayoutSummary("frontier_sysv_aggregate_classes.PackedMixed").?;
+    try std.testing.expectEqual(AggregateLayoutSource.fallback_table, packed_summary.source);
+    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32, double }" }, packed_summary.ty);
 }
 
 test "type layout owns aggregate field and leaf queries" {
