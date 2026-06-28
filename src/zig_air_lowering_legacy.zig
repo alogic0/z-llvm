@@ -713,26 +713,26 @@ pub fn structSumShape(function: air_export.Function) bool {
 }
 
 fn optionalPointerShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "is_non_null") and
-        functionHasOpcode(function, "optional_payload") and
-        functionHasOpcode(function, "load") and
+    return air_model.functionHasOptionalOp(function, .is_non_null) and
+        air_model.functionHasOptionalOp(function, .optional_payload) and
+        air_model.functionHasMemoryOp(function, .load) and
         functionHasReturnOpcode(function);
 }
 
 fn optionalPayloadShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "wrap_optional") and
-        functionHasOpcode(function, "optional_payload") and
-        functionHasOpcode(function, "is_non_null");
+    return air_model.functionHasOptionalOp(function, .wrap_optional) and
+        air_model.functionHasOptionalOp(function, .optional_payload) and
+        air_model.functionHasOptionalOp(function, .is_non_null);
 }
 
 fn errorUnionPayloadShape(function: air_export.Function) bool {
     return !std.mem.eql(u8, function.name, "error_switch.error_switch") and
-        functionHasOpcode(function, "unwrap_errunion_payload") and
-        functionHasOpcode(function, "is_non_err");
+        air_model.functionHasErrorUnionOp(function, .unwrap_payload) and
+        air_model.functionHasErrorUnionOp(function, .is_non_err);
 }
 
 fn sliceSumShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "slice") and
+    return air_model.functionHasPointerAggregateOp(function, .slice) and
         functionHasOpcode(function, "slice_elem_ptr") and
         functionHasOpcode(function, "ptr_slice_len_ptr") and
         functionHasOpcode(function, "loop");
@@ -778,8 +778,8 @@ fn maybeErrorShape(function: air_export.Function) bool {
 pub fn errorSwitchShape(function: air_export.Function) bool {
     return std.mem.eql(u8, function.name, "error_switch.error_switch") and
         functionHasOpcode(function, "call") and
-        functionHasOpcode(function, "is_non_err") and
-        functionHasOpcode(function, "unwrap_errunion_payload") and
+        air_model.functionHasErrorUnionOp(function, .is_non_err) and
+        air_model.functionHasErrorUnionOp(function, .unwrap_payload) and
         functionHasOpcode(function, "switch_br");
 }
 

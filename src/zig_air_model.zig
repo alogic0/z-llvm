@@ -575,6 +575,41 @@ pub fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool
     return false;
 }
 
+pub fn functionHasScalarOp(function: air_export.Function, op: air_capabilities.ScalarSemanticOp) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode) == op) return true;
+    }
+    return false;
+}
+
+pub fn functionHasMemoryOp(function: air_export.Function, op: air_capabilities.MemorySemanticOp) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == op) return true;
+    }
+    return false;
+}
+
+pub fn functionHasOptionalOp(function: air_export.Function, op: air_capabilities.OptionalSemanticOp) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.optionalSemanticOpForOpcode(instruction.opcode) == op) return true;
+    }
+    return false;
+}
+
+pub fn functionHasErrorUnionOp(function: air_export.Function, op: air_capabilities.ErrorUnionSemanticOp) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.errorUnionSemanticOpForOpcode(instruction.opcode) == op) return true;
+    }
+    return false;
+}
+
+pub fn functionHasPointerAggregateOp(function: air_export.Function, op: air_capabilities.PointerAggregateSemanticOp) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode) == op) return true;
+    }
+    return false;
+}
+
 pub const UntypedValueSource = union(enum) {
     int: i128,
     ref: u32,
@@ -1162,6 +1197,38 @@ test "AIR model reports legacy instruction opcode presence" {
 
     try std.testing.expect(functionHasOpcode(function, "add_safe"));
     try std.testing.expect(!functionHasOpcode(function, "mul"));
+}
+
+test "AIR model reports semantic operation presence" {
+    const instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "is_non_null", .payload = "", .category = .other },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "optional_payload", .payload = "", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "unwrap_errunion_payload", .payload = "", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "is_non_err", .payload = "", .category = .other },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %0!", .category = .memory },
+        .{ .index = 5, .indent = 0, .unused = false, .opcode = "slice", .payload = "", .category = .other },
+    };
+    const function = air_export.Function{
+        .name = "test.main",
+        .type_text = "fn () void",
+        .instruction_count = instructions.len,
+        .main_body_count = instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&instructions),
+    };
+
+    try std.testing.expect(functionHasOptionalOp(function, .is_non_null));
+    try std.testing.expect(functionHasOptionalOp(function, .optional_payload));
+    try std.testing.expect(!functionHasOptionalOp(function, .wrap_optional));
+    try std.testing.expect(functionHasErrorUnionOp(function, .unwrap_payload));
+    try std.testing.expect(functionHasErrorUnionOp(function, .is_non_err));
+    try std.testing.expect(functionHasMemoryOp(function, .load));
+    try std.testing.expect(functionHasPointerAggregateOp(function, .slice));
 }
 
 test "AIR model parses untyped AIR value query shapes" {
