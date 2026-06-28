@@ -736,6 +736,13 @@ pub const OptionalShapeSummary = struct {
     return_value: ?u32 = null,
 };
 
+pub const IntegerSwitchSummary = struct {
+    switch_br: u32,
+    block_count: usize,
+    branch_count: usize,
+    has_default_arm_text: bool,
+};
+
 pub const PointerSliceAddressSummary = struct {
     ptr_add_count: usize = 0,
     ptr_sub_count: usize = 0,
@@ -1164,6 +1171,43 @@ pub fn optionalPayloadSummary(function: air_export.Function) ?OptionalShapeSumma
 
 pub fn selectedOptionalPayloadShape(function: air_export.Function) bool {
     return optionalPayloadSummary(function) != null;
+}
+
+pub fn integerSwitchSummary(function: air_export.Function) ?IntegerSwitchSummary {
+    var switch_br: ?u32 = null;
+    var block_count: usize = 0;
+    var branch_count: usize = 0;
+    for (function.instructions) |instruction| {
+        if (air_capabilities.isIgnoredOpcode(instruction.opcode) or
+            air_capabilities.isArgOpcode(instruction.opcode) or
+            air_capabilities.isReturnOpcode(instruction.opcode))
+        {
+            continue;
+        }
+        if (air_capabilities.isBlockOpcode(instruction.opcode)) {
+            block_count += 1;
+        } else if (air_capabilities.isSwitchBrOpcode(instruction.opcode)) {
+            if (switch_br != null) return null;
+            switch_br = instruction.index;
+        } else if (air_capabilities.isBrOpcode(instruction.opcode)) {
+            branch_count += 1;
+        } else {
+            return null;
+        }
+    }
+    if (block_count != 1 or branch_count < 2) return null;
+    const default_arm = std.mem.indexOf(u8, function.air_text, "else => {") != null;
+    if (!default_arm) return null;
+    return .{
+        .switch_br = switch_br orelse return null,
+        .block_count = block_count,
+        .branch_count = branch_count,
+        .has_default_arm_text = default_arm,
+    };
+}
+
+pub fn selectedIntegerSwitchShape(function: air_export.Function) bool {
+    return integerSwitchSummary(function) != null;
 }
 
 pub fn aggregateMakePairSummary(function: air_export.Function) ?AggregatePairSummary {
@@ -2320,6 +2364,51 @@ test "AIR model reports semantic operation presence" {
     try std.testing.expect(functionHasCfgOp(function, .block));
     try std.testing.expect(functionHasCfgOp(function, .unreach));
     try std.testing.expect(!functionHasCfgOp(function, .cond_br));
+}
+
+test "AIR model recognizes selected integer switch admission structurally" {
+    const switch_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "u8, 0", .category = .argument },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "block", .payload = "", .category = .control_flow },
+        .{ .index = 2, .indent = 1, .unused = false, .opcode = "switch_br", .payload = "%0!", .category = .control_flow },
+        .{ .index = 3, .indent = 2, .unused = false, .opcode = "br", .payload = "%1!, <i32, 10>", .category = .control_flow },
+        .{ .index = 4, .indent = 2, .unused = false, .opcode = "br", .payload = "%1!, <i32, 20>", .category = .control_flow },
+        .{ .index = 5, .indent = 0, .unused = false, .opcode = "ret", .payload = "%1!", .category = .return_op },
+    };
+    const switch_function = air_export.Function{
+        .name = "not_named_integer_switch",
+        .type_text = "fn (u8) i32",
+        .instruction_count = switch_instructions.len,
+        .main_body_count = switch_instructions.len,
+        .has_liveness = true,
+        .air_text = "switch_br %0\n  else => {\n    br(<i32, 20>)\n  }",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&switch_instructions),
+    };
+    const summary = integerSwitchSummary(switch_function).?;
+    try std.testing.expectEqual(@as(u32, 2), summary.switch_br);
+    try std.testing.expectEqual(@as(usize, 1), summary.block_count);
+    try std.testing.expectEqual(@as(usize, 2), summary.branch_count);
+    try std.testing.expect(summary.has_default_arm_text);
+    try std.testing.expect(selectedIntegerSwitchShape(switch_function));
+
+    const missing_default = air_export.Function{
+        .name = "not_named_integer_switch_without_default",
+        .type_text = "fn (u8) i32",
+        .instruction_count = switch_instructions.len,
+        .main_body_count = switch_instructions.len,
+        .has_liveness = true,
+        .air_text = "switch_br %0\n  0 => {\n    br(<i32, 10>)\n  }",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&switch_instructions),
+    };
+    try std.testing.expect(integerSwitchSummary(missing_default) == null);
 }
 
 test "AIR model recognizes selected optional shapes structurally" {

@@ -11,7 +11,6 @@ const FunctionType = air_model.FunctionType;
 const parseFunctionType = air_types.parseFunctionType;
 const shortFunctionName = air_model.shortFunctionName;
 const ownPrint = air_model.ownPrint;
-const isIgnoredOpcode = air_capabilities.isIgnoredOpcode;
 const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
 
 pub fn lowerTypedV2ArraySum(
@@ -315,28 +314,7 @@ const SwitchRange = struct {
 };
 
 pub fn isIntegerSwitchBlock(function: air_export.Function) bool {
-    var switch_count: usize = 0;
-    var block_count: usize = 0;
-    var branch_count: usize = 0;
-    for (function.instructions) |instruction| {
-        if (isIgnoredOpcode(instruction.opcode) or
-            air_capabilities.isArgOpcode(instruction.opcode) or
-            air_capabilities.isReturnOpcode(instruction.opcode))
-        {
-            continue;
-        }
-        if (air_capabilities.isBlockOpcode(instruction.opcode)) {
-            block_count += 1;
-        } else if (air_capabilities.isSwitchBrOpcode(instruction.opcode)) {
-            switch_count += 1;
-        } else if (air_capabilities.isBrOpcode(instruction.opcode)) {
-            branch_count += 1;
-        } else {
-            return false;
-        }
-    }
-    return switch_count == 1 and block_count == 1 and branch_count >= 2 and
-        std.mem.indexOf(u8, function.air_text, "else => {") != null;
+    return air_model.integerSwitchSummary(function) != null;
 }
 
 pub fn lowerIntegerSwitch(
