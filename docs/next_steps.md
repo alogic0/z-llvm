@@ -281,7 +281,7 @@ Execution order:
    source, field count, scalar leaves, and construction/store/load evidence.
    It is consulted before the basename compatibility table, so
    the first broad easy-layout slice is no longer fallback-table-owned. The
-   owned side now has 42 exported sidecar facts, 3 temporary static source
+   owned side now has 45 exported sidecar facts, 0 temporary static source
    layout facts in `src/zig_air_aggregate_layout_facts.zig`, plus generated
    `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
    Big3..Big20 forms and the 12 current Big32..Big256 array-leaf rows. The
@@ -517,10 +517,15 @@ Aggregate/type-layout ownership start:
   temporary static source-fact provider in
   `src/zig_air_aggregate_layout_facts.zig`. The exported fact contract lives in
   `src/zig_air_exported_aggregate_layout_facts.zig` as
-  `zllvm-aggregate-layout-facts-v1`; the frontier gate now loads the checked-in
-  `test/zig/frontier/aggregate_layout_facts.sidecar` sidecar as the active
-  exported-fact provider. That sidecar now owns 42 representative frontier facts
-  (`frontier_nested_records.Inner`,
+  `zllvm-aggregate-layout-facts-v1`; the gate now loads checked-in sidecars
+  for the source roots included by the selected corpus:
+  `test/zig/inputs/aggregate_layout_facts.sidecar`,
+  `test/zig/integrated/aggregate_layout_facts.sidecar`,
+  `test/zig/expanded/aggregate_layout_facts.sidecar`, and
+  `test/zig/frontier/aggregate_layout_facts.sidecar`. Those sidecars now own
+  45 representative facts (`aggregate_abi.Pair`,
+  `runtime_aggregate_pair_main.Pair`, `expanded_abi_frontier.Pair`,
+  `frontier_nested_records.Inner`,
   `frontier_nested_records.Outer`,
   `frontier_sysv_aggregate_classes.Pair32`,
   `frontier_sysv_aggregate_classes.Mixed`,
@@ -563,9 +568,9 @@ Aggregate/type-layout ownership start:
   `frontier_sysv_sret_byval.ScalarNested`, and
   `frontier_sysv_sret_byval.ScalarArray`) that were removed from the
   temporary static provider after the frontier gate stayed green. The temporary
-  static provider currently has 3 named facts and exists only until equivalent
-  Zig-owned field facts are
-  available. `AggregateLayoutSummary.provider_kind`
+  static provider currently has 0 named facts; remaining source-backed layouts
+  are either exported sidecar facts, generated inference, or explicit
+  boundaries. `AggregateLayoutSummary.provider_kind`
   records exported-fact, generated-inference, static-source-fact, or
   boundary-provider ownership directly. Exported facts now fail closed if they
   disagree with lower-priority static or generated evidence for the same
@@ -590,8 +595,7 @@ Aggregate/type-layout ownership start:
   argument to the single call and return that call result.
 - Nominal aggregate layout source audit:
   - Static source layout facts before fallback table:
-    the exact non-frontier compatibility facts `aggregate_abi.Pair`,
-    `runtime_aggregate_pair_main.Pair`, and `expanded_abi_frontier.Pair`.
+    none.
   - Generated inference before fallback table:
     the scalar-BigN rule for the current Big3..Big20 rows and the large-BigN
     array rule for BigN >= 32.
@@ -600,8 +604,9 @@ Aggregate/type-layout ownership start:
     `zllvm-aggregate-layout-facts-v1`, exact nominal fact matching, aggregate
     text, and construction/store/load evidence. It now includes fail-closed
     sidecar parsing and an active provider hook. The strict frontier gate loads
-    `test/zig/frontier/aggregate_layout_facts.sidecar`, proving the exported
-    provider ownership path for `frontier_nested_records.Inner`,
+    the checked-in sidecars, proving the exported provider ownership path for
+    `aggregate_abi.Pair`, `runtime_aggregate_pair_main.Pair`,
+    `expanded_abi_frontier.Pair`, `frontier_nested_records.Inner`,
     `frontier_nested_records.Outer`,
     `frontier_sysv_aggregate_classes.Pair32`,
     `frontier_sysv_aggregate_classes.Mixed`,
@@ -655,7 +660,7 @@ Aggregate/type-layout ownership start:
     tmp/aggregate_layout_provider_audit.log` prints exported sidecar facts,
     current static facts, generated inference samples, and boundary provider
     rows with aggregate text. The current saved audit reports
-    `exported_facts=42`, `static_source_facts=3`, `boundary_provider=2`, and
+    `exported_facts=45`, `static_source_facts=0`, `boundary_provider=2`, and
     `generated_examples=4`. Use this before removing more static facts so the
     next ownership slice is driven by provider evidence rather than manual
     table scanning.

@@ -477,6 +477,9 @@ fn aggregate(text: []const u8) ir.Type {
 fn installTestExportedAggregateProvider() !exported_aggregate_layout_facts.Provider {
     const contents =
         exported_aggregate_layout_facts.section_name ++ "\n" ++
+        "fact nominal=\"aggregate_abi.Pair\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"runtime_aggregate_pair_main.Pair\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"expanded_abi_frontier.Pair\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_nested_records.Inner\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_nested_records.Outer\" aggregate=\"{ { i32, i32 }, { i32, i32 } }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_aggregate_classes.Pair32\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n" ++
@@ -530,9 +533,9 @@ test "type layout decodes exact aggregate facts and generated names" {
     try std.testing.expect(parseNamedAggregateType("frontier_sysv_sret_byval.BigNested").?.eql(.{ .aggregate = "{ { i64, i64, i64 }, { i64, i64, i64 } }" }));
     try std.testing.expect(parseNamedAggregateType("other.BigMixed") == null);
     try std.testing.expect(parseNamedAggregateType("%frontier_sysv_sret_byval.Big3").?.eql(.{ .aggregate = "{ i64, i64, i64 }" }));
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("aggregate_abi.Pair").?);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("%runtime_aggregate_pair_main.Pair").?);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, normalizeAggregateType(.{ .aggregate = "%expanded_abi_frontier.Pair" }));
+    try std.testing.expect(parseNamedAggregateType("aggregate_abi.Pair").?.eql(.{ .aggregate = "{ i32, i32 }" }));
+    try std.testing.expect(parseNamedAggregateType("%runtime_aggregate_pair_main.Pair").?.eql(.{ .aggregate = "{ i32, i32 }" }));
+    try std.testing.expect(normalizeAggregateType(.{ .aggregate = "%expanded_abi_frontier.Pair" }).eql(.{ .aggregate = "{ i32, i32 }" }));
     try std.testing.expect(parseNamedAggregateType("other.Pair") == null);
 }
 
@@ -554,10 +557,10 @@ test "type layout prefers exported facts and inference before fallback table" {
 
     try std.testing.expect(aggregateLayoutSummary("other.Outer") == null);
 
-    const pair = aggregateLayoutSummary("aggregate_abi.Pair").?;
-    try std.testing.expectEqual(AggregateLayoutSource.facts, pair.source);
-    try std.testing.expectEqual(AggregateLayoutProviderKind.static_source_facts, pair.provider_kind.?);
-    try std.testing.expect(aggregateLayoutMismatch("aggregate_abi.Pair") == null);
+    const big3 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big3").?;
+    try std.testing.expectEqual(AggregateLayoutSource.inference, big3.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.generated_inference, big3.provider_kind.?);
+    try std.testing.expect(aggregateLayoutMismatch("frontier_sysv_sret_byval.Big3") == null);
 }
 
 test "type layout prefers active exported facts before temporary static source facts" {
@@ -575,16 +578,16 @@ test "type layout prefers active exported facts before temporary static source f
 test "type layout fails closed when exported fact conflicts with lower-priority evidence" {
     const contents =
         exported_aggregate_layout_facts.section_name ++ "\n" ++
-        "fact nominal=\"aggregate_abi.Pair\" aggregate=\"{ i64, double }\" construction=1 store=1 load=1\n";
+        "fact nominal=\"frontier_sysv_sret_byval.Big3\" aggregate=\"{ i64, double }\" construction=1 store=1 load=1\n";
     const provider = try exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
     exported_aggregate_layout_facts.setActiveProvider(provider);
     defer provider.deinit(std.testing.allocator);
     defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
 
-    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("aggregate_abi.Pair"));
-    const mismatch = aggregateLayoutMismatch("aggregate_abi.Pair").?;
+    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("frontier_sysv_sret_byval.Big3"));
+    const mismatch = aggregateLayoutMismatch("frontier_sysv_sret_byval.Big3").?;
     try std.testing.expectEqual(@as(usize, 2), mismatch.inferred_leaf_count);
-    try std.testing.expectEqual(@as(usize, 2), mismatch.fallback_leaf_count);
+    try std.testing.expectEqual(@as(usize, 3), mismatch.fallback_leaf_count);
 }
 
 test "type layout infers representative frontier aggregate rows" {
@@ -696,9 +699,14 @@ test "type layout owns aggregate field and leaf queries" {
 }
 
 test "type layout builds reusable aggregate layout plan" {
+    const provider = try installTestExportedAggregateProvider();
+    exported_aggregate_layout_facts.setActiveProvider(provider);
+    defer provider.deinit(std.testing.allocator);
+    defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+
     const layout = try target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
     const plan = try aggregateLayoutPlan(layout, .{ .aggregate = "%runtime_aggregate_pair_main.Pair" });
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, plan.ty);
+    try std.testing.expect(plan.ty.eql(.{ .aggregate = "{ i32, i32 }" }));
     try std.testing.expectEqual(@as(usize, 2), plan.field_count);
     try std.testing.expectEqual(@as(usize, 2), plan.leaf_count);
     try std.testing.expectEqual(@as(u64, 0), plan.leafSlice()[0].offset);

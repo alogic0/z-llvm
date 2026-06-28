@@ -656,22 +656,72 @@ fn runMode(init: std.process.Init, options: Options) !void {
     }
 }
 
-const frontier_aggregate_layout_fact_sidecar = "test/zig/frontier/aggregate_layout_facts.sidecar";
+const aggregate_layout_fact_inputs_sidecar = "test/zig/inputs/aggregate_layout_facts.sidecar";
+const aggregate_layout_fact_integrated_sidecar = "test/zig/integrated/aggregate_layout_facts.sidecar";
+const aggregate_layout_fact_expanded_sidecar = "test/zig/expanded/aggregate_layout_facts.sidecar";
+const aggregate_layout_fact_frontier_sidecar = "test/zig/frontier/aggregate_layout_facts.sidecar";
 
 fn loadAggregateLayoutFactProvider(
     allocator: std.mem.Allocator,
     io: std.Io,
     corpus: Corpus,
 ) !?exported_aggregate_layout_facts.Provider {
-    if (corpus != .frontier) return null;
-    const contents = try std.Io.Dir.cwd().readFileAlloc(
-        io,
-        frontier_aggregate_layout_fact_sidecar,
-        allocator,
-        .limited(1024 * 1024),
-    );
-    defer allocator.free(contents);
-    return try exported_aggregate_layout_facts.parseSidecar(allocator, contents);
+    const paths = aggregateLayoutFactSidecarPaths(corpus);
+    if (paths.len == 0) return null;
+
+    var combined: std.ArrayList(u8) = .empty;
+    defer combined.deinit(allocator);
+    try combined.appendSlice(allocator, exported_aggregate_layout_facts.section_name);
+    try combined.append(allocator, '\n');
+
+    for (paths) |path| {
+        const contents = try std.Io.Dir.cwd().readFileAlloc(
+            io,
+            path,
+            allocator,
+            .limited(1024 * 1024),
+        );
+        defer allocator.free(contents);
+        try appendAggregateLayoutFactSidecarBody(allocator, &combined, contents);
+    }
+
+    return try exported_aggregate_layout_facts.parseSidecar(allocator, combined.items);
+}
+
+fn aggregateLayoutFactSidecarPaths(corpus: Corpus) []const []const u8 {
+    return switch (corpus) {
+        .inputs => &.{aggregate_layout_fact_inputs_sidecar},
+        .broad => &.{
+            aggregate_layout_fact_inputs_sidecar,
+            aggregate_layout_fact_integrated_sidecar,
+        },
+        .expanded, .scale => &.{
+            aggregate_layout_fact_inputs_sidecar,
+            aggregate_layout_fact_integrated_sidecar,
+            aggregate_layout_fact_expanded_sidecar,
+        },
+        .frontier => &.{
+            aggregate_layout_fact_inputs_sidecar,
+            aggregate_layout_fact_integrated_sidecar,
+            aggregate_layout_fact_expanded_sidecar,
+            aggregate_layout_fact_frontier_sidecar,
+        },
+        .frontier_boundaries => &.{},
+    };
+}
+
+fn appendAggregateLayoutFactSidecarBody(
+    allocator: std.mem.Allocator,
+    combined: *std.ArrayList(u8),
+    contents: []const u8,
+) !void {
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    const header = std.mem.trim(u8, lines.next() orelse return error.InvalidAggregateLayoutFactSidecar, " \t\r");
+    if (!std.mem.eql(u8, header, exported_aggregate_layout_facts.section_name)) return error.InvalidAggregateLayoutFactSidecar;
+    while (lines.next()) |line| {
+        try combined.appendSlice(allocator, line);
+        try combined.append(allocator, '\n');
+    }
 }
 
 const helpers = @import("uncurated_air_gate_helpers.zig");

@@ -22,11 +22,7 @@ pub const Fact = struct {
     },
 };
 
-const facts = [_]Fact{
-    .{ .name = "aggregate_abi.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
-    .{ .name = "runtime_aggregate_pair_main.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
-    .{ .name = "expanded_abi_frontier.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
-};
+const facts = [_]Fact{};
 
 pub fn lookup(nominal: []const u8) ?Fact {
     const normalized = stripNominalSigil(std.mem.trim(u8, nominal, " "));
@@ -63,7 +59,8 @@ fn stripNominalSigil(text: []const u8) []const u8 {
 }
 
 test "aggregate layout facts keep exact pair ownership narrow" {
-    try std.testing.expect(lookup("aggregate_abi.Pair") != null);
-    try std.testing.expect(lookup("%runtime_aggregate_pair_main.Pair") != null);
+    try std.testing.expectEqual(@as(usize, 0), count());
+    try std.testing.expect(lookup("aggregate_abi.Pair") == null);
+    try std.testing.expect(lookup("%runtime_aggregate_pair_main.Pair") == null);
     try std.testing.expect(lookup("other.Pair") == null);
 }

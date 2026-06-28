@@ -755,17 +755,18 @@ operands against the same plan before using typed AIR pointer paths for
 insertvalue indices, and SysV classification consumes the same normalized
 aggregate type. `AggregateLayoutSummary` now records whether a layout came from
 static source facts, generated inference, a boundary, or the compatibility
-table. The owned side now has 42 exported sidecar facts, 3 temporary static
-source layout facts in `src/zig_air_aggregate_layout_facts.zig`, plus generated
+table. The owned side now has 45 exported sidecar facts and 0 temporary static
+source layout facts, plus generated
 `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar Big3..Big20
 rows and the 12 current Big32..Big256 array-leaf rows; those accepted aggregate
 rows no longer depend on the basename fallback table. Owned lookup now runs
 through a provider registry: exported aggregate layout facts first, generated
 inference second, then the temporary static source-fact provider. The exported
 fact contract is `zllvm-aggregate-layout-facts-v1` in
-`src/zig_air_exported_aggregate_layout_facts.zig`; the strict frontier gate now
-loads `test/zig/frontier/aggregate_layout_facts.sidecar` as the active exported
-provider. That sidecar now owns `frontier_nested_records.Inner`,
+`src/zig_air_exported_aggregate_layout_facts.zig`; gates now load checked-in
+sidecars for the source roots included by the selected corpus. Those sidecars
+own `aggregate_abi.Pair`, `runtime_aggregate_pair_main.Pair`,
+`expanded_abi_frontier.Pair`, `frontier_nested_records.Inner`,
 `frontier_nested_records.Outer`, `frontier_sysv_aggregate_classes.Pair32`,
 `frontier_sysv_aggregate_classes.Mixed`,
 `frontier_sysv_aggregate_classes.ReverseMixed`,
@@ -813,10 +814,8 @@ generated-inference, static-source-fact, or boundary-provider ownership
 directly. Exported facts are checked against lower-priority static/generated
 evidence for the same nominal layout, and owned summaries fail closed if their
 field/leaf counts disagree with any remaining fallback equivalent. Remaining
-aggregate layout debt is explicit: the compatibility
-fallback table is empty, while 3 temporary static source facts still stand in
-for future Zig-exported field layout facts or broader construction/store/load
-inference.
+aggregate layout debt is explicit: the compatibility fallback table and
+temporary static source fact provider are empty.
 Packed/unaligned aggregate ABI remains a 2-row targeted boundary through
 `src/zig_air_aggregate_layout_boundaries.zig` rather than a fallback layout.
 Register

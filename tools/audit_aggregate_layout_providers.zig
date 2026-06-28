@@ -12,7 +12,12 @@ const ProviderRow = struct {
     aggregate_text: []const u8,
 };
 
-const frontier_sidecar_path = "test/zig/frontier/aggregate_layout_facts.sidecar";
+const exported_sidecar_paths = [_][]const u8{
+    "test/zig/inputs/aggregate_layout_facts.sidecar",
+    "test/zig/integrated/aggregate_layout_facts.sidecar",
+    "test/zig/expanded/aggregate_layout_facts.sidecar",
+    "test/zig/frontier/aggregate_layout_facts.sidecar",
+};
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -25,7 +30,7 @@ pub fn main(init: std.process.Init) !void {
     defer freeProviderRows(allocator, fact_rows);
     const boundary_rows = try readProviderRows(allocator, io, "src/zig_air_aggregate_layout_boundaries.zig");
     defer freeProviderRows(allocator, boundary_rows);
-    const exported_rows = try readSidecarRows(allocator, io, frontier_sidecar_path);
+    const exported_rows = try readSidecarRows(allocator, io, &exported_sidecar_paths);
     defer freeProviderRows(allocator, exported_rows);
 
     try stdout.print(
@@ -84,10 +89,7 @@ fn readProviderRows(allocator: std.mem.Allocator, io: std.Io, path: []const u8) 
     return rows.toOwnedSlice(allocator);
 }
 
-fn readSidecarRows(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![]ProviderRow {
-    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-    defer allocator.free(contents);
-
+fn readSidecarRows(allocator: std.mem.Allocator, io: std.Io, paths: []const []const u8) ![]ProviderRow {
     var rows: std.ArrayList(ProviderRow) = .empty;
     errdefer {
         for (rows.items) |row| {
@@ -96,6 +98,22 @@ fn readSidecarRows(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !
         }
         rows.deinit(allocator);
     }
+
+    for (paths) |path| {
+        try appendSidecarRows(allocator, io, &rows, path);
+    }
+
+    return rows.toOwnedSlice(allocator);
+}
+
+fn appendSidecarRows(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    rows: *std.ArrayList(ProviderRow),
+    path: []const u8,
+) !void {
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+    defer allocator.free(contents);
 
     var saw_header = false;
     var lines = std.mem.splitScalar(u8, contents, '\n');
@@ -116,8 +134,6 @@ fn readSidecarRows(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !
         });
     }
     if (!saw_header) return error.InvalidAggregateLayoutFactSidecar;
-
-    return rows.toOwnedSlice(allocator);
 }
 
 fn freeProviderRows(allocator: std.mem.Allocator, rows: []const ProviderRow) void {

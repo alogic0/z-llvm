@@ -1,0 +1,2 @@
+zllvm-aggregate-layout-facts-v1
+fact nominal="aggregate_abi.Pair" aggregate="{ i32, i32 }" construction=1 store=1 load=1
