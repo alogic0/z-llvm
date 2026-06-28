@@ -22,6 +22,10 @@ pub fn count() usize {
     return boundaries.len;
 }
 
+pub fn all() []const Boundary {
+    return boundaries[0..];
+}
+
 fn typeBasename(text: []const u8) []const u8 {
     const trimmed = stripNominalSigil(std.mem.trim(u8, text, " "));
     if (std.mem.lastIndexOfScalar(u8, trimmed, '.')) |dot| return trimmed[dot + 1 ..];

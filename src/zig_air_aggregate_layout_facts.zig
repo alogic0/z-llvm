@@ -82,6 +82,10 @@ pub fn count() usize {
     return facts.len;
 }
 
+pub fn all() []const Fact {
+    return facts[0..];
+}
+
 fn factMatches(nominal: []const u8, fact: Fact) bool {
     return switch (fact.match) {
         .exact => std.mem.eql(u8, nominal, fact.name),

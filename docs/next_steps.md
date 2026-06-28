@@ -550,6 +550,12 @@ Aggregate/type-layout ownership start:
   - `PackedMixed` and `PackedReverseMixed` stay boundary-owned through
     `src/zig_air_aggregate_layout_boundaries.zig` until packed/unaligned field
     layout and ABI facts are exported or implemented explicitly.
+  - Provider audit command:
+    `zig run tools/audit_aggregate_layout_providers.zig >
+    tmp/aggregate_layout_provider_audit.log` prints each current static fact,
+    generated inference sample, and boundary provider row with aggregate text.
+    Use this before removing more static facts so the next ownership slice is
+    driven by provider evidence rather than manual table scanning.
 
 Validation after these refactor slices is saved in
 `tmp/frontier_counter_update.log` and
