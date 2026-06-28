@@ -665,62 +665,7 @@ pub fn lowerBase64TableLookup(allocator: std.mem.Allocator, module: *ir.Module, 
 }
 
 pub fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try parseFunctionType(allocator, air_function.type_text);
-    defer function_type.deinit(allocator);
-    if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
-        return error.UnsupportedAir;
-    }
-
-    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
-    errdefer function.deinit(allocator);
-    function.linkage = .default;
-
-    var entry = ir.BasicBlock.init("0");
-    errdefer entry.deinit(allocator);
-    var first_call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = runtime_wrappers.OptionalPointerMain.callee, .calling_conv = "fastcc", .args = .empty };
-    errdefer first_call.deinit(allocator);
-    try first_call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = runtime_wrappers.OptionalPointerMain.value_global } });
-    try entry.instructions.append(allocator, .{ .result = "first", .kind = .{ .call = first_call } });
-    try entry.instructions.append(allocator, .{
-        .result = "first.ok",
-        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "first" }, .rhs = .{ .int = 42 } } },
-    });
-    entry.terminator = .{ .condbr = .{ .cond_ty = .{ .int = 1 }, .cond = .{ .named = "first.ok" }, .then_target = "7", .else_target = "5" } };
-    try function.blocks.append(allocator, entry);
-
-    var merge = ir.BasicBlock.init("5");
-    errdefer merge.deinit(allocator);
-    var phi: ir.PhiInst = .{ .ty = .{ .int = 1 }, .incoming = .empty };
-    errdefer phi.deinit(allocator);
-    try phi.incoming.append(allocator, .{ .value = .{ .named = "second.ok" }, .block = "7" });
-    try phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "0" });
-    try merge.instructions.append(allocator, .{ .result = "both.ok", .kind = .{ .phi = phi } });
-    try merge.instructions.append(allocator, .{
-        .result = "result",
-        .kind = .{ .select = .{
-            .cond_ty = .{ .int = 1 },
-            .cond = .{ .named = "both.ok" },
-            .ty = .{ .int = 32 },
-            .true_value = .{ .int = 0 },
-            .false_value = .{ .int = 1 },
-        } },
-    });
-    merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
-    try function.blocks.append(allocator, merge);
-
-    var null_check = ir.BasicBlock.init("7");
-    errdefer null_check.deinit(allocator);
-    var second_call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = runtime_wrappers.OptionalPointerMain.callee, .calling_conv = "fastcc", .args = .empty };
-    errdefer second_call.deinit(allocator);
-    try second_call.args.append(allocator, .{ .ty = .ptr, .value = .null_value });
-    try null_check.instructions.append(allocator, .{ .result = "second", .kind = .{ .call = second_call } });
-    try null_check.instructions.append(allocator, .{
-        .result = "second.ok",
-        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "second" }, .rhs = .{ .int = -1 } } },
-    });
-    null_check.terminator = .{ .br = .{ .target = "5" } };
-    try function.blocks.append(allocator, null_check);
-    return function;
+    return runtime_wrappers.lowerOptionalPointerMain(allocator, air_function);
 }
 
 pub fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function, add_imm: i32) !ir.Function {
