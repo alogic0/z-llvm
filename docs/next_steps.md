@@ -344,11 +344,10 @@ Remaining selected recognizer ownership to normalize:
 
 | Rank | Current location | Duplicated parsing/checking | Target reusable helper |
 | --- | --- | --- | --- |
-| 1 | `src/zig_air_lowering_legacy.zig::accumulatorLoopShape` | raw AIR payload parsing for `arg`, `alloc`, store/load slot refs, binary refs/constants, compare/cond-br, and return source | model-owned untyped AIR value queries for arg index/type, slot load/store, binary-use, branch condition, and return source |
-| 2 | `src/zig_air_lowering_legacy.zig::conditionalSlotUpdateShape` | raw arg/alloc/cond-br payload parsing plus store/binary update scans | same slot/value query helpers as accumulator loops, reused by conditional slot update |
-| 3 | `src/zig_air_lowering_legacy.zig` optional/error-union shape predicates | opcode-presence sets for optional payload, optional pointer, error-union payload, error switch/classifier, and maybe-error branches | capability/model predicates for optional and error-union semantic-op presence and selected terminal branch shapes |
-| 4 | `src/zig_air_lowering_legacy.zig` aggregate pair/array/struct predicates | selected aggregate opcode-count and field-index checks, with some name suffix gates for pair make/read | aggregate layout/query helpers shared by typed-v2 aggregate construction, copy planning, and legacy compatibility predicates |
-| 5 | `src/zig_air_lowering_legacy.zig` slice/base64/runtime wrapper predicates | selected opcode-presence and function-name gates for slice sums, table lookup, optional pointer main, pointer load/store main, and add-may-panic | normalized typed-AIR CFG/value summaries, runtime-boundary call descriptors, and table-load helpers consumed by generic CFG lowering |
+| 1 | `src/zig_air_lowering_legacy.zig::isIntegerSwitchBlock` and `lowerIntegerSwitch` | legacy AIR text line parsing for dense switch ranges and branch constants | typed/model-owned switch summary with block targets, ranges, default, and terminal return values |
+| 2 | `src/zig_air_lowering_legacy.zig` optional/slice/packed predicates | opcode-presence sets for optional pointer/payload, slice sum, packed read/replace, and array/struct sum predicates | normalized typed-AIR CFG/value summaries and aggregate/pointer helpers consumed by generic CFG lowering |
+| 3 | `src/zig_air_lowering_legacy.zig` array/struct aggregate predicates | selected load/add/field-count checks and local payload prefix checks for `i32` loads | aggregate layout/query helpers shared by typed-v2 aggregate construction, copy planning, and legacy compatibility predicates |
+| 4 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerers | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
 
 This inventory is refactor-only: it does not expand accepted rows or weaken the
 strict frontier counters. Each slice should move one recognizer family behind
@@ -359,20 +358,37 @@ Completed slices from this inventory:
 
 - `src/zig_air_model.zig` now owns untyped AIR value queries for arg
   index/type, alloc type, load source slot, store destination/value, binary
-  refs, binary ref+integer constants, branch condition refs, and return refs.
+  refs, binary ref+integer constants, branch condition refs, return refs,
+  compare-against-argument queries, cast-from-slot queries, binary-use
+  queries, slot binary-update queries, and runtime-nav symbol extraction.
   `accumulatorLoopShape` and `conditionalSlotUpdateShape` now reuse those
   helpers instead of parsing those payloads locally.
 - Optional/error-union selected recognizers now use model-owned semantic-op
   presence helpers for optional non-null/payload/wrap and error-union
-  unwrap/is-non-error checks.
+  unwrap/is-non-error checks. The selected error-union payload, maybe-error,
+  error-switch, and error-classifier compatibility recognizers now use
+  model-owned structural summaries rather than function names such as
+  `error_switch.error_switch`, `.maybeError`, or `.classify`.
 - Aggregate/store/return selected recognizers now use model-owned return,
-  store, memory-op, and field-index presence helpers. The legacy lowerer still
-  owns selected function-name gates for pair/read/make wrappers, runtime main
-  wrappers, base64 table lookup, and panic-edge rows; common call and CFG
-  presence checks inside those runtime/panic wrapper recognizers now use
-  model-owned call/control-flow helpers. Remaining normalization targets are
-  the selected function-name gates themselves plus table-load/base64 and
-  panic-edge value summaries.
+  store, memory-op, return-pointer, and field-index presence helpers. The
+  aggregate pair/read/make compatibility recognizers now use model-owned
+  structural summaries instead of `.pair_first`, `.pairFirst`, `.make_pair`,
+  or `.makePair` suffix gates.
+- Base64 table lookup, runtime optional-pointer wrapper, runtime
+  pointer-load/store wrapper, and mixed C/Zig add-may-panic compatibility
+  recognizers now use model-owned structural summaries. Legacy recognizer
+  admission no longer depends on `.base64_table_lookup`,
+  `runtime_optional_pointer_main.main`,
+  `runtime_pointer_load_store_main.main`, or `.add_may_panic` names. The old
+  lowerer bodies still emit selected compatibility helper/global symbol names;
+  that is a separate runtime-symbol cleanup, not accepted recognizer
+  admission.
+- Current scan status: `src/zig_air_lowering_legacy.zig` has no
+  function-name-specific accepted recognizer gates for the aggregate,
+  error/switch, table-lookup, runtime-wrapper, or panic-edge selected shapes.
+  Remaining debt is local text/shape parsing in integer-switch, optional/slice,
+  packed, array/struct aggregate, and compatibility runtime-wrapper lowerer
+  bodies.
 
 Validation after these refactor slices:
 
