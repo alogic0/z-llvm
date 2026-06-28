@@ -19,3 +19,8 @@ fact nominal="frontier_sysv_sret_byval.NarrowInner" aggregate="{ i16, i32 }" con
 fact nominal="frontier_sysv_sret_byval.BigNarrow" aggregate="{ i8, { i16, i32 }, i64 }" construction=1 store=1 load=1
 fact nominal="frontier_sysv_sret_byval.BigDouble" aggregate="{ double, double, double }" construction=1 store=1 load=1
 fact nominal="frontier_sysv_sret_byval.BigFloat" aggregate="{ float, float, float, float, float }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigArray" aggregate="{ [5 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigDoubleArray" aggregate="{ [3 x double] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigFloatArray" aggregate="{ [5 x float] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigPtrDouble" aggregate="{ ptr, double, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigPtrFloat" aggregate="{ ptr, float, i64 }" construction=1 store=1 load=1
