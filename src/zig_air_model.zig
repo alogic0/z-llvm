@@ -664,6 +664,35 @@ pub fn selectedAggregateMakePairShape(function: air_export.Function) bool {
         functionHasOpcode(function, "ret_load");
 }
 
+pub fn selectedErrorUnionPayloadShape(function: air_export.Function) bool {
+    return functionHasErrorUnionOp(function, .unwrap_payload) and
+        functionHasErrorUnionOp(function, .is_non_err) and
+        !functionHasCallOp(function) and
+        !functionHasOpcode(function, "switch_br");
+}
+
+pub fn selectedMaybeErrorShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "cmp_neq") and
+        functionHasCfgOp(function, .cond_br) and
+        functionHasReturnOp(function) and
+        !functionHasOpcode(function, "switch_br");
+}
+
+pub fn selectedErrorSwitchShape(function: air_export.Function) bool {
+    return functionHasCallOp(function) and
+        functionHasErrorUnionOp(function, .is_non_err) and
+        functionHasErrorUnionOp(function, .unwrap_payload) and
+        functionHasOpcode(function, "switch_br");
+}
+
+pub fn selectedErrorClassifyShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "switch_br") and
+        functionHasReturnOp(function) and
+        !functionHasCallOp(function) and
+        !functionHasErrorUnionOp(function, .is_non_err) and
+        !functionHasErrorUnionOp(function, .unwrap_payload);
+}
+
 pub const UntypedValueSource = union(enum) {
     int: i128,
     ref: u32,
@@ -1345,6 +1374,93 @@ test "AIR model recognizes selected aggregate shapes structurally" {
     };
     try std.testing.expect(selectedAggregateMakePairShape(make_pair));
     try std.testing.expect(!selectedAggregatePairFirstShape(make_pair));
+}
+
+test "AIR model recognizes selected error and switch shapes structurally" {
+    const payload_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "is_non_err", .payload = "%arg0!", .category = .other },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "unwrap_errunion_payload", .payload = "%arg0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "ret", .payload = "%1!", .category = .return_op },
+    };
+    const payload = air_export.Function{
+        .name = "not_named_payload",
+        .type_text = "fn () i32",
+        .instruction_count = payload_instructions.len,
+        .main_body_count = payload_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&payload_instructions),
+    };
+    try std.testing.expect(selectedErrorUnionPayloadShape(payload));
+    try std.testing.expect(!selectedErrorSwitchShape(payload));
+
+    const switch_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "is_non_err", .payload = "%0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "unwrap_errunion_payload", .payload = "%0!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "switch_br", .payload = "%2!", .category = .control_flow },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%2!", .category = .return_op },
+    };
+    const err_switch = air_export.Function{
+        .name = "not_named_error_switch",
+        .type_text = "fn () i32",
+        .instruction_count = switch_instructions.len,
+        .main_body_count = switch_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&switch_instructions),
+    };
+    try std.testing.expect(selectedErrorSwitchShape(err_switch));
+    try std.testing.expect(!selectedErrorUnionPayloadShape(err_switch));
+    try std.testing.expect(!selectedErrorClassifyShape(err_switch));
+
+    const classify_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "switch_br", .payload = "%arg0!", .category = .control_flow },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "ret", .payload = "%arg0!", .category = .return_op },
+    };
+    const classify = air_export.Function{
+        .name = "not_named_classify",
+        .type_text = "fn () i32",
+        .instruction_count = classify_instructions.len,
+        .main_body_count = classify_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&classify_instructions),
+    };
+    try std.testing.expect(selectedErrorClassifyShape(classify));
+    try std.testing.expect(!selectedErrorSwitchShape(classify));
+
+    const maybe_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "cmp_neq", .payload = "%arg0!, <i32, 0>", .category = .comparison },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%0!, then_body, else_body", .category = .control_flow },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "ret", .payload = "%arg0!", .category = .return_op },
+    };
+    const maybe = air_export.Function{
+        .name = "not_named_maybe",
+        .type_text = "fn () i32",
+        .instruction_count = maybe_instructions.len,
+        .main_body_count = maybe_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&maybe_instructions),
+    };
+    try std.testing.expect(selectedMaybeErrorShape(maybe));
 }
 
 test "AIR model parses untyped AIR value query shapes" {

@@ -724,9 +724,7 @@ fn optionalPayloadShape(function: air_export.Function) bool {
 }
 
 fn errorUnionPayloadShape(function: air_export.Function) bool {
-    return !std.mem.eql(u8, function.name, "error_switch.error_switch") and
-        air_model.functionHasErrorUnionOp(function, .unwrap_payload) and
-        air_model.functionHasErrorUnionOp(function, .is_non_err);
+    return air_model.selectedErrorUnionPayloadShape(function);
 }
 
 fn sliceSumShape(function: air_export.Function) bool {
@@ -757,24 +755,15 @@ fn aggregateMakePairShape(function: air_export.Function) bool {
 }
 
 fn maybeErrorShape(function: air_export.Function) bool {
-    return std.mem.endsWith(u8, function.name, ".maybeError") and
-        functionHasOpcode(function, "cmp_neq") and
-        functionHasOpcode(function, "cond_br") and
-        air_model.functionHasReturnOp(function);
+    return air_model.selectedMaybeErrorShape(function);
 }
 
 pub fn errorSwitchShape(function: air_export.Function) bool {
-    return std.mem.eql(u8, function.name, "error_switch.error_switch") and
-        air_model.functionHasCallOp(function) and
-        air_model.functionHasErrorUnionOp(function, .is_non_err) and
-        air_model.functionHasErrorUnionOp(function, .unwrap_payload) and
-        functionHasOpcode(function, "switch_br");
+    return air_model.selectedErrorSwitchShape(function);
 }
 
 pub fn errorClassifyShape(function: air_export.Function) bool {
-    return std.mem.endsWith(u8, function.name, ".classify") and
-        functionHasOpcode(function, "switch_br") and
-        air_model.functionHasReturnOp(function);
+    return air_model.selectedErrorClassifyShape(function);
 }
 
 pub fn base64TableLookupShape(function: air_export.Function) bool {
