@@ -55,6 +55,30 @@ export fn frontier_ptr_add_load_index_rcx(values: [*]const u32, skip_a: usize, s
     return ptr[0];
 }
 
+export fn frontier_ptr_add_load_const_runtime_u8(values: [*]const u8, index: usize) u8 {
+    const base = values + 1;
+    const ptr = base + index;
+    return ptr[0];
+}
+
+export fn frontier_ptr_add_load_const_runtime_u16(values: [*]const u16, index: usize) u16 {
+    const base = values + 1;
+    const ptr = base + index;
+    return ptr[0];
+}
+
+export fn frontier_ptr_add_load_const_runtime_u32(values: [*]const u32, index: usize) u32 {
+    const base = values + 1;
+    const ptr = base + index;
+    return ptr[0];
+}
+
+export fn frontier_ptr_add_load_const_runtime_u64(values: [*]const u64, index: usize) u64 {
+    const base = values + 1;
+    const ptr = base + index;
+    return ptr[0];
+}
+
 export fn frontier_ptr_add_store_u8(values: [*]u8, index: usize, value: u8) u8 {
     const ptr = values + index;
     ptr[0] = value;
@@ -71,6 +95,26 @@ export fn frontier_ptr_add_store_u64(values: [*]u64, index: usize, value: u64) u
     const ptr = values + index;
     ptr[0] = value;
     return ptr[0];
+}
+
+export fn frontier_ptr_add_store_const_runtime_i32(values: [*]i32, index: usize, value: i32) i32 {
+    const base = values + 1;
+    const ptr = base + index;
+    ptr[0] = value;
+    return ptr[0];
+}
+
+export fn frontier_ptr_slot_load(values: [*]const i32, index: usize) i32 {
+    const base = values + 1;
+    const ptr = base;
+    return ptr[index];
+}
+
+export fn frontier_ptr_slot_store(values: [*]i32, index: usize, value: i32) i32 {
+    const base = values + 1;
+    const ptr = base;
+    ptr[index] = value;
+    return ptr[index];
 }
 
 export fn frontier_slice_len_from_ptr(values: [*]const i32, len: usize) usize {
@@ -94,5 +138,18 @@ export fn frontier_slice_elem_ptr_store(values: [*]i32, len: usize, index: usize
     @setRuntimeSafety(false);
     const slice = values[0..len];
     slice[index] = value;
+    return slice[index];
+}
+
+export fn frontier_slice_ptr_const_runtime_load(values: [*]const i32, len: usize, index: usize) i32 {
+    const slice = values[0..len];
+    const base = slice.ptr + 1;
+    const ptr = base + index;
+    return ptr[0];
+}
+
+export fn frontier_checked_slice_elem_ptr_load(values: [*]const i32, len: usize, index: usize) i32 {
+    @setRuntimeSafety(true);
+    const slice = values[0..len];
     return slice[index];
 }

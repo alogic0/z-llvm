@@ -55,11 +55,12 @@ slice element pointers. The x86_64 generic CFG path now uses a reusable typed
 address model with a base pointer, optional dynamic index, constant byte
 offset, scalar width, and conservative element-size checks. Accepted rows prove
 i8, i16, i32, and i64 scalar pointer loads/stores, including dynamic-index and
-constant-offset forms. The accepted `slice_elem_ptr` rows still disable runtime
-safety inside the row so ReleaseSafe proves pointer-address lowering rather
-than bounds-panic CFG ownership. The checked slice-element row is now a
-source-backed fail-closed safety-edge boundary until the checked bounds panic
-CFG is generalized for that shape.
+constant-offset forms. The accepted `slice_elem_ptr` rows still include
+unchecked pointer-address proof, and `frontier_checked_slice_elem_ptr_load` now
+adds the checked bounds guard: the hot path lowers through the same typed
+address model, the cold path preserves the `outOfBounds(index, len)` noreturn
+runtime call, and the C harness proves both the in-bounds result and
+child-process trap behavior.
 
 Current frontier ABI boundary seed:
 
@@ -69,26 +70,25 @@ Current frontier ABI boundary seed:
 - `test/zig/frontier_boundaries/frontier_packed_aggregate_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_tail_call_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_callconv_boundary.zig`
-- `test/zig/frontier_boundaries/frontier_checked_slice_boundary.zig`
 
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=617
-structured_functions=617
-generic_codegen_functions=617
-generic_cfg_functions=617
+discovered_functions=626
+structured_functions=626
+generic_codegen_functions=626
+generic_cfg_functions=626
 structural_matcher_functions=0
-structured_air_v2_functions=617
-typed_air_operand_functions=617
+structured_air_v2_functions=626
+typed_air_operand_functions=626
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=617
+generic_lowering_functions=626
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=617
+object_emitted_functions=626
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -126,8 +126,8 @@ Source-backed ABI boundary proof is green for all three modes through
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=7
-discovered_functions=11
+source_rows=6
+discovered_functions=10
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
@@ -135,7 +135,7 @@ packed_aggregate_boundary_rows=2
 tail_call_boundary_rows=1
 callconv_boundary_rows=1
 stack_pressure_boundary_rows=0
-safety_edge_boundary_rows=1
+safety_edge_boundary_rows=0
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -143,14 +143,15 @@ lld_rows=0
 local_fail=0
 ```
 
-These boundary rows are expected unsupported source-backed ABI and safety-edge
-surfaces. They are not counted in the accepted 13-source / 617-function strict
-frontier executable proof. Stack-pressure forwarding for the previous
+These boundary rows are expected unsupported source-backed ABI surfaces. They
+are not counted in the accepted 13-source / 626-function strict frontier
+executable proof. Stack-pressure forwarding for the previous
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 indirect and stack-source
 rows is now accepted in the frontier corpus; the boundary gate keeps
-`stack_pressure_boundary_rows=0` as a regression guard. Checked
-slice-element bounds CFG remains a targeted safety-edge boundary with
-`safety_edge_boundary_rows=1`.
+`stack_pressure_boundary_rows=0` as a regression guard. Checked slice-element
+bounds CFG is accepted in the strict frontier corpus, so
+`safety_edge_boundary_rows=0` is now a regression guard rather than an active
+boundary.
 
 Executable ABI proof is green for all three modes:
 

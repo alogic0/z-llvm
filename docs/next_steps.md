@@ -213,8 +213,8 @@ Execution order:
    aggregate scans now use shared aggregate/load/field-pointer predicates, and
    the legacy compatibility module reuses the model-owned opcode query helper
    instead of carrying its own duplicate implementation.
-   The strict frontier gate was re-run after these refactors and still reports
-   `generic_cfg_functions=617`, `structural_matcher_functions=0`,
+   The strict frontier gate was re-run after these refactors and now reports
+   `generic_cfg_functions=626`, `structural_matcher_functions=0`,
    `legacy_air_text_lowering_functions=0`, and executable proof green across
    ReleaseFast, ReleaseSafe, and ReleaseSmall. The
    Zig type/function signature parsing and pointer-child text now live in
@@ -422,23 +422,28 @@ Completed slices from this inventory:
   rows lower through typed AIR v2 pointer/aggregate semantics, generic CFG
   pointer/slice return/load/store codegen, z_llvm object emission, Zig native
   link, and executable proof. This closes the selected frontier address forms
-  only; the accepted `slice_elem_ptr` rows intentionally disable runtime safety,
-  while the checked slice-element row is source-backed in the boundary gate as
-  `safety_edge_boundary_rows=1`.
+  only; unchecked `slice_elem_ptr` rows still prove pointer-address lowering
+  without safety checks, while `frontier_checked_slice_elem_ptr_load` now proves
+  the ReleaseSafe-style bounds guard, hot in-bounds load, cold `outOfBounds`
+  trap path, and child-process executable death check in the accepted frontier.
+  The older `GenericCfgDynamicI32Address` path remains only for additive
+  multi-load i32 forms such as pair-sum rows where the typed address model still
+  needs a reusable "load two addresses then combine" operation; scalar
+  load/store and checked-slice hot paths route through `GenericCfgTypedAddress`.
 
 Validation after these refactor slices:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
-  ReleaseSmall all report `source_rows=13`, `discovered_functions=617`,
-  `generic_cfg_functions=617`, `structural_matcher_functions=0`,
+  ReleaseSmall all report `source_rows=13`, `discovered_functions=626`,
+  `generic_cfg_functions=626`, `structural_matcher_functions=0`,
   `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
-  `object_emitted_functions=617`, `native_link_accepted_rows=13`,
+  `object_emitted_functions=626`, `native_link_accepted_rows=13`,
   `executable_ok_rows=13`, and `local_fail=0`.
 - `zig build distribution-air-release-frontier-boundaries`: ReleaseFast,
   ReleaseSafe, and ReleaseSmall all report `varargs_boundary_rows=2`,
   `vector_boundary_rows=2`, `x87_boundary_rows=2`,
   `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
-  `callconv_boundary_rows=1`, `safety_edge_boundary_rows=1`,
+  `callconv_boundary_rows=1`, `safety_edge_boundary_rows=0`,
   `unexpected_accept_rows=0`,
   `wrong_diagnostic_rows=0`, and `local_fail=0`.
 - `zig build test` and `git diff --check` pass.
@@ -946,12 +951,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=617`,
-`generic_codegen_functions=617`, `generic_cfg_functions=617`,
+frontier gate reports `source_rows=13`, `discovered_functions=626`,
+`generic_codegen_functions=626`, `generic_cfg_functions=626`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=617`, `object_failures=0`,
+`object_emitted_functions=626`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -964,9 +969,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=617`,
-`generic_cfg_functions=617`, `structural_matcher_functions=0`,
-`object_emitted_functions=617`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=626`,
+`generic_cfg_functions=626`, `structural_matcher_functions=0`,
+`object_emitted_functions=626`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -1074,13 +1079,13 @@ ReleaseSafe, and ReleaseSmall and currently reports `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
-`safety_edge_boundary_rows=1`,
+`safety_edge_boundary_rows=0`,
 `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0` per
 mode. Varargs, vectors, X87/long double, packed/unaligned aggregates, tail
-calls, non-default call conventions, and checked slice-element safety edges are
-therefore source-backed
-fail-closed boundaries, not vague docs-only gaps and not accepted executable
-proof. Stack-pressure byval forwarding is currently accepted for the Big80
+calls, and non-default call conventions are therefore source-backed fail-closed
+boundaries, not vague docs-only gaps and not accepted executable proof. Checked
+slice-element bounds have moved into the accepted frontier with executable hot
+and trap-path proof. Stack-pressure byval forwarding is currently accepted for the Big80
 frontier rows, with the boundary counter held at zero as a regression guard.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads

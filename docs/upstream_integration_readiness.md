@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=617
-structured_functions=617
-generic_codegen_functions=617
-generic_cfg_functions=617
+discovered_functions=626
+structured_functions=626
+generic_codegen_functions=626
+generic_cfg_functions=626
 structural_matcher_functions=0
-structured_air_v2_functions=617
-typed_air_operand_functions=617
+structured_air_v2_functions=626
+typed_air_operand_functions=626
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=617
+generic_lowering_functions=626
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=617
+object_emitted_functions=626
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-13-source / 617-function counters above plus `native_link_accepted_rows=13`,
+13-source / 626-function counters above plus `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -685,17 +685,18 @@ progress, executable progress, and strict counter checks. It requires the
 Source-backed ABI boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs
 `test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
-ReleaseSmall and currently reports per mode: `source_rows=7`,
-`discovered_functions=11`, `varargs_boundary_rows=2`,
+ReleaseSmall and currently reports per mode: `source_rows=6`,
+`discovered_functions=10`, `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
-`safety_edge_boundary_rows=1`,
+`safety_edge_boundary_rows=0`,
 `unexpected_accept_rows=0`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries for
-varargs, vectors, long-double/X87, packed aggregates, tail calls, non-default
-call conventions, and checked slice-element safety edges. The prior
+varargs, vectors, long-double/X87, packed aggregates, tail calls, and
+non-default call conventions. Checked slice-element bounds moved into the
+accepted strict frontier corpus with executable hot/trap-path proof. The prior
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 stack-source forwarding
 boundary is now
 accepted in the strict frontier corpus, and the boundary counter remains at
