@@ -355,6 +355,38 @@ strict frontier counters. Each slice should move one recognizer family behind
 model/capability helpers, then rerun `zig build test`; rerun
 `distribution-air-release-frontier` when lowering dispatch behavior changes.
 
+Completed slices from this inventory:
+
+- `src/zig_air_model.zig` now owns untyped AIR value queries for arg
+  index/type, alloc type, load source slot, store destination/value, binary
+  refs, binary ref+integer constants, branch condition refs, and return refs.
+  `accumulatorLoopShape` and `conditionalSlotUpdateShape` now reuse those
+  helpers instead of parsing those payloads locally.
+- Optional/error-union selected recognizers now use model-owned semantic-op
+  presence helpers for optional non-null/payload/wrap and error-union
+  unwrap/is-non-error checks.
+- Aggregate/store/return selected recognizers now use model-owned return,
+  store, memory-op, and field-index presence helpers. The legacy lowerer still
+  owns selected function-name gates for pair/read/make wrappers, runtime main
+  wrappers, base64 table lookup, and panic-edge rows; those remain the next
+  normalization targets.
+
+Validation after these refactor slices:
+
+- `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
+  ReleaseSmall all report `source_rows=13`, `discovered_functions=603`,
+  `generic_cfg_functions=603`, `structural_matcher_functions=0`,
+  `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
+  `object_emitted_functions=603`, `native_link_accepted_rows=13`,
+  `executable_ok_rows=13`, and `local_fail=0`.
+- `zig build distribution-air-release-frontier-boundaries`: ReleaseFast,
+  ReleaseSafe, and ReleaseSmall all report `varargs_boundary_rows=2`,
+  `vector_boundary_rows=2`, `x87_boundary_rows=2`,
+  `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
+  `callconv_boundary_rows=1`, `unexpected_accept_rows=0`,
+  `wrong_diagnostic_rows=0`, and `local_fail=0`.
+- `zig build test` and `git diff --check` pass.
+
 - Category: `aggregate-abi`.
   Inventory counts: ReleaseFast 2255777, ReleaseSafe 2338212,
   ReleaseSmall 2206792.
