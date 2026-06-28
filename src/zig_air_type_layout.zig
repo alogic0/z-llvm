@@ -55,7 +55,6 @@ pub const AggregateLayoutSummary = struct {
 
 pub const AggregateLayoutProviderKind = enum {
     exported_aggregate_facts,
-    generated_inference,
     static_source_facts,
     boundary_provider,
 };
@@ -66,7 +65,6 @@ const AggregateLayoutProvider = struct {
     fn lookup(provider: AggregateLayoutProvider, nominal: []const u8) ?AggregateLayoutSummary {
         return switch (provider.kind) {
             .exported_aggregate_facts => exportedFactAggregateLayoutSummary(nominal),
-            .generated_inference => generatedAggregateLayoutSummary(nominal),
             .static_source_facts => sourceFactAggregateLayoutSummary(nominal),
             .boundary_provider => null,
         };
@@ -75,7 +73,6 @@ const AggregateLayoutProvider = struct {
 
 const aggregate_layout_providers = [_]AggregateLayoutProvider{
     .{ .kind = .exported_aggregate_facts },
-    .{ .kind = .generated_inference },
     .{ .kind = .static_source_facts },
 };
 
@@ -159,6 +156,10 @@ fn conflictingOwnedAggregateLayoutSummary(nominal: []const u8, selected: Aggrega
         const candidate = provider.lookup(nominal) orelse continue;
         if (!aggregateLayoutSummariesEquivalent(selected, candidate)) return candidate;
     }
+    if (boundaryNamedAggregateType(nominal)) |boundary_ty| {
+        const candidate = boundaryAggregateLayoutSummary(nominal, boundary_ty);
+        if (!aggregateLayoutSummariesEquivalent(selected, candidate)) return candidate;
+    }
     return null;
 }
 
@@ -181,12 +182,6 @@ fn ownedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
     for (aggregate_layout_providers) |provider| {
         if (provider.lookup(nominal)) |summary| return summary;
     }
-    return null;
-}
-
-fn generatedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
-    if (inferredBigScalarLayoutSummary(nominal)) |summary| return withProviderKind(summary, .generated_inference);
-    if (inferredBigArrayLayoutSummary(nominal)) |summary| return withProviderKind(summary, .generated_inference);
     return null;
 }
 
@@ -226,45 +221,6 @@ fn withProviderKind(summary: AggregateLayoutSummary, provider_kind: AggregateLay
     var result = summary;
     result.provider_kind = provider_kind;
     return result;
-}
-
-fn inferredBigArrayLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
-    const prefix = "frontier_sysv_sret_byval.Big";
-    if (!std.mem.startsWith(u8, nominal, prefix)) return null;
-    const field_count = std.fmt.parseInt(u16, nominal[prefix.len..], 10) catch return null;
-    if (field_count < 32) return null;
-    const aggregate_text = std.fmt.allocPrint(std.heap.page_allocator, "{{ [{d} x i64] }}", .{field_count}) catch return null;
-    return summarizeAggregateLayout(nominal, aggregate(aggregate_text), .inference, .{
-        .construction = true,
-        .store = true,
-        .load = true,
-    });
-}
-
-fn inferredBigScalarLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
-    const prefix = "frontier_sysv_sret_byval.Big";
-    if (!std.mem.startsWith(u8, nominal, prefix)) return null;
-    const field_count = std.fmt.parseInt(u16, nominal[prefix.len..], 10) catch return null;
-    if (field_count < 3 or field_count > 20) return null;
-    const aggregate_text = repeatedScalarAggregateText(field_count, "i64") orelse return null;
-    return summarizeAggregateLayout(nominal, aggregate(aggregate_text), .inference, .{
-        .construction = true,
-        .store = true,
-        .load = true,
-    });
-}
-
-fn repeatedScalarAggregateText(field_count: usize, scalar_text: []const u8) ?[]const u8 {
-    if (field_count == 0) return null;
-    var aggregate_text: std.ArrayList(u8) = .empty;
-    aggregate_text.appendSlice(std.heap.page_allocator, "{ ") catch return null;
-    var index: usize = 0;
-    while (index < field_count) : (index += 1) {
-        if (index != 0) aggregate_text.appendSlice(std.heap.page_allocator, ", ") catch return null;
-        aggregate_text.appendSlice(std.heap.page_allocator, scalar_text) catch return null;
-    }
-    aggregate_text.appendSlice(std.heap.page_allocator, " }") catch return null;
-    return aggregate_text.toOwnedSlice(std.heap.page_allocator) catch return null;
 }
 
 fn aggregateLayoutSummariesEquivalent(lhs: AggregateLayoutSummary, rhs: AggregateLayoutSummary) bool {
@@ -466,10 +422,6 @@ pub fn isAggregateType(ty: ir.Type) bool {
     };
 }
 
-pub fn frontierSysVSretByvalBigType(trimmed: []const u8) ?ir.Type {
-    return if (inferredBigScalarLayoutSummary(trimmed)) |summary| summary.ty else null;
-}
-
 fn aggregate(text: []const u8) ir.Type {
     return .{ .aggregate = text };
 }
@@ -517,11 +469,32 @@ fn installTestExportedAggregateProvider() !exported_aggregate_layout_facts.Provi
         "fact nominal=\"frontier_sysv_sret_byval.ScalarMixed\" aggregate=\"{ i8, i16, i32, i64, ptr, float, double }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.ScalarNestedInner\" aggregate=\"{ i8, i16 }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.ScalarNested\" aggregate=\"{ { i8, i16 }, i32, double, ptr }\" construction=1 store=1 load=1\n" ++
-        "fact nominal=\"frontier_sysv_sret_byval.ScalarArray\" aggregate=\"{ [3 x i32], [2 x double], ptr }\" construction=1 store=1 load=1\n";
+        "fact nominal=\"frontier_sysv_sret_byval.ScalarArray\" aggregate=\"{ [3 x i32], [2 x double], ptr }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big3\" aggregate=\"{ i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big4\" aggregate=\"{ i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big5\" aggregate=\"{ i64, i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big6\" aggregate=\"{ i64, i64, i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big7\" aggregate=\"{ i64, i64, i64, i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big8\" aggregate=\"{ i64, i64, i64, i64, i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big12\" aggregate=\"{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big16\" aggregate=\"{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big20\" aggregate=\"{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big32\" aggregate=\"{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big40\" aggregate=\"{ [40 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big48\" aggregate=\"{ [48 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big64\" aggregate=\"{ [64 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big80\" aggregate=\"{ [80 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big81\" aggregate=\"{ [81 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big96\" aggregate=\"{ [96 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big128\" aggregate=\"{ [128 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big160\" aggregate=\"{ [160 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big192\" aggregate=\"{ [192 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big224\" aggregate=\"{ [224 x i64] }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.Big256\" aggregate=\"{ [256 x i64] }\" construction=1 store=1 load=1\n";
     return exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
 }
 
-test "type layout decodes exact aggregate facts and generated names" {
+test "type layout decodes exact exported aggregate facts" {
     const provider = try installTestExportedAggregateProvider();
     exported_aggregate_layout_facts.setActiveProvider(provider);
     defer provider.deinit(std.testing.allocator);
@@ -539,7 +512,7 @@ test "type layout decodes exact aggregate facts and generated names" {
     try std.testing.expect(parseNamedAggregateType("other.Pair") == null);
 }
 
-test "type layout prefers exported facts and inference before fallback table" {
+test "type layout prefers exported facts before compatibility providers" {
     const provider = try installTestExportedAggregateProvider();
     exported_aggregate_layout_facts.setActiveProvider(provider);
     defer provider.deinit(std.testing.allocator);
@@ -558,8 +531,8 @@ test "type layout prefers exported facts and inference before fallback table" {
     try std.testing.expect(aggregateLayoutSummary("other.Outer") == null);
 
     const big3 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big3").?;
-    try std.testing.expectEqual(AggregateLayoutSource.inference, big3.source);
-    try std.testing.expectEqual(AggregateLayoutProviderKind.generated_inference, big3.provider_kind.?);
+    try std.testing.expectEqual(AggregateLayoutSource.facts, big3.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, big3.provider_kind.?);
     try std.testing.expect(aggregateLayoutMismatch("frontier_sysv_sret_byval.Big3") == null);
 }
 
@@ -578,14 +551,14 @@ test "type layout prefers active exported facts before temporary static source f
 test "type layout fails closed when exported fact conflicts with lower-priority evidence" {
     const contents =
         exported_aggregate_layout_facts.section_name ++ "\n" ++
-        "fact nominal=\"frontier_sysv_sret_byval.Big3\" aggregate=\"{ i64, double }\" construction=1 store=1 load=1\n";
+        "fact nominal=\"frontier_sysv_aggregate_classes.PackedMixed\" aggregate=\"{ i64, double }\" construction=1 store=1 load=1\n";
     const provider = try exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
     exported_aggregate_layout_facts.setActiveProvider(provider);
     defer provider.deinit(std.testing.allocator);
     defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
 
-    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("frontier_sysv_sret_byval.Big3"));
-    const mismatch = aggregateLayoutMismatch("frontier_sysv_sret_byval.Big3").?;
+    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("frontier_sysv_aggregate_classes.PackedMixed"));
+    const mismatch = aggregateLayoutMismatch("frontier_sysv_aggregate_classes.PackedMixed").?;
     try std.testing.expectEqual(@as(usize, 2), mismatch.inferred_leaf_count);
     try std.testing.expectEqual(@as(usize, 3), mismatch.fallback_leaf_count);
 }
@@ -632,18 +605,20 @@ test "type layout infers representative frontier aggregate rows" {
     try std.testing.expectEqual(@as(usize, 5), big_array.leaf_count);
 
     const big3 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big3").?;
-    try std.testing.expectEqual(AggregateLayoutSource.inference, big3.source);
-    try std.testing.expectEqual(AggregateLayoutProviderKind.generated_inference, big3.provider_kind.?);
+    try std.testing.expectEqual(AggregateLayoutSource.facts, big3.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, big3.provider_kind.?);
     try std.testing.expect(big3.ty.eql(.{ .aggregate = "{ i64, i64, i64 }" }));
     try std.testing.expectEqual(@as(usize, 3), big3.leaf_count);
 
     const big20 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big20").?;
-    try std.testing.expectEqual(AggregateLayoutSource.inference, big20.source);
+    try std.testing.expectEqual(AggregateLayoutSource.facts, big20.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, big20.provider_kind.?);
     try std.testing.expectEqual(@as(usize, 20), big20.leaf_count);
     try std.testing.expect(big20.leafSlice()[19].ty.eql(.{ .int = 64 }));
 
     const big256 = aggregateLayoutSummary("frontier_sysv_sret_byval.Big256").?;
-    try std.testing.expectEqual(AggregateLayoutSource.inference, big256.source);
+    try std.testing.expectEqual(AggregateLayoutSource.facts, big256.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, big256.provider_kind.?);
     try std.testing.expect(big256.ty.eql(.{ .aggregate = "{ [256 x i64] }" }));
     try std.testing.expectEqual(@as(usize, 256), big256.leaf_count);
 }
@@ -716,6 +691,11 @@ test "type layout builds reusable aggregate layout plan" {
 }
 
 test "type layout plan covers large sret byval aggregates" {
+    const provider = try installTestExportedAggregateProvider();
+    exported_aggregate_layout_facts.setActiveProvider(provider);
+    defer provider.deinit(std.testing.allocator);
+    defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+
     const layout = try target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
     const plan = try aggregateLayoutPlan(layout, .{ .aggregate = "%frontier_sysv_sret_byval.Big256" });
     try std.testing.expectEqual(@as(usize, 256), plan.leaf_count);

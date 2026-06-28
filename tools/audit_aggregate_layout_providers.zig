@@ -1,11 +1,6 @@
 const std = @import("std");
 
-const generated_examples = [_][]const u8{
-    "frontier_sysv_sret_byval.Big3",
-    "frontier_sysv_sret_byval.Big20",
-    "frontier_sysv_sret_byval.Big32",
-    "frontier_sysv_sret_byval.Big256",
-};
+const generated_examples = [_][]const u8{};
 
 const ProviderRow = struct {
     name: []const u8,

@@ -143,15 +143,16 @@ For aggregate layout ownership:
 - Any x86_64 ABI interpretation of those facts must stay in x86_64 ABI
   planning code, not in the generic fact contract.
 - Provider precedence should be explicit:
-  `exported_fact > generated_inference > temporary_static_facts > boundary >
-  missing`.
+  `exported_fact > temporary_static_facts > boundary > missing`.
 - Compatibility fallback entries should remain at zero.
+- Generated inference is currently not an active aggregate layout provider; use
+  function-local inference only as validation/bridging evidence, not as a
+  nominal lookup source.
 - Packed/unaligned aggregates stay boundary-owned until their layout and ABI
   facts are explicitly supported.
 
 Do not remove temporary static aggregate facts by guessing from names. Remove
-them by moving rows to exported facts, generated inference, or proven
-function-local evidence.
+them by moving rows to exported facts or proven function-local evidence.
 
 ## Progress Metrics
 
@@ -161,7 +162,7 @@ ownership, report:
 ```text
 exported_facts=N
 temporary_static_facts=N
-generated_inference=N
+generated_inference_examples=N
 boundary_provider=N
 fallback_entries=N
 frontier_source_rows=N

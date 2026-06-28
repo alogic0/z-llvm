@@ -41,3 +41,24 @@ fact nominal="frontier_sysv_sret_byval.ScalarMixed" aggregate="{ i8, i16, i32, i
 fact nominal="frontier_sysv_sret_byval.ScalarNestedInner" aggregate="{ i8, i16 }" construction=1 store=1 load=1
 fact nominal="frontier_sysv_sret_byval.ScalarNested" aggregate="{ { i8, i16 }, i32, double, ptr }" construction=1 store=1 load=1
 fact nominal="frontier_sysv_sret_byval.ScalarArray" aggregate="{ [3 x i32], [2 x double], ptr }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big3" aggregate="{ i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big4" aggregate="{ i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big5" aggregate="{ i64, i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big6" aggregate="{ i64, i64, i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big7" aggregate="{ i64, i64, i64, i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big8" aggregate="{ i64, i64, i64, i64, i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big12" aggregate="{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big16" aggregate="{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big20" aggregate="{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big32" aggregate="{ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big40" aggregate="{ [40 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big48" aggregate="{ [48 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big64" aggregate="{ [64 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big80" aggregate="{ [80 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big81" aggregate="{ [81 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big96" aggregate="{ [96 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big128" aggregate="{ [128 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big160" aggregate="{ [160 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big192" aggregate="{ [192 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big224" aggregate="{ [224 x i64] }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.Big256" aggregate="{ [256 x i64] }" construction=1 store=1 load=1

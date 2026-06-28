@@ -83,13 +83,12 @@ construction admission validates operands against the same plan before using
 typed AIR pointer paths for insertvalue indices. SysV classification consumes
 the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
 of the basename compatibility table and records layout source, field count,
-scalar leaves, and construction/store/load evidence. The owned slice has 45
-exported sidecar facts and 0 temporary static source layout facts, plus generated
-`frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
-Big3..Big20 rows and the 12 current Big32..Big256 array-leaf rows; those rows
-no longer depend on the fallback table. Owned lookup now runs through a
-provider registry: exported aggregate layout facts first, generated inference
-second, then the temporary static source-fact provider. The exported fact
+scalar leaves, and construction/store/load evidence. The owned slice has 66
+exported sidecar facts and 0 temporary static source layout facts. The finite
+`frontier_sysv_sret_byval.BigN` rows are source-owned sidecar facts rather than
+generated nominal inference. Owned lookup now runs through a provider registry:
+exported aggregate layout facts first, then the temporary static source-fact
+provider. The exported fact
 contract is `zllvm-aggregate-layout-facts-v1` in
 `src/zig_air_exported_aggregate_layout_facts.zig`; gates now load checked-in
 sidecars for the source roots included by the selected corpus. Those sidecars
@@ -134,12 +133,33 @@ own `aggregate_abi.Pair`, `runtime_aggregate_pair_main.Pair`,
 `frontier_sysv_sret_byval.ScalarMixed`,
 `frontier_sysv_sret_byval.ScalarNestedInner`,
 `frontier_sysv_sret_byval.ScalarNested`, and
-`frontier_sysv_sret_byval.ScalarArray`; those duplicate entries were
+`frontier_sysv_sret_byval.ScalarArray`,
+`frontier_sysv_sret_byval.Big3`,
+`frontier_sysv_sret_byval.Big4`,
+`frontier_sysv_sret_byval.Big5`,
+`frontier_sysv_sret_byval.Big6`,
+`frontier_sysv_sret_byval.Big7`,
+`frontier_sysv_sret_byval.Big8`,
+`frontier_sysv_sret_byval.Big12`,
+`frontier_sysv_sret_byval.Big16`,
+`frontier_sysv_sret_byval.Big20`,
+`frontier_sysv_sret_byval.Big32`,
+`frontier_sysv_sret_byval.Big40`,
+`frontier_sysv_sret_byval.Big48`,
+`frontier_sysv_sret_byval.Big64`,
+`frontier_sysv_sret_byval.Big80`,
+`frontier_sysv_sret_byval.Big81`,
+`frontier_sysv_sret_byval.Big96`,
+`frontier_sysv_sret_byval.Big128`,
+`frontier_sysv_sret_byval.Big160`,
+`frontier_sysv_sret_byval.Big192`,
+`frontier_sysv_sret_byval.Big224`, and
+`frontier_sysv_sret_byval.Big256`; those duplicate entries were
 removed from the temporary static provider after the strict frontier gate stayed
 green. The contract has fail-closed sidecar parsing and an active provider hook.
 `AggregateLayoutSummary.provider_kind` records exported-fact,
-generated-inference, static-source-fact, or boundary-provider ownership
-directly. Exported facts are checked against lower-priority static/generated
+static-source-fact, or boundary-provider ownership
+directly. Exported facts are checked against lower-priority static or boundary
 evidence for the same nominal layout, and owned summaries are checked against
 any still-present fallback equivalent; conflicts fail closed on field/leaf-count
 mismatch. Remaining aggregate

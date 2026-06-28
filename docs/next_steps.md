@@ -281,10 +281,10 @@ Execution order:
    source, field count, scalar leaves, and construction/store/load evidence.
    It is consulted before the basename compatibility table, so
    the first broad easy-layout slice is no longer fallback-table-owned. The
-   owned side now has 45 exported sidecar facts, 0 temporary static source
-   layout facts in `src/zig_air_aggregate_layout_facts.zig`, plus generated
-   `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
-   Big3..Big20 forms and the 12 current Big32..Big256 array-leaf rows. The
+   owned side now has 66 exported sidecar facts and 0 temporary static source
+   layout facts in `src/zig_air_aggregate_layout_facts.zig`. The finite
+   `frontier_sysv_sret_byval.BigN` rows are source-owned sidecar facts rather
+   than generated nominal inference. The
    fallback side is empty; `PackedMixed` and `PackedReverseMixed` are
    boundary-owned through `src/zig_air_aggregate_layout_boundaries.zig`, not
    fallback-owned.
@@ -511,10 +511,9 @@ Aggregate/type-layout ownership start:
   is layout-owned as `{ i32, i32 }`, the runtime aggregate-pair compatibility
   lowerers now admit by normalized layout and data-flow structure instead of
   exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
-  static source facts, generated inference, fallback-table layouts, and
-  boundary-owned layouts. Owned layout lookup goes through a provider registry:
-  exported aggregate layout facts first, generated inference second, then the
-  temporary static source-fact provider in
+  static source facts, fallback-table layouts, and boundary-owned layouts.
+  Owned layout lookup goes through a provider registry: exported aggregate
+  layout facts first, then the temporary static source-fact provider in
   `src/zig_air_aggregate_layout_facts.zig`. The exported fact contract lives in
   `src/zig_air_exported_aggregate_layout_facts.zig` as
   `zllvm-aggregate-layout-facts-v1`; the gate now loads checked-in sidecars
@@ -569,17 +568,16 @@ Aggregate/type-layout ownership start:
   `frontier_sysv_sret_byval.ScalarArray`) that were removed from the
   temporary static provider after the frontier gate stayed green. The temporary
   static provider currently has 0 named facts; remaining source-backed layouts
-  are either exported sidecar facts, generated inference, or explicit
+  are either exported sidecar facts or explicit
   boundaries. `AggregateLayoutSummary.provider_kind`
-  records exported-fact, generated-inference, static-source-fact, or
+  records exported-fact, static-source-fact, or
   boundary-provider ownership directly. Exported facts now fail closed if they
-  disagree with lower-priority static or generated evidence for the same
+  disagree with lower-priority static or boundary evidence for the same
   nominal layout, so sidecar migration cannot silently override a conflicting
-  existing plan. Generated inference
-  covers the scalar-BigN rule for
-  Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20 and the large-BigN
-  array-leaf rule covering Big32, Big40, Big48, Big64, Big80, Big81, Big96,
-  Big128, Big160, Big192, Big224, and Big256. The fallback table is empty; the
+  existing plan. Exported sidecar facts now cover
+  Big3/Big4/Big5/Big6/Big7/Big8/Big12/Big16/Big20, Big32, Big40, Big48,
+  Big64, Big80, Big81, Big96, Big128, Big160, Big192, Big224, and Big256. The
+  fallback table is empty; the
   2 packed/unaligned entries are boundary-owned through
   `src/zig_air_aggregate_layout_boundaries.zig`.
   Function-local typed AIR construction evidence now feeds register aggregate
@@ -597,8 +595,7 @@ Aggregate/type-layout ownership start:
   - Static source layout facts before fallback table:
     none.
   - Generated inference before fallback table:
-    the scalar-BigN rule for the current Big3..Big20 rows and the large-BigN
-    array rule for BigN >= 32.
+    none. Finite BigN rows are exported sidecar facts.
   - Exported aggregate layout fact contract:
     `src/zig_air_exported_aggregate_layout_facts.zig` defines
     `zllvm-aggregate-layout-facts-v1`, exact nominal fact matching, aggregate
@@ -647,7 +644,28 @@ Aggregate/type-layout ownership start:
     `frontier_sysv_sret_byval.ScalarMixed`,
     `frontier_sysv_sret_byval.ScalarNestedInner`,
     `frontier_sysv_sret_byval.ScalarNested`, and
-    `frontier_sysv_sret_byval.ScalarArray`.
+    `frontier_sysv_sret_byval.ScalarArray`,
+    `frontier_sysv_sret_byval.Big3`,
+    `frontier_sysv_sret_byval.Big4`,
+    `frontier_sysv_sret_byval.Big5`,
+    `frontier_sysv_sret_byval.Big6`,
+    `frontier_sysv_sret_byval.Big7`,
+    `frontier_sysv_sret_byval.Big8`,
+    `frontier_sysv_sret_byval.Big12`,
+    `frontier_sysv_sret_byval.Big16`,
+    `frontier_sysv_sret_byval.Big20`,
+    `frontier_sysv_sret_byval.Big32`,
+    `frontier_sysv_sret_byval.Big40`,
+    `frontier_sysv_sret_byval.Big48`,
+    `frontier_sysv_sret_byval.Big64`,
+    `frontier_sysv_sret_byval.Big80`,
+    `frontier_sysv_sret_byval.Big81`,
+    `frontier_sysv_sret_byval.Big96`,
+    `frontier_sysv_sret_byval.Big128`,
+    `frontier_sysv_sret_byval.Big160`,
+    `frontier_sysv_sret_byval.Big192`,
+    `frontier_sysv_sret_byval.Big224`, and
+    `frontier_sysv_sret_byval.Big256`.
   - Remaining fallback-table compatibility entries:
     none.
   - Boundary-owned aggregate layouts:
@@ -658,10 +676,10 @@ Aggregate/type-layout ownership start:
   - Provider audit command:
     `zig run tools/audit_aggregate_layout_providers.zig >
     tmp/aggregate_layout_provider_audit.log` prints exported sidecar facts,
-    current static facts, generated inference samples, and boundary provider
+    current static facts, generated inference samples if any, and boundary provider
     rows with aggregate text. The current saved audit reports
-    `exported_facts=45`, `static_source_facts=0`, `boundary_provider=2`, and
-    `generated_examples=4`. Use this before removing more static facts so the
+    `exported_facts=66`, `static_source_facts=0`, `boundary_provider=2`, and
+    `generated_examples=0`. Use this before removing more static facts so the
     next ownership slice is driven by provider evidence rather than manual
     table scanning.
 
@@ -710,14 +728,13 @@ Validation after these refactor slices is saved in
   `Pair` rule and exact runtime aggregate-pair symbol-name admission have been
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
   checks. `AggregateLayoutSummary` now records whether a layout came from
-  exported aggregate facts, static source facts, generated inference, a
+  exported aggregate facts, static source facts, a
   boundary, or the compatibility table; owned layout lookup now goes through a
   provider registry, and
   `AggregateLayoutSummary.provider_kind` records the provider that supplied the
   layout so future exported Zig field facts can replace the static
-  source-fact provider module without changing lowering callers. The generated
-  inference side has scalar-BigN and
-  large-BigN rules, and mismatch checking compares owned field/leaf counts
+  source-fact provider module without changing lowering callers. Finite BigN
+  rows are now exported sidecar facts, and mismatch checking compares owned field/leaf counts
   against any remaining fallback entry. Register aggregate construction now also has
   mechanical typed-AIR
   inference for ret_ptr/field-or-element pointer/store/ret_load rows, including
