@@ -642,6 +642,28 @@ pub fn functionHasFieldPtrIndex(function: air_export.Function, index: usize) boo
     return false;
 }
 
+pub fn functionHasRetPtrOp(function: air_export.Function) bool {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.isRetPtrOpcode(instruction.opcode)) return true;
+    }
+    return false;
+}
+
+pub fn selectedAggregatePairFirstShape(function: air_export.Function) bool {
+    return functionHasMemoryOp(function, .alloc) and
+        functionHasFieldPtrIndex(function, 0) and
+        functionHasMemoryOp(function, .load) and
+        functionHasReturnOp(function);
+}
+
+pub fn selectedAggregateMakePairShape(function: air_export.Function) bool {
+    return functionHasRetPtrOp(function) and
+        functionHasFieldPtrIndex(function, 0) and
+        functionHasFieldPtrIndex(function, 1) and
+        functionHasStoreOp(function) and
+        functionHasOpcode(function, "ret_load");
+}
+
 pub const UntypedValueSource = union(enum) {
     int: i128,
     ref: u32,
@@ -1275,6 +1297,54 @@ test "AIR model reports semantic operation presence" {
     try std.testing.expect(functionHasCfgOp(function, .block));
     try std.testing.expect(functionHasCfgOp(function, .unreach));
     try std.testing.expect(!functionHasCfgOp(function, .cond_br));
+}
+
+test "AIR model recognizes selected aggregate shapes structurally" {
+    const pair_first_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "alloc", .payload = "*struct", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_0", .payload = "%0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %1!", .category = .memory },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "ret", .payload = "%2!", .category = .return_op },
+    };
+    const pair_first = air_export.Function{
+        .name = "not_named_pair_first",
+        .type_text = "fn () i32",
+        .instruction_count = pair_first_instructions.len,
+        .main_body_count = pair_first_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&pair_first_instructions),
+    };
+    try std.testing.expect(selectedAggregatePairFirstShape(pair_first));
+    try std.testing.expect(!selectedAggregateMakePairShape(pair_first));
+
+    const make_pair_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "ret_ptr", .payload = "*struct", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_0", .payload = "%0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "store", .payload = "%1!, %arg0!", .category = .memory },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_1", .payload = "%0!", .category = .memory },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "store", .payload = "%3!, %arg1!", .category = .memory },
+        .{ .index = 5, .indent = 0, .unused = false, .opcode = "ret_load", .payload = "%0!", .category = .return_op },
+    };
+    const make_pair = air_export.Function{
+        .name = "not_named_make_pair",
+        .type_text = "fn (i32, i32) struct",
+        .instruction_count = make_pair_instructions.len,
+        .main_body_count = make_pair_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&make_pair_instructions),
+    };
+    try std.testing.expect(selectedAggregateMakePairShape(make_pair));
+    try std.testing.expect(!selectedAggregatePairFirstShape(make_pair));
 }
 
 test "AIR model parses untyped AIR value query shapes" {

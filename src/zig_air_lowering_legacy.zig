@@ -749,21 +749,11 @@ fn packedReplaceLowShape(function: air_export.Function) bool {
 }
 
 fn aggregatePairFirstShape(function: air_export.Function) bool {
-    return (std.mem.endsWith(u8, function.name, ".pair_first") or
-        std.mem.endsWith(u8, function.name, ".pairFirst")) and
-        air_model.functionHasMemoryOp(function, .alloc) and
-        air_model.functionHasFieldPtrIndex(function, 0) and
-        air_model.functionHasMemoryOp(function, .load) and
-        air_model.functionHasReturnOp(function);
+    return air_model.selectedAggregatePairFirstShape(function);
 }
 
 fn aggregateMakePairShape(function: air_export.Function) bool {
-    return (std.mem.endsWith(u8, function.name, ".make_pair") or
-        std.mem.endsWith(u8, function.name, ".makePair")) and
-        functionHasOpcode(function, "ret_ptr") and
-        air_model.functionHasFieldPtrIndex(function, 0) and
-        air_model.functionHasFieldPtrIndex(function, 1) and
-        functionHasOpcode(function, "ret_load");
+    return air_model.selectedAggregateMakePairShape(function);
 }
 
 fn maybeErrorShape(function: air_export.Function) bool {
