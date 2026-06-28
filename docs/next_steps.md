@@ -547,11 +547,13 @@ Aggregate/type-layout ownership start:
   aggregate construction and sret/byval make admission on top of provider
   facts. Copy rows must return the typed aggregate argument, and call-wrapper
   rows must pass that aggregate argument to the single call and return that
-  call result. The next ownership slice is to fix the pre-existing strict broad
-  executable blocker in `test/zig/inputs/aggregates.zig`: the dumped
-  `aggregates.slice_sum` IR currently returns `0` on both loop and zero paths,
-  so `distribution-air-release-broad` still exits with `NativeLinkLocalFailure`
-  even though lowering/object counters are clean.
+  call result. The pre-existing strict broad executable blocker in
+  `test/zig/inputs/aggregates.zig` is closed: typed-v2 slice-sum lowering now
+  emits a real loop with index/sum phis, indexed GEP/load, accumulator update,
+  and exit phi instead of returning `0` on both paths. The saved
+  `tmp/broad_aggregates_slice_sum_fix.log` run reports all three release modes
+  with `native_link_accepted_rows=100`, `executable_ok_rows=100`,
+  `native_link_failures=0`, and `local_fail=0`.
 
 Validation after these refactor slices is saved in
 `tmp/frontier_counter_update.log` and
