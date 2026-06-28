@@ -26,9 +26,6 @@ const facts = [_]Fact{
     .{ .name = "aggregate_abi.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
     .{ .name = "runtime_aggregate_pair_main.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
     .{ .name = "expanded_abi_frontier.Pair", .aggregate_text = "{ i32, i32 }", .match = .exact },
-    .{ .name = "Pair64", .aggregate_text = "{ i64, i64 }" },
-    .{ .name = "BigNested", .aggregate_text = "{ { i64, i64, i64 }, { i64, i64, i64 } }" },
-    .{ .name = "BigMixed", .aggregate_text = "{ i64, i32, i64, i32 }" },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {

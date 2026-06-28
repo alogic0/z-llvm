@@ -83,8 +83,8 @@ construction admission validates operands against the same plan before using
 typed AIR pointer paths for insertvalue indices. SysV classification consumes
 the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
 of the basename compatibility table and records layout source, field count,
-scalar leaves, and construction/store/load evidence. The owned slice has 39
-exported sidecar facts, 6 temporary static source layout facts in
+scalar leaves, and construction/store/load evidence. The owned slice has 42
+exported sidecar facts, 3 temporary static source layout facts in
 `src/zig_air_aggregate_layout_facts.zig`, plus generated
 `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
 Big3..Big20 rows and the 12 current Big32..Big256 array-leaf rows; those rows
@@ -109,7 +109,10 @@ provider. That sidecar now owns `frontier_nested_records.Inner`,
 `frontier_sysv_aggregate_classes.NestedMixed`,
 `frontier_sysv_aggregate_classes.SmallMixed`,
 `frontier_sysv_aggregate_classes.SmallReverseMixed`,
+`frontier_sysv_abi.Pair64`,
 `frontier_sysv_sret_byval.NarrowInner`,
+`frontier_sysv_sret_byval.BigNested`,
+`frontier_sysv_sret_byval.BigMixed`,
 `frontier_sysv_sret_byval.BigNarrow`,
 `frontier_sysv_sret_byval.BigDouble`, and
 `frontier_sysv_sret_byval.BigFloat`,
@@ -140,7 +143,7 @@ directly. Exported facts are checked against lower-priority static/generated
 evidence for the same nominal layout, and owned summaries are checked against
 any still-present fallback equivalent; conflicts fail closed on field/leaf-count
 mismatch. Remaining aggregate
-layout debt is explicit: the compatibility fallback table is empty, while 6
+layout debt is explicit: the compatibility fallback table is empty, while 3
 temporary static source facts still stand in for future Zig-exported field
 facts or broader construction/store/load inference. The 2 packed/unaligned targeted
 entries are boundary-owned through `src/zig_air_aggregate_layout_boundaries.zig`

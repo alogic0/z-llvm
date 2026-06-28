@@ -493,6 +493,9 @@ fn installTestExportedAggregateProvider() !exported_aggregate_layout_facts.Provi
         "fact nominal=\"frontier_sysv_aggregate_classes.NestedMixed\" aggregate=\"{ { i32, i32 }, double }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_aggregate_classes.SmallMixed\" aggregate=\"{ i32, double }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_aggregate_classes.SmallReverseMixed\" aggregate=\"{ double, i32 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_abi.Pair64\" aggregate=\"{ i64, i64 }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.BigNested\" aggregate=\"{ { i64, i64, i64 }, { i64, i64, i64 } }\" construction=1 store=1 load=1\n" ++
+        "fact nominal=\"frontier_sysv_sret_byval.BigMixed\" aggregate=\"{ i64, i32, i64, i32 }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.BigArray\" aggregate=\"{ [5 x i64] }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.BigDoubleArray\" aggregate=\"{ [3 x double] }\" construction=1 store=1 load=1\n" ++
         "fact nominal=\"frontier_sysv_sret_byval.BigFloatArray\" aggregate=\"{ [5 x float] }\" construction=1 store=1 load=1\n" ++
@@ -515,12 +518,17 @@ fn installTestExportedAggregateProvider() !exported_aggregate_layout_facts.Provi
     return exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
 }
 
-test "type layout decodes nominal aggregate basenames without fixture module names" {
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, i64 }" }, parseNamedAggregateType("any_module.Pair64").?);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, i64 }" }, parseNamedAggregateType("%Pair64").?);
+test "type layout decodes exact aggregate facts and generated names" {
+    const provider = try installTestExportedAggregateProvider();
+    exported_aggregate_layout_facts.setActiveProvider(provider);
+    defer provider.deinit(std.testing.allocator);
+    defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+
+    try std.testing.expect(parseNamedAggregateType("frontier_sysv_abi.Pair64").?.eql(.{ .aggregate = "{ i64, i64 }" }));
+    try std.testing.expect(parseNamedAggregateType("any_module.Pair64") == null);
     try std.testing.expect(parseNamedAggregateType("*frontier_sysv_aggregate_classes.Mixed") == null);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ { i64, i64, i64 }, { i64, i64, i64 } }" }, parseNamedAggregateType("frontier_sysv_sret_byval.BigNested").?);
-    try std.testing.expectEqual(ir.Type{ .aggregate = "{ i64, i32, i64, i32 }" }, parseNamedAggregateType("other.BigMixed").?);
+    try std.testing.expect(parseNamedAggregateType("frontier_sysv_sret_byval.BigNested").?.eql(.{ .aggregate = "{ { i64, i64, i64 }, { i64, i64, i64 } }" }));
+    try std.testing.expect(parseNamedAggregateType("other.BigMixed") == null);
     try std.testing.expect(parseNamedAggregateType("%frontier_sysv_sret_byval.Big3").?.eql(.{ .aggregate = "{ i64, i64, i64 }" }));
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("aggregate_abi.Pair").?);
     try std.testing.expectEqual(ir.Type{ .aggregate = "{ i32, i32 }" }, parseNamedAggregateType("%runtime_aggregate_pair_main.Pair").?);
@@ -546,10 +554,10 @@ test "type layout prefers exported facts and inference before fallback table" {
 
     try std.testing.expect(aggregateLayoutSummary("other.Outer") == null);
 
-    const big_mixed = aggregateLayoutSummary("any_module.BigMixed").?;
-    try std.testing.expectEqual(AggregateLayoutSource.facts, big_mixed.source);
-    try std.testing.expectEqual(AggregateLayoutProviderKind.static_source_facts, big_mixed.provider_kind.?);
-    try std.testing.expect(aggregateLayoutMismatch("any_module.BigMixed") == null);
+    const pair = aggregateLayoutSummary("aggregate_abi.Pair").?;
+    try std.testing.expectEqual(AggregateLayoutSource.facts, pair.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.static_source_facts, pair.provider_kind.?);
+    try std.testing.expect(aggregateLayoutMismatch("aggregate_abi.Pair") == null);
 }
 
 test "type layout prefers active exported facts before temporary static source facts" {
@@ -567,14 +575,14 @@ test "type layout prefers active exported facts before temporary static source f
 test "type layout fails closed when exported fact conflicts with lower-priority evidence" {
     const contents =
         exported_aggregate_layout_facts.section_name ++ "\n" ++
-        "fact nominal=\"Pair64\" aggregate=\"{ i64, double }\" construction=1 store=1 load=1\n";
+        "fact nominal=\"aggregate_abi.Pair\" aggregate=\"{ i64, double }\" construction=1 store=1 load=1\n";
     const provider = try exported_aggregate_layout_facts.parseSidecar(std.testing.allocator, contents);
     exported_aggregate_layout_facts.setActiveProvider(provider);
     defer provider.deinit(std.testing.allocator);
     defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
 
-    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("Pair64"));
-    const mismatch = aggregateLayoutMismatch("Pair64").?;
+    try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("aggregate_abi.Pair"));
+    const mismatch = aggregateLayoutMismatch("aggregate_abi.Pair").?;
     try std.testing.expectEqual(@as(usize, 2), mismatch.inferred_leaf_count);
     try std.testing.expectEqual(@as(usize, 2), mismatch.fallback_leaf_count);
 }
@@ -638,6 +646,11 @@ test "type layout infers representative frontier aggregate rows" {
 }
 
 test "type layout keeps packed aggregates compatibility boundary owned" {
+    const provider = try installTestExportedAggregateProvider();
+    exported_aggregate_layout_facts.setActiveProvider(provider);
+    defer provider.deinit(std.testing.allocator);
+    defer exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+
     const packed_summary = aggregateLayoutSummary("frontier_sysv_aggregate_classes.PackedMixed").?;
     try std.testing.expectEqual(AggregateLayoutSource.boundary, packed_summary.source);
     try std.testing.expectEqual(AggregateLayoutProviderKind.boundary_provider, packed_summary.provider_kind.?);
@@ -645,6 +658,7 @@ test "type layout keeps packed aggregates compatibility boundary owned" {
 
     const big_mixed = aggregateLayoutSummary("frontier_sysv_sret_byval.BigMixed").?;
     try std.testing.expectEqual(AggregateLayoutSource.facts, big_mixed.source);
+    try std.testing.expectEqual(AggregateLayoutProviderKind.exported_aggregate_facts, big_mixed.provider_kind.?);
     try std.testing.expectEqual(@as(usize, 4), big_mixed.leaf_count);
 }
 
