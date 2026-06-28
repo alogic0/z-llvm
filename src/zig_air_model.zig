@@ -693,6 +693,41 @@ pub fn selectedErrorClassifyShape(function: air_export.Function) bool {
         !functionHasErrorUnionOp(function, .unwrap_payload);
 }
 
+pub fn selectedBase64TableLookupShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "bit_and") and
+        (functionHasOpcode(function, "intcast") or functionHasOpcode(function, "intcast_safe")) and
+        functionHasOpcode(function, "array_elem_val") and
+        functionHasReturnOp(function);
+}
+
+pub fn selectedRuntimeOptionalPointerMainShape(function: air_export.Function) bool {
+    return functionHasCallOp(function) and
+        functionHasOpcode(function, "cmp_eq") and
+        functionHasCfgOp(function, .block) and
+        functionHasCfgOp(function, .cond_br) and
+        functionHasReturnOp(function) and
+        !functionHasMemoryOp(function, .load);
+}
+
+pub fn selectedRuntimePointerLoadStoreMainShape(function: air_export.Function) bool {
+    return functionHasCallOp(function) and
+        functionHasMemoryOp(function, .load) and
+        functionHasOpcode(function, "cmp_eq") and
+        functionHasCfgOp(function, .block) and
+        functionHasCfgOp(function, .cond_br) and
+        functionHasReturnOp(function);
+}
+
+pub fn selectedMixCAddMayPanicShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "cmp_lt") and
+        functionHasCfgOp(function, .cond_br) and
+        functionHasCallOp(function) and
+        functionHasCfgOp(function, .unreach) and
+        functionHasMemoryOp(function, .load) and
+        (functionHasOpcode(function, "add") or functionHasOpcode(function, "add_safe")) and
+        functionHasReturnOp(function);
+}
+
 pub const UntypedValueSource = union(enum) {
     int: i128,
     ref: u32,
@@ -1461,6 +1496,100 @@ test "AIR model recognizes selected error and switch shapes structurally" {
         .instructions = @constCast(&maybe_instructions),
     };
     try std.testing.expect(selectedMaybeErrorShape(maybe));
+}
+
+test "AIR model recognizes selected table lookup and runtime wrapper shapes structurally" {
+    const table_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "bit_and", .payload = "%arg0!, <i32, 63>", .category = .arithmetic },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "intcast", .payload = "%0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "array_elem_val", .payload = "@table, %1!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "ret", .payload = "%2!", .category = .return_op },
+    };
+    const table = air_export.Function{
+        .name = "not_named_table_lookup",
+        .type_text = "fn (u8) u8",
+        .instruction_count = table_instructions.len,
+        .main_body_count = table_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&table_instructions),
+    };
+    try std.testing.expect(selectedBase64TableLookupShape(table));
+
+    const optional_wrapper_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "cmp_eq", .payload = "%0!, <i32, 0>", .category = .comparison },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "block", .payload = "", .category = .control_flow },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%1!, then_body, else_body", .category = .control_flow },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%0!", .category = .return_op },
+    };
+    const optional_wrapper = air_export.Function{
+        .name = "not_named_optional_wrapper",
+        .type_text = "fn () i32",
+        .instruction_count = optional_wrapper_instructions.len,
+        .main_body_count = optional_wrapper_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&optional_wrapper_instructions),
+    };
+    try std.testing.expect(selectedRuntimeOptionalPointerMainShape(optional_wrapper));
+    try std.testing.expect(!selectedRuntimePointerLoadStoreMainShape(optional_wrapper));
+
+    const load_store_wrapper_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "cmp_eq", .payload = "%1!, <i32, 0>", .category = .comparison },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "block", .payload = "", .category = .control_flow },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%2!, then_body, else_body", .category = .control_flow },
+        .{ .index = 5, .indent = 0, .unused = false, .opcode = "ret", .payload = "%1!", .category = .return_op },
+    };
+    const load_store_wrapper = air_export.Function{
+        .name = "not_named_pointer_wrapper",
+        .type_text = "fn () i32",
+        .instruction_count = load_store_wrapper_instructions.len,
+        .main_body_count = load_store_wrapper_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&load_store_wrapper_instructions),
+    };
+    try std.testing.expect(selectedRuntimePointerLoadStoreMainShape(load_store_wrapper));
+    try std.testing.expect(!selectedRuntimeOptionalPointerMainShape(load_store_wrapper));
+
+    const panic_edge_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "load", .payload = "i32, %arg0!", .category = .memory },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "cmp_lt", .payload = "%0!, <i32, 0>", .category = .comparison },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%1!, then_body, else_body", .category = .control_flow },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "call", .payload = "debug.defaultPanic", .category = .call },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "unreach", .payload = "", .category = .control_flow },
+        .{ .index = 5, .indent = 0, .unused = false, .opcode = "add_safe", .payload = "%0!, %arg1!", .category = .arithmetic },
+        .{ .index = 6, .indent = 0, .unused = false, .opcode = "ret", .payload = "%5!", .category = .return_op },
+    };
+    const panic_edge = air_export.Function{
+        .name = "not_named_add_may_panic",
+        .type_text = "fn () i32",
+        .instruction_count = panic_edge_instructions.len,
+        .main_body_count = panic_edge_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&panic_edge_instructions),
+    };
+    try std.testing.expect(selectedMixCAddMayPanicShape(panic_edge));
 }
 
 test "AIR model parses untyped AIR value query shapes" {

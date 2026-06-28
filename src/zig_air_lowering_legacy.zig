@@ -767,41 +767,19 @@ pub fn errorClassifyShape(function: air_export.Function) bool {
 }
 
 pub fn base64TableLookupShape(function: air_export.Function) bool {
-    return std.mem.endsWith(u8, function.name, ".base64_table_lookup") and
-        functionHasOpcode(function, "bit_and") and
-        (functionHasOpcode(function, "intcast") or functionHasOpcode(function, "intcast_safe")) and
-        functionHasOpcode(function, "array_elem_val") and
-        air_model.functionHasReturnOp(function);
+    return air_model.selectedBase64TableLookupShape(function);
 }
 
 pub fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
-    return std.mem.eql(u8, function.name, "runtime_optional_pointer_main.main") and
-        air_model.functionHasCallOp(function) and
-        functionHasOpcode(function, "cmp_eq") and
-        air_model.functionHasCfgOp(function, .block) and
-        air_model.functionHasCfgOp(function, .cond_br) and
-        air_model.functionHasReturnOp(function);
+    return air_model.selectedRuntimeOptionalPointerMainShape(function);
 }
 
 pub fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
-    return std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.main") and
-        air_model.functionHasCallOp(function) and
-        air_model.functionHasMemoryOp(function, .load) and
-        functionHasOpcode(function, "cmp_eq") and
-        air_model.functionHasCfgOp(function, .block) and
-        air_model.functionHasCfgOp(function, .cond_br) and
-        air_model.functionHasReturnOp(function);
+    return air_model.selectedRuntimePointerLoadStoreMainShape(function);
 }
 
 pub fn mixCAddMayPanicShape(function: air_export.Function) bool {
-    return std.mem.endsWith(u8, function.name, ".add_may_panic") and
-        functionHasOpcode(function, "cmp_lt") and
-        air_model.functionHasCfgOp(function, .cond_br) and
-        air_model.functionHasCallOp(function) and
-        air_model.functionHasCfgOp(function, .unreach) and
-        air_model.functionHasMemoryOp(function, .load) and
-        (functionHasOpcode(function, "add") or functionHasOpcode(function, "add_safe")) and
-        air_model.functionHasReturnOp(function);
+    return air_model.selectedMixCAddMayPanicShape(function);
 }
 
 pub fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
