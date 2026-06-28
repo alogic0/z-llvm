@@ -83,8 +83,8 @@ construction admission validates operands against the same plan before using
 typed AIR pointer paths for insertvalue indices. SysV classification consumes
 the same normalized aggregate type. `AggregateLayoutSummary` now sits in front
 of the basename compatibility table and records layout source, field count,
-scalar leaves, and construction/store/load evidence. The owned slice has 16
-exported sidecar facts, 29 temporary static source layout facts in
+scalar leaves, and construction/store/load evidence. The owned slice has 20
+exported sidecar facts, 25 temporary static source layout facts in
 `src/zig_air_aggregate_layout_facts.zig`, plus generated
 `frontier_sysv_sret_byval.BigN` inference rules for the 9 scalar
 Big3..Big20 rows and the 12 current Big32..Big256 array-leaf rows; those rows
@@ -107,8 +107,12 @@ provider. That sidecar now owns `frontier_nested_records.Inner`,
 `frontier_sysv_aggregate_classes.DoubleBox`,
 `frontier_sysv_aggregate_classes.NestedDouble`,
 `frontier_sysv_aggregate_classes.NestedMixed`,
-`frontier_sysv_aggregate_classes.SmallMixed`, and
-`frontier_sysv_aggregate_classes.SmallReverseMixed`; those duplicate entries were
+`frontier_sysv_aggregate_classes.SmallMixed`,
+`frontier_sysv_aggregate_classes.SmallReverseMixed`,
+`frontier_sysv_sret_byval.NarrowInner`,
+`frontier_sysv_sret_byval.BigNarrow`,
+`frontier_sysv_sret_byval.BigDouble`, and
+`frontier_sysv_sret_byval.BigFloat`; those duplicate entries were
 removed from the temporary static provider after the strict frontier gate stayed
 green. The contract has fail-closed sidecar parsing and an active provider hook.
 `AggregateLayoutSummary.provider_kind` records exported-fact,
@@ -117,7 +121,7 @@ directly. Exported facts are checked against lower-priority static/generated
 evidence for the same nominal layout, and owned summaries are checked against
 any still-present fallback equivalent; conflicts fail closed on field/leaf-count
 mismatch. Remaining aggregate
-layout debt is explicit: the compatibility fallback table is empty, while 29
+layout debt is explicit: the compatibility fallback table is empty, while 25
 temporary static source facts still stand in for future Zig-exported field
 facts or broader construction/store/load inference. The 2 packed/unaligned targeted
 entries are boundary-owned through `src/zig_air_aggregate_layout_boundaries.zig`

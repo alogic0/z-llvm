@@ -15,3 +15,7 @@ fact nominal="frontier_sysv_aggregate_classes.NestedDouble" aggregate="{ { doubl
 fact nominal="frontier_sysv_aggregate_classes.NestedMixed" aggregate="{ { i32, i32 }, double }" construction=1 store=1 load=1
 fact nominal="frontier_sysv_aggregate_classes.SmallMixed" aggregate="{ i32, double }" construction=1 store=1 load=1
 fact nominal="frontier_sysv_aggregate_classes.SmallReverseMixed" aggregate="{ double, i32 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.NarrowInner" aggregate="{ i16, i32 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigNarrow" aggregate="{ i8, { i16, i32 }, i64 }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigDouble" aggregate="{ double, double, double }" construction=1 store=1 load=1
+fact nominal="frontier_sysv_sret_byval.BigFloat" aggregate="{ float, float, float, float, float }" construction=1 store=1 load=1
