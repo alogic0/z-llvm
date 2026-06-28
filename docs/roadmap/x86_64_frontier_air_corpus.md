@@ -160,11 +160,10 @@ green. The contract has fail-closed sidecar parsing and an active provider hook.
 `AggregateLayoutSummary.provider_kind` records exported-fact,
 static-source-fact, or boundary-provider ownership
 directly. Exported facts are checked against lower-priority static or boundary
-evidence for the same nominal layout, and owned summaries are checked against
-any still-present fallback equivalent; conflicts fail closed on field/leaf-count
+evidence for the same nominal layout; conflicts fail closed on field/leaf-count
 mismatch. Remaining aggregate
-layout debt is explicit: the compatibility fallback table and temporary static
-source fact provider are empty. The 2 packed/unaligned targeted
+layout debt is explicit: the compatibility fallback table has been removed, and
+the temporary static source fact provider is empty. The 2 packed/unaligned targeted
 entries are boundary-owned through `src/zig_air_aggregate_layout_boundaries.zig`
 rather than fallback-owned.
 Register aggregate

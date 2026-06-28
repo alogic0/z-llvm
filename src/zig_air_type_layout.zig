@@ -28,7 +28,6 @@ pub const AggregateLayoutPlan = struct {
 pub const AggregateLayoutSource = enum {
     facts,
     inference,
-    fallback_table,
     boundary,
 };
 
@@ -79,9 +78,9 @@ const aggregate_layout_providers = [_]AggregateLayoutProvider{
 pub const AggregateLayoutMismatch = struct {
     nominal_type_name: []const u8,
     inferred_field_count: usize,
-    fallback_field_count: usize,
+    conflicting_field_count: usize,
     inferred_leaf_count: usize,
-    fallback_leaf_count: usize,
+    conflicting_leaf_count: usize,
     evidence: AggregateLayoutEvidence,
 };
 
@@ -125,26 +124,16 @@ pub fn aggregateLayoutMismatch(text: []const u8) ?AggregateLayoutMismatch {
     if (conflictingOwnedAggregateLayoutSummary(nominal, inferred)) |conflict| {
         return aggregateLayoutMismatchFromSummaries(nominal, inferred, conflict);
     }
-    const fallback_ty = fallbackNamedAggregateType(nominal) orelse return null;
-    const fallback = summarizeAggregateLayout(nominal, fallback_ty, .fallback_table, .{});
-    if (aggregateLayoutSummariesEquivalent(inferred, fallback)) return null;
-    return aggregateLayoutMismatchFromSummaries(nominal, inferred, fallback);
+    return null;
 }
 
 fn aggregateLayoutSummaryForNominal(nominal: []const u8) error{AggregateLayoutMismatch}!?AggregateLayoutSummary {
     if (ownedAggregateLayoutSummary(nominal)) |summary| {
         if (conflictingOwnedAggregateLayoutSummary(nominal, summary) != null) return error.AggregateLayoutMismatch;
-        if (fallbackNamedAggregateType(nominal)) |fallback_ty| {
-            const fallback = summarizeAggregateLayout(nominal, fallback_ty, .fallback_table, .{});
-            if (!aggregateLayoutSummariesEquivalent(summary, fallback)) return error.AggregateLayoutMismatch;
-        }
         return summary;
     }
     if (boundaryNamedAggregateType(nominal)) |ty| {
         return boundaryAggregateLayoutSummary(nominal, ty);
-    }
-    if (fallbackNamedAggregateType(nominal)) |ty| {
-        return summarizeAggregateLayout(nominal, ty, .fallback_table, .{});
     }
     return null;
 }
@@ -166,14 +155,14 @@ fn conflictingOwnedAggregateLayoutSummary(nominal: []const u8, selected: Aggrega
 fn aggregateLayoutMismatchFromSummaries(
     nominal: []const u8,
     inferred: AggregateLayoutSummary,
-    fallback: AggregateLayoutSummary,
+    conflicting: AggregateLayoutSummary,
 ) AggregateLayoutMismatch {
     return .{
         .nominal_type_name = nominal,
         .inferred_field_count = inferred.field_count,
-        .fallback_field_count = fallback.field_count,
+        .conflicting_field_count = conflicting.field_count,
         .inferred_leaf_count = inferred.leaf_count,
-        .fallback_leaf_count = fallback.leaf_count,
+        .conflicting_leaf_count = conflicting.leaf_count,
         .evidence = inferred.evidence,
     };
 }
@@ -201,11 +190,6 @@ fn sourceFactAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary
         .store = fact.evidence.store,
         .load = fact.evidence.load,
     }), .static_source_facts);
-}
-
-fn fallbackNamedAggregateType(nominal: []const u8) ?ir.Type {
-    _ = nominal;
-    return null;
 }
 
 fn boundaryNamedAggregateType(nominal: []const u8) ?ir.Type {
@@ -560,7 +544,7 @@ test "type layout fails closed when exported fact conflicts with lower-priority 
     try std.testing.expectError(error.AggregateLayoutMismatch, aggregateLayoutSummaryChecked("frontier_sysv_aggregate_classes.PackedMixed"));
     const mismatch = aggregateLayoutMismatch("frontier_sysv_aggregate_classes.PackedMixed").?;
     try std.testing.expectEqual(@as(usize, 2), mismatch.inferred_leaf_count);
-    try std.testing.expectEqual(@as(usize, 3), mismatch.fallback_leaf_count);
+    try std.testing.expectEqual(@as(usize, 3), mismatch.conflicting_leaf_count);
 }
 
 test "type layout infers representative frontier aggregate rows" {

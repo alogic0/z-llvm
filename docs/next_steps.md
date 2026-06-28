@@ -279,17 +279,17 @@ Execution order:
    insertvalue index paths because the layout plan owns offsets/types rather
    than AIR instruction paths. `AggregateLayoutSummary` now records layout
    source, field count, scalar leaves, and construction/store/load evidence.
-   It is consulted before the basename compatibility table, so
-   the first broad easy-layout slice is no longer fallback-table-owned. The
+   The basename compatibility table has been removed, so no accepted aggregate
+   row can enter through fallback-table ownership. The
    owned side now has 66 exported sidecar facts and 0 temporary static source
    layout facts in `src/zig_air_aggregate_layout_facts.zig`. The finite
    `frontier_sysv_sret_byval.BigN` rows are source-owned sidecar facts rather
    than generated nominal inference. The
-   fallback side is empty; `PackedMixed` and `PackedReverseMixed` are
+   compatibility fallback side is removed; `PackedMixed` and `PackedReverseMixed` are
    boundary-owned through `src/zig_air_aggregate_layout_boundaries.zig`, not
    fallback-owned.
-   Owned summaries are compared against any still-present compatibility
-   fallback; a disagreement fails closed with nominal name, field-count,
+   Owned summaries are compared against lower-priority static or boundary
+   evidence; a disagreement fails closed with nominal name, field-count,
    leaf-count, and construction/store/load evidence available through
    `aggregateLayoutMismatch`. Register aggregate construction no longer admits
    rows from nominal layout alone: it mechanically rebuilds a layout summary
@@ -511,7 +511,7 @@ Aggregate/type-layout ownership start:
   is layout-owned as `{ i32, i32 }`, the runtime aggregate-pair compatibility
   lowerers now admit by normalized layout and data-flow structure instead of
   exact aggregate-pair symbol names. `AggregateLayoutSummary` now separates
-  static source facts, fallback-table layouts, and boundary-owned layouts.
+  static source facts and boundary-owned layouts.
   Owned layout lookup goes through a provider registry: exported aggregate
   layout facts first, then the temporary static source-fact provider in
   `src/zig_air_aggregate_layout_facts.zig`. The exported fact contract lives in
@@ -666,8 +666,8 @@ Aggregate/type-layout ownership start:
     `frontier_sysv_sret_byval.Big192`,
     `frontier_sysv_sret_byval.Big224`, and
     `frontier_sysv_sret_byval.Big256`.
-  - Remaining fallback-table compatibility entries:
-    none.
+  - Compatibility fallback table:
+    removed.
   - Boundary-owned aggregate layouts:
     `PackedMixed` and `PackedReverseMixed`.
   - `PackedMixed` and `PackedReverseMixed` stay boundary-owned through
@@ -729,13 +729,13 @@ Validation after these refactor slices is saved in
   replaced by normalized `{ i32, i32 }` layout and structural call/data-flow
   checks. `AggregateLayoutSummary` now records whether a layout came from
   exported aggregate facts, static source facts, a
-  boundary, or the compatibility table; owned layout lookup now goes through a
+  boundary; owned layout lookup now goes through a
   provider registry, and
   `AggregateLayoutSummary.provider_kind` records the provider that supplied the
   layout so future exported Zig field facts can replace the static
   source-fact provider module without changing lowering callers. Finite BigN
   rows are now exported sidecar facts, and mismatch checking compares owned field/leaf counts
-  against any remaining fallback entry. Register aggregate construction now also has
+  against lower-priority static or boundary evidence. Register aggregate construction now also has
   mechanical typed-AIR
   inference for ret_ptr/field-or-element pointer/store/ret_load rows, including
   single-field array leaf reconstruction; register construction and direct sret
@@ -744,10 +744,9 @@ Validation after these refactor slices is saved in
   gates sret/byval make rows. Sret/byval copy rows mechanically validate that
   the terminal return is the typed aggregate argument, and sret/byval
   call-wrapper rows validate that the aggregate argument feeds the call and the
-  aggregate terminal return is produced by that call. The remaining nominal
-  table entries require exported field-layout facts or broader
-  construction/store/load inference before they can leave compatibility
-  ownership.
+  aggregate terminal return is produced by that call. Remaining non-exported
+  aggregate ownership work now requires exported field-layout facts or broader
+  construction/store/load inference, not compatibility fallback table entries.
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.

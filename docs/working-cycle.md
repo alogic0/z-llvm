@@ -144,7 +144,7 @@ For aggregate layout ownership:
   planning code, not in the generic fact contract.
 - Provider precedence should be explicit:
   `exported_fact > temporary_static_facts > boundary > missing`.
-- Compatibility fallback entries should remain at zero.
+- Compatibility fallback table plumbing should remain removed.
 - Generated inference is currently not an active aggregate layout provider; use
   function-local inference only as validation/bridging evidence, not as a
   nominal lookup source.
@@ -164,7 +164,7 @@ exported_facts=N
 temporary_static_facts=N
 generated_inference_examples=N
 boundary_provider=N
-fallback_entries=N
+fallback_table=removed
 frontier_source_rows=N
 frontier_functions=N
 frontier_executable_ok_rows=N
@@ -177,7 +177,7 @@ Measurable forward progress means:
 
 - `temporary_static_facts` goes down;
 - `exported_facts` goes up;
-- `fallback_entries` stays `0`;
+- `fallback_table` stays `removed`;
 - x86_64-specific assumptions remain in explicit x86_64/ABI/provider code;
 - `frontier_local_fail` stays `0`;
 - `boundary_unexpected_accept_rows` stays `0`;
@@ -194,13 +194,13 @@ Example cycle result:
 Before:
 exported_facts=0
 temporary_static_facts=45
-fallback_entries=0
+fallback_table=removed
 frontier_local_fail=0
 
 After:
 exported_facts=3
 temporary_static_facts=42
-fallback_entries=0
+fallback_table=removed
 frontier_local_fail=0
 ```
 

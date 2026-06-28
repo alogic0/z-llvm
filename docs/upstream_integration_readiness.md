@@ -832,9 +832,9 @@ green. The contract has fail-closed sidecar parsing and an active provider hook.
 static-source-fact, or boundary-provider ownership
 directly. Exported facts are checked against lower-priority static or boundary
 evidence for the same nominal layout, and owned summaries fail closed if their
-field/leaf counts disagree with any remaining fallback equivalent. Remaining
-aggregate layout debt is explicit: the compatibility fallback table and
-temporary static source fact provider are empty.
+field/leaf counts disagree with lower-priority static or boundary evidence.
+Remaining aggregate layout debt is explicit: the compatibility fallback table
+has been removed, and the temporary static source fact provider is empty.
 Packed/unaligned aggregate ABI remains a 2-row targeted boundary through
 `src/zig_air_aggregate_layout_boundaries.zig` rather than a fallback layout.
 Register
@@ -847,9 +847,9 @@ function-local construction evidence rather than nominal layout facts alone.
 Sret/byval copy rows now also prove the
 terminal return is the typed aggregate argument, and sret/byval call-wrapper
 rows prove that the typed aggregate argument feeds the single call and that the
-aggregate terminal return is produced by that call. The static
-source-aggregate facts table and the smaller compatibility fallback table still
-remain; replacing those entries with exported Zig field facts or broader
+aggregate terminal return is produced by that call. The static source-aggregate
+facts table is currently empty, and the compatibility fallback table has been
+removed; replacing sidecar facts with exported Zig field facts or broader
 function-local inference is the next ownership step.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
