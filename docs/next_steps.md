@@ -383,12 +383,22 @@ Completed slices from this inventory:
   lowerer bodies still emit selected compatibility helper/global symbol names;
   that is a separate runtime-symbol cleanup, not accepted recognizer
   admission.
+- The selected aggregate pair, error-switch/classify, maybe-error,
+  error-union payload, table-lookup, runtime-wrapper, and panic-edge
+  compatibility recognizers now use model-owned data-flow summaries rather
+  than broad opcode-presence checks. The summaries return concrete instruction
+  indexes/value refs for producer-consumer paths such as ret-ptr-to-field
+  stores, field-load-to-return, mask-to-intcast-to-table-load-to-return,
+  error-union unwrap-to-switch, call-result-to-compare-to-condbr, and
+  panic-predicate-to-cold-call/unreach plus hot load/add/return.
 - Current scan status: `src/zig_air_lowering_legacy.zig` has no
   function-name-specific accepted recognizer gates for the aggregate,
   error/switch, table-lookup, runtime-wrapper, or panic-edge selected shapes.
-  Remaining debt is local text/shape parsing in integer-switch, optional/slice,
-  packed, array/struct aggregate, and compatibility runtime-wrapper lowerer
-  bodies.
+  Remaining presence-based compatibility predicates are integer-switch text
+  parsing, optional pointer/payload, slice sum, packed read/replace, and
+  array/struct aggregate sum checks. Compatibility runtime-wrapper lowerer
+  bodies still emit fixed helper/global symbol names even though admission is
+  now model/data-flow owned.
 
 Validation after these refactor slices:
 

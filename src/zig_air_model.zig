@@ -649,83 +649,435 @@ pub fn functionHasRetPtrOp(function: air_export.Function) bool {
     return false;
 }
 
+pub const TableLookupSummary = struct {
+    index_source: u32,
+    mask_or_narrow: u32,
+    index_cast: u32,
+    table_access: u32,
+    return_value: u32,
+};
+
+pub const ErrorSwitchSummary = struct {
+    kind: enum { payload, maybe_error, switch_dispatch, classify },
+    condition: ?u32 = null,
+    error_union_value: ?u32 = null,
+    extracted_value: ?u32 = null,
+    switch_br: ?u32 = null,
+    return_value: ?u32 = null,
+};
+
+pub const RuntimeWrapperSummary = struct {
+    kind: enum { optional_pointer_main, pointer_load_store_main },
+    call: u32,
+    compare: u32,
+    cond_br: u32,
+    block: u32,
+    load: ?u32 = null,
+    return_value: ?u32 = null,
+};
+
+pub const PanicEdgeSummary = struct {
+    predicate: u32,
+    cond_br: u32,
+    panic_call: u32,
+    unreach: u32,
+    load: u32,
+    add: u32,
+    return_value: u32,
+};
+
+pub const AggregatePairSummary = struct {
+    kind: enum { first, make },
+    base_ptr: u32,
+    field0_ptr: u32,
+    field1_ptr: ?u32 = null,
+    field0_value: ?u32 = null,
+    field1_value: ?u32 = null,
+    return_value: u32,
+};
+
+fn untypedFieldPtrIndex(instruction: air_export.Instruction) ?usize {
+    const prefix = "struct_field_ptr_index_";
+    if (!std.mem.startsWith(u8, instruction.opcode, prefix)) return null;
+    return std.fmt.parseInt(usize, instruction.opcode[prefix.len..], 10) catch null;
+}
+
+fn untypedFirstRefOperand(instruction: air_export.Instruction) ?u32 {
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    return air_text.instructionRef(fields.next() orelse return null);
+}
+
+fn untypedSecondRefOperand(instruction: air_export.Instruction) ?u32 {
+    var fields = air_text.splitTopLevel(instruction.payload, ',');
+    _ = fields.next() orelse return null;
+    return air_text.instructionRef(fields.next() orelse return null);
+}
+
+fn untypedFieldPtrBase(instruction: air_export.Instruction, field_index: usize) ?u32 {
+    if (untypedFieldPtrIndex(instruction) != field_index) return null;
+    return untypedFirstRefOperand(instruction);
+}
+
+fn untypedCastSource(instruction: air_export.Instruction) ?u32 {
+    if (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode) != .cast) return null;
+    return untypedSecondRefOperand(instruction);
+}
+
+fn untypedSwitchInput(instruction: air_export.Instruction) ?u32 {
+    if (!air_capabilities.isSwitchBrOpcode(instruction.opcode)) return null;
+    return untypedFirstRefOperand(instruction);
+}
+
+fn untypedCondBrInput(instruction: air_export.Instruction) ?u32 {
+    return untypedBranchConditionRef(instruction);
+}
+
+fn untypedArrayElemIndex(instruction: air_export.Instruction) ?u32 {
+    if (!std.mem.eql(u8, instruction.opcode, "array_elem_val")) return null;
+    return untypedSecondRefOperand(instruction);
+}
+
+fn untypedValueFeedsReturn(function: air_export.Function, value: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (untypedReturnRef(instruction)) |returned| {
+            if (returned == value) return returned;
+            const returned_instruction = untypedInstructionByIndex(function, returned) orelse continue;
+            if (untypedCastSource(returned_instruction) == value) return returned;
+        }
+    }
+    return null;
+}
+
+fn untypedFindFieldPtrFromBase(function: air_export.Function, base: u32, field_index: usize) ?u32 {
+    for (function.instructions) |instruction| {
+        if (untypedFieldPtrBase(instruction, field_index) == base) return instruction.index;
+    }
+    return null;
+}
+
+fn untypedFindStoreToSlot(function: air_export.Function, slot: u32) ?UntypedStore {
+    for (function.instructions) |instruction| {
+        const store = untypedStore(instruction) orelse continue;
+        if (store.slot == slot) return store;
+    }
+    return null;
+}
+
+pub fn aggregatePairFirstSummary(function: air_export.Function) ?AggregatePairSummary {
+    for (function.instructions) |alloc| {
+        if (!air_capabilities.isAllocOpcode(alloc.opcode)) continue;
+        const field0 = untypedFindFieldPtrFromBase(function, alloc.index, 0) orelse continue;
+        const load = untypedFindAnyLoadFromSlot(function, field0) orelse continue;
+        const returned = untypedValueFeedsReturn(function, load) orelse continue;
+        return .{
+            .kind = .first,
+            .base_ptr = alloc.index,
+            .field0_ptr = field0,
+            .field0_value = load,
+            .return_value = returned,
+        };
+    }
+    return null;
+}
+
+pub fn aggregateMakePairSummary(function: air_export.Function) ?AggregatePairSummary {
+    for (function.instructions) |ret_ptr| {
+        if (!air_capabilities.isRetPtrOpcode(ret_ptr.opcode)) continue;
+        const field0 = untypedFindFieldPtrFromBase(function, ret_ptr.index, 0) orelse continue;
+        const field1 = untypedFindFieldPtrFromBase(function, ret_ptr.index, 1) orelse continue;
+        const field0_store = untypedFindStoreToSlot(function, field0) orelse continue;
+        const field1_store = untypedFindStoreToSlot(function, field1) orelse continue;
+        for (function.instructions) |ret_load| {
+            if (!std.mem.eql(u8, ret_load.opcode, "ret_load")) continue;
+            if (untypedFirstRefOperand(ret_load) != ret_ptr.index) continue;
+            return .{
+                .kind = .make,
+                .base_ptr = ret_ptr.index,
+                .field0_ptr = field0,
+                .field1_ptr = field1,
+                .field0_value = switch (field0_store.value) {
+                    .ref => |value| value,
+                    .int => null,
+                },
+                .field1_value = switch (field1_store.value) {
+                    .ref => |value| value,
+                    .int => null,
+                },
+                .return_value = ret_load.index,
+            };
+        }
+    }
+    return null;
+}
+
 pub fn selectedAggregatePairFirstShape(function: air_export.Function) bool {
-    return functionHasMemoryOp(function, .alloc) and
-        functionHasFieldPtrIndex(function, 0) and
-        functionHasMemoryOp(function, .load) and
-        functionHasReturnOp(function);
+    return aggregatePairFirstSummary(function) != null;
 }
 
 pub fn selectedAggregateMakePairShape(function: air_export.Function) bool {
-    return functionHasRetPtrOp(function) and
-        functionHasFieldPtrIndex(function, 0) and
-        functionHasFieldPtrIndex(function, 1) and
-        functionHasStoreOp(function) and
-        functionHasOpcode(function, "ret_load");
+    return aggregateMakePairSummary(function) != null;
 }
 
-pub fn selectedErrorUnionPayloadShape(function: air_export.Function) bool {
-    return functionHasErrorUnionOp(function, .unwrap_payload) and
-        functionHasErrorUnionOp(function, .is_non_err) and
-        !functionHasCallOp(function) and
-        !functionHasOpcode(function, "switch_br");
-}
-
-pub fn selectedMaybeErrorShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "cmp_neq") and
-        functionHasCfgOp(function, .cond_br) and
-        functionHasReturnOp(function) and
-        !functionHasOpcode(function, "switch_br");
-}
-
-pub fn selectedErrorSwitchShape(function: air_export.Function) bool {
-    return functionHasCallOp(function) and
-        functionHasErrorUnionOp(function, .is_non_err) and
-        functionHasErrorUnionOp(function, .unwrap_payload) and
-        functionHasOpcode(function, "switch_br");
-}
-
-pub fn selectedErrorClassifyShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "switch_br") and
-        functionHasReturnOp(function) and
-        !functionHasCallOp(function) and
-        !functionHasErrorUnionOp(function, .is_non_err) and
-        !functionHasErrorUnionOp(function, .unwrap_payload);
+pub fn tableLookupSummary(function: air_export.Function) ?TableLookupSummary {
+    for (function.instructions) |mask| {
+        const masked = untypedBinaryRefAndInt(mask) orelse continue;
+        if (!std.mem.eql(u8, mask.opcode, "bit_and")) continue;
+        for (function.instructions) |cast| {
+            if (untypedCastSource(cast) != mask.index) continue;
+            if (!std.mem.startsWith(u8, cast.opcode, "intcast")) continue;
+            for (function.instructions) |table_access| {
+                if (untypedArrayElemIndex(table_access) != cast.index) continue;
+                const returned = untypedValueFeedsReturn(function, table_access.index) orelse continue;
+                return .{
+                    .index_source = masked.lhs,
+                    .mask_or_narrow = mask.index,
+                    .index_cast = cast.index,
+                    .table_access = table_access.index,
+                    .return_value = returned,
+                };
+            }
+        }
+    }
+    return null;
 }
 
 pub fn selectedBase64TableLookupShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "bit_and") and
-        (functionHasOpcode(function, "intcast") or functionHasOpcode(function, "intcast_safe")) and
-        functionHasOpcode(function, "array_elem_val") and
-        functionHasReturnOp(function);
+    return tableLookupSummary(function) != null;
+}
+
+fn errorUnionSource(instruction: air_export.Instruction) ?u32 {
+    if (air_capabilities.errorUnionSemanticOpForOpcode(instruction.opcode) == .none) return null;
+    return untypedFirstRefOperand(instruction);
+}
+
+pub fn errorUnionPayloadSummary(function: air_export.Function) ?ErrorSwitchSummary {
+    for (function.instructions) |is_non_err| {
+        if (air_capabilities.errorUnionSemanticOpForOpcode(is_non_err.opcode) != .is_non_err) continue;
+        const source = errorUnionSource(is_non_err) orelse continue;
+        for (function.instructions) |payload| {
+            if (air_capabilities.errorUnionSemanticOpForOpcode(payload.opcode) != .unwrap_payload) continue;
+            if (errorUnionSource(payload) != source) continue;
+            const returned = untypedValueFeedsReturn(function, payload.index) orelse continue;
+            if (functionHasCallOp(function) or functionHasOpcode(function, "switch_br")) return null;
+            return .{
+                .kind = .payload,
+                .condition = is_non_err.index,
+                .error_union_value = source,
+                .extracted_value = payload.index,
+                .return_value = returned,
+            };
+        }
+    }
+    return null;
+}
+
+pub fn selectedErrorUnionPayloadShape(function: air_export.Function) bool {
+    return errorUnionPayloadSummary(function) != null;
+}
+
+pub fn maybeErrorSummary(function: air_export.Function) ?ErrorSwitchSummary {
+    for (function.instructions) |compare| {
+        if (!std.mem.eql(u8, compare.opcode, "cmp_neq")) continue;
+        for (function.instructions) |cond| {
+            if (untypedCondBrInput(cond) != compare.index) continue;
+            if (functionHasOpcode(function, "switch_br")) return null;
+            const returned = for (function.instructions) |ret| {
+                if (untypedReturnRef(ret)) |value| break value;
+            } else null;
+            return .{
+                .kind = .maybe_error,
+                .condition = compare.index,
+                .switch_br = cond.index,
+                .return_value = returned,
+            };
+        }
+    }
+    return null;
+}
+
+pub fn selectedMaybeErrorShape(function: air_export.Function) bool {
+    return maybeErrorSummary(function) != null;
+}
+
+pub fn errorSwitchSummary(function: air_export.Function) ?ErrorSwitchSummary {
+    for (function.instructions) |call| {
+        if (!air_capabilities.isCallOpcode(call.opcode)) continue;
+        for (function.instructions) |is_non_err| {
+            if (air_capabilities.errorUnionSemanticOpForOpcode(is_non_err.opcode) != .is_non_err) continue;
+            if (errorUnionSource(is_non_err) != call.index) continue;
+            for (function.instructions) |payload| {
+                if (air_capabilities.errorUnionSemanticOpForOpcode(payload.opcode) != .unwrap_payload) continue;
+                if (errorUnionSource(payload) != call.index) continue;
+                for (function.instructions) |switch_br| {
+                    if (untypedSwitchInput(switch_br) != payload.index) continue;
+                    const returned = for (function.instructions) |ret| {
+                        if (untypedReturnRef(ret)) |value| break value;
+                    } else null;
+                    return .{
+                        .kind = .switch_dispatch,
+                        .condition = is_non_err.index,
+                        .error_union_value = call.index,
+                        .extracted_value = payload.index,
+                        .switch_br = switch_br.index,
+                        .return_value = returned,
+                    };
+                }
+            }
+        }
+    }
+    return null;
+}
+
+pub fn selectedErrorSwitchShape(function: air_export.Function) bool {
+    return errorSwitchSummary(function) != null;
+}
+
+pub fn errorClassifySummary(function: air_export.Function) ?ErrorSwitchSummary {
+    if (functionHasCallOp(function) or
+        functionHasErrorUnionOp(function, .is_non_err) or
+        functionHasErrorUnionOp(function, .unwrap_payload))
+    {
+        return null;
+    }
+    for (function.instructions) |switch_br| {
+        const switch_input = untypedSwitchInput(switch_br) orelse continue;
+        const returned = for (function.instructions) |ret| {
+            if (untypedReturnRef(ret)) |value| break value;
+        } else null;
+        return .{
+            .kind = .classify,
+            .extracted_value = switch_input,
+            .switch_br = switch_br.index,
+            .return_value = returned,
+        };
+    }
+    return null;
+}
+
+pub fn selectedErrorClassifyShape(function: air_export.Function) bool {
+    return errorClassifySummary(function) != null;
+}
+
+fn findCmpEqUsingValue(function: air_export.Function, value: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "cmp_eq")) continue;
+        var fields = air_text.splitTopLevel(instruction.payload, ',');
+        const lhs = air_text.instructionRef(fields.next() orelse continue) orelse continue;
+        const rhs_text = std.mem.trim(u8, fields.next() orelse continue, " ");
+        if (fields.next() != null) continue;
+        if (lhs == value) return instruction.index;
+        if (air_text.instructionRef(rhs_text) == value) return instruction.index;
+    }
+    return null;
+}
+
+fn findCondBrUsingValue(function: air_export.Function, value: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (untypedCondBrInput(instruction) == value) return instruction.index;
+    }
+    return null;
+}
+
+fn findFirstBlock(function: air_export.Function) ?u32 {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.isBlockOpcode(instruction.opcode)) return instruction.index;
+    }
+    return null;
+}
+
+fn findFirstCall(function: air_export.Function) ?u32 {
+    for (function.instructions) |instruction| {
+        if (air_capabilities.isCallOpcode(instruction.opcode)) return instruction.index;
+    }
+    return null;
+}
+
+pub fn runtimeOptionalPointerMainSummary(function: air_export.Function) ?RuntimeWrapperSummary {
+    const call = findFirstCall(function) orelse return null;
+    const compare = findCmpEqUsingValue(function, call) orelse return null;
+    const cond_br = findCondBrUsingValue(function, compare) orelse return null;
+    if (functionHasMemoryOp(function, .load)) return null;
+    const returned = untypedValueFeedsReturn(function, call) orelse return null;
+    return .{
+        .kind = .optional_pointer_main,
+        .call = call,
+        .compare = compare,
+        .cond_br = cond_br,
+        .block = findFirstBlock(function) orelse return null,
+        .return_value = returned,
+    };
 }
 
 pub fn selectedRuntimeOptionalPointerMainShape(function: air_export.Function) bool {
-    return functionHasCallOp(function) and
-        functionHasOpcode(function, "cmp_eq") and
-        functionHasCfgOp(function, .block) and
-        functionHasCfgOp(function, .cond_br) and
-        functionHasReturnOp(function) and
-        !functionHasMemoryOp(function, .load);
+    return runtimeOptionalPointerMainSummary(function) != null;
+}
+
+pub fn runtimePointerLoadStoreMainSummary(function: air_export.Function) ?RuntimeWrapperSummary {
+    const call = findFirstCall(function) orelse return null;
+    const load = untypedFindAnyLoadFromSlot(function, call) orelse blk: {
+        for (function.instructions) |instruction| {
+            if (air_capabilities.memorySemanticOpForOpcode(instruction.opcode) == .load) break :blk instruction.index;
+        }
+        return null;
+    };
+    const compare = findCmpEqUsingValue(function, load) orelse return null;
+    const cond_br = findCondBrUsingValue(function, compare) orelse return null;
+    const returned = untypedValueFeedsReturn(function, load) orelse return null;
+    return .{
+        .kind = .pointer_load_store_main,
+        .call = call,
+        .compare = compare,
+        .cond_br = cond_br,
+        .block = findFirstBlock(function) orelse return null,
+        .load = load,
+        .return_value = returned,
+    };
 }
 
 pub fn selectedRuntimePointerLoadStoreMainShape(function: air_export.Function) bool {
-    return functionHasCallOp(function) and
-        functionHasMemoryOp(function, .load) and
-        functionHasOpcode(function, "cmp_eq") and
-        functionHasCfgOp(function, .block) and
-        functionHasCfgOp(function, .cond_br) and
-        functionHasReturnOp(function);
+    return runtimePointerLoadStoreMainSummary(function) != null;
+}
+
+fn findUnreachAfter(function: air_export.Function, instruction_index: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (instruction.index <= instruction_index) continue;
+        if (air_capabilities.isUnreachOpcode(instruction.opcode)) return instruction.index;
+    }
+    return null;
+}
+
+pub fn panicEdgeSummary(function: air_export.Function) ?PanicEdgeSummary {
+    for (function.instructions) |predicate| {
+        if (!std.mem.eql(u8, predicate.opcode, "cmp_lt")) continue;
+        const cond_br = findCondBrUsingValue(function, predicate.index) orelse continue;
+        for (function.instructions) |panic_call| {
+            if (!air_capabilities.isCallOpcode(panic_call.opcode)) continue;
+            const unreach = findUnreachAfter(function, panic_call.index) orelse continue;
+            for (function.instructions) |load| {
+                if (air_capabilities.memorySemanticOpForOpcode(load.opcode) != .load) continue;
+                for (function.instructions) |add| {
+                    if (!air_capabilities.isAddOpcodeFamily(add.opcode)) continue;
+                    const refs = untypedBinaryRefs(add) orelse continue;
+                    if (refs.lhs != load.index and refs.rhs != load.index) continue;
+                    const returned = untypedValueFeedsReturn(function, add.index) orelse continue;
+                    return .{
+                        .predicate = predicate.index,
+                        .cond_br = cond_br,
+                        .panic_call = panic_call.index,
+                        .unreach = unreach,
+                        .load = load.index,
+                        .add = add.index,
+                        .return_value = returned,
+                    };
+                }
+            }
+        }
+    }
+    return null;
 }
 
 pub fn selectedMixCAddMayPanicShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "cmp_lt") and
-        functionHasCfgOp(function, .cond_br) and
-        functionHasCallOp(function) and
-        functionHasCfgOp(function, .unreach) and
-        functionHasMemoryOp(function, .load) and
-        (functionHasOpcode(function, "add") or functionHasOpcode(function, "add_safe")) and
-        functionHasReturnOp(function);
+    return panicEdgeSummary(function) != null;
 }
 
 pub const UntypedValueSource = union(enum) {
@@ -1518,6 +1870,9 @@ test "AIR model recognizes selected aggregate shapes structurally" {
         .structured_air_v2 = null,
         .instructions = @constCast(&pair_first_instructions),
     };
+    const pair_first_summary = aggregatePairFirstSummary(pair_first).?;
+    try std.testing.expectEqual(.first, pair_first_summary.kind);
+    try std.testing.expectEqual(@as(u32, 1), pair_first_summary.field0_ptr);
     try std.testing.expect(selectedAggregatePairFirstShape(pair_first));
     try std.testing.expect(!selectedAggregateMakePairShape(pair_first));
 
@@ -1542,15 +1897,20 @@ test "AIR model recognizes selected aggregate shapes structurally" {
         .structured_air_v2 = null,
         .instructions = @constCast(&make_pair_instructions),
     };
+    const make_pair_summary = aggregateMakePairSummary(make_pair).?;
+    try std.testing.expectEqual(.make, make_pair_summary.kind);
+    try std.testing.expectEqual(@as(u32, 1), make_pair_summary.field0_ptr);
+    try std.testing.expectEqual(@as(u32, 3), make_pair_summary.field1_ptr.?);
     try std.testing.expect(selectedAggregateMakePairShape(make_pair));
     try std.testing.expect(!selectedAggregatePairFirstShape(make_pair));
 }
 
 test "AIR model recognizes selected error and switch shapes structurally" {
     const payload_instructions = [_]air_export.Instruction{
-        .{ .index = 0, .indent = 0, .unused = false, .opcode = "is_non_err", .payload = "%arg0!", .category = .other },
-        .{ .index = 1, .indent = 0, .unused = false, .opcode = "unwrap_errunion_payload", .payload = "%arg0!", .category = .other },
-        .{ .index = 2, .indent = 0, .unused = false, .opcode = "ret", .payload = "%1!", .category = .return_op },
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "error_union, 0", .category = .argument },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "is_non_err", .payload = "%0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "unwrap_errunion_payload", .payload = "%0!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "ret", .payload = "%2!", .category = .return_op },
     };
     const payload = air_export.Function{
         .name = "not_named_payload",
@@ -1565,6 +1925,10 @@ test "AIR model recognizes selected error and switch shapes structurally" {
         .structured_air_v2 = null,
         .instructions = @constCast(&payload_instructions),
     };
+    const payload_summary = errorUnionPayloadSummary(payload).?;
+    try std.testing.expectEqual(.payload, payload_summary.kind);
+    try std.testing.expectEqual(@as(u32, 0), payload_summary.error_union_value.?);
+    try std.testing.expectEqual(@as(u32, 2), payload_summary.extracted_value.?);
     try std.testing.expect(selectedErrorUnionPayloadShape(payload));
     try std.testing.expect(!selectedErrorSwitchShape(payload));
 
@@ -1588,13 +1952,40 @@ test "AIR model recognizes selected error and switch shapes structurally" {
         .structured_air_v2 = null,
         .instructions = @constCast(&switch_instructions),
     };
+    const err_switch_summary = errorSwitchSummary(err_switch).?;
+    try std.testing.expectEqual(.switch_dispatch, err_switch_summary.kind);
+    try std.testing.expectEqual(@as(u32, 2), err_switch_summary.extracted_value.?);
+    try std.testing.expectEqual(@as(u32, 3), err_switch_summary.switch_br.?);
     try std.testing.expect(selectedErrorSwitchShape(err_switch));
     try std.testing.expect(!selectedErrorUnionPayloadShape(err_switch));
     try std.testing.expect(!selectedErrorClassifyShape(err_switch));
 
+    const unrelated_switch_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "is_non_err", .payload = "%0!", .category = .other },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "unwrap_errunion_payload", .payload = "%0!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "switch_br", .payload = "%1!", .category = .control_flow },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%2!", .category = .return_op },
+    };
+    const unrelated_switch = air_export.Function{
+        .name = "not_named_unrelated_error_switch",
+        .type_text = "fn () i32",
+        .instruction_count = unrelated_switch_instructions.len,
+        .main_body_count = unrelated_switch_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&unrelated_switch_instructions),
+    };
+    try std.testing.expect(errorSwitchSummary(unrelated_switch) == null);
+
     const classify_instructions = [_]air_export.Instruction{
-        .{ .index = 0, .indent = 0, .unused = false, .opcode = "switch_br", .payload = "%arg0!", .category = .control_flow },
-        .{ .index = 1, .indent = 0, .unused = false, .opcode = "ret", .payload = "%arg0!", .category = .return_op },
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "u16, 0", .category = .argument },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "switch_br", .payload = "%0!", .category = .control_flow },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "ret", .payload = "%0!", .category = .return_op },
     };
     const classify = air_export.Function{
         .name = "not_named_classify",
@@ -1635,10 +2026,11 @@ test "AIR model recognizes selected error and switch shapes structurally" {
 
 test "AIR model recognizes selected table lookup and runtime wrapper shapes structurally" {
     const table_instructions = [_]air_export.Instruction{
-        .{ .index = 0, .indent = 0, .unused = false, .opcode = "bit_and", .payload = "%arg0!, <i32, 63>", .category = .arithmetic },
-        .{ .index = 1, .indent = 0, .unused = false, .opcode = "intcast", .payload = "%0!", .category = .other },
-        .{ .index = 2, .indent = 0, .unused = false, .opcode = "array_elem_val", .payload = "@table, %1!", .category = .other },
-        .{ .index = 3, .indent = 0, .unused = false, .opcode = "ret", .payload = "%2!", .category = .return_op },
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "u8, 0", .category = .argument },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "bit_and", .payload = "%0!, <i32, 63>", .category = .arithmetic },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "intcast", .payload = "usize, %1!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "array_elem_val", .payload = "@table, %2!", .category = .other },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%3!", .category = .return_op },
     };
     const table = air_export.Function{
         .name = "not_named_table_lookup",
@@ -1653,7 +2045,33 @@ test "AIR model recognizes selected table lookup and runtime wrapper shapes stru
         .structured_air_v2 = null,
         .instructions = @constCast(&table_instructions),
     };
+    const table_summary = tableLookupSummary(table).?;
+    try std.testing.expectEqual(@as(u32, 1), table_summary.mask_or_narrow);
+    try std.testing.expectEqual(@as(u32, 2), table_summary.index_cast);
+    try std.testing.expectEqual(@as(u32, 3), table_summary.table_access);
     try std.testing.expect(selectedBase64TableLookupShape(table));
+
+    const unrelated_table_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "arg", .payload = "u8, 0", .category = .argument },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "bit_and", .payload = "%0!, <i32, 63>", .category = .arithmetic },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "intcast", .payload = "usize, %1!", .category = .other },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "array_elem_val", .payload = "@table, %2!", .category = .other },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%2!", .category = .return_op },
+    };
+    const unrelated_table = air_export.Function{
+        .name = "not_named_unrelated_table_lookup",
+        .type_text = "fn (u8) u8",
+        .instruction_count = unrelated_table_instructions.len,
+        .main_body_count = unrelated_table_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&unrelated_table_instructions),
+    };
+    try std.testing.expect(tableLookupSummary(unrelated_table) == null);
 
     const optional_wrapper_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
@@ -1675,8 +2093,34 @@ test "AIR model recognizes selected table lookup and runtime wrapper shapes stru
         .structured_air_v2 = null,
         .instructions = @constCast(&optional_wrapper_instructions),
     };
+    const optional_wrapper_summary = runtimeOptionalPointerMainSummary(optional_wrapper).?;
+    try std.testing.expectEqual(.optional_pointer_main, optional_wrapper_summary.kind);
+    try std.testing.expectEqual(@as(u32, 0), optional_wrapper_summary.call);
+    try std.testing.expectEqual(@as(u32, 1), optional_wrapper_summary.compare);
     try std.testing.expect(selectedRuntimeOptionalPointerMainShape(optional_wrapper));
     try std.testing.expect(!selectedRuntimePointerLoadStoreMainShape(optional_wrapper));
+
+    const unrelated_wrapper_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
+        .{ .index = 1, .indent = 0, .unused = false, .opcode = "cmp_eq", .payload = "%0!, <i32, 0>", .category = .comparison },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "block", .payload = "", .category = .control_flow },
+        .{ .index = 3, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%0!, then_body, else_body", .category = .control_flow },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "ret", .payload = "%0!", .category = .return_op },
+    };
+    const unrelated_wrapper = air_export.Function{
+        .name = "not_named_unrelated_wrapper",
+        .type_text = "fn () i32",
+        .instruction_count = unrelated_wrapper_instructions.len,
+        .main_body_count = unrelated_wrapper_instructions.len,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = @constCast(&unrelated_wrapper_instructions),
+    };
+    try std.testing.expect(runtimeOptionalPointerMainSummary(unrelated_wrapper) == null);
 
     const load_store_wrapper_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "call", .payload = "helper", .category = .call },
@@ -1699,6 +2143,9 @@ test "AIR model recognizes selected table lookup and runtime wrapper shapes stru
         .structured_air_v2 = null,
         .instructions = @constCast(&load_store_wrapper_instructions),
     };
+    const load_store_wrapper_summary = runtimePointerLoadStoreMainSummary(load_store_wrapper).?;
+    try std.testing.expectEqual(.pointer_load_store_main, load_store_wrapper_summary.kind);
+    try std.testing.expectEqual(@as(u32, 1), load_store_wrapper_summary.load.?);
     try std.testing.expect(selectedRuntimePointerLoadStoreMainShape(load_store_wrapper));
     try std.testing.expect(!selectedRuntimeOptionalPointerMainShape(load_store_wrapper));
 
@@ -1708,7 +2155,7 @@ test "AIR model recognizes selected table lookup and runtime wrapper shapes stru
         .{ .index = 2, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%1!, then_body, else_body", .category = .control_flow },
         .{ .index = 3, .indent = 0, .unused = false, .opcode = "call", .payload = "debug.defaultPanic", .category = .call },
         .{ .index = 4, .indent = 0, .unused = false, .opcode = "unreach", .payload = "", .category = .control_flow },
-        .{ .index = 5, .indent = 0, .unused = false, .opcode = "add_safe", .payload = "%0!, %arg1!", .category = .arithmetic },
+        .{ .index = 5, .indent = 0, .unused = false, .opcode = "add_safe", .payload = "%0!, %1!", .category = .arithmetic },
         .{ .index = 6, .indent = 0, .unused = false, .opcode = "ret", .payload = "%5!", .category = .return_op },
     };
     const panic_edge = air_export.Function{
@@ -1724,6 +2171,10 @@ test "AIR model recognizes selected table lookup and runtime wrapper shapes stru
         .structured_air_v2 = null,
         .instructions = @constCast(&panic_edge_instructions),
     };
+    const panic_summary = panicEdgeSummary(panic_edge).?;
+    try std.testing.expectEqual(@as(u32, 1), panic_summary.predicate);
+    try std.testing.expectEqual(@as(u32, 3), panic_summary.panic_call);
+    try std.testing.expectEqual(@as(u32, 5), panic_summary.add);
     try std.testing.expect(selectedMixCAddMayPanicShape(panic_edge));
 }
 

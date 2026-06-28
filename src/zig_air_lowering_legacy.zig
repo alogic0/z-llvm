@@ -599,7 +599,7 @@ fn optionalPayloadShape(function: air_export.Function) bool {
 }
 
 fn errorUnionPayloadShape(function: air_export.Function) bool {
-    return air_model.selectedErrorUnionPayloadShape(function);
+    return air_model.errorUnionPayloadSummary(function) != null;
 }
 
 fn sliceSumShape(function: air_export.Function) bool {
@@ -622,39 +622,39 @@ fn packedReplaceLowShape(function: air_export.Function) bool {
 }
 
 fn aggregatePairFirstShape(function: air_export.Function) bool {
-    return air_model.selectedAggregatePairFirstShape(function);
+    return air_model.aggregatePairFirstSummary(function) != null;
 }
 
 fn aggregateMakePairShape(function: air_export.Function) bool {
-    return air_model.selectedAggregateMakePairShape(function);
+    return air_model.aggregateMakePairSummary(function) != null;
 }
 
 fn maybeErrorShape(function: air_export.Function) bool {
-    return air_model.selectedMaybeErrorShape(function);
+    return air_model.maybeErrorSummary(function) != null;
 }
 
 pub fn errorSwitchShape(function: air_export.Function) bool {
-    return air_model.selectedErrorSwitchShape(function);
+    return air_model.errorSwitchSummary(function) != null;
 }
 
 pub fn errorClassifyShape(function: air_export.Function) bool {
-    return air_model.selectedErrorClassifyShape(function);
+    return air_model.errorClassifySummary(function) != null;
 }
 
 pub fn base64TableLookupShape(function: air_export.Function) bool {
-    return air_model.selectedBase64TableLookupShape(function);
+    return air_model.tableLookupSummary(function) != null;
 }
 
 pub fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
-    return air_model.selectedRuntimeOptionalPointerMainShape(function);
+    return air_model.runtimeOptionalPointerMainSummary(function) != null;
 }
 
 pub fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
-    return air_model.selectedRuntimePointerLoadStoreMainShape(function);
+    return air_model.runtimePointerLoadStoreMainSummary(function) != null;
 }
 
 pub fn mixCAddMayPanicShape(function: air_export.Function) bool {
-    return air_model.selectedMixCAddMayPanicShape(function);
+    return air_model.panicEdgeSummary(function) != null;
 }
 
 pub fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
