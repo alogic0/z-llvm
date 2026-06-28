@@ -749,12 +749,12 @@ follow-up removes the former ambiguous nominal `Pair` compatibility rule:
 nominal `Pair` normalizes as `{ i32, i32 }`, and runtime aggregate-pair
 compatibility lowerers now admit by normalized layout and data-flow structure
 rather than exact symbol names. `AggregateLayoutPlan` is now the shared
-normalized field/leaf plan for pair admission, with SysV classification
-consuming the same normalized aggregate type. Remaining aggregate layout debt is
-explicit: the broader nominal layout table still stands in for future
-Zig-exported field layout facts, sret/byval copy planning still needs to fold
-into the shared plan without strict-gate drift, and packed/unaligned aggregate
-ABI remains a targeted boundary.
+normalized field/leaf plan for pair admission and sret/byval aggregate copy
+planning, with SysV classification consuming the same normalized aggregate
+type. Remaining aggregate layout debt is explicit: the broader nominal layout
+table still stands in for future Zig-exported field layout facts, sret/byval
+aggregate construction still needs to fold into the shared plan, and
+packed/unaligned aggregate ABI remains a targeted boundary.
 
 Strict release baselines now cover the cumulative broad, expanded, and scale
 corpora plus the isolated frontier corpus: broad is inputs + integrated,

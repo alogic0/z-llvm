@@ -8,7 +8,7 @@ pub const AggregateLeaf = struct {
     ty: ir.Type,
 };
 
-pub const max_aggregate_layout_leaves = 64;
+pub const max_aggregate_layout_leaves = 512;
 
 pub const AggregateLayoutPlan = struct {
     ty: ir.Type,
@@ -282,4 +282,13 @@ test "type layout builds reusable aggregate layout plan" {
     try std.testing.expectEqual(@as(u64, 4), plan.leafSlice()[1].offset);
     try std.testing.expect(plan.leafSlice()[0].ty.eql(.{ .int = 32 }));
     try std.testing.expect(plan.leafSlice()[1].ty.eql(.{ .int = 32 }));
+}
+
+test "type layout plan covers large sret byval aggregates" {
+    const layout = try target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    const plan = try aggregateLayoutPlan(layout, .{ .aggregate = "%frontier_sysv_sret_byval.Big256" });
+    try std.testing.expectEqual(@as(usize, 256), plan.leaf_count);
+    try std.testing.expectEqual(@as(u64, 0), plan.leafSlice()[0].offset);
+    try std.testing.expectEqual(@as(u64, 2040), plan.leafSlice()[255].offset);
+    try std.testing.expect(plan.leafSlice()[255].ty.eql(.{ .int = 64 }));
 }
