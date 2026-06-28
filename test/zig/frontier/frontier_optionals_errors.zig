@@ -39,3 +39,17 @@ export fn frontier_try_match(tag: i32, value: i32) i32 {
         return -31;
     }
 }
+
+fn frontierNestedTryAdd(first_tag: i32, second_tag: i32, value: i32) FrontierError!i32 {
+    const first = try frontierMaybeTryPayload(first_tag, value);
+    const second = try frontierMaybeTryPayload(second_tag, first + 5);
+    return second + 9;
+}
+
+export fn frontier_nested_try_match(first_tag: i32, second_tag: i32, value: i32) i32 {
+    if (frontierNestedTryAdd(first_tag, second_tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -37;
+    }
+}

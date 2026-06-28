@@ -214,7 +214,7 @@ Execution order:
    the legacy compatibility module reuses the model-owned opcode query helper
    instead of carrying its own duplicate implementation.
    The strict frontier gate was re-run after these refactors and now reports
-   `generic_cfg_functions=626`, `structural_matcher_functions=0`,
+   `generic_cfg_functions=628`, `structural_matcher_functions=0`,
    `legacy_air_text_lowering_functions=0`, and executable proof green across
    ReleaseFast, ReleaseSafe, and ReleaseSmall. The
    Zig type/function signature parsing and pointer-child text now live in
@@ -349,10 +349,13 @@ Execution order:
    `ptr_slice_len_ptr:ty_op`, and `slice_len:ty_op`. The first accepted
    source-backed error-union slice is now in `frontier_optionals_errors.zig`: it lowers
    `wrap_errunion_payload`, `wrap_errunion_err`, `is_non_err`,
-   `unwrap_errunion_payload`, `unwrap_errunion_err`, and a selected direct
-   `try:pl_op` continuation through typed AIR v2, generic CFG, z_llvm object
-   emission, and executable proof. Broader nested/multi-block compiler-core
-   `try` forms remain the next error-union sub-slice. The first accepted
+   `unwrap_errunion_payload`, `unwrap_errunion_err`, a selected direct
+   `try:pl_op` continuation, and a nested two-`try` continuation where both
+   error paths propagate the original error-union value and the hot path reuses
+   call results without re-calling clobbered arguments. These rows pass through
+   typed AIR v2, generic CFG, z_llvm object emission, native link, and
+   executable proof. Broader arbitrary nested/multi-block compiler-core `try`
+   forms remain the next error-union sub-slice. The first accepted
    pointer/slice source-backed slice is now in
    `frontier_slice_pointer_arith.zig`: it lowers `ptr_add:bin_ty_pl`,
    `slice_len:ty_op`, `ptr_slice_len_ptr`, `slice_ptr`,
@@ -580,10 +583,10 @@ Validation after these refactor slices is saved in
 `tmp/frontier_boundary_counter_update.log`:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
-  ReleaseSmall all report `source_rows=13`, `discovered_functions=626`,
-  `generic_cfg_functions=626`, `structural_matcher_functions=0`,
+  ReleaseSmall all report `source_rows=13`, `discovered_functions=628`,
+  `generic_cfg_functions=628`, `structural_matcher_functions=0`,
   `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
-  `object_emitted_functions=626`, `native_link_accepted_rows=13`,
+  `object_emitted_functions=628`, `native_link_accepted_rows=13`,
   `executable_ok_rows=13`, and `local_fail=0`.
 - `zig build distribution-air-release-frontier-boundaries`: ReleaseFast,
   ReleaseSafe, and ReleaseSmall all report `varargs_boundary_rows=2`,
@@ -1124,12 +1127,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=626`,
-`generic_codegen_functions=626`, `generic_cfg_functions=626`,
+frontier gate reports `source_rows=13`, `discovered_functions=628`,
+`generic_codegen_functions=628`, `generic_cfg_functions=628`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=626`, `object_failures=0`,
+`object_emitted_functions=628`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1142,9 +1145,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=626`,
-`generic_cfg_functions=626`, `structural_matcher_functions=0`,
-`object_emitted_functions=626`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=628`,
+`generic_cfg_functions=628`, `structural_matcher_functions=0`,
+`object_emitted_functions=628`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
