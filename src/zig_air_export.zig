@@ -1,4 +1,5 @@
 const std = @import("std");
+const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 
 pub const contract_name = "zllvm-air-export-v1";
 pub const contract_version: u16 = 1;
@@ -144,9 +145,11 @@ pub const Module = struct {
     mode: []const u8,
     target: []const u8,
     globals: []Global,
+    aggregate_layout_facts: ?exported_aggregate_layout_facts.Provider = null,
     functions: []Function,
 
     pub fn deinit(self: *Module) void {
+        if (self.aggregate_layout_facts) |provider| provider.deinit(self.allocator);
         for (self.functions) |function| {
             if (function.structured_air) |structured_air| structured_air.deinit(self.allocator);
             if (function.structured_air_v2) |structured_air_v2| structured_air_v2.deinit(self.allocator);
@@ -209,6 +212,16 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
         });
     }
 
+    const aggregate_layout_facts_text: ?[]const u8 = if (cursor.peekValueLine("aggregate_layout_facts_bytes"))
+        try cursor.readFramed("aggregate_layout_facts_bytes")
+    else
+        null;
+    const aggregate_layout_facts = if (aggregate_layout_facts_text) |text|
+        try exported_aggregate_layout_facts.parseSidecar(allocator, text)
+    else
+        null;
+    errdefer if (aggregate_layout_facts) |provider| provider.deinit(allocator);
+
     var functions: std.ArrayList(Function) = .empty;
     errdefer {
         for (functions.items) |function| allocator.free(function.instructions);
@@ -267,6 +280,7 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
         .mode = mode,
         .target = target,
         .globals = try globals.toOwnedSlice(allocator),
+        .aggregate_layout_facts = aggregate_layout_facts,
         .functions = try functions.toOwnedSlice(allocator),
     };
     storage_owned_by_parse = false;
@@ -901,6 +915,50 @@ test "parse optional structured AIR v2 typed instruction records" {
     try std.testing.expectEqualStrings("inst", structured_air_v2.instructions[1].operands[0].kind);
     try std.testing.expectEqualStrings("0", structured_air_v2.instructions[1].operands[0].value);
     try std.testing.expectEqualStrings("i32", structured_air_v2.instructions[1].operands[0].type_text);
+}
+
+test "parse optional aggregate layout fact section" {
+    const air_text =
+        \\  %0!= ret(<i32, 0>)
+        \\
+    ;
+    const aggregate_facts =
+        exported_aggregate_layout_facts.section_name ++ "\n" ++
+        "fact nominal=\"frontier.Pair32\" aggregate=\"{ i32, i32 }\" construction=1 store=1 load=1\n";
+    const input = try std.fmt.allocPrint(std.testing.allocator,
+        \\zllvm-air-export-v1
+        \\contract_version=1
+        \\payload=zig-air-print-v1
+        \\producer=test
+        \\root_source=aggregate-facts.zig
+        \\wrapper=aggregate-facts.zig
+        \\mode=ReleaseFast
+        \\target=x86_64-linux-gnu
+        \\function_count=1
+        \\global_count=0
+        \\aggregate_layout_facts_bytes={}
+        \\{s}
+        \\function_begin
+        \\name_bytes=4
+        \\main
+        \\type_bytes=9
+        \\fn () i32
+        \\instruction_count=1
+        \\main_body_count=1
+        \\liveness=present
+        \\air_bytes={}
+        \\{s}
+        \\function_end
+        \\
+    , .{ aggregate_facts.len, aggregate_facts, air_text.len, air_text });
+    defer std.testing.allocator.free(input);
+
+    var module = try parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    const provider = module.aggregate_layout_facts.?;
+    const fact = provider.lookup("frontier.Pair32").?;
+    try std.testing.expectEqualStrings("{ i32, i32 }", fact.aggregate_text);
 }
 
 test "parse structured AIR v2 typed instruction details" {

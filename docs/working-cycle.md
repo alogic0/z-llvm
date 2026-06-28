@@ -143,7 +143,12 @@ For aggregate layout ownership:
 - Any x86_64 ABI interpretation of those facts must stay in x86_64 ABI
   planning code, not in the generic fact contract.
 - Provider precedence should be explicit:
-  `exported_fact > temporary_static_facts > boundary > missing`.
+  `zig_emitted_exported_fact > sidecar_exported_fact >
+  temporary_static_facts > boundary > missing`.
+- The patched Zig hook now emits a narrow
+  `zllvm-aggregate-layout-facts-v1` descriptor section for supported aggregate
+  semantic layouts; checked-in sidecars remain a temporary compatibility
+  provider until all accepted rows are proven from Zig-emitted facts.
 - Compatibility fallback table plumbing should remain removed.
 - Generated inference is currently not an active aggregate layout provider; use
   function-local inference only as validation/bridging evidence, not as a

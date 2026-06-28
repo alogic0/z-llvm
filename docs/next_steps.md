@@ -305,6 +305,15 @@ Execution order:
    `aggregateLayoutPlan` now uses the checked summary path, so layout mismatch
    reaches plan-based lowerers as `AggregateLayoutMismatch` instead of being
    silently converted to an optional miss.
+   The patched Zig hook now emits a narrow descriptor-owned
+   `zllvm-aggregate-layout-facts-v1` section for supported aggregate semantic
+   layouts found in function signatures and aggregate construction result
+   types. z_llvm parses that section as an owned provider and gives it
+   precedence over the checked-in sidecar provider; sidecars remain the
+   temporary compatibility source for rows not yet proven from emitted facts.
+   The hook contract still carries only semantic aggregate layout text and
+   construction/store/load evidence flags; x86_64 SysV classification and ABI
+   interpretation remain in z_llvm.
 4. Boundary slice: move vector, X87/f128, packed/unaligned aggregate, varargs,
    and inline-asm rejection policy behind shared boundary classifiers. The
    dedicated frontier boundary gate should prove these remain fail-closed and
@@ -591,6 +600,18 @@ Aggregate/type-layout ownership start:
   rows now add mechanical typed AIR path validation as well: copy rows must
   return the typed aggregate argument, while wrappers must pass that aggregate
   argument to the single call and return that call result.
+- Zig-emitted aggregate layout facts:
+  `../ziglang/src/codegen/llvm.zig` now emits the same
+  `zllvm-aggregate-layout-facts-v1` contract directly into
+  `zllvm-air-export-v1` descriptors when `ZLLVM_AIR_EXPORT_PATH` is active.
+  The z_llvm parser accepts an optional `aggregate_layout_facts_bytes` section,
+  and the uncurated AIR gate installs descriptor facts ahead of the temporary
+  sidecar provider for each source. A focused check saved at
+  `tmp/aggregate_hook_check.air` shows direct emitted facts such as
+  `frontier_sysv_aggregate_classes.Mixed` -> `{ i64, double }`. The strict
+  frontier and boundary gates stayed green after rebuilding stage4, so sidecar
+  facts can now be retired incrementally only where descriptor facts prove the
+  same rows.
 - Nominal aggregate layout source audit:
   - Static source layout facts before fallback table:
     none.

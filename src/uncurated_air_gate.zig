@@ -212,6 +212,14 @@ fn runMode(init: std.process.Init, options: Options) !void {
             continue;
         };
         defer parsed.deinit();
+        const active_provider = try aggregateLayoutProviderForModule(allocator, parsed, aggregate_layout_provider);
+        defer active_provider.deinit(allocator);
+        exported_aggregate_layout_facts.setActiveProvider(active_provider);
+        defer if (aggregate_layout_provider) |provider| {
+            exported_aggregate_layout_facts.setActiveProvider(provider);
+        } else {
+            exported_aggregate_layout_facts.setActiveProvider(exported_aggregate_layout_facts.empty_provider);
+        };
         var lowered = air_lowering.lowerCompatible(allocator, parsed) catch |err| {
             if (options.abi_boundary_expectations) {
                 if (abi_boundaries.categoryForLoweringFailure(source, err)) |category| {
@@ -686,6 +694,60 @@ fn loadAggregateLayoutFactProvider(
     }
 
     return try exported_aggregate_layout_facts.parseSidecar(allocator, combined.items);
+}
+
+fn aggregateLayoutProviderForModule(
+    allocator: std.mem.Allocator,
+    module: air_export.Module,
+    sidecar_provider: ?exported_aggregate_layout_facts.Provider,
+) !exported_aggregate_layout_facts.Provider {
+    const direct_provider = module.aggregate_layout_facts orelse {
+        if (sidecar_provider) |provider| return try duplicateAggregateLayoutProvider(allocator, provider);
+        return .{ .facts = try allocator.alloc(exported_aggregate_layout_facts.Fact, 0) };
+    };
+    const sidecar_facts = if (sidecar_provider) |provider| provider.facts else &.{};
+    var facts: std.ArrayList(exported_aggregate_layout_facts.Fact) = .empty;
+    errdefer {
+        for (facts.items) |fact| {
+            allocator.free(fact.nominal_type_name);
+            allocator.free(fact.aggregate_text);
+        }
+        facts.deinit(allocator);
+    }
+    for (direct_provider.facts) |fact| try appendAggregateLayoutFact(allocator, &facts, fact);
+    for (sidecar_facts) |fact| {
+        if (direct_provider.lookup(fact.nominal_type_name) != null) continue;
+        try appendAggregateLayoutFact(allocator, &facts, fact);
+    }
+    return .{ .facts = try facts.toOwnedSlice(allocator) };
+}
+
+fn duplicateAggregateLayoutProvider(
+    allocator: std.mem.Allocator,
+    provider: exported_aggregate_layout_facts.Provider,
+) !exported_aggregate_layout_facts.Provider {
+    var facts: std.ArrayList(exported_aggregate_layout_facts.Fact) = .empty;
+    errdefer {
+        for (facts.items) |fact| {
+            allocator.free(fact.nominal_type_name);
+            allocator.free(fact.aggregate_text);
+        }
+        facts.deinit(allocator);
+    }
+    for (provider.facts) |fact| try appendAggregateLayoutFact(allocator, &facts, fact);
+    return .{ .facts = try facts.toOwnedSlice(allocator) };
+}
+
+fn appendAggregateLayoutFact(
+    allocator: std.mem.Allocator,
+    facts: *std.ArrayList(exported_aggregate_layout_facts.Fact),
+    fact: exported_aggregate_layout_facts.Fact,
+) !void {
+    try facts.append(allocator, .{
+        .nominal_type_name = try allocator.dupe(u8, fact.nominal_type_name),
+        .aggregate_text = try allocator.dupe(u8, fact.aggregate_text),
+        .evidence = fact.evidence,
+    });
 }
 
 fn aggregateLayoutFactSidecarPaths(corpus: Corpus) []const []const u8 {

@@ -157,6 +157,12 @@ own `aggregate_abi.Pair`, `runtime_aggregate_pair_main.Pair`,
 `frontier_sysv_sret_byval.Big256`; those duplicate entries were
 removed from the temporary static provider after the strict frontier gate stayed
 green. The contract has fail-closed sidecar parsing and an active provider hook.
+The patched Zig stage4 emitter also writes the same
+`zllvm-aggregate-layout-facts-v1` contract directly into AIR descriptors for
+supported aggregate semantic layouts. z_llvm parses the optional
+`aggregate_layout_facts_bytes` section and gives descriptor facts precedence
+over checked-in sidecars, while sidecars remain temporary compatibility
+coverage until rows are retired from them with matching descriptor evidence.
 `AggregateLayoutSummary.provider_kind` records exported-fact,
 static-source-fact, or boundary-provider ownership
 directly. Exported facts are checked against lower-priority static or boundary
