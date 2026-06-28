@@ -12,6 +12,8 @@ const ProviderRow = struct {
     aggregate_text: []const u8,
 };
 
+const frontier_sidecar_path = "test/zig/frontier/aggregate_layout_facts.sidecar";
+
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
@@ -23,11 +25,20 @@ pub fn main(init: std.process.Init) !void {
     defer freeProviderRows(allocator, fact_rows);
     const boundary_rows = try readProviderRows(allocator, io, "src/zig_air_aggregate_layout_boundaries.zig");
     defer freeProviderRows(allocator, boundary_rows);
+    const exported_rows = try readSidecarRows(allocator, io, frontier_sidecar_path);
+    defer freeProviderRows(allocator, exported_rows);
 
     try stdout.print(
-        "summary aggregate-layout-provider-audit static_source_facts={d} boundary_provider={d} generated_examples={d}\n",
-        .{ fact_rows.len, boundary_rows.len, generated_examples.len },
+        "summary aggregate-layout-provider-audit exported_facts={d} static_source_facts={d} boundary_provider={d} generated_examples={d}\n",
+        .{ exported_rows.len, fact_rows.len, boundary_rows.len, generated_examples.len },
     );
+
+    for (exported_rows) |row| {
+        try stdout.print(
+            "layout provider=exported_aggregate_facts name={s} aggregate={s}\n",
+            .{ row.name, row.aggregate_text },
+        );
+    }
 
     for (fact_rows) |row| {
         try stdout.print(
@@ -69,6 +80,42 @@ fn readProviderRows(allocator: std.mem.Allocator, io: std.Io, path: []const u8) 
             .aggregate_text = try allocator.dupe(u8, aggregate_text),
         });
     }
+
+    return rows.toOwnedSlice(allocator);
+}
+
+fn readSidecarRows(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![]ProviderRow {
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+    defer allocator.free(contents);
+
+    var rows: std.ArrayList(ProviderRow) = .empty;
+    errdefer {
+        for (rows.items) |row| {
+            allocator.free(row.name);
+            allocator.free(row.aggregate_text);
+        }
+        rows.deinit(allocator);
+    }
+
+    var saw_header = false;
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r");
+        if (line.len == 0 or line[0] == '#') continue;
+        if (!saw_header) {
+            if (!std.mem.eql(u8, line, "zllvm-aggregate-layout-facts-v1")) return error.InvalidAggregateLayoutFactSidecar;
+            saw_header = true;
+            continue;
+        }
+        if (!std.mem.startsWith(u8, line, "fact ")) return error.InvalidAggregateLayoutFactSidecar;
+        const name = extractQuotedField(line, "nominal=") orelse return error.InvalidAggregateLayoutFactSidecar;
+        const aggregate_text = extractQuotedField(line, "aggregate=") orelse return error.InvalidAggregateLayoutFactSidecar;
+        try rows.append(allocator, .{
+            .name = try allocator.dupe(u8, name),
+            .aggregate_text = try allocator.dupe(u8, aggregate_text),
+        });
+    }
+    if (!saw_header) return error.InvalidAggregateLayoutFactSidecar;
 
     return rows.toOwnedSlice(allocator);
 }

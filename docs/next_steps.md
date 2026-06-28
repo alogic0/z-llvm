@@ -575,10 +575,13 @@ Aggregate/type-layout ownership start:
     layout and ABI facts are exported or implemented explicitly.
   - Provider audit command:
     `zig run tools/audit_aggregate_layout_providers.zig >
-    tmp/aggregate_layout_provider_audit.log` prints each current static fact,
-    generated inference sample, and boundary provider row with aggregate text.
-    Use this before removing more static facts so the next ownership slice is
-    driven by provider evidence rather than manual table scanning.
+    tmp/aggregate_layout_provider_audit.log` prints exported sidecar facts,
+    current static facts, generated inference samples, and boundary provider
+    rows with aggregate text. The current saved audit reports
+    `exported_facts=3`, `static_source_facts=45`, `boundary_provider=2`, and
+    `generated_examples=4`. Use this before removing more static facts so the
+    next ownership slice is driven by provider evidence rather than manual
+    table scanning.
 
 Validation after these refactor slices is saved in
 `tmp/frontier_counter_update.log` and
