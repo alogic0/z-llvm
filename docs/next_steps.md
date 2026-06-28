@@ -554,9 +554,10 @@ Aggregate/type-layout ownership start:
   - Exported aggregate layout fact contract:
     `src/zig_air_exported_aggregate_layout_facts.zig` defines
     `zllvm-aggregate-layout-facts-v1`, exact nominal fact matching, aggregate
-    text, and construction/store/load evidence. The default provider is empty
-    until the sidecar ingestion slice wires checked-in facts into this
-    contract.
+    text, and construction/store/load evidence. It now includes fail-closed
+    sidecar parsing and an active provider hook. The default provider remains
+    empty until the next slice wires checked-in sidecar facts into the frontier
+    gate.
   - Remaining fallback-table compatibility entries:
     none.
   - Boundary-owned aggregate layouts:

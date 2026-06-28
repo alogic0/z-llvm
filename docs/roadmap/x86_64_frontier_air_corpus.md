@@ -92,9 +92,11 @@ provider registry: exported aggregate layout facts first, generated inference
 second, then the temporary static source-fact provider. The exported fact
 contract is `zllvm-aggregate-layout-facts-v1` in
 `src/zig_air_exported_aggregate_layout_facts.zig`; the default provider is
-empty until sidecar ingestion is wired. `AggregateLayoutSummary.provider_kind`
-records exported-fact, generated-inference, static-source-fact, or
-boundary-provider ownership directly. Owned summaries are
+empty until sidecar facts are wired into the frontier gate. The contract now
+has fail-closed sidecar parsing and an active provider hook.
+`AggregateLayoutSummary.provider_kind` records exported-fact,
+generated-inference, static-source-fact, or boundary-provider ownership
+directly. Owned summaries are
 checked against any still-present fallback
 equivalent and fail closed on field/leaf-count mismatch. Remaining aggregate
 layout debt is explicit: the compatibility fallback table is empty, while

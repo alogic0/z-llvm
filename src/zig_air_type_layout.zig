@@ -169,7 +169,7 @@ fn generatedAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary 
 }
 
 fn exportedFactAggregateLayoutSummary(nominal: []const u8) ?AggregateLayoutSummary {
-    const fact = exported_aggregate_layout_facts.empty_provider.lookup(nominal) orelse return null;
+    const fact = exported_aggregate_layout_facts.active_provider.lookup(nominal) orelse return null;
     return withProviderKind(summarizeAggregateLayout(nominal, aggregate(fact.aggregate_text), .facts, .{
         .construction = fact.evidence.construction,
         .store = fact.evidence.store,
