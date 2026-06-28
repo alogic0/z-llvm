@@ -40,11 +40,11 @@ pub fn registerAggregateLeafPaths(
     leaf_paths: *[8][]const u8,
 ) bool {
     if (function_type.return_type.ir_type != .aggregate) return false;
-    if (!isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     if (function_type.params.len == 0 or function_type.params.len > leaf_paths.len) return false;
-    const layout = x86_64SysVDataLayout() orelse return false;
-    const plan = type_layout.aggregateLayoutPlan(layout, function_type.return_type.ir_type) catch return false;
     const inferred_summary = inferRegisterAggregateConstructionLayout(function_type, structured_air_v2) orelse return false;
+    if (!isSysVRegisterAggregateCandidate(inferred_summary.ty)) return false;
+    const layout = x86_64SysVDataLayout() orelse return false;
+    const plan = type_layout.aggregateLayoutPlan(layout, inferred_summary.ty) catch return false;
     const plan_summary = type_layout.summarizeInferredAggregateLayout(function_type.return_type.ir_type.aggregate, plan.ty, .{
         .construction = true,
         .store = true,
@@ -259,6 +259,14 @@ test "aggregate construction infers simple register aggregate layout from typed 
     try std.testing.expect(summary.ty.eql(.{ .aggregate = "{ i32, i32 }" }));
     try std.testing.expectEqual(type_layout.AggregateLayoutSource.inference, summary.source);
     try std.testing.expect(registerAggregateRecords(function_type, structured_air_v2));
+
+    const unknown_nominal_function_type = FunctionType{
+        .params = params[0..],
+        .return_type = .{ .ir_type = .{ .aggregate = "%AdHocPair" } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    try std.testing.expect(registerAggregateRecords(unknown_nominal_function_type, structured_air_v2));
 }
 
 test "aggregate construction infers array leaf layout from typed AIR element stores" {

@@ -103,7 +103,9 @@ Register aggregate
 construction and sret/byval make rows now add function-local typed AIR
 inference on top of the nominal summaries: `ret_ptr` plus field/element pointer
 stores and `ret_load` are used to validate the aggregate shape, including the
-selected single-field array-leaf form, before the row is admitted. Sret/byval
+selected single-field array-leaf form, before the row is admitted. Register
+aggregate construction now classifies and plans from the inferred layout before
+provider facts when the store paths prove the shape. Sret/byval
 copy rows now mechanically validate that the terminal return is the typed
 aggregate argument, and sret/byval call-wrapper rows validate that the typed
 aggregate argument feeds the single call and that the aggregate terminal return
