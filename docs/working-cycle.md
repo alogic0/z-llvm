@@ -1,8 +1,10 @@
 # Working Cycle
 
 This project replaces the LLVM library dependency used by Zig's distribution.
+The active milestone validates x86_64 first, but implementation must keep target
+ownership explicit so later targets are not blocked by hidden x86_64 shortcuts.
 Worker cycles should therefore move x86_64 Zig codegen replacement evidence
-forward, not just add local recognizers.
+forward while preserving target boundaries.
 
 ## Cycle Mode
 
@@ -42,8 +44,9 @@ At the start of every cycle:
 
 1.  Read `docs/next_steps.md`.
 2.  Check the latest saved logs under `tmp/`.
-3.  Pick the highest-value goal that removes ownership debt toward x86_64 Zig
-    codegen replacement.
+3.  Pick the highest-value goal that removes ownership debt toward the x86_64
+    Zig codegen replacement milestone without hiding x86_64 assumptions in
+    generic code.
 
 Prefer goals in this order:
 
@@ -57,6 +60,36 @@ Prefer goals in this order:
 Do not choose docs-only work while clear implementation debt remains.
 Do not bundle unrelated goals into one commit.
 
+## Initial Target Policy
+
+The active replacement milestone is x86_64. Validate and claim progress only
+for x86_64 unless the selected goal is explicitly about a cross-target
+boundary.
+
+This does not mean hardcode x86_64 behavior in generic code. Target-specific
+logic must stay visible behind target, ABI, object, or provider boundaries.
+Acceptable locations and names include:
+
+- `src/codegen/x86_64/`;
+- x86_64 SysV ABI planners and classifiers;
+- x86_64 DataLayout helpers;
+- x86_64 object, relocation, and native-link handoff paths;
+- provider kinds or diagnostics that explicitly say x86_64.
+
+Generic modules may call target-specific helpers, but they must not silently
+encode x86_64-only rules as if they were target-independent.
+
+For non-x86_64 targets:
+
+- do not implement them in this milestone;
+- keep them as explicit future or boundary rows;
+- fail closed when a generic path cannot prove the target;
+- document target assumptions in `docs/next_steps.md` or readiness docs.
+
+A change is acceptable if it advances x86_64 while keeping target ownership
+visible. A change is not acceptable if it makes x86_64 behavior look generic
+when it is not.
+
 ## Architectural Decisions
 
 Do not stop just because there are two plausible directions.
@@ -68,10 +101,11 @@ When an architectural choice appears, choose the option that:
 3.  Puts temporary data behind provider/contract abstractions.
 4.  Fails closed instead of accepting permissive recognition.
 5.  Removes nominal/name-specific admission.
-6.  Keeps scope on x86_64 unless the selected goal is explicitly about a
-    cross-target boundary.
-7.  Minimizes Zig stage4 rebuilds.
-8.  Can be validated with focused frontier gates.
+6.  Keeps validation and claims scoped to x86_64 unless the selected goal is
+    explicitly about a cross-target boundary.
+7.  Keeps target-specific behavior behind explicit target/ABI/provider modules.
+8.  Minimizes Zig stage4 rebuilds.
+9.  Can be validated with focused frontier gates.
 
 Record the decision in `docs/next_steps.md` before or with the implementation.
 
@@ -80,6 +114,7 @@ Stop for architectural review only if the choice would require:
 - changing the public hook contract with `../ziglang`;
 - broad redesign of the AIR export format;
 - abandoning an existing documented milestone;
+- making an x86_64-only rule appear target-independent;
 - accepting behavior that is not fail-closed.
 
 ## Current Aggregate Direction
@@ -88,6 +123,8 @@ For aggregate layout ownership:
 
 - Zig-owned exported aggregate layout facts are the desired source of truth.
 - Function-local inference is validation or a bridge, not the final authority.
+- Any x86_64 ABI interpretation of those facts must stay in x86_64 ABI
+  planning code, not in the generic fact contract.
 - Provider precedence should be explicit:
   `exported_fact > generated_inference > temporary_static_facts > boundary >
   missing`.
@@ -123,6 +160,7 @@ Measurable forward progress means:
 - `temporary_static_facts` goes down;
 - `exported_facts` goes up;
 - `fallback_entries` stays `0`;
+- x86_64-specific assumptions remain in explicit x86_64/ABI/provider code;
 - `frontier_local_fail` stays `0`;
 - `boundary_unexpected_accept_rows` stays `0`;
 - `boundary_wrong_diagnostic_rows` stays `0`;
@@ -186,6 +224,7 @@ architectural_choice=<none or short decision>
 validation=<commands/logs>
 progress_before=<key counters>
 progress_after=<key counters>
+target_scope=<x86_64 only, or named cross-target boundary>
 remaining_blocker=<one sentence>
 next_goal=<one sentence>
 git_status=clean
