@@ -398,7 +398,7 @@ Remaining selected recognizer ownership to normalize:
 
 | Rank | Current location | Duplicated parsing/checking | Target reusable helper |
 | --- | --- | --- | --- |
-| 1 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerer bodies | emitted helper/global symbol names for compatibility lowerers remain local to the old lowerer body | runtime-boundary/runtime-symbol registry plus generic CFG/runtime-call lowering helpers |
+| 1 | `src/zig_air_lowering_legacy.zig` runtime wrapper lowerer bodies | selected compatibility CFG construction remains in the legacy lowerer body; helper/global symbol spelling is now centralized in `src/zig_air_runtime_wrappers.zig` | generic CFG/runtime-call construction helpers consuming model summaries and runtime-wrapper symbol registry |
 
 This inventory is refactor-only: it does not expand accepted rows or weaken the
 strict frontier counters. Each slice should move one recognizer family behind
