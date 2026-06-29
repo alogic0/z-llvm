@@ -898,6 +898,10 @@ pub const TypedCheckedIntFromFloatSummary = struct {
     high_value: []const u8,
 };
 
+pub const TypedMixCAddMayPanicSummary = struct {
+    checked_add: bool,
+};
+
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
     if (!view.operandCoverage()) return null;
@@ -2400,6 +2404,29 @@ pub fn typedCheckedIntFromFloatSummary(
         .low_value = typedConstantOperandValueText(structured_air_v2, "cmp_lte") orelse return null,
         .high_value = typedConstantOperandValueText(structured_air_v2, "cmp_gte") orelse return null,
     };
+}
+
+pub fn typedMixCAddMayPanicSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedMixCAddMayPanicSummary {
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_lt") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 1 or
+        typedOpcodeCount(structured_air_v2, "load") != 1 or
+        add_count != 1 or
+        typedCalleeNameCount(structured_air_v2, "defaultPanic") != 1 or
+        typedOpcodeCount(structured_air_v2, "unreach") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .checked_add = typedOpcodeCount(structured_air_v2, "add_safe") == 1 };
 }
 
 fn typedUnionFieldVal(structured_air_v2: air_export.StructuredAirV2, field_index: usize) ?air_export.TypedInstruction {

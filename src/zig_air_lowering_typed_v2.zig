@@ -1328,28 +1328,15 @@ pub fn lowerTypedV2MixCAddMayPanic(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2MixCAddMayPanicRecords(function_type, structured_air_v2)) return null;
-    const checked_add = air_model.typedOpcodeCount(structured_air_v2, "add_safe") == 1;
-    return try lowerMixCAddMayPanicChecked(allocator, module, air_function, checked_add);
+    const summary = air_model.typedMixCAddMayPanicSummary(function_type, structured_air_v2) orelse return null;
+    return try lowerMixCAddMayPanicChecked(allocator, module, air_function, summary.checked_add);
 }
 
 pub fn typedV2MixCAddMayPanicRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    const add_count = air_model.typedOpcodeCount(structured_air_v2, "add") + air_model.typedOpcodeCount(structured_air_v2, "add_safe");
-    return function_type.params.len == 1 and
-        function_type.params[0].ir_type.eql(.{ .int = 32 }) and
-        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
-        air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_lt") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
-        add_count == 1 and
-        air_model.typedCalleeNameCount(structured_air_v2, "defaultPanic") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "unreach") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedMixCAddMayPanicSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn typedV2CheckedIntFromFloatRecords(

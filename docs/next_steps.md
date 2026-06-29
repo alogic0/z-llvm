@@ -199,9 +199,11 @@ Execution order:
    operand detail keys directly. Checked int-from-float guard/runtime-call
    admission is also model-owned now: the lowering module consumes the
    model-provided operand type and low/high bound constants, then only builds
-   the IR blocks and runtime call symbol. Typed pointer-to-pointer bitcast
-   identity now uses a capability predicate rather than a local string
-   comparison. Typed
+   the IR blocks and runtime call symbol. The typed-v2 mixed C/Zig add-may-panic
+   wrapper now follows the same pattern: the model owns the guard/call/add
+   admission and reports whether the add is checked, while lowering owns the
+   IR/runtime symbol materialization. Typed pointer-to-pointer bitcast identity
+   now uses a capability predicate rather than a local string comparison. Typed
    block-target operand parsing is now normalized through model-local block
    operand helpers instead of inline `kind`/`value` checks. Typed result and
    operand coverage now use a model-owned known-type sentinel helper, typed
