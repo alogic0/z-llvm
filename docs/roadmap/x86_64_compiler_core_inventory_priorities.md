@@ -98,8 +98,8 @@ after the largest families are split.
 | vector | 26132 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
 | union-tag-shape | 14507 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
 | optional-shape | 6454 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
-| scalar-transform | 887 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.net.HostName.DnsResponse.next` | unsupported inventory family | semantic lowering, backend |
-| other | 1069 | 33949 | 22545 | `../ziglang/src/main.zig` | `main.buildOutputType` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
+| scalar-transform | 1744 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `main.buildOutputType` | unsupported inventory family | semantic lowering, backend |
+| other | 212 | 33949 | 22545 | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
 | safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
@@ -126,6 +126,14 @@ after the largest families are split.
 | 14 | `union-tag-shape:tag_name:opaque` | 806 | - | - | - | - |
 | 15 | `error-union-try:try_cold:pl_op` | 763 | - | - | - | - |
 | 16 | `scalar-transform:byte_swap:opaque` | 760 | - | - | - | - |
+| 17 | `error-union-try:unwrap_errunion_err_ptr:opaque` | 573 | - | - | - | - |
+| 18 | `error-union-try:try_ptr:opaque` | 571 | - | - | - | - |
+| 19 | `scalar-transform:max:opaque` | 429 | - | - | - | - |
+| 20 | `scalar-transform:min:opaque` | 364 | - | - | - | - |
+| 21 | `error-union-try:error_name:opaque` | 323 | - | - | - | - |
+| 22 | `pointer-address:is_non_null_ptr:un_op` | 263 | - | - | - | - |
+| 23 | `pointer-address:ptr_sub:bin_ty_pl` | 119 | - | - | - | - |
+| 24 | `scalar-transform:abs:opaque` | 64 | - | - | - | - |
 
 ## Top Opcode Categories
 

@@ -452,7 +452,8 @@ fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
     if (containsAny(text, &.{ "try", "err", "error", "unwrap_err", "errunion" })) return .error_union_try;
     if (containsAny(text, &.{ "optional", "wrap_optional" })) return .optional_shape;
     if (containsAny(text, &.{ "union", "get_union_tag", "set_union_tag", "tag_name" })) return .union_tag_shape;
-    if (containsAny(text, &.{ "byte_swap", "bit_reverse", "popcount", "clz", "ctz" })) return .scalar_transform;
+    if (equalsAny(text, &.{ "max", "min", "abs" }) or
+        containsAny(text, &.{ "byte_swap", "bit_reverse", "popcount", "clz", "ctz" })) return .scalar_transform;
     if (containsAny(text, &.{ "ptr", "addr", "gep", "nav", "field_ptr" })) return .pointer_address;
     if (containsAny(text, &.{ "switch", "dispatch" })) return .switch_dispatch;
     if (containsAny(text, &.{ "safe", "panic", "overflow", "bounds", "trap", "sentinel" })) return .safety_runtime;
@@ -767,6 +768,13 @@ fn containsAny(text: []const u8, needles: []const []const u8) bool {
     return false;
 }
 
+fn equalsAny(text: []const u8, needles: []const []const u8) bool {
+    for (needles) |needle| {
+        if (std.mem.eql(u8, text, needle)) return true;
+    }
+    return false;
+}
+
 test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(isIgnoredOpcode("dbg_stmt"));
     try std.testing.expect(isInventoryKnownOpcode("dbg_stmt"));
@@ -807,6 +815,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(UnknownOpcodeCategory.union_tag_shape, unknownOpcodeCategory("tag_name", "opaque"));
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("union_init", "opaque").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("byte_swap", "opaque"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("max", "opaque"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("min", "opaque"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("abs", "opaque"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.other, unknownOpcodeCategory("admin_token", "opaque"));
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("byte_swap", "opaque").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, opcodeDataKindCapability("try", "pl_op").category);
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("try", "pl_op").owner);
