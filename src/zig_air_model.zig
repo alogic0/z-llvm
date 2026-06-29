@@ -932,6 +932,10 @@ pub const TypedAtomicRmwSummary = struct {
     instruction: air_export.TypedInstruction,
 };
 
+pub const TypedDenseIntegerSwitchSummary = struct {
+    results: [5]i32,
+};
+
 pub const TypedErrorSwitchSummary = struct {
     kind: enum { switch_dispatch, classify },
 };
@@ -2748,6 +2752,26 @@ pub fn typedAtomicAddSummary(
     return null;
 }
 
+pub fn typedDenseIntegerSwitchSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedDenseIntegerSwitchSummary {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    var results: [5]i32 = undefined;
+    const result_count = typedBranchI32ConstValues(structured_air_v2, &results) orelse return null;
+    if (result_count != results.len) return null;
+    return .{ .results = results };
+}
+
 pub fn typedErrorSwitchSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -3521,6 +3545,47 @@ test "typed AIR model recognizes atomic add summary" {
 
     instructions[1].data_kind = "bin_op";
     try std.testing.expect(typedAtomicAddSummary(function_type, structured_air_v2) == null);
+}
+
+test "typed AIR model recognizes dense integer switch summary" {
+    var params = [_]ZigType{
+        .{ .ir_type = .{ .int = 8 } },
+    };
+    const function_type = FunctionType{
+        .params = &params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var br0_operands = [_]air_export.TypedOperand{
+        .{ .kind = "block", .value = "0", .type_text = "0" },
+        .{ .kind = "const", .value = "value", .type_text = "i32" },
+    };
+    var br1_operands = br0_operands;
+    var br2_operands = br0_operands;
+    var br3_operands = br0_operands;
+    var br4_operands = br0_operands;
+    var br0_details = [_]air_export.TypedDetail{.{ .key = "operand1_text", .value = "<i32, 10>" }};
+    var br1_details = [_]air_export.TypedDetail{.{ .key = "operand1_text", .value = "<i32, 20>" }};
+    var br2_details = [_]air_export.TypedDetail{.{ .key = "operand1_text", .value = "<i32, 30>" }};
+    var br3_details = [_]air_export.TypedDetail{.{ .key = "operand1_text", .value = "<i32, 40>" }};
+    var br4_details = [_]air_export.TypedDetail{.{ .key = "operand1_text", .value = "<i32, 50>" }};
+    var instructions = [_]air_export.TypedInstruction{
+        testTypedInstruction(0, "arg"),
+        testTypedInstruction(1, "block"),
+        testTypedInstruction(2, "switch_br"),
+        .{ .index = 3, .opcode = "br", .result_type = "void", .data_kind = "br", .operands = @constCast(&br0_operands), .details = @constCast(&br0_details) },
+        .{ .index = 4, .opcode = "br", .result_type = "void", .data_kind = "br", .operands = @constCast(&br1_operands), .details = @constCast(&br1_details) },
+        .{ .index = 5, .opcode = "br", .result_type = "void", .data_kind = "br", .operands = @constCast(&br2_operands), .details = @constCast(&br2_details) },
+        .{ .index = 6, .opcode = "br", .result_type = "void", .data_kind = "br", .operands = @constCast(&br3_operands), .details = @constCast(&br3_details) },
+        .{ .index = 7, .opcode = "br", .result_type = "void", .data_kind = "br", .operands = @constCast(&br4_operands), .details = @constCast(&br4_details) },
+        testTypedInstruction(8, "ret"),
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = &instructions };
+    try std.testing.expectEqual([_]i32{ 10, 20, 30, 40, 50 }, typedDenseIntegerSwitchSummary(function_type, structured_air_v2).?.results);
+
+    instructions[7].opcode = "ret";
+    try std.testing.expect(typedDenseIntegerSwitchSummary(function_type, structured_air_v2) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {

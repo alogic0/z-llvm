@@ -966,7 +966,7 @@ pub fn lowerTypedV2DenseIntegerSwitch(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    const results = typedV2DenseIntegerSwitchResults(function_type, structured_air_v2) orelse return null;
+    const results = (air_model.typedDenseIntegerSwitchSummary(function_type, structured_air_v2) orelse return null).results;
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
@@ -1019,20 +1019,7 @@ pub fn typedV2DenseIntegerSwitchResults(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) ?[5]i32 {
-    if (function_type.params.len != 1 or
-        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
-        air_model.typedOpcodeCount(structured_air_v2, "arg") != 1 or
-        air_model.typedOpcodeCount(structured_air_v2, "block") != 1 or
-        air_model.typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
-        !air_model.typedHasReturnOpcode(structured_air_v2))
-    {
-        return null;
-    }
-    var results: [5]i32 = undefined;
-    const result_count = air_model.typedBranchI32ConstValues(structured_air_v2, &results) orelse return null;
-    if (result_count != results.len) return null;
-    return results;
+    return (air_model.typedDenseIntegerSwitchSummary(function_type, structured_air_v2) orelse return null).results;
 }
 
 pub fn lowerTypedV2ErrorSwitch(
