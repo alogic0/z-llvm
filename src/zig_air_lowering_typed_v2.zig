@@ -1876,7 +1876,7 @@ pub fn lowerTypedV2RuntimeOptionalPointerMain(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2RuntimeOptionalPointerMainRecords(function_type, structured_air_v2)) return null;
-    return try runtime_wrappers.lowerOptionalPointerMain(allocator, air_function);
+    return try runtime_wrappers.lowerOptionalPointerMainWithType(allocator, air_function, function_type);
 }
 
 pub fn typedV2RuntimeOptionalPointerMainRecords(
