@@ -82,10 +82,9 @@ fn lowerMixCAddMayPanicChecked(
     allocator: std.mem.Allocator,
     module: *ir.Module,
     air_function: air_export.Function,
+    function_type: FunctionType,
     checked_add: bool,
 ) !ir.Function {
-    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
-    defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or
         !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
         !function_type.return_type.ir_type.eql(.{ .int = 32 }))
@@ -1911,7 +1910,7 @@ pub fn lowerTypedV2MixCAddMayPanic(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     const summary = air_model.typedMixCAddMayPanicSummary(function_type, structured_air_v2) orelse return null;
-    return try lowerMixCAddMayPanicChecked(allocator, module, air_function, summary.checked_add);
+    return try lowerMixCAddMayPanicChecked(allocator, module, air_function, function_type, summary.checked_add);
 }
 
 pub fn typedV2MixCAddMayPanicRecords(

@@ -291,7 +291,9 @@ Execution order:
    directly instead of routing through the legacy lowering module; both runtime
    wrapper paths now consume the typed-v2 parsed `FunctionType` instead of
    reparsing AIR type text, while the wrapper-shaped helper bodies themselves
-   remain explicit compatibility surfaces.
+   remain explicit compatibility surfaces. The typed-v2 mixed C/Zig panic-edge
+   helper also consumes the parsed `FunctionType` instead of reparsing the AIR
+   type text.
    Typed-v2 dense integer-switch admission and branch-result extraction now
    use a model-owned summary as well. The
    remaining refactor is deeper normalization of each operation's operand/type
