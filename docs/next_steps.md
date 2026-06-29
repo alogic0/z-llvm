@@ -730,10 +730,15 @@ Validation after these refactor slices is saved in
   `ptr_add:bin_ty_pl` 14273/19156/13966,
   `slice_len:ty_op` 13768/47605/13459, and
   `get_union_tag:opaque` 6057/not-refreshed/not-refreshed as the next
-  measured semantic families. The pointer and error-union shapes remain the
-  first implementation families; optional wrapping, union/tag operations, and
-  scalar transforms such as `byte_swap` are now separately measured instead of
-  hidden in `other`. The pair report now prints the top 50 concrete pairs; the
+  measured semantic families. The first source-backed union/tag slice is now in
+  `frontier_union_tags.zig`: Zig exports versioned `set_union_tag`,
+  `get_union_tag`, and union-tag `switch_br` facts, and z_llvm lowers the
+  selected tag/payload switch without AIR text fallback or function-name
+  admission. Broader union ABI/layout support remains future work. The pointer
+  and error-union shapes remain the first implementation families; optional
+  wrapping, broader union/tag operations, and scalar transforms such as
+  `byte_swap` are now separately measured instead of hidden in `other`. The
+  pair report now prints the top 50 concrete pairs; the
   residual ReleaseFast `other` bucket is 0 rows after selected float math,
   select, and saturating shift opcodes were split into named categories; see
   `tmp/compiler_core_module_releasefast_final_unknown_classification.log`.
@@ -1187,28 +1192,28 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=649`,
-`generic_codegen_functions=649`, `generic_cfg_functions=649`,
+frontier gate reports `source_rows=14`, `discovered_functions=650`,
+`generic_codegen_functions=650`, `generic_cfg_functions=650`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=649`, `object_failures=0`,
+`object_emitted_functions=650`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
 `local_fail=0`; native-link and executable gates are also green at
-`native_link_accepted_rows=13`, `executable_ok_rows=13`,
+`native_link_accepted_rows=14`, `executable_ok_rows=14`,
 `link_only_rows=0`, `runtime_boundary_rows=0`, `llvm_targetmachine_rows=0`,
 `lld_rows=0`, and `local_fail=0`.
 
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=649`,
-`generic_cfg_functions=649`, `structural_matcher_functions=0`,
-`object_emitted_functions=649`, `native_link_accepted_rows=13`,
-`executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
+`source_rows=14`, `discovered_functions=650`,
+`generic_cfg_functions=650`, `structural_matcher_functions=0`,
+`object_emitted_functions=650`, `native_link_accepted_rows=14`,
+`executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
 This proof includes the selected slice-panic runtime-call row through the

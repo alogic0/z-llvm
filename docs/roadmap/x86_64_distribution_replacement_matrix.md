@@ -426,17 +426,17 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=649`,
-`generic_codegen_functions=649`, `generic_cfg_functions=649`,
+three release modes at `source_rows=14`, `discovered_functions=650`,
+`generic_codegen_functions=650`, `generic_cfg_functions=650`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=649`, `object_failures=0`,
+`object_emitted_functions=650`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
 `local_fail=0`. Frontier native-link and executable proof are green for all
-three modes at `native_link_accepted_rows=13`, `executable_ok_rows=13`,
+three modes at `native_link_accepted_rows=14`, `executable_ok_rows=14`,
 `link_only_rows=0`, `runtime_boundary_rows=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The strict
 `zig build distribution-air-release-frontier` gate now locks these isolated

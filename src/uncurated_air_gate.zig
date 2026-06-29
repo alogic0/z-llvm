@@ -6,6 +6,8 @@ const codegen = @import("codegen.zig");
 const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const mc = @import("mc.zig");
 
+const max_air_descriptor_bytes = 512 * 1024 * 1024;
+
 pub fn main(init: std.process.Init) !void {
     const options = try parseOptions(init.minimal.args);
     if (options.all_release_modes) {
@@ -193,7 +195,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
             io,
             descriptor_path,
             allocator,
-            .limited(32 * 1024 * 1024),
+            .limited(max_air_descriptor_bytes),
         );
         defer allocator.free(descriptor);
         source_rows += 1;

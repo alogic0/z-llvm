@@ -36,6 +36,7 @@ Current frontier seed:
 - `test/zig/frontier/frontier_sysv_abi.zig`
 - `test/zig/frontier/frontier_sysv_aggregate_classes.zig`
 - `test/zig/frontier/frontier_sysv_sret_byval.zig`
+- `test/zig/frontier/frontier_union_tags.zig`
 
 `frontier_optionals_errors.zig` now includes source-backed error-union
 wrap/error/payload matching and selected direct/nested `try` propagation. It
@@ -55,6 +56,16 @@ this AIR shape, plus a nested two-`try_ptr` chain that feeds the first payload
 into the second helper call before rewrapping the final payload. Broader
 arbitrary compiler-core `try` and pointer-form error-union forms remain a
 separate compiler-core priority.
+
+`frontier_union_tags.zig` adds the first source-backed tagged-union tag/payload
+switch proof. The patched Zig typed-v2 exporter emits versioned
+`zllvm-union-tag-facts-v1` facts for `set_union_tag` and `get_union_tag`, plus
+`zllvm-switch-facts-v1` case tag indexes for the union-tag `switch_br`. z_llvm
+admits the row from those typed facts and the structural payload data-flow, not
+from a function-name gate, and the C harness checks both `.small` and `.large`
+payload paths across ReleaseFast, ReleaseSafe, and ReleaseSmall. General union
+ABI/layout lowering remains future work; this row only owns the selected
+frontier tag/payload switch shape.
 
 `frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
@@ -133,21 +144,21 @@ Current frontier ABI boundary seed:
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
-source_rows=13
-discovered_functions=649
-structured_functions=649
-generic_codegen_functions=649
-generic_cfg_functions=649
+source_rows=14
+discovered_functions=650
+structured_functions=650
+generic_codegen_functions=650
+generic_cfg_functions=650
 structural_matcher_functions=0
-structured_air_v2_functions=649
-typed_air_operand_functions=649
+structured_air_v2_functions=650
+typed_air_operand_functions=650
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=649
+generic_lowering_functions=650
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=649
+object_emitted_functions=650
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -170,8 +181,8 @@ local_fail=0
 Native-link progress is green for all three modes:
 
 ```text
-native_link_accepted_rows=13
-executable_ok_rows=13
+native_link_accepted_rows=14
+executable_ok_rows=14
 link_only_rows=0
 runtime_boundary_rows=0
 unsupported_zig_linker_feature_rows=0
@@ -217,8 +228,8 @@ boundary until the store-side bounds/panic CFG path is implemented.
 Executable ABI proof is green for all three modes:
 
 ```text
-native_link_accepted_rows=13
-executable_ok_rows=13
+native_link_accepted_rows=14
+executable_ok_rows=14
 link_only_rows=0
 runtime_boundary_rows=0
 unsupported_zig_linker_feature_rows=0

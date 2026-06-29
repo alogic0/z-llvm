@@ -233,11 +233,11 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
             },
         },
         .frontier => .{
-            .source_rows = 13,
-            .functions = 649,
+            .source_rows = 14,
+            .functions = 650,
             .executable = .{
-                .native_link_accepted_rows = 13,
-                .executable_ok_rows = 13,
+                .native_link_accepted_rows = 14,
+                .executable_ok_rows = 14,
                 .link_only_rows = 0,
                 .runtime_boundary_rows = 0,
             },
@@ -488,6 +488,7 @@ pub fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_nested_loops.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier scalarized loop frontier values", .c_path = "test/zig/harnesses/frontier_frontier_nested_loops.c" };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_nested_records.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier record scalar values", .c_path = "test/zig/harnesses/frontier_frontier_nested_records.c" };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_optionals_errors.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier optional/error control flow", .c_path = "test/zig/harnesses/frontier_frontier_optionals_errors.c" };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_union_tags.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier union tag payloads", .c_path = "test/zig/harnesses/frontier_frontier_union_tags.c" };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_slice_pointer_arith.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier pointer load forms", .c_path = "test/zig/harnesses/frontier_frontier_slice_pointer_arith.c" };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_comptime_constants.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier comptime constants", .c_path = "test/zig/harnesses/frontier_frontier_comptime_constants.c" };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_helper_graph.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier private helper graph", .c_path = "test/zig/harnesses/frontier_frontier_helper_graph.c" };

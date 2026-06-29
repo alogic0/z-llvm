@@ -129,6 +129,7 @@ const typedV2RuntimeOptionalPointerMainRecords = typed_v2.typedV2RuntimeOptional
 const typedV2RuntimePointerLoadStoreMainRecords = typed_v2.typedV2RuntimePointerLoadStoreMainRecords;
 const typedV2MixCAddMayPanicRecords = typed_v2.typedV2MixCAddMayPanicRecords;
 const typedV2CheckedIntFromFloatRecords = typed_v2.typedV2CheckedIntFromFloatRecords;
+const typedV2UnionTagPayloadSwitchRecords = typed_v2.typedV2UnionTagPayloadSwitchRecords;
 const lowerTypedV2ArraySum = legacy.lowerTypedV2ArraySum;
 const lowerTypedV2AggregatePairAbi = legacy.lowerTypedV2AggregatePairAbi;
 const lowerTypedV2SmallIntegerAggregateAbi = typed_v2.lowerTypedV2SmallIntegerAggregateAbi;
@@ -151,6 +152,7 @@ const lowerTypedV2RuntimeOptionalPointerMain = typed_v2.lowerTypedV2RuntimeOptio
 const lowerTypedV2RuntimePointerLoadStoreMain = typed_v2.lowerTypedV2RuntimePointerLoadStoreMain;
 const lowerTypedV2MixCAddMayPanic = typed_v2.lowerTypedV2MixCAddMayPanic;
 const lowerTypedV2CheckedIntFromFloat = typed_v2.lowerTypedV2CheckedIntFromFloat;
+const lowerTypedV2UnionTagPayloadSwitch = typed_v2.lowerTypedV2UnionTagPayloadSwitch;
 
 const lowerErrorClassify = typed_v2_fallbacks.lowerErrorClassify;
 const lowerErrorSwitch = typed_v2_fallbacks.lowerErrorSwitch;
@@ -400,6 +402,11 @@ pub fn firstUnsupported(
             typedV2CheckedIntFromFloatRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_union_tag_payload_switch =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2UnionTagPayloadSwitchRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
@@ -427,6 +434,7 @@ pub fn firstUnsupported(
         typed_mix_c_add_may_panic or
         mixCAddMayPanicShape(function) or
         typed_checked_int_from_float or
+        typed_union_tag_payload_switch or
         typed_maybe_error)
     {
         return null;
@@ -681,6 +689,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2CheckedIntFromFloat(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2UnionTagPayloadSwitch(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
