@@ -1,4 +1,5 @@
 extern int z_frontier_optional_merge(int, int) __asm__("frontier_optionals_errors.frontier_optional_merge");
+extern int z_frontier_optional_ptr_non_null(const int *) __asm__("frontier_optionals_errors.frontier_optional_ptr_non_null");
 extern int z_frontier_error_payload(int, int) __asm__("frontier_optionals_errors.frontier_error_payload");
 extern int z_frontier_error_union_match(int) __asm__("frontier_optionals_errors.frontier_error_union_match");
 extern int z_frontier_try_match(int, int) __asm__("frontier_optionals_errors.frontier_try_match");
@@ -9,8 +10,11 @@ extern int z_frontier_try_switch_match(int, int) __asm__("frontier_optionals_err
 extern int z_frontier_maybe_error_tag_match(int, int) __asm__("frontier_optionals_errors.frontier_maybe_error_tag_match");
 extern int z_frontier_error_tag_switch(int, int) __asm__("frontier_optionals_errors.frontier_error_tag_switch");
 int main(void) {
+    const int ptr_value = 49;
     if (z_frontier_optional_merge(1, 30) != 30) return 1;
     if (z_frontier_optional_merge(0, 30) != -17) return 2;
+    if (z_frontier_optional_ptr_non_null(&ptr_value) != 49) return 27;
+    if (z_frontier_optional_ptr_non_null(0) != -49) return 28;
     if (z_frontier_error_payload(0, 40) != 42) return 3;
     if (z_frontier_error_union_match(0) != 14) return 4;
     if (z_frontier_error_union_match(1) != -22) return 5;

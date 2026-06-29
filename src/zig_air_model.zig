@@ -1985,10 +1985,27 @@ pub fn typedBranchI32ConstValue(instruction: air_export.TypedInstruction) ?i32 {
     return typedConstI32Operand(instruction, 1);
 }
 
+pub fn typedReturnI32ConstValue(instruction: air_export.TypedInstruction) ?i32 {
+    if (!air_capabilities.isReturnOpcode(instruction.opcode)) return null;
+    if (instruction.operands.len != 1) return null;
+    if (!isTypedI32ConstOperand(instruction.operands[0])) return null;
+    return typedConstI32Operand(instruction, 0);
+}
+
 pub fn typedLastBranchI32ConstValue(structured_air_v2: air_export.StructuredAirV2) ?i32 {
     var result: ?i32 = null;
     for (structured_air_v2.instructions) |instruction_record| {
         if (typedBranchI32ConstValue(instruction_record)) |value| result = value;
+    }
+    return result;
+}
+
+pub fn typedLastBranchOrReturnI32ConstValue(structured_air_v2: air_export.StructuredAirV2) ?i32 {
+    var result: ?i32 = null;
+    for (structured_air_v2.instructions) |instruction_record| {
+        if (typedBranchI32ConstValue(instruction_record) orelse typedReturnI32ConstValue(instruction_record)) |value| {
+            result = value;
+        }
     }
     return result;
 }
@@ -2204,6 +2221,12 @@ test "typed AIR model collects branch i32 constants" {
     var add_details = [_]air_export.TypedDetail{
         .{ .key = "operand1_text", .value = "<i32, 11>" },
     };
+    const ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "const", .value = "value", .type_text = "i32" },
+    };
+    var ret_details = [_]air_export.TypedDetail{
+        .{ .key = "operand0_text", .value = "<i32, -49>" },
+    };
     const instructions = [_]air_export.TypedInstruction{
         .{
             .index = 0,
@@ -2226,7 +2249,8 @@ test "typed AIR model collects branch i32 constants" {
             .opcode = "ret",
             .result_type = "void",
             .data_kind = "un_op",
-            .operands = &.{},
+            .operands = @constCast(&ret_operands),
+            .details = &ret_details,
         },
     };
     const structured_air_v2 = air_export.StructuredAirV2{
@@ -2236,6 +2260,8 @@ test "typed AIR model collects branch i32 constants" {
 
     try std.testing.expectEqual(@as(i32, 7), typedBranchI32ConstValue(instructions[0]).?);
     try std.testing.expectEqual(@as(i32, 7), typedLastBranchI32ConstValue(structured_air_v2).?);
+    try std.testing.expectEqual(@as(i32, -49), typedReturnI32ConstValue(instructions[2]).?);
+    try std.testing.expectEqual(@as(i32, -49), typedLastBranchOrReturnI32ConstValue(structured_air_v2).?);
     try std.testing.expectEqual(@as(usize, 1), typedBranchI32ConstValues(structured_air_v2, &values).?);
     try std.testing.expectEqual(@as(i32, 7), values[0]);
     try std.testing.expectEqual(@as(i32, 11), typedFirstI32ConstOperandForOpcodes(structured_air_v2, &.{"add"}, 1).?);

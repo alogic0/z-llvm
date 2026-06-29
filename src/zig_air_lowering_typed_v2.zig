@@ -706,11 +706,20 @@ pub fn lowerTypedV2OptionalPointer(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2OptionalPointerRecords(function_type, structured_air_v2)) return null;
-    return try lowerOptionalPointer(allocator, air_function, typedV2OptionalPointerAddImm(structured_air_v2) orelse 0);
+    return try lowerOptionalPointer(
+        allocator,
+        air_function,
+        typedV2OptionalPointerAddImm(structured_air_v2) orelse 0,
+        typedV2OptionalPointerFallback(structured_air_v2) orelse return error.UnsupportedAir,
+    );
 }
 
 pub fn typedV2OptionalPointerAddImm(structured_air_v2: air_export.StructuredAirV2) ?i32 {
     return air_model.typedFirstI32ConstOperandForOpcodes(structured_air_v2, &.{ "add", "add_safe" }, 1);
+}
+
+pub fn typedV2OptionalPointerFallback(structured_air_v2: air_export.StructuredAirV2) ?i32 {
+    return air_model.typedLastBranchOrReturnI32ConstValue(structured_air_v2);
 }
 
 pub fn typedV2OptionalPointerRecords(
@@ -723,14 +732,22 @@ pub fn typedV2OptionalPointerRecords(
         return false;
     }
     const ret_count = air_model.typedReturnOpcodeCount(structured_air_v2);
+    const block_count = air_model.typedOpcodeCount(structured_air_v2, "block");
+    const non_null_count = air_model.typedOpcodeCount(structured_air_v2, "is_non_null");
+    const br_count = air_model.typedOpcodeCount(structured_air_v2, "br");
+    const cond_br_count = air_model.typedOpcodeCount(structured_air_v2, "cond_br");
+    const release_fast_shape = block_count == 1 and non_null_count == 1 and br_count == 1 and cond_br_count == 1;
+    const checked_unwrap_shape = block_count == 2 and
+        non_null_count == 2 and
+        br_count == 2 and
+        cond_br_count == 2 and
+        air_model.typedCalleeNameCount(structured_air_v2, "unwrapNull") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "unreach") == 1;
     return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "is_non_null") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "optional_payload") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
-        ret_count == 2;
+        ret_count == 2 and
+        (release_fast_shape or checked_unwrap_shape);
 }
 
 pub fn lowerTypedV2PackedBits(

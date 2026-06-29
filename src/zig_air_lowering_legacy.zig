@@ -668,7 +668,7 @@ pub fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_functio
     return runtime_wrappers.lowerOptionalPointerMain(allocator, air_function);
 }
 
-pub fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function, add_imm: i32) !ir.Function {
+pub fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function, add_imm: i32, fallback: i32) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or function_type.params[0].ir_type != .ptr or
@@ -727,7 +727,7 @@ pub fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_expo
     errdefer merge.deinit(allocator);
     var phi: ir.PhiInst = .{ .ty = .{ .int = 32 }, .incoming = .empty };
     errdefer phi.deinit(allocator);
-    try phi.incoming.append(allocator, .{ .value = .{ .int = -1 }, .block = "entry" });
+    try phi.incoming.append(allocator, .{ .value = .{ .int = fallback }, .block = "entry" });
     try phi.incoming.append(allocator, .{ .value = .{ .named = loaded_value_name }, .block = "load" });
     try merge.instructions.append(allocator, .{ .result = "result", .kind = .{ .phi = phi } });
     merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };

@@ -3,6 +3,13 @@ export fn frontier_optional_merge(flag: i32, value: i32) i32 {
     return maybe_value orelse -17;
 }
 
+export fn frontier_optional_ptr_non_null(ptr: ?*const i32) i32 {
+    if (ptr != null) {
+        return ptr.?.*;
+    }
+    return -49;
+}
+
 export fn frontier_error_payload(flag: i32, value: i32) i32 {
     _ = flag;
     return value + 2;
