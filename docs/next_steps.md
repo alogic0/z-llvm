@@ -519,6 +519,10 @@ Execution order:
    v2, generic CFG, z_llvm object emission, native link, and executable proof.
    The slice pointer address proof now includes `slice.ptr` plus constant
    offset plus runtime index feeding a store/reload, not just a derived load.
+   It also covers a pointer-to-array slice expression (`values[0..]`) that Zig
+   exports as typed `bitcast`/`ptr_add`/`ptr_elem_ptr` data, proving the
+   address model handles this source-backed array-to-slice pointer form without
+   a selected function-name path.
    The optional-pointer slice also admits `is_non_null_ptr` through the shared
    optional semantic classifier and lowers a source-backed `?*const i32` null
    fallback from typed-v2 branch/return constants. ReleaseSafe checked unwrap
@@ -1348,12 +1352,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=672`,
-`generic_codegen_functions=672`, `generic_cfg_functions=672`,
+frontier gate reports `source_rows=14`, `discovered_functions=673`,
+`generic_codegen_functions=673`, `generic_cfg_functions=673`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=672`, `object_failures=0`,
+`object_emitted_functions=673`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1366,9 +1370,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=672`,
-`generic_cfg_functions=672`, `structural_matcher_functions=0`,
-`object_emitted_functions=672`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=673`,
+`generic_cfg_functions=673`, `structural_matcher_functions=0`,
+`object_emitted_functions=673`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

@@ -116,11 +116,12 @@ constant `ptr_sub`, runtime `ptr_sub` with one additive and one subtractive
 dynamic index term, pointer-add-fed loads, pointer-add-fed stores, and
 load/store through derived slice element pointers. The same typed address path
 now covers `slice.ptr` plus constant offset plus runtime index feeding a
-store/reload, so the slice pointer proof is not load-only. The x86_64 generic
-CFG path now uses a reusable typed
-address model with a base pointer, additive and subtractive dynamic index
-terms, constant byte offset, scalar width, and conservative element-size
-checks. Accepted rows prove
+store/reload, so the slice pointer proof is not load-only. It also covers a
+pointer-to-array slice (`values[0..]`) lowered from typed
+`bitcast`/`ptr_add`/`ptr_elem_ptr` facts. The x86_64 generic CFG path now uses
+a reusable typed address model with a base pointer, additive and subtractive
+dynamic index terms, constant byte offset, scalar width, and conservative
+element-size checks. Accepted rows prove
 i8, i16, i32, and i64 scalar pointer loads/stores, including dynamic-index and
 constant-offset forms. The accepted rows now include a two-term dynamic address
 where the subtractive index arrives in `%rcx`; the emitter consumes that term
@@ -196,20 +197,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=672
-structured_functions=672
-generic_codegen_functions=672
-generic_cfg_functions=672
+discovered_functions=673
+structured_functions=673
+generic_codegen_functions=673
+generic_cfg_functions=673
 structural_matcher_functions=0
-structured_air_v2_functions=672
-typed_air_operand_functions=672
+structured_air_v2_functions=673
+typed_air_operand_functions=673
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=672
+generic_lowering_functions=673
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=672
+object_emitted_functions=673
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

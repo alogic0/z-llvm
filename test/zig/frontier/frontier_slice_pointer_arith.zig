@@ -160,6 +160,12 @@ export fn frontier_slice_elem_ptr_store(values: [*]i32, len: usize, index: usize
     return slice[index];
 }
 
+export fn frontier_array_pointer_slice_load(values: *const [4]i32, index: usize) i32 {
+    @setRuntimeSafety(false);
+    const slice = values[0..];
+    return slice[index];
+}
+
 export fn frontier_slice_ptr_const_runtime_load(values: [*]const i32, len: usize, index: usize) i32 {
     const slice = values[0..len];
     const base = slice.ptr + 1;
