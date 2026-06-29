@@ -209,6 +209,16 @@ export fn frontier_try_ptr_switch_match(tag: i32, value: i32) i32 {
     }
 }
 
+export fn frontier_errunion_payload_ptr_branch(tag: i32, value: i32, delta: i32) i32 {
+    _ = delta;
+    var result = frontierMaybeTryPayload(tag, value);
+    if (result) |*payload| {
+        return payload.*;
+    } else |_| {
+        return -65;
+    }
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,

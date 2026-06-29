@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=654
-structured_functions=654
-generic_codegen_functions=654
-generic_cfg_functions=654
+discovered_functions=655
+structured_functions=655
+generic_codegen_functions=655
+generic_cfg_functions=655
 structural_matcher_functions=0
-structured_air_v2_functions=654
-typed_air_operand_functions=654
+structured_air_v2_functions=655
+typed_air_operand_functions=655
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=654
+generic_lowering_functions=655
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=654
+object_emitted_functions=655
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 654-function counters above plus `native_link_accepted_rows=14`,
+14-source / 655-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -748,7 +748,7 @@ The aggregate/type-layout refactor starts the next ownership phase: named
 aggregate decoding, field offsets, recursive leaf lookup, supported scalar-leaf
 collection, generic CFG aggregate field/copy lowering, and SysV aggregate
 classification now share `src/zig_air_type_layout.zig`. This preserves the
-strict 13-source / 628-function frontier executable proof while removing the
+strict 14-source / 655-function frontier executable proof while removing the
 former long fixture-path mapping block from `src/zig_air_types.zig`. The
 follow-up removes the former ambiguous nominal `Pair` compatibility rule:
 nominal `Pair` normalizes as `{ i32, i32 }`, and runtime aggregate-pair

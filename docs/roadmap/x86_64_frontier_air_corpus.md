@@ -50,6 +50,10 @@ both terminal arms rewrap payload-derived values, plus source-backed
 `try_ptr` and `try_ptr_cold` rows where the Zig hook exports pointer operands
 for `try_ptr`/`try_ptr_cold` and `unwrap_errunion_err_ptr` and z_llvm lowers
 the selected error-union pointer slot/payload path without AIR text fallback.
+The direct payload-pointer row also proves `unwrap_errunion_payload_ptr:ty_op`
+from typed-v2 facts: the exported instruction carries the error-union pointer
+operand, z_llvm decodes the selected i32 payload into a synthetic pointer
+payload value, and the executable harness checks both success and error arms.
 The optional scalar payload branch row now validates `wrap_optional`,
 `is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
 payload add/sub branch through generic single-block CFG, and has executable
@@ -157,20 +161,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=654
-structured_functions=654
-generic_codegen_functions=654
-generic_cfg_functions=654
+discovered_functions=655
+structured_functions=655
+generic_codegen_functions=655
+generic_cfg_functions=655
 structural_matcher_functions=0
-structured_air_v2_functions=654
-typed_air_operand_functions=654
+structured_air_v2_functions=655
+typed_air_operand_functions=655
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=654
+generic_lowering_functions=655
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=654
+object_emitted_functions=655
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -227,7 +231,7 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 13-source / 628-function strict frontier
+are not counted in the accepted 14-source / 655-function strict frontier
 executable proof. Stack-pressure forwarding for the previous
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 indirect and stack-source
 rows is now accepted in the frontier corpus; the boundary gate keeps
