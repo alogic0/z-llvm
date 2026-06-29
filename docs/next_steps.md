@@ -696,8 +696,9 @@ Validation after these refactor slices is saved in
   `pointer-address` 50417/59226/49313,
   `aggregate-shape` 30599/64537/29881,
   `vector` 26132/not-refreshed/not-refreshed,
+  `union-tag-shape` 14507/not-refreshed/not-refreshed,
   `optional-shape` 6454/not-refreshed/not-refreshed,
-  `other` 16463/33949/22545, and
+  `other` 1956/33949/22545, and
   `safety-runtime` 144/11354/141 for
   ReleaseFast/ReleaseSafe/ReleaseSmall. The concrete top-pair split identifies
   `unwrap_errunion_err:ty_op` 84377/84913/82350,
@@ -705,10 +706,10 @@ Validation after these refactor slices is saved in
   `try:pl_op` 73606/73993/72265,
   `ptr_add:bin_ty_pl` 14273/19156/13966,
   `slice_len:ty_op` 13768/47605/13459, and
-  `wrap_optional:ty_op` 6454/not-refreshed/not-refreshed as the next
-  measured semantic family. The pointer and error-union shapes remain the
-  first implementation families; optional wrapping is now separately measured
-  instead of hidden in `other`.
+  `get_union_tag:opaque` 6057/not-refreshed/not-refreshed as the next
+  measured semantic families. The pointer and error-union shapes remain the
+  first implementation families; optional wrapping and union/tag operations are
+  now separately measured instead of hidden in `other`.
   Validation gate: compare against the saved compiler-core inventory baseline;
   rerun `zig build distribution-zig-air-inventory` with
   `-- --slice=compiler-core-module --mode=<mode>` only after
