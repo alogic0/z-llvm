@@ -33,7 +33,6 @@ const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegist
 const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
 const lowerConditionalSlotUpdate = legacy.lowerConditionalSlotUpdate;
 const lowerErrorUnionPayload = legacy.lowerErrorUnionPayload;
-const lowerOptionalPayload = legacy.lowerOptionalPayload;
 const lowerOptionalPointer = legacy.lowerOptionalPointer;
 const lowerPackedReadFlag = legacy.lowerPackedReadFlag;
 const lowerPackedReplaceLow = legacy.lowerPackedReplaceLow;
@@ -639,7 +638,38 @@ pub fn lowerTypedV2OptionalPayload(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     const summary = air_model.typedOptionalPayloadSummary(function_type, structured_air_v2) orelse return null;
-    return try lowerOptionalPayload(allocator, air_function, summary.fallback);
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg1" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_null",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_null" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = summary.fallback },
+            .false_value = .{ .named = "arg1" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn lowerTypedV2OptionalPayloadBranch(

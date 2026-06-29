@@ -266,8 +266,9 @@ Execution order:
    consumes a model-owned summary containing the selected add immediate,
    fallback value, and checked-unwrap marker instead of duplicating that
    extraction in the typed-v2 lowerer. The simpler typed-v2 optional-payload
-   row now also gets its fallback value from a model-owned summary rather than
-   a lowerer-local branch scan. Typed-v2 packed read/replace admission
+   row now also builds its selected `icmp`/`select`/`ret` IR directly from the
+   model-owned fallback summary instead of delegating to the legacy
+   optional-payload compatibility lowerer. Typed-v2 packed read/replace admission
    now also uses model-owned summaries instead of carrying packed-field opcode
    count predicates in the typed-v2 lowerer. Typed-v2 plain and conditional
    slice-loop admission now uses model-owned summaries as well, leaving the
