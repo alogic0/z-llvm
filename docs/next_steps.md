@@ -698,8 +698,8 @@ Validation after these refactor slices is saved in
   `vector` 26132/not-refreshed/not-refreshed,
   `union-tag-shape` 14507/not-refreshed/not-refreshed,
   `optional-shape` 6454/not-refreshed/not-refreshed,
-  `scalar-transform` 1744/not-refreshed/not-refreshed,
-  `other` 212/33949/22545, and
+  `scalar-transform` 1840/not-refreshed/not-refreshed,
+  `other` 116/33949/22545, and
   `safety-runtime` 144/11354/141 for
   ReleaseFast/ReleaseSafe/ReleaseSmall. The concrete top-pair split identifies
   `unwrap_errunion_err:ty_op` 84377/84913/82350,
@@ -712,8 +712,8 @@ Validation after these refactor slices is saved in
   first implementation families; optional wrapping, union/tag operations, and
   scalar transforms such as `byte_swap` are now separately measured instead of
   hidden in `other`. The pair report now prints the top 50 concrete pairs; the
-  residual ReleaseFast `other` bucket is 212 rows, led by exact shifts, `neg`,
-  `reduce`, and selected float math opcodes in
+  residual ReleaseFast `other` bucket is 116 rows, led by vector reduction and
+  selected float math opcodes in
   `tmp/compiler_core_module_releasefast_top50_unknown_pairs.log`.
   Validation gate: compare against the saved compiler-core inventory baseline;
   rerun `zig build distribution-zig-air-inventory` with

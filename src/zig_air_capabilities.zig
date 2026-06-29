@@ -452,7 +452,7 @@ fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
     if (containsAny(text, &.{ "try", "err", "error", "unwrap_err", "errunion" })) return .error_union_try;
     if (containsAny(text, &.{ "optional", "wrap_optional" })) return .optional_shape;
     if (containsAny(text, &.{ "union", "get_union_tag", "set_union_tag", "tag_name" })) return .union_tag_shape;
-    if (equalsAny(text, &.{ "max", "min", "abs" }) or
+    if (equalsAny(text, &.{ "max", "min", "abs", "neg", "shl_exact", "shr_exact" }) or
         containsAny(text, &.{ "byte_swap", "bit_reverse", "popcount", "clz", "ctz" })) return .scalar_transform;
     if (containsAny(text, &.{ "ptr", "addr", "gep", "nav", "field_ptr" })) return .pointer_address;
     if (containsAny(text, &.{ "switch", "dispatch" })) return .switch_dispatch;
@@ -818,6 +818,9 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("max", "opaque"));
     try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("min", "opaque"));
     try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("abs", "opaque"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("shl_exact", "bin_op"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("shr_exact", "bin_op"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("neg", "opaque"));
     try std.testing.expectEqual(UnknownOpcodeCategory.other, unknownOpcodeCategory("admin_token", "opaque"));
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("byte_swap", "opaque").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, opcodeDataKindCapability("try", "pl_op").category);
