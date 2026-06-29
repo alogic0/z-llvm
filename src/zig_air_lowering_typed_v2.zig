@@ -1356,20 +1356,7 @@ pub fn typedV2CheckedIntFromFloatRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 1) return false;
-    const param_ty = function_type.params[0].ir_type;
-    if (!param_ty.eql(.float) and !param_ty.eql(.double)) return false;
-    return function_type.return_type.ir_type.eql(.{ .int = 32 }) and
-        air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_lte") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_gte") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "bit_or") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "int_from_float") == 1 and
-        air_model.typedCalleeNameCount(structured_air_v2, "integerPartOutOfBounds") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "unreach") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedCheckedIntFromFloatSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2CheckedIntFromFloat(
@@ -1379,12 +1366,10 @@ pub fn lowerTypedV2CheckedIntFromFloat(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2CheckedIntFromFloatRecords(function_type, structured_air_v2)) return null;
-    const operand_ty = function_type.params[0].ir_type;
-    const low_value = air_model.typedConstantOperandValueText(structured_air_v2, "cmp_lte") orelse return null;
-    const high_value = air_model.typedConstantOperandValueText(structured_air_v2, "cmp_gte") orelse return null;
-    const low_text = try normalizedFpLiteralText(module, low_value);
-    const high_text = try normalizedFpLiteralText(module, high_value);
+    const summary = air_model.typedCheckedIntFromFloatSummary(function_type, structured_air_v2) orelse return null;
+    const operand_ty = summary.operand_ty;
+    const low_text = try normalizedFpLiteralText(module, summary.low_value);
+    const high_text = try normalizedFpLiteralText(module, summary.high_value);
     const callee = callee: {
         const dot = std.mem.lastIndexOfScalar(u8, air_function.name, '.') orelse
             break :callee "integerPartOutOfBounds";

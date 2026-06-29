@@ -892,6 +892,12 @@ pub const TypedOptionalPayloadBranchSummary = struct {
     fallback: i32,
 };
 
+pub const TypedCheckedIntFromFloatSummary = struct {
+    operand_ty: ir.Type,
+    low_value: []const u8,
+    high_value: []const u8,
+};
+
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
     if (!view.operandCoverage()) return null;
@@ -2366,6 +2372,34 @@ pub fn typedOptionalPayloadBranchSummary(
 
     const fallback = typedRetI32Const(structured_air_v2) orelse return null;
     return .{ .threshold = threshold, .fallback = fallback };
+}
+
+pub fn typedCheckedIntFromFloatSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedCheckedIntFromFloatSummary {
+    if (function_type.params.len != 1) return null;
+    const operand_ty = function_type.params[0].ir_type;
+    if (!operand_ty.eql(.float) and !operand_ty.eql(.double)) return null;
+    if (!function_type.return_type.ir_type.eql(.{ .int = 32 })) return null;
+    if (typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_lte") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_gte") != 1 or
+        typedOpcodeCount(structured_air_v2, "bit_or") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 1 or
+        typedOpcodeCount(structured_air_v2, "int_from_float") != 1 or
+        typedCalleeNameCount(structured_air_v2, "integerPartOutOfBounds") != 1 or
+        typedOpcodeCount(structured_air_v2, "unreach") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{
+        .operand_ty = operand_ty,
+        .low_value = typedConstantOperandValueText(structured_air_v2, "cmp_lte") orelse return null,
+        .high_value = typedConstantOperandValueText(structured_air_v2, "cmp_gte") orelse return null,
+    };
 }
 
 fn typedUnionFieldVal(structured_air_v2: air_export.StructuredAirV2, field_index: usize) ?air_export.TypedInstruction {
