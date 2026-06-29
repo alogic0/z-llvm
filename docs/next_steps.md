@@ -592,6 +592,10 @@ Aggregate/type-layout ownership start:
   tmp/aggregate_layout_provider_audit_empty_sidecar.log` now reports
   `exported_facts=0`, `static_source_facts=0`, `boundary_provider=2`, and
   `generated_examples=0` after retiring the final non-frontier sidecar facts.
+  In this static provider audit, `exported_facts` means checked-in sidecar
+  exported facts only. Per-descriptor Zig-emitted aggregate facts are observed
+  during AIR gate runs and are not counted by this sidecar/static provider
+  audit.
   The prior broad failure was not a missing aggregate fact: `pointers_memory.load_store`
   and `runtime_pointer_load_store_main.loadStore` were plain pointer-memory rows
   hitting aggregate ABI routing, and `runtime_aggregate_pair_main.main` needed

@@ -768,7 +768,9 @@ optional `aggregate_layout_facts_bytes` section and gives descriptor facts
 precedence over compatibility sidecars. The current empty-sidecar provider
 audit reports `exported_facts=0`, `static_source_facts=0`,
 `boundary_provider=2`, and `generated_examples=0`; the former 3 non-frontier
-sidecar compatibility facts have been retired. Packed/unaligned aggregate ABI
+sidecar compatibility facts have been retired. In that static provider audit,
+`exported_facts` means checked-in sidecar exported facts, not per-descriptor
+Zig-emitted facts observed during AIR gate runs. Packed/unaligned aggregate ABI
 remains a 2-row targeted boundary through
 `src/zig_air_aggregate_layout_boundaries.zig` rather than a fallback layout.
 Register

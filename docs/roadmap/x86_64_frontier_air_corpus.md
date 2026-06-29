@@ -117,7 +117,8 @@ optional `aggregate_layout_facts_bytes` section and gives descriptor facts
 precedence over compatibility sidecars. The current empty-sidecar provider
 audit reports `exported_facts=0`, `static_source_facts=0`,
 `boundary_provider=2`, and `generated_examples=0`; accepted frontier aggregate
-layouts are descriptor-fact owned, and the former non-frontier sidecar
+layouts are descriptor-fact owned during AIR gate runs, while this static audit
+counts only checked-in sidecar exported facts. The former non-frontier sidecar
 compatibility facts have been retired.
 The 2 packed/unaligned targeted entries are boundary-owned through
 `src/zig_air_aggregate_layout_boundaries.zig`.
