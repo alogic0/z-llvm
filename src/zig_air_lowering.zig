@@ -1308,6 +1308,9 @@ const LoweringContext = struct {
             try self.lowerTypedCondBodiesReturn(cond, cond_instruction.index, then_body, else_body);
             return;
         }
+        if (try self.lowerTypedBranchReturnContinueValueBlock(instruction, cond, then_body, else_body)) {
+            return;
+        }
         if (try self.lowerTypedBranchReturnContinueBlock(instruction, cond, then_body, else_body)) {
             return;
         }
@@ -1590,6 +1593,48 @@ const LoweringContext = struct {
         return true;
     }
 
+    fn lowerTypedBranchReturnContinueValueBlock(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+        cond: TypedValue,
+        then_body: air_export.StructuredBody,
+        else_body: air_export.StructuredBody,
+    ) LowerError!bool {
+        const view = self.typed_view orelse return error.UnsupportedAir;
+        const then_returns = view.bodyHasReturn(then_body);
+        const else_returns = view.bodyHasReturn(else_body);
+        if (then_returns == else_returns) return false;
+
+        const merge_type = self.typedBlockResultType(instruction) orelse return false;
+        if (merge_type.ir_type == .void) return false;
+
+        const continue_body = if (then_returns) else_body else then_body;
+        const return_body = if (then_returns) then_body else else_body;
+        const return_label = try ownPrint(self.module, "block{}_return", .{instruction.index});
+        const cont_label = try ownPrint(self.module, "block{}_cont", .{instruction.index});
+
+        var finished = self.block.*;
+        finished.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = cond.value,
+            .then_target = if (then_returns) return_label else cont_label,
+            .else_target = if (then_returns) cont_label else return_label,
+        } };
+        self.block.* = ir.BasicBlock.init(return_label);
+        try self.function.blocks.append(self.allocator, finished);
+
+        try self.lowerTypedBodyToTerminalBlock(return_label, return_body);
+
+        self.block.* = ir.BasicBlock.init(cont_label);
+        const continue_value = try self.lowerTypedBranchBodyToOpenContinuation(
+            instruction.index,
+            continue_body,
+            merge_type,
+        );
+        self.values[instruction.index] = continue_value;
+        return true;
+    }
+
     // Lowers a ReleaseSafe void guard block into real control flow: the
     // current block ends with the guard branch, the cold noreturn panic call
     // gets its own block, and lowering continues in a fresh continuation
@@ -1750,6 +1795,33 @@ const LoweringContext = struct {
             .value = branch_value,
             .predecessor_label = predecessor_label,
         };
+    }
+
+    fn lowerTypedBranchBodyToOpenContinuation(
+        self: *LoweringContext,
+        target_block: u32,
+        body: air_export.StructuredBody,
+        merge_type: ZigType,
+    ) LowerError!TypedValue {
+        const view = self.typed_view orelse return error.UnsupportedAir;
+        var branch_value: ?TypedValue = null;
+        var saw_branch = false;
+        for (body.instructions) |instruction_index| {
+            const child = view.instruction(instruction_index) orelse return error.UnsupportedAir;
+            if (view.capability(child).status == .ignored_metadata) continue;
+            if (air_capabilities.isBrOpcode(child.opcode)) {
+                if (child.operands.len != 2) return error.UnsupportedAir;
+                const target = typedBlockTarget(child.operands[0]) orelse return error.UnsupportedAir;
+                if (target != target_block) return error.UnsupportedAir;
+                branch_value = (try self.resolveTypedBranchOperand(child, 1)) orelse return error.UnsupportedAir;
+                saw_branch = true;
+                continue;
+            }
+            if (saw_branch) return error.UnsupportedAir;
+            try self.lowerTypedInstruction(child);
+        }
+        const value = if (saw_branch) branch_value orelse return error.UnsupportedAir else return error.UnsupportedAir;
+        return try self.coerceTypedBranchValueToMerge(target_block, self.block.name, value, merge_type);
     }
 
     fn coerceTypedBranchValueToMerge(

@@ -384,6 +384,10 @@ Execution order:
    with an error-arm switch over the extracted error tag, proving the shared
    error-tag switch return path applies to pointer-form payload success arms
    without a selected function-name gate.
+   The catch/remap row now lowers a post-try catch body that switches over the
+   unwrapped error tag, returns remapped error-union constants from the cold
+   arms, and rewraps the hot payload after arithmetic through the same
+   typed-v2 block/branch and generic CFG backend path.
    Together these prove the same pointer-slot model beyond simple branch
    continuations.
    These rows pass through typed AIR v2, generic CFG, z_llvm object
@@ -1223,12 +1227,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=659`,
-`generic_codegen_functions=659`, `generic_cfg_functions=659`,
+frontier gate reports `source_rows=14`, `discovered_functions=661`,
+`generic_codegen_functions=661`, `generic_cfg_functions=661`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=659`, `object_failures=0`,
+`object_emitted_functions=661`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1241,9 +1245,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=659`,
-`generic_cfg_functions=659`, `structural_matcher_functions=0`,
-`object_emitted_functions=659`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=661`,
+`generic_cfg_functions=661`, `structural_matcher_functions=0`,
+`object_emitted_functions=661`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

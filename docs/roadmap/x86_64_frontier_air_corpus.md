@@ -62,6 +62,10 @@ The follow-up direct payload-pointer row pairs the same success-arm payload
 path with an error-arm switch over the extracted error tag, proving the
 pointer-form payload path composes with the existing error-tag switch return
 lowering without a selected function-name gate.
+The catch/remap row adds a post-try catch body that switches over the
+unwrapped error tag, returns remapped error-union constants from the cold arms,
+and rewraps the hot payload after arithmetic through typed-v2 block lowering
+and generic CFG backend codegen.
 The optional scalar payload branch row now validates `wrap_optional`,
 `is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
 payload add/sub branch through generic single-block CFG, and has executable
@@ -173,20 +177,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=659
-structured_functions=659
-generic_codegen_functions=659
-generic_cfg_functions=659
+discovered_functions=661
+structured_functions=661
+generic_codegen_functions=661
+generic_cfg_functions=661
 structural_matcher_functions=0
-structured_air_v2_functions=659
-typed_air_operand_functions=659
+structured_air_v2_functions=661
+typed_air_operand_functions=661
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=659
+generic_lowering_functions=661
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=659
+object_emitted_functions=661
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

@@ -17,6 +17,7 @@ extern int z_frontier_nested_try_ptr_match(int, int, int) __asm__("frontier_opti
 extern int z_frontier_try_ptr_switch_match(int, int) __asm__("frontier_optionals_errors.frontier_try_ptr_switch_match");
 extern int z_frontier_errunion_payload_ptr_branch(int, int, int) __asm__("frontier_optionals_errors.frontier_errunion_payload_ptr_branch");
 extern int z_frontier_errunion_payload_ptr_error_switch(int, int) __asm__("frontier_optionals_errors.frontier_errunion_payload_ptr_error_switch");
+extern int z_frontier_try_catch_map_match(int, int) __asm__("frontier_optionals_errors.frontier_try_catch_map_match");
 extern int z_frontier_maybe_error_tag_match(int, int) __asm__("frontier_optionals_errors.frontier_maybe_error_tag_match");
 extern int z_frontier_error_tag_switch(int, int) __asm__("frontier_optionals_errors.frontier_error_tag_switch");
 int main(void) {
@@ -70,6 +71,9 @@ int main(void) {
     if (z_frontier_errunion_payload_ptr_error_switch(0, 40) != 42) return 57;
     if (z_frontier_errunion_payload_ptr_error_switch(1, 40) != -67) return 58;
     if (z_frontier_errunion_payload_ptr_error_switch(2, 40) != -68) return 59;
+    if (z_frontier_try_catch_map_match(0, 36) != 42) return 62;
+    if (z_frontier_try_catch_map_match(1, 36) != -72) return 63;
+    if (z_frontier_try_catch_map_match(2, 36) != -71) return 64;
     if (z_frontier_maybe_error_tag_match(0, 46) != 46) return 21;
     if (z_frontier_maybe_error_tag_match(1, 46) != -46) return 22;
     if (z_frontier_maybe_error_tag_match(2, 46) != -46) return 23;

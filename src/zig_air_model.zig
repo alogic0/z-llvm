@@ -340,18 +340,24 @@ pub const TypedFunctionView = struct {
         if (self.bodyEndsInReturn(structured_body)) return true;
         if (self.noreturnBody(structured_body)) return true;
         var saw_branch = false;
+        var saw_return = false;
         for (structured_body.instructions) |instruction_index| {
             const typed_instruction = self.instruction(instruction_index) orelse return false;
             const typed_capability = self.capability(typed_instruction);
             if (typed_capability.status == .ignored_metadata) continue;
             if (air_capabilities.isBrOpcode(typed_instruction.opcode)) {
-                if (saw_branch or typed_instruction.operands.len != 2) return false;
+                if (saw_branch or saw_return or typed_instruction.operands.len != 2) return false;
                 const target = blockTarget(typed_instruction.operands[0]) orelse return false;
                 if (target != target_block) return false;
                 saw_branch = true;
                 continue;
             }
-            if (saw_branch) return false;
+            if (air_capabilities.isReturnOpcode(typed_instruction.opcode)) {
+                if (saw_branch or saw_return or typed_instruction.operands.len != 1) return false;
+                saw_return = true;
+                continue;
+            }
+            if (saw_branch or saw_return) return false;
             if (air_capabilities.isBlockOpcode(typed_instruction.opcode)) {
                 if (!self.genericCfgBlock(typed_instruction.index) and
                     !self.voidGuardBlockByIndex(typed_instruction.index))
@@ -361,13 +367,12 @@ pub const TypedFunctionView = struct {
                 continue;
             }
             if (!air_capabilities.typedV2CanLower(typed_capability) or
-                air_capabilities.isReturnOpcode(typed_instruction.opcode) or
                 air_capabilities.isUnreachOpcode(typed_instruction.opcode))
             {
                 return false;
             }
         }
-        return saw_branch;
+        return saw_branch or saw_return;
     }
 
     pub fn containsGenericCfgBlockInstruction(self: TypedFunctionView, instruction_index: u32) bool {

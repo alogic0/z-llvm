@@ -246,6 +246,27 @@ export fn frontier_errunion_payload_ptr_error_switch(tag: i32, value: i32) i32 {
     }
 }
 
+fn frontierTryCatchMap(tag: i32, value: i32) FrontierError!i32 {
+    const payload = frontierMaybeErrorTag(tag, value) catch |err| {
+        return switch (err) {
+            FrontierError.BadTag => FrontierError.WorseTag,
+            FrontierError.WorseTag => FrontierError.BadTag,
+        };
+    };
+    return payload + 6;
+}
+
+export fn frontier_try_catch_map_match(tag: i32, value: i32) i32 {
+    if (frontierTryCatchMap(tag, value)) |payload| {
+        return payload;
+    } else |err| {
+        return switch (err) {
+            FrontierError.BadTag => -71,
+            FrontierError.WorseTag => -72,
+        };
+    }
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,
