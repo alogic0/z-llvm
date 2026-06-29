@@ -94,7 +94,8 @@ implementation slices can target concrete AIR shapes.
 | pointer-address | 50417 | 59226 | 49313 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
 | aggregate-shape | 30599 | 64537 | 29881 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | aggregate semantic lowering, ABI planner |
 | vector | 26132 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
-| other | 22917 | 33949 | 22545 | `../ziglang/src/main.zig` | `print_targets.cmdTargets` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
+| optional-shape | 6454 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
+| other | 16463 | 33949 | 22545 | `../ziglang/src/main.zig` | `print_targets.cmdTargets` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
 | safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
@@ -110,10 +111,10 @@ implementation slices can target concrete AIR shapes.
 | 3 | `error-union-try:try:pl_op` | 73606 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
 | 4 | `vector:shuffle_one:opaque` | 26122 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
 | 5 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17458 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
-| 6 | `aggregate-shape:slice_len:ty_op` | 13766 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
+| 6 | `aggregate-shape:slice_len:ty_op` | 13768 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
 | 7 | `pointer-address:slice_ptr:ty_op` | 11920 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |
 | 8 | `aggregate-shape:slice:bin_ty_pl` | 10895 | `safety-runtime:intcast_safe:ty_op` | 11185 | `aggregate-shape:slice:bin_ty_pl` | 10603 |
-| 9 | `other:wrap_optional:ty_op` | 6453 | `aggregate-shape:slice:bin_ty_pl` | 10942 | `other:wrap_optional:ty_op` | 6359 |
+| 9 | `optional-shape:wrap_optional:ty_op` | 6454 | `aggregate-shape:slice:bin_ty_pl` | 10942 | `other:wrap_optional:ty_op` | 6359 |
 | 10 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6343 | `other:get_union_tag:opaque` | 10923 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6250 |
 
 ## Top Opcode Categories

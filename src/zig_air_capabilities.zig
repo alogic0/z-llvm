@@ -169,6 +169,7 @@ pub const CfgLoweringOp = enum {
 pub const UnknownOpcodeCategory = enum(u8) {
     debug_metadata,
     error_union_try,
+    optional_shape,
     pointer_address,
     switch_dispatch,
     safety_runtime,
@@ -182,6 +183,7 @@ pub const UnknownOpcodeCategory = enum(u8) {
         return switch (self) {
             .debug_metadata => "debug-metadata",
             .error_union_try => "error-union-try",
+            .optional_shape => "optional-shape",
             .pointer_address => "pointer-address",
             .switch_dispatch => "switch-dispatch",
             .safety_runtime => "safety-runtime",
@@ -444,6 +446,7 @@ pub fn dataKindCapability(data_kind: []const u8) DataKindCapability {
 fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
     if (containsAny(text, &.{ "dbg", "debug" })) return .debug_metadata;
     if (containsAny(text, &.{ "try", "err", "error", "unwrap_err", "errunion" })) return .error_union_try;
+    if (containsAny(text, &.{ "optional", "wrap_optional" })) return .optional_shape;
     if (containsAny(text, &.{ "ptr", "addr", "gep", "nav", "field_ptr" })) return .pointer_address;
     if (containsAny(text, &.{ "switch", "dispatch" })) return .switch_dispatch;
     if (containsAny(text, &.{ "safe", "panic", "overflow", "bounds", "trap", "sentinel" })) return .safety_runtime;
@@ -457,7 +460,7 @@ fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
 fn ownerForDataKindCategory(category: UnknownOpcodeCategory) CapabilityOwner {
     return switch (category) {
         .debug_metadata => .debug_metadata,
-        .error_union_try, .pointer_address, .aggregate_shape => .semantic_lowering,
+        .error_union_try, .optional_shape, .pointer_address, .aggregate_shape => .semantic_lowering,
         .switch_dispatch, .safety_runtime => .cfg_lowering,
         .call_shape => .abi_planner,
         .memory_shape, .vector => .backend,
@@ -792,6 +795,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, unknownOpcodeCategory("slice_ptr", "none"));
     try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, unknownOpcodeCategory("try_ptr", "error_union"));
     try std.testing.expectEqual(UnknownOpcodeCategory.safety_runtime, unknownOpcodeCategory("panic_cold", "none"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.optional_shape, unknownOpcodeCategory("wrap_optional", "ty_op"));
+    try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("wrap_optional", "ty_op").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, opcodeDataKindCapability("try", "pl_op").category);
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("try", "pl_op").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, dataKindCapability("ptr_slice_len_ptr:ty_op").category);
