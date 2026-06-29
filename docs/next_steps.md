@@ -695,7 +695,8 @@ Validation after these refactor slices is saved in
   `error-union-try` 236821/238174/231997,
   `pointer-address` 50417/59226/49313,
   `aggregate-shape` 30599/64537/29881,
-  `other` 49049/33949/22545, and
+  `vector` 26132/not-refreshed/not-refreshed,
+  `other` 22917/33949/22545, and
   `safety-runtime` 144/11354/141 for
   ReleaseFast/ReleaseSafe/ReleaseSmall. The concrete top-pair split identifies
   `unwrap_errunion_err:ty_op` 84377/84913/82350,

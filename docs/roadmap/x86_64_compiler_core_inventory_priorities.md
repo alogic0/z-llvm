@@ -93,7 +93,8 @@ implementation slices can target concrete AIR shapes.
 | error-union-try | 236821 | 238174 | 231997 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
 | pointer-address | 50417 | 59226 | 49313 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
 | aggregate-shape | 30599 | 64537 | 29881 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | aggregate semantic lowering, ABI planner |
-| other | 49049 | 33949 | 22545 | `../ziglang/src/main.zig` | `print_targets.cmdTargets` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
+| vector | 26132 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
+| other | 22917 | 33949 | 22545 | `../ziglang/src/main.zig` | `print_targets.cmdTargets` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
 | safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
@@ -107,7 +108,7 @@ implementation slices can target concrete AIR shapes.
 | 1 | `error-union-try:unwrap_errunion_err:ty_op` | 84377 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
 | 2 | `error-union-try:wrap_errunion_err:ty_op` | 76608 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
 | 3 | `error-union-try:try:pl_op` | 73606 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
-| 4 | `other:shuffle_one:opaque` | 26122 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
+| 4 | `vector:shuffle_one:opaque` | 26122 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
 | 5 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17458 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
 | 6 | `aggregate-shape:slice_len:ty_op` | 13766 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
 | 7 | `pointer-address:slice_ptr:ty_op` | 11920 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |

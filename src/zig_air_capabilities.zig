@@ -175,6 +175,7 @@ pub const UnknownOpcodeCategory = enum(u8) {
     aggregate_shape,
     call_shape,
     memory_shape,
+    vector,
     other,
 
     pub fn name(self: UnknownOpcodeCategory) []const u8 {
@@ -187,6 +188,7 @@ pub const UnknownOpcodeCategory = enum(u8) {
             .aggregate_shape => "aggregate-shape",
             .call_shape => "call-shape",
             .memory_shape => "memory-shape",
+            .vector => "vector",
             .other => "other",
         };
     }
@@ -448,6 +450,7 @@ fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
     if (containsAny(text, &.{ "aggregate", "struct", "field", "elem", "array", "slice" })) return .aggregate_shape;
     if (containsAny(text, &.{ "call", "invoke" })) return .call_shape;
     if (containsAny(text, &.{ "load", "store", "alloc", "memcpy", "memset", "memmove", "atomic", "cmpxchg", "fence" })) return .memory_shape;
+    if (containsAny(text, &.{ "vector", "Vector", "shuffle", "splat", "lane" })) return .vector;
     return .other;
 }
 
@@ -457,7 +460,7 @@ fn ownerForDataKindCategory(category: UnknownOpcodeCategory) CapabilityOwner {
         .error_union_try, .pointer_address, .aggregate_shape => .semantic_lowering,
         .switch_dispatch, .safety_runtime => .cfg_lowering,
         .call_shape => .abi_planner,
-        .memory_shape => .backend,
+        .memory_shape, .vector => .backend,
         .other => .unknown,
     };
 }
@@ -793,6 +796,9 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("try", "pl_op").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, dataKindCapability("ptr_slice_len_ptr:ty_op").category);
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, dataKindCapability("ptr_slice_len_ptr:ty_op").owner);
+    try std.testing.expectEqual(UnknownOpcodeCategory.vector, unknownOpcodeCategory("shuffle_one", "opaque"));
+    try std.testing.expectEqual(CapabilityOwner.backend, opcodeDataKindCapability("shuffle_one", "opaque").owner);
+    try std.testing.expectEqual(UnknownOpcodeCategory.vector, dataKindCapability("@Vector(4, f32)").category);
 
     const try_capability = opcodeCapability("try");
     try std.testing.expectEqual(OpcodeStatus.lowerable, try_capability.status);
