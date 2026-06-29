@@ -441,7 +441,8 @@ pub fn firstUnsupported(
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         if (air_capabilities.isCondBrOpcode(instruction.opcode) or
-            air_capabilities.isBrOpcode(instruction.opcode))
+            air_capabilities.isBrOpcode(instruction.opcode) or
+            air_capabilities.isSwitchBrOpcode(instruction.opcode))
         {
             if (belongsToSimpleSelectBlock(function, instruction.index)) continue;
             if (typed_view != null and typed_view.?.containsVoidGuardBlockInstruction(instruction.index)) continue;
@@ -1198,6 +1199,7 @@ const LoweringContext = struct {
     fn lowerTypedBlock(self: *LoweringContext, instruction: air_export.TypedInstruction) LowerError!void {
         const view = self.typed_view orelse return error.UnsupportedAir;
         const block_body = view.body(.block, instruction.index) orelse return error.UnsupportedAir;
+        if (try self.lowerTypedSwitchValueBlock(instruction, block_body)) return;
         const cond_instruction = try self.lowerTypedBlockBodyUntilCond(block_body);
         if (!air_capabilities.isCondBrOpcode(cond_instruction.opcode) or cond_instruction.operands.len != 1) {
             return error.UnsupportedAir;
@@ -1244,6 +1246,143 @@ const LoweringContext = struct {
         } else |_| {}
 
         try self.lowerTypedBranchMergeBlock(instruction, cond, then_body, else_body);
+    }
+
+    fn lowerTypedSwitchValueBlock(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+        body: air_export.StructuredBody,
+    ) LowerError!bool {
+        const switch_instruction = try self.singleSwitchInstruction(body) orelse return false;
+        const cond_index = switchInputIndexFromAirText(self.air_function.air_text, switch_instruction.index) orelse
+            return error.UnsupportedAir;
+        if (cond_index >= self.values.len) return error.UnsupportedAir;
+        const cond = self.values[cond_index] orelse return error.UnsupportedAir;
+        if (!cond.ty.ir_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+        const merge_type = self.typedBlockResultType(instruction) orelse {
+            return error.UnsupportedAir;
+        };
+        if (merge_type.ir_type == .void) return error.UnsupportedAir;
+
+        var case_values: std.ArrayList(i32) = .empty;
+        defer case_values.deinit(self.allocator);
+        try collectSwitchCaseValues(self.allocator, &case_values, self.air_function.air_text, switch_instruction.index);
+        if (case_values.items.len == 0) return error.UnsupportedAir;
+        if (!switchHasElseArm(self.air_function.air_text, switch_instruction.index)) return error.UnsupportedAir;
+
+        var branch_instructions: std.ArrayList(air_export.TypedInstruction) = .empty;
+        defer branch_instructions.deinit(self.allocator);
+        try self.collectBlockValueBranches(instruction.index, &branch_instructions);
+        if (branch_instructions.items.len != case_values.items.len + 1) return error.UnsupportedAir;
+
+        var labels: std.ArrayList([]const u8) = .empty;
+        defer labels.deinit(self.allocator);
+        for (case_values.items, 0..) |_, case_index| {
+            try labels.append(self.allocator, try ownPrint(self.module, "block{}_case{}", .{ instruction.index, case_index }));
+        }
+        const default_label = try ownPrint(self.module, "block{}_default", .{instruction.index});
+        try labels.append(self.allocator, default_label);
+        const merge_label = try ownPrint(self.module, "block{}_switch_merge", .{instruction.index});
+
+        var switch_term: ir.SwitchTerminator = .{
+            .cond_ty = cond.ty.ir_type,
+            .cond = cond.value,
+            .default_target = default_label,
+            .cases = .empty,
+        };
+        errdefer switch_term.cases.deinit(self.allocator);
+        for (case_values.items, 0..) |case_value, case_index| {
+            try switch_term.cases.append(self.allocator, .{
+                .value_ty = cond.ty.ir_type,
+                .value = .{ .int = case_value },
+                .target = labels.items[case_index],
+            });
+        }
+
+        var finished = self.block.*;
+        finished.terminator = .{ .@"switch" = switch_term };
+        self.block.* = ir.BasicBlock.init(labels.items[0]);
+        try self.function.blocks.append(self.allocator, finished);
+
+        var phi: ir.PhiInst = .{ .ty = merge_type.ir_type, .incoming = .empty };
+        errdefer phi.deinit(self.allocator);
+        for (branch_instructions.items, 0..) |branch_instruction, branch_index| {
+            const label = labels.items[branch_index];
+            self.block.* = ir.BasicBlock.init(label);
+            const branch_value = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instruction, merge_type);
+            try phi.incoming.append(self.allocator, .{ .value = branch_value.value, .block = label });
+            var branch_block = self.block.*;
+            branch_block.terminator = .{ .br = .{ .target = merge_label } };
+            try self.function.blocks.append(self.allocator, branch_block);
+        }
+
+        self.block.* = ir.BasicBlock.init(merge_label);
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .phi = phi },
+        });
+        self.values[instruction.index] = .{
+            .ty = merge_type,
+            .value = .{ .named = result_name },
+        };
+        return true;
+    }
+
+    fn singleSwitchInstruction(
+        self: *LoweringContext,
+        body: air_export.StructuredBody,
+    ) LowerError!?air_export.TypedInstruction {
+        const view = self.typed_view orelse return error.UnsupportedAir;
+        var switch_instruction: ?air_export.TypedInstruction = null;
+        for (body.instructions) |instruction_index| {
+            const child = view.instruction(instruction_index) orelse return error.UnsupportedAir;
+            if (view.capability(child).status == .ignored_metadata) continue;
+            if (!air_capabilities.isSwitchBrOpcode(child.opcode)) return null;
+            if (switch_instruction != null) return error.UnsupportedAir;
+            switch_instruction = child;
+        }
+        return switch_instruction;
+    }
+
+    fn collectBlockValueBranches(
+        self: *LoweringContext,
+        target_block: u32,
+        branches: *std.ArrayList(air_export.TypedInstruction),
+    ) !void {
+        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        for (structured_air_v2.instructions) |candidate| {
+            if (!air_capabilities.isBrOpcode(candidate.opcode) or candidate.operands.len != 2) continue;
+            const target = typedBlockTarget(candidate.operands[0]) orelse continue;
+            if (target == target_block) try branches.append(self.allocator, candidate);
+        }
+    }
+
+    fn lowerTypedSwitchBranchValue(
+        self: *LoweringContext,
+        target_block: u32,
+        branch_instruction: air_export.TypedInstruction,
+        merge_type: ZigType,
+    ) LowerError!TypedValue {
+        if (branch_instruction.operands.len != 2) return error.UnsupportedAir;
+        const value_index = air_model.typedInstOperandIndex(branch_instruction.operands[1]) orelse return error.UnsupportedAir;
+        try self.lowerTypedValueDependency(value_index);
+        const value = (try self.resolveTypedBranchOperand(branch_instruction, 1)) orelse return error.UnsupportedAir;
+        return try self.coerceTypedBranchValueToMerge(target_block, self.block.name, value, merge_type);
+    }
+
+    fn lowerTypedValueDependency(self: *LoweringContext, instruction_index: u32) LowerError!void {
+        if (instruction_index >= self.values.len) return error.UnsupportedAir;
+        if (self.values[instruction_index] != null) return;
+        const view = self.typed_view orelse return error.UnsupportedAir;
+        const instruction = view.instruction(instruction_index) orelse return error.UnsupportedAir;
+        if (view.capability(instruction).status == .ignored_metadata) return;
+        if (air_capabilities.cfgLoweringOpForOpcode(instruction.opcode) != .none) return error.UnsupportedAir;
+        for (instruction.operands) |operand| {
+            const operand_index = air_model.typedInstOperandIndex(operand) orelse continue;
+            try self.lowerTypedValueDependency(operand_index);
+        }
+        try self.lowerTypedInstruction(instruction);
     }
 
     fn lowerTypedCondBrReturn(self: *LoweringContext, instruction: air_export.TypedInstruction) LowerError!void {
@@ -1455,6 +1594,15 @@ const LoweringContext = struct {
         } else if (false_result.value != null) {
             return error.UnsupportedAir;
         }
+    }
+
+    fn typedBlockResultType(self: *LoweringContext, instruction: air_export.TypedInstruction) ?ZigType {
+        if (parseZigType(instruction.result_type)) |merge_type| return merge_type;
+        const return_type_text = functionReturnTypeText(self.air_function.type_text) orelse return null;
+        if (isErrorUnionTypeText(return_type_text) and self.function_type.return_type.ir_type.eql(.{ .int = 64 })) {
+            return self.function_type.return_type;
+        }
+        return null;
     }
 
     fn lowerTypedBranchBodyToMerge(
@@ -2858,3 +3006,57 @@ const LoweringContext = struct {
         return ownPrint(self.module, "{s}.{s}", .{ self.air_function.name[0..dot], callee });
     }
 };
+
+fn switchInputIndexFromAirText(function_air_text: []const u8, switch_index: u32) ?u32 {
+    const line = switchLine(function_air_text, switch_index) orelse return null;
+    const open = std.mem.indexOfScalar(u8, line, '(') orelse return null;
+    const close = std.mem.indexOfScalarPos(u8, line, open + 1, ',') orelse
+        std.mem.indexOfScalarPos(u8, line, open + 1, ')') orelse return null;
+    return parseInstructionRef(std.mem.trim(u8, line[open + 1 .. close], " !"));
+}
+
+fn collectSwitchCaseValues(
+    allocator: std.mem.Allocator,
+    values: *std.ArrayList(i32),
+    function_air_text: []const u8,
+    switch_index: u32,
+) !void {
+    const text = switchText(function_air_text, switch_index) orelse return error.UnsupportedAir;
+    var offset: usize = 0;
+    while (std.mem.indexOfPos(u8, text, offset, "[<i32, ")) |start| {
+        const value_start = start + "[<i32, ".len;
+        const value_end = std.mem.indexOfPos(u8, text, value_start, ">]") orelse return error.UnsupportedAir;
+        const value = std.fmt.parseInt(i32, std.mem.trim(u8, text[value_start..value_end], " "), 10) catch
+            return error.UnsupportedAir;
+        try values.append(allocator, value);
+        offset = value_end + ">]".len;
+    }
+}
+
+fn switchHasElseArm(function_air_text: []const u8, switch_index: u32) bool {
+    const text = switchText(function_air_text, switch_index) orelse return false;
+    return std.mem.indexOf(u8, text, "else =>") != null;
+}
+
+fn switchLine(function_air_text: []const u8, switch_index: u32) ?[]const u8 {
+    var needle_buffer: [32]u8 = undefined;
+    const needle = std.fmt.bufPrint(&needle_buffer, "%{}", .{switch_index}) catch return null;
+    var start: usize = 0;
+    while (std.mem.indexOfPos(u8, function_air_text, start, needle)) |needle_pos| {
+        const line_start = std.mem.lastIndexOfScalar(u8, function_air_text[0..needle_pos], '\n') orelse 0;
+        const adjusted_start = if (line_start == 0) 0 else line_start + 1;
+        const line_end = std.mem.indexOfScalarPos(u8, function_air_text, needle_pos, '\n') orelse function_air_text.len;
+        const line = function_air_text[adjusted_start..line_end];
+        if (std.mem.indexOf(u8, line, "switch_br(") != null) return line;
+        start = needle_pos + needle.len;
+    }
+    return null;
+}
+
+fn switchText(function_air_text: []const u8, switch_index: u32) ?[]const u8 {
+    const line = switchLine(function_air_text, switch_index) orelse return null;
+    const start = @intFromPtr(line.ptr) - @intFromPtr(function_air_text.ptr);
+    const end_marker = "\n    )";
+    const relative_end = std.mem.indexOfPos(u8, function_air_text, start, end_marker) orelse return null;
+    return function_air_text[start .. relative_end + end_marker.len];
+}

@@ -67,3 +67,20 @@ export fn frontier_try_branch_match(tag: i32, value: i32, delta: i32) i32 {
         return -41;
     }
 }
+
+fn frontierTrySwitch(tag: i32, value: i32) FrontierError!i32 {
+    const payload = try frontierMaybeTryPayload(tag, value);
+    return switch (payload & 3) {
+        0 => payload + 1,
+        1 => payload + 2,
+        else => payload + 3,
+    };
+}
+
+export fn frontier_try_switch_match(tag: i32, value: i32) i32 {
+    if (frontierTrySwitch(tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -43;
+    }
+}

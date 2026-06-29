@@ -289,6 +289,7 @@ pub const TypedFunctionView = struct {
     }
 
     pub fn genericCfgBlock(self: TypedFunctionView, block_index: u32) bool {
+        if (self.genericCfgSwitchBlock(block_index)) return true;
         const block_body = self.body(.block, block_index) orelse return false;
         var cond_index: ?u32 = null;
         for (block_body.instructions) |instruction_index| {
@@ -308,6 +309,26 @@ pub const TypedFunctionView = struct {
         const else_body = self.body(.else_body, cond) orelse return false;
         return self.genericCfgBranchBody(block_index, then_body) and
             self.genericCfgBranchBody(block_index, else_body);
+    }
+
+    pub fn genericCfgSwitchBlock(self: TypedFunctionView, block_index: u32) bool {
+        const block_body = self.body(.block, block_index) orelse return false;
+        var switch_count: usize = 0;
+        for (block_body.instructions) |instruction_index| {
+            const typed_instruction = self.instruction(instruction_index) orelse return false;
+            const typed_capability = self.capability(typed_instruction);
+            if (typed_capability.status == .ignored_metadata) continue;
+            if (!air_capabilities.isSwitchBrOpcode(typed_instruction.opcode)) return false;
+            switch_count += 1;
+        }
+        if (switch_count != 1) return false;
+        var branch_count: usize = 0;
+        for (self.structured_air_v2.instructions) |candidate| {
+            if (!air_capabilities.isBrOpcode(candidate.opcode) or candidate.operands.len != 2) continue;
+            const target = blockTarget(candidate.operands[0]) orelse continue;
+            if (target == block_index) branch_count += 1;
+        }
+        return branch_count >= 2;
     }
 
     pub fn genericCfgBranchBody(
@@ -355,6 +376,11 @@ pub const TypedFunctionView = struct {
             if (!self.genericCfgBlock(instruction_record.index)) continue;
             const block_body = self.body(.block, instruction_record.index) orelse return false;
             if (self.containsInstruction(block_body, instruction_index)) return true;
+            if (self.genericCfgSwitchBlock(instruction_record.index) and
+                self.switchBlockBranchInstruction(instruction_record.index, instruction_index))
+            {
+                return true;
+            }
             for (block_body.instructions) |child_index| {
                 const child = self.instruction(child_index) orelse return false;
                 if (!air_capabilities.isCondBrOpcode(child.opcode)) continue;
@@ -395,6 +421,11 @@ pub const TypedFunctionView = struct {
             if (!self.genericCfgBlock(typed_instruction.index)) continue;
             const nested_body = self.body(.block, typed_instruction.index) orelse return false;
             if (self.containsInstruction(nested_body, instruction_index)) return true;
+            if (self.genericCfgSwitchBlock(typed_instruction.index) and
+                self.switchBlockBranchInstruction(typed_instruction.index, instruction_index))
+            {
+                return true;
+            }
             for (nested_body.instructions) |nested_candidate| {
                 const nested_instruction = self.instruction(nested_candidate) orelse return false;
                 if (!air_capabilities.isCondBrOpcode(nested_instruction.opcode)) continue;
@@ -408,6 +439,13 @@ pub const TypedFunctionView = struct {
             }
         }
         return false;
+    }
+
+    fn switchBlockBranchInstruction(self: TypedFunctionView, block_index: u32, instruction_index: u32) bool {
+        const candidate = self.instruction(instruction_index) orelse return false;
+        if (!air_capabilities.isBrOpcode(candidate.opcode) or candidate.operands.len != 2) return false;
+        const target = blockTarget(candidate.operands[0]) orelse return false;
+        return target == block_index;
     }
 };
 
