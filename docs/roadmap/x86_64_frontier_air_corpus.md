@@ -72,6 +72,12 @@ and the success edge rewraps payload arithmetic into the outer switch phi.
 Typed-v2 block/value facts own the admission, and x86_64 generic CFG lowers
 the call, guard, branch-to-merge, and i64 error-union return without a
 function-name gate.
+The counted-loop try rows now include a post-loop switch continuation:
+`frontier_loop_try_post_switch` carries the loop accumulator through the helper
+`try` guard, computes `total & 3` after loop exit, and returns one of two
+explicit switch-case addends or the default addend. The typed-v2 lowerer emits a
+real switch terminator for that continuation, and generic CFG validates the
+case targets and terminal return values before codegen.
 The optional scalar payload branch row now validates `wrap_optional`,
 `is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
 payload add/sub branch through generic single-block CFG, and has executable
@@ -185,20 +191,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=671
-structured_functions=671
-generic_codegen_functions=671
-generic_cfg_functions=671
+discovered_functions=672
+structured_functions=672
+generic_codegen_functions=672
+generic_cfg_functions=672
 structural_matcher_functions=0
-structured_air_v2_functions=671
-typed_air_operand_functions=671
+structured_air_v2_functions=672
+typed_air_operand_functions=672
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=671
+generic_lowering_functions=672
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=671
+object_emitted_functions=672
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

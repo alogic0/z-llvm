@@ -68,6 +68,8 @@ pub fn lowerGenericCfgLoopTryReturn(
     const error_label = "generic_cfg_loop_try_error";
     const exit_label = "generic_cfg_loop_try_exit";
     const exit_else_label = "generic_cfg_loop_try_exit_else";
+    const exit_case1_label = "generic_cfg_loop_try_exit_case1";
+    const exit_default_label = "generic_cfg_loop_try_exit_default";
     const epilogue_label = "generic_cfg_loop_try_generic_cfg_select_end";
     const frame_bytes: u8 = if (plan.post_branch != null) 40 else 24;
 
@@ -128,6 +130,25 @@ pub fn lowerGenericCfgLoopTryReturn(
         try appendGenericCfgBlockLabel(allocator, machine, exit_else_label);
         try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
         if (post_branch.false_addend != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = post_branch.false_addend });
+    } else if (plan.post_switch) |post_switch| {
+        try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+        try machine.instructions.append(allocator, .{ .and_eax_imm32 = post_switch.mask });
+        try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 0 });
+        try machine.instructions.append(allocator, .{ .jne = exit_case1_label });
+        try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+        if (post_switch.case0_addend != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = post_switch.case0_addend });
+        try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+        try appendGenericCfgBlockLabel(allocator, machine, exit_case1_label);
+        try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+        try machine.instructions.append(allocator, .{ .and_eax_imm32 = post_switch.mask });
+        try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 1 });
+        try machine.instructions.append(allocator, .{ .jne = exit_default_label });
+        try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+        if (post_switch.case1_addend != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = post_switch.case1_addend });
+        try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+        try appendGenericCfgBlockLabel(allocator, machine, exit_default_label);
+        try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+        if (post_switch.default_addend != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = post_switch.default_addend });
     } else {
         try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
     }
@@ -141,6 +162,7 @@ const LoopTryReturnPlan = struct {
     call: ir.CallInst,
     error_return: i32,
     post_branch: ?LoopTryPostBranchPlan = null,
+    post_switch: ?LoopTryPostSwitchPlan = null,
 };
 
 const LoopTryPostBranchPlan = struct {
@@ -148,31 +170,52 @@ const LoopTryPostBranchPlan = struct {
     false_addend: i32,
 };
 
+const LoopTryPostSwitchPlan = struct {
+    mask: i32,
+    case0_addend: i32,
+    case1_addend: i32,
+    default_addend: i32,
+};
+
 fn loopTryReturn(function: ir.Function) ?LoopTryReturnPlan {
-    const has_post_branch = switch (function.params.items.len) {
-        2 => false,
-        3 => true,
+    const post_kind: enum { none, branch, @"switch" } = switch (function.params.items.len) {
+        2 => switch (function.blocks.items.len) {
+            6 => .none,
+            9 => .@"switch",
+            else => return null,
+        },
+        3 => .branch,
         else => return null,
     };
-    const expected_block_count: usize = if (has_post_branch) 8 else 6;
+    const expected_block_count: usize = switch (post_kind) {
+        .none => 6,
+        .branch => 8,
+        .@"switch" => 9,
+    };
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != expected_block_count) return null;
     if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return null;
-    if (has_post_branch and !function.params.items[2].ty.eql(.{ .int = 32 })) return null;
+    if (post_kind == .branch and !function.params.items[2].ty.eql(.{ .int = 32 })) return null;
     const entry = function.blocks.items[0];
     const loop = function.blocks.items[1];
     const body = function.blocks.items[2];
     const success = function.blocks.items[3];
     const err_block = function.blocks.items[4];
     const exit = function.blocks.items[5];
-    const exit_then = if (has_post_branch) function.blocks.items[6] else undefined;
-    const exit_else = if (has_post_branch) function.blocks.items[7] else undefined;
+    const exit_then = if (post_kind == .branch) function.blocks.items[6] else undefined;
+    const exit_else = if (post_kind == .branch) function.blocks.items[7] else undefined;
+    const exit_case0 = if (post_kind == .@"switch") function.blocks.items[6] else undefined;
+    const exit_case1 = if (post_kind == .@"switch") function.blocks.items[7] else undefined;
+    const exit_default = if (post_kind == .@"switch") function.blocks.items[8] else undefined;
     if (!std.mem.eql(u8, entry.name, "entry") or
         !std.mem.eql(u8, loop.name, "loop") or
         !std.mem.eql(u8, body.name, "body") or
         !std.mem.eql(u8, success.name, "success") or
         !std.mem.eql(u8, err_block.name, "error") or
         !std.mem.eql(u8, exit.name, "exit")) return null;
-    if (has_post_branch and (!std.mem.eql(u8, exit_then.name, "exit_then") or !std.mem.eql(u8, exit_else.name, "exit_else"))) return null;
+    if (post_kind == .branch and (!std.mem.eql(u8, exit_then.name, "exit_then") or !std.mem.eql(u8, exit_else.name, "exit_else"))) return null;
+    if (post_kind == .@"switch" and (!std.mem.eql(u8, exit_case0.name, "exit_case0") or
+        !std.mem.eql(u8, exit_case1.name, "exit_case1") or
+        !std.mem.eql(u8, exit_default.name, "exit_default"))) return null;
     switch (entry.terminator orelse return null) {
         .br => |br| if (!std.mem.eql(u8, br.target, loop.name)) return null,
         else => return null,
@@ -290,17 +333,22 @@ fn loopTryReturn(function: ir.Function) ?LoopTryReturnPlan {
         .int => |int| i32Value(int) catch return null,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    const post_branch = if (has_post_branch)
+    const post_branch: ?LoopTryPostBranchPlan = if (post_kind == .branch)
         loopTryPostBranch(exit, exit_then, exit_else, total_name, function.params.items[2].name) orelse return null
-    else blk: {
+    else
+        null;
+    const post_switch: ?LoopTryPostSwitchPlan = if (post_kind == .@"switch")
+        loopTryPostSwitch(exit, exit_case0, exit_case1, exit_default, total_name) orelse return null
+    else
+        null;
+    if (post_kind == .none) {
         const exit_ret = switch (exit.terminator orelse return null) {
             .ret => |ret| ret,
             else => return null,
         };
         if (!exit_ret.ty.eql(.{ .int = 32 }) or !isNamed(exit_ret.value orelse return null, total_name)) return null;
-        break :blk null;
-    };
-    return .{ .call = call, .error_return = error_return, .post_branch = post_branch };
+    }
+    return .{ .call = call, .error_return = error_return, .post_branch = post_branch, .post_switch = post_switch };
 }
 
 fn loopTryPostBranch(
@@ -351,6 +399,44 @@ fn loopTryPostBranchReturnAddend(block: ir.BasicBlock, total_name: []const u8) ?
     };
     if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, result_name)) return null;
     return addend;
+}
+
+fn loopTryPostSwitch(
+    exit: ir.BasicBlock,
+    exit_case0: ir.BasicBlock,
+    exit_case1: ir.BasicBlock,
+    exit_default: ir.BasicBlock,
+    total_name: []const u8,
+) ?LoopTryPostSwitchPlan {
+    if (exit.instructions.items.len != 1) return null;
+    const key_name = exit.instructions.items[0].result orelse return null;
+    const key = switch (exit.instructions.items[0].kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (key.op != .@"and" or !key.ty.eql(.{ .int = 32 }) or !isNamed(key.lhs, total_name)) return null;
+    const mask = switch (key.rhs) {
+        .int => |int| i32Value(int) catch return null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const switch_term = switch (exit.terminator orelse return null) {
+        .@"switch" => |switch_term| switch_term,
+        else => return null,
+    };
+    if (!switch_term.cond_ty.eql(.{ .int = 32 }) or !isNamed(switch_term.cond, key_name)) return null;
+    if (!std.mem.eql(u8, switch_term.default_target, exit_default.name) or switch_term.cases.items.len != 2) return null;
+    if (!switchCaseTargets(switch_term.cases.items[0], 0, exit_case0.name) or
+        !switchCaseTargets(switch_term.cases.items[1], 1, exit_case1.name)) return null;
+    return .{
+        .mask = mask,
+        .case0_addend = loopTryPostBranchReturnAddend(exit_case0, total_name) orelse return null,
+        .case1_addend = loopTryPostBranchReturnAddend(exit_case1, total_name) orelse return null,
+        .default_addend = loopTryPostBranchReturnAddend(exit_default, total_name) orelse return null,
+    };
+}
+
+fn switchCaseTargets(case: ir.SwitchCase, value: i32, target: []const u8) bool {
+    return case.value_ty.eql(.{ .int = 32 }) and isInt(case.value, value) and std.mem.eql(u8, case.target, target);
 }
 
 fn validateAssumeColdCall(instruction: ir.Instruction) !void {

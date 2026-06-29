@@ -1149,6 +1149,80 @@ pub fn lowerTypedV2LoopTry(
         try function.blocks.append(allocator, exit_else);
         return function;
     }
+    if (summary.post_switch) |post_switch| {
+        try exit.instructions.append(allocator, .{
+            .result = "post_switch_key",
+            .kind = .{ .binary = .{
+                .op = .@"and",
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = "total" },
+                .rhs = .{ .int = post_switch.mask },
+            } },
+        });
+        var switch_term: ir.SwitchTerminator = .{
+            .cond_ty = .{ .int = 32 },
+            .cond = .{ .named = "post_switch_key" },
+            .default_target = "exit_default",
+            .cases = .empty,
+        };
+        errdefer switch_term.cases.deinit(allocator);
+        try switch_term.cases.append(allocator, .{
+            .value_ty = .{ .int = 32 },
+            .value = .{ .int = 0 },
+            .target = "exit_case0",
+        });
+        try switch_term.cases.append(allocator, .{
+            .value_ty = .{ .int = 32 },
+            .value = .{ .int = 1 },
+            .target = "exit_case1",
+        });
+        exit.terminator = .{ .@"switch" = switch_term };
+        switch_term.cases = .empty;
+        try function.blocks.append(allocator, exit);
+
+        var exit_case0 = ir.BasicBlock.init("exit_case0");
+        errdefer exit_case0.deinit(allocator);
+        try exit_case0.instructions.append(allocator, .{
+            .result = "post_switch_case0",
+            .kind = .{ .binary = .{
+                .op = .add,
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = "total" },
+                .rhs = .{ .int = post_switch.case0_addend },
+            } },
+        });
+        exit_case0.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "post_switch_case0" } } };
+        try function.blocks.append(allocator, exit_case0);
+
+        var exit_case1 = ir.BasicBlock.init("exit_case1");
+        errdefer exit_case1.deinit(allocator);
+        try exit_case1.instructions.append(allocator, .{
+            .result = "post_switch_case1",
+            .kind = .{ .binary = .{
+                .op = .add,
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = "total" },
+                .rhs = .{ .int = post_switch.case1_addend },
+            } },
+        });
+        exit_case1.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "post_switch_case1" } } };
+        try function.blocks.append(allocator, exit_case1);
+
+        var exit_default = ir.BasicBlock.init("exit_default");
+        errdefer exit_default.deinit(allocator);
+        try exit_default.instructions.append(allocator, .{
+            .result = "post_switch_default",
+            .kind = .{ .binary = .{
+                .op = .add,
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = "total" },
+                .rhs = .{ .int = post_switch.default_addend },
+            } },
+        });
+        exit_default.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "post_switch_default" } } };
+        try function.blocks.append(allocator, exit_default);
+        return function;
+    }
     exit.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "total" } } };
     try function.blocks.append(allocator, exit);
     return function;

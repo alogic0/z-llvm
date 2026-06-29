@@ -449,6 +449,11 @@ Execution order:
    validated `icmp`/`cond_br` continuation after loop exit; generic CFG
    preserves the third threshold argument across the helper call and emits the
    two terminal add/sub return arms without a selected row-name path.
+   The post-loop switch variant reuses the same loop-carried try summary, then
+   normalizes `total & 3` into a typed switch terminator with two explicit cases
+   and a default arm. Generic CFG validates the switch targets and terminal
+   addends before emitting the x86_64 compare/jump sequence, so this remains a
+   structural typed-v2 CFG path rather than a function-name admission.
    Together these prove the same pointer-slot model beyond simple branch
    continuations.
    These rows pass through typed AIR v2, generic CFG, z_llvm object
@@ -1293,12 +1298,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=671`,
-`generic_codegen_functions=671`, `generic_cfg_functions=671`,
+frontier gate reports `source_rows=14`, `discovered_functions=672`,
+`generic_codegen_functions=672`, `generic_cfg_functions=672`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=671`, `object_failures=0`,
+`object_emitted_functions=672`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1311,9 +1316,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=671`,
-`generic_cfg_functions=671`, `structural_matcher_functions=0`,
-`object_emitted_functions=671`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=672`,
+`generic_cfg_functions=672`, `structural_matcher_functions=0`,
+`object_emitted_functions=672`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

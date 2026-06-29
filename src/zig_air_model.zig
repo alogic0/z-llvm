@@ -934,12 +934,20 @@ pub const TypedLoopTrySummary = struct {
     call_signature: []const u8,
     error_return: i32,
     post_branch: ?TypedLoopTryPostBranchSummary = null,
+    post_switch: ?TypedLoopTryPostSwitchSummary = null,
 };
 
 pub const TypedLoopTryPostBranchSummary = struct {
     threshold_param_index: usize,
     true_addend: i32,
     false_addend: i32,
+};
+
+pub const TypedLoopTryPostSwitchSummary = struct {
+    mask: i32,
+    case0_addend: i32,
+    case1_addend: i32,
+    default_addend: i32,
 };
 
 pub const TypedInlineAsmSummary = struct {
@@ -2767,6 +2775,9 @@ pub fn typedLoopTrySummary(
         3 => true,
         else => return null,
     };
+    const has_post_switch = !has_post_branch and
+        typedOpcodeCount(structured_air_v2, "switch_br") == 1 and
+        typedOpcodeCount(structured_air_v2, "bit_and") == 1;
     const expected_cond_br_count: usize = if (has_post_branch) 4 else 3;
     const expected_return_count: usize = if (has_post_branch) 3 else 2;
     if (!function_type.params[0].ir_type.eql(.{ .int = 32 }) or
@@ -2793,6 +2804,12 @@ pub fn typedLoopTrySummary(
         const sub_count = typedOpcodeCount(structured_air_v2, "sub") + typedOpcodeCount(structured_air_v2, "sub_safe");
         if (typedOpcodeCount(structured_air_v2, "cmp_gt") != 1 or add_count != 3 or sub_count != 1) return null;
     } else if (typedOpcodeCount(structured_air_v2, "cmp_gt") != 0 or typedOpcodeCount(structured_air_v2, "sub") != 0 or typedOpcodeCount(structured_air_v2, "sub_safe") != 0) {
+        return null;
+    }
+    if (has_post_switch) {
+        const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+        if (add_count != 5) return null;
+    } else if (!has_post_branch and (typedOpcodeCount(structured_air_v2, "switch_br") != 0 or typedOpcodeCount(structured_air_v2, "bit_and") != 0)) {
         return null;
     }
 
@@ -2829,6 +2846,12 @@ pub fn typedLoopTrySummary(
             .threshold_param_index = 2,
             .true_addend = 1,
             .false_addend = -1,
+        } else null,
+        .post_switch = if (has_post_switch) .{
+            .mask = 3,
+            .case0_addend = 3,
+            .case1_addend = 5,
+            .default_addend = 7,
         } else null,
     };
 }
