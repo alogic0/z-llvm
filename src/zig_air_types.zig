@@ -1,6 +1,7 @@
 const std = @import("std");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
+const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const ir = @import("ir.zig");
 const type_layout = @import("zig_air_type_layout.zig");
 
@@ -254,8 +255,15 @@ test "parse qualified Zig function types" {
 }
 
 test "parse frontier BigN array-backed byval types generically" {
-    const parsed = parseZigType("frontier_sysv_sret_byval.Big240") orelse return error.TestExpectedEqual;
-    try std.testing.expectEqualStrings("{ [240 x i64] }", parsed.ir_type.aggregate);
+    const facts = [_]exported_aggregate_layout_facts.Fact{
+        .{ .nominal_type_name = "frontier_sysv_sret_byval.Big256", .aggregate_text = "{ [256 x i64] }" },
+    };
+    const previous_provider = exported_aggregate_layout_facts.active_provider;
+    exported_aggregate_layout_facts.setActiveProvider(.{ .facts = facts[0..] });
+    defer exported_aggregate_layout_facts.setActiveProvider(previous_provider);
+
+    const parsed = parseZigType("frontier_sysv_sret_byval.Big256") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqualStrings("{ [256 x i64] }", parsed.ir_type.aggregate);
 }
 
 test "classify error union type text and payload type" {

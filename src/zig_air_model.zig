@@ -936,10 +936,11 @@ fn parseIntegerText(text: []const u8) ?i128 {
 }
 
 fn scalarWidthFromText(text: []const u8) ?u16 {
-    if (std.mem.indexOf(u8, text, "i8") != null or std.mem.indexOf(u8, text, "u8") != null) return 8;
-    if (std.mem.indexOf(u8, text, "i16") != null or std.mem.indexOf(u8, text, "u16") != null) return 16;
-    if (std.mem.indexOf(u8, text, "i32") != null or std.mem.indexOf(u8, text, "u32") != null) return 32;
-    if (std.mem.indexOf(u8, text, "i64") != null or std.mem.indexOf(u8, text, "u64") != null or std.mem.indexOf(u8, text, "usize") != null) return 64;
+    const trimmed = std.mem.trim(u8, text, " ");
+    if (std.mem.eql(u8, trimmed, "i8") or std.mem.eql(u8, trimmed, "u8")) return 8;
+    if (std.mem.eql(u8, trimmed, "i16") or std.mem.eql(u8, trimmed, "u16")) return 16;
+    if (std.mem.eql(u8, trimmed, "i32") or std.mem.eql(u8, trimmed, "u32")) return 32;
+    if (std.mem.eql(u8, trimmed, "i64") or std.mem.eql(u8, trimmed, "u64") or std.mem.eql(u8, trimmed, "usize")) return 64;
     return null;
 }
 
@@ -2161,16 +2162,17 @@ pub fn singleInstructionByOpcode(
 }
 
 test "typed AIR model parses instruction details and block operands" {
+    var details = [_]air_export.TypedDetail{
+        .{ .key = "callee_text", .value = "function 'helper'" },
+        .{ .key = "operand1", .value = "@.void_value" },
+    };
     const instruction = air_export.TypedInstruction{
         .index = 4,
         .opcode = "br",
         .result_type = "void",
         .data_kind = "br",
         .operands = &.{},
-        .details = &.{
-            .{ .key = "callee_text", .value = "function 'helper'" },
-            .{ .key = "operand1", .value = "@.void_value" },
-        },
+        .details = &details,
     };
     try std.testing.expectEqualStrings("function 'helper'", detail(instruction, "callee_text").?);
     try std.testing.expectEqualStrings("@.void_value", operandTextDetail(instruction, 1).?);
@@ -2196,6 +2198,12 @@ test "typed AIR model collects branch i32 constants" {
         .{ .kind = "inst", .value = "0", .type_text = "i32" },
         .{ .kind = "const", .value = "value", .type_text = "i32" },
     };
+    var br_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, 7>" },
+    };
+    var add_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, 11>" },
+    };
     const instructions = [_]air_export.TypedInstruction{
         .{
             .index = 0,
@@ -2203,7 +2211,7 @@ test "typed AIR model collects branch i32 constants" {
             .result_type = "void",
             .data_kind = "br",
             .operands = @constCast(&br_operands),
-            .details = &.{.{ .key = "operand1_text", .value = "<i32, 7>" }},
+            .details = &br_details,
         },
         .{
             .index = 1,
@@ -2211,7 +2219,7 @@ test "typed AIR model collects branch i32 constants" {
             .result_type = "i32",
             .data_kind = "bin_op",
             .operands = @constCast(&add_operands),
-            .details = &.{.{ .key = "operand1_text", .value = "<i32, 11>" }},
+            .details = &add_details,
         },
         .{
             .index = 2,
@@ -2222,7 +2230,6 @@ test "typed AIR model collects branch i32 constants" {
         },
     };
     const structured_air_v2 = air_export.StructuredAirV2{
-        .version = "structured_air-v2",
         .instructions = @constCast(&instructions),
     };
     var values: [2]i32 = undefined;
@@ -2906,9 +2913,9 @@ test "AIR model recognizes selected aggregate shapes structurally" {
     const make_pair_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "ret_ptr", .payload = "*struct", .category = .memory },
         .{ .index = 1, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_0", .payload = "%0!", .category = .memory },
-        .{ .index = 2, .indent = 0, .unused = false, .opcode = "store", .payload = "%1!, %arg0!", .category = .memory },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "store", .payload = "%1!, <i32, 11>", .category = .memory },
         .{ .index = 3, .indent = 0, .unused = false, .opcode = "struct_field_ptr_index_1", .payload = "%0!", .category = .memory },
-        .{ .index = 4, .indent = 0, .unused = false, .opcode = "store", .payload = "%3!, %arg1!", .category = .memory },
+        .{ .index = 4, .indent = 0, .unused = false, .opcode = "store", .payload = "%3!, <i32, 12>", .category = .memory },
         .{ .index = 5, .indent = 0, .unused = false, .opcode = "ret_load", .payload = "%0!", .category = .return_op },
     };
     const make_pair = air_export.Function{
@@ -3074,7 +3081,7 @@ test "AIR model recognizes selected error and switch shapes structurally" {
     const maybe_instructions = [_]air_export.Instruction{
         .{ .index = 0, .indent = 0, .unused = false, .opcode = "cmp_neq", .payload = "%arg0!, <i32, 0>", .category = .comparison },
         .{ .index = 1, .indent = 0, .unused = false, .opcode = "cond_br", .payload = "%0!, then_body, else_body", .category = .control_flow },
-        .{ .index = 2, .indent = 0, .unused = false, .opcode = "ret", .payload = "%arg0!", .category = .return_op },
+        .{ .index = 2, .indent = 0, .unused = false, .opcode = "ret", .payload = "%0!", .category = .return_op },
     };
     const maybe = air_export.Function{
         .name = "not_named_maybe",

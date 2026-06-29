@@ -1258,30 +1258,37 @@ const LoweringContext = struct {
             return error.UnsupportedAir;
         if (cond_index >= self.values.len) return error.UnsupportedAir;
         const cond = self.values[cond_index] orelse return error.UnsupportedAir;
-        if (!cond.ty.ir_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+        if (!cond.ty.ir_type.eql(.{ .int = 32 }) and !cond.ty.ir_type.eql(.{ .int = 16 })) return error.UnsupportedAir;
         const merge_type = self.typedBlockResultType(instruction) orelse {
             return error.UnsupportedAir;
         };
         if (merge_type.ir_type == .void) return error.UnsupportedAir;
 
-        var case_values: std.ArrayList(i32) = .empty;
+        var case_values: std.ArrayList(TypedValue) = .empty;
         defer case_values.deinit(self.allocator);
         try collectSwitchCaseValues(self.allocator, &case_values, self.air_function.air_text, switch_instruction.index);
         if (case_values.items.len == 0) return error.UnsupportedAir;
-        if (!switchHasElseArm(self.air_function.air_text, switch_instruction.index)) return error.UnsupportedAir;
+        for (case_values.items) |case_value| {
+            if (!case_value.ty.ir_type.eql(cond.ty.ir_type)) return error.UnsupportedAir;
+        }
+        const has_else_arm = switchHasElseArm(self.air_function.air_text, switch_instruction.index);
 
         var branch_instructions: std.ArrayList(air_export.TypedInstruction) = .empty;
         defer branch_instructions.deinit(self.allocator);
         try self.collectBlockValueBranches(instruction.index, &branch_instructions);
-        if (branch_instructions.items.len != case_values.items.len + 1) return error.UnsupportedAir;
+        const expected_branches = case_values.items.len + @intFromBool(has_else_arm);
+        if (branch_instructions.items.len != expected_branches) return error.UnsupportedAir;
 
         var labels: std.ArrayList([]const u8) = .empty;
         defer labels.deinit(self.allocator);
         for (case_values.items, 0..) |_, case_index| {
             try labels.append(self.allocator, try ownPrint(self.module, "block{}_case{}", .{ instruction.index, case_index }));
         }
-        const default_label = try ownPrint(self.module, "block{}_default", .{instruction.index});
-        try labels.append(self.allocator, default_label);
+        const default_label = if (has_else_arm)
+            try ownPrint(self.module, "block{}_default", .{instruction.index})
+        else
+            try ownPrint(self.module, "block{}_default_unreachable", .{instruction.index});
+        if (has_else_arm) try labels.append(self.allocator, default_label);
         const merge_label = try ownPrint(self.module, "block{}_switch_merge", .{instruction.index});
 
         var switch_term: ir.SwitchTerminator = .{
@@ -1294,7 +1301,7 @@ const LoweringContext = struct {
         for (case_values.items, 0..) |case_value, case_index| {
             try switch_term.cases.append(self.allocator, .{
                 .value_ty = cond.ty.ir_type,
-                .value = .{ .int = case_value },
+                .value = case_value.value,
                 .target = labels.items[case_index],
             });
         }
@@ -1314,6 +1321,11 @@ const LoweringContext = struct {
             var branch_block = self.block.*;
             branch_block.terminator = .{ .br = .{ .target = merge_label } };
             try self.function.blocks.append(self.allocator, branch_block);
+        }
+        if (!has_else_arm) {
+            var default_block = ir.BasicBlock.init(default_label);
+            default_block.terminator = .{ .@"unreachable" = {} };
+            try self.function.blocks.append(self.allocator, default_block);
         }
 
         self.block.* = ir.BasicBlock.init(merge_label);
@@ -1365,8 +1377,9 @@ const LoweringContext = struct {
         merge_type: ZigType,
     ) LowerError!TypedValue {
         if (branch_instruction.operands.len != 2) return error.UnsupportedAir;
-        const value_index = air_model.typedInstOperandIndex(branch_instruction.operands[1]) orelse return error.UnsupportedAir;
-        try self.lowerTypedValueDependency(value_index);
+        if (air_model.typedInstOperandIndex(branch_instruction.operands[1])) |value_index| {
+            try self.lowerTypedValueDependency(value_index);
+        }
         const value = (try self.resolveTypedBranchOperand(branch_instruction, 1)) orelse return error.UnsupportedAir;
         return try self.coerceTypedBranchValueToMerge(target_block, self.block.name, value, merge_type);
     }
@@ -3017,19 +3030,19 @@ fn switchInputIndexFromAirText(function_air_text: []const u8, switch_index: u32)
 
 fn collectSwitchCaseValues(
     allocator: std.mem.Allocator,
-    values: *std.ArrayList(i32),
+    values: *std.ArrayList(TypedValue),
     function_air_text: []const u8,
     switch_index: u32,
 ) !void {
     const text = switchText(function_air_text, switch_index) orelse return error.UnsupportedAir;
     var offset: usize = 0;
-    while (std.mem.indexOfPos(u8, text, offset, "[<i32, ")) |start| {
-        const value_start = start + "[<i32, ".len;
-        const value_end = std.mem.indexOfPos(u8, text, value_start, ">]") orelse return error.UnsupportedAir;
-        const value = std.fmt.parseInt(i32, std.mem.trim(u8, text[value_start..value_end], " "), 10) catch
+    while (std.mem.indexOfPos(u8, text, offset, "[<")) |start| {
+        const value_start = start + 1;
+        const value_end = std.mem.indexOfPos(u8, text, value_start, "] =>") orelse return error.UnsupportedAir;
+        const value = parseConstant(std.mem.trim(u8, text[value_start..value_end], " ")) orelse
             return error.UnsupportedAir;
         try values.append(allocator, value);
-        offset = value_end + ">]".len;
+        offset = value_end + "] =>".len;
     }
 }
 
@@ -3059,4 +3072,50 @@ fn switchText(function_air_text: []const u8, switch_index: u32) ?[]const u8 {
     const end_marker = "\n    )";
     const relative_end = std.mem.indexOfPos(u8, function_air_text, start, end_marker) orelse return null;
     return function_air_text[start .. relative_end + end_marker.len];
+}
+
+test "typed switch case parsing supports typed constants and exhaustive switches" {
+    const text =
+        \\  %10!= switch_br(%0!, [<error{BadTag,WorseTag}, error.BadTag>] => {
+        \\      %7!= br(%3, <i32, -44>)
+        \\    }, [<error{BadTag,WorseTag}, error.WorseTag>] => {
+        \\      %9!= br(%3, <i32, -45>)
+        \\    }
+        \\    )
+    ;
+    var values: std.ArrayList(TypedValue) = .empty;
+    defer values.deinit(std.testing.allocator);
+
+    try collectSwitchCaseValues(std.testing.allocator, &values, text, 10);
+
+    try std.testing.expectEqual(@as(usize, 2), values.items.len);
+    try std.testing.expect(values.items[0].ty.ir_type.eql(.{ .int = 16 }));
+    try std.testing.expect(values.items[1].ty.ir_type.eql(.{ .int = 16 }));
+    try std.testing.expectEqual(@as(i128, 1), values.items[0].value.int);
+    try std.testing.expectEqual(@as(i128, 2), values.items[1].value.int);
+    try std.testing.expect(!switchHasElseArm(text, 10));
+}
+
+test "typed switch case parsing preserves i32 else cases" {
+    const text =
+        \\  %26!= switch_br(%11!, [<i32, 0>] => {
+        \\      %17!= br(%13, %16!)
+        \\    }, [<i32, 1>] => {
+        \\      %21!= br(%13, %20!)
+        \\    }, else => {
+        \\      %25!= br(%13, %24!)
+        \\    }
+        \\    )
+    ;
+    var values: std.ArrayList(TypedValue) = .empty;
+    defer values.deinit(std.testing.allocator);
+
+    try collectSwitchCaseValues(std.testing.allocator, &values, text, 26);
+
+    try std.testing.expectEqual(@as(usize, 2), values.items.len);
+    try std.testing.expect(values.items[0].ty.ir_type.eql(.{ .int = 32 }));
+    try std.testing.expect(values.items[1].ty.ir_type.eql(.{ .int = 32 }));
+    try std.testing.expectEqual(@as(i128, 0), values.items[0].value.int);
+    try std.testing.expectEqual(@as(i128, 1), values.items[1].value.int);
+    try std.testing.expect(switchHasElseArm(text, 26));
 }
