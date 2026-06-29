@@ -121,6 +121,7 @@ const UnsupportedCategory = enum(u8) {
 
 const unsupported_category_count = @typeInfo(UnsupportedCategory).@"enum".fields.len;
 const unknown_opcode_category_count = @typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".fields.len;
+const top_unknown_opcode_pair_limit = 50;
 
 const AggregateSurfaceCategory = enum(u8) {
     opcode_shape,
@@ -1377,7 +1378,7 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
         );
     }
     try printTopUnknownOpcodes(writer, slice, mode, counters);
-    try printTopUnknownOpcodePairs(allocator, writer, slice, mode, counters, 20);
+    try printTopUnknownOpcodePairs(allocator, writer, slice, mode, counters, top_unknown_opcode_pair_limit);
     inline for (std.meta.fields(BoundaryCategory)) |field| {
         const category: BoundaryCategory = @enumFromInt(field.value);
         const stat = counters.boundary_categories[field.value];

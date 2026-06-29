@@ -86,7 +86,9 @@ The inventory also emits `unknown_opcode` and ranked `top_unknown_opcode`
 records. These keep the old `unknown-opcode` total intact while splitting the
 work queue into stable implementation families. It also emits
 `top_unknown_opcode_pair` records keyed by `subcategory:opcode:data_kind` so
-implementation slices can target concrete AIR shapes.
+implementation slices can target concrete AIR shapes. The pair report prints
+the top 50 rows so smaller residual buckets such as `other` remain visible
+after the largest families are split.
 
 | Subcategory | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |

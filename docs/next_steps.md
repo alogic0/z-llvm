@@ -711,7 +711,10 @@ Validation after these refactor slices is saved in
   measured semantic families. The pointer and error-union shapes remain the
   first implementation families; optional wrapping, union/tag operations, and
   scalar transforms such as `byte_swap` are now separately measured instead of
-  hidden in `other`.
+  hidden in `other`. The pair report now prints the top 50 concrete pairs; the
+  residual ReleaseFast `other` bucket is 1069 rows, led by `max`, `min`,
+  `abs`, exact shifts, and selected float math opcodes in
+  `tmp/compiler_core_module_releasefast_top50_unknown_pairs.log`.
   Validation gate: compare against the saved compiler-core inventory baseline;
   rerun `zig build distribution-zig-air-inventory` with
   `-- --slice=compiler-core-module --mode=<mode>` only after
