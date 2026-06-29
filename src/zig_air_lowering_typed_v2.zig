@@ -960,25 +960,7 @@ pub fn typedV2AccumulatorLoopRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 1 or
-        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return false;
-    }
-    const add_count = air_model.typedOpcodeCount(structured_air_v2, "add") + air_model.typedOpcodeCount(structured_air_v2, "add_safe");
-    const intcast_count = air_model.typedOpcodeCount(structured_air_v2, "intcast") + air_model.typedOpcodeCount(structured_air_v2, "intcast_safe");
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "alloc") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "loop") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "repeat") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_lt") == 1 and
-        intcast_count == 1 and
-        add_count == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "load") >= 4 and
-        air_model.typedStoreOpcodeCount(structured_air_v2) >= 4 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedAccumulatorLoopSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2ConditionalSlotUpdate(
@@ -995,26 +977,7 @@ pub fn typedV2ConditionalSlotUpdateRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 3 or
-        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
-        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
-        !function_type.params[2].ir_type.eql(.{ .int = 1 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return false;
-    }
-    const add_count = air_model.typedOpcodeCount(structured_air_v2, "add") + air_model.typedOpcodeCount(structured_air_v2, "add_safe");
-    const sub_count = air_model.typedOpcodeCount(structured_air_v2, "sub") + air_model.typedOpcodeCount(structured_air_v2, "sub_safe");
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 3 and
-        air_model.typedOpcodeCount(structured_air_v2, "alloc") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 2 and
-        add_count == 1 and
-        sub_count == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "load") >= 3 and
-        air_model.typedStoreOpcodeCount(structured_air_v2) >= 4 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedConditionalSlotUpdateSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2DenseIntegerSwitch(

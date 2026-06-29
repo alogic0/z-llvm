@@ -920,6 +920,10 @@ pub const TypedSliceLoopSummary = struct {
     kind: enum { plain_sum, conditional_sum },
 };
 
+pub const TypedScalarControlSummary = struct {
+    kind: enum { accumulator_loop, conditional_slot_update },
+};
+
 pub const TypedErrorSwitchSummary = struct {
     kind: enum { switch_dispatch, classify },
 };
@@ -2639,6 +2643,65 @@ pub fn typedConditionalSliceSumSummary(
     return .{ .kind = .conditional_sum };
 }
 
+pub fn typedAccumulatorLoopSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedScalarControlSummary {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return null;
+    }
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    const intcast_count = typedOpcodeCount(structured_air_v2, "intcast") + typedOpcodeCount(structured_air_v2, "intcast_safe");
+    if (typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "alloc") != 2 or
+        typedOpcodeCount(structured_air_v2, "loop") != 1 or
+        typedOpcodeCount(structured_air_v2, "repeat") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_lt") != 1 or
+        intcast_count != 1 or
+        add_count != 2 or
+        typedOpcodeCount(structured_air_v2, "load") < 4 or
+        typedStoreOpcodeCount(structured_air_v2) < 4 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .accumulator_loop };
+}
+
+pub fn typedConditionalSlotUpdateSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedScalarControlSummary {
+    if (function_type.params.len != 3 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[2].ir_type.eql(.{ .int = 1 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return null;
+    }
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    const sub_count = typedOpcodeCount(structured_air_v2, "sub") + typedOpcodeCount(structured_air_v2, "sub_safe");
+    if (typedOpcodeCount(structured_air_v2, "arg") != 3 or
+        typedOpcodeCount(structured_air_v2, "alloc") != 1 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 1 or
+        typedOpcodeCount(structured_air_v2, "br") != 2 or
+        add_count != 1 or
+        sub_count != 1 or
+        typedOpcodeCount(structured_air_v2, "load") < 3 or
+        typedStoreOpcodeCount(structured_air_v2) < 4 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .conditional_slot_update };
+}
+
 pub fn typedErrorSwitchSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -3284,6 +3347,81 @@ test "typed AIR model recognizes slice loop summaries" {
 
     conditional_instructions[19].opcode = "cmp_eq";
     try std.testing.expect(typedConditionalSliceSumSummary(conditional_type, conditional_air) == null);
+}
+
+test "typed AIR model recognizes scalar control summaries" {
+    var loop_params = [_]ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const loop_type = FunctionType{
+        .params = &loop_params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var loop_instructions = [_]air_export.TypedInstruction{
+        testTypedInstruction(0, "arg"),
+        testTypedInstruction(1, "alloc"),
+        testTypedInstruction(2, "alloc"),
+        testTypedInstruction(3, "loop"),
+        testTypedInstruction(4, "repeat"),
+        testTypedInstruction(5, "cond_br"),
+        testTypedInstruction(6, "cmp_lt"),
+        testTypedInstruction(7, "intcast"),
+        testTypedInstruction(8, "add"),
+        testTypedInstruction(9, "add"),
+        testTypedInstruction(10, "load"),
+        testTypedInstruction(11, "load"),
+        testTypedInstruction(12, "load"),
+        testTypedInstruction(13, "load"),
+        testTypedInstruction(14, "store"),
+        testTypedInstruction(15, "store"),
+        testTypedInstruction(16, "store"),
+        testTypedInstruction(17, "store"),
+        testTypedInstruction(18, "ret"),
+    };
+    const loop_air = air_export.StructuredAirV2{ .instructions = &loop_instructions };
+    try std.testing.expectEqual(.accumulator_loop, typedAccumulatorLoopSummary(loop_type, loop_air).?.kind);
+
+    loop_instructions[7].opcode = "bitcast";
+    try std.testing.expect(typedAccumulatorLoopSummary(loop_type, loop_air) == null);
+
+    var slot_params = [_]ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+        .{ .ir_type = .{ .int = 32 } },
+        .{ .ir_type = .{ .int = 1 } },
+    };
+    const slot_type = FunctionType{
+        .params = &slot_params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var slot_instructions = [_]air_export.TypedInstruction{
+        testTypedInstruction(0, "arg"),
+        testTypedInstruction(1, "arg"),
+        testTypedInstruction(2, "arg"),
+        testTypedInstruction(3, "alloc"),
+        testTypedInstruction(4, "block"),
+        testTypedInstruction(5, "cond_br"),
+        testTypedInstruction(6, "br"),
+        testTypedInstruction(7, "br"),
+        testTypedInstruction(8, "add"),
+        testTypedInstruction(9, "sub"),
+        testTypedInstruction(10, "load"),
+        testTypedInstruction(11, "load"),
+        testTypedInstruction(12, "load"),
+        testTypedInstruction(13, "store"),
+        testTypedInstruction(14, "store"),
+        testTypedInstruction(15, "store"),
+        testTypedInstruction(16, "store"),
+        testTypedInstruction(17, "ret"),
+    };
+    const slot_air = air_export.StructuredAirV2{ .instructions = &slot_instructions };
+    try std.testing.expectEqual(.conditional_slot_update, typedConditionalSlotUpdateSummary(slot_type, slot_air).?.kind);
+
+    slot_instructions[9].opcode = "mul";
+    try std.testing.expect(typedConditionalSlotUpdateSummary(slot_type, slot_air) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {

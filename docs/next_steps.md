@@ -269,7 +269,9 @@ Execution order:
    now also uses model-owned summaries instead of carrying packed-field opcode
    count predicates in the typed-v2 lowerer. Typed-v2 plain and conditional
    slice-loop admission now uses model-owned summaries as well, leaving the
-   existing compatibility emitters unchanged. The
+   existing compatibility emitters unchanged. Typed-v2 accumulator-loop and
+   conditional-slot-update admission has likewise moved to model-owned scalar
+   control summaries. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_type_layout.zig` is now the shared
