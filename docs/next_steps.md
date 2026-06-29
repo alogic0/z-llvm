@@ -355,7 +355,10 @@ Execution order:
    paths propagate the original error-union value and the hot path reuses call
    results without re-calling clobbered arguments, and a `try` continuation
    whose payload feeds a second branch before both arms re-wrap an adjusted
-   payload. These rows pass through typed AIR v2, generic CFG, z_llvm object
+   payload, an error-branch `switch` over the unwrapped error tag, and a
+   branch-local `try` arm that preserves the single error-union call result
+   across the guard and payload return instead of reissuing the helper call.
+   These rows pass through typed AIR v2, generic CFG, z_llvm object
    emission, native link, and executable proof. Broader arbitrary
    nested/multi-block compiler-core `try` forms remain the next error-union
    sub-slice. The first accepted
