@@ -296,9 +296,11 @@ families where the inventory does not yet record per-opcode first examples.
    than AIR text fallback. The pointer-form payload branch follow-up keeps that
    synthetic payload live through a post-try compare and add/sub rewrap returns,
    with the x86_64 CFG path accepting the unsigned payload-greater predicate
-   this AIR shape emits. Broader arbitrary nested/multi-block compiler-core
-   `try` forms remain measured error-union work; pointer/slice length forms and
-   `ptr_add:bin_ty_pl` remain the next non-error-union targets.
+   this AIR shape emits. The nested pointer-form row reuses the same semantic
+   payload model across two sequential `try_ptr` continuations. Broader
+   arbitrary nested/multi-block compiler-core `try` forms remain measured
+   error-union work; pointer/slice length forms and `ptr_add:bin_ty_pl` remain
+   the next non-error-union targets.
 3. Harden generic CFG for high-volume compiler patterns: nested blocks,
    branch-heavy loops, error-union continuation blocks, and switch dispatch.
 4. Expand call ownership around live-across-call values, indirect/default C

@@ -166,6 +166,22 @@ export fn frontier_try_ptr_branch_match(tag: i32, value: i32, delta: i32) i32 {
     }
 }
 
+fn frontierNestedTryPtrAdd(first_tag: i32, second_tag: i32, value: i32) FrontierError!i32 {
+    var first_result = frontierMaybeTryPayload(first_tag, value);
+    const first_ptr = &(try first_result);
+    var second_result = frontierMaybeTryPayload(second_tag, first_ptr.* + 5);
+    const second_ptr = &(try second_result);
+    return second_ptr.* + 9;
+}
+
+export fn frontier_nested_try_ptr_match(first_tag: i32, second_tag: i32, value: i32) i32 {
+    if (frontierNestedTryPtrAdd(first_tag, second_tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -59;
+    }
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,
