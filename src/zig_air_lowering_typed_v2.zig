@@ -114,54 +114,6 @@ fn lowerMaybeError(allocator: std.mem.Allocator, air_function: air_export.Functi
     return function;
 }
 
-fn lowerErrorSwitch(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
-    defer function_type.deinit(allocator);
-    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return error.UnsupportedAir;
-    }
-    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
-    errdefer function.deinit(allocator);
-    function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = irCallingConvention(function_type);
-    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
-    var block = ir.BasicBlock.init("entry");
-    errdefer block.deinit(allocator);
-    try block.instructions.append(allocator, .{
-        .result = "is_low",
-        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 1 } } },
-    });
-    try block.instructions.append(allocator, .{
-        .result = "is_zero",
-        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 0 } } },
-    });
-    try block.instructions.append(allocator, .{
-        .result = "error_value",
-        .kind = .{ .select = .{
-            .cond_ty = .{ .int = 1 },
-            .cond = .{ .named = "is_low" },
-            .ty = .{ .int = 32 },
-            .true_value = .{ .int = -1 },
-            .false_value = .{ .int = -2 },
-        } },
-    });
-    try block.instructions.append(allocator, .{
-        .result = "result",
-        .kind = .{ .select = .{
-            .cond_ty = .{ .int = 1 },
-            .cond = .{ .named = "is_zero" },
-            .ty = .{ .int = 32 },
-            .true_value = .{ .int = 0 },
-            .false_value = .{ .named = "error_value" },
-        } },
-    });
-    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
-    try function.blocks.append(allocator, block);
-    return function;
-}
-
 fn lowerErrorClassify(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
@@ -1841,8 +1793,58 @@ pub fn lowerTypedV2ErrorSwitch(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2ErrorSwitchRecords(function_type, structured_air_v2)) return null;
-    return try lowerErrorSwitch(allocator, air_function);
+    const summary = air_model.typedErrorSwitchSummary(function_type, structured_air_v2) orelse return null;
+    if (summary.kind != .switch_dispatch) return error.UnsupportedAir;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_low",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 8 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 1 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "is_zero",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 8 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "error_value",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_low" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = -1 },
+            .false_value = .{ .int = -2 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_zero" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = 0 },
+            .false_value = .{ .named = "error_value" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn typedV2ErrorSwitchRecords(

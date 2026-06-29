@@ -257,10 +257,11 @@ Execution order:
    uncurated AIR gates. The remaining legacy AIR instruction opcode query used
    by typed-v2 compatibility fallbacks now lives in `src/zig_air_model.zig`
    instead of the fallback module. Typed-v2 error switch and error-classifier
-   admission now also enters through `src/zig_air_model.zig`; the existing
-   compatibility IR builders still own the selected emitted block bodies until
-   those paths are normalized. Typed-v2 error-union payload and maybe-error
-   admission also uses model summaries now, replacing the old
+   admission now also enters through `src/zig_air_model.zig`; typed-v2 error
+   switch now builds its selected `icmp`/`select`/`ret` body directly from the
+   model-owned switch summary, while the error-classifier compatibility IR
+   builder still owns its selected emitted block body. Typed-v2 error-union
+   payload and maybe-error admission also uses model summaries now, replacing the old
    `error_switch.error_switch` exclusion and `.maybeError` suffix gate with
    structural opcode/type checks. Typed-v2 optional-pointer admission and
    selected null-check/load/phi IR construction now consume a model-owned
