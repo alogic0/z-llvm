@@ -916,6 +916,10 @@ pub const TypedPackedFieldSummary = struct {
     kind: enum { read_flag, replace_low },
 };
 
+pub const TypedSliceLoopSummary = struct {
+    kind: enum { plain_sum, conditional_sum },
+};
+
 pub const TypedErrorSwitchSummary = struct {
     kind: enum { switch_dispatch, classify },
 };
@@ -2573,6 +2577,68 @@ pub fn typedPackedReplaceLowSummary(
     return .{ .kind = .replace_low };
 }
 
+pub fn typedSliceSumSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedSliceLoopSummary {
+    if (function_type.params.len != 2 or function_type.params[0].ir_type != .ptr or
+        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return null;
+    }
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    if (typedOpcodeCount(structured_air_v2, "arg") != 2 or
+        typedOpcodeCount(structured_air_v2, "ptr_add") != 1 or
+        typedOpcodeCount(structured_air_v2, "slice") != 1 or
+        typedOpcodeCount(structured_air_v2, "ptr_slice_len_ptr") != 1 or
+        typedOpcodeCount(structured_air_v2, "slice_elem_ptr") != 1 or
+        typedOpcodeCount(structured_air_v2, "loop") != 1 or
+        typedOpcodeCount(structured_air_v2, "repeat") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") < 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_lt") < 1 or
+        add_count != 2 or
+        typedOpcodeCount(structured_air_v2, "load") < 6 or
+        typedStoreOpcodeCount(structured_air_v2) < 5 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .plain_sum };
+}
+
+pub fn typedConditionalSliceSumSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedSliceLoopSummary {
+    if (function_type.params.len != 3 or function_type.params[0].ir_type != .ptr or
+        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
+        !function_type.params[2].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return null;
+    }
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    if (typedOpcodeCount(structured_air_v2, "arg") != 3 or
+        typedOpcodeCount(structured_air_v2, "alloc") != 3 or
+        typedOpcodeCount(structured_air_v2, "ptr_elem_ptr") != 1 or
+        typedOpcodeCount(structured_air_v2, "loop") != 1 or
+        typedOpcodeCount(structured_air_v2, "repeat") != 1 or
+        typedOpcodeCount(structured_air_v2, "block") < 3 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 2 or
+        typedOpcodeCount(structured_air_v2, "br") < 4 or
+        typedOpcodeCount(structured_air_v2, "cmp_lt") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_gt") != 1 or
+        add_count != 2 or
+        typedOpcodeCount(structured_air_v2, "load") < 6 or
+        typedStoreOpcodeCount(structured_air_v2) < 5 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .conditional_sum };
+}
+
 pub fn typedErrorSwitchSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -3111,6 +3177,113 @@ test "typed AIR model recognizes packed field summaries" {
 
     replace_instructions[6].opcode = "intcast";
     try std.testing.expect(typedPackedReplaceLowSummary(replace_type, replace_air) == null);
+}
+
+fn testTypedInstruction(index: u32, opcode: []const u8) air_export.TypedInstruction {
+    return .{
+        .index = index,
+        .opcode = opcode,
+        .result_type = "-",
+        .data_kind = "-",
+        .operands = &.{},
+    };
+}
+
+test "typed AIR model recognizes slice loop summaries" {
+    var plain_params = [_]ZigType{
+        .{ .ir_type = .ptr },
+        .{ .ir_type = .{ .int = 64 } },
+    };
+    const plain_type = FunctionType{
+        .params = &plain_params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var plain_instructions = [_]air_export.TypedInstruction{
+        testTypedInstruction(0, "arg"),
+        testTypedInstruction(1, "arg"),
+        testTypedInstruction(2, "ptr_add"),
+        testTypedInstruction(3, "slice"),
+        testTypedInstruction(4, "ptr_slice_len_ptr"),
+        testTypedInstruction(5, "slice_elem_ptr"),
+        testTypedInstruction(6, "loop"),
+        testTypedInstruction(7, "repeat"),
+        testTypedInstruction(8, "cond_br"),
+        testTypedInstruction(9, "cmp_lt"),
+        testTypedInstruction(10, "add"),
+        testTypedInstruction(11, "add"),
+        testTypedInstruction(12, "load"),
+        testTypedInstruction(13, "load"),
+        testTypedInstruction(14, "load"),
+        testTypedInstruction(15, "load"),
+        testTypedInstruction(16, "load"),
+        testTypedInstruction(17, "load"),
+        testTypedInstruction(18, "store"),
+        testTypedInstruction(19, "store"),
+        testTypedInstruction(20, "store"),
+        testTypedInstruction(21, "store"),
+        testTypedInstruction(22, "store"),
+        testTypedInstruction(23, "ret"),
+    };
+    const plain_air = air_export.StructuredAirV2{ .instructions = &plain_instructions };
+    try std.testing.expectEqual(.plain_sum, typedSliceSumSummary(plain_type, plain_air).?.kind);
+
+    plain_instructions[5].opcode = "load";
+    try std.testing.expect(typedSliceSumSummary(plain_type, plain_air) == null);
+
+    var conditional_params = [_]ZigType{
+        .{ .ir_type = .ptr },
+        .{ .ir_type = .{ .int = 64 } },
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const conditional_type = FunctionType{
+        .params = &conditional_params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var conditional_instructions = [_]air_export.TypedInstruction{
+        testTypedInstruction(0, "arg"),
+        testTypedInstruction(1, "arg"),
+        testTypedInstruction(2, "arg"),
+        testTypedInstruction(3, "alloc"),
+        testTypedInstruction(4, "alloc"),
+        testTypedInstruction(5, "alloc"),
+        testTypedInstruction(6, "ptr_elem_ptr"),
+        testTypedInstruction(7, "loop"),
+        testTypedInstruction(8, "repeat"),
+        testTypedInstruction(9, "block"),
+        testTypedInstruction(10, "block"),
+        testTypedInstruction(11, "block"),
+        testTypedInstruction(12, "cond_br"),
+        testTypedInstruction(13, "cond_br"),
+        testTypedInstruction(14, "br"),
+        testTypedInstruction(15, "br"),
+        testTypedInstruction(16, "br"),
+        testTypedInstruction(17, "br"),
+        testTypedInstruction(18, "cmp_lt"),
+        testTypedInstruction(19, "cmp_gt"),
+        testTypedInstruction(20, "add"),
+        testTypedInstruction(21, "add"),
+        testTypedInstruction(22, "load"),
+        testTypedInstruction(23, "load"),
+        testTypedInstruction(24, "load"),
+        testTypedInstruction(25, "load"),
+        testTypedInstruction(26, "load"),
+        testTypedInstruction(27, "load"),
+        testTypedInstruction(28, "store"),
+        testTypedInstruction(29, "store"),
+        testTypedInstruction(30, "store"),
+        testTypedInstruction(31, "store"),
+        testTypedInstruction(32, "store"),
+        testTypedInstruction(33, "ret"),
+    };
+    const conditional_air = air_export.StructuredAirV2{ .instructions = &conditional_instructions };
+    try std.testing.expectEqual(.conditional_sum, typedConditionalSliceSumSummary(conditional_type, conditional_air).?.kind);
+
+    conditional_instructions[19].opcode = "cmp_eq";
+    try std.testing.expect(typedConditionalSliceSumSummary(conditional_type, conditional_air) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {

@@ -267,7 +267,9 @@ Execution order:
    fallback value, and checked-unwrap marker instead of duplicating that
    extraction in the typed-v2 lowerer. Typed-v2 packed read/replace admission
    now also uses model-owned summaries instead of carrying packed-field opcode
-   count predicates in the typed-v2 lowerer. The
+   count predicates in the typed-v2 lowerer. Typed-v2 plain and conditional
+   slice-loop admission now uses model-owned summaries as well, leaving the
+   existing compatibility emitters unchanged. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_type_layout.zig` is now the shared

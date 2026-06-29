@@ -831,54 +831,14 @@ pub fn typedV2SliceSumRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 2 or function_type.params[0].ir_type != .ptr or
-        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return false;
-    }
-    const add_count = air_model.typedOpcodeCount(structured_air_v2, "add") + air_model.typedOpcodeCount(structured_air_v2, "add_safe");
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "ptr_add") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "slice") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "ptr_slice_len_ptr") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "slice_elem_ptr") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "loop") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "repeat") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") >= 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_lt") >= 1 and
-        add_count == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "load") >= 6 and
-        air_model.typedStoreOpcodeCount(structured_air_v2) >= 5 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedSliceSumSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn typedV2ConditionalSliceSumRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 3 or function_type.params[0].ir_type != .ptr or
-        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
-        !function_type.params[2].ir_type.eql(.{ .int = 32 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return false;
-    }
-    const add_count = air_model.typedOpcodeCount(structured_air_v2, "add") + air_model.typedOpcodeCount(structured_air_v2, "add_safe");
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 3 and
-        air_model.typedOpcodeCount(structured_air_v2, "alloc") == 3 and
-        air_model.typedOpcodeCount(structured_air_v2, "ptr_elem_ptr") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "loop") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "repeat") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") >= 3 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") >= 4 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_lt") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_gt") == 1 and
-        add_count == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "load") >= 6 and
-        air_model.typedStoreOpcodeCount(structured_air_v2) >= 5 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedConditionalSliceSumSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2InlineAsmBarrier(
