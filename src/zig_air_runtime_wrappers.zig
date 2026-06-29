@@ -89,6 +89,14 @@ pub fn lowerOptionalPointerMainWithType(
 pub fn lowerPointerLoadStoreMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
+    return lowerPointerLoadStoreMainWithType(allocator, air_function, function_type);
+}
+
+pub fn lowerPointerLoadStoreMainWithType(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+) !ir.Function {
     if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
         return error.UnsupportedAir;
     }

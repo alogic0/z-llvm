@@ -1893,7 +1893,7 @@ pub fn lowerTypedV2RuntimePointerLoadStoreMain(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2RuntimePointerLoadStoreMainRecords(function_type, structured_air_v2)) return null;
-    return try runtime_wrappers.lowerPointerLoadStoreMain(allocator, air_function);
+    return try runtime_wrappers.lowerPointerLoadStoreMainWithType(allocator, air_function, function_type);
 }
 
 pub fn typedV2RuntimePointerLoadStoreMainRecords(
