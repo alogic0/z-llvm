@@ -114,6 +114,22 @@ const UnsupportedCategory = enum(u8) {
 const unsupported_category_count = @typeInfo(UnsupportedCategory).@"enum".fields.len;
 const unknown_opcode_category_count = @typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".fields.len;
 
+const AggregateSurfaceCategory = enum(u8) {
+    opcode_shape,
+    metadata_type_surface,
+    abi_type_surface,
+
+    fn name(self: AggregateSurfaceCategory) []const u8 {
+        return switch (self) {
+            .opcode_shape => "opcode-shape",
+            .metadata_type_surface => "metadata-type-surface",
+            .abi_type_surface => "abi-type-surface",
+        };
+    }
+};
+
+const aggregate_surface_category_count = @typeInfo(AggregateSurfaceCategory).@"enum".fields.len;
+
 const BoundaryCategory = enum(u8) {
     parse_import,
     module_root,
@@ -155,6 +171,11 @@ const UnknownOpcodePairStat = struct {
     }
 };
 
+const TextFeatureContext = enum {
+    metadata,
+    abi,
+};
+
 const Counters = struct {
     sources: usize = 0,
     inventory_ok_sources: usize = 0,
@@ -193,6 +214,9 @@ const Counters = struct {
     loops: usize = 0,
     branches: usize = 0,
     aggregate_types: usize = 0,
+    aggregate_opcode_shapes: usize = 0,
+    aggregate_metadata_type_surfaces: usize = 0,
+    aggregate_abi_type_surfaces: usize = 0,
     pointer_uses: usize = 0,
     slice_uses: usize = 0,
     optional_uses: usize = 0,
@@ -201,6 +225,7 @@ const Counters = struct {
     unsupported_opcodes: usize = 0,
     unsupported_categories: [unsupported_category_count]CategoryStat = [_]CategoryStat{.{}} ** unsupported_category_count,
     unknown_opcode_categories: [unknown_opcode_category_count]CategoryStat = [_]CategoryStat{.{}} ** unknown_opcode_category_count,
+    aggregate_surface_categories: [aggregate_surface_category_count]CategoryStat = [_]CategoryStat{.{}} ** aggregate_surface_category_count,
     boundary_categories: [boundary_category_count]CategoryStat = [_]CategoryStat{.{}} ** boundary_category_count,
     opcode_counts: StringCountMap = .empty,
     data_kind_counts: StringCountMap = .empty,
@@ -210,6 +235,7 @@ const Counters = struct {
     fn deinit(self: *Counters, allocator: std.mem.Allocator) void {
         for (&self.unsupported_categories) |*category| category.deinit(allocator);
         for (&self.unknown_opcode_categories) |*category| category.deinit(allocator);
+        for (&self.aggregate_surface_categories) |*category| category.deinit(allocator);
         for (&self.boundary_categories) |*category| category.deinit(allocator);
         freeStringCountMap(allocator, &self.opcode_counts);
         freeStringCountMap(allocator, &self.data_kind_counts);
@@ -428,6 +454,7 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
     var env_map = try cloneEnvironment(allocator, init.environ_map);
     defer env_map.deinit();
     try env_map.put("ZLLVM_AIR_EXPORT_PATH", descriptor_path);
+    try env_map.put("ZLLVM_DISABLE_AGGREGATE_LAYOUT_FACTS", "1");
 
     const argv = [_][]const u8{
         zig_emitter,
@@ -746,9 +773,10 @@ fn accountStructuredAirV2Line(
     const result_type = try fields.readFramedField(true);
     const data_kind = try fields.readField();
     const operand_count = try parseUnsignedLine(usize, try fields.readField());
+    const text_context = textFeatureContextForOpcode(opcode);
 
     try accountOpcode(allocator, counters, source, function, opcode, data_kind, unsupported_in_function);
-    try accountTextFeatures(allocator, counters, source, function, result_type, unsupported_in_function);
+    try accountTextFeaturesInContext(allocator, counters, source, function, result_type, text_context, unsupported_in_function);
     try accountTextFeatures(allocator, counters, source, function, data_kind, unsupported_in_function);
 
     for (0..operand_count) |operand_index| {
@@ -757,7 +785,7 @@ fn accountStructuredAirV2Line(
         const type_text = try fields.readFramedField(operand_index + 1 < operand_count);
         try accountTextFeatures(allocator, counters, source, function, operand_kind, unsupported_in_function);
         try accountTextFeatures(allocator, counters, source, function, value, unsupported_in_function);
-        try accountTextFeatures(allocator, counters, source, function, type_text, unsupported_in_function);
+        try accountTextFeaturesInContext(allocator, counters, source, function, type_text, text_context, unsupported_in_function);
         if (isCallOpcode(opcode) and isRuntimeSymbol(value)) counters.runtime_symbols += 1;
     }
 
@@ -768,7 +796,7 @@ fn accountStructuredAirV2Line(
             const detail_key = try fields.readField();
             const detail_value = try fields.readFramedField(detail_index + 1 < detail_count);
             try accountTextFeatures(allocator, counters, source, function, detail_key, unsupported_in_function);
-            try accountTextFeatures(allocator, counters, source, function, detail_value, unsupported_in_function);
+            try accountTextFeaturesInContext(allocator, counters, source, function, detail_value, text_context, unsupported_in_function);
             if (isCallOpcode(opcode)) {
                 if (maybeDetailCalleeText(detail_key, detail_value)) |callee| {
                     if (isRuntimeSymbol(callee)) counters.runtime_symbols += 1;
@@ -888,7 +916,7 @@ fn accountFunctionType(
         counters.callconv_default += 1;
         try countString(allocator, &counters.callconv_counts, "default");
     }
-    try accountTextFeatures(allocator, counters, source, function, type_text, unsupported_in_function);
+    try accountTextFeaturesInContext(allocator, counters, source, function, type_text, .abi, unsupported_in_function);
 }
 
 fn accountTypedInstruction(
@@ -901,11 +929,12 @@ fn accountTypedInstruction(
     unsupported_in_function: *bool,
 ) !void {
     try accountOpcode(allocator, counters, source, function, instruction.opcode, instruction.data_kind, unsupported_in_function);
-    try accountTextFeatures(allocator, counters, source, function, instruction.result_type, unsupported_in_function);
+    const text_context = textFeatureContextForOpcode(instruction.opcode);
+    try accountTextFeaturesInContext(allocator, counters, source, function, instruction.result_type, text_context, unsupported_in_function);
     try accountTextFeatures(allocator, counters, source, function, instruction.data_kind, unsupported_in_function);
     for (instruction.operands) |operand| {
         try accountTextFeatures(allocator, counters, source, function, operand.kind, unsupported_in_function);
-        try accountTextFeatures(allocator, counters, source, function, operand.type_text, unsupported_in_function);
+        try accountTextFeaturesInContext(allocator, counters, source, function, operand.type_text, text_context, unsupported_in_function);
         try accountTextFeatures(allocator, counters, source, function, operand.value, unsupported_in_function);
         if (isCallOpcode(instruction.opcode)) {
             if (maybeOperandCallee(operand)) |callee| {
@@ -916,7 +945,7 @@ fn accountTypedInstruction(
     }
     for (instruction.details) |detail| {
         try accountTextFeatures(allocator, counters, source, function, detail.key, unsupported_in_function);
-        try accountTextFeatures(allocator, counters, source, function, detail.value, unsupported_in_function);
+        try accountTextFeaturesInContext(allocator, counters, source, function, detail.value, text_context, unsupported_in_function);
         if (isCallOpcode(instruction.opcode)) {
             if (maybeDetailCallee(detail)) |callee| {
                 if (!function_names.contains(callee)) counters.extern_imports += 1;
@@ -935,7 +964,7 @@ fn accountLegacyInstruction(
     unsupported_in_function: *bool,
 ) !void {
     try accountOpcode(allocator, counters, source, function, instruction.opcode, instruction.payload, unsupported_in_function);
-    try accountTextFeatures(allocator, counters, source, function, instruction.payload, unsupported_in_function);
+    try accountTextFeaturesInContext(allocator, counters, source, function, instruction.payload, textFeatureContextForOpcode(instruction.opcode), unsupported_in_function);
 }
 
 fn accountOpcode(
@@ -959,7 +988,11 @@ fn accountOpcode(
             if (containsAny(opcode, &.{ "loop", "repeat" })) counters.loops += 1;
             if (containsAny(opcode, &.{ "br", "cond_br", "block" })) counters.branches += 1;
         },
-        .aggregate => counters.aggregate_types += 1,
+        .aggregate => {
+            counters.aggregate_types += 1;
+            counters.aggregate_opcode_shapes += 1;
+            try noteAggregateSurface(allocator, counters, .opcode_shape, source, function);
+        },
         .memory => {
             if (std.mem.eql(u8, opcode, "load") or std.mem.eql(u8, opcode, "atomic_load")) counters.loads += 1;
             if (std.mem.startsWith(u8, opcode, "store") or std.mem.eql(u8, opcode, "atomic_store")) counters.stores += 1;
@@ -985,7 +1018,7 @@ fn accountOpcode(
         try noteUnknownOpcodePair(allocator, counters, data_kind_capability.category, opcode, data_kind, source, function);
         unsupported_in_function.* = true;
     }
-    try accountTextFeatures(allocator, counters, source, function, data_kind, unsupported_in_function);
+    try accountTextFeaturesInContext(allocator, counters, source, function, data_kind, textFeatureContextForOpcode(opcode), unsupported_in_function);
 }
 
 fn accountTextFeatures(
@@ -994,6 +1027,18 @@ fn accountTextFeatures(
     source: []const u8,
     function: []const u8,
     text: []const u8,
+    unsupported_in_function: ?*bool,
+) !void {
+    try accountTextFeaturesInContext(allocator, counters, source, function, text, .metadata, unsupported_in_function);
+}
+
+fn accountTextFeaturesInContext(
+    allocator: std.mem.Allocator,
+    counters: *Counters,
+    source: []const u8,
+    function: []const u8,
+    text: []const u8,
+    context: TextFeatureContext,
     unsupported_in_function: ?*bool,
 ) !void {
     if (text.len == 0) return;
@@ -1016,6 +1061,16 @@ fn accountTextFeatures(
     }
     if (capability.aggregate_abi) {
         counters.aggregate_types += 1;
+        switch (context) {
+            .metadata => {
+                counters.aggregate_metadata_type_surfaces += 1;
+                try noteAggregateSurface(allocator, counters, .metadata_type_surface, source, function);
+            },
+            .abi => {
+                counters.aggregate_abi_type_surfaces += 1;
+                try noteAggregateSurface(allocator, counters, .abi_type_surface, source, function);
+            },
+        }
         try noteUnsupportedMaybe(allocator, counters, .aggregate_abi, source, function, unsupported_in_function);
     }
     if (capability.pointer) counters.pointer_uses += 1;
@@ -1023,6 +1078,21 @@ fn accountTextFeatures(
     if (capability.optional) counters.optional_uses += 1;
     if (capability.error_union) counters.error_union_uses += 1;
     if (isRuntimeSymbol(text)) counters.runtime_symbols += 1;
+}
+
+fn noteAggregateSurface(
+    allocator: std.mem.Allocator,
+    counters: *Counters,
+    category: AggregateSurfaceCategory,
+    source: []const u8,
+    function: []const u8,
+) !void {
+    const index = @intFromEnum(category);
+    counters.aggregate_surface_categories[index].count += 1;
+    if (counters.aggregate_surface_categories[index].first_source == null) {
+        counters.aggregate_surface_categories[index].first_source = try allocator.dupe(u8, source);
+        counters.aggregate_surface_categories[index].first_function = try allocator.dupe(u8, function);
+    }
 }
 
 fn noteUnknownOpcodeCategory(
@@ -1190,7 +1260,7 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
         },
     );
     try writer.print(
-        " varargs_uses={} vector_uses={} x87_uses={} packed_unaligned_aggregate_uses={} atomics={} inline_asm={} loads={} stores={} allocas={} switches={} loops={} branches={} aggregate_types={} pointer_uses={} slice_uses={} optional_uses={} error_union_uses={} unsupported_functions={} unsupported_opcodes={} local_fail=0\n",
+        " varargs_uses={} vector_uses={} x87_uses={} packed_unaligned_aggregate_uses={} atomics={} inline_asm={} loads={} stores={} allocas={} switches={} loops={} branches={} aggregate_types={} aggregate_opcode_shapes={} aggregate_metadata_type_surfaces={} aggregate_abi_type_surfaces={} pointer_uses={} slice_uses={} optional_uses={} error_union_uses={} unsupported_functions={} unsupported_opcodes={} local_fail=0\n",
         .{
             counters.varargs_uses,
             counters.vector_uses,
@@ -1205,6 +1275,9 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
             counters.loops,
             counters.branches,
             counters.aggregate_types,
+            counters.aggregate_opcode_shapes,
+            counters.aggregate_metadata_type_surfaces,
+            counters.aggregate_abi_type_surfaces,
             counters.pointer_uses,
             counters.slice_uses,
             counters.optional_uses,
@@ -1213,6 +1286,21 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
             counters.unsupported_opcodes,
         },
     );
+    inline for (std.meta.fields(AggregateSurfaceCategory)) |field| {
+        const category: AggregateSurfaceCategory = @enumFromInt(field.value);
+        const stat = counters.aggregate_surface_categories[field.value];
+        try writer.print(
+            "aggregate_surface slice={s} mode={s} category={s} count={} first_source={s} first_function={s}\n",
+            .{
+                slice.cliName(),
+                mode.name(),
+                category.name(),
+                stat.count,
+                stat.first_source orelse "-",
+                stat.first_function orelse "-",
+            },
+        );
+    }
     inline for (std.meta.fields(UnsupportedCategory)) |field| {
         const category: UnsupportedCategory = @enumFromInt(field.value);
         const stat = counters.unsupported_categories[field.value];
@@ -1489,6 +1577,16 @@ fn isRuntimeSymbol(text: []const u8) bool {
 
 fn isCallOpcode(opcode: []const u8) bool {
     return air_capabilities.isCallOpcode(opcode);
+}
+
+fn textFeatureContextForOpcode(opcode: []const u8) TextFeatureContext {
+    if (air_capabilities.isCallOpcode(opcode) or
+        air_capabilities.isReturnOpcode(opcode) or
+        air_capabilities.isArgOpcode(opcode))
+    {
+        return .abi;
+    }
+    return .metadata;
 }
 
 fn maybeOperandCallee(operand: air_export.TypedOperand) ?[]const u8 {

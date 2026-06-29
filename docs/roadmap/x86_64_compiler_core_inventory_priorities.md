@@ -36,6 +36,41 @@ category.
 | varargs | 738 | 745 | 827 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, call lowering |
 | inline-asm | 21 | 22 | 20 | `../ziglang/src/main.zig` | `start._start` | partially supported boundary | CFG lowering, backend |
 
+## Aggregate Surface Split
+
+The inventory scanner now emits `aggregate_surface` lines and matching summary
+fields:
+
+- `aggregate_opcode_shapes`: aggregate-producing AIR opcodes.
+- `aggregate_metadata_type_surfaces`: aggregate type text seen in globals,
+  data kinds, operands, details, and other non-ABI metadata surfaces.
+- `aggregate_abi_type_surfaces`: aggregate type text seen in function
+  signatures and call/return/argument instruction contexts.
+
+This preserves the existing `aggregate_types` and
+`unsupported category=aggregate-abi` totals for compatibility while giving the
+next implementation slice a cleaner signal. The old compiler-core-module
+baseline above predates these split counters; the latest focused validation of
+the output contract is:
+
+| Slice | Mode | aggregate_opcode_shapes | aggregate_metadata_type_surfaces | aggregate_abi_type_surfaces | Log |
+| --- | --- | ---: | ---: | ---: | --- |
+| runtime-libs | ReleaseFast | 10118 | 43101 | 19497 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
+| runtime-libs | ReleaseSafe | 10179 | 47078 | 20214 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
+| runtime-libs | ReleaseSmall | 4964 | 23801 | 10554 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
+| compiler-core-standalone-probe | ReleaseFast | 0 | 85 | 2 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
+| compiler-core-standalone-probe | ReleaseSafe | 0 | 85 | 2 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
+| compiler-core-standalone-probe | ReleaseSmall | 0 | 0 | 0 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
+
+The full `compiler-core-module` refresh with the new split was attempted in
+`tmp/compiler_core_aggregate_surface_inventory.log`, but the first ReleaseFast
+compiler build did not complete within the focused cycle window. The runner now
+sets `ZLLVM_DISABLE_AGGREGATE_LAYOUT_FACTS=1` for this count-only inventory
+slice so the large aggregate-layout side channel is not emitted while AIR body
+payload scanning remains enabled. The next full compiler-core refresh should
+reuse the same command and record the new split counters when the long build is
+allowed to complete.
+
 ## Unknown Opcode Split
 
 The inventory also emits `unknown_opcode` and ranked `top_unknown_opcode`
@@ -184,9 +219,11 @@ families where the inventory does not yet record per-opcode first examples.
 
 ## Recommended Next Work
 
-1. Split aggregate inventory into metadata-only type surface versus real ABI
-   lowering gaps, then prioritize MEMORY/byval/sret and mixed INTEGER/SSE
-   shapes that appear in real compiler bodies.
+1. Refresh the full `compiler-core-module` inventory with the new
+   `aggregate_surface` split when a long count-only compiler build is
+   acceptable, then prioritize the measured `abi-type-surface` aggregate rows
+   before metadata-only type surfaces. Until that refresh completes, keep using
+   the saved compiler-core-module totals above for broad priority ordering.
 2. Continue converting concrete `unknown-opcode` pairs into source-backed
    compiler-core frontier rows. The first error-union slice is now accepted:
    `frontier_optionals_errors.zig` covers `wrap_errunion_payload`,

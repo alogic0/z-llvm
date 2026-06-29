@@ -164,6 +164,10 @@ The build graph provides the root module/import configuration used for the Zig
 compiler executable, including generated `build_options` and the `aro` import.
 No stubs are used. The inventory hook still does not require z_llvm lowering,
 object emission, native linking, or executable proof.
+For this count-only module slice, the runner sets
+`ZLLVM_DISABLE_AGGREGATE_LAYOUT_FACTS=1`: AIR bodies, signatures, globals, and
+typed payloads are still exported and scanned, but the large aggregate-layout
+fact side channel is not emitted because this inventory does not consume it.
 
 The first module-context result was signature/global-only because the real
 compiler descriptor is gigabyte-scale. That result established the correct
@@ -201,6 +205,16 @@ Unsupported category signals now include function bodies:
 | ReleaseFast | 738 | 15820 | 2255777 | 6194 | 5039 | 340808 | 56211 |
 | ReleaseSafe | 745 | 16024 | 2338212 | 6220 | 5548 | 407240 | 57216 |
 | ReleaseSmall | 827 | 15808 | 2206792 | 6550 | 4863 | 333877 | 54849 |
+
+The scanner now also emits `aggregate_surface` records to split aggregate
+observations into `opcode-shape`, `metadata-type-surface`, and
+`abi-type-surface`. The full compiler-core-module table above is the current
+saved baseline from before that split was refreshed; the split output has been
+validated on `runtime-libs` and the standalone `compiler-core` probe in
+`tmp/runtime_libs_aggregate_surface_inventory.log` and
+`tmp/compiler_core_standalone_aggregate_surface_inventory.log`. Refreshing the
+full module-context table with those new counters remains a long count-only
+inventory run, not a lowering milestone.
 
 Top body opcode signals:
 

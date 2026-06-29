@@ -652,6 +652,19 @@ Validation after these refactor slices is saved in
   Target reusable abstraction: a shared Zig/AIR type-layout decoder feeding the
   existing SysV aggregate classifier, with one aggregate ABI plan consumed by
   typed lowering, call planning, return lowering, and inventory classification.
+  The inventory scanner now emits an `aggregate_surface` split that preserves
+  the old aggregate totals while separating `opcode-shape`,
+  `metadata-type-surface`, and `abi-type-surface` observations. This is
+  validated for `runtime-libs` in
+  `tmp/runtime_libs_aggregate_surface_inventory.log` and for the standalone
+  compiler-core probe in
+  `tmp/compiler_core_standalone_aggregate_surface_inventory.log`. A full
+  `compiler-core-module` refresh with the new split was attempted in
+  `tmp/compiler_core_aggregate_surface_inventory.log`, but the first
+  ReleaseFast compiler build did not complete within the focused cycle window.
+  The module inventory runner now disables the aggregate-layout fact side
+  channel with `ZLLVM_DISABLE_AGGREGATE_LAYOUT_FACTS=1` so future count-only
+  refreshes scan AIR bodies without emitting the large aggregate fact stream.
   Validation gate: compare against the saved compiler-core inventory baseline;
   rerun `zig build distribution-zig-air-inventory` with
   `-- --slice=compiler-core-module` only after classifier/lowering changes
