@@ -202,8 +202,11 @@ Execution order:
    the IR blocks and runtime call symbol. The typed-v2 mixed C/Zig add-may-panic
    wrapper now follows the same pattern: the model owns the guard/call/add
    admission and reports whether the add is checked, while lowering owns the
-   IR/runtime symbol materialization. Typed pointer-to-pointer bitcast identity
-   now uses a capability predicate rather than a local string comparison. Typed
+   IR/runtime symbol materialization. Typed runtime optional-pointer and
+   pointer-load/store main wrappers now also use model-owned typed-v2 wrapper
+   summaries, matching the older untyped runtime wrapper summaries. Typed
+   pointer-to-pointer bitcast identity now uses a capability predicate rather
+   than a local string comparison. Typed
    block-target operand parsing is now normalized through model-local block
    operand helpers instead of inline `kind`/`value` checks. Typed result and
    operand coverage now use a model-owned known-type sentinel helper, typed

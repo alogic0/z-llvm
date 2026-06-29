@@ -1284,15 +1284,7 @@ pub fn typedV2RuntimeOptionalPointerMainRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    return function_type.params.len == 0 and
-        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
-        air_model.typedOpcodeCount(structured_air_v2, "call") == 2 and
-        air_model.typedCalleeNameCount(structured_air_v2, "optionalPtrValue") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_eq") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 4 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedRuntimeOptionalPointerMainSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2RuntimePointerLoadStoreMain(
@@ -1309,16 +1301,7 @@ pub fn typedV2RuntimePointerLoadStoreMainRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    return function_type.params.len == 0 and
-        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
-        air_model.typedOpcodeCount(structured_air_v2, "call") == 1 and
-        air_model.typedCalleeNameCount(structured_air_v2, "loadStore") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_eq") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 4 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedRuntimePointerLoadStoreMainSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2MixCAddMayPanic(

@@ -902,6 +902,10 @@ pub const TypedMixCAddMayPanicSummary = struct {
     checked_add: bool,
 };
 
+pub const TypedRuntimeWrapperSummary = struct {
+    kind: enum { optional_pointer_main, pointer_load_store_main },
+};
+
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
     if (!view.operandCoverage()) return null;
@@ -2427,6 +2431,43 @@ pub fn typedMixCAddMayPanicSummary(
         return null;
     }
     return .{ .checked_add = typedOpcodeCount(structured_air_v2, "add_safe") == 1 };
+}
+
+pub fn typedRuntimeOptionalPointerMainSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedRuntimeWrapperSummary {
+    if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) return null;
+    if (typedOpcodeCount(structured_air_v2, "call") != 2 or
+        typedCalleeNameCount(structured_air_v2, "optionalPtrValue") != 2 or
+        typedOpcodeCount(structured_air_v2, "cmp_eq") != 2 or
+        typedOpcodeCount(structured_air_v2, "block") != 2 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 2 or
+        typedOpcodeCount(structured_air_v2, "br") != 4 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .optional_pointer_main };
+}
+
+pub fn typedRuntimePointerLoadStoreMainSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedRuntimeWrapperSummary {
+    if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) return null;
+    if (typedOpcodeCount(structured_air_v2, "call") != 1 or
+        typedCalleeNameCount(structured_air_v2, "loadStore") != 1 or
+        typedOpcodeCount(structured_air_v2, "load") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_eq") != 2 or
+        typedOpcodeCount(structured_air_v2, "block") != 2 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 2 or
+        typedOpcodeCount(structured_air_v2, "br") != 4 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .pointer_load_store_main };
 }
 
 fn typedUnionFieldVal(structured_air_v2: air_export.StructuredAirV2, field_index: usize) ?air_export.TypedInstruction {
