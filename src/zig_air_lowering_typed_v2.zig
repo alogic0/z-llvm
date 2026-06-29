@@ -2,6 +2,7 @@ const std = @import("std");
 const air_aggregate_construction = @import("zig_air_aggregate_construction.zig");
 const air_aggregate_copy = @import("zig_air_aggregate_copy.zig");
 const air_export = @import("zig_air_export.zig");
+const error_union_call_facts = @import("zig_air_error_union_call_facts.zig");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
@@ -31,7 +32,6 @@ const validateSretAggregateCopyRecords = air_aggregate_copy.validateSretAggregat
 const validateSretAggregateCallWrapperRecords = air_aggregate_copy.validateSretAggregateCallWrapperRecords;
 const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegisterAggregateCandidate;
 
-const lowerErrorUnionPayload = legacy.lowerErrorUnionPayload;
 const lowerConditionalSliceSum = legacy.lowerConditionalSliceSum;
 
 fn lowerRegisterAggregateMake(
@@ -592,25 +592,18 @@ pub fn aggregateAbiAttrsForAggregate(module: *ir.Module, attr_name: []const u8, 
 
 pub fn lowerTypedV2ErrorUnionPayload(
     allocator: std.mem.Allocator,
+    module: *ir.Module,
     air_function: air_export.Function,
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
+    fact_provider: ?error_union_call_facts.Provider,
 ) !?ir.Function {
     const flow = switch (air_model.typedErrorUnionFlow(function_type, structured_air_v2)) {
         .flow => |flow| flow,
         .diagnostic => return null,
     };
     if (flow.payload_kind != .call_produced) return null;
-    if (flow.call_result_owner == null or
-        flow.post_success_branch_target == null or
-        flow.post_catch_branch_target == null)
-    {
-        return error.UnsupportedAir;
-    }
-    // This is still the existing compatibility emitter for the broad
-    // call-produced catch row. Admission is now model-owned, but fully replacing
-    // the selected values requires module-level callee payload/error facts.
-    return try lowerErrorUnionPayload(allocator, air_function);
+    return try lowerErrorUnionPayloadFromFact(allocator, module, air_function, function_type, flow, fact_provider);
 }
 
 pub fn typedV2ErrorUnionPayloadRecords(
@@ -618,6 +611,64 @@ pub fn typedV2ErrorUnionPayloadRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     return air_model.typedErrorUnionPayloadSummary(function_type, structured_air_v2) != null;
+}
+
+fn lowerErrorUnionPayloadFromFact(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    flow: air_model.TypedErrorUnionFlow,
+    fact_provider: ?error_union_call_facts.Provider,
+) !ir.Function {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+    const call_inst = flow.call_result_owner orelse return error.UnsupportedAir;
+    if (flow.post_success_branch_target == null or flow.post_catch_branch_target == null) return error.UnsupportedAir;
+    const catch_value = flow.catch_value_i32 orelse return error.UnsupportedAir;
+    const provider = fact_provider orelse return error.UnsupportedAir;
+    const fact = provider.lookup(air_function.name, call_inst) orelse return error.UnsupportedAir;
+    if (fact.success_arg_index != 0) return error.UnsupportedAir;
+    if (!isI32ErrorUnionResultType(fact.result_type)) return error.UnsupportedAir;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_success",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = fact.success_arg_eq_i32 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_success" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = fact.success_payload_i32 },
+            .false_value = .{ .int = catch_value },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    _ = module;
+    return function;
+}
+
+fn isI32ErrorUnionResultType(text: []const u8) bool {
+    return std.mem.startsWith(u8, text, "error{") and std.mem.endsWith(u8, text, "!i32");
 }
 
 pub fn lowerTypedV2MaybeError(

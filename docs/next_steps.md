@@ -474,16 +474,27 @@ Execution order:
    `TypedErrorUnionFlow` summary in `src/zig_air_model.zig`. The summary
    records the error-union source instruction, success payload owner, error
    owner, visible call result owner, branch targets, and whether the payload is
-   local or call-produced. The typed-v2 compatibility entry point consumes this
-   model before using the existing selected broad-row payload helper. Local
-   error-union flows continue through generic typed-v2 CFG. The remaining
-   compatibility debt is now precise: call-produced catch payloads still need
-   module-level callee facts before the old selected `arg0 == 0 ? 7 : -1`
-   helper can be retired. The minimal hook/contract direction, if this becomes
-   the next blocker, is a module-level typed fact connecting a direct
-   error-union helper call to the helper's proven payload/error return values
-   or to the helper body lowering result; z_llvm should not recover that
-   relation from AIR text.
+   local or call-produced. The patched Zig hook now emits the narrow,
+   versioned `zllvm-error-union-call-facts-v1` section in
+   `error_union_call_facts_bytes`; it connects a direct error-union helper call
+   in the caller to the callee's proven `error{...}!i32` result type, success
+   argument equality, success payload constant, and error return name. z_llvm
+   parses that fact into a provider, `lowerTypedV2ErrorUnionPayload` consumes it
+   through the `TypedErrorUnionFlow` model, and the old selected broad-row
+   `arg0 == 0 ? 7 : -1` compatibility emitter has been removed. Missing or
+   incomplete facts fail closed with `UnsupportedAir` instead of recovering the
+   relation from AIR text. Local error-union flows continue through generic
+   typed-v2 CFG; broader non-`i32` payloads and helper bodies whose success or
+   error relation is not proven by the v1 fact remain unsupported.
+   Validation evidence for the hook cycle: `tmp/error_union_call_fact_descriptor.air`
+   contains `zllvm-error-union-call-facts-v1` for
+   `aggregates.error_union_payload -> maybeError`,
+   `tmp/frontier_error_union_call_fact.log` is green at
+   `source_rows=14`, `discovered_functions=672`, `executable_ok_rows=14`,
+   and `local_fail=0` for ReleaseFast/ReleaseSafe/ReleaseSmall, and
+   `tmp/broad_error_union_call_fact.log` is green at
+   `source_rows=101`, `discovered_functions=152`, `executable_ok_rows=100`,
+   `runtime_boundary_rows=1`, and `local_fail=0` for all three release modes.
    Together these prove the same pointer-slot model beyond simple branch
    continuations.
    These rows pass through typed AIR v2, generic CFG, z_llvm object

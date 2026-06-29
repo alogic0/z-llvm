@@ -994,6 +994,7 @@ pub const TypedErrorUnionFlow = struct {
     call_result_owner: ?u32,
     post_success_branch_target: ?u32,
     post_catch_branch_target: ?u32,
+    catch_value_i32: ?i32,
     payload_kind: TypedErrorUnionPayloadKind,
 };
 
@@ -3054,6 +3055,7 @@ pub fn typedErrorUnionFlow(
         .call_result_owner = if (payload_kind == .call_produced) source_index else null,
         .post_success_branch_target = typedBranchTargetForValue(structured_air_v2, payload.index),
         .post_catch_branch_target = typedCatchBranchTarget(structured_air_v2, err.index),
+        .catch_value_i32 = typedCatchBranchI32Value(structured_air_v2, err.index),
         .payload_kind = payload_kind,
     } };
 }
@@ -3083,13 +3085,29 @@ fn typedBranchTargetForValue(structured_air_v2: air_export.StructuredAirV2, valu
 
 fn typedCatchBranchTarget(structured_air_v2: air_export.StructuredAirV2, error_owner: u32) ?u32 {
     if (typedBranchTargetForValue(structured_air_v2, error_owner)) |target| return target;
+    var found_target: ?u32 = null;
     for (structured_air_v2.instructions) |instruction| {
         if (!air_capabilities.isBrOpcode(instruction.opcode)) continue;
         if (instruction.operands.len != 2) continue;
-        if (!isTypedConstOperand(instruction.operands[1])) continue;
-        return typedBranchTargetIndex(instruction);
+        if (!isTypedI32ConstOperand(instruction.operands[1])) continue;
+        const target = typedBranchTargetIndex(instruction) orelse continue;
+        if (found_target != null) return null;
+        found_target = target;
     }
-    return null;
+    return found_target;
+}
+
+fn typedCatchBranchI32Value(structured_air_v2: air_export.StructuredAirV2, error_owner: u32) ?i32 {
+    if (typedBranchTargetForValue(structured_air_v2, error_owner) != null) return null;
+    var found_value: ?i32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isBrOpcode(instruction.opcode)) continue;
+        if (instruction.operands.len != 2) continue;
+        if (!isTypedI32ConstOperand(instruction.operands[1])) continue;
+        if (found_value != null) return null;
+        found_value = typedConstI32Operand(instruction, 1) orelse return null;
+    }
+    return found_value;
 }
 
 fn typedBranchTargetIndex(instruction: air_export.TypedInstruction) ?u32 {
@@ -3602,6 +3620,7 @@ test "typed AIR model recognizes error-union payload and maybe-error summaries" 
     try std.testing.expectEqual(@as(u32, 1), payload_flow.call_result_owner.?);
     try std.testing.expectEqual(@as(u32, 5), payload_flow.post_success_branch_target.?);
     try std.testing.expectEqual(@as(u32, 5), payload_flow.post_catch_branch_target.?);
+    try std.testing.expectEqual(@as(i32, -1), payload_flow.catch_value_i32.?);
 
     payload_instructions[2].operands = &.{};
     try std.testing.expect(typedErrorUnionPayloadSummary(payload_type, payload_air) == null);

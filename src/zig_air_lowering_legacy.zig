@@ -478,10 +478,6 @@ fn optionalPayloadShape(function: air_export.Function) bool {
     return air_model.optionalPayloadSummary(function) != null;
 }
 
-fn errorUnionPayloadShape(function: air_export.Function) bool {
-    return air_model.errorUnionPayloadSummary(function) != null;
-}
-
 fn sliceSumShape(function: air_export.Function) bool {
     return air_model.sliceSumSummary(function) != null;
 }
@@ -774,46 +770,6 @@ pub fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_expo
             .ty = .{ .int = 32 },
             .true_value = .{ .int = fallback },
             .false_value = .{ .named = "arg1" },
-        } },
-    });
-    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
-    try function.blocks.append(allocator, block);
-    return function;
-}
-
-pub fn lowerErrorUnionPayload(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try parseFunctionType(allocator, air_function.type_text);
-    defer function_type.deinit(allocator);
-    if (function_type.params.len != 1 or
-        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return error.UnsupportedAir;
-    }
-    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
-    errdefer function.deinit(allocator);
-    function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
-    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
-    var block = ir.BasicBlock.init("entry");
-    errdefer block.deinit(allocator);
-    try block.instructions.append(allocator, .{
-        .result = "is_ok",
-        .kind = .{ .icmp = .{
-            .predicate = .eq,
-            .operand_ty = .{ .int = 32 },
-            .lhs = .{ .named = "arg0" },
-            .rhs = .{ .int = 0 },
-        } },
-    });
-    try block.instructions.append(allocator, .{
-        .result = "result",
-        .kind = .{ .select = .{
-            .cond_ty = .{ .int = 1 },
-            .cond = .{ .named = "is_ok" },
-            .ty = .{ .int = 32 },
-            .true_value = .{ .int = 7 },
-            .false_value = .{ .int = -1 },
         } },
     });
     block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };

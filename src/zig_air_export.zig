@@ -1,5 +1,6 @@
 const std = @import("std");
 const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
+const error_union_call_facts = @import("zig_air_error_union_call_facts.zig");
 
 pub const contract_name = "zllvm-air-export-v1";
 pub const contract_version: u16 = 1;
@@ -146,10 +147,12 @@ pub const Module = struct {
     target: []const u8,
     globals: []Global,
     aggregate_layout_facts: ?exported_aggregate_layout_facts.Provider = null,
+    error_union_call_facts: ?error_union_call_facts.Provider = null,
     functions: []Function,
 
     pub fn deinit(self: *Module) void {
         if (self.aggregate_layout_facts) |provider| provider.deinit(self.allocator);
+        if (self.error_union_call_facts) |provider| provider.deinit(self.allocator);
         for (self.functions) |function| {
             if (function.structured_air) |structured_air| structured_air.deinit(self.allocator);
             if (function.structured_air_v2) |structured_air_v2| structured_air_v2.deinit(self.allocator);
@@ -222,6 +225,16 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
         null;
     errdefer if (aggregate_layout_facts) |provider| provider.deinit(allocator);
 
+    const error_union_call_facts_text: ?[]const u8 = if (cursor.peekValueLine("error_union_call_facts_bytes"))
+        try cursor.readFramed("error_union_call_facts_bytes")
+    else
+        null;
+    const parsed_error_union_call_facts = if (error_union_call_facts_text) |text|
+        try error_union_call_facts.parseSidecar(allocator, text)
+    else
+        null;
+    errdefer if (parsed_error_union_call_facts) |provider| provider.deinit(allocator);
+
     var functions: std.ArrayList(Function) = .empty;
     errdefer {
         for (functions.items) |function| allocator.free(function.instructions);
@@ -281,6 +294,7 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
         .target = target,
         .globals = try globals.toOwnedSlice(allocator),
         .aggregate_layout_facts = aggregate_layout_facts,
+        .error_union_call_facts = parsed_error_union_call_facts,
         .functions = try functions.toOwnedSlice(allocator),
     };
     storage_owned_by_parse = false;

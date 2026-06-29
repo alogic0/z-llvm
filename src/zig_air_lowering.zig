@@ -253,7 +253,7 @@ pub fn lowerCompatible(
         var lowered_from_typed_v2 = true;
         var typed_v2_fallback: ?TypedV2Fallback = null;
         var function = function: {
-            break :function lowerFunctionTypedV2(allocator, &module, air_function, &typed_v2_fallback) catch |typed_err| switch (typed_err) {
+            break :function lowerFunctionTypedV2(allocator, &module, air_module, air_function, &typed_v2_fallback) catch |typed_err| switch (typed_err) {
                 error.UnsupportedAir => {
                     lowered_from_typed_v2 = false;
                     try typed_v2_fallback_list.append(allocator, typed_v2_fallback orelse firstTypedV2Fallback(air_function));
@@ -628,6 +628,7 @@ fn lowerFunction(
 fn lowerFunctionTypedV2(
     allocator: std.mem.Allocator,
     module: *ir.Module,
+    air_module: air_export.Module,
     air_function: air_export.Function,
     typed_v2_fallback: ?*?TypedV2Fallback,
 ) LowerError!ir.Function {
@@ -649,7 +650,7 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2SretIntegerAggregateAbi(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
-    if (try lowerTypedV2ErrorUnionPayload(allocator, air_function, function_type, structured_air_v2)) |function| {
+    if (try lowerTypedV2ErrorUnionPayload(allocator, module, air_function, function_type, structured_air_v2, air_module.error_union_call_facts)) |function| {
         return function;
     }
     if (try lowerTypedV2MaybeError(allocator, air_function, function_type, structured_air_v2)) |function| {
