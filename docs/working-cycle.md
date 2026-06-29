@@ -237,6 +237,12 @@ git diff --check
 Run `distribution-all` only for a broad milestone confirmation, shared build
 orchestration changes, or a documented reason in the active goal.
 
+For compiler-core inventory refreshes, prefer per-mode runs such as
+`zig build distribution-zig-air-inventory --
+--slice=compiler-core-module --mode=ReleaseFast`. The all-mode
+compiler-core-module refresh is milestone-cost evidence, not a default worker
+cycle gate.
+
 Do not rebuild `../ziglang` stage4 unless the Zig hook contract or patched Zig
 source changed.
 
