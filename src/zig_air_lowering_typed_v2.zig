@@ -78,42 +78,6 @@ fn lowerRegisterAggregateMake(
     return function;
 }
 
-fn lowerMaybeError(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
-    defer function_type.deinit(allocator);
-    if (function_type.params.len != 1 or
-        !function_type.return_type.ir_type.eql(.{ .int = 64 }) or
-        !(function_type.params[0].ir_type.eql(.{ .int = 32 }) or function_type.params[0].ir_type.eql(.{ .int = 8 })))
-    {
-        return error.UnsupportedAir;
-    }
-    const param_ty = function_type.params[0].ir_type;
-    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 64 });
-    errdefer function.deinit(allocator);
-    function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = irCallingConvention(function_type);
-    try function.params.append(allocator, .{ .ty = param_ty, .name = "arg0" });
-    var block = ir.BasicBlock.init("entry");
-    errdefer block.deinit(allocator);
-    try block.instructions.append(allocator, .{
-        .result = "is_error",
-        .kind = .{ .icmp = .{ .predicate = .ne, .operand_ty = param_ty, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 0 } } },
-    });
-    try block.instructions.append(allocator, .{
-        .result = "result",
-        .kind = .{ .select = .{
-            .cond_ty = .{ .int = 1 },
-            .cond = .{ .named = "is_error" },
-            .ty = .{ .int = 64 },
-            .true_value = .{ .int = 1 },
-            .false_value = .{ .int = 7 },
-        } },
-    });
-    block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "result" } } };
-    try function.blocks.append(allocator, block);
-    return function;
-}
-
 fn lowerMixCAddMayPanicChecked(
     allocator: std.mem.Allocator,
     module: *ir.Module,
@@ -689,8 +653,40 @@ pub fn lowerTypedV2MaybeError(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2MaybeErrorRecords(function_type, structured_air_v2)) return null;
-    return try lowerMaybeError(allocator, air_function);
+    const summary = air_model.typedMaybeErrorSummary(function_type, structured_air_v2) orelse return null;
+    if (summary.kind != .maybe_error) return error.UnsupportedAir;
+    const param_ty = function_type.params[0].ir_type;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 64 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = param_ty, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_error",
+        .kind = .{ .icmp = .{
+            .predicate = .ne,
+            .operand_ty = param_ty,
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_error" },
+            .ty = .{ .int = 64 },
+            .true_value = .{ .int = 1 },
+            .false_value = .{ .int = 7 },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn typedV2MaybeErrorRecords(

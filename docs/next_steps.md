@@ -260,10 +260,12 @@ Execution order:
    admission now also enters through `src/zig_air_model.zig`; both selected
    error-switch-family `icmp`/`select`/`ret` bodies now build directly from the
    model-owned summaries instead of delegating to compatibility IR builders.
-   Typed-v2 error-union payload and maybe-error admission also uses model
-   summaries now, replacing the old `error_switch.error_switch` exclusion and
-   `.maybeError` suffix gate with
-   structural opcode/type checks. Typed-v2 optional-pointer admission and
+   Typed-v2 maybe-error also builds its selected `icmp`/`select`/`ret` body
+   directly from the model-owned summary, replacing the old `.maybeError` suffix
+   gate with structural opcode/type checks. Typed-v2 error-union payload
+   admission also uses model summaries now, replacing the old
+   `error_switch.error_switch` exclusion with structural opcode/type checks.
+   Typed-v2 optional-pointer admission and
    selected null-check/load/phi IR construction now consume a model-owned
    summary containing the selected add immediate, fallback value, and
    checked-unwrap marker instead of delegating to the legacy optional-pointer
