@@ -96,7 +96,8 @@ implementation slices can target concrete AIR shapes.
 | vector | 26132 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
 | union-tag-shape | 14507 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
 | optional-shape | 6454 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
-| other | 1956 | 33949 | 22545 | `../ziglang/src/main.zig` | `main.buildOutputType` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
+| scalar-transform | 887 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.net.HostName.DnsResponse.next` | unsupported inventory family | semantic lowering, backend |
+| other | 1069 | 33949 | 22545 | `../ziglang/src/main.zig` | `main.buildOutputType` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
 | safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
@@ -119,6 +120,10 @@ implementation slices can target concrete AIR shapes.
 | 10 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6343 | `other:get_union_tag:opaque` | 10923 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6250 |
 | 11 | `union-tag-shape:get_union_tag:opaque` | 6057 | - | - | - | - |
 | 12 | `union-tag-shape:union_init:opaque` | 4624 | - | - | - | - |
+| 13 | `union-tag-shape:set_union_tag:opaque` | 3020 | - | - | - | - |
+| 14 | `union-tag-shape:tag_name:opaque` | 806 | - | - | - | - |
+| 15 | `error-union-try:try_cold:pl_op` | 763 | - | - | - | - |
+| 16 | `scalar-transform:byte_swap:opaque` | 760 | - | - | - | - |
 
 ## Top Opcode Categories
 
