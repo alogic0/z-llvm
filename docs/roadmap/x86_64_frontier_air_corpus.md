@@ -162,10 +162,13 @@ descriptors for supported aggregate semantic layouts; z_llvm parses the
 optional `aggregate_layout_facts_bytes` section and gives descriptor facts
 precedence over compatibility sidecars. The current empty-sidecar provider
 audit reports `exported_facts=0`, `static_source_facts=0`,
-`boundary_provider=2`, and `generated_examples=0`; accepted frontier aggregate
-layouts are descriptor-fact owned during AIR gate runs, while this static audit
-counts only checked-in sidecar exported facts. The former non-frontier sidecar
-compatibility facts have been retired.
+`boundary_provider=2`, `generated_examples=0`, `sidecar_exported_facts=0`,
+and `descriptor_exported_facts=0`. The same audit tool accepts
+`--from-air=<descriptor>` for saved AIR descriptors; the saved
+`tmp/aggregate_hook_check.air` descriptor reports `descriptor_exported_facts=14`
+and `static_source_facts=0`, proving descriptor-owned aggregate facts are now
+machine-readable evidence rather than only gate-internal state. The former
+non-frontier sidecar compatibility facts have been retired.
 The 2 packed/unaligned targeted entries are boundary-owned through
 `src/zig_air_aggregate_layout_boundaries.zig`.
 Register aggregate

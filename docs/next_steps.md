@@ -740,13 +740,18 @@ Aggregate/type-layout ownership start:
   on sidecar aggregate facts.
 - Current aggregate provider audit:
   `zig run tools/audit_aggregate_layout_providers.zig >
-  tmp/aggregate_layout_provider_audit_empty_sidecar.log` now reports
-  `exported_facts=0`, `static_source_facts=0`, `boundary_provider=2`, and
-  `generated_examples=0` after retiring the final non-frontier sidecar facts.
-  In this static provider audit, `exported_facts` means checked-in sidecar
-  exported facts only. Per-descriptor Zig-emitted aggregate facts are observed
-  during AIR gate runs and are not counted by this sidecar/static provider
-  audit.
+  tmp/aggregate_layout_provider_audit.log` now reports `exported_facts=0`,
+  `static_source_facts=0`, `boundary_provider=2`, `generated_examples=0`,
+  `sidecar_exported_facts=0`, and `descriptor_exported_facts=0` after
+  retiring the final non-frontier sidecar facts. The same audit tool can now
+  count descriptor-emitted facts explicitly with `--from-air=<descriptor>`:
+  `zig run tools/audit_aggregate_layout_providers.zig -- --from-air=tmp/aggregate_hook_check.air >
+  tmp/aggregate_layout_provider_descriptor_audit.log` reports
+  `exported_facts=14`, `sidecar_exported_facts=0`,
+  `descriptor_exported_facts=14`, `static_source_facts=0`, and
+  `boundary_provider=2` for the saved SysV aggregate-class descriptor. This
+  keeps sidecar/static ownership and Zig-emitted descriptor ownership visible
+  as separate evidence buckets.
   The prior broad failure was not a missing aggregate fact: `pointers_memory.load_store`
   and `runtime_pointer_load_store_main.loadStore` were plain pointer-memory rows
   hitting aggregate ABI routing, and `runtime_aggregate_pair_main.main` needed
