@@ -272,7 +272,8 @@ Execution order:
    existing compatibility emitters unchanged. Typed-v2 accumulator-loop and
    conditional-slot-update admission has likewise moved to model-owned scalar
    control summaries. Typed-v2 inline-asm memory-barrier admission now uses a
-   model-owned summary too. The
+   model-owned summary too, and typed-v2 monotonic atomic-add admission now
+   selects the `atomic_rmw` instruction through a model-owned summary. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_type_layout.zig` is now the shared

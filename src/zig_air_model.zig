@@ -928,6 +928,10 @@ pub const TypedInlineAsmSummary = struct {
     memory_barrier: bool,
 };
 
+pub const TypedAtomicRmwSummary = struct {
+    instruction: air_export.TypedInstruction,
+};
+
 pub const TypedErrorSwitchSummary = struct {
     kind: enum { switch_dispatch, classify },
 };
@@ -2722,6 +2726,28 @@ pub fn typedInlineAsmBarrierSummary(
     return .{ .memory_barrier = true };
 }
 
+pub fn typedAtomicAddSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedAtomicRmwSummary {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "atomic_rmw") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isAtomicRmwOpcode(instruction.opcode)) continue;
+        if (!isTypedPayloadOpDataKind(instruction.data_kind) or instruction.operands.len != 1) return null;
+        if (!isTypedPtrU32ConstOperand(instruction.operands[0])) return null;
+        return .{ .instruction = instruction };
+    }
+    return null;
+}
+
 pub fn typedErrorSwitchSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -3464,6 +3490,37 @@ test "typed AIR model recognizes inline asm barrier summary" {
 
     instructions[1].opcode = "call";
     try std.testing.expect(typedInlineAsmBarrierSummary(function_type, structured_air_v2) == null);
+}
+
+test "typed AIR model recognizes atomic add summary" {
+    var params = [_]ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const function_type = FunctionType{
+        .params = &params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var atomic_operands = [_]air_export.TypedOperand{
+        .{ .kind = "const", .value = "ptr", .type_text = "*u32" },
+    };
+    var instructions = [_]air_export.TypedInstruction{
+        testTypedInstruction(0, "arg"),
+        .{
+            .index = 1,
+            .opcode = "atomic_rmw",
+            .result_type = "u32",
+            .data_kind = "pl_op",
+            .operands = @constCast(&atomic_operands),
+        },
+        testTypedInstruction(2, "ret"),
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = &instructions };
+    try std.testing.expectEqual(@as(u32, 1), typedAtomicAddSummary(function_type, structured_air_v2).?.instruction.index);
+
+    instructions[1].data_kind = "bin_op";
+    try std.testing.expect(typedAtomicAddSummary(function_type, structured_air_v2) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {

@@ -1,7 +1,6 @@
 const std = @import("std");
 const air_aggregate_construction = @import("zig_air_aggregate_construction.zig");
 const air_aggregate_copy = @import("zig_air_aggregate_copy.zig");
-const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
@@ -890,7 +889,7 @@ pub fn lowerTypedV2AtomicAdd(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    const atomic = typedV2AtomicAddInstruction(function_type, structured_air_v2) orelse return null;
+    const atomic = (air_model.typedAtomicAddSummary(function_type, structured_air_v2) orelse return null).instruction;
     const pointer_text = typedOperandTextDetail(atomic, 0) orelse return null;
     const pointer = parseSymbolPointer(pointer_text) orelse return null;
     if (!pointer.ty.ir_type.eql(.ptr)) return null;
@@ -922,22 +921,7 @@ pub fn typedV2AtomicAddInstruction(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) ?air_export.TypedInstruction {
-    if (function_type.params.len != 1 or
-        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
-        air_model.typedOpcodeCount(structured_air_v2, "arg") != 1 or
-        air_model.typedOpcodeCount(structured_air_v2, "atomic_rmw") != 1 or
-        !air_model.typedHasReturnOpcode(structured_air_v2))
-    {
-        return null;
-    }
-    for (structured_air_v2.instructions) |instruction| {
-        if (!air_capabilities.isAtomicRmwOpcode(instruction.opcode)) continue;
-        if (!air_model.isTypedPayloadOpDataKind(instruction.data_kind) or instruction.operands.len != 1) return null;
-        if (!air_model.isTypedPtrU32ConstOperand(instruction.operands[0])) return null;
-        return instruction;
-    }
-    return null;
+    return (air_model.typedAtomicAddSummary(function_type, structured_air_v2) orelse return null).instruction;
 }
 
 pub fn lowerTypedV2AccumulatorLoop(
