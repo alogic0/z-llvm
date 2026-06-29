@@ -970,6 +970,38 @@ pub const TypedErrorUnionSummary = struct {
     kind: enum { payload, maybe_error },
 };
 
+pub const TypedErrorUnionPayloadKind = enum {
+    local,
+    call_produced,
+    unsupported,
+};
+
+pub const TypedErrorUnionFlowDiagnostic = enum {
+    missing_operand,
+    missing_call_result_type,
+    missing_branch_target,
+    missing_payload_owner,
+    missing_error_owner,
+    cross_function_fact_required,
+    unsupported_payload_owner,
+    unsupported_shape,
+};
+
+pub const TypedErrorUnionFlow = struct {
+    source_instruction: u32,
+    success_payload_owner: u32,
+    error_owner: u32,
+    call_result_owner: ?u32,
+    post_success_branch_target: ?u32,
+    post_catch_branch_target: ?u32,
+    payload_kind: TypedErrorUnionPayloadKind,
+};
+
+pub const TypedErrorUnionFlowResult = union(enum) {
+    flow: TypedErrorUnionFlow,
+    diagnostic: TypedErrorUnionFlowDiagnostic,
+};
+
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
     if (!view.operandCoverage()) return null;
@@ -2957,23 +2989,114 @@ pub fn typedErrorUnionPayloadSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) ?TypedErrorUnionSummary {
+    const flow = switch (typedErrorUnionFlow(function_type, structured_air_v2)) {
+        .flow => |flow| flow,
+        .diagnostic => return null,
+    };
+    if (flow.payload_kind != .call_produced) return null;
+    return .{ .kind = .payload };
+}
+
+pub fn typedErrorUnionFlow(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) TypedErrorUnionFlowResult {
     if (function_type.params.len != 1 or
         !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
         !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
         typedOpcodeCount(structured_air_v2, "arg") != 1 or
-        typedOpcodeCount(structured_air_v2, "call") != 1 or
         typedOpcodeCount(structured_air_v2, "is_non_err") != 1 or
         typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") != 1 or
         typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") != 1 or
-        typedOpcodeCount(structured_air_v2, "block") != 1 or
-        typedOpcodeCount(structured_air_v2, "switch_br") != 0 or
-        typedOpcodeCount(structured_air_v2, "br") != 2 or
         typedOpcodeCount(structured_air_v2, "cond_br") != 1 or
         !typedHasReturnOpcode(structured_air_v2))
     {
-        return null;
+        return .{ .diagnostic = .unsupported_shape };
     }
-    return .{ .kind = .payload };
+
+    const is_non_err = singleInstructionByOpcode(structured_air_v2, "is_non_err") orelse
+        return .{ .diagnostic = .missing_payload_owner };
+    if (is_non_err.operands.len != 1) return .{ .diagnostic = .missing_operand };
+    const source_index = typedInstOperandIndex(is_non_err.operands[0]) orelse
+        return .{ .diagnostic = .missing_operand };
+
+    const payload = singleInstructionByOpcode(structured_air_v2, "unwrap_errunion_payload") orelse
+        return .{ .diagnostic = .missing_payload_owner };
+    if (payload.operands.len != 1 or typedInstOperandIndex(payload.operands[0]) != source_index) {
+        return .{ .diagnostic = .missing_payload_owner };
+    }
+
+    const err = singleInstructionByOpcode(structured_air_v2, "unwrap_errunion_err") orelse
+        return .{ .diagnostic = .missing_error_owner };
+    if (err.operands.len != 1 or typedInstOperandIndex(err.operands[0]) != source_index) {
+        return .{ .diagnostic = .missing_error_owner };
+    }
+
+    if (!typedCondBrUsesInstruction(structured_air_v2, is_non_err.index)) {
+        return .{ .diagnostic = .missing_branch_target };
+    }
+
+    const source = instructionByIndex(structured_air_v2, source_index) orelse
+        return .{ .diagnostic = .missing_payload_owner };
+    const payload_kind: TypedErrorUnionPayloadKind = if (std.mem.eql(u8, source.opcode, "call")) kind: {
+        const call = callDetails(source) orelse return .{ .diagnostic = .missing_call_result_type };
+        if (std.mem.indexOfScalar(u8, call.signature_text, '!') == null) {
+            return .{ .diagnostic = .missing_call_result_type };
+        }
+        break :kind .call_produced;
+    } else if (std.mem.eql(u8, source.opcode, "block")) .local else .unsupported;
+    if (payload_kind == .unsupported) return .{ .diagnostic = .unsupported_payload_owner };
+
+    return .{ .flow = .{
+        .source_instruction = source_index,
+        .success_payload_owner = payload.index,
+        .error_owner = err.index,
+        .call_result_owner = if (payload_kind == .call_produced) source_index else null,
+        .post_success_branch_target = typedBranchTargetForValue(structured_air_v2, payload.index),
+        .post_catch_branch_target = typedCatchBranchTarget(structured_air_v2, err.index),
+        .payload_kind = payload_kind,
+    } };
+}
+
+pub fn typedErrorUnionFlowDiagnosticName(diagnostic: TypedErrorUnionFlowDiagnostic) []const u8 {
+    return @tagName(diagnostic);
+}
+
+fn typedCondBrUsesInstruction(structured_air_v2: air_export.StructuredAirV2, instruction_index: u32) bool {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isCondBrOpcode(instruction.opcode)) continue;
+        if (instruction.operands.len != 1) return false;
+        if (typedInstOperandIndex(instruction.operands[0]) == instruction_index) return true;
+    }
+    return false;
+}
+
+fn typedBranchTargetForValue(structured_air_v2: air_export.StructuredAirV2, value_index: u32) ?u32 {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isBrOpcode(instruction.opcode)) continue;
+        if (instruction.operands.len != 2) continue;
+        if (typedInstOperandIndex(instruction.operands[1]) != value_index) continue;
+        return typedBranchTargetIndex(instruction);
+    }
+    return null;
+}
+
+fn typedCatchBranchTarget(structured_air_v2: air_export.StructuredAirV2, error_owner: u32) ?u32 {
+    if (typedBranchTargetForValue(structured_air_v2, error_owner)) |target| return target;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isBrOpcode(instruction.opcode)) continue;
+        if (instruction.operands.len != 2) continue;
+        if (!isTypedConstOperand(instruction.operands[1])) continue;
+        return typedBranchTargetIndex(instruction);
+    }
+    return null;
+}
+
+fn typedBranchTargetIndex(instruction: air_export.TypedInstruction) ?u32 {
+    if (!air_capabilities.isBrOpcode(instruction.opcode)) return null;
+    if (instruction.operands.len == 0) return null;
+    const target_text = typedBlockOperandTargetText(instruction.operands[0]) orelse return null;
+    return std.fmt.parseInt(u32, target_text, 10) catch null;
 }
 
 pub fn typedMaybeErrorSummary(
@@ -3430,23 +3553,81 @@ test "typed AIR model recognizes error-union payload and maybe-error summaries" 
         .c_calling_convention = true,
         .non_default_calling_convention = false,
     };
+    var is_non_err_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "error{Bad}!i32" },
+    };
+    var payload_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "error{Bad}!i32" },
+    };
+    var err_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "error{Bad}!i32" },
+    };
+    var success_br_operands = [_]air_export.TypedOperand{
+        .{ .kind = "block", .value = "5", .type_text = "block" },
+        .{ .kind = "inst", .value = "3", .type_text = "i32" },
+    };
+    var catch_br_operands = [_]air_export.TypedOperand{
+        .{ .kind = "block", .value = "5", .type_text = "block" },
+        .{ .kind = "const", .value = "-", .type_text = "i32" },
+    };
+    var catch_br_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, -1>" },
+    };
+    var cond_br_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "2", .type_text = "bool" },
+    };
+    var call_details = [_]air_export.TypedDetail{
+        .{ .key = "call_signature", .value = "fn (i32) error{Bad}!i32" },
+        .{ .key = "callee_text", .value = "(function 'maybeError')" },
+    };
     var payload_instructions = [_]air_export.TypedInstruction{
         .{ .index = 0, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
-        .{ .index = 1, .opcode = "call", .result_type = "error_union", .data_kind = "pl_op", .operands = &.{} },
-        .{ .index = 2, .opcode = "is_non_err", .result_type = "i1", .data_kind = "un_op", .operands = &.{} },
-        .{ .index = 3, .opcode = "unwrap_errunion_payload", .result_type = "i32", .data_kind = "ty_op", .operands = &.{} },
-        .{ .index = 4, .opcode = "unwrap_errunion_err", .result_type = "i16", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 1, .opcode = "call", .result_type = "error{Bad}!i32", .data_kind = "pl_op", .operands = &.{}, .details = &call_details },
+        .{ .index = 2, .opcode = "is_non_err", .result_type = "i1", .data_kind = "un_op", .operands = &is_non_err_operands },
+        .{ .index = 3, .opcode = "unwrap_errunion_payload", .result_type = "i32", .data_kind = "ty_op", .operands = &payload_operands },
+        .{ .index = 4, .opcode = "unwrap_errunion_err", .result_type = "i16", .data_kind = "ty_op", .operands = &err_operands },
         .{ .index = 5, .opcode = "block", .result_type = "void", .data_kind = "ty_pl", .operands = &.{} },
-        .{ .index = 6, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
-        .{ .index = 7, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
-        .{ .index = 8, .opcode = "cond_br", .result_type = "noreturn", .data_kind = "pl_op", .operands = &.{} },
+        .{ .index = 6, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &success_br_operands },
+        .{ .index = 7, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &catch_br_operands, .details = &catch_br_details },
+        .{ .index = 8, .opcode = "cond_br", .result_type = "noreturn", .data_kind = "pl_op", .operands = &cond_br_operands },
         .{ .index = 9, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &.{} },
     };
     const payload_air = air_export.StructuredAirV2{ .instructions = &payload_instructions };
     try std.testing.expectEqual(.payload, typedErrorUnionPayloadSummary(payload_type, payload_air).?.kind);
+    const payload_flow = switch (typedErrorUnionFlow(payload_type, payload_air)) {
+        .flow => |flow| flow,
+        .diagnostic => return error.TestExpectedEqual,
+    };
+    try std.testing.expectEqual(TypedErrorUnionPayloadKind.call_produced, payload_flow.payload_kind);
+    try std.testing.expectEqual(@as(u32, 1), payload_flow.call_result_owner.?);
+    try std.testing.expectEqual(@as(u32, 5), payload_flow.post_success_branch_target.?);
+    try std.testing.expectEqual(@as(u32, 5), payload_flow.post_catch_branch_target.?);
 
-    payload_instructions[5].opcode = "switch_br";
+    payload_instructions[2].operands = &.{};
     try std.testing.expect(typedErrorUnionPayloadSummary(payload_type, payload_air) == null);
+    try std.testing.expectEqual(
+        TypedErrorUnionFlowDiagnostic.missing_operand,
+        switch (typedErrorUnionFlow(payload_type, payload_air)) {
+            .flow => return error.TestExpectedEqual,
+            .diagnostic => |diagnostic| diagnostic,
+        },
+    );
+    payload_instructions[2].operands = &is_non_err_operands;
+
+    var local_flow_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "5", .type_text = "error{Bad}!i32" },
+    };
+    payload_instructions[1].opcode = "block";
+    payload_instructions[1].details = &.{};
+    payload_instructions[2].operands = &local_flow_operands;
+    payload_instructions[3].operands = &local_flow_operands;
+    payload_instructions[4].operands = &local_flow_operands;
+    try std.testing.expect(typedErrorUnionPayloadSummary(payload_type, payload_air) == null);
+    const local_flow = switch (typedErrorUnionFlow(payload_type, payload_air)) {
+        .flow => |flow| flow,
+        .diagnostic => return error.TestExpectedEqual,
+    };
+    try std.testing.expectEqual(TypedErrorUnionPayloadKind.local, local_flow.payload_kind);
 
     const maybe_type = FunctionType{
         .params = &i32_param,

@@ -596,7 +596,20 @@ pub fn lowerTypedV2ErrorUnionPayload(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2ErrorUnionPayloadRecords(function_type, structured_air_v2)) return null;
+    const flow = switch (air_model.typedErrorUnionFlow(function_type, structured_air_v2)) {
+        .flow => |flow| flow,
+        .diagnostic => return null,
+    };
+    if (flow.payload_kind != .call_produced) return null;
+    if (flow.call_result_owner == null or
+        flow.post_success_branch_target == null or
+        flow.post_catch_branch_target == null)
+    {
+        return error.UnsupportedAir;
+    }
+    // This is still the existing compatibility emitter for the broad
+    // call-produced catch row. Admission is now model-owned, but fully replacing
+    // the selected values requires module-level callee payload/error facts.
     return try lowerErrorUnionPayload(allocator, air_function);
 }
 
