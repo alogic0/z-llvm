@@ -1497,7 +1497,7 @@ pub fn lowerTypedV2UnionTagPayloadSwitch(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    const summary = typedV2UnionTagPayloadSwitchSummary(function_type, structured_air_v2) orelse return null;
+    const summary = air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) orelse return null;
 
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
@@ -1563,105 +1563,7 @@ pub fn typedV2UnionTagPayloadSwitchRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    return typedV2UnionTagPayloadSwitchSummary(function_type, structured_air_v2) != null;
-}
-
-const UnionTagPayloadSwitchSummary = struct {
-    tag0_return_add: i32,
-    tag1_store_add: i32,
-    tag1_return_add: i32,
-};
-
-fn typedV2UnionTagPayloadSwitchSummary(
-    function_type: FunctionType,
-    structured_air_v2: air_export.StructuredAirV2,
-) ?UnionTagPayloadSwitchSummary {
-    if (function_type.params.len != 2 or
-        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
-        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return null;
-    }
-    if (air_model.typedOpcodeCount(structured_air_v2, "alloc") != 1 or
-        air_model.typedOpcodeCount(structured_air_v2, "set_union_tag") != 2 or
-        air_model.typedOpcodeCount(structured_air_v2, "get_union_tag") != 1 or
-        air_model.typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
-        air_model.typedOpcodeCount(structured_air_v2, "struct_field_val") != 2 or
-        air_model.typedStoreOpcodeCount(structured_air_v2) != 2 or
-        !air_model.typedHasReturnOpcode(structured_air_v2))
-    {
-        return null;
-    }
-
-    const alloc = typedSingleInstructionByOpcode(structured_air_v2, "alloc") orelse return null;
-    if (!std.mem.startsWith(u8, alloc.result_type, "*")) return null;
-
-    var saw_tag0 = false;
-    var saw_tag1 = false;
-    for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "set_union_tag")) continue;
-        if (instruction.operands.len != 2) return null;
-        if (air_model.typedInstOperandIndex(instruction.operands[0]) != alloc.index) return null;
-        const tag_index = typedDetailU32(instruction, "tag_index") orelse return null;
-        switch (tag_index) {
-            0 => saw_tag0 = true,
-            1 => saw_tag1 = true,
-            else => return null,
-        }
-    }
-    if (!saw_tag0 or !saw_tag1) return null;
-
-    const get_tag = typedSingleInstructionByOpcode(structured_air_v2, "get_union_tag") orelse return null;
-    const switch_br = typedSingleInstructionByOpcode(structured_air_v2, "switch_br") orelse return null;
-    if (switch_br.operands.len != 1 or air_model.typedInstOperandIndex(switch_br.operands[0]) != get_tag.index) return null;
-    if ((typedDetailU32(switch_br, "cases_len") orelse return null) != 2) return null;
-    if ((typedDetailU32(switch_br, "case0_item0_tag_index") orelse return null) != 0) return null;
-    if ((typedDetailU32(switch_br, "case1_item0_tag_index") orelse return null) != 1) return null;
-
-    const field0 = typedUnionFieldVal(structured_air_v2, 0) orelse return null;
-    const field1 = typedUnionFieldVal(structured_air_v2, 1) orelse return null;
-    if (field0.operands.len != 1 or field1.operands.len != 1) return null;
-    const union_value_index0 = air_model.typedInstOperandIndex(field0.operands[0]) orelse return null;
-    const union_value_index1 = air_model.typedInstOperandIndex(field1.operands[0]) orelse return null;
-    if (union_value_index0 != union_value_index1) return null;
-
-    const tag0_return_add = typedAddConstUsing(structured_air_v2, field0.index) orelse return null;
-    const tag1_return_add = typedAddConstUsing(structured_air_v2, field1.index) orelse return null;
-    const tag1_store_add = typedAddConstUsingArg1(structured_air_v2) orelse return null;
-    if (tag0_return_add == 0 or tag1_return_add == 0 or tag1_store_add == 0) return null;
-    return .{
-        .tag0_return_add = tag0_return_add,
-        .tag1_store_add = tag1_store_add,
-        .tag1_return_add = tag1_return_add,
-    };
-}
-
-fn typedUnionFieldVal(structured_air_v2: air_export.StructuredAirV2, field_index: usize) ?air_export.TypedInstruction {
-    var found: ?air_export.TypedInstruction = null;
-    for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "struct_field_val")) continue;
-        if (air_model.fieldIndexUsize(instruction) != field_index) continue;
-        if (found != null) return null;
-        found = instruction;
-    }
-    return found;
-}
-
-fn typedAddConstUsing(structured_air_v2: air_export.StructuredAirV2, operand_index: u32) ?i32 {
-    for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.startsWith(u8, instruction.opcode, "add")) continue;
-        if (instruction.operands.len != 2) continue;
-        const lhs_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse continue;
-        if (lhs_index != operand_index) continue;
-        return air_model.typedConstI32Operand(instruction, 1);
-    }
-    return null;
-}
-
-fn typedAddConstUsingArg1(structured_air_v2: air_export.StructuredAirV2) ?i32 {
-    const arg1 = typedSecondI32ArgIndex(structured_air_v2) orelse return null;
-    return typedAddConstUsing(structured_air_v2, arg1);
+    return air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) != null;
 }
 
 fn typedNthI32ArgIndex(structured_air_v2: air_export.StructuredAirV2, wanted: usize) ?u32 {

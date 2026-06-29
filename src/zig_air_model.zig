@@ -881,6 +881,12 @@ pub const PointerSliceAddressSummary = struct {
     }
 };
 
+pub const TypedUnionTagPayloadSwitchSummary = struct {
+    tag0_return_add: i32,
+    tag1_store_add: i32,
+    tag1_return_add: i32,
+};
+
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
     if (!view.operandCoverage()) return null;
@@ -2227,6 +2233,114 @@ pub fn singleInstructionByOpcode(
     return found;
 }
 
+pub fn typedUnionTagPayloadSwitchSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedUnionTagPayloadSwitchSummary {
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return null;
+    }
+    if (typedOpcodeCount(structured_air_v2, "alloc") != 1 or
+        typedOpcodeCount(structured_air_v2, "set_union_tag") != 2 or
+        typedOpcodeCount(structured_air_v2, "get_union_tag") != 1 or
+        typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
+        typedOpcodeCount(structured_air_v2, "struct_field_val") != 2 or
+        typedStoreOpcodeCount(structured_air_v2) != 2 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+
+    const alloc = singleInstructionByOpcode(structured_air_v2, "alloc") orelse return null;
+    if (!std.mem.startsWith(u8, alloc.result_type, "*")) return null;
+
+    var saw_tag0 = false;
+    var saw_tag1 = false;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "set_union_tag")) continue;
+        if (instruction.operands.len != 2) return null;
+        if (typedInstOperandIndex(instruction.operands[0]) != alloc.index) return null;
+        const tag_index = typedDetailU32(instruction, "tag_index") orelse return null;
+        switch (tag_index) {
+            0 => saw_tag0 = true,
+            1 => saw_tag1 = true,
+            else => return null,
+        }
+    }
+    if (!saw_tag0 or !saw_tag1) return null;
+
+    const get_tag = singleInstructionByOpcode(structured_air_v2, "get_union_tag") orelse return null;
+    const switch_br = singleInstructionByOpcode(structured_air_v2, "switch_br") orelse return null;
+    if (switch_br.operands.len != 1 or typedInstOperandIndex(switch_br.operands[0]) != get_tag.index) return null;
+    if ((typedDetailU32(switch_br, "cases_len") orelse return null) != 2) return null;
+    if ((typedDetailU32(switch_br, "case0_item0_tag_index") orelse return null) != 0) return null;
+    if ((typedDetailU32(switch_br, "case1_item0_tag_index") orelse return null) != 1) return null;
+
+    const field0 = typedUnionFieldVal(structured_air_v2, 0) orelse return null;
+    const field1 = typedUnionFieldVal(structured_air_v2, 1) orelse return null;
+    if (field0.operands.len != 1 or field1.operands.len != 1) return null;
+    const union_value_index0 = typedInstOperandIndex(field0.operands[0]) orelse return null;
+    const union_value_index1 = typedInstOperandIndex(field1.operands[0]) orelse return null;
+    if (union_value_index0 != union_value_index1) return null;
+
+    const tag0_return_add = typedAddConstUsing(structured_air_v2, field0.index) orelse return null;
+    const tag1_return_add = typedAddConstUsing(structured_air_v2, field1.index) orelse return null;
+    const tag1_store_add = typedAddConstUsingSecondI32Arg(structured_air_v2) orelse return null;
+    if (tag0_return_add == 0 or tag1_return_add == 0 or tag1_store_add == 0) return null;
+    return .{
+        .tag0_return_add = tag0_return_add,
+        .tag1_store_add = tag1_store_add,
+        .tag1_return_add = tag1_return_add,
+    };
+}
+
+fn typedUnionFieldVal(structured_air_v2: air_export.StructuredAirV2, field_index: usize) ?air_export.TypedInstruction {
+    var found: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "struct_field_val")) continue;
+        if (fieldIndexUsize(instruction) != field_index) continue;
+        if (found != null) return null;
+        found = instruction;
+    }
+    return found;
+}
+
+fn typedAddConstUsing(structured_air_v2: air_export.StructuredAirV2, operand_index: u32) ?i32 {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.startsWith(u8, instruction.opcode, "add")) continue;
+        if (instruction.operands.len != 2) continue;
+        const lhs_index = typedInstOperandIndex(instruction.operands[0]) orelse continue;
+        if (lhs_index != operand_index) continue;
+        return typedConstI32Operand(instruction, 1);
+    }
+    return null;
+}
+
+fn typedAddConstUsingSecondI32Arg(structured_air_v2: air_export.StructuredAirV2) ?i32 {
+    const arg1 = typedNthI32ArgIndex(structured_air_v2, 1) orelse return null;
+    return typedAddConstUsing(structured_air_v2, arg1);
+}
+
+fn typedNthI32ArgIndex(structured_air_v2: air_export.StructuredAirV2, wanted: usize) ?u32 {
+    var seen: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "arg")) continue;
+        if (!std.mem.eql(u8, instruction.result_type, "i32")) continue;
+        if (seen == wanted) return instruction.index;
+        seen += 1;
+    }
+    return null;
+}
+
+fn typedDetailU32(instruction: air_export.TypedInstruction, key: []const u8) ?u32 {
+    const text = detail(instruction, key) orelse return null;
+    return std.fmt.parseInt(u32, text, 10) catch null;
+}
+
 test "typed AIR model parses instruction details and block operands" {
     var details = [_]air_export.TypedDetail{
         .{ .key = "callee_text", .value = "function 'helper'" },
@@ -2253,6 +2367,108 @@ test "typed AIR model parses instruction details and block operands" {
         .value = "7",
         .type_text = "ignored",
     }).?);
+}
+
+test "typed AIR model recognizes union tag payload switch summary" {
+    var function_params = [_]ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const function_type = FunctionType{
+        .params = &function_params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+
+    var add_store_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "i32" },
+        .{ .kind = "const", .value = "tag1_store_add", .type_text = "i32" },
+    };
+    var add_store_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, 5>" },
+    };
+    var set_tag0_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "2", .type_text = "*TaggedValue" },
+        .{ .kind = "const", .value = "small", .type_text = "TaggedValue.Tag" },
+    };
+    var set_tag0_details = [_]air_export.TypedDetail{
+        .{ .key = "tag_index", .value = "0" },
+    };
+    var set_tag1_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "2", .type_text = "*TaggedValue" },
+        .{ .kind = "const", .value = "large", .type_text = "TaggedValue.Tag" },
+    };
+    var set_tag1_details = [_]air_export.TypedDetail{
+        .{ .key = "tag_index", .value = "1" },
+    };
+    var get_tag_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "12", .type_text = "TaggedValue" },
+    };
+    var switch_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "7", .type_text = "TaggedValue.Tag" },
+    };
+    var switch_details = [_]air_export.TypedDetail{
+        .{ .key = "cases_len", .value = "2" },
+        .{ .key = "case0_item0_tag_index", .value = "0" },
+        .{ .key = "case1_item0_tag_index", .value = "1" },
+    };
+    var field0_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "12", .type_text = "TaggedValue" },
+    };
+    var field0_details = [_]air_export.TypedDetail{
+        .{ .key = "field_index", .value = "0" },
+    };
+    var field1_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "12", .type_text = "TaggedValue" },
+    };
+    var field1_details = [_]air_export.TypedDetail{
+        .{ .key = "field_index", .value = "1" },
+    };
+    var add_tag0_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "9", .type_text = "i32" },
+        .{ .kind = "const", .value = "tag0_return_add", .type_text = "i32" },
+    };
+    var add_tag0_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, 7>" },
+    };
+    var add_tag1_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "10", .type_text = "i32" },
+        .{ .kind = "const", .value = "tag1_return_add", .type_text = "i32" },
+    };
+    var add_tag1_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, 11>" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "13", .type_text = "i32" },
+    };
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 2, .opcode = "alloc", .result_type = "*TaggedValue", .data_kind = "ty", .operands = &.{} },
+        .{ .index = 3, .opcode = "add", .result_type = "i32", .data_kind = "bin_op", .operands = @constCast(&add_store_operands), .details = @constCast(&add_store_details) },
+        .{ .index = 4, .opcode = "store", .result_type = "void", .data_kind = "bin_op", .operands = &.{} },
+        .{ .index = 5, .opcode = "store", .result_type = "void", .data_kind = "bin_op", .operands = &.{} },
+        .{ .index = 6, .opcode = "set_union_tag", .result_type = "void", .data_kind = "bin_op", .operands = @constCast(&set_tag0_operands), .details = @constCast(&set_tag0_details) },
+        .{ .index = 7, .opcode = "get_union_tag", .result_type = "TaggedValue.Tag", .data_kind = "ty_op", .operands = @constCast(&get_tag_operands) },
+        .{ .index = 8, .opcode = "switch_br", .result_type = "noreturn", .data_kind = "switch_br", .operands = @constCast(&switch_operands), .details = @constCast(&switch_details) },
+        .{ .index = 9, .opcode = "struct_field_val", .result_type = "i32", .data_kind = "ty_pl", .operands = @constCast(&field0_operands), .details = @constCast(&field0_details) },
+        .{ .index = 10, .opcode = "struct_field_val", .result_type = "i32", .data_kind = "ty_pl", .operands = @constCast(&field1_operands), .details = @constCast(&field1_details) },
+        .{ .index = 11, .opcode = "set_union_tag", .result_type = "void", .data_kind = "bin_op", .operands = @constCast(&set_tag1_operands), .details = @constCast(&set_tag1_details) },
+        .{ .index = 12, .opcode = "load", .result_type = "TaggedValue", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 13, .opcode = "add", .result_type = "i32", .data_kind = "bin_op", .operands = @constCast(&add_tag0_operands), .details = @constCast(&add_tag0_details) },
+        .{ .index = 14, .opcode = "add", .result_type = "i32", .data_kind = "bin_op", .operands = @constCast(&add_tag1_operands), .details = @constCast(&add_tag1_details) },
+        .{ .index = 15, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = @constCast(&ret_operands) },
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = @constCast(&instructions) };
+
+    const summary = typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2).?;
+    try std.testing.expectEqual(@as(i32, 7), summary.tag0_return_add);
+    try std.testing.expectEqual(@as(i32, 5), summary.tag1_store_add);
+    try std.testing.expectEqual(@as(i32, 11), summary.tag1_return_add);
+
+    switch_operands[0].value = "0";
+    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {

@@ -383,7 +383,10 @@ Execution order:
    A second direct payload-pointer row combines the same pointer payload path
    with an error-arm switch over the extracted error tag, proving the shared
    error-tag switch return path applies to pointer-form payload success arms
-   without a selected function-name gate.
+   without a selected function-name gate. The typed-v2 union-tag payload switch
+   recognizer now lives in `src/zig_air_model.zig` as a model-owned summary
+   rather than in the lowering module; the x86_64 lowering path consumes the
+   summary fields and still emits the same selected frontier IR.
    The catch/remap row now lowers a post-try catch body that switches over the
    unwrapped error tag, returns remapped error-union constants from the cold
    arms, and rewraps the hot payload after arithmetic through the same
