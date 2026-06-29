@@ -892,6 +892,10 @@ pub const TypedOptionalPayloadBranchSummary = struct {
     fallback: i32,
 };
 
+pub const TypedOptionalPayloadSummary = struct {
+    fallback: i32,
+};
+
 pub const TypedOptionalPointerSummary = struct {
     add_imm: i32,
     fallback: i32,
@@ -2420,6 +2424,32 @@ pub fn typedOptionalPayloadBranchSummary(
     return .{ .threshold = threshold, .fallback = fallback };
 }
 
+pub fn typedOptionalPayloadSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedOptionalPayloadSummary {
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return null;
+    }
+    if (typedOpcodeCount(structured_air_v2, "arg") != 2 or
+        typedOpcodeCount(structured_air_v2, "block") != 2 or
+        typedOpcodeCount(structured_air_v2, "cmp_neq") != 1 or
+        typedOpcodeCount(structured_air_v2, "wrap_optional") != 1 or
+        typedOpcodeCount(structured_air_v2, "is_non_null") != 1 or
+        typedOpcodeCount(structured_air_v2, "optional_payload") != 1 or
+        typedOpcodeCount(structured_air_v2, "br") != 4 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 2 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .fallback = typedLastBranchI32ConstValue(structured_air_v2) orelse return null };
+}
+
 pub fn typedOptionalPointerSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -3209,6 +3239,48 @@ test "typed AIR model recognizes error-union payload and maybe-error summaries" 
 
     maybe_instructions[1].opcode = "call";
     try std.testing.expect(typedMaybeErrorSummary(maybe_type, maybe_air) == null);
+}
+
+test "typed AIR model recognizes optional payload summary" {
+    var params = [_]ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const function_type = FunctionType{
+        .params = &params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var fallback_operands = [_]air_export.TypedOperand{
+        .{ .kind = "block", .value = "0", .type_text = "0" },
+        .{ .kind = "const", .value = "fallback", .type_text = "i32" },
+    };
+    var fallback_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, -21>" },
+    };
+    var instructions = [_]air_export.TypedInstruction{
+        testTypedInstruction(0, "arg"),
+        testTypedInstruction(1, "arg"),
+        testTypedInstruction(2, "block"),
+        testTypedInstruction(3, "block"),
+        testTypedInstruction(4, "cmp_neq"),
+        testTypedInstruction(5, "wrap_optional"),
+        testTypedInstruction(6, "is_non_null"),
+        testTypedInstruction(7, "optional_payload"),
+        testTypedInstruction(8, "br"),
+        testTypedInstruction(9, "br"),
+        testTypedInstruction(10, "br"),
+        .{ .index = 11, .opcode = "br", .result_type = "void", .data_kind = "br", .operands = @constCast(&fallback_operands), .details = @constCast(&fallback_details) },
+        testTypedInstruction(12, "cond_br"),
+        testTypedInstruction(13, "cond_br"),
+        testTypedInstruction(14, "ret"),
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = &instructions };
+    try std.testing.expectEqual(@as(i32, -21), typedOptionalPayloadSummary(function_type, structured_air_v2).?.fallback);
+
+    instructions[11].operands = &.{};
+    try std.testing.expect(typedOptionalPayloadSummary(function_type, structured_air_v2) == null);
 }
 
 test "typed AIR model recognizes optional pointer summary" {

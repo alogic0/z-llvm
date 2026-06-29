@@ -638,8 +638,8 @@ pub fn lowerTypedV2OptionalPayload(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2OptionalPayloadRecords(function_type, structured_air_v2)) return null;
-    return try lowerOptionalPayload(allocator, air_function, typedV2OptionalPayloadFallback(structured_air_v2) orelse return null);
+    const summary = air_model.typedOptionalPayloadSummary(function_type, structured_air_v2) orelse return null;
+    return try lowerOptionalPayload(allocator, air_function, summary.fallback);
 }
 
 pub fn lowerTypedV2OptionalPayloadBranch(
@@ -729,30 +729,11 @@ pub fn typedV2OptionalPayloadBranchRecords(
     return air_model.typedOptionalPayloadBranchSummary(function_type, structured_air_v2) != null;
 }
 
-pub fn typedV2OptionalPayloadFallback(structured_air_v2: air_export.StructuredAirV2) ?i32 {
-    return air_model.typedLastBranchI32ConstValue(structured_air_v2);
-}
-
 pub fn typedV2OptionalPayloadRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 2 or
-        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
-        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return false;
-    }
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_neq") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "wrap_optional") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "is_non_null") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "optional_payload") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 4 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedOptionalPayloadSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2OptionalPointer(
