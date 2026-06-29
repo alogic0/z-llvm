@@ -2154,6 +2154,7 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (try lowerGenericCfgLinearErrorUnionTryChainReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTrySwitchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionSwitchPhiReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgErrorUnionErrorTagSwitchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadBranchReturn(allocator, machine, function)) return true;
     if (function.blocks.items.len != 5) return false;
     const entry = function.blocks.items[0];
@@ -2242,6 +2243,19 @@ const ErrorUnionSwitchPhiReturn = struct {
     default_incoming: ir.Value,
 };
 
+const ErrorUnionErrorTagSwitchReturn = struct {
+    entry: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    payload_block: ir.BasicBlock,
+    payload_add_imm: i32,
+    switch_block: ir.BasicBlock,
+    cases: [8]ErrorUnionSwitchPhiCase,
+    case_count: usize,
+    default_block: ir.BasicBlock,
+    merge_block: ir.BasicBlock,
+};
+
 fn lowerGenericCfgErrorUnionSwitchPhiReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -2308,6 +2322,205 @@ fn errorUnionSwitchPhiReturn(function: ir.Function) ?ErrorUnionSwitchPhiReturn {
         .default_block = default_block,
         .default_incoming = phiIncomingForBlock(phi, default_block.name) orelse return null,
     };
+}
+
+fn lowerGenericCfgErrorUnionErrorTagSwitchReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionErrorTagSwitchReturn(function) orelse return false;
+    const frame_bytes: u8 = 8;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_error_tag_switch_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.payload_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.switch_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    for (plan.cases[0..plan.case_count]) |case| {
+        try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = case.value });
+        try appendGenericCfgConditionalBranch(allocator, machine, .je, case.block.name);
+    }
+    try machine.instructions.append(allocator, .{ .jmp = plan.default_block.name });
+
+    for (plan.cases[0..plan.case_count]) |case| {
+        try appendGenericCfgBlockLabel(allocator, machine, case.block.name);
+        try emitGenericCfgTerminalI32ValueIntoEax(allocator, machine, function, plan.entry, case.block, case.incoming);
+        try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+    }
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.payload_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+    if (plan.payload_add_imm != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = plan.payload_add_imm });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.default_block.name);
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwitchReturn {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len < 6) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
+    const call_instruction = findInstruction(entry, call_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    const then_payload_add = errorUnionPayloadAddReturn(then_block, call_name);
+    const else_payload_add = errorUnionPayloadAddReturn(else_block, call_name);
+    if ((then_payload_add != null) == (else_payload_add != null)) return null;
+    const payload_block = if (then_payload_add != null) then_block else else_block;
+    const switch_block = if (then_payload_add != null) else_block else then_block;
+    const payload_add_imm = then_payload_add orelse else_payload_add.?;
+
+    const switch_term = blockSwitchTerminator(switch_block) orelse return null;
+    if (!switch_term.cond_ty.eql(.{ .int = 16 })) return null;
+    if (!errorTagValueFromCallResult(switch_block, switch_term.cond, call_name)) return null;
+    if (switch_term.cases.items.len == 0 or switch_term.cases.items.len > 8) return null;
+    const merge_block = exhaustiveSwitchMergeBlock(function, switch_term) orelse return null;
+    const phi = firstPhiReturn(function, merge_block) orelse return null;
+    if (!phi.ty.eql(.{ .int = 32 })) return null;
+
+    var cases: [8]ErrorUnionSwitchPhiCase = undefined;
+    for (switch_term.cases.items, 0..) |case, case_index| {
+        if (!case.value_ty.eql(.{ .int = 16 })) return null;
+        const value = switch (case.value) {
+            .int => |int| i32Value(int) catch return null,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+        };
+        const block = function.blocks.items[blockIndex(function, case.target) orelse return null];
+        if (!blockBranchesTo(block, merge_block.name)) return null;
+        cases[case_index] = .{
+            .value = value,
+            .block = block,
+            .incoming = phiIncomingForBlock(phi, block.name) orelse return null,
+        };
+    }
+    const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
+    if (!blockIsUnreachable(default_block)) return null;
+    if (!errorTagSwitchUsesAllBlocks(function, payload_block.name, switch_block.name, merge_block.name, switch_term)) return null;
+
+    return .{
+        .entry = entry,
+        .call_name = call_name,
+        .call = call,
+        .payload_block = payload_block,
+        .payload_add_imm = payload_add_imm,
+        .switch_block = switch_block,
+        .cases = cases,
+        .case_count = switch_term.cases.items.len,
+        .default_block = default_block,
+        .merge_block = merge_block,
+    };
+}
+
+fn errorUnionPayloadAddReturn(block: ir.BasicBlock, call_name: []const u8) ?i32 {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const ret_value = ret.value orelse return null;
+    if (payloadValueFromCallResult(block, ret_value, call_name)) return 0;
+    const add_name = switch (ret_value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    return payloadAddFromCallResult(block, add_name, call_name) orelse return null;
+}
+
+fn errorTagValueFromCallResult(block: ir.BasicBlock, value: ir.Value, call_name: []const u8) bool {
+    const trunc_name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const trunc_inst = findInstruction(block, trunc_name) orelse return false;
+    const trunc = switch (trunc_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 16 })) return false;
+    const mask_name = switch (trunc.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const mask_inst = findInstruction(block, mask_name) orelse return false;
+    const mask = switch (mask_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    return mask.ty.eql(.{ .int = 64 }) and mask.op == .@"and" and isInt(mask.rhs, 65535) and isNamed(mask.lhs, call_name);
+}
+
+fn exhaustiveSwitchMergeBlock(function: ir.Function, switch_term: ir.SwitchTerminator) ?ir.BasicBlock {
+    var target: ?[]const u8 = null;
+    for (switch_term.cases.items) |case| {
+        const block = function.blocks.items[blockIndex(function, case.target) orelse return null];
+        const branch_target = singleBrTarget(block) orelse return null;
+        if (target) |existing| {
+            if (!std.mem.eql(u8, existing, branch_target)) return null;
+        } else {
+            target = branch_target;
+        }
+    }
+    return function.blocks.items[blockIndex(function, target orelse return null) orelse return null];
+}
+
+fn errorTagSwitchUsesAllBlocks(
+    function: ir.Function,
+    payload_block: []const u8,
+    switch_block: []const u8,
+    merge_block: []const u8,
+    switch_term: ir.SwitchTerminator,
+) bool {
+    for (function.blocks.items, 0..) |block, index| {
+        if (index == 0 or
+            std.mem.eql(u8, block.name, payload_block) or
+            std.mem.eql(u8, block.name, switch_block) or
+            std.mem.eql(u8, block.name, merge_block) or
+            std.mem.eql(u8, block.name, switch_term.default_target))
+        {
+            continue;
+        }
+        var matched_case = false;
+        for (switch_term.cases.items) |case| {
+            if (std.mem.eql(u8, block.name, case.target)) {
+                matched_case = true;
+                break;
+            }
+        }
+        if (matched_case) continue;
+        if (blockIsUnreachable(block)) continue;
+        return false;
+    }
+    return true;
 }
 
 fn phiIncomingForBlock(phi: ir.PhiInst, block_name: []const u8) ?ir.Value {
@@ -3225,6 +3438,13 @@ pub fn singleBrTarget(block: ir.BasicBlock) ?[]const u8 {
     return switch (block.terminator orelse return null) {
         .br => |br| br.target,
         else => null,
+    };
+}
+
+fn blockIsUnreachable(block: ir.BasicBlock) bool {
+    return switch (block.terminator orelse return false) {
+        .@"unreachable" => true,
+        else => false,
     };
 }
 

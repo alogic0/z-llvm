@@ -100,3 +100,14 @@ export fn frontier_maybe_error_tag_match(tag: i32, value: i32) i32 {
         return -46;
     }
 }
+
+export fn frontier_error_tag_switch(tag: i32, value: i32) i32 {
+    if (frontierMaybeErrorTag(tag, value)) |payload| {
+        return payload + 1;
+    } else |err| {
+        return switch (err) {
+            FrontierError.BadTag => -47,
+            FrontierError.WorseTag => -48,
+        };
+    }
+}

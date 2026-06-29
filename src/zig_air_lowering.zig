@@ -1308,6 +1308,7 @@ const LoweringContext = struct {
 
         var finished = self.block.*;
         finished.terminator = .{ .@"switch" = switch_term };
+        switch_term.cases = .empty;
         self.block.* = ir.BasicBlock.init(labels.items[0]);
         try self.function.blocks.append(self.allocator, finished);
 
@@ -1611,6 +1612,7 @@ const LoweringContext = struct {
 
     fn typedBlockResultType(self: *LoweringContext, instruction: air_export.TypedInstruction) ?ZigType {
         if (parseZigType(instruction.result_type)) |merge_type| return merge_type;
+        if (blockResultTypeFromAirText(self.air_function.air_text, instruction.index)) |merge_type| return merge_type;
         const return_type_text = functionReturnTypeText(self.air_function.type_text) orelse return null;
         if (isErrorUnionTypeText(return_type_text) and self.function_type.return_type.ir_type.eql(.{ .int = 64 })) {
             return self.function_type.return_type;
@@ -3028,6 +3030,15 @@ fn switchInputIndexFromAirText(function_air_text: []const u8, switch_index: u32)
     return parseInstructionRef(std.mem.trim(u8, line[open + 1 .. close], " !"));
 }
 
+fn blockResultTypeFromAirText(function_air_text: []const u8, block_index: u32) ?ZigType {
+    const line = blockLine(function_air_text, block_index) orelse return null;
+    const block_start = std.mem.indexOf(u8, line, "block(") orelse return null;
+    const type_start = block_start + "block(".len;
+    var fields = splitTopLevel(line[type_start..], ',');
+    const type_text = fields.next() orelse return null;
+    return parseZigType(std.mem.trim(u8, type_text, " "));
+}
+
 fn collectSwitchCaseValues(
     allocator: std.mem.Allocator,
     values: *std.ArrayList(TypedValue),
@@ -3066,12 +3077,35 @@ fn switchLine(function_air_text: []const u8, switch_index: u32) ?[]const u8 {
     return null;
 }
 
+fn blockLine(function_air_text: []const u8, block_index: u32) ?[]const u8 {
+    var needle_buffer: [32]u8 = undefined;
+    const needle = std.fmt.bufPrint(&needle_buffer, "%{}", .{block_index}) catch return null;
+    var start: usize = 0;
+    while (std.mem.indexOfPos(u8, function_air_text, start, needle)) |needle_pos| {
+        const line_start = std.mem.lastIndexOfScalar(u8, function_air_text[0..needle_pos], '\n') orelse 0;
+        const adjusted_start = if (line_start == 0) 0 else line_start + 1;
+        const line_end = std.mem.indexOfScalarPos(u8, function_air_text, needle_pos, '\n') orelse function_air_text.len;
+        const line = function_air_text[adjusted_start..line_end];
+        if (std.mem.indexOf(u8, line, "block(") != null) return line;
+        start = needle_pos + needle.len;
+    }
+    return null;
+}
+
 fn switchText(function_air_text: []const u8, switch_index: u32) ?[]const u8 {
     const line = switchLine(function_air_text, switch_index) orelse return null;
     const start = @intFromPtr(line.ptr) - @intFromPtr(function_air_text.ptr);
-    const end_marker = "\n    )";
-    const relative_end = std.mem.indexOfPos(u8, function_air_text, start, end_marker) orelse return null;
-    return function_air_text[start .. relative_end + end_marker.len];
+    var pos = start;
+    while (pos < function_air_text.len) {
+        const line_end = std.mem.indexOfScalarPos(u8, function_air_text, pos, '\n') orelse function_air_text.len;
+        const candidate = function_air_text[pos..line_end];
+        if (std.mem.eql(u8, std.mem.trim(u8, candidate, " \t"), ")")) {
+            return function_air_text[start..line_end];
+        }
+        if (line_end == function_air_text.len) break;
+        pos = line_end + 1;
+    }
+    return null;
 }
 
 test "typed switch case parsing supports typed constants and exhaustive switches" {
@@ -3118,4 +3152,42 @@ test "typed switch case parsing preserves i32 else cases" {
     try std.testing.expectEqual(@as(i128, 0), values.items[0].value.int);
     try std.testing.expectEqual(@as(i128, 1), values.items[1].value.int);
     try std.testing.expect(switchHasElseArm(text, 26));
+}
+
+test "typed block result parser preserves error-set commas" {
+    const error_union_text =
+        \\  %3 = block(error{BadTag,WorseTag}!i32, {
+        \\  } %0!)
+    ;
+    const error_union_ty = blockResultTypeFromAirText(error_union_text, 3) orelse return error.TestExpectedEqual;
+    try std.testing.expect(error_union_ty.ir_type.eql(.{ .int = 64 }));
+
+    const scalar_text =
+        \\  %17 = block(i32, {
+        \\  } %14!)
+    ;
+    const scalar_ty = blockResultTypeFromAirText(scalar_text, 17) orelse return error.TestExpectedEqual;
+    try std.testing.expect(scalar_ty.ir_type.eql(.{ .int = 32 }));
+}
+
+test "typed switch text parser handles nested switch indentation" {
+    const text =
+        \\    %17 = block(i32, {
+        \\      %20!= switch_br(%14!, [<error{BadTag,WorseTag}, error.BadTag>] => {
+        \\          %18!= br(%17, <i32, -44>)
+        \\        }, [<error{BadTag,WorseTag}, error.WorseTag>] => {
+        \\          %19!= br(%17, <i32, -45>)
+        \\        }
+        \\      )
+        \\    } %14!)
+    ;
+    const extracted = switchText(text, 20) orelse return error.TestExpectedEqual;
+    try std.testing.expect(std.mem.indexOf(u8, extracted, "error.WorseTag") != null);
+
+    var values: std.ArrayList(TypedValue) = .empty;
+    defer values.deinit(std.testing.allocator);
+    try collectSwitchCaseValues(std.testing.allocator, &values, text, 20);
+    try std.testing.expectEqual(@as(usize, 2), values.items.len);
+    try std.testing.expect(values.items[0].ty.ir_type.eql(.{ .int = 16 }));
+    try std.testing.expect(values.items[1].ty.ir_type.eql(.{ .int = 16 }));
 }
