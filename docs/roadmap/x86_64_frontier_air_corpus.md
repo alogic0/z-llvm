@@ -111,9 +111,11 @@ address model with a base pointer, additive and subtractive dynamic index
 terms, constant byte offset, scalar width, and conservative element-size
 checks. Accepted rows prove
 i8, i16, i32, and i64 scalar pointer loads/stores, including dynamic-index and
-constant-offset forms. Two-term dynamic address forms that require `%rcx` as an
-input scratch remain explicitly fail-closed until the emitter has a second
-scratch strategy. The accepted `slice_elem_ptr` rows still include
+constant-offset forms. The accepted rows now include a two-term dynamic address
+where the subtractive index arrives in `%rcx`; the emitter consumes that term
+before reusing `%rcx` as the final address register. Forms that also need `%r8`
+preserved while `%r8` is the scratch register remain explicitly fail-closed.
+The accepted `slice_elem_ptr` rows still include
 unchecked pointer-address proof, and `frontier_checked_slice_elem_ptr_load` now
 adds the checked bounds guard: the hot path lowers through the same typed
 address model, the cold path preserves the `outOfBounds(index, len)` noreturn
@@ -183,20 +185,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=667
-structured_functions=667
-generic_codegen_functions=667
-generic_cfg_functions=667
+discovered_functions=668
+structured_functions=668
+generic_codegen_functions=668
+generic_cfg_functions=668
 structural_matcher_functions=0
-structured_air_v2_functions=667
-typed_air_operand_functions=667
+structured_air_v2_functions=668
+typed_air_operand_functions=668
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=667
+generic_lowering_functions=668
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=667
+object_emitted_functions=668
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

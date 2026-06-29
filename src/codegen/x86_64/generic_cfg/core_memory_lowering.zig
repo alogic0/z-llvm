@@ -584,10 +584,17 @@ pub fn emitGenericCfgTypedAddressIntoRcx(
             }
         }
     } else {
-        if (address.add_index_reg == .rcx or address.sub_index_reg == .rcx) return error.UnsupportedCodegenValue;
-        try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.base_reg } });
-        if (address.add_index_reg) |reg| try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, reg, .add);
-        if (address.sub_index_reg) |reg| try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, reg, .sub);
+        if (address.add_index_reg == .rcx) {
+            try emitGenericCfgTypedAddressRcxIndexFirst(allocator, machine, address, .add);
+            if (address.sub_index_reg) |reg| try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, reg, .sub);
+        } else if (address.sub_index_reg == .rcx) {
+            try emitGenericCfgTypedAddressRcxIndexFirst(allocator, machine, address, .sub);
+            if (address.add_index_reg) |reg| try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, reg, .add);
+        } else {
+            try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.base_reg } });
+            if (address.add_index_reg) |reg| try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, reg, .add);
+            if (address.sub_index_reg) |reg| try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, reg, .sub);
+        }
     }
     if (address.offset_bytes != 0) {
         try machine.instructions.append(allocator, .{ .add_rcx_imm32 = @intCast(address.offset_bytes) });
@@ -600,6 +607,29 @@ const IndexTerm = struct {
     reg: ArgReg,
     direction: IndexDirection,
 };
+
+fn emitGenericCfgTypedAddressRcxIndexFirst(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    address: GenericCfgTypedAddress,
+    direction: IndexDirection,
+) !void {
+    const other_reg = switch (direction) {
+        .add => address.sub_index_reg,
+        .sub => address.add_index_reg,
+    };
+    if (other_reg == .r8) return error.UnsupportedCodegenValue;
+    if (address.base_reg == .r8) {
+        if (direction == .sub) return error.UnsupportedCodegenValue;
+        const shift = address.width.shift();
+        if (shift != 0) try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = shift });
+        try machine.instructions.append(allocator, .add_r8_rcx);
+        return;
+    }
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rcx } });
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.base_reg } });
+    try emitGenericCfgTypedAddressPreparedIndexTerm(allocator, machine, address.width, direction);
+}
 
 fn emitGenericCfgTypedAddressIndexTerm(
     allocator: std.mem.Allocator,
