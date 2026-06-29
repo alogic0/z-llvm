@@ -150,6 +150,27 @@ export fn frontier_branch_both_try_match(flag: i32, first_tag: i32, second_tag: 
     }
 }
 
+fn frontierSwitchBothTry(selector: i32, first_tag: i32, second_tag: i32, value: i32) FrontierError!i32 {
+    return switch (selector & 1) {
+        0 => blk: {
+            const payload = try frontierMaybeTryPayload(first_tag, value);
+            break :blk payload + 4;
+        },
+        else => blk: {
+            const payload = try frontierMaybeTryPayload(second_tag, value);
+            break :blk payload + 6;
+        },
+    };
+}
+
+export fn frontier_switch_both_try_match(selector: i32, first_tag: i32, second_tag: i32, value: i32) i32 {
+    if (frontierSwitchBothTry(selector, first_tag, second_tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -77;
+    }
+}
+
 fn frontierTrySwitch(tag: i32, value: i32) FrontierError!i32 {
     const payload = try frontierMaybeTryPayload(tag, value);
     return switch (payload & 3) {

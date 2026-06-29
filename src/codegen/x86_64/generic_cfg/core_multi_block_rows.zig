@@ -2160,6 +2160,7 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (try lowerGenericCfgErrorUnionTryPayloadBranchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgBranchBothErrorUnionTryReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgBranchThenErrorUnionTryReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgSwitchBothErrorUnionTryReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgSwitchThenErrorUnionTryReturn(allocator, machine, function)) return true;
     if (function.blocks.items.len < 5) return false;
     const entry = function.blocks.items[0];
@@ -2825,6 +2826,17 @@ const SwitchThenErrorUnionTryReturn = struct {
     success_is_then: bool,
 };
 
+const SwitchBothErrorUnionTryReturn = struct {
+    entry: ir.BasicBlock,
+    switch_term: ir.SwitchTerminator,
+    case_block: ir.BasicBlock,
+    case_stage: BranchTryStage,
+    case_success_add_imm: u8,
+    default_block: ir.BasicBlock,
+    default_stage: BranchTryStage,
+    default_success_add_imm: u8,
+};
+
 const ErrorUnionTrySwitchCase = struct {
     value: i32,
     block: ir.BasicBlock,
@@ -3054,6 +3066,62 @@ fn lowerGenericCfgSwitchThenErrorUnionTryReturn(
     return true;
 }
 
+fn lowerGenericCfgSwitchBothErrorUnionTryReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = switchBothErrorUnionTryReturn(function) orelse return false;
+    const frame_bytes: u8 = 8;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_switch_both_try_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try emitSwitchThenTryCondition(allocator, machine, function, plan.entry, plan.switch_term);
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.case_block.name);
+    try machine.instructions.append(allocator, .{ .jmp = plan.default_block.name });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.default_block.name);
+    try emitSwitchTryStageToEpilogue(allocator, machine, function, plan.default_block, plan.default_stage, plan.default_success_add_imm, epilogue_label);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.case_block.name);
+    try emitSwitchTryStageToEpilogue(allocator, machine, function, plan.case_block, plan.case_stage, plan.case_success_add_imm, epilogue_label);
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn emitSwitchTryStageToEpilogue(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    try_block: ir.BasicBlock,
+    stage: BranchTryStage,
+    success_add_imm: u8,
+    epilogue_label: []const u8,
+) !void {
+    const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, try_block, stage.call);
+    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = stage.call.callee, .ret_ty = stage.call.ret_ty } });
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, if (stage.success_is_then) .je else .jne, stage.success_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, stage.err_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, stage.success_block.name);
+    try emitPayloadAddImmWrapFromCallSlot(allocator, machine, success_add_imm, epilogue_label);
+}
+
 fn branchBothErrorUnionTryReturn(function: ir.Function) ?BranchBothErrorUnionTryReturn {
     if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 7) return null;
     const entry = function.blocks.items[0];
@@ -3082,6 +3150,50 @@ fn branchBothErrorUnionTryReturn(function: ir.Function) ?BranchBothErrorUnionTry
         .then_stage = then_stage,
         .else_block = else_block,
         .else_stage = else_stage,
+    };
+}
+
+fn switchBothErrorUnionTryReturn(function: ir.Function) ?SwitchBothErrorUnionTryReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 8) return null;
+    const entry = function.blocks.items[0];
+    const switch_term = blockSwitchTerminator(entry) orelse return null;
+    if (!switch_term.cond_ty.eql(.{ .int = 32 }) or switch_term.cases.items.len != 1) return null;
+    const case = switch_term.cases.items[0];
+    if (!case.value_ty.eql(.{ .int = 32 }) or !isInt(case.value, 0)) return null;
+    if (switchMaskParamConst(function, entry, switch_term.cond) != 1) return null;
+
+    const case_block = function.blocks.items[blockIndex(function, case.target) orelse return null];
+    const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
+    const case_stage = switchArmTryStage(function, case_block) orelse return null;
+    const default_stage = switchArmTryStage(function, default_block) orelse return null;
+    const merge_block = commonSwitchBothTryMergeBlock(function, case_stage.success_block, default_stage.success_block) orelse return null;
+    const phi = firstPhiReturn(function, merge_block) orelse return null;
+    if (!phi.ty.eql(.{ .int = 64 }) or phi.incoming.items.len != 2) return null;
+
+    const case_incoming = phiIncomingForBlock(phi, case_stage.success_block.name) orelse return null;
+    const default_incoming = phiIncomingForBlock(phi, default_stage.success_block.name) orelse return null;
+    const case_success_add_imm = payloadAddWrapValue(case_stage.success_block, case_stage.success_block, case_incoming, case_stage.call_name) orelse return null;
+    const default_success_add_imm = payloadAddWrapValue(default_stage.success_block, default_stage.success_block, default_incoming, default_stage.call_name) orelse return null;
+    if (!switchBothTryUsesAllBlocks(
+        function,
+        case_block.name,
+        case_stage.success_block.name,
+        case_stage.err_block.name,
+        default_block.name,
+        default_stage.success_block.name,
+        default_stage.err_block.name,
+        merge_block.name,
+    )) return null;
+
+    return .{
+        .entry = entry,
+        .switch_term = switch_term,
+        .case_block = case_block,
+        .case_stage = case_stage,
+        .case_success_add_imm = case_success_add_imm,
+        .default_block = default_block,
+        .default_stage = default_stage,
+        .default_success_add_imm = default_success_add_imm,
     };
 }
 
@@ -3246,6 +3358,13 @@ fn commonSwitchTryMergeBlock(function: ir.Function, direct_block: ir.BasicBlock,
     return function.blocks.items[blockIndex(function, direct_target) orelse return null];
 }
 
+fn commonSwitchBothTryMergeBlock(function: ir.Function, case_success_block: ir.BasicBlock, default_success_block: ir.BasicBlock) ?ir.BasicBlock {
+    const case_target = singleBrTarget(case_success_block) orelse return null;
+    const default_target = singleBrTarget(default_success_block) orelse return null;
+    if (!std.mem.eql(u8, case_target, default_target)) return null;
+    return function.blocks.items[blockIndex(function, case_target) orelse return null];
+}
+
 fn switchThenTryUsesAllBlocks(
     function: ir.Function,
     direct_block: []const u8,
@@ -3348,6 +3467,33 @@ fn branchBothTryUsesAllBlocks(
             std.mem.eql(u8, block.name, else_block) or
             std.mem.eql(u8, block.name, else_success) or
             std.mem.eql(u8, block.name, else_err))
+        {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+fn switchBothTryUsesAllBlocks(
+    function: ir.Function,
+    case_block: []const u8,
+    case_success: []const u8,
+    case_err: []const u8,
+    default_block: []const u8,
+    default_success: []const u8,
+    default_err: []const u8,
+    merge_block: []const u8,
+) bool {
+    for (function.blocks.items, 0..) |block, index| {
+        if (index == 0 or
+            std.mem.eql(u8, block.name, case_block) or
+            std.mem.eql(u8, block.name, case_success) or
+            std.mem.eql(u8, block.name, case_err) or
+            std.mem.eql(u8, block.name, default_block) or
+            std.mem.eql(u8, block.name, default_success) or
+            std.mem.eql(u8, block.name, default_err) or
+            std.mem.eql(u8, block.name, merge_block))
         {
             continue;
         }
