@@ -95,11 +95,11 @@ after the largest families are split.
 | error-union-try | 236821 | 238174 | 231997 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
 | pointer-address | 50417 | 59226 | 49313 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
 | aggregate-shape | 30599 | 64537 | 29881 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | aggregate semantic lowering, ABI planner |
-| vector | 26132 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
+| vector | 26154 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
 | union-tag-shape | 14507 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
 | optional-shape | 6454 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
 | scalar-transform | 1840 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `main.buildOutputType` | unsupported inventory family | semantic lowering, backend |
-| other | 116 | 33949 | 22545 | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
+| other | 94 | 33949 | 22545 | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
 | safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
@@ -136,7 +136,7 @@ after the largest families are split.
 | 24 | `scalar-transform:abs:opaque` | 64 | - | - | - | - |
 | 25 | `scalar-transform:shr_exact:bin_op` | 49 | - | - | - | - |
 | 26 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
-| 27 | `other:reduce:opaque` | 22 | - | - | - | - |
+| 27 | `vector:reduce:opaque` | 22 | - | - | - | - |
 | 28 | `scalar-transform:neg:opaque` | 22 | - | - | - | - |
 
 ## Top Opcode Categories

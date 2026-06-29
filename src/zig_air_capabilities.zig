@@ -460,7 +460,7 @@ fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
     if (containsAny(text, &.{ "aggregate", "struct", "field", "elem", "array", "slice" })) return .aggregate_shape;
     if (containsAny(text, &.{ "call", "invoke" })) return .call_shape;
     if (containsAny(text, &.{ "load", "store", "alloc", "memcpy", "memset", "memmove", "atomic", "cmpxchg", "fence" })) return .memory_shape;
-    if (containsAny(text, &.{ "vector", "Vector", "shuffle", "splat", "lane" })) return .vector;
+    if (equalsAny(text, &.{"reduce"}) or containsAny(text, &.{ "vector", "Vector", "shuffle", "splat", "lane" })) return .vector;
     return .other;
 }
 
@@ -828,6 +828,7 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, dataKindCapability("ptr_slice_len_ptr:ty_op").category);
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, dataKindCapability("ptr_slice_len_ptr:ty_op").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.vector, unknownOpcodeCategory("shuffle_one", "opaque"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.vector, unknownOpcodeCategory("reduce", "opaque"));
     try std.testing.expectEqual(CapabilityOwner.backend, opcodeDataKindCapability("shuffle_one", "opaque").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.vector, dataKindCapability("@Vector(4, f32)").category);
 
