@@ -172,6 +172,7 @@ pub const UnknownOpcodeCategory = enum(u8) {
     optional_shape,
     union_tag_shape,
     scalar_transform,
+    float_math,
     pointer_address,
     switch_dispatch,
     safety_runtime,
@@ -188,6 +189,7 @@ pub const UnknownOpcodeCategory = enum(u8) {
             .optional_shape => "optional-shape",
             .union_tag_shape => "union-tag-shape",
             .scalar_transform => "scalar-transform",
+            .float_math => "float-math",
             .pointer_address => "pointer-address",
             .switch_dispatch => "switch-dispatch",
             .safety_runtime => "safety-runtime",
@@ -454,6 +456,7 @@ fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
     if (containsAny(text, &.{ "union", "get_union_tag", "set_union_tag", "tag_name" })) return .union_tag_shape;
     if (equalsAny(text, &.{ "max", "min", "abs", "neg", "shl_exact", "shr_exact" }) or
         containsAny(text, &.{ "byte_swap", "bit_reverse", "popcount", "clz", "ctz" })) return .scalar_transform;
+    if (equalsAny(text, &.{ "round", "ceil", "floor", "trunc_float", "sqrt", "exp", "log", "log2", "cos", "sin", "tan", "mul_add" })) return .float_math;
     if (containsAny(text, &.{ "ptr", "addr", "gep", "nav", "field_ptr" })) return .pointer_address;
     if (containsAny(text, &.{ "switch", "dispatch" })) return .switch_dispatch;
     if (containsAny(text, &.{ "safe", "panic", "overflow", "bounds", "trap", "sentinel" })) return .safety_runtime;
@@ -470,7 +473,7 @@ fn ownerForDataKindCategory(category: UnknownOpcodeCategory) CapabilityOwner {
         .error_union_try, .optional_shape, .union_tag_shape, .scalar_transform, .pointer_address, .aggregate_shape => .semantic_lowering,
         .switch_dispatch, .safety_runtime => .cfg_lowering,
         .call_shape => .abi_planner,
-        .memory_shape, .vector => .backend,
+        .memory_shape, .vector, .float_math => .backend,
         .other => .unknown,
     };
 }
@@ -823,6 +826,9 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(UnknownOpcodeCategory.scalar_transform, unknownOpcodeCategory("neg", "opaque"));
     try std.testing.expectEqual(UnknownOpcodeCategory.other, unknownOpcodeCategory("admin_token", "opaque"));
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("byte_swap", "opaque").owner);
+    try std.testing.expectEqual(UnknownOpcodeCategory.float_math, unknownOpcodeCategory("sqrt", "opaque"));
+    try std.testing.expectEqual(UnknownOpcodeCategory.float_math, unknownOpcodeCategory("mul_add", "opaque"));
+    try std.testing.expectEqual(CapabilityOwner.backend, opcodeDataKindCapability("sqrt", "opaque").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, opcodeDataKindCapability("try", "pl_op").category);
     try std.testing.expectEqual(CapabilityOwner.semantic_lowering, opcodeDataKindCapability("try", "pl_op").owner);
     try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, dataKindCapability("ptr_slice_len_ptr:ty_op").category);

@@ -99,7 +99,8 @@ after the largest families are split.
 | union-tag-shape | 14507 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
 | optional-shape | 6454 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
 | scalar-transform | 1840 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `main.buildOutputType` | unsupported inventory family | semantic lowering, backend |
-| other | 94 | 33949 | 22545 | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
+| float-math | 77 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `math.pow.pow__anon_62528` | unsupported inventory family | backend, runtime boundary |
+| other | 17 | 33949 | 22545 | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
 | safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
@@ -138,6 +139,11 @@ after the largest families are split.
 | 26 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
 | 27 | `vector:reduce:opaque` | 22 | - | - | - | - |
 | 28 | `scalar-transform:neg:opaque` | 22 | - | - | - | - |
+| 29 | `float-math:round:opaque` | 10 | - | - | - | - |
+| 30 | `float-math:ceil:opaque` | 7 | - | - | - | - |
+| 31 | `float-math:exp:opaque` | 7 | - | - | - | - |
+| 32 | `float-math:log:opaque` | 7 | - | - | - | - |
+| 33 | `float-math:sqrt:opaque` | 7 | - | - | - | - |
 
 ## Top Opcode Categories
 
