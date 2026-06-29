@@ -34,10 +34,9 @@ const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegist
 fn lowerRegisterAggregateMake(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
+    function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !ir.Function {
-    const function_type = try air_types.parseFunctionType(allocator, air_function.type_text);
-    defer function_type.deinit(allocator);
     const aggregate_ty = function_type.return_type.ir_type;
     if (!isSysVRegisterAggregateCandidate(aggregate_ty)) return error.UnsupportedAir;
     if (function_type.params.len == 0 or function_type.params.len > 8) return error.UnsupportedAir;
@@ -224,7 +223,7 @@ pub fn lowerTypedV2SmallIntegerAggregateAbi(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2RegisterAggregateRecords(function_type, structured_air_v2)) return null;
-    return try lowerRegisterAggregateMake(allocator, air_function, structured_air_v2);
+    return try lowerRegisterAggregateMake(allocator, air_function, function_type, structured_air_v2);
 }
 
 pub fn typedV2RegisterAggregateRecords(

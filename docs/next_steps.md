@@ -293,7 +293,8 @@ Execution order:
    reparsing AIR type text, while the wrapper-shaped helper bodies themselves
    remain explicit compatibility surfaces. The typed-v2 mixed C/Zig panic-edge
    helper also consumes the parsed `FunctionType` instead of reparsing the AIR
-   type text.
+   type text, and typed-v2 register aggregate construction now uses the same
+   parsed `FunctionType` for its aggregate return plan.
    Typed-v2 dense integer-switch admission and branch-result extraction now
    use a model-owned summary as well. The
    remaining refactor is deeper normalization of each operation's operand/type
