@@ -265,7 +265,9 @@ Execution order:
    structural opcode/type checks. Typed-v2 optional-pointer admission now
    consumes a model-owned summary containing the selected add immediate,
    fallback value, and checked-unwrap marker instead of duplicating that
-   extraction in the typed-v2 lowerer. The
+   extraction in the typed-v2 lowerer. Typed-v2 packed read/replace admission
+   now also uses model-owned summaries instead of carrying packed-field opcode
+   count predicates in the typed-v2 lowerer. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_type_layout.zig` is now the shared

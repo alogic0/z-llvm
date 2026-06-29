@@ -912,6 +912,10 @@ pub const TypedRuntimeWrapperSummary = struct {
     kind: enum { optional_pointer_main, pointer_load_store_main },
 };
 
+pub const TypedPackedFieldSummary = struct {
+    kind: enum { read_flag, replace_low },
+};
+
 pub const TypedErrorSwitchSummary = struct {
     kind: enum { switch_dispatch, classify },
 };
@@ -2522,6 +2526,53 @@ pub fn typedRuntimePointerLoadStoreMainSummary(
     return .{ .kind = .pointer_load_store_main };
 }
 
+pub fn typedPackedReadFlagSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedPackedFieldSummary {
+    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 1 }))
+    {
+        return null;
+    }
+    if (typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "alloc") != 1 or
+        typedOpcodeCount(structured_air_v2, "bitcast") != 2 or
+        typedStoreOpcodeCount(structured_air_v2) != 1 or
+        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_2") != 1 or
+        typedOpcodeCount(structured_air_v2, "load") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .read_flag };
+}
+
+pub fn typedPackedReplaceLowSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedPackedFieldSummary {
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 8 }))
+    {
+        return null;
+    }
+    if (typedOpcodeCount(structured_air_v2, "arg") != 2 or
+        typedOpcodeCount(structured_air_v2, "alloc") != 1 or
+        typedOpcodeCount(structured_air_v2, "bitcast") != 2 or
+        typedStoreOpcodeCount(structured_air_v2) != 2 or
+        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") != 1 or
+        typedOpcodeCount(structured_air_v2, "trunc") != 1 or
+        typedOpcodeCount(structured_air_v2, "load") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .replace_low };
+}
+
 pub fn typedErrorSwitchSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -3007,6 +3058,59 @@ test "typed AIR model recognizes optional pointer summary" {
 
     instructions[9].operands = &.{};
     try std.testing.expect(typedOptionalPointerSummary(function_type, structured_air_v2) == null);
+}
+
+test "typed AIR model recognizes packed field summaries" {
+    var one_i8_param = [_]ZigType{
+        .{ .ir_type = .{ .int = 8 } },
+    };
+    const read_type = FunctionType{
+        .params = &one_i8_param,
+        .return_type = .{ .ir_type = .{ .int = 1 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    const read_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i8", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "alloc", .result_type = "*Packed", .data_kind = "ty", .operands = &.{} },
+        .{ .index = 2, .opcode = "bitcast", .result_type = "*i8", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 3, .opcode = "store", .result_type = "void", .data_kind = "bin_op", .operands = &.{} },
+        .{ .index = 4, .opcode = "struct_field_ptr_index_2", .result_type = "*u1", .data_kind = "field_ptr", .operands = &.{} },
+        .{ .index = 5, .opcode = "load", .result_type = "i1", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 6, .opcode = "bitcast", .result_type = "i1", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 7, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &.{} },
+    };
+    const read_air = air_export.StructuredAirV2{ .instructions = @constCast(&read_instructions) };
+    try std.testing.expectEqual(.read_flag, typedPackedReadFlagSummary(read_type, read_air).?.kind);
+
+    var two_i8_params = [_]ZigType{
+        .{ .ir_type = .{ .int = 8 } },
+        .{ .ir_type = .{ .int = 8 } },
+    };
+    const replace_type = FunctionType{
+        .params = &two_i8_params,
+        .return_type = .{ .ir_type = .{ .int = 8 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var replace_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i8", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "arg", .result_type = "i8", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 2, .opcode = "alloc", .result_type = "*Packed", .data_kind = "ty", .operands = &.{} },
+        .{ .index = 3, .opcode = "bitcast", .result_type = "*i8", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 4, .opcode = "store", .result_type = "void", .data_kind = "bin_op", .operands = &.{} },
+        .{ .index = 5, .opcode = "struct_field_ptr_index_0", .result_type = "*u3", .data_kind = "field_ptr", .operands = &.{} },
+        .{ .index = 6, .opcode = "trunc", .result_type = "i3", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 7, .opcode = "store", .result_type = "void", .data_kind = "bin_op", .operands = &.{} },
+        .{ .index = 8, .opcode = "load", .result_type = "i8", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 9, .opcode = "bitcast", .result_type = "i8", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 10, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &.{} },
+    };
+    const replace_air = air_export.StructuredAirV2{ .instructions = &replace_instructions };
+    try std.testing.expectEqual(.replace_low, typedPackedReplaceLowSummary(replace_type, replace_air).?.kind);
+
+    replace_instructions[6].opcode = "intcast";
+    try std.testing.expect(typedPackedReplaceLowSummary(replace_type, replace_air) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {

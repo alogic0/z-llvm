@@ -797,39 +797,14 @@ pub fn typedV2PackedReadFlagRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 1 }))
-    {
-        return false;
-    }
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "alloc") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "bitcast") == 2 and
-        air_model.typedStoreOpcodeCount(structured_air_v2) == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_2") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedPackedReadFlagSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn typedV2PackedReplaceLowRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 2 or
-        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
-        !function_type.params[1].ir_type.eql(.{ .int = 8 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 8 }))
-    {
-        return false;
-    }
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "alloc") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "bitcast") == 2 and
-        air_model.typedStoreOpcodeCount(structured_air_v2) == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "trunc") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedPackedReplaceLowSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2SliceSum(
