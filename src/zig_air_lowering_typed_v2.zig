@@ -940,6 +940,177 @@ pub fn typedV2ConditionalSlotUpdateRecords(
     return air_model.typedConditionalSlotUpdateSummary(function_type, structured_air_v2) != null;
 }
 
+pub fn lowerTypedV2LoopTry(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const summary = air_model.typedLoopTrySummary(function_type, structured_air_v2) orelse return null;
+    if (summary.callee_external) return error.UnsupportedAir;
+    const call_type = try air_types.parseFunctionType(allocator, summary.call_signature);
+    defer call_type.deinit(allocator);
+    const dot = std.mem.lastIndexOfScalar(u8, air_function.name, '.') orelse return error.UnsupportedAir;
+    const callee_name = try ownPrint(module, "{s}.{s}", .{ air_function.name[0..dot], summary.callee_name });
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg1" });
+
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    entry.terminator = .{ .br = .{ .target = "loop" } };
+    try function.blocks.append(allocator, entry);
+
+    var loop = ir.BasicBlock.init("loop");
+    errdefer loop.deinit(allocator);
+    var index_phi = ir.PhiInst{ .ty = .{ .int = 32 }, .incoming = .empty };
+    try index_phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "entry" });
+    try index_phi.incoming.append(allocator, .{ .value = .{ .named = "index_next" }, .block = "success" });
+    try loop.instructions.append(allocator, .{ .result = "index", .kind = .{ .phi = index_phi } });
+    var total_phi = ir.PhiInst{ .ty = .{ .int = 32 }, .incoming = .empty };
+    try total_phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "entry" });
+    try total_phi.incoming.append(allocator, .{ .value = .{ .named = "total_next" }, .block = "success" });
+    try loop.instructions.append(allocator, .{ .result = "total", .kind = .{ .phi = total_phi } });
+    try loop.instructions.append(allocator, .{
+        .result = "in_bounds",
+        .kind = .{ .icmp = .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "index" },
+            .rhs = .{ .named = "arg0" },
+        } },
+    });
+    loop.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "in_bounds" },
+        .then_target = "body",
+        .else_target = "exit",
+    } };
+    try function.blocks.append(allocator, loop);
+
+    var body = ir.BasicBlock.init("body");
+    errdefer body.deinit(allocator);
+    try body.instructions.append(allocator, .{
+        .result = "matches_fail",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "index" },
+            .rhs = .{ .named = "arg1" },
+        } },
+    });
+    try body.instructions.append(allocator, .{
+        .result = "tag",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "matches_fail" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = 1 },
+            .false_value = .{ .int = 0 },
+        } },
+    });
+    var call = ir.CallInst{
+        .ret_ty = call_type.return_type.ir_type,
+        .callee = callee_name,
+        .calling_conv = irCallingConvention(call_type),
+        .args = .empty,
+    };
+    errdefer call.deinit(allocator);
+    try call.args.append(allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "tag" } });
+    try call.args.append(allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "index" } });
+    try body.instructions.append(allocator, .{ .result = "try_result", .kind = .{ .call = call } });
+    call.args = .empty;
+    try body.instructions.append(allocator, .{
+        .result = "error_tag",
+        .kind = .{ .binary = .{
+            .op = .@"and",
+            .ty = .{ .int = 64 },
+            .lhs = .{ .named = "try_result" },
+            .rhs = .{ .int = 65535 },
+        } },
+    });
+    try body.instructions.append(allocator, .{
+        .result = "is_success",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "error_tag" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    body.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "is_success" },
+        .then_target = "success",
+        .else_target = "error",
+    } };
+    try function.blocks.append(allocator, body);
+
+    var success = ir.BasicBlock.init("success");
+    errdefer success.deinit(allocator);
+    try success.instructions.append(allocator, .{
+        .result = "payload64",
+        .kind = .{ .binary = .{
+            .op = .lshr,
+            .ty = .{ .int = 64 },
+            .lhs = .{ .named = "try_result" },
+            .rhs = .{ .int = 16 },
+        } },
+    });
+    try success.instructions.append(allocator, .{
+        .result = "payload",
+        .kind = .{ .cast = .{
+            .op = .trunc,
+            .from_ty = .{ .int = 64 },
+            .value = .{ .named = "payload64" },
+            .to_ty = .{ .int = 32 },
+        } },
+    });
+    try success.instructions.append(allocator, .{
+        .result = "total_next",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "total" },
+            .rhs = .{ .named = "payload" },
+        } },
+    });
+    try success.instructions.append(allocator, .{
+        .result = "index_next",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "index" },
+            .rhs = .{ .int = 1 },
+        } },
+    });
+    success.terminator = .{ .br = .{ .target = "loop" } };
+    try function.blocks.append(allocator, success);
+
+    var err_block = ir.BasicBlock.init("error");
+    errdefer err_block.deinit(allocator);
+    err_block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .int = summary.error_return } } };
+    try function.blocks.append(allocator, err_block);
+
+    var exit = ir.BasicBlock.init("exit");
+    errdefer exit.deinit(allocator);
+    exit.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "total" } } };
+    try function.blocks.append(allocator, exit);
+    return function;
+}
+
+pub fn typedV2LoopTryRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return air_model.typedLoopTrySummary(function_type, structured_air_v2) != null;
+}
+
 pub fn lowerTypedV2DenseIntegerSwitch(
     allocator: std.mem.Allocator,
     module: *ir.Module,

@@ -928,6 +928,13 @@ pub const TypedScalarControlSummary = struct {
     kind: enum { accumulator_loop, conditional_slot_update },
 };
 
+pub const TypedLoopTrySummary = struct {
+    callee_name: []const u8,
+    callee_external: bool,
+    call_signature: []const u8,
+    error_return: i32,
+};
+
 pub const TypedInlineAsmSummary = struct {
     memory_barrier: bool,
 };
@@ -2742,6 +2749,63 @@ pub fn typedConditionalSlotUpdateSummary(
         return null;
     }
     return .{ .kind = .conditional_slot_update };
+}
+
+pub fn typedLoopTrySummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedLoopTrySummary {
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 2 or
+        typedOpcodeCount(structured_air_v2, "alloc") != 2 or
+        typedOpcodeCount(structured_air_v2, "loop") != 1 or
+        typedOpcodeCount(structured_air_v2, "repeat") != 1 or
+        typedOpcodeCount(structured_air_v2, "call") != 1 or
+        typedOpcodeCount(structured_air_v2, "is_non_err") != 1 or
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") != 1 or
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_lt") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_eq") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 3 or
+        typedOpcodeCount(structured_air_v2, "repeat") != 1 or
+        typedReturnOpcodeCount(structured_air_v2) != 2)
+    {
+        return null;
+    }
+
+    const call_instruction = singleInstructionByOpcode(structured_air_v2, "call") orelse return null;
+    const details = callDetails(call_instruction) orelse return null;
+    const typed_callee = details.callee orelse return null;
+    if (std.mem.indexOf(u8, details.signature_text, "error{") == null) return null;
+    if (!std.mem.endsWith(u8, details.signature_text, "!i32")) return null;
+    if (call_instruction.operands.len != 3) return null;
+    _ = typedI32InstOperandIndex(call_instruction.operands[1]) orelse return null;
+    _ = typedI32InstOperandIndex(call_instruction.operands[2]) orelse return null;
+
+    const is_non_err = singleInstructionByOpcode(structured_air_v2, "is_non_err") orelse return null;
+    if (is_non_err.operands.len != 1 or typedInstOperandIndex(is_non_err.operands[0]) != call_instruction.index) return null;
+    const payload = singleInstructionByOpcode(structured_air_v2, "unwrap_errunion_payload") orelse return null;
+    if (payload.operands.len != 1 or typedInstOperandIndex(payload.operands[0]) != call_instruction.index) return null;
+    const err = singleInstructionByOpcode(structured_air_v2, "unwrap_errunion_err") orelse return null;
+    if (err.operands.len != 1 or typedInstOperandIndex(err.operands[0]) != call_instruction.index) return null;
+
+    var error_return: ?i32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isReturnOpcode(instruction.opcode)) continue;
+        if (typedConstI32Operand(instruction, 0)) |value| {
+            if (error_return != null) return null;
+            error_return = value;
+        }
+    }
+    return .{
+        .callee_name = typed_callee.name,
+        .callee_external = typed_callee.external,
+        .call_signature = details.signature_text,
+        .error_return = error_return orelse return null,
+    };
 }
 
 pub fn typedInlineAsmBarrierSummary(

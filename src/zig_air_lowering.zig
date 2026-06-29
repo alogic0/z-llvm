@@ -123,6 +123,7 @@ const typedV2SliceSumRecords = typed_v2.typedV2SliceSumRecords;
 const typedV2ConditionalSliceSumRecords = typed_v2.typedV2ConditionalSliceSumRecords;
 const typedV2AccumulatorLoopRecords = typed_v2.typedV2AccumulatorLoopRecords;
 const typedV2ConditionalSlotUpdateRecords = typed_v2.typedV2ConditionalSlotUpdateRecords;
+const typedV2LoopTryRecords = typed_v2.typedV2LoopTryRecords;
 const typedV2DenseIntegerSwitchResults = typed_v2.typedV2DenseIntegerSwitchResults;
 const typedV2ErrorSwitchRecords = typed_v2.typedV2ErrorSwitchRecords;
 const typedV2ErrorClassifierRecords = typed_v2.typedV2ErrorClassifierRecords;
@@ -147,6 +148,7 @@ const lowerTypedV2InlineAsmBarrier = typed_v2.lowerTypedV2InlineAsmBarrier;
 const lowerTypedV2AtomicAdd = typed_v2.lowerTypedV2AtomicAdd;
 const lowerTypedV2AccumulatorLoop = typed_v2.lowerTypedV2AccumulatorLoop;
 const lowerTypedV2ConditionalSlotUpdate = typed_v2.lowerTypedV2ConditionalSlotUpdate;
+const lowerTypedV2LoopTry = typed_v2.lowerTypedV2LoopTry;
 const lowerTypedV2DenseIntegerSwitch = typed_v2.lowerTypedV2DenseIntegerSwitch;
 const lowerTypedV2ErrorSwitch = typed_v2.lowerTypedV2ErrorSwitch;
 const lowerTypedV2ErrorClassifier = typed_v2.lowerTypedV2ErrorClassifier;
@@ -370,6 +372,11 @@ pub fn firstUnsupported(
             typedV2ConditionalSlotUpdateRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_loop_try =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2LoopTryRecords(function_type, structured_air_v2)
+        else
+            false;
     const typed_integer_switch =
         if (function.structured_air_v2) |structured_air_v2|
             typedV2DenseIntegerSwitchResults(function_type, structured_air_v2) != null
@@ -419,6 +426,7 @@ pub fn firstUnsupported(
         isIntegerSwitchBlock(function) or
         typed_conditional_slot_update or
         conditionalSlotUpdateShape(function) or
+        typed_loop_try or
         typed_runtime_optional_pointer_main or
         runtimeOptionalPointerMainShape(function) or
         typed_optional_pointer or
@@ -675,6 +683,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2ConditionalSlotUpdate(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2LoopTry(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2DenseIntegerSwitch(allocator, module, air_function, function_type, structured_air_v2)) |function| {
