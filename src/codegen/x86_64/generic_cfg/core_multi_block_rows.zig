@@ -3823,7 +3823,12 @@ fn emitGenericCfgTerminalI32ValueIntoEax(
                             .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -try i32Value(int) }),
                             else => return error.UnsupportedCodegenInstruction,
                         },
-                        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                        .named => |rhs_name| {
+                            const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
+                            const rhs_reg = try paramReg(function, rhs_name, .{ .int = 32 });
+                            try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs_reg } });
+                        },
+                        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                     }
                 },
                 .cast => |cast| {

@@ -376,7 +376,8 @@ Execution order:
    rewraps each selected arm. The direct payload-pointer row now proves the
    separate `unwrap_errunion_payload_ptr:ty_op` typed-v2 path: the exported
    instruction carries the error-union pointer operand and z_llvm lowers the
-   ok arm to a synthetic payload value without AIR text recovery.
+   ok arm to a synthetic payload value plus an ABI parameter without AIR text
+   recovery.
    Together these prove the same pointer-slot model beyond simple branch
    continuations.
    These rows pass through typed AIR v2, generic CFG, z_llvm object
