@@ -56,6 +56,10 @@ operand, z_llvm decodes the selected i32 payload into a synthetic pointer
 payload value, the success arm now lowers a nested compare with add/sub
 terminal returns against an ABI parameter, and the executable harness checks
 both payload arms plus the error arm.
+The follow-up direct payload-pointer row pairs the same success-arm payload
+path with an error-arm switch over the extracted error tag, proving the
+pointer-form payload path composes with the existing error-tag switch return
+lowering without a selected function-name gate.
 The optional scalar payload branch row now validates `wrap_optional`,
 `is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
 payload add/sub branch through generic single-block CFG, and has executable
@@ -163,20 +167,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=655
-structured_functions=655
-generic_codegen_functions=655
-generic_cfg_functions=655
+discovered_functions=656
+structured_functions=656
+generic_codegen_functions=656
+generic_cfg_functions=656
 structural_matcher_functions=0
-structured_air_v2_functions=655
-typed_air_operand_functions=655
+structured_air_v2_functions=656
+typed_air_operand_functions=656
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=655
+generic_lowering_functions=656
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=655
+object_emitted_functions=656
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -233,7 +237,7 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 14-source / 655-function strict frontier
+are not counted in the accepted 14-source / 656-function strict frontier
 executable proof. Stack-pressure forwarding for the previous
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 indirect and stack-source
 rows is now accepted in the frontier corpus; the boundary gate keeps

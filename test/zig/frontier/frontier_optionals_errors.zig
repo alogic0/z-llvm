@@ -219,6 +219,18 @@ export fn frontier_errunion_payload_ptr_branch(tag: i32, value: i32, delta: i32)
     }
 }
 
+export fn frontier_errunion_payload_ptr_error_switch(tag: i32, value: i32) i32 {
+    var result = frontierMaybeErrorTag(tag, value);
+    if (result) |*payload| {
+        return payload.* + 2;
+    } else |err| {
+        return switch (err) {
+            FrontierError.BadTag => -67,
+            FrontierError.WorseTag => -68,
+        };
+    }
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,
