@@ -1512,11 +1512,6 @@ pub fn typedV2UnionTagPayloadSwitchRecords(
     return air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) != null;
 }
 
-fn typedDetailU32(instruction: air_export.TypedInstruction, key: []const u8) ?u32 {
-    const text = typedDetail(instruction, key) orelse return null;
-    return std.fmt.parseInt(u32, text, 10) catch null;
-}
-
 pub fn typedConstantOperandValueText(
     structured_air_v2: air_export.StructuredAirV2,
     opcode: []const u8,
