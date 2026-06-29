@@ -698,9 +698,10 @@ Validation after these refactor slices is saved in
   `vector` 26154/not-refreshed/not-refreshed,
   `union-tag-shape` 14507/not-refreshed/not-refreshed,
   `optional-shape` 6454/not-refreshed/not-refreshed,
-  `scalar-transform` 1840/not-refreshed/not-refreshed,
+  `scalar-transform` 1842/not-refreshed/not-refreshed,
   `float-math` 87/not-refreshed/not-refreshed,
-  `other` 7/33949/22545, and
+  `select-shape` 5/not-refreshed/not-refreshed,
+  `other` 0/33949/22545, and
   `safety-runtime` 144/11354/141 for
   ReleaseFast/ReleaseSafe/ReleaseSmall. The concrete top-pair split identifies
   `unwrap_errunion_err:ty_op` 84377/84913/82350,
@@ -713,11 +714,9 @@ Validation after these refactor slices is saved in
   first implementation families; optional wrapping, union/tag operations, and
   scalar transforms such as `byte_swap` are now separately measured instead of
   hidden in `other`. The pair report now prints the top 50 concrete pairs; the
-  residual ReleaseFast `other` bucket is 7 rows after selected float math
-  opcodes were split into `float-math`; see
-  `tmp/compiler_core_module_releasefast_category_unknown_pairs.log`. The
-  category-specific pair report identifies the remaining ReleaseFast `other`
-  pairs as `select` and `shl_sat`.
+  residual ReleaseFast `other` bucket is 0 rows after selected float math,
+  select, and saturating shift opcodes were split into named categories; see
+  `tmp/compiler_core_module_releasefast_final_unknown_classification.log`.
   Validation gate: compare against the saved compiler-core inventory baseline;
   rerun `zig build distribution-zig-air-inventory` with
   `-- --slice=compiler-core-module --mode=<mode>` only after
