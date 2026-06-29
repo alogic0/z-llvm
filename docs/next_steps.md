@@ -282,6 +282,10 @@ Execution order:
    memory-barrier admission now uses a
    model-owned summary too, and typed-v2 monotonic atomic-add admission now
    selects the `atomic_rmw` instruction through a model-owned summary.
+   Typed-v2 runtime wrapper rows now call `src/zig_air_runtime_wrappers.zig`
+   directly instead of routing through the legacy lowering module; the
+   wrapper-shaped helper bodies themselves remain explicit compatibility
+   surfaces.
    Typed-v2 dense integer-switch admission and branch-result extraction now
    use a model-owned summary as well. The
    remaining refactor is deeper normalization of each operation's operand/type

@@ -8,6 +8,7 @@ const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
 const ir = @import("ir.zig");
 const legacy = @import("zig_air_lowering_legacy.zig");
+const runtime_wrappers = @import("zig_air_runtime_wrappers.zig");
 const type_layout = @import("zig_air_type_layout.zig");
 
 const ZigType = air_model.ZigType;
@@ -31,8 +32,6 @@ const validateSretAggregateCallWrapperRecords = air_aggregate_copy.validateSretA
 const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegisterAggregateCandidate;
 
 const lowerErrorUnionPayload = legacy.lowerErrorUnionPayload;
-const lowerRuntimeOptionalPointerMain = legacy.lowerRuntimeOptionalPointerMain;
-const lowerRuntimePointerLoadStoreMain = legacy.lowerRuntimePointerLoadStoreMain;
 const lowerConditionalSliceSum = legacy.lowerConditionalSliceSum;
 
 fn lowerRegisterAggregateMake(
@@ -1670,7 +1669,7 @@ pub fn lowerTypedV2RuntimeOptionalPointerMain(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2RuntimeOptionalPointerMainRecords(function_type, structured_air_v2)) return null;
-    return try lowerRuntimeOptionalPointerMain(allocator, air_function);
+    return try runtime_wrappers.lowerOptionalPointerMain(allocator, air_function);
 }
 
 pub fn typedV2RuntimeOptionalPointerMainRecords(
@@ -1687,7 +1686,7 @@ pub fn lowerTypedV2RuntimePointerLoadStoreMain(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2RuntimePointerLoadStoreMainRecords(function_type, structured_air_v2)) return null;
-    return try lowerRuntimePointerLoadStoreMain(allocator, air_function);
+    return try runtime_wrappers.lowerPointerLoadStoreMain(allocator, air_function);
 }
 
 pub fn typedV2RuntimePointerLoadStoreMainRecords(
