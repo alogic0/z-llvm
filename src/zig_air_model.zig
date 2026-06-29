@@ -2010,6 +2010,22 @@ pub fn typedConstOperandText(instruction: air_export.TypedInstruction, operand_i
     return operandTextDetail(instruction, operand_index);
 }
 
+pub fn typedConstantOperandValueText(
+    structured_air_v2: air_export.StructuredAirV2,
+    opcode: []const u8,
+) ?[]const u8 {
+    const instruction = singleInstructionByOpcode(structured_air_v2, opcode) orelse return null;
+    const text = operandTextDetail(instruction, 1) orelse return null;
+    return typedAngleConstantValue(text);
+}
+
+pub fn typedAngleConstantValue(text: []const u8) ?[]const u8 {
+    if (!std.mem.startsWith(u8, text, "<") or !std.mem.endsWith(u8, text, ">")) return null;
+    const inner = text[1 .. text.len - 1];
+    const comma = std.mem.indexOfScalar(u8, inner, ',') orelse return null;
+    return std.mem.trim(u8, inner[comma + 1 ..], " ");
+}
+
 pub fn isTypedNoneOperand(operand: air_export.TypedOperand) bool {
     return std.mem.eql(u8, operand.kind, "none");
 }

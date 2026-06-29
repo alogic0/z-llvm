@@ -1381,8 +1381,8 @@ pub fn lowerTypedV2CheckedIntFromFloat(
 ) !?ir.Function {
     if (!typedV2CheckedIntFromFloatRecords(function_type, structured_air_v2)) return null;
     const operand_ty = function_type.params[0].ir_type;
-    const low_value = typedConstantOperandValueText(structured_air_v2, "cmp_lte") orelse return null;
-    const high_value = typedConstantOperandValueText(structured_air_v2, "cmp_gte") orelse return null;
+    const low_value = air_model.typedConstantOperandValueText(structured_air_v2, "cmp_lte") orelse return null;
+    const high_value = air_model.typedConstantOperandValueText(structured_air_v2, "cmp_gte") orelse return null;
     const low_text = try normalizedFpLiteralText(module, low_value);
     const high_text = try normalizedFpLiteralText(module, high_value);
     const callee = callee: {
@@ -1510,22 +1510,6 @@ pub fn typedV2UnionTagPayloadSwitchRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     return air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) != null;
-}
-
-pub fn typedConstantOperandValueText(
-    structured_air_v2: air_export.StructuredAirV2,
-    opcode: []const u8,
-) ?[]const u8 {
-    const instruction = typedSingleInstructionByOpcode(structured_air_v2, opcode) orelse return null;
-    const text = typedOperandTextDetail(instruction, 1) orelse return null;
-    return typedAngleConstantValue(text);
-}
-
-pub fn typedAngleConstantValue(text: []const u8) ?[]const u8 {
-    if (!std.mem.startsWith(u8, text, "<") or !std.mem.endsWith(u8, text, ">")) return null;
-    const inner = text[1 .. text.len - 1];
-    const comma = std.mem.indexOfScalar(u8, inner, ',') orelse return null;
-    return std.mem.trim(u8, inner[comma + 1 ..], " ");
 }
 
 pub fn normalizedFpLiteralText(module: *ir.Module, text: []const u8) ![]const u8 {
