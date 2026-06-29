@@ -184,9 +184,21 @@ Measured with:
 zig build distribution-zig-air-inventory -- --slice=compiler-core-module
 ```
 
+The all-mode command is milestone-cost. During worker cycles, refresh one mode
+at a time:
+
+```sh
+zig build distribution-zig-air-inventory -- --slice=compiler-core-module --mode=ReleaseFast
+```
+
+The output summary format is identical for the selected mode. The tool prints
+`inventory-progress` diagnostics with the selected slice, mode, phase, and
+export path before the expensive build and scan phases, so a killed run leaves
+actionable evidence. Empty or incomplete logs are not evidence.
+
 | Mode | Sources | Real module context | Generated imports available | Stubbed imports | Functions | Functions with body | Declarations without body | Instructions | Globals | TLS globals | Boundary sources |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ReleaseFast | 1 | 1 | 1 | 0 | 61326 | 61326 | 0 | 6289585 | 59630 | 16 | 0 |
+| ReleaseFast | 1 | 1 | 1 | 0 | 61341 | 61341 | 0 | 6291825 | 59640 | 15 | 0 |
 | ReleaseSafe | 1 | 1 | 1 | 0 | 61951 | 61951 | 0 | 6842493 | 60751 | 14 | 0 |
 | ReleaseSmall | 1 | 1 | 1 | 0 | 59837 | 59837 | 0 | 4178468 | 55096 | 16 | 0 |
 
@@ -194,7 +206,7 @@ Compiler-core module body-aware category signals:
 
 | Mode | Calls | Loads | Stores | Stack slots | Branches | Loops/backedges | Switches | Atomics | Inline asm |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ReleaseFast | 329937 | 589047 | 315284 | 372427 | 1036974 | 25428 | 15593 | 620 | 87 |
+| ReleaseFast | 330045 | 589168 | 315333 | 372519 | 1037603 | 25436 | 15599 | 620 | 87 |
 | ReleaseSafe | 414768 | 598366 | 317492 | 385116 | 1243546 | 25710 | 15618 | 619 | 88 |
 | ReleaseSmall | 324995 | 577888 | 310553 | 366867 | 981856 | 24996 | 15463 | 615 | 86 |
 
@@ -202,25 +214,27 @@ Unsupported category signals now include function bodies:
 
 | Mode | varargs | vector | aggregate-abi | X87/f80/f128 | packed aggregate | unknown opcodes | Unsupported functions |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ReleaseFast | 738 | 15820 | 2255777 | 6194 | 5039 | 340808 | 56211 |
+| ReleaseFast | 738 | 15820 | 2256445 | 6194 | 5041 | 367030 | 56231 |
 | ReleaseSafe | 745 | 16024 | 2338212 | 6220 | 5548 | 407240 | 57216 |
 | ReleaseSmall | 827 | 15808 | 2206792 | 6550 | 4863 | 333877 | 54849 |
 
 The scanner now also emits `aggregate_surface` records to split aggregate
 observations into `opcode-shape`, `metadata-type-surface`, and
-`abi-type-surface`. The full compiler-core-module table above is the current
-saved baseline from before that split was refreshed; the split output has been
-validated on `runtime-libs` and the standalone `compiler-core` probe in
-`tmp/runtime_libs_aggregate_surface_inventory.log` and
-`tmp/compiler_core_standalone_aggregate_surface_inventory.log`. Refreshing the
-full module-context table with those new counters remains a long count-only
-inventory run, not a lowering milestone.
+`abi-type-surface`. The ReleaseFast row above was refreshed with the split in
+`tmp/compiler_core_module_releasefast_inventory.log` and reports
+`aggregate_opcode_shapes=410592`,
+`aggregate_metadata_type_surfaces=1325299`, and
+`aggregate_abi_type_surfaces=931146`. ReleaseSafe and ReleaseSmall still use
+the saved all-mode baseline until their per-mode refreshes run. The split
+output has also been validated on `runtime-libs` and the standalone
+`compiler-core` probe in `tmp/runtime_libs_aggregate_surface_inventory.log` and
+`tmp/compiler_core_standalone_aggregate_surface_inventory.log`.
 
 Top body opcode signals:
 
 | Mode | Highest opcode counts |
 | --- | --- |
-| ReleaseFast | `dbg_stmt=1582916`, `block=482697`, `br=444541`, `alloc=372427`, `call=329937`, `store=315284`, `bitcast=291270`, `load=588943` |
+| ReleaseFast | `dbg_stmt=1583492`, `block=483000`, `br=444826`, `alloc=372519`, `call=330045`, `store=315333`, `bitcast=291356`, `load=589064` |
 | ReleaseSafe | `dbg_stmt=1608158`, `block=552975`, `br=514565`, `call=414768`, `alloc=385116`, `store_safe=268309`, `load=598263` |
 | ReleaseSmall | `block=461641`, `br=412562`, `alloc=366867`, `call=324995`, `store=310553`, `bitcast=286673`, `load=577785` |
 

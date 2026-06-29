@@ -8,6 +8,7 @@ const UnknownOpcodePairMap = std.array_hash_map.String(UnknownOpcodePairStat);
 
 const Options = struct {
     slice: InventorySlice = .all,
+    mode: ?Mode = null,
 };
 
 const InventorySlice = enum {
@@ -57,6 +58,13 @@ const Mode = enum {
 
     fn name(self: Mode) []const u8 {
         return @tagName(self);
+    }
+
+    fn parse(value: []const u8) !Mode {
+        if (std.mem.eql(u8, value, "ReleaseFast")) return .ReleaseFast;
+        if (std.mem.eql(u8, value, "ReleaseSafe")) return .ReleaseSafe;
+        if (std.mem.eql(u8, value, "ReleaseSmall")) return .ReleaseSmall;
+        return error.UnsupportedDistributionInventoryMode;
     }
 
     fn lowerName(self: Mode) []const u8 {
@@ -261,6 +269,7 @@ pub fn main(init: std.process.Init) !void {
 
     const modes = [_]Mode{ .ReleaseFast, .ReleaseSafe, .ReleaseSmall };
     for (modes) |mode| {
+        if (!modeSelected(options, mode)) continue;
         if (options.slice == .runtime_libs or options.slice == .all) {
             try runSlice(init, zig_emitter, mode, .runtime_libs);
         }
@@ -280,11 +289,22 @@ fn parseOptions(args: std.process.Args) !Options {
     while (iterator.next()) |arg| {
         if (std.mem.startsWith(u8, arg, "--slice=")) {
             options.slice = try InventorySlice.parse(arg["--slice=".len..]);
+        } else if (std.mem.startsWith(u8, arg, "--mode=")) {
+            const value = arg["--mode=".len..];
+            if (std.mem.eql(u8, value, "all")) {
+                options.mode = null;
+            } else {
+                options.mode = try Mode.parse(value);
+            }
         } else {
             return error.UnsupportedDistributionInventoryArgument;
         }
     }
     return options;
+}
+
+fn modeSelected(options: Options, mode: Mode) bool {
+    return if (options.mode) |selected| selected == mode else true;
 }
 
 fn runSlice(init: std.process.Init, zig_emitter: []const u8, mode: Mode, slice: InventorySlice) !void {
@@ -451,6 +471,8 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
     const zig_cache_path = try std.fs.path.join(allocator, &.{ temp_path, "zig-cache" });
     defer allocator.free(zig_cache_path);
 
+    printCompilerCoreModuleProgress(slice, mode, descriptor_path, "prepare");
+
     var env_map = try cloneEnvironment(allocator, init.environ_map);
     defer env_map.deinit();
     try env_map.put("ZLLVM_AIR_EXPORT_PATH", descriptor_path);
@@ -470,6 +492,7 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
         "-Dtarget=x86_64-linux-gnu",
         mode.zigBuildOptimizeArg(),
     };
+    printCompilerCoreModuleProgress(slice, mode, descriptor_path, "zig-build-start");
     const build_result = try std.process.run(allocator, io, .{
         .argv = &argv,
         .environ_map = &env_map,
@@ -496,6 +519,7 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
             return error.ZigCompilerModuleInventoryFailed;
         },
     }
+    printCompilerCoreModuleProgress(slice, mode, descriptor_path, "zig-build-complete");
 
     var counters: Counters = .{
         .sources = 1,
@@ -506,7 +530,13 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
         .instruction_payload_scan = 1,
     };
     defer counters.deinit(allocator);
+    printCompilerCoreModuleProgress(slice, mode, descriptor_path, "descriptor-scan-start");
     try scanLargeDescriptor(allocator, io, descriptor_path, &counters, "../ziglang/src/main.zig");
+    std.debug.print(
+        "inventory-progress slice={s} mode={s} phase=descriptor-scan-complete export_path={s} functions={} instructions_total={}\n",
+        .{ slice.cliName(), mode.name(), descriptor_path, counters.functions, counters.instructions_total },
+    );
+    printCompilerCoreModuleProgress(slice, mode, descriptor_path, "validate-start");
     if (counters.functions <= 1) {
         std.debug.print(
             "inventory-module-context-failure slice={s} mode={s} reason=insufficient-function-count functions={}\n",
@@ -521,7 +551,21 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
         );
         return error.ZigCompilerModuleInventoryMissingBodyScan;
     }
+    printCompilerCoreModuleProgress(slice, mode, descriptor_path, "summary-start");
     try printSummary(allocator, slice, mode, counters);
+    printCompilerCoreModuleProgress(slice, mode, descriptor_path, "complete");
+}
+
+fn printCompilerCoreModuleProgress(
+    slice: InventorySlice,
+    mode: Mode,
+    export_path: []const u8,
+    phase: []const u8,
+) void {
+    std.debug.print(
+        "inventory-progress slice={s} mode={s} phase={s} export_path={s}\n",
+        .{ slice.cliName(), mode.name(), phase, export_path },
+    );
 }
 
 fn accountModule(

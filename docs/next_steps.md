@@ -605,7 +605,7 @@ Validation after these refactor slices is saved in
 - `zig build test` and `git diff --check` pass.
 
 - Category: `aggregate-abi`.
-  Inventory counts: ReleaseFast 2255777, ReleaseSafe 2338212,
+  Inventory counts: ReleaseFast 2256445, ReleaseSafe 2338212,
   ReleaseSmall 2206792.
   Likely layers: semantic type lowering, SysV ABI planner, x86_64 aggregate
   backend.
@@ -658,21 +658,27 @@ Validation after these refactor slices is saved in
   validated for `runtime-libs` in
   `tmp/runtime_libs_aggregate_surface_inventory.log` and for the standalone
   compiler-core probe in
-  `tmp/compiler_core_standalone_aggregate_surface_inventory.log`. A full
-  `compiler-core-module` refresh with the new split was attempted in
-  `tmp/compiler_core_aggregate_surface_inventory.log`, but the first
-  ReleaseFast compiler build did not complete within the focused cycle window.
-  The module inventory runner now disables the aggregate-layout fact side
-  channel with `ZLLVM_DISABLE_AGGREGATE_LAYOUT_FACTS=1` so future count-only
-  refreshes scan AIR bodies without emitting the large aggregate fact stream.
+  `tmp/compiler_core_standalone_aggregate_surface_inventory.log`. The
+  ReleaseFast `compiler-core-module` refresh with the new split completed in
+  `tmp/compiler_core_module_releasefast_inventory.log` and reports
+  `aggregate_opcode_shapes=410592`,
+  `aggregate_metadata_type_surfaces=1325299`, and
+  `aggregate_abi_type_surfaces=931146`. The module inventory runner disables
+  the aggregate-layout fact side channel with
+  `ZLLVM_DISABLE_AGGREGATE_LAYOUT_FACTS=1` so count-only refreshes scan AIR
+  bodies without emitting the large aggregate fact stream.
+  Use the per-mode form for normal cycles:
+  `zig build distribution-zig-air-inventory --
+  --slice=compiler-core-module --mode=ReleaseFast`. The all-mode refresh is
+  milestone-cost, and empty or incomplete inventory logs are not evidence.
   Validation gate: compare against the saved compiler-core inventory baseline;
   rerun `zig build distribution-zig-air-inventory` with
-  `-- --slice=compiler-core-module` only after classifier/lowering changes
-  that can change inventory counters, then run focused aggregate rows through
-  `zig build distribution-air-release-frontier`.
+  `-- --slice=compiler-core-module --mode=<mode>` only after
+  classifier/lowering changes that can change inventory counters, then run
+  focused aggregate rows through `zig build distribution-air-release-frontier`.
 
 - Category: `unknown-opcode`.
-  Inventory counts: ReleaseFast 340808, ReleaseSafe 407240,
+  Inventory counts: ReleaseFast 367030, ReleaseSafe 407240,
   ReleaseSmall 333877.
   Likely layers: AIR export parser, semantic lowering, generic CFG lowering.
   Current duplicated/selected-code location:
@@ -686,21 +692,22 @@ Validation after these refactor slices is saved in
   diagnostics, and typed lowering should query it instead of maintaining local
   string lists.
   Current subcategory counts:
-  `error-union-try` 236716/238174/231997,
-  `pointer-address` 50414/59226/49313,
-  `aggregate-shape` 30597/64537/29881,
-  `other` 22937/33949/22545, and
+  `error-union-try` 236821/238174/231997,
+  `pointer-address` 50417/59226/49313,
+  `aggregate-shape` 30599/64537/29881,
+  `other` 49049/33949/22545, and
   `safety-runtime` 144/11354/141 for
   ReleaseFast/ReleaseSafe/ReleaseSmall. The concrete top-pair split identifies
-  `unwrap_errunion_err:ty_op` 84331/84913/82350,
-  `wrap_errunion_err:ty_op` 76578/77020/75165,
-  `try:pl_op` 73577/73993/72265,
+  `unwrap_errunion_err:ty_op` 84377/84913/82350,
+  `wrap_errunion_err:ty_op` 76608/77020/75165,
+  `try:pl_op` 73606/73993/72265,
   `ptr_add:bin_ty_pl` 14273/19156/13966, and
-  `slice_len:ty_op` 13766/47605/13459 as the first implementation families.
+  `slice_len:ty_op` 13768/47605/13459 as the first implementation families.
   Validation gate: compare against the saved compiler-core inventory baseline;
   rerun `zig build distribution-zig-air-inventory` with
-  `-- --slice=compiler-core-module` only after registry/classifier changes,
-  plus `zig build distribution-zig-air-uncurated-release`.
+  `-- --slice=compiler-core-module --mode=<mode>` only after
+  registry/classifier changes, plus
+  `zig build distribution-zig-air-uncurated-release`.
 
 - Category: `vector`.
   Inventory counts: ReleaseFast 15820, ReleaseSafe 16024,

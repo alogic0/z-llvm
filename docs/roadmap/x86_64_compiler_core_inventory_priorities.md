@@ -7,6 +7,17 @@ This report ranks implementation priorities from the body-aware
 zig build distribution-zig-air-inventory -- --slice=compiler-core-module
 ```
 
+That all-mode command is milestone-cost. Normal worker cycles should refresh a
+single mode, for example:
+
+```sh
+zig build distribution-zig-air-inventory -- --slice=compiler-core-module --mode=ReleaseFast
+```
+
+The selected-mode summary lines use the same format as the all-mode output.
+Inventory logs must contain a complete summary for the selected mode; empty or
+incomplete logs are not evidence.
+
 It does not claim lowering, object emission, native linking, or executable
 proof. The slice uses the real `../ziglang/build.zig` compiler executable
 module graph with generated imports available, no stubs, and
@@ -16,7 +27,7 @@ module graph with generated imports available, no stubs, and
 
 | Mode | Functions | Instructions | Calls | Branches | Loops | Switches | Loads | Stores | Stack slots | Unsupported functions | Unsupported opcodes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ReleaseFast | 61326 | 6289585 | 329937 | 1036974 | 25428 | 15593 | 589047 | 315284 | 372427 | 56211 | 340808 |
+| ReleaseFast | 61341 | 6291825 | 330045 | 1037603 | 25436 | 15599 | 589168 | 315333 | 372519 | 56231 | 367030 |
 | ReleaseSafe | 61951 | 6842493 | 414768 | 1243546 | 25710 | 15618 | 598366 | 317492 | 385116 | 57216 | 407240 |
 | ReleaseSmall | 59837 | 4178468 | 324995 | 981856 | 24996 | 15463 | 577888 | 310553 | 366867 | 54849 | 333877 |
 
@@ -28,8 +39,8 @@ category.
 
 | Category | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| aggregate-abi | 2255777 | 2338212 | 2206792 | `../ziglang/src/main.zig` | `global` | partially supported | semantic lowering, ABI planner, backend |
-| unknown-opcode | 340808 | 407240 | 333877 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | AIR parser, CFG lowering |
+| aggregate-abi | 2256445 | 2338212 | 2206792 | `../ziglang/src/main.zig` | `global` | partially supported | semantic lowering, ABI planner, backend |
+| unknown-opcode | 367030 | 407240 | 333877 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | AIR parser, CFG lowering |
 | vector | 15820 | 16024 | 15808 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
 | x87 | 6194 | 6220 | 6550 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
 | packed-aggregate | 5039 | 5548 | 4863 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
@@ -58,18 +69,16 @@ the output contract is:
 | runtime-libs | ReleaseFast | 10118 | 43101 | 19497 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
 | runtime-libs | ReleaseSafe | 10179 | 47078 | 20214 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
 | runtime-libs | ReleaseSmall | 4964 | 23801 | 10554 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
+| compiler-core-module | ReleaseFast | 410592 | 1325299 | 931146 | `tmp/compiler_core_module_releasefast_inventory.log` |
 | compiler-core-standalone-probe | ReleaseFast | 0 | 85 | 2 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 | compiler-core-standalone-probe | ReleaseSafe | 0 | 85 | 2 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 | compiler-core-standalone-probe | ReleaseSmall | 0 | 0 | 0 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 
-The full `compiler-core-module` refresh with the new split was attempted in
-`tmp/compiler_core_aggregate_surface_inventory.log`, but the first ReleaseFast
-compiler build did not complete within the focused cycle window. The runner now
-sets `ZLLVM_DISABLE_AGGREGATE_LAYOUT_FACTS=1` for this count-only inventory
-slice so the large aggregate-layout side channel is not emitted while AIR body
-payload scanning remains enabled. The next full compiler-core refresh should
-reuse the same command and record the new split counters when the long build is
-allowed to complete.
+The full `compiler-core-module` all-mode refresh remains milestone-cost. The
+ReleaseFast per-mode refresh completed in
+`tmp/compiler_core_module_releasefast_inventory.log`; ReleaseSafe and
+ReleaseSmall should be refreshed separately with `--mode` when their counters
+need the same split.
 
 ## Unknown Opcode Split
 
@@ -81,10 +90,10 @@ implementation slices can target concrete AIR shapes.
 
 | Subcategory | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| error-union-try | 236716 | 238174 | 231997 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
-| pointer-address | 50414 | 59226 | 49313 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
-| aggregate-shape | 30597 | 64537 | 29881 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | aggregate semantic lowering, ABI planner |
-| other | 22937 | 33949 | 22545 | `../ziglang/src/main.zig` | `print_targets.cmdTargets` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
+| error-union-try | 236821 | 238174 | 231997 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
+| pointer-address | 50417 | 59226 | 49313 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
+| aggregate-shape | 30599 | 64537 | 29881 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | aggregate semantic lowering, ABI planner |
+| other | 49049 | 33949 | 22545 | `../ziglang/src/main.zig` | `print_targets.cmdTargets` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
 | safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
@@ -95,11 +104,11 @@ implementation slices can target concrete AIR shapes.
 
 | Rank | ReleaseFast | Count | ReleaseSafe | Count | ReleaseSmall | Count |
 | ---: | --- | ---: | --- | ---: | --- | ---: |
-| 1 | `error-union-try:unwrap_errunion_err:ty_op` | 84331 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
-| 2 | `error-union-try:wrap_errunion_err:ty_op` | 76578 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
-| 3 | `error-union-try:try:pl_op` | 73577 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
-| 4 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17455 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
-| 5 | `pointer-address:ptr_add:bin_ty_pl` | 14273 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
+| 1 | `error-union-try:unwrap_errunion_err:ty_op` | 84377 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
+| 2 | `error-union-try:wrap_errunion_err:ty_op` | 76608 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
+| 3 | `error-union-try:try:pl_op` | 73606 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
+| 4 | `other:shuffle_one:opaque` | 26122 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
+| 5 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17458 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
 | 6 | `aggregate-shape:slice_len:ty_op` | 13766 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
 | 7 | `pointer-address:slice_ptr:ty_op` | 11920 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |
 | 8 | `aggregate-shape:slice:bin_ty_pl` | 10895 | `safety-runtime:intcast_safe:ty_op` | 11185 | `aggregate-shape:slice:bin_ty_pl` | 10603 |
@@ -113,14 +122,14 @@ body opcode counts, not necessarily the highest implementation gaps.
 
 | Rank | ReleaseFast | Count | ReleaseSafe | Count | ReleaseSmall | Count |
 | ---: | --- | ---: | --- | ---: | --- | ---: |
-| 1 | `dbg_stmt` | 1582916 | `dbg_stmt` | 1608158 | `load` | 577785 |
-| 2 | `load` | 588943 | `load` | 598263 | `block` | 461641 |
-| 3 | `block` | 482697 | `block` | 552975 | `br` | 412562 |
-| 4 | `br` | 444541 | `br` | 514565 | `alloc` | 366867 |
-| 5 | `alloc` | 372427 | `call` | 414768 | `call` | 324995 |
-| 6 | `call` | 329937 | `alloc` | 385116 | `store` | 310553 |
-| 7 | `store` | 315284 | `bitcast` | 296563 | `bitcast` | 286673 |
-| 8 | `bitcast` | 291270 | `store_safe` | 268309 | `ret` | 167333 |
+| 1 | `dbg_stmt` | 1583492 | `dbg_stmt` | 1608158 | `load` | 577785 |
+| 2 | `load` | 589064 | `load` | 598263 | `block` | 461641 |
+| 3 | `block` | 483000 | `block` | 552975 | `br` | 412562 |
+| 4 | `br` | 444826 | `br` | 514565 | `alloc` | 366867 |
+| 5 | `alloc` | 372519 | `call` | 414768 | `call` | 324995 |
+| 6 | `call` | 330045 | `alloc` | 385116 | `store` | 310553 |
+| 7 | `store` | 315333 | `bitcast` | 296563 | `bitcast` | 286673 |
+| 8 | `bitcast` | 291356 | `store_safe` | 268309 | `ret` | 167333 |
 | 9 | `dbg_var_val` | 180148 | `dbg_var_val` | 181555 | `arg` | 122648 |
 | 10 | `ret` | 170547 | `ret_safe` | 171372 | `struct_field_ptr_index_0` | 95363 |
 | 11 | `dbg_empty_stmt` | 157346 | `dbg_empty_stmt` | 159305 | `cond_br` | 88955 |
@@ -142,11 +151,11 @@ lowering, or backend codegen.
 
 | Rank | ReleaseFast | Count | ReleaseSafe | Count | ReleaseSmall | Count |
 | ---: | --- | ---: | --- | ---: | --- | ---: |
-| 1 | `opaque` | 2939441 | `opaque` | 3136464 | `ty_op` | 1157348 |
-| 2 | `ty_op` | 1179106 | `ty_op` | 1231897 | `opaque` | 917410 |
-| 3 | `br` | 444541 | `br` | 514565 | `br` | 412562 |
-| 4 | `call` | 329937 | `call` | 414768 | `call` | 324995 |
-| 5 | `store` | 315284 | `store` | 317492 | `store` | 310553 |
+| 1 | `opaque` | 2940665 | `opaque` | 3136464 | `ty_op` | 1157348 |
+| 2 | `ty_op` | 1179404 | `ty_op` | 1231897 | `opaque` | 917410 |
+| 3 | `br` | 444826 | `br` | 514565 | `br` | 412562 |
+| 4 | `call` | 330045 | `call` | 414768 | `call` | 324995 |
+| 5 | `store` | 315333 | `store` | 317492 | `store` | 310553 |
 | 6 | `field_ptr` | 292995 | `field_ptr` | 294691 | `field_ptr` | 288670 |
 | 7 | `un_op` | 196616 | `un_op` | 202603 | `un_op` | 192404 |
 | 8 | `bin_op` | 132239 | `bin_op` | 196878 | `bin_op` | 127867 |
@@ -196,20 +205,20 @@ families where the inventory does not yet record per-opcode first examples.
 
 | Rank | Category/opcode | ReleaseFast | ReleaseSafe | ReleaseSmall | First source/function | Status | Likely implementation layer |
 | ---: | --- | ---: | ---: | ---: | --- | --- | --- |
-| 1 | aggregate-abi | 2255777 | 2338212 | 2206792 | `../ziglang/src/main.zig` / `global` | partially supported | semantic lowering, ABI planner, backend |
-| 2 | unknown-opcode: error-union-try | 236716 | 238174 | 231997 | `../ziglang/src/main.zig` / `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
+| 1 | aggregate-abi | 2256445 | 2338212 | 2206792 | `../ziglang/src/main.zig` / `global` | partially supported | semantic lowering, ABI planner, backend |
+| 2 | unknown-opcode: error-union-try | 236821 | 238174 | 231997 | `../ziglang/src/main.zig` / `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
 | 3 | `dbg_stmt` / debug metadata | 1582916 | 1608158 | 0 | - | runtime/metadata boundary | AIR parser, verifier policy |
 | 4 | `load` | 588943 | 598263 | 577785 | - | supported subset | CFG lowering, backend |
 | 5 | `block` | 482697 | 552975 | 461641 | - | supported subset | CFG lowering |
 | 6 | `br` | 444541 | 514565 | 412562 | - | supported subset | CFG lowering |
-| 7 | `call` | 329937 | 414768 | 324995 | - | partially supported | ABI planner, backend, runtime boundary |
+| 7 | `call` | 330045 | 414768 | 324995 | - | partially supported | ABI planner, backend, runtime boundary |
 | 8 | `alloc` / stack slots | 372427 | 385116 | 366867 | - | partially supported | CFG lowering, stack frame layout |
 | 9 | `store` / `store_safe` | 315284 | 317492 | 310553 | - | partially supported | CFG lowering, ReleaseSafe safety edges |
 | 10 | `bitcast` | 291270 | 296563 | 286673 | - | partially supported | semantic lowering, backend |
 | 11 | field pointer data kind | 292995 | 294691 | 288670 | - | partially supported | semantic lowering, address-form lowering |
 | 12 | `cond_br` | 90901 | 157143 | 88955 | - | supported subset | CFG lowering, safety-edge lowering |
 | 13 | `arg` | 126700 | 127909 | 122648 | - | supported subset | AIR parser, ABI planner |
-| 14 | unknown-opcode: pointer-address | 50414 | 59226 | 49313 | `../ziglang/src/main.zig` / `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
+| 14 | unknown-opcode: pointer-address | 50417 | 59226 | 49313 | `../ziglang/src/main.zig` / `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
 | 15 | `struct_field_ptr_index_0` | 97671 | 98304 | 95363 | - | partially supported | aggregate layout, address-form lowering |
 | 16 | vector | 15820 | 16024 | 15808 | `../ziglang/src/main.zig` / `global` | unsupported boundary | ABI planner, backend |
 | 17 | X87/f80/f128 | 6194 | 6220 | 6550 | `../ziglang/src/main.zig` / `global` | unsupported boundary | ABI planner, backend |
@@ -219,11 +228,12 @@ families where the inventory does not yet record per-opcode first examples.
 
 ## Recommended Next Work
 
-1. Refresh the full `compiler-core-module` inventory with the new
-   `aggregate_surface` split when a long count-only compiler build is
-   acceptable, then prioritize the measured `abi-type-surface` aggregate rows
-   before metadata-only type surfaces. Until that refresh completes, keep using
-   the saved compiler-core-module totals above for broad priority ordering.
+1. Refresh `compiler-core-module` inventory with the new `aggregate_surface`
+   split one mode at a time using `--mode=ReleaseFast`,
+   `--mode=ReleaseSafe`, and `--mode=ReleaseSmall`; then prioritize the
+   measured `abi-type-surface` aggregate rows before metadata-only type
+   surfaces. Until those complete summaries exist, keep using the saved
+   compiler-core-module totals above for broad priority ordering.
 2. Continue converting concrete `unknown-opcode` pairs into source-backed
    compiler-core frontier rows. The first error-union slice is now accepted:
    `frontier_optionals_errors.zig` covers `wrap_errunion_payload`,
