@@ -453,7 +453,10 @@ Execution order:
    normalizes `total & 3` into a typed switch terminator with two explicit cases
    and a default arm. Generic CFG validates the switch targets and terminal
    addends before emitting the x86_64 compare/jump sequence, so this remains a
-   structural typed-v2 CFG path rather than a function-name admission.
+   structural typed-v2 CFG path rather than a function-name admission. The
+   typed AIR model now derives the switch mask and terminal addends from the
+   `bit_and`, branch-to-block, load, and add value flow instead of storing fixed
+   row constants in the summary.
    Together these prove the same pointer-slot model beyond simple branch
    continuations.
    These rows pass through typed AIR v2, generic CFG, z_llvm object

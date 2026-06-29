@@ -2806,6 +2806,10 @@ pub fn typedLoopTrySummary(
     } else if (typedOpcodeCount(structured_air_v2, "cmp_gt") != 0 or typedOpcodeCount(structured_air_v2, "sub") != 0 or typedOpcodeCount(structured_air_v2, "sub_safe") != 0) {
         return null;
     }
+    const post_switch = if (has_post_switch)
+        typedLoopTryPostSwitchSummary(structured_air_v2) orelse return null
+    else
+        null;
     if (has_post_switch) {
         const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
         if (add_count != 5) return null;
@@ -2847,12 +2851,7 @@ pub fn typedLoopTrySummary(
             .true_addend = 1,
             .false_addend = -1,
         } else null,
-        .post_switch = if (has_post_switch) .{
-            .mask = 3,
-            .case0_addend = 3,
-            .case1_addend = 5,
-            .default_addend = 7,
-        } else null,
+        .post_switch = post_switch,
     };
 }
 
@@ -3027,6 +3026,64 @@ fn typedAddConstUsing(structured_air_v2: air_export.StructuredAirV2, operand_ind
 fn typedAddConstUsingSecondI32Arg(structured_air_v2: air_export.StructuredAirV2) ?i32 {
     const arg1 = typedNthI32ArgIndex(structured_air_v2, 1) orelse return null;
     return typedAddConstUsing(structured_air_v2, arg1);
+}
+
+fn typedLoopTryPostSwitchSummary(structured_air_v2: air_export.StructuredAirV2) ?TypedLoopTryPostSwitchSummary {
+    const bit_and = singleInstructionByOpcode(structured_air_v2, "bit_and") orelse return null;
+    if (bit_and.operands.len != 2) return null;
+    const mask = typedConstI32Operand(bit_and, 1) orelse return null;
+    const total_load_index = typedInstOperandIndex(bit_and.operands[0]) orelse return null;
+    const total_load = instructionByIndex(structured_air_v2, total_load_index) orelse return null;
+    if (!std.mem.eql(u8, total_load.opcode, "load") or total_load.operands.len != 1) return null;
+    const total_ptr_index = typedInstOperandIndex(total_load.operands[0]) orelse return null;
+
+    const result_block_index = typedLoopTryPostSwitchResultBlockIndex(structured_air_v2) orelse return null;
+    const switch_br = singleInstructionByOpcode(structured_air_v2, "switch_br") orelse return null;
+    if (switch_br.operands.len != 1 or typedInstOperandIndex(switch_br.operands[0]) != bit_and.index) return null;
+    if ((typedDetailU32(switch_br, "cases_len") orelse return null) != 2) return null;
+
+    var addends: [3]i32 = undefined;
+    var addend_count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isBrOpcode(instruction.opcode)) continue;
+        if (instruction.operands.len != 2) continue;
+        if ((blockTarget(instruction.operands[0]) orelse continue) != result_block_index) continue;
+        const add_index = typedInstOperandIndex(instruction.operands[1]) orelse return null;
+        if (addend_count >= addends.len) return null;
+        addends[addend_count] = typedLoopTryPostSwitchAddend(structured_air_v2, add_index, total_ptr_index) orelse return null;
+        addend_count += 1;
+    }
+    if (addend_count != addends.len) return null;
+    return .{
+        .mask = mask,
+        .case0_addend = addends[0],
+        .case1_addend = addends[1],
+        .default_addend = addends[2],
+    };
+}
+
+fn typedLoopTryPostSwitchResultBlockIndex(structured_air_v2: air_export.StructuredAirV2) ?u32 {
+    var result: ?u32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isReturnOpcode(instruction.opcode)) continue;
+        if (instruction.operands.len != 1) continue;
+        const block_index = typedInstOperandIndex(instruction.operands[0]) orelse continue;
+        const block = instructionByIndex(structured_air_v2, block_index) orelse continue;
+        if (!std.mem.eql(u8, block.opcode, "block")) continue;
+        if (result != null) return null;
+        result = block_index;
+    }
+    return result;
+}
+
+fn typedLoopTryPostSwitchAddend(structured_air_v2: air_export.StructuredAirV2, add_index: u32, total_ptr_index: u32) ?i32 {
+    const add = instructionByIndex(structured_air_v2, add_index) orelse return null;
+    if (!std.mem.startsWith(u8, add.opcode, "add") or add.operands.len != 2) return null;
+    const load_index = typedInstOperandIndex(add.operands[0]) orelse return null;
+    const load = instructionByIndex(structured_air_v2, load_index) orelse return null;
+    if (!std.mem.eql(u8, load.opcode, "load") or load.operands.len != 1) return null;
+    if (typedInstOperandIndex(load.operands[0]) != total_ptr_index) return null;
+    return typedConstI32Operand(add, 1);
 }
 
 fn typedBinaryInstConstRhs(

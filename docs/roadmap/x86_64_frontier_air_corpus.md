@@ -77,7 +77,9 @@ The counted-loop try rows now include a post-loop switch continuation:
 `try` guard, computes `total & 3` after loop exit, and returns one of two
 explicit switch-case addends or the default addend. The typed-v2 lowerer emits a
 real switch terminator for that continuation, and generic CFG validates the
-case targets and terminal return values before codegen.
+case targets and terminal return values before codegen. The model summary now
+derives the mask and addends from the typed AIR `bit_and`, branch-to-block,
+load, and add data flow rather than fixed row constants.
 The optional scalar payload branch row now validates `wrap_optional`,
 `is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
 payload add/sub branch through generic single-block CFG, and has executable
