@@ -2156,6 +2156,7 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (try lowerGenericCfgErrorUnionSwitchPhiReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionErrorTagSwitchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadBranchReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgBranchThenErrorUnionTryReturn(allocator, machine, function)) return true;
     if (function.blocks.items.len != 5) return false;
     const entry = function.blocks.items[0];
     const entry_condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
@@ -2645,6 +2646,19 @@ const LinearErrorUnionTryChain = struct {
     success_payload_add: u8,
 };
 
+const BranchThenErrorUnionTryReturn = struct {
+    entry: ir.BasicBlock,
+    try_block: ir.BasicBlock,
+    direct_block: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    success_block: ir.BasicBlock,
+    err_block: ir.BasicBlock,
+    success_add_imm: u8,
+    try_is_then: bool,
+    success_is_then: bool,
+};
+
 const ErrorUnionTrySwitchCase = struct {
     value: i32,
     block: ir.BasicBlock,
@@ -2718,6 +2732,165 @@ fn lowerGenericCfgLinearErrorUnionTryChainReturn(
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
     return true;
+}
+
+fn lowerGenericCfgBranchThenErrorUnionTryReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = branchThenErrorUnionTryReturn(function) orelse return false;
+    const frame_bytes: u8 = 8;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_branch_then_try_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    const entry_condbr = switch (plan.entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, plan.entry, plan.entry, entry_condbr.cond, if (plan.try_is_then) plan.try_block.name else plan.direct_block.name);
+    if (plan.try_is_then) {
+        try emitGenericCfgTerminalReturnBlock(allocator, machine, function, plan.entry, plan.direct_block);
+        try appendGenericCfgBlockLabel(allocator, machine, plan.try_block.name);
+    }
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, plan.try_block, plan.call);
+    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = plan.call.callee, .ret_ty = plan.call.ret_ty } });
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, if (plan.success_is_then) .je else .jne, plan.success_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.success_block.name);
+    try emitPayloadAddImmWrapFromCallSlot(allocator, machine, plan.success_add_imm, epilogue_label);
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+
+    if (!plan.try_is_then) {
+        try appendGenericCfgBlockLabel(allocator, machine, plan.direct_block.name);
+        try emitGenericCfgTerminalReturnBlock(allocator, machine, function, plan.entry, plan.direct_block);
+    }
+    return true;
+}
+
+fn branchThenErrorUnionTryReturn(function: ir.Function) ?BranchThenErrorUnionTryReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 5) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    const then_try = branchTryStage(function, then_block);
+    const else_try = branchTryStage(function, else_block);
+    if ((then_try != null) == (else_try != null)) return null;
+    const try_stage = then_try orelse else_try.?;
+    const try_block = if (then_try != null) then_block else else_block;
+    const direct_block = if (then_try != null) else_block else then_block;
+    if (!genericCfgSupportsTerminalReturnBlock(function, entry, direct_block)) return null;
+    if (!branchThenTryUsesAllBlocks(function, try_block.name, direct_block.name, try_stage.success_block.name, try_stage.err_block.name)) return null;
+
+    return .{
+        .entry = entry,
+        .try_block = try_block,
+        .direct_block = direct_block,
+        .call_name = try_stage.call_name,
+        .call = try_stage.call,
+        .success_block = try_stage.success_block,
+        .err_block = try_stage.err_block,
+        .success_add_imm = try_stage.success_add_imm,
+        .try_is_then = then_try != null,
+        .success_is_then = try_stage.success_is_then,
+    };
+}
+
+const BranchTryStage = struct {
+    call_name: []const u8,
+    call: ir.CallInst,
+    success_block: ir.BasicBlock,
+    err_block: ir.BasicBlock,
+    success_add_imm: u8,
+    success_is_then: bool,
+};
+
+fn branchTryStage(function: ir.Function, block: ir.BasicBlock) ?BranchTryStage {
+    const condbr = switch (block.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const call_name = errorUnionTryGuardCallResult(block, condbr.cond) orelse return null;
+    const call_instruction = findInstruction(block, call_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call)) return null;
+
+    const then_block = function.blocks.items[blockIndex(function, condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, condbr.else_target) orelse return null];
+    const then_success = successReturnPayloadAdd(then_block, call_name);
+    const else_success = successReturnPayloadAdd(else_block, call_name);
+    if ((then_success != null) == (else_success != null)) return null;
+    const success_block = if (then_success != null) then_block else else_block;
+    const err_block = if (then_success != null) else_block else then_block;
+    if (!blockReturnsNamedValue(err_block, call_name, .{ .int = 64 })) return null;
+    return .{
+        .call_name = call_name,
+        .call = call,
+        .success_block = success_block,
+        .err_block = err_block,
+        .success_add_imm = then_success orelse else_success.?,
+        .success_is_then = then_success != null,
+    };
+}
+
+fn branchThenTryUsesAllBlocks(
+    function: ir.Function,
+    try_block: []const u8,
+    direct_block: []const u8,
+    success_block: []const u8,
+    err_block: []const u8,
+) bool {
+    for (function.blocks.items, 0..) |block, index| {
+        if (index == 0 or
+            std.mem.eql(u8, block.name, try_block) or
+            std.mem.eql(u8, block.name, direct_block) or
+            std.mem.eql(u8, block.name, success_block) or
+            std.mem.eql(u8, block.name, err_block))
+        {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+fn emitPayloadAddImmWrapFromCallSlot(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    add_imm: u8,
+    epilogue_label: []const u8,
+) !void {
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+    if (add_imm != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = add_imm });
+    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 }
 
 fn errorUnionTrySwitchReturn(function: ir.Function) ?ErrorUnionTrySwitchReturn {

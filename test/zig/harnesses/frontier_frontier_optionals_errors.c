@@ -4,6 +4,7 @@ extern int z_frontier_error_union_match(int) __asm__("frontier_optionals_errors.
 extern int z_frontier_try_match(int, int) __asm__("frontier_optionals_errors.frontier_try_match");
 extern int z_frontier_nested_try_match(int, int, int) __asm__("frontier_optionals_errors.frontier_nested_try_match");
 extern int z_frontier_try_branch_match(int, int, int) __asm__("frontier_optionals_errors.frontier_try_branch_match");
+extern int z_frontier_branch_then_try_match(int, int, int) __asm__("frontier_optionals_errors.frontier_branch_then_try_match");
 extern int z_frontier_try_switch_match(int, int) __asm__("frontier_optionals_errors.frontier_try_switch_match");
 extern int z_frontier_maybe_error_tag_match(int, int) __asm__("frontier_optionals_errors.frontier_maybe_error_tag_match");
 extern int z_frontier_error_tag_switch(int, int) __asm__("frontier_optionals_errors.frontier_error_tag_switch");
@@ -21,15 +22,18 @@ int main(void) {
     if (z_frontier_try_branch_match(0, 30, 4) != 34) return 11;
     if (z_frontier_try_branch_match(0, 10, 3) != 7) return 12;
     if (z_frontier_try_branch_match(1, 30, 4) != -41) return 13;
-    if (z_frontier_try_switch_match(0, 28) != 29) return 14;
-    if (z_frontier_try_switch_match(0, 29) != 31) return 15;
-    if (z_frontier_try_switch_match(0, 30) != 33) return 16;
-    if (z_frontier_try_switch_match(1, 28) != -43) return 17;
-    if (z_frontier_maybe_error_tag_match(0, 46) != 46) return 18;
-    if (z_frontier_maybe_error_tag_match(1, 46) != -46) return 19;
-    if (z_frontier_maybe_error_tag_match(2, 46) != -46) return 20;
-    if (z_frontier_error_tag_switch(0, 46) != 47) return 21;
-    if (z_frontier_error_tag_switch(1, 46) != -47) return 22;
-    if (z_frontier_error_tag_switch(2, 46) != -48) return 23;
+    if (z_frontier_branch_then_try_match(1, 0, 38) != 42) return 14;
+    if (z_frontier_branch_then_try_match(0, 1, 46) != 42) return 15;
+    if (z_frontier_branch_then_try_match(1, 1, 38) != -42) return 16;
+    if (z_frontier_try_switch_match(0, 28) != 29) return 17;
+    if (z_frontier_try_switch_match(0, 29) != 31) return 18;
+    if (z_frontier_try_switch_match(0, 30) != 33) return 19;
+    if (z_frontier_try_switch_match(1, 28) != -43) return 20;
+    if (z_frontier_maybe_error_tag_match(0, 46) != 46) return 21;
+    if (z_frontier_maybe_error_tag_match(1, 46) != -46) return 22;
+    if (z_frontier_maybe_error_tag_match(2, 46) != -46) return 23;
+    if (z_frontier_error_tag_switch(0, 46) != 47) return 24;
+    if (z_frontier_error_tag_switch(1, 46) != -47) return 25;
+    if (z_frontier_error_tag_switch(2, 46) != -48) return 26;
     return 0;
 }
