@@ -154,6 +154,14 @@ export fn frontier_slice_ptr_const_runtime_load(values: [*]const i32, len: usize
     return ptr[0];
 }
 
+export fn frontier_slice_ptr_const_runtime_store(values: [*]i32, len: usize, index: usize, value: i32) i32 {
+    const slice = values[0..len];
+    const base = slice.ptr + 1;
+    const ptr = base + index;
+    ptr[0] = value;
+    return ptr[0];
+}
+
 export fn frontier_checked_slice_elem_ptr_load(values: [*]const i32, len: usize, index: usize) i32 {
     @setRuntimeSafety(true);
     const slice = values[0..len];

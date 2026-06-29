@@ -28,6 +28,7 @@ extern int z_frontier_slice_ptr_load(const int *, unsigned long, unsigned long) 
 extern int z_frontier_slice_elem_ptr_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_elem_ptr_load");
 extern int z_frontier_slice_elem_ptr_store(int *, unsigned long, unsigned long, int) __asm__("frontier_slice_pointer_arith.frontier_slice_elem_ptr_store");
 extern int z_frontier_slice_ptr_const_runtime_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_ptr_const_runtime_load");
+extern int z_frontier_slice_ptr_const_runtime_store(int *, unsigned long, unsigned long, int) __asm__("frontier_slice_pointer_arith.frontier_slice_ptr_const_runtime_store");
 extern int z_frontier_checked_slice_elem_ptr_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_checked_slice_elem_ptr_load");
 void z_frontier_slice_out_of_bounds(unsigned long index, unsigned long len) __asm__("frontier_slice_pointer_arith.outOfBounds");
 void z_frontier_slice_out_of_bounds(unsigned long index, unsigned long len) {
@@ -97,6 +98,8 @@ int main(void) {
     if (z_frontier_ptr_slot_store(mutable_values, 1, 43) != 43) return 31;
     if (mutable_values[2] != 43) return 32;
     if (z_frontier_slice_ptr_const_runtime_load(values, 5, 2) != 13) return 33;
+    if (z_frontier_slice_ptr_const_runtime_store(mutable_values, 5, 2, 47) != 47) return 37;
+    if (mutable_values[3] != 47) return 38;
     if (z_frontier_checked_slice_elem_ptr_load(values, 5, 4) != 21) return 34;
     if (expect_death(death_checked_slice_oob) != 0) return 35;
     return 0;

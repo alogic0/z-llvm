@@ -74,8 +74,10 @@ frontier tag/payload switch shape.
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
 `slice_elem_ptr`, runtime and comptime `ptr_add`, chained `ptr_add`,
 constant `ptr_sub`, pointer-add-fed loads, pointer-add-fed stores, and
-load/store through derived slice element pointers. The x86_64 generic CFG path
-now uses a reusable typed
+load/store through derived slice element pointers. The same typed address path
+now covers `slice.ptr` plus constant offset plus runtime index feeding a
+store/reload, so the slice pointer proof is not load-only. The x86_64 generic
+CFG path now uses a reusable typed
 address model with a base pointer, optional dynamic index, constant byte
 offset, scalar width, and conservative element-size checks. Accepted rows prove
 i8, i16, i32, and i64 scalar pointer loads/stores, including dynamic-index and
@@ -148,20 +150,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=652
-structured_functions=652
-generic_codegen_functions=652
-generic_cfg_functions=652
+discovered_functions=653
+structured_functions=653
+generic_codegen_functions=653
+generic_cfg_functions=653
 structural_matcher_functions=0
-structured_air_v2_functions=652
-typed_air_operand_functions=652
+structured_air_v2_functions=653
+typed_air_operand_functions=653
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=652
+generic_lowering_functions=653
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=652
+object_emitted_functions=653
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
