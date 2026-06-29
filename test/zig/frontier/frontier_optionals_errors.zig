@@ -133,6 +133,23 @@ export fn frontier_switch_then_try_match(selector: i32, tag: i32, value: i32) i3
     }
 }
 
+fn frontierBranchBothTry(flag: i32, first_tag: i32, second_tag: i32, value: i32) FrontierError!i32 {
+    if (flag != 0) {
+        const payload = try frontierMaybeTryPayload(first_tag, value);
+        return payload + 4;
+    }
+    const payload = try frontierMaybeTryPayload(second_tag, value);
+    return payload + 6;
+}
+
+export fn frontier_branch_both_try_match(flag: i32, first_tag: i32, second_tag: i32, value: i32) i32 {
+    if (frontierBranchBothTry(flag, first_tag, second_tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -75;
+    }
+}
+
 fn frontierTrySwitch(tag: i32, value: i32) FrontierError!i32 {
     const payload = try frontierMaybeTryPayload(tag, value);
     return switch (payload & 3) {

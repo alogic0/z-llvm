@@ -2158,6 +2158,7 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (try lowerGenericCfgErrorUnionCatchSwitchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTrySlotUpdateReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadBranchReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgBranchBothErrorUnionTryReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgBranchThenErrorUnionTryReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgSwitchThenErrorUnionTryReturn(allocator, machine, function)) return true;
     if (function.blocks.items.len < 5) return false;
@@ -2804,6 +2805,14 @@ const BranchThenErrorUnionTryReturn = struct {
     success_is_then: bool,
 };
 
+const BranchBothErrorUnionTryReturn = struct {
+    entry: ir.BasicBlock,
+    then_block: ir.BasicBlock,
+    then_stage: BranchTryStage,
+    else_block: ir.BasicBlock,
+    else_stage: BranchTryStage,
+};
+
 const SwitchThenErrorUnionTryReturn = struct {
     entry: ir.BasicBlock,
     switch_term: ir.SwitchTerminator,
@@ -2891,6 +2900,40 @@ fn lowerGenericCfgLinearErrorUnionTryChainReturn(
     return true;
 }
 
+fn lowerGenericCfgBranchBothErrorUnionTryReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = branchBothErrorUnionTryReturn(function) orelse return false;
+    const frame_bytes: u8 = 8;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_branch_both_try_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    const entry_condbr = switch (plan.entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, plan.entry, plan.entry, entry_condbr.cond, plan.then_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.else_block.name);
+    try emitBranchTryStageToEpilogue(allocator, machine, function, plan.else_block, plan.else_stage, epilogue_label);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.then_block.name);
+    try emitBranchTryStageToEpilogue(allocator, machine, function, plan.then_block, plan.then_stage, epilogue_label);
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
 fn lowerGenericCfgBranchThenErrorUnionTryReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -2942,6 +2985,30 @@ fn lowerGenericCfgBranchThenErrorUnionTryReturn(
     return true;
 }
 
+fn emitBranchTryStageToEpilogue(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    try_block: ir.BasicBlock,
+    stage: BranchTryStage,
+    epilogue_label: []const u8,
+) !void {
+    const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, try_block, stage.call);
+    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = stage.call.callee, .ret_ty = stage.call.ret_ty } });
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, if (stage.success_is_then) .je else .jne, stage.success_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, stage.err_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, stage.success_block.name);
+    try emitPayloadAddImmWrapFromCallSlot(allocator, machine, stage.success_add_imm, epilogue_label);
+}
+
 fn lowerGenericCfgSwitchThenErrorUnionTryReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -2985,6 +3052,37 @@ fn lowerGenericCfgSwitchThenErrorUnionTryReturn(
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
     return true;
+}
+
+fn branchBothErrorUnionTryReturn(function: ir.Function) ?BranchBothErrorUnionTryReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 7) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    const then_stage = branchTryStage(function, then_block) orelse return null;
+    const else_stage = branchTryStage(function, else_block) orelse return null;
+    if (!branchBothTryUsesAllBlocks(
+        function,
+        then_block.name,
+        then_stage.success_block.name,
+        then_stage.err_block.name,
+        else_block.name,
+        else_stage.success_block.name,
+        else_stage.err_block.name,
+    )) return null;
+
+    return .{
+        .entry = entry,
+        .then_block = then_block,
+        .then_stage = then_stage,
+        .else_block = else_block,
+        .else_stage = else_stage,
+    };
 }
 
 fn branchThenErrorUnionTryReturn(function: ir.Function) ?BranchThenErrorUnionTryReturn {
@@ -3225,6 +3323,31 @@ fn branchThenTryUsesAllBlocks(
             std.mem.eql(u8, block.name, direct_block) or
             std.mem.eql(u8, block.name, success_block) or
             std.mem.eql(u8, block.name, err_block))
+        {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+fn branchBothTryUsesAllBlocks(
+    function: ir.Function,
+    then_block: []const u8,
+    then_success: []const u8,
+    then_err: []const u8,
+    else_block: []const u8,
+    else_success: []const u8,
+    else_err: []const u8,
+) bool {
+    for (function.blocks.items, 0..) |block, index| {
+        if (index == 0 or
+            std.mem.eql(u8, block.name, then_block) or
+            std.mem.eql(u8, block.name, then_success) or
+            std.mem.eql(u8, block.name, then_err) or
+            std.mem.eql(u8, block.name, else_block) or
+            std.mem.eql(u8, block.name, else_success) or
+            std.mem.eql(u8, block.name, else_err))
         {
             continue;
         }
