@@ -122,6 +122,20 @@ export fn frontier_try_cold_match(tag: i32, value: i32) i32 {
     }
 }
 
+fn frontierTryPtrAdd(tag: i32, value: i32) FrontierError!i32 {
+    var result = frontierMaybeTryPayload(tag, value);
+    const payload_ptr = &(try result);
+    return payload_ptr.* + 13;
+}
+
+export fn frontier_try_ptr_match(tag: i32, value: i32) i32 {
+    if (frontierTryPtrAdd(tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -53;
+    }
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,

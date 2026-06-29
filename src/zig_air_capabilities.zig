@@ -141,7 +141,10 @@ pub const ErrorUnionSemanticOp = enum {
     wrap_err,
     unwrap_payload,
     unwrap_err,
+    unwrap_payload_ptr,
+    unwrap_err_ptr,
     try_op,
+    try_ptr,
 };
 
 pub const PointerAggregateSemanticOp = enum {
@@ -330,7 +333,10 @@ pub fn errorUnionSemanticOpForOpcode(opcode: []const u8) ErrorUnionSemanticOp {
     if (std.mem.eql(u8, opcode, "wrap_errunion_err")) return .wrap_err;
     if (std.mem.eql(u8, opcode, "unwrap_errunion_payload")) return .unwrap_payload;
     if (std.mem.eql(u8, opcode, "unwrap_errunion_err")) return .unwrap_err;
+    if (std.mem.eql(u8, opcode, "unwrap_errunion_payload_ptr")) return .unwrap_payload_ptr;
+    if (std.mem.eql(u8, opcode, "unwrap_errunion_err_ptr")) return .unwrap_err_ptr;
     if (std.mem.eql(u8, opcode, "try") or std.mem.eql(u8, opcode, "try_cold")) return .try_op;
+    if (std.mem.eql(u8, opcode, "try_ptr") or std.mem.eql(u8, opcode, "try_ptr_cold")) return .try_ptr;
     return .none;
 }
 
@@ -888,8 +894,12 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ErrorUnionSemanticOp.wrap_err, errorUnionSemanticOpForOpcode("wrap_errunion_err"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.unwrap_payload, errorUnionSemanticOpForOpcode("unwrap_errunion_payload"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.unwrap_err, errorUnionSemanticOpForOpcode("unwrap_errunion_err"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.unwrap_payload_ptr, errorUnionSemanticOpForOpcode("unwrap_errunion_payload_ptr"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.unwrap_err_ptr, errorUnionSemanticOpForOpcode("unwrap_errunion_err_ptr"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.try_op, errorUnionSemanticOpForOpcode("try"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.try_op, errorUnionSemanticOpForOpcode("try_cold"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.try_ptr, errorUnionSemanticOpForOpcode("try_ptr"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.try_ptr, errorUnionSemanticOpForOpcode("try_ptr_cold"));
     try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.slice, pointerAggregateSemanticOpForOpcode("slice"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.slice_ptr, pointerAggregateSemanticOpForOpcode("slice_ptr"));
