@@ -2153,6 +2153,7 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (!function.ret_ty.eql(.{ .int = 32 }) and !function.ret_ty.eql(.{ .int = 64 })) return false;
     if (try lowerGenericCfgLinearErrorUnionTryChainReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTrySwitchReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgErrorUnionSwitchPhiReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadBranchReturn(allocator, machine, function)) return true;
     if (function.blocks.items.len != 5) return false;
     const entry = function.blocks.items[0];
@@ -2222,6 +2223,120 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
         );
         try appendGenericCfgBlockLabel(allocator, machine, first_return.name);
         try emitGenericCfgTerminalReturnBlock(allocator, machine, function, entry, first_return);
+    }
+    return true;
+}
+
+const ErrorUnionSwitchPhiCase = struct {
+    value: i32,
+    block: ir.BasicBlock,
+    incoming: ir.Value,
+};
+
+const ErrorUnionSwitchPhiReturn = struct {
+    entry: ir.BasicBlock,
+    tag_reg: ArgReg,
+    cases: [8]ErrorUnionSwitchPhiCase,
+    case_count: usize,
+    default_block: ir.BasicBlock,
+    default_incoming: ir.Value,
+};
+
+fn lowerGenericCfgErrorUnionSwitchPhiReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionSwitchPhiReturn(function) orelse return false;
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = plan.tag_reg });
+    for (plan.cases[0..plan.case_count]) |case| {
+        try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = case.value });
+        try appendGenericCfgConditionalBranch(allocator, machine, .je, case.block.name);
+    }
+    try machine.instructions.append(allocator, .{ .jmp = plan.default_block.name });
+
+    for (plan.cases[0..plan.case_count]) |case| {
+        try appendGenericCfgBlockLabel(allocator, machine, case.block.name);
+        try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, plan.entry, case.block, case.incoming);
+        try appendGenericCfgReturn(allocator, machine);
+    }
+    try appendGenericCfgBlockLabel(allocator, machine, plan.default_block.name);
+    try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, plan.entry, plan.default_block, plan.default_incoming);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn errorUnionSwitchPhiReturn(function: ir.Function) ?ErrorUnionSwitchPhiReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len < 4) return null;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 0) return null;
+    const switch_term = blockSwitchTerminator(entry) orelse return null;
+    if (!switch_term.cond_ty.eql(.{ .int = 32 })) return null;
+    const tag_reg = switch (switch_term.cond) {
+        .named => |name| paramRegOrNull(function, name, .{ .int = 32 }) catch return null,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    } orelse return null;
+    if (switch_term.cases.items.len == 0 or switch_term.cases.items.len > 8) return null;
+    const merge_block = commonSwitchMergeBlock(function, switch_term) orelse return null;
+    const phi = firstPhiReturn(function, merge_block) orelse return null;
+    if (!phi.ty.eql(.{ .int = 64 })) return null;
+
+    var cases: [8]ErrorUnionSwitchPhiCase = undefined;
+    for (switch_term.cases.items, 0..) |case, case_index| {
+        if (!case.value_ty.eql(.{ .int = 32 })) return null;
+        const value = switch (case.value) {
+            .int => |int| i32Value(int) catch return null,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+        };
+        const block = function.blocks.items[blockIndex(function, case.target) orelse return null];
+        if (!blockBranchesTo(block, merge_block.name)) return null;
+        cases[case_index] = .{
+            .value = value,
+            .block = block,
+            .incoming = phiIncomingForBlock(phi, block.name) orelse return null,
+        };
+    }
+    const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
+    if (!blockBranchesTo(default_block, merge_block.name)) return null;
+    if (!switchPhiUsesAllBlocks(function, merge_block.name, switch_term)) return null;
+
+    return .{
+        .entry = entry,
+        .tag_reg = tag_reg,
+        .cases = cases,
+        .case_count = switch_term.cases.items.len,
+        .default_block = default_block,
+        .default_incoming = phiIncomingForBlock(phi, default_block.name) orelse return null,
+    };
+}
+
+fn phiIncomingForBlock(phi: ir.PhiInst, block_name: []const u8) ?ir.Value {
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, block_name)) return incoming.value;
+    }
+    return null;
+}
+
+fn switchPhiUsesAllBlocks(
+    function: ir.Function,
+    merge_block: []const u8,
+    switch_term: ir.SwitchTerminator,
+) bool {
+    for (function.blocks.items, 0..) |block, index| {
+        if (index == 0 or
+            std.mem.eql(u8, block.name, merge_block) or
+            std.mem.eql(u8, block.name, switch_term.default_target))
+        {
+            continue;
+        }
+        var matched_case = false;
+        for (switch_term.cases.items) |case| {
+            if (std.mem.eql(u8, block.name, case.target)) {
+                matched_case = true;
+                break;
+            }
+        }
+        if (!matched_case) return false;
     }
     return true;
 }
