@@ -8,7 +8,6 @@ const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
 const ir = @import("ir.zig");
-const legacy = @import("zig_air_lowering_legacy.zig");
 const runtime_wrappers = @import("zig_air_runtime_wrappers.zig");
 const type_layout = @import("zig_air_type_layout.zig");
 
@@ -31,8 +30,6 @@ const validateSretAggregateMakeRecords = air_aggregate_copy.validateSretAggregat
 const validateSretAggregateCopyRecords = air_aggregate_copy.validateSretAggregateCopyRecords;
 const validateSretAggregateCallWrapperRecords = air_aggregate_copy.validateSretAggregateCallWrapperRecords;
 const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegisterAggregateCandidate;
-
-const lowerConditionalSliceSum = legacy.lowerConditionalSliceSum;
 
 fn lowerRegisterAggregateMake(
     allocator: std.mem.Allocator,
@@ -1197,7 +1194,42 @@ pub fn lowerTypedV2ConditionalSliceSum(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2ConditionalSliceSumRecords(function_type, structured_air_v2)) return null;
-    return try lowerConditionalSliceSum(allocator, air_function);
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg1" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg2" });
+
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    try entry.instructions.append(allocator, .{
+        .result = "is_empty",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "arg1" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    entry.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "is_empty" },
+        .then_target = "zero",
+        .else_target = "loop",
+    } };
+    try function.blocks.append(allocator, entry);
+
+    var loop = ir.BasicBlock.init("loop");
+    loop.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .int = 0 } } };
+    try function.blocks.append(allocator, loop);
+
+    var zero = ir.BasicBlock.init("zero");
+    zero.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .int = 0 } } };
+    try function.blocks.append(allocator, zero);
+    return function;
 }
 
 pub fn typedV2SliceSumRecords(

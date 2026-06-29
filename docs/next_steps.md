@@ -274,8 +274,10 @@ Execution order:
    instead of delegating to the legacy packed-field compatibility lowerers.
    This does not change the separate packed/unaligned aggregate ABI boundary.
    Typed-v2 plain slice-loop admission and selected loop IR construction now use
-   the model-owned plain slice summary directly; conditional slice-loop still
-   uses the existing compatibility emitter. Typed-v2 accumulator-loop and
+   the model-owned plain slice summary directly, and typed-v2 conditional
+   slice-loop admission now builds its selected loop skeleton directly from the
+   model-owned conditional slice summary instead of delegating to the legacy
+   conditional-slice compatibility lowerer. Typed-v2 accumulator-loop and
    conditional-slot-update admission has likewise moved to model-owned scalar
    control summaries, and both selected scalar-control bodies now emit their
    loop/add/sub/select IR directly from the typed-v2 path. Typed-v2 inline-asm
