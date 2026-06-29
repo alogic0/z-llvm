@@ -262,10 +262,11 @@ Execution order:
    those paths are normalized. Typed-v2 error-union payload and maybe-error
    admission also uses model summaries now, replacing the old
    `error_switch.error_switch` exclusion and `.maybeError` suffix gate with
-   structural opcode/type checks. Typed-v2 optional-pointer admission now
-   consumes a model-owned summary containing the selected add immediate,
-   fallback value, and checked-unwrap marker instead of duplicating that
-   extraction in the typed-v2 lowerer. The simpler typed-v2 optional-payload
+   structural opcode/type checks. Typed-v2 optional-pointer admission and
+   selected null-check/load/phi IR construction now consume a model-owned
+   summary containing the selected add immediate, fallback value, and
+   checked-unwrap marker instead of delegating to the legacy optional-pointer
+   compatibility lowerer. The simpler typed-v2 optional-payload
    row now also builds its selected `icmp`/`select`/`ret` IR directly from the
    model-owned fallback summary instead of delegating to the legacy
    optional-payload compatibility lowerer. Typed-v2 packed read/replace admission

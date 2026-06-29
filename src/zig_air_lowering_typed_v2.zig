@@ -33,7 +33,6 @@ const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegist
 const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
 const lowerConditionalSlotUpdate = legacy.lowerConditionalSlotUpdate;
 const lowerErrorUnionPayload = legacy.lowerErrorUnionPayload;
-const lowerOptionalPointer = legacy.lowerOptionalPointer;
 const lowerPackedReadFlag = legacy.lowerPackedReadFlag;
 const lowerPackedReplaceLow = legacy.lowerPackedReplaceLow;
 const lowerRuntimeOptionalPointerMain = legacy.lowerRuntimeOptionalPointerMain;
@@ -773,12 +772,63 @@ pub fn lowerTypedV2OptionalPointer(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     const summary = air_model.typedOptionalPointerSummary(function_type, structured_air_v2) orelse return null;
-    return try lowerOptionalPointer(
-        allocator,
-        air_function,
-        summary.add_imm,
-        summary.fallback,
-    );
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    try entry.instructions.append(allocator, .{
+        .result = "is_null",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .ptr,
+            .lhs = .{ .named = "arg0" },
+            .rhs = .null_value,
+        } },
+    });
+    entry.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "is_null" },
+        .then_target = "merge",
+        .else_target = "load",
+    } };
+    try function.blocks.append(allocator, entry);
+
+    var load = ir.BasicBlock.init("load");
+    errdefer load.deinit(allocator);
+    try load.instructions.append(allocator, .{
+        .result = "loaded",
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "arg0" } } },
+    });
+    const loaded_value_name = if (summary.add_imm == 0) "loaded" else "adjusted";
+    if (summary.add_imm != 0) {
+        try load.instructions.append(allocator, .{
+            .result = loaded_value_name,
+            .kind = .{ .binary = .{
+                .op = .add,
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = "loaded" },
+                .rhs = .{ .int = summary.add_imm },
+            } },
+        });
+    }
+    load.terminator = .{ .br = .{ .target = "merge" } };
+    try function.blocks.append(allocator, load);
+
+    var merge = ir.BasicBlock.init("merge");
+    errdefer merge.deinit(allocator);
+    var phi: ir.PhiInst = .{ .ty = .{ .int = 32 }, .incoming = .empty };
+    errdefer phi.deinit(allocator);
+    try phi.incoming.append(allocator, .{ .value = .{ .int = summary.fallback }, .block = "entry" });
+    try phi.incoming.append(allocator, .{ .value = .{ .named = loaded_value_name }, .block = "load" });
+    try merge.instructions.append(allocator, .{ .result = "result", .kind = .{ .phi = phi } });
+    merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, merge);
+    return function;
 }
 
 pub fn typedV2OptionalPointerRecords(
