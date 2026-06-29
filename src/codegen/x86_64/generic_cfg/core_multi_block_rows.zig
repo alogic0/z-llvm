@@ -2624,7 +2624,7 @@ const ErrorUnionTryPayloadBranchReturn = struct {
     cont_block: ir.BasicBlock,
     true_block: ir.BasicBlock,
     false_block: ir.BasicBlock,
-    compare_imm: i32,
+    compare: PayloadGreaterConst,
     delta_reg: ArgReg,
     true_op: MachineBinaryOp,
     false_op: MachineBinaryOp,
@@ -3142,14 +3142,29 @@ fn lowerGenericCfgErrorUnionTryPayloadBranchReturn(
     try appendGenericCfgBlockLabel(allocator, machine, plan.cont_block.name);
     try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
     try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
-    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = plan.compare_imm });
-    try machine.instructions.append(allocator, .{ .jle = plan.false_block.name });
+    switch (plan.compare) {
+        .signed_gt => |imm| {
+            try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = imm });
+            try machine.instructions.append(allocator, .{ .jle = plan.false_block.name });
 
-    try appendGenericCfgBlockLabel(allocator, machine, plan.true_block.name);
-    try emitPayloadBinaryWrapReturn(allocator, machine, plan.true_op, plan.delta_reg, epilogue_label);
+            try appendGenericCfgBlockLabel(allocator, machine, plan.true_block.name);
+            try emitPayloadBinaryWrapReturn(allocator, machine, plan.true_op, plan.delta_reg, epilogue_label);
 
-    try appendGenericCfgBlockLabel(allocator, machine, plan.false_block.name);
-    try emitPayloadBinaryWrapReturn(allocator, machine, plan.false_op, plan.delta_reg, epilogue_label);
+            try appendGenericCfgBlockLabel(allocator, machine, plan.false_block.name);
+            try emitPayloadBinaryWrapReturn(allocator, machine, plan.false_op, plan.delta_reg, epilogue_label);
+        },
+        .unsigned_gt => |imm| {
+            if (imm == std.math.maxInt(i32)) return error.UnsupportedCodegenControlFlow;
+            try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = imm + 1 });
+            try machine.instructions.append(allocator, .{ .jae = plan.true_block.name });
+
+            try appendGenericCfgBlockLabel(allocator, machine, plan.false_block.name);
+            try emitPayloadBinaryWrapReturn(allocator, machine, plan.false_op, plan.delta_reg, epilogue_label);
+
+            try appendGenericCfgBlockLabel(allocator, machine, plan.true_block.name);
+            try emitPayloadBinaryWrapReturn(allocator, machine, plan.true_op, plan.delta_reg, epilogue_label);
+        },
+    }
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
     try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
@@ -3206,7 +3221,7 @@ fn errorUnionTryPayloadBranchReturn(function: ir.Function) ?ErrorUnionTryPayload
         else => return null,
     };
     if (!cont_condbr.cond_ty.eql(.{ .int = 1 })) return null;
-    const compare_imm = payloadSgtConst(function, cont_block, cont_condbr.cond, call_name) orelse return null;
+    const compare = payloadGreaterConst(function, cont_block, cont_condbr.cond, call_name) orelse return null;
     const true_block = function.blocks.items[blockIndex(function, cont_condbr.then_target) orelse return null];
     const false_block = function.blocks.items[blockIndex(function, cont_condbr.else_target) orelse return null];
     const true_return = payloadBinaryWrapReturn(function, cont_block, true_block, call_name) orelse return null;
@@ -3228,14 +3243,14 @@ fn errorUnionTryPayloadBranchReturn(function: ir.Function) ?ErrorUnionTryPayload
         .cont_block = cont_block,
         .true_block = true_block,
         .false_block = false_block,
-        .compare_imm = compare_imm,
+        .compare = compare,
         .delta_reg = true_return.reg,
         .true_op = true_return.op,
         .false_op = false_return.op,
     };
 }
 
-fn payloadSgtConst(function: ir.Function, block: ir.BasicBlock, cond: ir.Value, call_name: []const u8) ?i32 {
+fn payloadGreaterConst(function: ir.Function, block: ir.BasicBlock, cond: ir.Value, call_name: []const u8) ?PayloadGreaterConst {
     _ = function;
     const cond_name = switch (cond) {
         .named => |name| name,
@@ -3246,14 +3261,32 @@ fn payloadSgtConst(function: ir.Function, block: ir.BasicBlock, cond: ir.Value, 
         .icmp => |icmp| icmp,
         else => return null,
     };
-    if (icmp.predicate != .sgt or !icmp.operand_ty.eql(.{ .int = 32 })) return null;
+    if (!icmp.operand_ty.eql(.{ .int = 32 })) return null;
+    const predicate: PayloadGreaterConstPredicate = switch (icmp.predicate) {
+        .sgt => .signed_gt,
+        .ugt => .unsigned_gt,
+        else => return null,
+    };
     const rhs = switch (icmp.rhs) {
         .int => |int| i32Value(int) catch return null,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
     if (!payloadValueFromCallResult(block, icmp.lhs, call_name)) return null;
-    return rhs;
+    return switch (predicate) {
+        .signed_gt => .{ .signed_gt = rhs },
+        .unsigned_gt => .{ .unsigned_gt = rhs },
+    };
 }
+
+const PayloadGreaterConstPredicate = enum {
+    signed_gt,
+    unsigned_gt,
+};
+
+const PayloadGreaterConst = union(PayloadGreaterConstPredicate) {
+    signed_gt: i32,
+    unsigned_gt: i32,
+};
 
 const PayloadBinaryWrapReturn = struct {
     op: MachineBinaryOp,

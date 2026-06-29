@@ -49,8 +49,10 @@ both terminal arms rewrap payload-derived values, plus source-backed
 `try_ptr` and `try_ptr_cold` rows where the Zig hook exports pointer operands
 for `try_ptr`/`try_ptr_cold` and `unwrap_errunion_err_ptr` and z_llvm lowers
 the selected error-union pointer slot/payload path without AIR text fallback.
-Broader arbitrary compiler-core `try` and pointer-form error-union forms remain
-a separate compiler-core priority.
+The same pointer-form path now includes a post-try payload branch where both
+arms rewrap add/sub results, including the unsigned payload compare emitted by
+this AIR shape. Broader arbitrary compiler-core `try` and pointer-form
+error-union forms remain a separate compiler-core priority.
 
 `frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
@@ -130,20 +132,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=645
-structured_functions=645
-generic_codegen_functions=645
-generic_cfg_functions=645
+discovered_functions=647
+structured_functions=647
+generic_codegen_functions=647
+generic_cfg_functions=647
 structural_matcher_functions=0
-structured_air_v2_functions=645
-typed_air_operand_functions=645
+structured_air_v2_functions=647
+typed_air_operand_functions=647
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=645
+generic_lowering_functions=647
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=645
+object_emitted_functions=647
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

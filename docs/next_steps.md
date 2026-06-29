@@ -365,7 +365,10 @@ Execution order:
    emits typed-v2 pointer operands for
    `try_ptr`/`try_ptr_cold`/`unwrap_errunion_err_ptr`, z_llvm models the
    error-union pointer slot semantically, and the ok-path load resolves through
-   a synthetic payload value instead of AIR text or row-name recovery.
+   a synthetic payload value instead of AIR text or row-name recovery. The
+   pointer-form branch row now carries that synthetic payload through a
+   post-try compare and both add/sub rewrap return arms; the x86_64 generic CFG
+   path accepts signed and unsigned payload-greater predicates for this family.
    These rows pass through typed AIR v2, generic CFG, z_llvm object
    emission, native link, and executable proof. Broader arbitrary
    nested/multi-block compiler-core `try` and pointer-form error-union shapes
@@ -1181,12 +1184,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=645`,
-`generic_codegen_functions=645`, `generic_cfg_functions=645`,
+frontier gate reports `source_rows=13`, `discovered_functions=647`,
+`generic_codegen_functions=647`, `generic_cfg_functions=647`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=645`, `object_failures=0`,
+`object_emitted_functions=647`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1199,9 +1202,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=13`, `discovered_functions=645`,
-`generic_cfg_functions=645`, `structural_matcher_functions=0`,
-`object_emitted_functions=645`, `native_link_accepted_rows=13`,
+`source_rows=13`, `discovered_functions=647`,
+`generic_cfg_functions=647`, `structural_matcher_functions=0`,
+`object_emitted_functions=647`, `native_link_accepted_rows=13`,
 `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

@@ -293,7 +293,10 @@ families where the inventory does not yet record per-opcode first examples.
    accepted: `try_ptr`, `try_ptr_cold`, and `unwrap_errunion_err_ptr` now have
    typed-v2 pointer operands from the Zig hook, and z_llvm lowers the selected
    source-backed rows through semantic error-union slot/payload modeling rather
-   than AIR text fallback. Broader arbitrary nested/multi-block compiler-core
+   than AIR text fallback. The pointer-form payload branch follow-up keeps that
+   synthetic payload live through a post-try compare and add/sub rewrap returns,
+   with the x86_64 CFG path accepting the unsigned payload-greater predicate
+   this AIR shape emits. Broader arbitrary nested/multi-block compiler-core
    `try` forms remain measured error-union work; pointer/slice length forms and
    `ptr_add:bin_ty_pl` remain the next non-error-union targets.
 3. Harden generic CFG for high-volume compiler patterns: nested blocks,

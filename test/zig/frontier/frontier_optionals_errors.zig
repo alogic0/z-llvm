@@ -151,6 +151,21 @@ export fn frontier_try_ptr_cold_match(tag: i32, value: i32) i32 {
     }
 }
 
+fn frontierTryPtrBranch(tag: i32, value: i32, delta: i32) FrontierError!i32 {
+    var result = frontierMaybeTryPayload(tag, value);
+    const payload_ptr = &(try result);
+    if (payload_ptr.* > 20) return payload_ptr.* + delta;
+    return payload_ptr.* - delta;
+}
+
+export fn frontier_try_ptr_branch_match(tag: i32, value: i32, delta: i32) i32 {
+    if (frontierTryPtrBranch(tag, value, delta)) |payload| {
+        return payload;
+    } else |_| {
+        return -57;
+    }
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,
