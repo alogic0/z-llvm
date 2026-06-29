@@ -924,6 +924,10 @@ pub const TypedScalarControlSummary = struct {
     kind: enum { accumulator_loop, conditional_slot_update },
 };
 
+pub const TypedInlineAsmSummary = struct {
+    memory_barrier: bool,
+};
+
 pub const TypedErrorSwitchSummary = struct {
     kind: enum { switch_dispatch, classify },
 };
@@ -2702,6 +2706,22 @@ pub fn typedConditionalSlotUpdateSummary(
     return .{ .kind = .conditional_slot_update };
 }
 
+pub fn typedInlineAsmBarrierSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedInlineAsmSummary {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "assembly") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .memory_barrier = true };
+}
+
 pub fn typedErrorSwitchSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -3422,6 +3442,28 @@ test "typed AIR model recognizes scalar control summaries" {
 
     slot_instructions[9].opcode = "mul";
     try std.testing.expect(typedConditionalSlotUpdateSummary(slot_type, slot_air) == null);
+}
+
+test "typed AIR model recognizes inline asm barrier summary" {
+    var params = [_]ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const function_type = FunctionType{
+        .params = &params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var instructions = [_]air_export.TypedInstruction{
+        testTypedInstruction(0, "arg"),
+        testTypedInstruction(1, "assembly"),
+        testTypedInstruction(2, "ret"),
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = &instructions };
+    try std.testing.expect((typedInlineAsmBarrierSummary(function_type, structured_air_v2) orelse return error.TestUnexpectedResult).memory_barrier);
+
+    instructions[1].opcode = "call";
+    try std.testing.expect(typedInlineAsmBarrierSummary(function_type, structured_air_v2) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {

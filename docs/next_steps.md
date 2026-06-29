@@ -271,7 +271,8 @@ Execution order:
    slice-loop admission now uses model-owned summaries as well, leaving the
    existing compatibility emitters unchanged. Typed-v2 accumulator-loop and
    conditional-slot-update admission has likewise moved to model-owned scalar
-   control summaries. The
+   control summaries. Typed-v2 inline-asm memory-barrier admission now uses a
+   model-owned summary too. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_type_layout.zig` is now the shared

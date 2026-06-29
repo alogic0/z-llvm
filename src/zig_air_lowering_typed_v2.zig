@@ -880,12 +880,7 @@ pub fn typedV2InlineAsmBarrierRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    return function_type.params.len == 1 and
-        function_type.params[0].ir_type.eql(.{ .int = 32 }) and
-        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
-        air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "assembly") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedInlineAsmBarrierSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2AtomicAdd(
