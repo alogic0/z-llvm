@@ -102,8 +102,8 @@ longer make the global top 50.
 | union-tag-shape | 14507 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
 | optional-shape | 6454 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
 | scalar-transform | 1840 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `main.buildOutputType` | unsupported inventory family | semantic lowering, backend |
-| float-math | 77 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `math.pow.pow__anon_62528` | unsupported inventory family | backend, runtime boundary |
-| other | 17 | 33949 | 22545 | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
+| float-math | 87 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `math.pow.pow__anon_62528` | unsupported inventory family | backend, runtime boundary |
+| other | 7 | 33949 | 22545 | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | needs next split | AIR parser, capability registry |
 | safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
@@ -147,6 +147,13 @@ longer make the global top 50.
 | 31 | `float-math:exp:opaque` | 7 | - | - | - | - |
 | 32 | `float-math:log:opaque` | 7 | - | - | - | - |
 | 33 | `float-math:sqrt:opaque` | 7 | - | - | - | - |
+| 34 | `float-math:floor:opaque` | 6 | - | - | - | - |
+| 35 | `float-math:log2:opaque` | 6 | - | - | - | - |
+| 36 | `float-math:mul_add:opaque` | 6 | - | - | - | - |
+| 37 | `float-math:trunc_float:opaque` | 6 | - | - | - | - |
+| 38 | `float-math:cos:opaque` | 5 | - | - | - | - |
+| 39 | `other:select:pl_op` | 5 | - | - | - | - |
+| 40 | `other:shl_sat:bin_op` | 2 | - | - | - | - |
 
 ## Top Opcode Categories
 
