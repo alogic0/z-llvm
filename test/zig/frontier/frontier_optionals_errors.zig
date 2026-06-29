@@ -108,6 +108,20 @@ export fn frontier_try_switch_match(tag: i32, value: i32) i32 {
     }
 }
 
+fn frontierTryColdAdd(tag: i32, value: i32) FrontierError!i32 {
+    @branchHint(.cold);
+    const payload = try frontierMaybeTryPayload(tag, value);
+    return payload + 11;
+}
+
+export fn frontier_try_cold_match(tag: i32, value: i32) i32 {
+    if (frontierTryColdAdd(tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -51;
+    }
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,

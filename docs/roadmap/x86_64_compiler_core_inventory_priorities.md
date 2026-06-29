@@ -286,7 +286,10 @@ families where the inventory does not yet record per-opcode first examples.
    error-union result for payload extraction, and the nested callee preserves
    live arguments/results across the second helper call, plus a `try`
    continuation whose payload feeds a second branch before both terminal arms
-   rewrap payload-derived values. Broader arbitrary nested/multi-block
+   rewrap payload-derived values. The `try_cold:pl_op` follow-up is now
+   source-backed in the frontier corpus and shares the same typed-v2 semantic
+   lowering as `try:pl_op`, with the cold hint treated as non-semantic for local
+   x86_64 CFG/codegen. Broader arbitrary nested/multi-block
    compiler-core `try` forms remain measured error-union work; pointer/slice
    length forms and `ptr_add:bin_ty_pl` remain the next non-error-union targets.
 3. Harden generic CFG for high-volume compiler patterns: nested blocks,
