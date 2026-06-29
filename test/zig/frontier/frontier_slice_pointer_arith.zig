@@ -33,6 +33,12 @@ export fn frontier_ptr_sub_const_load(values: [*]const i32, index: usize) i32 {
     return prev[0];
 }
 
+export fn frontier_ptr_sub_runtime_load(values: [*]const i32, back: usize) i32 {
+    const ptr = values + 4;
+    const prev = ptr - back;
+    return prev[0];
+}
+
 export fn frontier_ptr_add_store(values: [*]i32, index: usize, value: i32) i32 {
     const ptr = values + index;
     ptr[0] = value;

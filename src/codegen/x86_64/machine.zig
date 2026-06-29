@@ -71,6 +71,7 @@ pub const Instruction = union(enum) {
     add_rax_imm8: u8,
     add_rcx_imm32: i32,
     add_r8_rcx,
+    sub_r8_rcx,
     add_ecx_eax,
     xor_ecx_ecx,
     xor_ebp_ebp,

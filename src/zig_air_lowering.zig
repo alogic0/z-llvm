@@ -2473,14 +2473,34 @@ const LoweringContext = struct {
         if (!index.ty.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
         const element_type = result_type.pointer_child orelse base.ty.pointer_child orelse return error.UnsupportedAir;
         if (!isSupportedTypedGepElementType(element_type)) return error.UnsupportedAir;
-        const gep_index = if (is_ptr_sub) switch (index.value) {
-            .int => |int| blk: {
-                if (int < 0) return error.UnsupportedAir;
-                break :blk ir.Value{ .int = -int };
-            },
-            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedAir,
+        const gep_index = if (is_ptr_sub) blk: {
+            switch (index.value) {
+                .int => |int| {
+                    if (int < 0) return error.UnsupportedAir;
+                    break :blk ir.Value{ .int = -int };
+                },
+                .named => {
+                    const negative_index_name = try ownPrint(self.module, "air{}_ptr_sub_index", .{instruction.index});
+                    try self.block.instructions.append(self.allocator, .{
+                        .result = negative_index_name,
+                        .kind = .{ .binary = .{
+                            .op = .sub,
+                            .ty = .{ .int = 64 },
+                            .lhs = .{ .int = 0 },
+                            .rhs = index.value,
+                        } },
+                    });
+                    break :blk ir.Value{ .named = negative_index_name };
+                },
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedAir,
+            }
         } else index.value;
-        if (!is_ptr_sub and !genericTypedGepIndex(gep_index)) return error.UnsupportedAir;
+        if (is_ptr_sub) {
+            switch (gep_index) {
+                .int, .named => {},
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedAir,
+            }
+        } else if (!genericTypedGepIndex(gep_index)) return error.UnsupportedAir;
 
         if (typedGepIndexIsZero(gep_index)) {
             self.values[instruction.index] = .{

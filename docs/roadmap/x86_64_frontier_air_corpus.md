@@ -89,7 +89,7 @@ frontier tag/payload switch shape.
 `frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
 `slice_elem_ptr`, runtime and comptime `ptr_add`, chained `ptr_add`,
-constant `ptr_sub`, pointer-add-fed loads, pointer-add-fed stores, and
+constant and selected runtime `ptr_sub`, pointer-add-fed loads, pointer-add-fed stores, and
 load/store through derived slice element pointers. The same typed address path
 now covers `slice.ptr` plus constant offset plus runtime index feeding a
 store/reload, so the slice pointer proof is not load-only. The x86_64 generic
@@ -167,20 +167,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=656
-structured_functions=656
-generic_codegen_functions=656
-generic_cfg_functions=656
+discovered_functions=657
+structured_functions=657
+generic_codegen_functions=657
+generic_cfg_functions=657
 structural_matcher_functions=0
-structured_air_v2_functions=656
-typed_air_operand_functions=656
+structured_air_v2_functions=657
+typed_air_operand_functions=657
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=656
+generic_lowering_functions=657
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=656
+object_emitted_functions=657
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -237,7 +237,7 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 14-source / 656-function strict frontier
+are not counted in the accepted 14-source / 657-function strict frontier
 executable proof. Stack-pressure forwarding for the previous
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 indirect and stack-source
 rows is now accepted in the frontier corpus; the boundary gate keeps

@@ -63,6 +63,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .add_rax_imm8 => |value| try writer.print("\taddq ${}, %rax\n", .{value}),
             .add_rcx_imm32 => |value| try writer.print("\taddq ${}, %rcx\n", .{value}),
             .add_r8_rcx => try writer.writeAll("\taddq %r8, %rcx\n"),
+            .sub_r8_rcx => try writer.writeAll("\tsubq %r8, %rcx\n"),
             .add_ecx_eax => try writer.writeAll("\taddl %ecx, %eax\n"),
             .xor_ecx_ecx => try writer.writeAll("\txorl %ecx, %ecx\n"),
             .xor_ebp_ebp => try writer.writeAll("\txorl %ebp, %ebp\n"),

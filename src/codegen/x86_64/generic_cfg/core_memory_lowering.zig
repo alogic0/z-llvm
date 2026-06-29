@@ -75,6 +75,7 @@ pub const GenericCfgScalarWidth = enum {
 pub const GenericCfgTypedAddress = struct {
     base_reg: ArgReg,
     index_reg: ?ArgReg,
+    index_direction: enum { add, sub } = .add,
     offset_bytes: i128,
     width: GenericCfgScalarWidth,
 };
@@ -193,6 +194,24 @@ fn genericCfgI64ParamRegThroughAddressScope(function: ir.Function, block: ir.Bas
     return genericCfgI64ParamRegThroughIdentityCast(function, block, value) orelse if (options.entry) |entry| genericCfgI64ParamRegThroughIdentityCast(function, entry, value) else null;
 }
 
+fn genericCfgI64NegatedParamRegThroughAddressScope(function: ir.Function, block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, value: ir.Value) ?ArgReg {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const instruction = findInstructionInAddressScope(block, options, name) orelse return null;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != .sub or !binary.ty.eql(.{ .int = 64 })) return null;
+    switch (binary.lhs) {
+        .int => |int| if (int != 0) return null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    }
+    return genericCfgI64ParamRegThroughAddressScope(function, block, options, binary.rhs);
+}
+
 pub fn genericCfgDynamicI32LoadValueAddress(function: ir.Function, block: ir.BasicBlock, value: ir.Value) ?GenericCfgDynamicI32Address {
     const name = switch (value) {
         .named => |name| name,
@@ -285,7 +304,14 @@ fn genericCfgTypedScalarAddressResolved(
                 .int => |int| address.offset_bytes += int * width.bytes(),
                 .named => |index_name| {
                     if (address.index_reg != null) return null;
-                    address.index_reg = genericCfgI64ParamRegThroughAddressScope(function, block, options, .{ .named = index_name }) orelse return null;
+                    if (genericCfgI64ParamRegThroughAddressScope(function, block, options, .{ .named = index_name })) |reg| {
+                        address.index_reg = reg;
+                    } else if (genericCfgI64NegatedParamRegThroughAddressScope(function, block, options, .{ .named = index_name })) |reg| {
+                        address.index_reg = reg;
+                        address.index_direction = .sub;
+                    } else {
+                        return null;
+                    }
                 },
                 .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
             }
@@ -387,7 +413,7 @@ fn lowerGenericCfgDynamicPointerStoreThenLoadReturn(
 }
 
 fn sameGenericCfgTypedAddress(lhs: GenericCfgTypedAddress, rhs: GenericCfgTypedAddress) bool {
-    return lhs.base_reg == rhs.base_reg and lhs.index_reg == rhs.index_reg and lhs.offset_bytes == rhs.offset_bytes and lhs.width == rhs.width;
+    return lhs.base_reg == rhs.base_reg and lhs.index_reg == rhs.index_reg and lhs.index_direction == rhs.index_direction and lhs.offset_bytes == rhs.offset_bytes and lhs.width == rhs.width;
 }
 
 fn sameGenericCfgDynamicI32Address(lhs: GenericCfgDynamicI32Address, rhs: GenericCfgDynamicI32Address) bool {
@@ -539,6 +565,7 @@ pub fn emitGenericCfgTypedAddressIntoRcx(
     if (address.index_reg) |index_reg| {
         const shift = address.width.shift();
         if (index_reg == .rcx and address.base_reg == .r8) {
+            if (address.index_direction == .sub) return error.UnsupportedCodegenValue;
             if (shift != 0) try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = shift });
             try machine.instructions.append(allocator, .add_r8_rcx);
         } else {
@@ -550,7 +577,7 @@ pub fn emitGenericCfgTypedAddressIntoRcx(
                 try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .r8, .src = index_reg } });
             }
             if (shift != 0) try machine.instructions.append(allocator, .{ .shl_r8_imm6 = shift });
-            try machine.instructions.append(allocator, .add_r8_rcx);
+            try machine.instructions.append(allocator, if (address.index_direction == .add) .add_r8_rcx else .sub_r8_rcx);
         }
     } else {
         try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.base_reg } });
