@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=637`,
-`generic_codegen_functions=637`, `generic_cfg_functions=637`,
+three release modes at `source_rows=13`, `discovered_functions=638`,
+`generic_codegen_functions=638`, `generic_cfg_functions=638`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=637`, `object_failures=0`,
+`object_emitted_functions=638`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -445,9 +445,9 @@ progress, executable progress, and strict counter checks. The strict release
 baselines are split by corpus topology: broad is inputs + integrated,
 expanded adds `test/zig/expanded`, scale adds `test/zig/scale`, and frontier
 is isolated to `test/zig/frontier`. The frontier pointer/slice proof now covers
-runtime and comptime `ptr_add`, chained `ptr_add`, `slice_len`, `slice_ptr`,
-`ptr_slice_ptr_ptr`, `slice_elem_ptr`, and load/store through derived scalar
-pointers. A reusable typed address model now carries base pointer, optional
+runtime and comptime `ptr_add`, chained `ptr_add`, constant `ptr_sub`,
+`slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`, `slice_elem_ptr`, and load/store
+through derived scalar pointers. A reusable typed address model now carries base pointer, optional
 dynamic index, constant byte offset, scalar width, and element-size checks for
 i8, i16, i32, and i64 loads/stores. The accepted `slice_elem_ptr` rows
 include unchecked pointer-address proof across all release modes, and the

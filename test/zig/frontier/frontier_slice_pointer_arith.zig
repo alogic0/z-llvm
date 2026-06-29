@@ -27,6 +27,12 @@ export fn frontier_chained_ptr_add(values: [*]const i32, index: usize) i32 {
     return next[0];
 }
 
+export fn frontier_ptr_sub_const_load(values: [*]const i32, index: usize) i32 {
+    const ptr = values + index;
+    const prev = ptr - 1;
+    return prev[0];
+}
+
 export fn frontier_ptr_add_store(values: [*]i32, index: usize, value: i32) i32 {
     const ptr = values + index;
     ptr[0] = value;

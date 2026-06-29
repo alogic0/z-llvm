@@ -2197,14 +2197,22 @@ const LoweringContext = struct {
         if (instruction.operands.len != 2) return error.UnsupportedAir;
         const base = try self.resolveTypedOperand(instruction, 0);
         const index = try self.resolveTypedOperand(instruction, 1);
+        const is_ptr_sub = std.mem.eql(u8, instruction.opcode, "ptr_sub");
         const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
         if (base.ty.ir_type != .ptr or result_type.ir_type != .ptr) return error.UnsupportedAir;
         if (!index.ty.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
         const element_type = result_type.pointer_child orelse base.ty.pointer_child orelse return error.UnsupportedAir;
         if (!isSupportedTypedGepElementType(element_type)) return error.UnsupportedAir;
-        if (!genericTypedGepIndex(index.value)) return error.UnsupportedAir;
+        const gep_index = if (is_ptr_sub) switch (index.value) {
+            .int => |int| blk: {
+                if (int < 0) return error.UnsupportedAir;
+                break :blk ir.Value{ .int = -int };
+            },
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedAir,
+        } else index.value;
+        if (!is_ptr_sub and !genericTypedGepIndex(gep_index)) return error.UnsupportedAir;
 
-        if (typedGepIndexIsZero(index.value)) {
+        if (typedGepIndexIsZero(gep_index)) {
             self.values[instruction.index] = .{
                 .ty = result_type,
                 .value = base.value,
@@ -2219,7 +2227,7 @@ const LoweringContext = struct {
             .indices = .empty,
         };
         errdefer gep.deinit(self.allocator);
-        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = index.value });
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = gep_index });
         try self.block.instructions.append(self.allocator, .{
             .result = result_name,
             .kind = .{ .gep = gep },

@@ -839,7 +839,11 @@ pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAd
     for (view.structured_air_v2.instructions) |instruction| {
         switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
             .ptr_gep => {
-                summary.ptr_add_count += 1;
+                if (std.mem.eql(u8, instruction.opcode, "ptr_sub")) {
+                    summary.ptr_sub_count += 1;
+                } else {
+                    summary.ptr_add_count += 1;
+                }
                 updatePointerSliceAddressOperands(&summary, instruction);
             },
             .slice => {
@@ -868,10 +872,6 @@ pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAd
                 updatePointerSliceAddressOperands(&summary, instruction);
             },
             .none, .runtime_nav_ptr, .array_elem_val, .field_ptr => {},
-        }
-        if (std.mem.eql(u8, instruction.opcode, "ptr_sub")) {
-            summary.ptr_sub_count += 1;
-            updatePointerSliceAddressOperands(&summary, instruction);
         }
         switch (air_capabilities.memorySemanticOpForOpcode(instruction.opcode)) {
             .load => {
@@ -2350,27 +2350,34 @@ test "typed AIR model summarizes pointer and slice address expressions" {
         },
         .{
             .index = 3,
+            .opcode = "ptr_sub",
+            .result_type = "ptr",
+            .data_kind = "bin_ty_pl",
+            .operands = @constCast(&[_]air_export.TypedOperand{ ptr_operand, const_operand }),
+        },
+        .{
+            .index = 4,
             .opcode = "slice_elem_ptr",
             .result_type = "ptr",
             .data_kind = "ty_pl",
             .operands = @constCast(&[_]air_export.TypedOperand{ ptr_operand, idx_operand }),
         },
         .{
-            .index = 4,
+            .index = 5,
             .opcode = "load",
             .result_type = "i32",
             .data_kind = "ty_op",
             .operands = @constCast(&[_]air_export.TypedOperand{load_operand}),
         },
         .{
-            .index = 5,
+            .index = 6,
             .opcode = "store",
             .result_type = "void",
             .data_kind = "bin_op",
             .operands = @constCast(&[_]air_export.TypedOperand{ load_operand, .{ .kind = "inst", .value = "%value", .type_text = "i32" } }),
         },
         .{
-            .index = 6,
+            .index = 7,
             .opcode = "cond_br",
             .result_type = "void",
             .data_kind = "pl_op",
@@ -2400,6 +2407,7 @@ test "typed AIR model summarizes pointer and slice address expressions" {
     const summary = pointerSliceAddressSummary(function).?;
 
     try std.testing.expectEqual(@as(usize, 1), summary.ptr_add_count);
+    try std.testing.expectEqual(@as(usize, 1), summary.ptr_sub_count);
     try std.testing.expectEqual(@as(usize, 1), summary.slice_count);
     try std.testing.expectEqual(@as(usize, 1), summary.slice_ptr_count);
     try std.testing.expectEqual(@as(usize, 1), summary.slice_elem_ptr_count);

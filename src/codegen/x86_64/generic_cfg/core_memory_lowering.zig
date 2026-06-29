@@ -535,7 +535,7 @@ pub fn emitGenericCfgTypedAddressIntoRcx(
     machine: *MachineFunction,
     address: GenericCfgTypedAddress,
 ) !void {
-    if (address.offset_bytes < 0 or address.offset_bytes > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
+    if (address.offset_bytes < std.math.minInt(i32) or address.offset_bytes > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
     if (address.index_reg) |index_reg| {
         const shift = address.width.shift();
         if (index_reg == .rcx and address.base_reg == .r8) {

@@ -51,8 +51,9 @@ compiler-core `try` forms remain a separate compiler-core priority.
 `frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
 `slice_elem_ptr`, runtime and comptime `ptr_add`, chained `ptr_add`,
-pointer-add-fed loads, pointer-add-fed stores, and load/store through derived
-slice element pointers. The x86_64 generic CFG path now uses a reusable typed
+constant `ptr_sub`, pointer-add-fed loads, pointer-add-fed stores, and
+load/store through derived slice element pointers. The x86_64 generic CFG path
+now uses a reusable typed
 address model with a base pointer, optional dynamic index, constant byte
 offset, scalar width, and conservative element-size checks. Accepted rows prove
 i8, i16, i32, and i64 scalar pointer loads/stores, including dynamic-index and
@@ -125,20 +126,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=637
-structured_functions=637
-generic_codegen_functions=637
-generic_cfg_functions=637
+discovered_functions=638
+structured_functions=638
+generic_codegen_functions=638
+generic_cfg_functions=638
 structural_matcher_functions=0
-structured_air_v2_functions=637
-typed_air_operand_functions=637
+structured_air_v2_functions=638
+typed_air_operand_functions=638
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=637
+generic_lowering_functions=638
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=637
+object_emitted_functions=638
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
