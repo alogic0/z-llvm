@@ -53,7 +53,10 @@ the selected error-union pointer slot/payload path without AIR text fallback.
 The same pointer-form path now includes a post-try payload branch where both
 arms rewrap add/sub results, including the unsigned payload compare emitted by
 this AIR shape, plus a nested two-`try_ptr` chain that feeds the first payload
-into the second helper call before rewrapping the final payload. Broader
+into the second helper call before rewrapping the final payload. The
+pointer-form switch row now feeds the synthetic payload into a selected integer
+switch and rewraps all chosen arms, extending the same semantic pointer-slot
+model beyond branch continuations. Broader
 arbitrary compiler-core `try` and pointer-form error-union forms remain a
 separate compiler-core priority.
 
@@ -145,20 +148,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=650
-structured_functions=650
-generic_codegen_functions=650
-generic_cfg_functions=650
+discovered_functions=652
+structured_functions=652
+generic_codegen_functions=652
+generic_cfg_functions=652
 structural_matcher_functions=0
-structured_air_v2_functions=650
-typed_air_operand_functions=650
+structured_air_v2_functions=652
+typed_air_operand_functions=652
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=650
+generic_lowering_functions=652
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=650
+object_emitted_functions=652
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

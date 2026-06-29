@@ -182,6 +182,24 @@ export fn frontier_nested_try_ptr_match(first_tag: i32, second_tag: i32, value: 
     }
 }
 
+fn frontierTryPtrSwitch(tag: i32, value: i32) FrontierError!i32 {
+    var result = frontierMaybeTryPayload(tag, value);
+    const payload_ptr = &(try result);
+    return switch (payload_ptr.* & 3) {
+        0 => payload_ptr.* + 1,
+        1 => payload_ptr.* + 2,
+        else => payload_ptr.* + 3,
+    };
+}
+
+export fn frontier_try_ptr_switch_match(tag: i32, value: i32) i32 {
+    if (frontierTryPtrSwitch(tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -61;
+    }
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,
