@@ -329,12 +329,12 @@ pub fn firstUnsupported(
             false;
     const typed_error_union_payload =
         if (function.structured_air_v2) |structured_air_v2|
-            typedV2ErrorUnionPayloadRecords(function, function_type, structured_air_v2)
+            typedV2ErrorUnionPayloadRecords(function_type, structured_air_v2)
         else
             false;
     const typed_maybe_error =
         if (function.structured_air_v2) |structured_air_v2|
-            typedV2MaybeErrorRecords(function, function_type, structured_air_v2)
+            typedV2MaybeErrorRecords(function_type, structured_air_v2)
         else
             false;
     const typed_optional_payload =

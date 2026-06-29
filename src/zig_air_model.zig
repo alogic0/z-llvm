@@ -910,6 +910,10 @@ pub const TypedErrorSwitchSummary = struct {
     kind: enum { switch_dispatch, classify },
 };
 
+pub const TypedErrorUnionSummary = struct {
+    kind: enum { payload, maybe_error },
+};
+
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
     if (!view.operandCoverage()) return null;
@@ -2515,6 +2519,53 @@ pub fn typedErrorClassifierSummary(
     return .{ .kind = .classify };
 }
 
+pub fn typedErrorUnionPayloadSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedErrorUnionSummary {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "call") != 1 or
+        typedOpcodeCount(structured_air_v2, "is_non_err") != 1 or
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") != 1 or
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") != 1 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "switch_br") != 0 or
+        typedOpcodeCount(structured_air_v2, "br") != 2 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .payload };
+}
+
+pub fn typedMaybeErrorSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedErrorUnionSummary {
+    if (function_type.params.len != 1 or
+        !function_type.return_type.ir_type.eql(.{ .int = 64 }) or
+        !(function_type.params[0].ir_type.eql(.{ .int = 32 }) or function_type.params[0].ir_type.eql(.{ .int = 8 })) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "call") != 0 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "cmp_neq") != 1 or
+        typedOpcodeCount(structured_air_v2, "switch_br") != 0 or
+        typedOpcodeCount(structured_air_v2, "is_non_err") != 0 or
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") != 0 or
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") != 0 or
+        typedOpcodeCount(structured_air_v2, "br") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 1 or
+        typedReturnOpcodeCount(structured_air_v2) != 2)
+    {
+        return null;
+    }
+    return .{ .kind = .maybe_error };
+}
+
 fn typedUnionFieldVal(structured_air_v2: air_export.StructuredAirV2, field_index: usize) ?air_export.TypedInstruction {
     var found: ?air_export.TypedInstruction = null;
     for (structured_air_v2.instructions) |instruction| {
@@ -2814,6 +2865,56 @@ test "typed AIR model recognizes error switch and classifier summaries" {
     const classifier_air = air_export.StructuredAirV2{ .instructions = @constCast(&classifier_instructions) };
     try std.testing.expectEqual(.classify, typedErrorClassifierSummary(classifier_type, classifier_air).?.kind);
     try std.testing.expect(typedErrorClassifierSummary(error_switch_type, classifier_air) == null);
+}
+
+test "typed AIR model recognizes error-union payload and maybe-error summaries" {
+    var i32_param = [_]ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const payload_type = FunctionType{
+        .params = &i32_param,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var payload_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "call", .result_type = "error_union", .data_kind = "pl_op", .operands = &.{} },
+        .{ .index = 2, .opcode = "is_non_err", .result_type = "i1", .data_kind = "un_op", .operands = &.{} },
+        .{ .index = 3, .opcode = "unwrap_errunion_payload", .result_type = "i32", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 4, .opcode = "unwrap_errunion_err", .result_type = "i16", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 5, .opcode = "block", .result_type = "void", .data_kind = "ty_pl", .operands = &.{} },
+        .{ .index = 6, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 7, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 8, .opcode = "cond_br", .result_type = "noreturn", .data_kind = "pl_op", .operands = &.{} },
+        .{ .index = 9, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &.{} },
+    };
+    const payload_air = air_export.StructuredAirV2{ .instructions = &payload_instructions };
+    try std.testing.expectEqual(.payload, typedErrorUnionPayloadSummary(payload_type, payload_air).?.kind);
+
+    payload_instructions[5].opcode = "switch_br";
+    try std.testing.expect(typedErrorUnionPayloadSummary(payload_type, payload_air) == null);
+
+    const maybe_type = FunctionType{
+        .params = &i32_param,
+        .return_type = .{ .ir_type = .{ .int = 64 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    var maybe_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "block", .result_type = "void", .data_kind = "ty_pl", .operands = &.{} },
+        .{ .index = 2, .opcode = "cmp_neq", .result_type = "i1", .data_kind = "bin_op", .operands = &.{} },
+        .{ .index = 3, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 4, .opcode = "cond_br", .result_type = "noreturn", .data_kind = "pl_op", .operands = &.{} },
+        .{ .index = 5, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &.{} },
+        .{ .index = 6, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &.{} },
+    };
+    const maybe_air = air_export.StructuredAirV2{ .instructions = &maybe_instructions };
+    try std.testing.expectEqual(.maybe_error, typedMaybeErrorSummary(maybe_type, maybe_air).?.kind);
+
+    maybe_instructions[1].opcode = "call";
+    try std.testing.expect(typedMaybeErrorSummary(maybe_type, maybe_air) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {

@@ -259,7 +259,10 @@ Execution order:
    instead of the fallback module. Typed-v2 error switch and error-classifier
    admission now also enters through `src/zig_air_model.zig`; the existing
    compatibility IR builders still own the selected emitted block bodies until
-   those paths are normalized. The
+   those paths are normalized. Typed-v2 error-union payload and maybe-error
+   admission also uses model summaries now, replacing the old
+   `error_switch.error_switch` exclusion and `.maybeError` suffix gate with
+   structural opcode/type checks. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_type_layout.zig` is now the shared

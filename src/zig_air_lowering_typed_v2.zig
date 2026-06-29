@@ -605,31 +605,15 @@ pub fn lowerTypedV2ErrorUnionPayload(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2ErrorUnionPayloadRecords(air_function, function_type, structured_air_v2)) return null;
+    if (!typedV2ErrorUnionPayloadRecords(function_type, structured_air_v2)) return null;
     return try lowerErrorUnionPayload(allocator, air_function);
 }
 
 pub fn typedV2ErrorUnionPayloadRecords(
-    air_function: air_export.Function,
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (std.mem.eql(u8, air_function.name, "error_switch.error_switch")) return false;
-    if (function_type.params.len != 1 or
-        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return false;
-    }
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "call") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "is_non_err") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 2 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedErrorUnionPayloadSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2MaybeError(
@@ -638,29 +622,15 @@ pub fn lowerTypedV2MaybeError(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2MaybeErrorRecords(air_function, function_type, structured_air_v2)) return null;
+    if (!typedV2MaybeErrorRecords(function_type, structured_air_v2)) return null;
     return try lowerMaybeError(allocator, air_function);
 }
 
 pub fn typedV2MaybeErrorRecords(
-    air_function: air_export.Function,
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (!std.mem.endsWith(u8, air_function.name, ".maybeError")) return false;
-    if (function_type.params.len != 1 or
-        !function_type.return_type.ir_type.eql(.{ .int = 64 }) or
-        !(function_type.params[0].ir_type.eql(.{ .int = 32 }) or function_type.params[0].ir_type.eql(.{ .int = 8 })))
-    {
-        return false;
-    }
-    const ret_count = air_model.typedReturnOpcodeCount(structured_air_v2);
-    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cmp_neq") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
-        ret_count == 2;
+    return air_model.typedMaybeErrorSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2OptionalPayload(
