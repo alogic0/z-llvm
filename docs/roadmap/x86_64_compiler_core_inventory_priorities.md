@@ -88,7 +88,10 @@ work queue into stable implementation families. It also emits
 `top_unknown_opcode_pair` records keyed by `subcategory:opcode:data_kind` so
 implementation slices can target concrete AIR shapes. The pair report prints
 the top 50 rows so smaller residual buckets such as `other` remain visible
-after the largest families are split.
+after the largest families are split. The inventory also prints
+`top_unknown_opcode_category_pair` rows for the top 10 pairs inside each
+subcategory, which keeps tiny residual buckets visible even when their pairs no
+longer make the global top 50.
 
 | Subcategory | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |

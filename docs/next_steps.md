@@ -715,7 +715,9 @@ Validation after these refactor slices is saved in
   hidden in `other`. The pair report now prints the top 50 concrete pairs; the
   residual ReleaseFast `other` bucket is 17 rows after selected float math
   opcodes were split into `float-math`; see
-  `tmp/compiler_core_module_releasefast_top50_unknown_pairs.log`.
+  `tmp/compiler_core_module_releasefast_category_unknown_pairs.log`. The
+  category-specific pair report identifies the remaining ReleaseFast `other`
+  pairs as `exp2`, `log10`, `select`, and `shl_sat`.
   Validation gate: compare against the saved compiler-core inventory baseline;
   rerun `zig build distribution-zig-air-inventory` with
   `-- --slice=compiler-core-module --mode=<mode>` only after

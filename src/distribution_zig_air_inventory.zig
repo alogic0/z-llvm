@@ -122,6 +122,7 @@ const UnsupportedCategory = enum(u8) {
 const unsupported_category_count = @typeInfo(UnsupportedCategory).@"enum".fields.len;
 const unknown_opcode_category_count = @typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".fields.len;
 const top_unknown_opcode_pair_limit = 50;
+const top_unknown_opcode_category_pair_limit = 10;
 
 const AggregateSurfaceCategory = enum(u8) {
     opcode_shape,
@@ -1379,6 +1380,7 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
     }
     try printTopUnknownOpcodes(writer, slice, mode, counters);
     try printTopUnknownOpcodePairs(allocator, writer, slice, mode, counters, top_unknown_opcode_pair_limit);
+    try printTopUnknownOpcodeCategoryPairs(allocator, writer, slice, mode, counters, top_unknown_opcode_category_pair_limit);
     inline for (std.meta.fields(BoundaryCategory)) |field| {
         const category: BoundaryCategory = @enumFromInt(field.value);
         const stat = counters.boundary_categories[field.value];
@@ -1549,6 +1551,47 @@ fn printTopUnknownOpcodePairs(
             .{ slice.cliName(), mode.name(), rank, entry.name, entry.count, entry.first_source, entry.first_function },
         );
     }
+}
+
+fn printTopUnknownOpcodeCategoryPairs(
+    allocator: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    slice: InventorySlice,
+    mode: Mode,
+    counters: Counters,
+    limit: usize,
+) !void {
+    inline for (std.meta.fields(air_capabilities.UnknownOpcodeCategory)) |field| {
+        const category: air_capabilities.UnknownOpcodeCategory = @enumFromInt(field.value);
+        const category_name = category.name();
+        var entries = try allocator.alloc(UnknownOpcodePairTopEntry, counters.unknown_opcode_pair_counts.count());
+        defer allocator.free(entries);
+        var entry_count: usize = 0;
+        for (counters.unknown_opcode_pair_counts.keys(), counters.unknown_opcode_pair_counts.values()) |name, stat| {
+            if (!unknownOpcodePairBelongsToCategory(name, category_name)) continue;
+            entries[entry_count] = .{
+                .name = name,
+                .count = stat.count,
+                .first_source = stat.first_source orelse "-",
+                .first_function = stat.first_function orelse "-",
+            };
+            entry_count += 1;
+        }
+        std.sort.heap(UnknownOpcodePairTopEntry, entries[0..entry_count], {}, unknownOpcodePairTopLessThan);
+        const top_count = @min(limit, entry_count);
+        for (entries[0..top_count], 1..) |entry, rank| {
+            try writer.print(
+                "top_unknown_opcode_category_pair slice={s} mode={s} category={s} rank={} name={s} count={} first_source={s} first_function={s}\n",
+                .{ slice.cliName(), mode.name(), category_name, rank, entry.name, entry.count, entry.first_source, entry.first_function },
+            );
+        }
+    }
+}
+
+fn unknownOpcodePairBelongsToCategory(name: []const u8, category_name: []const u8) bool {
+    return name.len > category_name.len and
+        name[category_name.len] == ':' and
+        std.mem.eql(u8, name[0..category_name.len], category_name);
 }
 
 fn printTopUnknownOpcodes(
