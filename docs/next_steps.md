@@ -262,7 +262,10 @@ Execution order:
    those paths are normalized. Typed-v2 error-union payload and maybe-error
    admission also uses model summaries now, replacing the old
    `error_switch.error_switch` exclusion and `.maybeError` suffix gate with
-   structural opcode/type checks. The
+   structural opcode/type checks. Typed-v2 optional-pointer admission now
+   consumes a model-owned summary containing the selected add immediate,
+   fallback value, and checked-unwrap marker instead of duplicating that
+   extraction in the typed-v2 lowerer. The
    remaining refactor is deeper normalization of each operation's operand/type
    validation and lowering inputs.
 3. Type-layout slice: `src/zig_air_type_layout.zig` is now the shared
