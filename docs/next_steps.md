@@ -273,9 +273,9 @@ Execution order:
    and selected bit-operation IR construction now also use model-owned summaries
    instead of delegating to the legacy packed-field compatibility lowerers.
    This does not change the separate packed/unaligned aggregate ABI boundary.
-   Typed-v2 plain and conditional
-   slice-loop admission now uses model-owned summaries as well, leaving the
-   existing compatibility emitters unchanged. Typed-v2 accumulator-loop and
+   Typed-v2 plain slice-loop admission and selected loop IR construction now use
+   the model-owned plain slice summary directly; conditional slice-loop still
+   uses the existing compatibility emitter. Typed-v2 accumulator-loop and
    conditional-slot-update admission has likewise moved to model-owned scalar
    control summaries. Typed-v2 inline-asm memory-barrier admission now uses a
    model-owned summary too, and typed-v2 monotonic atomic-add admission now
