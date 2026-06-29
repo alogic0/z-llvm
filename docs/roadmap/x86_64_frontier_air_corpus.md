@@ -80,6 +80,9 @@ real switch terminator for that continuation, and generic CFG validates the
 case targets and terminal return values before codegen. The model summary now
 derives the mask and addends from the typed AIR `bit_and`, branch-to-block,
 load, and add data flow rather than fixed row constants.
+The sibling post-loop branch summary similarly derives its threshold argument
+and terminal add/sub constants from the typed AIR `cmp_gt`, accumulator load,
+and return-value flow.
 The optional scalar payload branch row now validates `wrap_optional`,
 `is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
 payload add/sub branch through generic single-block CFG, and has executable

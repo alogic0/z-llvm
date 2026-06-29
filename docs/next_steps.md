@@ -448,7 +448,10 @@ Execution order:
    The post-loop branch variant now reuses that loop-try summary and adds a
    validated `icmp`/`cond_br` continuation after loop exit; generic CFG
    preserves the third threshold argument across the helper call and emits the
-   two terminal add/sub return arms without a selected row-name path.
+   two terminal add/sub return arms without a selected row-name path. The
+   typed AIR model derives the threshold argument and terminal add/sub addends
+   from the `cmp_gt`, accumulator reload, and return value data flow instead of
+   fixed summary constants.
    The post-loop switch variant reuses the same loop-carried try summary, then
    normalizes `total & 3` into a typed switch terminator with two explicit cases
    and a default arm. Generic CFG validates the switch targets and terminal
