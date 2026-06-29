@@ -290,11 +290,11 @@ families where the inventory does not yet record per-opcode first examples.
    source-backed in the frontier corpus and shares the same typed-v2 semantic
    lowering as `try:pl_op`, with the cold hint treated as non-semantic for local
    x86_64 CFG/codegen. The first pointer-form error-union slice is also
-   accepted: `try_ptr` and `unwrap_errunion_err_ptr` now have typed-v2 pointer
-   operands from the Zig hook, and z_llvm lowers the selected source-backed
-   `try_ptr` row through semantic error-union slot/payload modeling rather than
-   AIR text fallback. Broader arbitrary nested/multi-block compiler-core `try`
-   forms remain measured error-union work; pointer/slice length forms and
+   accepted: `try_ptr`, `try_ptr_cold`, and `unwrap_errunion_err_ptr` now have
+   typed-v2 pointer operands from the Zig hook, and z_llvm lowers the selected
+   source-backed rows through semantic error-union slot/payload modeling rather
+   than AIR text fallback. Broader arbitrary nested/multi-block compiler-core
+   `try` forms remain measured error-union work; pointer/slice length forms and
    `ptr_add:bin_ty_pl` remain the next non-error-union targets.
 3. Harden generic CFG for high-volume compiler patterns: nested blocks,
    branch-heavy loops, error-union continuation blocks, and switch dispatch.

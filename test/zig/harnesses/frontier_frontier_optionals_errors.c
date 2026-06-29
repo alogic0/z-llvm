@@ -9,6 +9,7 @@ extern int z_frontier_branch_then_try_match(int, int, int) __asm__("frontier_opt
 extern int z_frontier_try_switch_match(int, int) __asm__("frontier_optionals_errors.frontier_try_switch_match");
 extern int z_frontier_try_cold_match(int, int) __asm__("frontier_optionals_errors.frontier_try_cold_match");
 extern int z_frontier_try_ptr_match(int, int) __asm__("frontier_optionals_errors.frontier_try_ptr_match");
+extern int z_frontier_try_ptr_cold_match(int, int) __asm__("frontier_optionals_errors.frontier_try_ptr_cold_match");
 extern int z_frontier_maybe_error_tag_match(int, int) __asm__("frontier_optionals_errors.frontier_maybe_error_tag_match");
 extern int z_frontier_error_tag_switch(int, int) __asm__("frontier_optionals_errors.frontier_error_tag_switch");
 int main(void) {
@@ -39,6 +40,8 @@ int main(void) {
     if (z_frontier_try_cold_match(1, 31) != -51) return 30;
     if (z_frontier_try_ptr_match(0, 29) != 42) return 31;
     if (z_frontier_try_ptr_match(1, 29) != -53) return 32;
+    if (z_frontier_try_ptr_cold_match(0, 27) != 42) return 33;
+    if (z_frontier_try_ptr_cold_match(1, 27) != -55) return 34;
     if (z_frontier_maybe_error_tag_match(0, 46) != 46) return 21;
     if (z_frontier_maybe_error_tag_match(1, 46) != -46) return 22;
     if (z_frontier_maybe_error_tag_match(2, 46) != -46) return 23;
