@@ -650,7 +650,24 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2SretIntegerAggregateAbi(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
-    if (try lowerTypedV2ErrorUnionPayload(allocator, module, air_function, function_type, structured_air_v2, air_module.error_union_call_facts)) |function| {
+    var error_union_call_fact_reason: ?[]const u8 = null;
+    if (lowerTypedV2ErrorUnionPayload(
+        allocator,
+        module,
+        air_function,
+        function_type,
+        structured_air_v2,
+        air_module.error_union_call_facts,
+        &error_union_call_fact_reason,
+    ) catch |err| switch (err) {
+        error.UnsupportedAir => {
+            if (error_union_call_fact_reason) |reason| {
+                setTypedV2Fallback(typed_v2_fallback, air_function, "error_union_call_fact", "-", reason);
+            }
+            return err;
+        },
+        else => return err,
+    }) |function| {
         return function;
     }
     if (try lowerTypedV2MaybeError(allocator, air_function, function_type, structured_air_v2)) |function| {
@@ -766,6 +783,23 @@ fn lowerFunctionTypedV2(
     if (block.terminator == null) return error.UnsupportedAir;
     try function.blocks.append(allocator, block);
     return function;
+}
+
+fn setTypedV2Fallback(
+    typed_v2_fallback: ?*?TypedV2Fallback,
+    air_function: air_export.Function,
+    opcode: []const u8,
+    data_kind: []const u8,
+    reason: []const u8,
+) void {
+    const slot = typed_v2_fallback orelse return;
+    if (slot.* != null) return;
+    slot.* = .{
+        .function = air_function.name,
+        .opcode = opcode,
+        .data_kind = data_kind,
+        .reason = reason,
+    };
 }
 
 const LoweringContext = struct {

@@ -485,7 +485,12 @@ Execution order:
    incomplete facts fail closed with `UnsupportedAir` instead of recovering the
    relation from AIR text. Local error-union flows continue through generic
    typed-v2 CFG; broader non-`i32` payloads and helper bodies whose success or
-   error relation is not proven by the v1 fact remain unsupported.
+   error relation is not proven by the v1 fact remain unsupported. The fact
+   path now reports targeted typed-v2 fallback reasons such as
+   `missing_error_union_call_fact_provider`, `missing_error_union_call_fact`,
+   `missing_catch_i32_value`, and
+   `unsupported_error_union_fact_result_type` rather than a generic
+   `UnsupportedAir` bucket.
    Validation evidence for the hook cycle: `tmp/error_union_call_fact_descriptor.air`
    contains `zllvm-error-union-call-facts-v1` for
    `aggregates.error_union_payload -> maybeError`,
@@ -495,6 +500,10 @@ Execution order:
    `tmp/broad_error_union_call_fact.log` is green at
    `source_rows=101`, `discovered_functions=152`, `executable_ok_rows=100`,
    `runtime_boundary_rows=1`, and `local_fail=0` for all three release modes.
+   The follow-up diagnostic cycle is validated by
+   `tmp/frontier_error_union_fact_diagnostic.log` and
+   `tmp/broad_error_union_fact_diagnostic.log`, both green with the same strict
+   counters.
    Together these prove the same pointer-slot model beyond simple branch
    continuations.
    These rows pass through typed AIR v2, generic CFG, z_llvm object
