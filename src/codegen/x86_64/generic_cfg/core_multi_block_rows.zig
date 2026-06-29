@@ -519,16 +519,16 @@ pub fn lowerGenericCfgGuardedDynamicPointerLoadReturn(
     const load_block = if (true_const != null) false_block else true_block;
     const const_value = true_const orelse false_const orelse return false;
 
-    const address = genericCfgDynamicI32LoadReturnAddress(function, entry, load_block) orelse return false;
+    const address = core_memory_lowering.genericCfgDynamicI32LoadReturnAddress(function, entry, load_block) orelse return false;
     const lhs_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, icmp.lhs) orelse return false;
     const rhs_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, icmp.rhs) orelse return false;
-    if (address.index_reg != lhs_reg) return false;
+    if ((address.index_reg orelse return false) != lhs_reg) return false;
 
     try emitGenericCfgUgeI64ParamCondition(allocator, machine, lhs_reg, rhs_reg);
     const branch_to_const = true_const != null;
     if (branch_to_const) {
         try appendGenericCfgConditionalBranch(allocator, machine, .jae, const_block.name);
-        try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
+        try core_memory_lowering.emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
         try appendGenericCfgReturn(allocator, machine);
         try appendGenericCfgBlockLabel(allocator, machine, const_block.name);
         try machine.instructions.append(allocator, .{ .mov_imm_eax = const_value });
@@ -538,7 +538,7 @@ pub fn lowerGenericCfgGuardedDynamicPointerLoadReturn(
         try machine.instructions.append(allocator, .{ .mov_imm_eax = const_value });
         try appendGenericCfgReturn(allocator, machine);
         try appendGenericCfgBlockLabel(allocator, machine, load_block.name);
-        try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
+        try core_memory_lowering.emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
         try appendGenericCfgReturn(allocator, machine);
     }
     return true;
@@ -638,77 +638,6 @@ pub fn genericCfgConstantI32Return(block: ir.BasicBlock) ?i32 {
         .int => |int| i32Value(int) catch null,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
     };
-}
-
-pub fn genericCfgDynamicI32LoadReturnAddress(
-    function: ir.Function,
-    entry: ir.BasicBlock,
-    block: ir.BasicBlock,
-) ?GenericCfgDynamicI32Address {
-    const ret = switch (block.terminator orelse return null) {
-        .ret => |ret| ret,
-        else => return null,
-    };
-    if (!ret.ty.eql(.{ .int = 32 })) return null;
-    const ret_name = switch (ret.value orelse return null) {
-        .named => |name| name,
-        else => return null,
-    };
-    const ret_instruction = findInstruction(block, ret_name) orelse return null;
-    const load = switch (ret_instruction.kind) {
-        .load => |load| load,
-        else => return null,
-    };
-    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return null;
-    return genericCfgDynamicI32AddressAcrossBlocks(function, entry, block, load.ptr);
-}
-
-pub fn genericCfgDynamicI32AddressAcrossBlocks(
-    function: ir.Function,
-    entry: ir.BasicBlock,
-    block: ir.BasicBlock,
-    ptr: ir.Value,
-) ?GenericCfgDynamicI32Address {
-    const name = switch (ptr) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
-        return .{ .base_reg = reg, .index_reg = .rsi, .offset_elems = 0 };
-    }
-    const instruction = findInstruction(block, name) orelse findInstruction(entry, name) orelse return null;
-    switch (instruction.kind) {
-        .gep => |gep| {
-            if (!gep.source_ty.eql(.{ .int = 32 }) or gep.indices.items.len != 1) return null;
-            var address = genericCfgDynamicI32AddressAcrossBlocks(function, entry, block, gep.ptr) orelse return null;
-            const index = gep.indices.items[0];
-            if (!index.ty.eql(.{ .int = 64 })) return null;
-            switch (index.value) {
-                .int => |int| address.offset_elems += int,
-                .named => |index_name| {
-                    if (address.offset_elems != 0) return null;
-                    address.index_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, .{ .named = index_name }) orelse return null;
-                },
-                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-            }
-            return address;
-        },
-        .load => |load| {
-            if (!load.ty.eql(.ptr) or load.attrs.isBarrier()) return null;
-            const slot_name = switch (load.ptr) {
-                .named => |slot| slot,
-                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-            };
-            const stored = genericCfgStoredPointerValue(block, slot_name) orelse
-                genericCfgStoredPointerValue(entry, slot_name) orelse return null;
-            return genericCfgDynamicI32AddressAcrossBlocks(function, entry, block, stored);
-        },
-        .cast => |cast| {
-            if (cast.op != .bitcast or !cast.to_ty.eql(.ptr)) return null;
-            return genericCfgDynamicI32AddressAcrossBlocks(function, entry, block, cast.value);
-        },
-        else => return null,
-    }
 }
 
 pub fn genericCfgI64ParamRegThroughIdentityCast(function: ir.Function, block: ir.BasicBlock, value: ir.Value) ?ArgReg {
@@ -4974,118 +4903,20 @@ pub fn lowerGenericCfgDynamicPointerLoadReturn(
     const ret_instruction = findInstruction(block, ret_name) orelse return false;
     switch (ret_instruction.kind) {
         .load => |load| {
-            const address = genericCfgDynamicI32LoadAddress(function, block, load) orelse return false;
-            try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
+            const address = core_memory_lowering.genericCfgDynamicI32LoadAddress(function, block, load) orelse return false;
+            try core_memory_lowering.emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, address);
         },
         .binary => |binary| {
             if (binary.op != .add or !binary.ty.eql(.{ .int = 32 })) return false;
-            const lhs = genericCfgDynamicI32LoadValueAddress(function, block, binary.lhs) orelse return false;
-            const rhs = genericCfgDynamicI32LoadValueAddress(function, block, binary.rhs) orelse return false;
-            try emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, lhs);
-            try emitGenericCfgDynamicI32AddIntoEax(allocator, machine, rhs);
+            const lhs = core_memory_lowering.genericCfgDynamicI32LoadValueAddress(function, block, binary.lhs) orelse return false;
+            const rhs = core_memory_lowering.genericCfgDynamicI32LoadValueAddress(function, block, binary.rhs) orelse return false;
+            try core_memory_lowering.emitGenericCfgDynamicI32LoadIntoEax(allocator, machine, lhs);
+            try core_memory_lowering.emitGenericCfgDynamicI32AddIntoEax(allocator, machine, rhs);
         },
         else => return false,
     }
     try appendGenericCfgReturn(allocator, machine);
     return true;
-}
-
-pub const GenericCfgDynamicI32Address = struct {
-    base_reg: ArgReg,
-    index_reg: ArgReg,
-    offset_elems: i128,
-};
-
-fn genericCfgDynamicI32LoadValueAddress(function: ir.Function, block: ir.BasicBlock, value: ir.Value) ?GenericCfgDynamicI32Address {
-    const name = switch (value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const instruction = findInstruction(block, name) orelse return null;
-    const load = switch (instruction.kind) {
-        .load => |load| load,
-        else => return null,
-    };
-    return genericCfgDynamicI32LoadAddress(function, block, load);
-}
-
-fn genericCfgDynamicI32LoadAddress(function: ir.Function, block: ir.BasicBlock, load: ir.LoadInst) ?GenericCfgDynamicI32Address {
-    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return null;
-    return genericCfgDynamicI32Address(function, block, load.ptr);
-}
-
-fn genericCfgDynamicI32Address(function: ir.Function, block: ir.BasicBlock, ptr: ir.Value) ?GenericCfgDynamicI32Address {
-    const name = switch (ptr) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
-        return .{ .base_reg = reg, .index_reg = .rsi, .offset_elems = 0 };
-    }
-    const instruction = findInstruction(block, name) orelse return null;
-    switch (instruction.kind) {
-        .gep => |gep| {
-            if (!gep.source_ty.eql(.{ .int = 32 }) or gep.indices.items.len != 1) return null;
-            var address = genericCfgDynamicI32Address(function, block, gep.ptr) orelse return null;
-            const index = gep.indices.items[0];
-            if (!index.ty.eql(.{ .int = 64 })) return null;
-            switch (index.value) {
-                .int => |int| address.offset_elems += int,
-                .named => |index_name| {
-                    if (address.index_reg != .rsi or address.offset_elems != 0) return null;
-                    const index_reg = paramRegOrNull(function, index_name, .{ .int = 64 }) catch return null;
-                    address.index_reg = index_reg orelse return null;
-                },
-                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-            }
-            return address;
-        },
-        .load => |load| {
-            if (!load.ty.eql(.ptr) or load.attrs.isBarrier()) return null;
-            const slot_name = switch (load.ptr) {
-                .named => |slot| slot,
-                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-            };
-            const stored = genericCfgStoredPointerValue(block, slot_name) orelse return null;
-            return genericCfgDynamicI32Address(function, block, stored);
-        },
-        else => return null,
-    }
-}
-
-fn genericCfgStoredPointerValue(block: ir.BasicBlock, slot_name: []const u8) ?ir.Value {
-    for (block.instructions.items) |instruction| {
-        if (instruction.removed) continue;
-        const store = switch (instruction.kind) {
-            .store => |store| store,
-            else => continue,
-        };
-        if (!store.ty.eql(.ptr) or store.attrs.isBarrier() or !isNamed(store.ptr, slot_name)) continue;
-        return store.value;
-    }
-    return null;
-}
-
-fn emitGenericCfgDynamicI32LoadIntoEax(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    address: GenericCfgDynamicI32Address,
-) !void {
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
-    try emitGenericCfgDynamicI32AddIntoEax(allocator, machine, address);
-}
-
-fn emitGenericCfgDynamicI32AddIntoEax(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    address: GenericCfgDynamicI32Address,
-) !void {
-    if (address.base_reg != .rdi) return error.UnsupportedCodegenAbi;
-    if (address.offset_elems < 0 or address.offset_elems > 1) return error.UnsupportedCodegenValue;
-    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.index_reg } });
-    if (address.offset_elems == 1) try machine.instructions.append(allocator, .inc_rcx);
-    try machine.instructions.append(allocator, .load_rdi_rcx4_ptr_r8d);
-    try machine.instructions.append(allocator, .add_r8d_eax);
 }
 
 pub fn genericCfgSupportsBranchSideEffects(function: ir.Function, block: ir.BasicBlock) bool {

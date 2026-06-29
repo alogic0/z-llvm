@@ -571,10 +571,11 @@ Completed slices from this inventory:
   without safety checks, while `frontier_checked_slice_elem_ptr_load` now proves
   the ReleaseSafe-style bounds guard, hot in-bounds load, cold `outOfBounds`
   trap path, and child-process executable death check in the accepted frontier.
-  The older `GenericCfgDynamicI32Address` path remains only for additive
-  multi-load i32 forms such as pair-sum rows where the typed address model still
-  needs a reusable "load two addresses then combine" operation; scalar
-  load/store and checked-slice hot paths route through `GenericCfgTypedAddress`.
+  The older `GenericCfgDynamicI32Address` compatibility path is now owned in
+  `core_memory_lowering` and remains only for additive multi-load i32 forms
+  such as pair-sum rows where the typed address model still needs a reusable
+  "load two addresses then combine" operation; scalar load/store and
+  checked-slice hot paths route through `GenericCfgTypedAddress`.
   Two-term dynamic addressing currently remains fail-closed when the selected
   terms require `%rcx` as an input scratch; single-index `%rcx` rows remain
   supported by the existing protected path. Pointer/slice semantic recognition now has a model-owned
