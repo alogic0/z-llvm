@@ -33,8 +33,6 @@ const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegist
 const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
 const lowerConditionalSlotUpdate = legacy.lowerConditionalSlotUpdate;
 const lowerErrorUnionPayload = legacy.lowerErrorUnionPayload;
-const lowerPackedReadFlag = legacy.lowerPackedReadFlag;
-const lowerPackedReplaceLow = legacy.lowerPackedReplaceLow;
 const lowerRuntimeOptionalPointerMain = legacy.lowerRuntimeOptionalPointerMain;
 const lowerRuntimePointerLoadStoreMain = legacy.lowerRuntimePointerLoadStoreMain;
 const lowerSliceSum = legacy.lowerSliceSum;
@@ -845,10 +843,50 @@ pub fn lowerTypedV2PackedBits(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (typedV2PackedReadFlagRecords(function_type, structured_air_v2)) {
-        return try lowerPackedReadFlag(allocator, air_function);
+        var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
+        errdefer function.deinit(allocator);
+        function.linkage = if (function_type.c_calling_convention) .default else .internal;
+        function.calling_conv = irCallingConvention(function_type);
+        try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+        var block = ir.BasicBlock.init("entry");
+        errdefer block.deinit(allocator);
+        try block.instructions.append(allocator, .{
+            .result = "flag",
+            .kind = .{ .icmp = .{
+                .predicate = .slt,
+                .operand_ty = .{ .int = 8 },
+                .lhs = .{ .named = "arg0" },
+                .rhs = .{ .int = 0 },
+            } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "flag" } } };
+        try function.blocks.append(allocator, block);
+        return function;
     }
     if (typedV2PackedReplaceLowRecords(function_type, structured_air_v2)) {
-        return try lowerPackedReplaceLow(allocator, air_function);
+        var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 8 });
+        errdefer function.deinit(allocator);
+        function.linkage = if (function_type.c_calling_convention) .default else .internal;
+        function.calling_conv = irCallingConvention(function_type);
+        try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+        try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg1" });
+        var block = ir.BasicBlock.init("entry");
+        errdefer block.deinit(allocator);
+        try block.instructions.append(allocator, .{
+            .result = "high",
+            .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = -8 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "low",
+            .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 8 }, .lhs = .{ .named = "arg1" }, .rhs = .{ .int = 7 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "result",
+            .kind = .{ .binary = .{ .op = .@"or", .ty = .{ .int = 8 }, .lhs = .{ .named = "high" }, .rhs = .{ .named = "low" } } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 8 }, .value = .{ .named = "result" } } };
+        try function.blocks.append(allocator, block);
+        return function;
     }
     return null;
 }

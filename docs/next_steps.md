@@ -270,8 +270,10 @@ Execution order:
    row now also builds its selected `icmp`/`select`/`ret` IR directly from the
    model-owned fallback summary instead of delegating to the legacy
    optional-payload compatibility lowerer. Typed-v2 packed read/replace admission
-   now also uses model-owned summaries instead of carrying packed-field opcode
-   count predicates in the typed-v2 lowerer. Typed-v2 plain and conditional
+   and selected bit-operation IR construction now also use model-owned summaries
+   instead of delegating to the legacy packed-field compatibility lowerers.
+   This does not change the separate packed/unaligned aggregate ABI boundary.
+   Typed-v2 plain and conditional
    slice-loop admission now uses model-owned summaries as well, leaving the
    existing compatibility emitters unchanged. Typed-v2 accumulator-loop and
    conditional-slot-update admission has likewise moved to model-owned scalar
