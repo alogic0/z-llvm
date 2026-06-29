@@ -449,6 +449,7 @@ pub fn firstUnsupported(
             if (isSimpleSelectBlock(function, instruction.index)) continue;
             if (typed_view != null and typed_view.?.voidGuardBlockByIndex(instruction.index)) continue;
             if (typed_view != null and typed_view.?.genericCfgBlock(instruction.index)) continue;
+            if (typed_view != null and typed_view.?.containsGenericCfgBlockInstruction(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         if (air_capabilities.isCondBrOpcode(instruction.opcode) or
@@ -1410,7 +1411,7 @@ const LoweringContext = struct {
             const label = labels.items[branch_index];
             self.block.* = ir.BasicBlock.init(label);
             const branch_value = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instruction, merge_type);
-            try phi.incoming.append(self.allocator, .{ .value = branch_value.value, .block = label });
+            try phi.incoming.append(self.allocator, .{ .value = branch_value.value.value, .block = branch_value.block_name });
             var branch_block = self.block.*;
             branch_block.terminator = .{ .br = .{ .target = merge_label } };
             try self.function.blocks.append(self.allocator, branch_block);
@@ -1463,18 +1464,54 @@ const LoweringContext = struct {
         }
     }
 
+    const TypedSwitchBranchValue = struct {
+        value: TypedValue,
+        block_name: []const u8,
+    };
+
     fn lowerTypedSwitchBranchValue(
         self: *LoweringContext,
         target_block: u32,
         branch_instruction: air_export.TypedInstruction,
         merge_type: ZigType,
-    ) LowerError!TypedValue {
+    ) LowerError!TypedSwitchBranchValue {
+        if (branch_instruction.operands.len != 2) return error.UnsupportedAir;
+        if (air_model.typedInstOperandIndex(branch_instruction.operands[1])) |value_index| {
+            const view = self.typed_view orelse return error.UnsupportedAir;
+            const value_instruction = view.instruction(value_index) orelse return error.UnsupportedAir;
+            if (air_capabilities.isBlockOpcode(value_instruction.opcode)) {
+                return try self.lowerTypedNestedBlockSwitchBranchValue(value_instruction.index, merge_type);
+            }
+        }
+        if (air_model.typedInstOperandIndex(branch_instruction.operands[1])) |value_index| {
+            try self.lowerTypedValueDependency(value_index);
+        }
+        const value = (try self.resolveTypedBranchOperand(branch_instruction, 1)) orelse return error.UnsupportedAir;
+        return .{
+            .value = try self.coerceTypedBranchValueToMerge(target_block, self.block.name, value, merge_type),
+            .block_name = self.block.name,
+        };
+    }
+
+    fn lowerTypedNestedBlockSwitchBranchValue(
+        self: *LoweringContext,
+        target_block: u32,
+        merge_type: ZigType,
+    ) LowerError!TypedSwitchBranchValue {
+        var branch_instructions: std.ArrayList(air_export.TypedInstruction) = .empty;
+        defer branch_instructions.deinit(self.allocator);
+        try self.collectBlockValueBranches(target_block, &branch_instructions);
+        if (branch_instructions.items.len != 1) return error.UnsupportedAir;
+        const branch_instruction = branch_instructions.items[0];
         if (branch_instruction.operands.len != 2) return error.UnsupportedAir;
         if (air_model.typedInstOperandIndex(branch_instruction.operands[1])) |value_index| {
             try self.lowerTypedValueDependency(value_index);
         }
         const value = (try self.resolveTypedBranchOperand(branch_instruction, 1)) orelse return error.UnsupportedAir;
-        return try self.coerceTypedBranchValueToMerge(target_block, self.block.name, value, merge_type);
+        return .{
+            .value = try self.coerceTypedBranchValueToMerge(target_block, self.block.name, value, merge_type),
+            .block_name = self.block.name,
+        };
     }
 
     fn lowerTypedValueDependency(self: *LoweringContext, instruction_index: u32) LowerError!void {

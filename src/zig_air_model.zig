@@ -386,6 +386,11 @@ pub const TypedFunctionView = struct {
             {
                 return true;
             }
+            if (self.genericCfgSwitchBlock(instruction_record.index) and
+                self.switchBlockValueInstruction(instruction_record.index, instruction_index))
+            {
+                return true;
+            }
             for (block_body.instructions) |child_index| {
                 const child = self.instruction(child_index) orelse return false;
                 if (!air_capabilities.isCondBrOpcode(child.opcode)) continue;
@@ -431,6 +436,11 @@ pub const TypedFunctionView = struct {
             {
                 return true;
             }
+            if (self.genericCfgSwitchBlock(typed_instruction.index) and
+                self.switchBlockValueInstruction(typed_instruction.index, instruction_index))
+            {
+                return true;
+            }
             for (nested_body.instructions) |nested_candidate| {
                 const nested_instruction = self.instruction(nested_candidate) orelse return false;
                 if (!air_capabilities.isCondBrOpcode(nested_instruction.opcode)) continue;
@@ -451,6 +461,40 @@ pub const TypedFunctionView = struct {
         if (!air_capabilities.isBrOpcode(candidate.opcode) or candidate.operands.len != 2) return false;
         const target = blockTarget(candidate.operands[0]) orelse return false;
         return target == block_index;
+    }
+
+    fn switchBlockValueInstruction(self: TypedFunctionView, block_index: u32, instruction_index: u32) bool {
+        if (self.switchBlockValueBlock(block_index, instruction_index)) return true;
+        for (self.structured_air_v2.instructions) |candidate| {
+            if (!air_capabilities.isBlockOpcode(candidate.opcode)) continue;
+            if (!self.switchBlockValueBlock(block_index, candidate.index)) continue;
+            if (self.linearValueBlockContains(candidate.index, instruction_index)) return true;
+        }
+        return false;
+    }
+
+    fn switchBlockValueBlock(self: TypedFunctionView, block_index: u32, value_block_index: u32) bool {
+        const value_block = self.instruction(value_block_index) orelse return false;
+        if (!air_capabilities.isBlockOpcode(value_block.opcode)) return false;
+        for (self.structured_air_v2.instructions) |candidate| {
+            if (!air_capabilities.isBrOpcode(candidate.opcode) or candidate.operands.len != 2) continue;
+            const target = blockTarget(candidate.operands[0]) orelse continue;
+            if (target != block_index) continue;
+            const value_index = typedInstOperandIndex(candidate.operands[1]) orelse continue;
+            if (value_index == value_block_index) return true;
+        }
+        return false;
+    }
+
+    fn linearValueBlockContains(self: TypedFunctionView, value_block_index: u32, instruction_index: u32) bool {
+        if (instruction_index == value_block_index) return true;
+        for (self.structured_air_v2.instructions) |candidate| {
+            if (!air_capabilities.isBrOpcode(candidate.opcode) or candidate.operands.len != 2) continue;
+            const target = blockTarget(candidate.operands[0]) orelse continue;
+            if (target != value_block_index) continue;
+            return instruction_index > value_block_index and instruction_index <= candidate.index;
+        }
+        return false;
     }
 };
 

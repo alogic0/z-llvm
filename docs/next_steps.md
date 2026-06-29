@@ -214,7 +214,7 @@ Execution order:
    the legacy compatibility module reuses the model-owned opcode query helper
    instead of carrying its own duplicate implementation.
    The strict frontier gate was re-run after these refactors and now reports
-   `generic_cfg_functions=657`, `structural_matcher_functions=0`,
+   `generic_cfg_functions=663`, `structural_matcher_functions=0`,
    `legacy_air_text_lowering_functions=0`, and executable proof green across
    ReleaseFast, ReleaseSafe, and ReleaseSmall. Post-try continuation blocks
    containing `switch_br` now lower through the typed-v2/generic CFG path. The
@@ -388,6 +388,11 @@ Execution order:
    unwrapped error tag, returns remapped error-union constants from the cold
    arms, and rewraps the hot payload after arithmetic through the same
    typed-v2 block/branch and generic CFG backend path.
+   The switch-local try row now lowers a switch arm whose nested value block
+   contains a `try` call, returns the original error-union value on the error
+   edge, and branches the rewrapped success payload into the outer switch phi;
+   admission is based on typed-v2 block/value and generic CFG data flow, not a
+   selected function-name gate.
    Together these prove the same pointer-slot model beyond simple branch
    continuations.
    These rows pass through typed AIR v2, generic CFG, z_llvm object
@@ -644,10 +649,10 @@ Validation after these refactor slices is saved in
 `tmp/frontier_boundary_counter_update.log`:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
-  ReleaseSmall all report `source_rows=14`, `discovered_functions=657`,
-  `generic_cfg_functions=657`, `structural_matcher_functions=0`,
+  ReleaseSmall all report `source_rows=14`, `discovered_functions=663`,
+  `generic_cfg_functions=663`, `structural_matcher_functions=0`,
   `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
-  `object_emitted_functions=657`, `native_link_accepted_rows=14`,
+  `object_emitted_functions=663`, `native_link_accepted_rows=14`,
   `executable_ok_rows=14`, and `local_fail=0`.
 - `zig build distribution-air-release-frontier-boundaries`: ReleaseFast,
   ReleaseSafe, and ReleaseSmall all report `varargs_boundary_rows=2`,
@@ -1227,12 +1232,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=661`,
-`generic_codegen_functions=661`, `generic_cfg_functions=661`,
+frontier gate reports `source_rows=14`, `discovered_functions=663`,
+`generic_codegen_functions=663`, `generic_cfg_functions=663`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=661`, `object_failures=0`,
+`object_emitted_functions=663`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1245,9 +1250,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=661`,
-`generic_cfg_functions=661`, `structural_matcher_functions=0`,
-`object_emitted_functions=661`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=663`,
+`generic_cfg_functions=663`, `structural_matcher_functions=0`,
+`object_emitted_functions=663`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

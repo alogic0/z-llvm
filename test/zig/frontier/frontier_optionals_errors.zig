@@ -115,6 +115,24 @@ export fn frontier_branch_then_try_match(flag: i32, tag: i32, value: i32) i32 {
     }
 }
 
+fn frontierSwitchThenTry(selector: i32, tag: i32, value: i32) FrontierError!i32 {
+    return switch (selector & 1) {
+        0 => value - 5,
+        else => blk: {
+            const payload = try frontierMaybeTryPayload(tag, value);
+            break :blk payload + 5;
+        },
+    };
+}
+
+export fn frontier_switch_then_try_match(selector: i32, tag: i32, value: i32) i32 {
+    if (frontierSwitchThenTry(selector, tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -73;
+    }
+}
+
 fn frontierTrySwitch(tag: i32, value: i32) FrontierError!i32 {
     const payload = try frontierMaybeTryPayload(tag, value);
     return switch (payload & 3) {

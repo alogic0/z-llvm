@@ -66,6 +66,12 @@ The catch/remap row adds a post-try catch body that switches over the
 unwrapped error tag, returns remapped error-union constants from the cold arms,
 and rewraps the hot payload after arithmetic through typed-v2 block lowering
 and generic CFG backend codegen.
+The switch-local try row adds a switch arm whose nested value-producing block
+contains a `try` call; the error edge returns the original error-union value
+and the success edge rewraps payload arithmetic into the outer switch phi.
+Typed-v2 block/value facts own the admission, and x86_64 generic CFG lowers
+the call, guard, branch-to-merge, and i64 error-union return without a
+function-name gate.
 The optional scalar payload branch row now validates `wrap_optional`,
 `is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
 payload add/sub branch through generic single-block CFG, and has executable
@@ -177,20 +183,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=661
-structured_functions=661
-generic_codegen_functions=661
-generic_cfg_functions=661
+discovered_functions=663
+structured_functions=663
+generic_codegen_functions=663
+generic_cfg_functions=663
 structural_matcher_functions=0
-structured_air_v2_functions=661
-typed_air_operand_functions=661
+structured_air_v2_functions=663
+typed_air_operand_functions=663
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=661
+generic_lowering_functions=663
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=661
+object_emitted_functions=663
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -247,7 +253,7 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 14-source / 657-function strict frontier
+are not counted in the accepted 14-source / 663-function strict frontier
 executable proof. Stack-pressure forwarding for the previous
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 indirect and stack-source
 rows is now accepted in the frontier corpus; the boundary gate keeps
