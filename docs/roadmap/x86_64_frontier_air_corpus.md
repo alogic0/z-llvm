@@ -46,7 +46,9 @@ proves typed AIR v2 lowering for
 `try:pl_op` continuation shape where the error path returns the original
 error-union value and the ok path unwraps, computes, rewraps, and returns. It
 also covers a nested two-`try` chain and a payload continuation branch where
-both terminal arms rewrap payload-derived values, plus source-backed
+both terminal arms rewrap payload-derived values, a local-slot continuation
+where the unwrapped payload is stored, reloaded, and rewrapped after a
+data-flow check proves the slot is function-local, plus source-backed
 `try_ptr` and `try_ptr_cold` rows where the Zig hook exports pointer operands
 for `try_ptr`/`try_ptr_cold` and `unwrap_errunion_err_ptr` and z_llvm lowers
 the selected error-union pointer slot/payload path without AIR text fallback.
@@ -171,20 +173,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=657
-structured_functions=657
-generic_codegen_functions=657
-generic_cfg_functions=657
+discovered_functions=659
+structured_functions=659
+generic_codegen_functions=659
+generic_cfg_functions=659
 structural_matcher_functions=0
-structured_air_v2_functions=657
-typed_air_operand_functions=657
+structured_air_v2_functions=659
+typed_air_operand_functions=659
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=657
+generic_lowering_functions=659
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=657
+object_emitted_functions=659
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

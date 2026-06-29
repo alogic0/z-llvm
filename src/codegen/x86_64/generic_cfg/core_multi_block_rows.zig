@@ -2155,6 +2155,7 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (try lowerGenericCfgErrorUnionTrySwitchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionSwitchPhiReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionErrorTagSwitchReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgErrorUnionTrySlotUpdateReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadBranchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgBranchThenErrorUnionTryReturn(allocator, machine, function)) return true;
     if (function.blocks.items.len < 5) return false;
@@ -3116,6 +3117,192 @@ fn trySwitchUsesAllBlocks(
         if (!matched_case) return false;
     }
     return true;
+}
+
+const ErrorUnionTrySlotUpdateReturn = struct {
+    entry: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    cont_block: ir.BasicBlock,
+    err_block: ir.BasicBlock,
+    op: MachineBinaryOp,
+    rhs_reg: ArgReg,
+    success_is_then: bool,
+};
+
+fn lowerGenericCfgErrorUnionTrySlotUpdateReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionTrySlotUpdateReturn(function) orelse return false;
+    const frame_bytes: u8 = 24;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_try_slot_update_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = plan.rhs_reg } });
+    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, if (plan.success_is_then) .je else .jne, plan.cont_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.cont_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+    try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = plan.rhs_reg } });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = plan.op, .reg = plan.rhs_reg } });
+    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn errorUnionTrySlotUpdateReturn(function: ir.Function) ?ErrorUnionTrySlotUpdateReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 3) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
+    const call_instruction = findInstruction(entry, call_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    const then_update = payloadSlotUpdateWrapReturn(function, entry, then_block, call_name);
+    const else_update = payloadSlotUpdateWrapReturn(function, entry, else_block, call_name);
+    if ((then_update != null) == (else_update != null)) return null;
+    const cont_block = if (then_update != null) then_block else else_block;
+    const err_block = if (then_update != null) else_block else then_block;
+    if (!blockReturnsNamedValue(err_block, call_name, .{ .int = 64 })) return null;
+    const update = then_update orelse else_update.?;
+
+    return .{
+        .entry = entry,
+        .call_name = call_name,
+        .call = call,
+        .cont_block = cont_block,
+        .err_block = err_block,
+        .op = update.op,
+        .rhs_reg = update.reg,
+        .success_is_then = then_update != null,
+    };
+}
+
+fn payloadSlotUpdateWrapReturn(function: ir.Function, entry: ir.BasicBlock, block: ir.BasicBlock, call_name: []const u8) ?PayloadBinaryWrapReturn {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 64 })) return null;
+    const shl_name = switch (ret.value orelse return null) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const shl_inst = findInstruction(block, shl_name) orelse return null;
+    const shl = switch (shl_inst.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (!shl.ty.eql(.{ .int = 64 }) or shl.op != .shl or !isInt(shl.rhs, 16)) return null;
+    const zext_name = switch (shl.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const zext_inst = findInstruction(block, zext_name) orelse return null;
+    const zext = switch (zext_inst.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 32 }) or !zext.to_ty.eql(.{ .int = 64 })) return null;
+    const load_name = switch (zext.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const load_index = instructionIndexByResult(block, load_name) orelse return null;
+    const load = switch (block.instructions.items[load_index].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return null;
+    const slot_name = switch (load.ptr) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!entryAllocaTy(entry, slot_name, .{ .int = 32 })) return null;
+
+    var stored_value_name: ?[]const u8 = null;
+    for (block.instructions.items[0..load_index]) |instruction| {
+        if (instruction.removed) continue;
+        const store = switch (instruction.kind) {
+            .store => |store| store,
+            else => continue,
+        };
+        if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier() or !isNamed(store.ptr, slot_name)) continue;
+        stored_value_name = switch (store.value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+        };
+    }
+    const binary_name = stored_value_name orelse return null;
+    const binary_inst = findInstruction(block, binary_name) orelse return null;
+    const binary = switch (binary_inst.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (!binary.ty.eql(.{ .int = 32 }) or (binary.op != .add and binary.op != .sub)) return null;
+    const payload_on_lhs = payloadValueFromCallResult(block, binary.lhs, call_name);
+    const payload_on_rhs = payloadValueFromCallResult(block, binary.rhs, call_name);
+    if (payload_on_lhs == payload_on_rhs) return null;
+    if (binary.op == .sub and !payload_on_lhs) return null;
+    const rhs_value = if (payload_on_lhs) binary.rhs else binary.lhs;
+    const reg = switch (rhs_value) {
+        .named => |name| paramReg(function, name, .{ .int = 32 }) catch return null,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const op: MachineBinaryOp = switch (binary.op) {
+        .add => .add,
+        .sub => .sub,
+        else => unreachable,
+    };
+    return .{ .op = op, .reg = reg };
+}
+
+fn instructionIndexByResult(block: ir.BasicBlock, result_name: []const u8) ?usize {
+    for (block.instructions.items, 0..) |instruction, index| {
+        if (instruction.removed) continue;
+        const result = instruction.result orelse continue;
+        if (std.mem.eql(u8, result, result_name)) return index;
+    }
+    return null;
+}
+
+fn entryAllocaTy(entry: ir.BasicBlock, result_name: []const u8, ty: ir.Type) bool {
+    const instruction = findInstruction(entry, result_name) orelse return false;
+    const alloca = switch (instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    return alloca.allocated_ty.eql(ty);
 }
 
 fn lowerGenericCfgErrorUnionTryPayloadBranchReturn(
