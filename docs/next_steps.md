@@ -431,8 +431,11 @@ Execution order:
    facts as well: z_llvm validates the `wrap_optional`/`is_non_null`/
    `optional_payload` data flow and the payload add/sub branch without a
    function-name gate, then emits a generic single-block CFG shape that is
-   executable-proven in all three release modes. Arbitrary optional payload
-   control-flow remains future work.
+   executable-proven in all three release modes. Its typed-v2
+   arg/compare/condbr/return summary now lives in `src/zig_air_model.zig`,
+   leaving the lowering module to materialize IR from model-owned
+   threshold/fallback facts. Arbitrary optional payload control-flow remains
+   future work.
 7. Compiler-core frontier slice: only after the registries are shared, add
    small real Zig compiler-core frontier rows that exercise the highest ranked
    categories through typed AIR v2 and generic CFG. Keep the

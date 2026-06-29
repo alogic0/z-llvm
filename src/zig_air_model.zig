@@ -887,6 +887,11 @@ pub const TypedUnionTagPayloadSwitchSummary = struct {
     tag1_return_add: i32,
 };
 
+pub const TypedOptionalPayloadBranchSummary = struct {
+    threshold: i32,
+    fallback: i32,
+};
+
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
     if (!view.operandCoverage()) return null;
@@ -2298,6 +2303,55 @@ pub fn typedUnionTagPayloadSwitchSummary(
     };
 }
 
+pub fn typedOptionalPayloadBranchSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedOptionalPayloadBranchSummary {
+    if (function_type.params.len != 3 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[2].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return null;
+    }
+    if (typedOpcodeCount(structured_air_v2, "arg") != 3 or
+        typedOpcodeCount(structured_air_v2, "wrap_optional") != 1 or
+        typedOpcodeCount(structured_air_v2, "is_non_null") != 1 or
+        typedOpcodeCount(structured_air_v2, "optional_payload") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 3 or
+        typedReturnOpcodeCount(structured_air_v2) != 3)
+    {
+        return null;
+    }
+
+    const arg0 = typedNthI32ArgIndex(structured_air_v2, 0) orelse return null;
+    const arg1 = typedNthI32ArgIndex(structured_air_v2, 1) orelse return null;
+    const arg2 = typedNthI32ArgIndex(structured_air_v2, 2) orelse return null;
+
+    const maybe_guard = typedBinaryInstConstRhs(structured_air_v2, "cmp_neq", arg0, 0) orelse return null;
+    if (!typedCondBrUses(structured_air_v2, maybe_guard)) return null;
+
+    const wrap_optional = singleInstructionByOpcode(structured_air_v2, "wrap_optional") orelse return null;
+    if (wrap_optional.operands.len != 1 or typedInstOperandIndex(wrap_optional.operands[0]) != arg1) return null;
+
+    const is_non_null = singleInstructionByOpcode(structured_air_v2, "is_non_null") orelse return null;
+    const optional_payload = singleInstructionByOpcode(structured_air_v2, "optional_payload") orelse return null;
+    if (is_non_null.operands.len != 1 or optional_payload.operands.len != 1) return null;
+    const optional_value = typedInstOperandIndex(is_non_null.operands[0]) orelse return null;
+    if (typedInstOperandIndex(optional_payload.operands[0]) != optional_value) return null;
+    if (!typedCondBrUses(structured_air_v2, is_non_null.index)) return null;
+
+    const threshold = typedBinaryInstConstRhsValue(structured_air_v2, "cmp_gt", optional_payload.index) orelse return null;
+    const payload_guard = typedBinaryInstConstRhs(structured_air_v2, "cmp_gt", optional_payload.index, threshold) orelse return null;
+    if (!typedCondBrUses(structured_air_v2, payload_guard)) return null;
+    _ = typedBinaryInstInstRhsPrefix(structured_air_v2, "add", optional_payload.index, arg2) orelse return null;
+    _ = typedBinaryInstInstRhsPrefix(structured_air_v2, "sub", optional_payload.index, arg2) orelse return null;
+
+    const fallback = typedRetI32Const(structured_air_v2) orelse return null;
+    return .{ .threshold = threshold, .fallback = fallback };
+}
+
 fn typedUnionFieldVal(structured_air_v2: air_export.StructuredAirV2, field_index: usize) ?air_export.TypedInstruction {
     var found: ?air_export.TypedInstruction = null;
     for (structured_air_v2.instructions) |instruction| {
@@ -2323,6 +2377,79 @@ fn typedAddConstUsing(structured_air_v2: air_export.StructuredAirV2, operand_ind
 fn typedAddConstUsingSecondI32Arg(structured_air_v2: air_export.StructuredAirV2) ?i32 {
     const arg1 = typedNthI32ArgIndex(structured_air_v2, 1) orelse return null;
     return typedAddConstUsing(structured_air_v2, arg1);
+}
+
+fn typedBinaryInstConstRhs(
+    structured_air_v2: air_export.StructuredAirV2,
+    opcode: []const u8,
+    lhs_index: u32,
+    rhs_value: i32,
+) ?u32 {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
+        if (instruction.operands.len != 2) continue;
+        if (typedInstOperandIndex(instruction.operands[0]) != lhs_index) continue;
+        const constant = typedConstI32Operand(instruction, 1) orelse continue;
+        if (constant != rhs_value) continue;
+        return instruction.index;
+    }
+    return null;
+}
+
+fn typedBinaryInstConstRhsValue(
+    structured_air_v2: air_export.StructuredAirV2,
+    opcode: []const u8,
+    lhs_index: u32,
+) ?i32 {
+    var found: ?i32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
+        if (instruction.operands.len != 2) continue;
+        if (typedInstOperandIndex(instruction.operands[0]) != lhs_index) continue;
+        const constant = typedConstI32Operand(instruction, 1) orelse continue;
+        if (found != null) return null;
+        found = constant;
+    }
+    return found;
+}
+
+fn typedBinaryInstInstRhsPrefix(
+    structured_air_v2: air_export.StructuredAirV2,
+    opcode_prefix: []const u8,
+    lhs_index: u32,
+    rhs_index: u32,
+) ?u32 {
+    var found: ?u32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.startsWith(u8, instruction.opcode, opcode_prefix)) continue;
+        if (instruction.operands.len != 2) continue;
+        if (typedInstOperandIndex(instruction.operands[0]) != lhs_index) continue;
+        if (typedInstOperandIndex(instruction.operands[1]) != rhs_index) continue;
+        if (found != null) return null;
+        found = instruction.index;
+    }
+    return found;
+}
+
+fn typedCondBrUses(structured_air_v2: air_export.StructuredAirV2, condition_index: u32) bool {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "cond_br")) continue;
+        if (instruction.operands.len == 0) continue;
+        if (typedInstOperandIndex(instruction.operands[0]) == condition_index) return true;
+    }
+    return false;
+}
+
+fn typedRetI32Const(structured_air_v2: air_export.StructuredAirV2) ?i32 {
+    var found: ?i32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "ret") and !std.mem.eql(u8, instruction.opcode, "ret_safe")) continue;
+        if (instruction.operands.len != 1) continue;
+        const constant = typedConstI32Operand(instruction, 0) orelse continue;
+        if (found != null) return null;
+        found = constant;
+    }
+    return found;
 }
 
 fn typedNthI32ArgIndex(structured_air_v2: air_export.StructuredAirV2, wanted: usize) ?u32 {
