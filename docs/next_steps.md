@@ -277,8 +277,8 @@ Execution order:
    the model-owned plain slice summary directly; conditional slice-loop still
    uses the existing compatibility emitter. Typed-v2 accumulator-loop and
    conditional-slot-update admission has likewise moved to model-owned scalar
-   control summaries, and conditional-slot-update now emits its selected
-   add/sub/select IR directly from the typed-v2 path. Typed-v2 inline-asm
+   control summaries, and both selected scalar-control bodies now emit their
+   loop/add/sub/select IR directly from the typed-v2 path. Typed-v2 inline-asm
    memory-barrier admission now uses a
    model-owned summary too, and typed-v2 monotonic atomic-add admission now
    selects the `atomic_rmw` instruction through a model-owned summary.

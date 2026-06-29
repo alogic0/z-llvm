@@ -30,7 +30,6 @@ const validateSretAggregateCopyRecords = air_aggregate_copy.validateSretAggregat
 const validateSretAggregateCallWrapperRecords = air_aggregate_copy.validateSretAggregateCallWrapperRecords;
 const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegisterAggregateCandidate;
 
-const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
 const lowerErrorUnionPayload = legacy.lowerErrorUnionPayload;
 const lowerRuntimeOptionalPointerMain = legacy.lowerRuntimeOptionalPointerMain;
 const lowerRuntimePointerLoadStoreMain = legacy.lowerRuntimePointerLoadStoreMain;
@@ -1133,7 +1132,78 @@ pub fn lowerTypedV2AccumulatorLoop(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2AccumulatorLoopRecords(function_type, structured_air_v2)) return null;
-    return try lowerAccumulatorLoop(allocator, module, air_function, .{ .limit_arg = 0 });
+    _ = module;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    entry.terminator = .{ .br = .{ .target = "loop" } };
+    try function.blocks.append(allocator, entry);
+
+    var loop = ir.BasicBlock.init("loop");
+    errdefer loop.deinit(allocator);
+    var index_phi: ir.PhiInst = .{ .ty = .{ .int = 32 }, .incoming = .empty };
+    errdefer index_phi.deinit(allocator);
+    try index_phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "entry" });
+    try index_phi.incoming.append(allocator, .{ .value = .{ .named = "index.next" }, .block = "body" });
+    try loop.instructions.append(allocator, .{ .result = "index", .kind = .{ .phi = index_phi } });
+    var sum_phi: ir.PhiInst = .{ .ty = .{ .int = 32 }, .incoming = .empty };
+    errdefer sum_phi.deinit(allocator);
+    try sum_phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "entry" });
+    try sum_phi.incoming.append(allocator, .{ .value = .{ .named = "sum.next" }, .block = "body" });
+    try loop.instructions.append(allocator, .{ .result = "sum", .kind = .{ .phi = sum_phi } });
+    try loop.instructions.append(allocator, .{
+        .result = "continue",
+        .kind = .{ .icmp = .{
+            .predicate = .ult,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "index" },
+            .rhs = .{ .named = "arg0" },
+        } },
+    });
+    loop.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "continue" },
+        .then_target = "body",
+        .else_target = "exit",
+    } };
+    try function.blocks.append(allocator, loop);
+
+    var body = ir.BasicBlock.init("body");
+    errdefer body.deinit(allocator);
+    try body.instructions.append(allocator, .{
+        .result = "sum.next",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "sum" },
+            .rhs = .{ .named = "index" },
+        } },
+    });
+    try body.instructions.append(allocator, .{
+        .result = "index.next",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "index" },
+            .rhs = .{ .int = 1 },
+        } },
+    });
+    body.terminator = .{ .br = .{ .target = "loop" } };
+    try function.blocks.append(allocator, body);
+
+    var exit = ir.BasicBlock.init("exit");
+    exit.terminator = .{ .ret = .{
+        .ty = .{ .int = 32 },
+        .value = .{ .named = "sum" },
+    } };
+    try function.blocks.append(allocator, exit);
+
+    return function;
 }
 
 pub fn typedV2AccumulatorLoopRecords(
