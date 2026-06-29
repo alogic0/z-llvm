@@ -193,13 +193,14 @@ families where the inventory does not yet record per-opcode first examples.
    `wrap_errunion_err`, `is_non_err`, `unwrap_errunion_payload`, and
    `unwrap_errunion_err` with executable proof, and the follow-up slice adds
    selected direct `try:pl_op` propagation for an error-union helper call with
-   payload continuation and error return. The follow-up frontier row now covers
-   a direct two-`try` chain where the wrapper calls once, preserves the
+   payload continuation and error return. Follow-up frontier rows now cover a
+   direct two-`try` chain where the wrapper calls once, preserves the
    error-union result for payload extraction, and the nested callee preserves
-   live arguments/results across the second helper call. Broader arbitrary
-   nested/multi-block compiler-core `try` forms remain measured error-union
-   work; pointer/slice length forms and `ptr_add:bin_ty_pl` remain the next
-   non-error-union targets.
+   live arguments/results across the second helper call, plus a `try`
+   continuation whose payload feeds a second branch before both terminal arms
+   rewrap payload-derived values. Broader arbitrary nested/multi-block
+   compiler-core `try` forms remain measured error-union work; pointer/slice
+   length forms and `ptr_add:bin_ty_pl` remain the next non-error-union targets.
 3. Harden generic CFG for high-volume compiler patterns: nested blocks,
    branch-heavy loops, error-union continuation blocks, and switch dispatch.
 4. Expand call ownership around live-across-call values, indirect/default C

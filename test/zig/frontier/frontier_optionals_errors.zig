@@ -53,3 +53,17 @@ export fn frontier_nested_try_match(first_tag: i32, second_tag: i32, value: i32)
         return -37;
     }
 }
+
+fn frontierTryBranch(tag: i32, value: i32, delta: i32) FrontierError!i32 {
+    const payload = try frontierMaybeTryPayload(tag, value);
+    if (payload > 20) return payload + delta;
+    return payload - delta;
+}
+
+export fn frontier_try_branch_match(tag: i32, value: i32, delta: i32) i32 {
+    if (frontierTryBranch(tag, value, delta)) |payload| {
+        return payload;
+    } else |_| {
+        return -41;
+    }
+}

@@ -38,14 +38,15 @@ Current frontier seed:
 - `test/zig/frontier/frontier_sysv_sret_byval.zig`
 
 `frontier_optionals_errors.zig` now includes source-backed error-union
-wrap/error/payload matching and selected direct `try` propagation. It proves
-typed AIR v2 lowering for
+wrap/error/payload matching and selected direct/nested `try` propagation. It
+proves typed AIR v2 lowering for
 `wrap_errunion_payload`, `wrap_errunion_err`, `is_non_err`,
 `unwrap_errunion_payload`, `unwrap_errunion_err`, and the direct
 `try:pl_op` continuation shape where the error path returns the original
-error-union value and the ok path unwraps, computes, rewraps, and returns.
-Broader nested/multi-block compiler-core `try` forms remain a separate
-compiler-core priority.
+error-union value and the ok path unwraps, computes, rewraps, and returns. It
+also covers a nested two-`try` chain and a payload continuation branch where
+both terminal arms rewrap payload-derived values. Broader arbitrary
+compiler-core `try` forms remain a separate compiler-core priority.
 
 `frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
@@ -124,20 +125,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=628
-structured_functions=628
-generic_codegen_functions=628
-generic_cfg_functions=628
+discovered_functions=630
+structured_functions=630
+generic_codegen_functions=630
+generic_cfg_functions=630
 structural_matcher_functions=0
-structured_air_v2_functions=628
-typed_air_operand_functions=628
+structured_air_v2_functions=630
+typed_air_operand_functions=630
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=628
+generic_lowering_functions=630
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=628
+object_emitted_functions=630
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
