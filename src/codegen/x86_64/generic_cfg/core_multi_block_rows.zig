@@ -587,7 +587,7 @@ pub fn lowerGenericCfgGuardedDynamicPointerLoadPanicReturn(
     const width = core_memory_lowering.GenericCfgScalarWidth.fromType(function.ret_ty) orelse return false;
     const address = core_memory_lowering.genericCfgTypedScalarLoadReturnAddressAcrossBlocks(function, entry, load_block, width) orelse return false;
     const lhs_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, icmp.lhs) orelse return false;
-    if (address.index_reg != lhs_reg) return false;
+    if (address.add_index_reg != lhs_reg or address.sub_index_reg != null) return false;
 
     switch (icmp.predicate) {
         .uge => {

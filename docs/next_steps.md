@@ -390,7 +390,8 @@ Execution order:
    remain the next error-union sub-slice. The first accepted
    pointer/slice source-backed slice is now in
    `frontier_slice_pointer_arith.zig`: it lowers `ptr_add:bin_ty_pl`,
-   constant and selected runtime `ptr_sub:bin_ty_pl`,
+   constant `ptr_sub:bin_ty_pl`, and runtime `ptr_sub:bin_ty_pl` with one
+   additive and one subtractive dynamic index term,
    `slice_len:ty_op`, `ptr_slice_len_ptr`, `slice_ptr`,
    `ptr_slice_ptr_ptr`, and `slice_elem_ptr` selected forms through typed AIR
    v2, generic CFG, z_llvm object emission, native link, and executable proof.
@@ -534,11 +535,12 @@ Completed slices from this inventory:
   `slice_ptr`, `ptr_slice_ptr_ptr`, and `slice_elem_ptr`:
   `frontier_slice_pointer_arith` now exports real rows for runtime and
   comptime pointer addition, chained pointer addition, constant pointer
-  subtraction, selected runtime pointer subtraction, loads/stores through
-  derived pointers, slice pointer extraction, slice element pointer
+  subtraction, runtime pointer subtraction from a runtime positive base index,
+  loads/stores through derived pointers, slice pointer extraction, slice element pointer
   load/store, and slice length from a pointer-backed slice. The x86_64 generic
-  CFG path now uses a reusable typed address model with base pointer, optional
-  dynamic index, constant byte offset, scalar width, and element-size checks;
+  CFG path now uses a reusable typed address model with base pointer, additive
+  and subtractive dynamic index terms, constant byte offset, scalar width, and
+  element-size checks;
   accepted rows prove i8, i16, i32, and i64 scalar pointer loads/stores. These
   rows lower through typed AIR v2 pointer/aggregate semantics, generic CFG
   pointer/slice return/load/store codegen, z_llvm object emission, Zig native
@@ -551,7 +553,9 @@ Completed slices from this inventory:
   multi-load i32 forms such as pair-sum rows where the typed address model still
   needs a reusable "load two addresses then combine" operation; scalar
   load/store and checked-slice hot paths route through `GenericCfgTypedAddress`.
-  Pointer/slice semantic recognition now has a model-owned
+  Two-term dynamic addressing currently remains fail-closed when the selected
+  terms require `%rcx` as an input scratch; single-index `%rcx` rows remain
+  supported by the existing protected path. Pointer/slice semantic recognition now has a model-owned
   `PointerSliceAddressSummary` for pointer/slice op counts, base pointer,
   dynamic index, constant offset, scalar width, slice source, and
   bounds-check-like branch presence. Checked slice-element store is tracked as

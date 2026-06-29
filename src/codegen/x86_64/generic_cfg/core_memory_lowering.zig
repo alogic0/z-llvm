@@ -74,8 +74,8 @@ pub const GenericCfgScalarWidth = enum {
 
 pub const GenericCfgTypedAddress = struct {
     base_reg: ArgReg,
-    index_reg: ?ArgReg,
-    index_direction: enum { add, sub } = .add,
+    add_index_reg: ?ArgReg,
+    sub_index_reg: ?ArgReg = null,
     offset_bytes: i128,
     width: GenericCfgScalarWidth,
 };
@@ -291,7 +291,7 @@ fn genericCfgTypedScalarAddressResolved(
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
     if (paramRegOrNull(function, name, .ptr) catch null) |reg| {
-        return .{ .base_reg = reg, .index_reg = null, .offset_bytes = 0, .width = width };
+        return .{ .base_reg = reg, .add_index_reg = null, .offset_bytes = 0, .width = width };
     }
     const instruction = findInstructionInAddressScope(block, options, name) orelse return null;
     switch (instruction.kind) {
@@ -303,12 +303,12 @@ fn genericCfgTypedScalarAddressResolved(
             switch (index.value) {
                 .int => |int| address.offset_bytes += int * width.bytes(),
                 .named => |index_name| {
-                    if (address.index_reg != null) return null;
                     if (genericCfgI64ParamRegThroughAddressScope(function, block, options, .{ .named = index_name })) |reg| {
-                        address.index_reg = reg;
+                        if (address.add_index_reg != null) return null;
+                        address.add_index_reg = reg;
                     } else if (genericCfgI64NegatedParamRegThroughAddressScope(function, block, options, .{ .named = index_name })) |reg| {
-                        address.index_reg = reg;
-                        address.index_direction = .sub;
+                        if (address.sub_index_reg != null) return null;
+                        address.sub_index_reg = reg;
                     } else {
                         return null;
                     }
@@ -413,7 +413,7 @@ fn lowerGenericCfgDynamicPointerStoreThenLoadReturn(
 }
 
 fn sameGenericCfgTypedAddress(lhs: GenericCfgTypedAddress, rhs: GenericCfgTypedAddress) bool {
-    return lhs.base_reg == rhs.base_reg and lhs.index_reg == rhs.index_reg and lhs.index_direction == rhs.index_direction and lhs.offset_bytes == rhs.offset_bytes and lhs.width == rhs.width;
+    return lhs.base_reg == rhs.base_reg and lhs.add_index_reg == rhs.add_index_reg and lhs.sub_index_reg == rhs.sub_index_reg and lhs.offset_bytes == rhs.offset_bytes and lhs.width == rhs.width;
 }
 
 fn sameGenericCfgDynamicI32Address(lhs: GenericCfgDynamicI32Address, rhs: GenericCfgDynamicI32Address) bool {
@@ -562,29 +562,68 @@ pub fn emitGenericCfgTypedAddressIntoRcx(
     address: GenericCfgTypedAddress,
 ) !void {
     if (address.offset_bytes < std.math.minInt(i32) or address.offset_bytes > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
-    if (address.index_reg) |index_reg| {
-        const shift = address.width.shift();
-        if (index_reg == .rcx and address.base_reg == .r8) {
-            if (address.index_direction == .sub) return error.UnsupportedCodegenValue;
+    const index_count: u2 = @as(u2, @intFromBool(address.add_index_reg != null)) + @as(u2, @intFromBool(address.sub_index_reg != null));
+    if (index_count == 1) {
+        const term = if (address.add_index_reg) |reg|
+            IndexTerm{ .reg = reg, .direction = .add }
+        else
+            IndexTerm{ .reg = address.sub_index_reg.?, .direction = .sub };
+        if (term.reg == .rcx and address.base_reg == .r8) {
+            if (term.direction == .sub) return error.UnsupportedCodegenValue;
+            const shift = address.width.shift();
             if (shift != 0) try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = shift });
             try machine.instructions.append(allocator, .add_r8_rcx);
         } else {
-            if (index_reg == .rcx) {
+            if (term.reg == .rcx) {
                 try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rcx } });
                 try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.base_reg } });
+                try emitGenericCfgTypedAddressPreparedIndexTerm(allocator, machine, address.width, term.direction);
             } else {
                 try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.base_reg } });
-                try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .r8, .src = index_reg } });
+                try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, term.reg, term.direction);
             }
-            if (shift != 0) try machine.instructions.append(allocator, .{ .shl_r8_imm6 = shift });
-            try machine.instructions.append(allocator, if (address.index_direction == .add) .add_r8_rcx else .sub_r8_rcx);
         }
     } else {
+        if (address.add_index_reg == .rcx or address.sub_index_reg == .rcx) return error.UnsupportedCodegenValue;
         try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = address.base_reg } });
+        if (address.add_index_reg) |reg| try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, reg, .add);
+        if (address.sub_index_reg) |reg| try emitGenericCfgTypedAddressIndexTerm(allocator, machine, address.width, reg, .sub);
     }
     if (address.offset_bytes != 0) {
         try machine.instructions.append(allocator, .{ .add_rcx_imm32 = @intCast(address.offset_bytes) });
     }
+}
+
+const IndexDirection = enum { add, sub };
+
+const IndexTerm = struct {
+    reg: ArgReg,
+    direction: IndexDirection,
+};
+
+fn emitGenericCfgTypedAddressIndexTerm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    width: GenericCfgScalarWidth,
+    index_reg: ArgReg,
+    direction: IndexDirection,
+) !void {
+    if (index_reg == .rcx) return error.UnsupportedCodegenValue;
+    if (index_reg != .r8) {
+        try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .r8, .src = index_reg } });
+    }
+    try emitGenericCfgTypedAddressPreparedIndexTerm(allocator, machine, width, direction);
+}
+
+fn emitGenericCfgTypedAddressPreparedIndexTerm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    width: GenericCfgScalarWidth,
+    direction: IndexDirection,
+) !void {
+    const shift = width.shift();
+    if (shift != 0) try machine.instructions.append(allocator, .{ .shl_r8_imm6 = shift });
+    try machine.instructions.append(allocator, if (direction == .add) .add_r8_rcx else .sub_r8_rcx);
 }
 
 pub fn emitGenericCfgScalarValueIntoReturnReg(

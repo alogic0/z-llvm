@@ -89,15 +89,19 @@ frontier tag/payload switch shape.
 `frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
 `slice_elem_ptr`, runtime and comptime `ptr_add`, chained `ptr_add`,
-constant and selected runtime `ptr_sub`, pointer-add-fed loads, pointer-add-fed stores, and
+constant `ptr_sub`, runtime `ptr_sub` with one additive and one subtractive
+dynamic index term, pointer-add-fed loads, pointer-add-fed stores, and
 load/store through derived slice element pointers. The same typed address path
 now covers `slice.ptr` plus constant offset plus runtime index feeding a
 store/reload, so the slice pointer proof is not load-only. The x86_64 generic
 CFG path now uses a reusable typed
-address model with a base pointer, optional dynamic index, constant byte
-offset, scalar width, and conservative element-size checks. Accepted rows prove
+address model with a base pointer, additive and subtractive dynamic index
+terms, constant byte offset, scalar width, and conservative element-size
+checks. Accepted rows prove
 i8, i16, i32, and i64 scalar pointer loads/stores, including dynamic-index and
-constant-offset forms. The accepted `slice_elem_ptr` rows still include
+constant-offset forms. Two-term dynamic address forms that require `%rcx` as an
+input scratch remain explicitly fail-closed until the emitter has a second
+scratch strategy. The accepted `slice_elem_ptr` rows still include
 unchecked pointer-address proof, and `frontier_checked_slice_elem_ptr_load` now
 adds the checked bounds guard: the hot path lowers through the same typed
 address model, the cold path preserves the `outOfBounds(index, len)` noreturn
