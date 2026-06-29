@@ -212,7 +212,8 @@ export fn frontier_try_ptr_switch_match(tag: i32, value: i32) i32 {
 export fn frontier_errunion_payload_ptr_branch(tag: i32, value: i32, delta: i32) i32 {
     var result = frontierMaybeTryPayload(tag, value);
     if (result) |*payload| {
-        return payload.* + delta;
+        if (payload.* > 20) return payload.* + delta;
+        return payload.* - delta;
     } else |_| {
         return -65;
     }

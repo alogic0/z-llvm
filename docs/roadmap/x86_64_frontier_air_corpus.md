@@ -53,8 +53,9 @@ the selected error-union pointer slot/payload path without AIR text fallback.
 The direct payload-pointer row also proves `unwrap_errunion_payload_ptr:ty_op`
 from typed-v2 facts: the exported instruction carries the error-union pointer
 operand, z_llvm decodes the selected i32 payload into a synthetic pointer
-payload value, the success arm adds an ABI parameter, and the executable
-harness checks both success and error arms.
+payload value, the success arm now lowers a nested compare with add/sub
+terminal returns against an ABI parameter, and the executable harness checks
+both payload arms plus the error arm.
 The optional scalar payload branch row now validates `wrap_optional`,
 `is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
 payload add/sub branch through generic single-block CFG, and has executable
