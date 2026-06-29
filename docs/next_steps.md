@@ -401,6 +401,9 @@ Execution order:
    case and default arm each contain an independent `try`; typed-v2 lowers both
    arms into a switch merge phi, and generic CFG codegen validates both
    success-arm incoming values before emitting the shared epilogue.
+   Branch-owned and switch-owned multi-arm try rows now share the same
+   error-union try-stage emitter, so call/spill/error-edge emission is no
+   longer duplicated per enclosing CFG shape.
    Together these prove the same pointer-slot model beyond simple branch
    continuations.
    These rows pass through typed AIR v2, generic CFG, z_llvm object

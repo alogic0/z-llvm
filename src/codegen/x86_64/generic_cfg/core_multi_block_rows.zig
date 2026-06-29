@@ -2935,10 +2935,10 @@ fn lowerGenericCfgBranchBothErrorUnionTryReturn(
     try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, plan.entry, plan.entry, entry_condbr.cond, plan.then_block.name);
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.else_block.name);
-    try emitBranchTryStageToEpilogue(allocator, machine, function, plan.else_block, plan.else_stage, epilogue_label);
+    try emitErrorUnionTryStageToEpilogue(allocator, machine, function, plan.else_block, plan.else_stage, plan.else_stage.success_add_imm, epilogue_label);
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.then_block.name);
-    try emitBranchTryStageToEpilogue(allocator, machine, function, plan.then_block, plan.then_stage, epilogue_label);
+    try emitErrorUnionTryStageToEpilogue(allocator, machine, function, plan.then_block, plan.then_stage, plan.then_stage.success_add_imm, epilogue_label);
 
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
     try appendStackFrameEnd(allocator, machine, frame_bytes);
@@ -2997,12 +2997,13 @@ fn lowerGenericCfgBranchThenErrorUnionTryReturn(
     return true;
 }
 
-fn emitBranchTryStageToEpilogue(
+fn emitErrorUnionTryStageToEpilogue(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     try_block: ir.BasicBlock,
     stage: BranchTryStage,
+    success_add_imm: u8,
     epilogue_label: []const u8,
 ) !void {
     const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, try_block, stage.call);
@@ -3018,7 +3019,7 @@ fn emitBranchTryStageToEpilogue(
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 
     try appendGenericCfgBlockLabel(allocator, machine, stage.success_block.name);
-    try emitPayloadAddImmWrapFromCallSlot(allocator, machine, stage.success_add_imm, epilogue_label);
+    try emitPayloadAddImmWrapFromCallSlot(allocator, machine, success_add_imm, epilogue_label);
 }
 
 fn lowerGenericCfgSwitchThenErrorUnionTryReturn(
@@ -3086,40 +3087,15 @@ fn lowerGenericCfgSwitchBothErrorUnionTryReturn(
     try machine.instructions.append(allocator, .{ .jmp = plan.default_block.name });
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.default_block.name);
-    try emitSwitchTryStageToEpilogue(allocator, machine, function, plan.default_block, plan.default_stage, plan.default_success_add_imm, epilogue_label);
+    try emitErrorUnionTryStageToEpilogue(allocator, machine, function, plan.default_block, plan.default_stage, plan.default_success_add_imm, epilogue_label);
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.case_block.name);
-    try emitSwitchTryStageToEpilogue(allocator, machine, function, plan.case_block, plan.case_stage, plan.case_success_add_imm, epilogue_label);
+    try emitErrorUnionTryStageToEpilogue(allocator, machine, function, plan.case_block, plan.case_stage, plan.case_success_add_imm, epilogue_label);
 
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
     return true;
-}
-
-fn emitSwitchTryStageToEpilogue(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    try_block: ir.BasicBlock,
-    stage: BranchTryStage,
-    success_add_imm: u8,
-    epilogue_label: []const u8,
-) !void {
-    const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, try_block, stage.call);
-    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = stage.call.callee, .ret_ty = stage.call.ret_ty } });
-    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
-    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
-    try machine.instructions.append(allocator, .test_eax_eax);
-    try appendGenericCfgConditionalBranch(allocator, machine, if (stage.success_is_then) .je else .jne, stage.success_block.name);
-
-    try appendGenericCfgBlockLabel(allocator, machine, stage.err_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, stage.success_block.name);
-    try emitPayloadAddImmWrapFromCallSlot(allocator, machine, success_add_imm, epilogue_label);
 }
 
 fn branchBothErrorUnionTryReturn(function: ir.Function) ?BranchBothErrorUnionTryReturn {
