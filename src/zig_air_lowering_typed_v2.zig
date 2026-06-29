@@ -31,7 +31,6 @@ const validateSretAggregateCallWrapperRecords = air_aggregate_copy.validateSretA
 const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegisterAggregateCandidate;
 
 const lowerAccumulatorLoop = legacy.lowerAccumulatorLoop;
-const lowerConditionalSlotUpdate = legacy.lowerConditionalSlotUpdate;
 const lowerErrorUnionPayload = legacy.lowerErrorUnionPayload;
 const lowerRuntimeOptionalPointerMain = legacy.lowerRuntimeOptionalPointerMain;
 const lowerRuntimePointerLoadStoreMain = legacy.lowerRuntimePointerLoadStoreMain;
@@ -1151,7 +1150,48 @@ pub fn lowerTypedV2ConditionalSlotUpdate(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2ConditionalSlotUpdateRecords(function_type, structured_air_v2)) return null;
-    return try lowerConditionalSlotUpdate(allocator, air_function);
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg1" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 1 }, .name = "arg2" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "neg",
+        .kind = .{ .binary = .{
+            .op = .sub,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .int = 0 },
+            .rhs = .{ .named = "arg1" },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "delta",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "arg2" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .named = "arg1" },
+            .false_value = .{ .named = "neg" },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .named = "delta" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn typedV2ConditionalSlotUpdateRecords(
