@@ -1231,19 +1231,7 @@ pub fn typedV2ErrorSwitchRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    return function_type.params.len == 1 and
-        function_type.params[0].ir_type.eql(.{ .int = 8 }) and
-        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
-        air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "call") >= 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "is_non_err") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "switch_br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 3 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedErrorSwitchSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2ErrorClassifier(
@@ -1260,14 +1248,7 @@ pub fn typedV2ErrorClassifierRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    return function_type.params.len == 1 and
-        function_type.params[0].ir_type.eql(.{ .int = 8 }) and
-        function_type.return_type.ir_type.eql(.{ .int = 64 }) and
-        air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "block") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "switch_br") == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "br") == 3 and
-        air_model.typedHasReturnOpcode(structured_air_v2);
+    return air_model.typedErrorClassifierSummary(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerTypedV2RuntimeOptionalPointerMain(

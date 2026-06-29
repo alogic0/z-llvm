@@ -906,6 +906,10 @@ pub const TypedRuntimeWrapperSummary = struct {
     kind: enum { optional_pointer_main, pointer_load_store_main },
 };
 
+pub const TypedErrorSwitchSummary = struct {
+    kind: enum { switch_dispatch, classify },
+};
+
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
     if (!view.operandCoverage()) return null;
@@ -2470,6 +2474,47 @@ pub fn typedRuntimePointerLoadStoreMainSummary(
     return .{ .kind = .pointer_load_store_main };
 }
 
+pub fn typedErrorSwitchSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedErrorSwitchSummary {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "call") < 1 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "is_non_err") != 1 or
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") != 1 or
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") != 1 or
+        typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
+        typedOpcodeCount(structured_air_v2, "cond_br") != 1 or
+        typedOpcodeCount(structured_air_v2, "br") != 3 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .switch_dispatch };
+}
+
+pub fn typedErrorClassifierSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedErrorSwitchSummary {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 64 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
+        typedOpcodeCount(structured_air_v2, "br") != 3 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{ .kind = .classify };
+}
+
 fn typedUnionFieldVal(structured_air_v2: air_export.StructuredAirV2, field_index: usize) ?air_export.TypedInstruction {
     var found: ?air_export.TypedInstruction = null;
     for (structured_air_v2.instructions) |instruction| {
@@ -2714,6 +2759,61 @@ test "typed AIR model recognizes union tag payload switch summary" {
 
     switch_operands[0].value = "0";
     try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) == null);
+}
+
+test "typed AIR model recognizes error switch and classifier summaries" {
+    var error_switch_params = [_]ZigType{
+        .{ .ir_type = .{ .int = 8 } },
+    };
+    const error_switch_type = FunctionType{
+        .params = &error_switch_params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    const error_switch_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i8", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "call", .result_type = "error_union", .data_kind = "pl_op", .operands = &.{} },
+        .{ .index = 2, .opcode = "block", .result_type = "void", .data_kind = "ty_pl", .operands = &.{} },
+        .{ .index = 3, .opcode = "is_non_err", .result_type = "i1", .data_kind = "un_op", .operands = &.{} },
+        .{ .index = 4, .opcode = "unwrap_errunion_payload", .result_type = "i8", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 5, .opcode = "unwrap_errunion_err", .result_type = "i16", .data_kind = "ty_op", .operands = &.{} },
+        .{ .index = 6, .opcode = "switch_br", .result_type = "noreturn", .data_kind = "switch_br", .operands = &.{} },
+        .{ .index = 7, .opcode = "cond_br", .result_type = "noreturn", .data_kind = "pl_op", .operands = &.{} },
+        .{ .index = 8, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 9, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 10, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 11, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &.{} },
+    };
+    const error_switch_air = air_export.StructuredAirV2{ .instructions = @constCast(&error_switch_instructions) };
+    try std.testing.expectEqual(.switch_dispatch, typedErrorSwitchSummary(error_switch_type, error_switch_air).?.kind);
+
+    const wrong_error_switch_type = FunctionType{
+        .params = &error_switch_params,
+        .return_type = .{ .ir_type = .{ .int = 64 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    try std.testing.expect(typedErrorSwitchSummary(wrong_error_switch_type, error_switch_air) == null);
+
+    const classifier_type = FunctionType{
+        .params = &error_switch_params,
+        .return_type = .{ .ir_type = .{ .int = 64 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    const classifier_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i8", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "block", .result_type = "void", .data_kind = "ty_pl", .operands = &.{} },
+        .{ .index = 2, .opcode = "switch_br", .result_type = "noreturn", .data_kind = "switch_br", .operands = &.{} },
+        .{ .index = 3, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 4, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 5, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &.{} },
+        .{ .index = 6, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &.{} },
+    };
+    const classifier_air = air_export.StructuredAirV2{ .instructions = @constCast(&classifier_instructions) };
+    try std.testing.expectEqual(.classify, typedErrorClassifierSummary(classifier_type, classifier_air).?.kind);
+    try std.testing.expect(typedErrorClassifierSummary(error_switch_type, classifier_air) == null);
 }
 
 test "typed AIR model collects branch i32 constants" {
