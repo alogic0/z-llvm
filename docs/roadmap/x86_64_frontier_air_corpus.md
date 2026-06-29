@@ -50,6 +50,12 @@ both terminal arms rewrap payload-derived values, plus source-backed
 `try_ptr` and `try_ptr_cold` rows where the Zig hook exports pointer operands
 for `try_ptr`/`try_ptr_cold` and `unwrap_errunion_err_ptr` and z_llvm lowers
 the selected error-union pointer slot/payload path without AIR text fallback.
+The optional scalar payload branch row now validates `wrap_optional`,
+`is_non_null`, and `optional_payload` data flow from typed-v2 facts, lowers the
+payload add/sub branch through generic single-block CFG, and has executable
+proof for both payload arms and the null fallback in ReleaseFast, ReleaseSafe,
+and ReleaseSmall. This is still a selected optional-payload branch subset, not
+arbitrary optional control-flow lowering.
 The same pointer-form path now includes a post-try payload branch where both
 arms rewrap add/sub results, including the unsigned payload compare emitted by
 this AIR shape, plus a nested two-`try_ptr` chain that feeds the first payload
@@ -151,20 +157,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=653
-structured_functions=653
-generic_codegen_functions=653
-generic_cfg_functions=653
+discovered_functions=654
+structured_functions=654
+generic_codegen_functions=654
+generic_cfg_functions=654
 structural_matcher_functions=0
-structured_air_v2_functions=653
-typed_air_operand_functions=653
+structured_air_v2_functions=654
+typed_air_operand_functions=654
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=653
+generic_lowering_functions=654
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=653
+object_emitted_functions=654
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

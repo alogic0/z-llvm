@@ -16,6 +16,7 @@ pub const GenericCfgBranchKind = enum {
     jc,
     js,
     jae,
+    jle,
 };
 
 pub fn appendGenericCfgBlockLabel(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8) !void {
@@ -35,6 +36,7 @@ pub fn appendGenericCfgConditionalBranch(
         .jc => .{ .jc = label },
         .js => .{ .js = label },
         .jae => .{ .jae = label },
+        .jle => .{ .jle = label },
     });
 }
 

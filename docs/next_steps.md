@@ -392,6 +392,12 @@ Execution order:
    fallback from typed-v2 branch/return constants. ReleaseSafe checked unwrap
    admission remains fail-closed to the explicit nested `unwrapNull`/`unreach`
    block shape.
+   The optional scalar payload branch row now lowers from typed-v2 optional
+   facts as well: z_llvm validates the `wrap_optional`/`is_non_null`/
+   `optional_payload` data flow and the payload add/sub branch without a
+   function-name gate, then emits a generic single-block CFG shape that is
+   executable-proven in all three release modes. Arbitrary optional payload
+   control-flow remains future work.
 7. Compiler-core frontier slice: only after the registries are shared, add
    small real Zig compiler-core frontier rows that exercise the highest ranked
    categories through typed AIR v2 and generic CFG. Keep the
@@ -1201,12 +1207,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=653`,
-`generic_codegen_functions=653`, `generic_cfg_functions=653`,
+frontier gate reports `source_rows=14`, `discovered_functions=654`,
+`generic_codegen_functions=654`, `generic_cfg_functions=654`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=653`, `object_failures=0`,
+`object_emitted_functions=654`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1219,9 +1225,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=653`,
-`generic_cfg_functions=653`, `structural_matcher_functions=0`,
-`object_emitted_functions=653`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=654`,
+`generic_cfg_functions=654`, `structural_matcher_functions=0`,
+`object_emitted_functions=654`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

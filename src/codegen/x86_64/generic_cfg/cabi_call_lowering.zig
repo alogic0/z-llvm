@@ -1453,7 +1453,7 @@ pub fn emitGenericCfgIcmpCondition(
         .slt => if (icmp.operand_ty.eql(.{ .int = 32 }) and isInt(icmp.rhs, 0))
             .js
         else
-            return error.UnsupportedCodegenInstruction,
+            .jle,
         .ugt, .uge, .ult, .ule, .sgt, .sge, .sle => return error.UnsupportedCodegenInstruction,
     };
 
@@ -1488,6 +1488,18 @@ pub fn emitGenericCfgIcmpCondition(
         const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });
         try appendGenericCfgCompareParamZero(allocator, machine, lhs_reg);
         return .js;
+    }
+
+    if (icmp.predicate == .slt) {
+        const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });
+        const rhs_imm = switch (icmp.rhs) {
+            .int => |int| try i32Value(int),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        if (rhs_imm == std.math.minInt(i32)) return error.UnsupportedCodegenValue;
+        try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
+        try appendGenericCfgCompareLocalImm(allocator, machine, .eax, rhs_imm - 1);
+        return .jle;
     }
 
     if (isInt(icmp.rhs, 0)) {

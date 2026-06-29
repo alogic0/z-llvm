@@ -115,6 +115,7 @@ const typedV2SretIntegerAggregateCallWrapperRecords = typed_v2.typedV2SretIntege
 const typedV2ErrorUnionPayloadRecords = typed_v2.typedV2ErrorUnionPayloadRecords;
 const typedV2MaybeErrorRecords = typed_v2.typedV2MaybeErrorRecords;
 const typedV2OptionalPayloadRecords = typed_v2.typedV2OptionalPayloadRecords;
+const typedV2OptionalPayloadBranchRecords = typed_v2.typedV2OptionalPayloadBranchRecords;
 const typedV2OptionalPointerRecords = typed_v2.typedV2OptionalPointerRecords;
 const typedV2PackedReadFlagRecords = typed_v2.typedV2PackedReadFlagRecords;
 const typedV2PackedReplaceLowRecords = typed_v2.typedV2PackedReplaceLowRecords;
@@ -137,6 +138,7 @@ const lowerTypedV2SretIntegerAggregateAbi = typed_v2.lowerTypedV2SretIntegerAggr
 const lowerTypedV2ErrorUnionPayload = typed_v2.lowerTypedV2ErrorUnionPayload;
 const lowerTypedV2MaybeError = typed_v2.lowerTypedV2MaybeError;
 const lowerTypedV2OptionalPayload = typed_v2.lowerTypedV2OptionalPayload;
+const lowerTypedV2OptionalPayloadBranch = typed_v2.lowerTypedV2OptionalPayloadBranch;
 const lowerTypedV2OptionalPointer = typed_v2.lowerTypedV2OptionalPointer;
 const lowerTypedV2PackedBits = typed_v2.lowerTypedV2PackedBits;
 const lowerTypedV2ConditionalSliceSum = typed_v2.lowerTypedV2ConditionalSliceSum;
@@ -337,7 +339,8 @@ pub fn firstUnsupported(
             false;
     const typed_optional_payload =
         if (function.structured_air_v2) |structured_air_v2|
-            typedV2OptionalPayloadRecords(function_type, structured_air_v2)
+            typedV2OptionalPayloadRecords(function_type, structured_air_v2) or
+                typedV2OptionalPayloadBranchRecords(function_type, structured_air_v2)
         else
             false;
     const typed_optional_pointer =
@@ -644,6 +647,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2OptionalPayload(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2OptionalPayloadBranch(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2OptionalPointer(allocator, air_function, function_type, structured_air_v2)) |function| {
