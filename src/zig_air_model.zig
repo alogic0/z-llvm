@@ -933,6 +933,13 @@ pub const TypedLoopTrySummary = struct {
     callee_external: bool,
     call_signature: []const u8,
     error_return: i32,
+    post_branch: ?TypedLoopTryPostBranchSummary = null,
+};
+
+pub const TypedLoopTryPostBranchSummary = struct {
+    threshold_param_index: usize,
+    true_addend: i32,
+    false_addend: i32,
 };
 
 pub const TypedInlineAsmSummary = struct {
@@ -2755,11 +2762,18 @@ pub fn typedLoopTrySummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) ?TypedLoopTrySummary {
-    if (function_type.params.len != 2 or
-        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+    const has_post_branch = switch (function_type.params.len) {
+        2 => false,
+        3 => true,
+        else => return null,
+    };
+    const expected_cond_br_count: usize = if (has_post_branch) 4 else 3;
+    const expected_return_count: usize = if (has_post_branch) 3 else 2;
+    if (!function_type.params[0].ir_type.eql(.{ .int = 32 }) or
         !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        (has_post_branch and !function_type.params[2].ir_type.eql(.{ .int = 32 })) or
         !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
-        typedOpcodeCount(structured_air_v2, "arg") != 2 or
+        typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len or
         typedOpcodeCount(structured_air_v2, "alloc") != 2 or
         typedOpcodeCount(structured_air_v2, "loop") != 1 or
         typedOpcodeCount(structured_air_v2, "repeat") != 1 or
@@ -2769,10 +2783,16 @@ pub fn typedLoopTrySummary(
         typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") != 1 or
         typedOpcodeCount(structured_air_v2, "cmp_lt") != 1 or
         typedOpcodeCount(structured_air_v2, "cmp_eq") != 1 or
-        typedOpcodeCount(structured_air_v2, "cond_br") != 3 or
-        typedOpcodeCount(structured_air_v2, "repeat") != 1 or
-        typedReturnOpcodeCount(structured_air_v2) != 2)
+        typedOpcodeCount(structured_air_v2, "cond_br") != expected_cond_br_count or
+        typedReturnOpcodeCount(structured_air_v2) != expected_return_count)
     {
+        return null;
+    }
+    if (has_post_branch) {
+        const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+        const sub_count = typedOpcodeCount(structured_air_v2, "sub") + typedOpcodeCount(structured_air_v2, "sub_safe");
+        if (typedOpcodeCount(structured_air_v2, "cmp_gt") != 1 or add_count != 3 or sub_count != 1) return null;
+    } else if (typedOpcodeCount(structured_air_v2, "cmp_gt") != 0 or typedOpcodeCount(structured_air_v2, "sub") != 0 or typedOpcodeCount(structured_air_v2, "sub_safe") != 0) {
         return null;
     }
 
@@ -2805,6 +2825,11 @@ pub fn typedLoopTrySummary(
         .callee_external = typed_callee.external,
         .call_signature = details.signature_text,
         .error_return = error_return orelse return null,
+        .post_branch = if (has_post_branch) .{
+            .threshold_param_index = 2,
+            .true_addend = 1,
+            .false_addend = -1,
+        } else null,
     };
 }
 

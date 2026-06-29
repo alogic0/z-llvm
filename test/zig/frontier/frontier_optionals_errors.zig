@@ -182,6 +182,18 @@ export fn frontier_loop_try_match(limit: i32, fail_at: i32) i32 {
     return total;
 }
 
+export fn frontier_loop_try_post_branch(limit: i32, fail_at: i32, threshold: i32) i32 {
+    var total: i32 = 0;
+    var index: i32 = 0;
+    while (index < limit) : (index += 1) {
+        const tag: i32 = if (index == fail_at) 1 else 0;
+        const payload = frontierMaybeTryPayload(tag, index) catch return -81;
+        total += payload;
+    }
+    if (total > threshold) return total + 1;
+    return total - 1;
+}
+
 fn frontierTrySwitch(tag: i32, value: i32) FrontierError!i32 {
     const payload = try frontierMaybeTryPayload(tag, value);
     return switch (payload & 3) {

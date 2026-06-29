@@ -960,6 +960,9 @@ pub fn lowerTypedV2LoopTry(
     function.calling_conv = irCallingConvention(function_type);
     try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
     try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg1" });
+    if (summary.post_branch != null) {
+        try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg2" });
+    }
 
     var entry = ir.BasicBlock.init("entry");
     errdefer entry.deinit(allocator);
@@ -1099,6 +1102,53 @@ pub fn lowerTypedV2LoopTry(
 
     var exit = ir.BasicBlock.init("exit");
     errdefer exit.deinit(allocator);
+    if (summary.post_branch) |post_branch| {
+        try exit.instructions.append(allocator, .{
+            .result = "post_branch_cond",
+            .kind = .{ .icmp = .{
+                .predicate = .sgt,
+                .operand_ty = .{ .int = 32 },
+                .lhs = .{ .named = "total" },
+                .rhs = .{ .named = "arg2" },
+            } },
+        });
+        exit.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "post_branch_cond" },
+            .then_target = "exit_then",
+            .else_target = "exit_else",
+        } };
+        try function.blocks.append(allocator, exit);
+
+        var exit_then = ir.BasicBlock.init("exit_then");
+        errdefer exit_then.deinit(allocator);
+        try exit_then.instructions.append(allocator, .{
+            .result = "post_branch_true",
+            .kind = .{ .binary = .{
+                .op = .add,
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = "total" },
+                .rhs = .{ .int = post_branch.true_addend },
+            } },
+        });
+        exit_then.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "post_branch_true" } } };
+        try function.blocks.append(allocator, exit_then);
+
+        var exit_else = ir.BasicBlock.init("exit_else");
+        errdefer exit_else.deinit(allocator);
+        try exit_else.instructions.append(allocator, .{
+            .result = "post_branch_false",
+            .kind = .{ .binary = .{
+                .op = .add,
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = "total" },
+                .rhs = .{ .int = post_branch.false_addend },
+            } },
+        });
+        exit_else.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "post_branch_false" } } };
+        try function.blocks.append(allocator, exit_else);
+        return function;
+    }
     exit.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "total" } } };
     try function.blocks.append(allocator, exit);
     return function;

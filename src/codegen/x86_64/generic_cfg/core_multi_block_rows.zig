@@ -67,12 +67,16 @@ pub fn lowerGenericCfgLoopTryReturn(
     const call_label = "generic_cfg_loop_try_call";
     const error_label = "generic_cfg_loop_try_error";
     const exit_label = "generic_cfg_loop_try_exit";
+    const exit_else_label = "generic_cfg_loop_try_exit_else";
     const epilogue_label = "generic_cfg_loop_try_generic_cfg_select_end";
-    const frame_bytes: u8 = 24;
+    const frame_bytes: u8 = if (plan.post_branch != null) 40 else 24;
 
     try appendStackFrame(allocator, machine, frame_bytes);
     try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = .rdi } });
     try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot3, .reg = .rsi } });
+    if (plan.post_branch != null) {
+        try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot6, .reg = .rdx } });
+    }
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot0 });
     try machine.instructions.append(allocator, .{ .spill_eax_rsp = .slot1 });
@@ -113,7 +117,20 @@ pub fn lowerGenericCfgLoopTryReturn(
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 
     try appendGenericCfgBlockLabel(allocator, machine, exit_label);
-    try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+    if (plan.post_branch) |post_branch| {
+        try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot6 } });
+        try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .reg = .r9, .frame_index = .slot0 } });
+        try machine.instructions.append(allocator, .{ .cmp_ecx_arg32 = .r9 });
+        try appendGenericCfgConditionalBranch(allocator, machine, .jle, exit_else_label);
+        try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+        if (post_branch.true_addend != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = post_branch.true_addend });
+        try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+        try appendGenericCfgBlockLabel(allocator, machine, exit_else_label);
+        try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+        if (post_branch.false_addend != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = post_branch.false_addend });
+    } else {
+        try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
+    }
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
@@ -123,23 +140,39 @@ pub fn lowerGenericCfgLoopTryReturn(
 const LoopTryReturnPlan = struct {
     call: ir.CallInst,
     error_return: i32,
+    post_branch: ?LoopTryPostBranchPlan = null,
+};
+
+const LoopTryPostBranchPlan = struct {
+    true_addend: i32,
+    false_addend: i32,
 };
 
 fn loopTryReturn(function: ir.Function) ?LoopTryReturnPlan {
-    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 2 or function.blocks.items.len != 6) return null;
+    const has_post_branch = switch (function.params.items.len) {
+        2 => false,
+        3 => true,
+        else => return null,
+    };
+    const expected_block_count: usize = if (has_post_branch) 8 else 6;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != expected_block_count) return null;
     if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return null;
+    if (has_post_branch and !function.params.items[2].ty.eql(.{ .int = 32 })) return null;
     const entry = function.blocks.items[0];
     const loop = function.blocks.items[1];
     const body = function.blocks.items[2];
     const success = function.blocks.items[3];
     const err_block = function.blocks.items[4];
     const exit = function.blocks.items[5];
+    const exit_then = if (has_post_branch) function.blocks.items[6] else undefined;
+    const exit_else = if (has_post_branch) function.blocks.items[7] else undefined;
     if (!std.mem.eql(u8, entry.name, "entry") or
         !std.mem.eql(u8, loop.name, "loop") or
         !std.mem.eql(u8, body.name, "body") or
         !std.mem.eql(u8, success.name, "success") or
         !std.mem.eql(u8, err_block.name, "error") or
         !std.mem.eql(u8, exit.name, "exit")) return null;
+    if (has_post_branch and (!std.mem.eql(u8, exit_then.name, "exit_then") or !std.mem.eql(u8, exit_else.name, "exit_else"))) return null;
     switch (entry.terminator orelse return null) {
         .br => |br| if (!std.mem.eql(u8, br.target, loop.name)) return null,
         else => return null,
@@ -257,12 +290,67 @@ fn loopTryReturn(function: ir.Function) ?LoopTryReturnPlan {
         .int => |int| i32Value(int) catch return null,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    const exit_ret = switch (exit.terminator orelse return null) {
+    const post_branch = if (has_post_branch)
+        loopTryPostBranch(exit, exit_then, exit_else, total_name, function.params.items[2].name) orelse return null
+    else blk: {
+        const exit_ret = switch (exit.terminator orelse return null) {
+            .ret => |ret| ret,
+            else => return null,
+        };
+        if (!exit_ret.ty.eql(.{ .int = 32 }) or !isNamed(exit_ret.value orelse return null, total_name)) return null;
+        break :blk null;
+    };
+    return .{ .call = call, .error_return = error_return, .post_branch = post_branch };
+}
+
+fn loopTryPostBranch(
+    exit: ir.BasicBlock,
+    exit_then: ir.BasicBlock,
+    exit_else: ir.BasicBlock,
+    total_name: []const u8,
+    threshold_name: []const u8,
+) ?LoopTryPostBranchPlan {
+    if (exit.instructions.items.len != 1) return null;
+    const cond_name = exit.instructions.items[0].result orelse return null;
+    const cmp = switch (exit.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (cmp.predicate != .sgt or
+        !cmp.operand_ty.eql(.{ .int = 32 }) or
+        !isNamed(cmp.lhs, total_name) or
+        !isNamed(cmp.rhs, threshold_name)) return null;
+    const branch = switch (exit.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!isNamed(branch.cond, cond_name) or
+        !std.mem.eql(u8, branch.then_target, exit_then.name) or
+        !std.mem.eql(u8, branch.else_target, exit_else.name)) return null;
+    return .{
+        .true_addend = loopTryPostBranchReturnAddend(exit_then, total_name) orelse return null,
+        .false_addend = loopTryPostBranchReturnAddend(exit_else, total_name) orelse return null,
+    };
+}
+
+fn loopTryPostBranchReturnAddend(block: ir.BasicBlock, total_name: []const u8) ?i32 {
+    if (block.instructions.items.len != 1) return null;
+    const result_name = block.instructions.items[0].result orelse return null;
+    const add = switch (block.instructions.items[0].kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 }) or !isNamed(add.lhs, total_name)) return null;
+    const addend = switch (add.rhs) {
+        .int => |int| i32Value(int) catch return null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const ret = switch (block.terminator orelse return null) {
         .ret => |ret| ret,
         else => return null,
     };
-    if (!exit_ret.ty.eql(.{ .int = 32 }) or !isNamed(exit_ret.value orelse return null, total_name)) return null;
-    return .{ .call = call, .error_return = error_return };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, result_name)) return null;
+    return addend;
 }
 
 fn validateAssumeColdCall(instruction: ir.Instruction) !void {
