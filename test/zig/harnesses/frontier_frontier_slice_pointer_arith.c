@@ -32,6 +32,7 @@ extern int z_frontier_slice_elem_ptr_store(int *, unsigned long, unsigned long, 
 extern int z_frontier_slice_ptr_const_runtime_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_ptr_const_runtime_load");
 extern int z_frontier_slice_ptr_const_runtime_store(int *, unsigned long, unsigned long, int) __asm__("frontier_slice_pointer_arith.frontier_slice_ptr_const_runtime_store");
 extern int z_frontier_checked_slice_elem_ptr_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_checked_slice_elem_ptr_load");
+extern int z_frontier_checked_slice_elem_ptr_store(int *, unsigned long, unsigned long, int) __asm__("frontier_slice_pointer_arith.frontier_checked_slice_elem_ptr_store");
 void z_frontier_slice_out_of_bounds(unsigned long index, unsigned long len) __asm__("frontier_slice_pointer_arith.outOfBounds");
 void z_frontier_slice_out_of_bounds(unsigned long index, unsigned long len) {
     if (index != 5UL || len != 3UL) _exit(104);
@@ -53,6 +54,11 @@ static int expect_death(void (*fn)(void)) {
 static void death_checked_slice_oob(void) {
     const int values[] = { 3, 5, 8 };
     (void)z_frontier_checked_slice_elem_ptr_load(values, 3, 5);
+}
+
+static void death_checked_slice_store_oob(void) {
+    int values[] = { 3, 5, 8 };
+    (void)z_frontier_checked_slice_elem_ptr_store(values, 3, 5, 99);
 }
 
 int main(void) {
@@ -106,5 +112,8 @@ int main(void) {
     if (mutable_values[3] != 47) return 38;
     if (z_frontier_checked_slice_elem_ptr_load(values, 5, 4) != 21) return 34;
     if (expect_death(death_checked_slice_oob) != 0) return 35;
+    if (z_frontier_checked_slice_elem_ptr_store(mutable_values, 5, 4, 59) != 59) return 41;
+    if (mutable_values[4] != 59) return 42;
+    if (expect_death(death_checked_slice_store_oob) != 0) return 43;
     return 0;
 }

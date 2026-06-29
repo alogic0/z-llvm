@@ -185,20 +185,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=668
-structured_functions=668
-generic_codegen_functions=668
-generic_cfg_functions=668
+discovered_functions=669
+structured_functions=669
+generic_codegen_functions=669
+generic_cfg_functions=669
 structural_matcher_functions=0
-structured_air_v2_functions=668
-typed_air_operand_functions=668
+structured_air_v2_functions=669
+typed_air_operand_functions=669
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=668
+generic_lowering_functions=669
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=668
+object_emitted_functions=669
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -236,8 +236,8 @@ Source-backed ABI and pointer/slice boundary proof is green for all three modes 
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=7
-discovered_functions=11
+source_rows=6
+discovered_functions=10
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
@@ -246,7 +246,7 @@ tail_call_boundary_rows=1
 callconv_boundary_rows=1
 stack_pressure_boundary_rows=0
 safety_edge_boundary_rows=0
-pointer_slice_boundary_rows=1
+pointer_slice_boundary_rows=0
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -255,15 +255,15 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 14-source / 663-function strict frontier
+are not counted in the accepted 14-source / 669-function strict frontier
 executable proof. Stack-pressure forwarding for the previous
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 indirect and stack-source
 rows is now accepted in the frontier corpus; the boundary gate keeps
 `stack_pressure_boundary_rows=0` as a regression guard. Checked slice-element
 bounds CFG is accepted in the strict frontier corpus, so
 `safety_edge_boundary_rows=0` is now a regression guard rather than an active
-boundary. Checked slice-element stores remain a source-backed pointer/slice
-boundary until the store-side bounds/panic CFG path is implemented.
+boundary. Checked slice-element stores are also accepted in the strict frontier
+corpus, so `pointer_slice_boundary_rows=0` is now a regression guard.
 
 Executable ABI proof is green for all three modes:
 

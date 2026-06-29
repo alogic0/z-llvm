@@ -627,6 +627,163 @@ pub fn lowerGenericCfgGuardedDynamicPointerLoadPanicReturn(
     return true;
 }
 
+pub fn lowerGenericCfgCheckedSliceStoreLoadReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 4) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or
+        !function.params.items[1].ty.eql(.{ .int = 64 }) or
+        !function.params.items[2].ty.eql(.{ .int = 64 }) or
+        !function.params.items[3].ty.eql(.{ .int = 32 })) return false;
+    if (function.blocks.items.len != 5) return false;
+
+    const entry = function.blocks.items[0];
+    const first_guard = genericCfgSliceBoundsGuard(function, entry) orelse return false;
+    const store_block = blockByName(function, first_guard.cont_target) orelse return false;
+    const first_panic = blockByName(function, first_guard.panic_target) orelse return false;
+    try validateSliceBoundsPanicBlock(function, entry, first_panic, first_guard.index_value, first_guard.len_value);
+
+    const store_step = genericCfgCheckedSliceStoreStep(function, entry, store_block) orelse return false;
+    if (!first_guard.index_value.eql(store_step.index_value)) return false;
+    const second_panic = blockByName(function, store_step.guard.panic_target) orelse return false;
+    const load_block = blockByName(function, store_step.guard.cont_target) orelse return false;
+    try validateSliceBoundsPanicBlock(function, entry, second_panic, store_step.guard.index_value, store_step.guard.len_value);
+
+    const load_address = genericCfgCheckedSliceReturnLoadAddress(function, entry, store_block, load_block) orelse return false;
+    if (!core_memory_lowering.sameGenericCfgTypedAddress(store_step.store_address, load_address)) return false;
+
+    const index_reg = genericCfgI64ParamRegThroughIdentityCast(function, entry, first_guard.index_value) orelse return false;
+    if (store_step.store_address.add_index_reg != index_reg or store_step.store_address.sub_index_reg != null) return false;
+
+    try core_memory_lowering.emitGenericCfgScalarValueIntoReturnReg(allocator, machine, function, store_step.store_value, .i32);
+    try emitGenericCfgUgeI64ValueCondition(allocator, machine, function, entry, index_reg, first_guard.len_value);
+    try appendGenericCfgConditionalBranch(allocator, machine, .jae, first_panic.name);
+    try core_memory_lowering.emitGenericCfgTypedAddressIntoRcx(allocator, machine, store_step.store_address);
+    try core_memory_lowering.emitGenericCfgTypedScalarStoreReturnReg(allocator, machine, .i32);
+
+    try emitGenericCfgUgeI64ValueCondition(allocator, machine, function, entry, index_reg, store_step.guard.len_value);
+    try appendGenericCfgConditionalBranch(allocator, machine, .jae, second_panic.name);
+    try core_memory_lowering.emitGenericCfgTypedScalarLoadIntoReturn(allocator, machine, load_address);
+    try appendGenericCfgReturn(allocator, machine);
+
+    try appendGenericCfgBlockLabel(allocator, machine, first_panic.name);
+    try emitValidatedI64NoreturnCallBlockWithArgs(allocator, machine, function, entry, first_panic);
+    try appendGenericCfgBlockLabel(allocator, machine, second_panic.name);
+    try emitValidatedI64NoreturnCallBlockWithArgs(allocator, machine, function, entry, second_panic);
+    return true;
+}
+
+const GenericCfgSliceBoundsGuard = struct {
+    index_value: ir.Value,
+    len_value: ir.Value,
+    cont_target: []const u8,
+    panic_target: []const u8,
+};
+
+const GenericCfgCheckedSliceStoreStep = struct {
+    store_address: core_memory_lowering.GenericCfgTypedAddress,
+    store_value: ir.Value,
+    index_value: ir.Value,
+    guard: GenericCfgSliceBoundsGuard,
+};
+
+fn genericCfgSliceBoundsGuard(function: ir.Function, block: ir.BasicBlock) ?GenericCfgSliceBoundsGuard {
+    const condbr = switch (block.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const cond_name = switch (condbr.cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const cond_inst = findInstructionInFunction(function, block, cond_name) orelse return null;
+    const icmp = switch (cond_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 64 })) return null;
+    return .{
+        .index_value = icmp.lhs,
+        .len_value = icmp.rhs,
+        .cont_target = condbr.then_target,
+        .panic_target = condbr.else_target,
+    };
+}
+
+fn genericCfgCheckedSliceStoreStep(
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    block: ir.BasicBlock,
+) ?GenericCfgCheckedSliceStoreStep {
+    const guard = genericCfgSliceBoundsGuard(function, block) orelse return null;
+    var store_inst: ?ir.StoreInst = null;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const store = switch (instruction.kind) {
+            .store => |store| store,
+            else => continue,
+        };
+        if (store_inst != null) return null;
+        store_inst = store;
+    }
+    const store = store_inst orelse return null;
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return null;
+    const address = core_memory_lowering.genericCfgTypedScalarAddressAcrossBlocks(function, entry, block, store.ptr, .i32) orelse return null;
+    return .{
+        .store_address = address,
+        .store_value = store.value,
+        .index_value = guard.index_value,
+        .guard = guard,
+    };
+}
+
+fn genericCfgCheckedSliceReturnLoadAddress(
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    store_block: ir.BasicBlock,
+    block: ir.BasicBlock,
+) ?core_memory_lowering.GenericCfgTypedAddress {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const ret_name = switch (ret.value orelse return null) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const ret_inst = findInstruction(block, ret_name) orelse return null;
+    const load = switch (ret_inst.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    return core_memory_lowering.genericCfgTypedScalarLoadAddressAcrossScopes(function, entry, store_block, block, load, .i32);
+}
+
+fn validateSliceBoundsPanicBlock(
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    block: ir.BasicBlock,
+    index_value: ir.Value,
+    len_value: ir.Value,
+) !void {
+    try validateI64NoreturnCallBlock(block);
+    const call = switch (block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => unreachable,
+    };
+    if (!call.args.items[0].value.eql(index_value) or !call.args.items[1].value.eql(len_value)) {
+        return error.UnsupportedCodegenValue;
+    }
+    _ = genericCfgI64ParamRegThroughIdentityCast(function, entry, index_value) orelse return error.UnsupportedCodegenValue;
+    if (directI64ParamReg(function, index_value) == .rsi or directI64ParamReg(function, len_value) == .rdi) {
+        return error.UnsupportedCodegenAbi;
+    }
+}
+
 pub fn genericCfgConstantI32Return(block: ir.BasicBlock) ?i32 {
     if (block.instructions.items.len != 0) return null;
     const ret = switch (block.terminator orelse return null) {

@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=668
-structured_functions=668
-generic_codegen_functions=668
-generic_cfg_functions=668
+discovered_functions=669
+structured_functions=669
+generic_codegen_functions=669
+generic_cfg_functions=669
 structural_matcher_functions=0
-structured_air_v2_functions=668
-typed_air_operand_functions=668
+structured_air_v2_functions=669
+typed_air_operand_functions=669
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=668
+generic_lowering_functions=669
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=668
+object_emitted_functions=669
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 668-function counters above plus `native_link_accepted_rows=14`,
+14-source / 669-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -690,20 +690,20 @@ lowering remains outside this selected frontier row.
 Source-backed ABI and pointer/slice boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs
 `test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
-ReleaseSmall and currently reports per mode: `source_rows=7`,
-`discovered_functions=11`, `varargs_boundary_rows=2`,
+ReleaseSmall and currently reports per mode: `source_rows=6`,
+`discovered_functions=10`, `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
 `safety_edge_boundary_rows=0`,
-`pointer_slice_boundary_rows=1`,
+`pointer_slice_boundary_rows=0`,
 `unexpected_accept_rows=0`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries for
 varargs, vectors, long-double/X87, packed aggregates, tail calls, and
-non-default call conventions, plus a precise pointer/slice boundary for checked
-slice-element store. Checked slice-element loads moved into the accepted strict
-frontier corpus with executable hot/trap-path proof. The prior
+non-default call conventions. Checked slice-element loads and stores moved into
+the accepted strict frontier corpus with executable hot/trap-path proof, so the
+pointer/slice boundary counter is now a zero regression guard. The prior
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 stack-source forwarding
 boundary is now
 accepted in the strict frontier corpus, and the boundary counter remains at
@@ -748,7 +748,7 @@ The aggregate/type-layout refactor starts the next ownership phase: named
 aggregate decoding, field offsets, recursive leaf lookup, supported scalar-leaf
 collection, generic CFG aggregate field/copy lowering, and SysV aggregate
 classification now share `src/zig_air_type_layout.zig`. This preserves the
-strict 14-source / 663-function frontier executable proof while removing the
+strict 14-source / 669-function frontier executable proof while removing the
 former long fixture-path mapping block from `src/zig_air_types.zig`. The
 follow-up removes the former ambiguous nominal `Pair` compatibility rule:
 nominal `Pair` normalizes as `{ i32, i32 }`, and runtime aggregate-pair

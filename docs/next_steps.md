@@ -619,9 +619,9 @@ Completed slices from this inventory:
   needed as the scratch register remain fail-closed. Pointer/slice semantic recognition now has a model-owned
   `PointerSliceAddressSummary` for pointer/slice op counts, base pointer,
   dynamic index, constant offset, scalar width, slice source, and
-  bounds-check-like branch presence. Checked slice-element store is tracked as
-  `pointer_slice_boundary_rows=1` until the store-side bounds/panic CFG path is
-  accepted.
+  bounds-check-like branch presence. Checked slice-element store now uses the
+  same typed address resolver plus a two-guard bounds/panic CFG path and is
+  accepted in the strict frontier proof.
 
 Pointer/slice frontier exit:
 
@@ -629,15 +629,14 @@ Pointer/slice frontier exit:
   x86_64 release claim. Semantic recognition has a model-owned
   `PointerSliceAddressSummary`; representative source-backed rows cover
   pointer addition, slice pointer/length extraction, derived scalar loads and
-  stores, and checked slice-element load.
+  stores, and checked slice-element load/store.
 - Accepted rows have strict object/native-link/executable proof across
   ReleaseFast, ReleaseSafe, and ReleaseSmall. The checked slice load proves both
-  the in-bounds hot path and the cold `outOfBounds(index, len)` trap path.
-- Checked slice-element store is intentionally left as the remaining
-  pointer/slice frontier boundary. It is source-backed and counted as
-  `pointer_slice_boundary_rows=1`, not folded into a generic control-flow
-  failure. The next milestone should move on unless that precise boundary is
-  selected explicitly.
+  the in-bounds hot path and the cold `outOfBounds(index, len)` trap path; the
+  checked slice store proves the in-bounds store/load path and the same cold
+  trap path.
+- `pointer_slice_boundary_rows=0` is now a regression guard. There is no active
+  pointer/slice boundary row in the frontier boundary gate.
 
 Aggregate/type-layout ownership start:
 
@@ -699,17 +698,17 @@ Validation after these refactor slices is saved in
 `tmp/frontier_boundary_counter_update.log`:
 
 - `zig build distribution-air-release-frontier`: ReleaseFast, ReleaseSafe, and
-  ReleaseSmall all report `source_rows=14`, `discovered_functions=663`,
-  `generic_cfg_functions=663`, `structural_matcher_functions=0`,
+  ReleaseSmall all report `source_rows=14`, `discovered_functions=669`,
+  `generic_cfg_functions=669`, `structural_matcher_functions=0`,
   `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
-  `object_emitted_functions=663`, `native_link_accepted_rows=14`,
+  `object_emitted_functions=669`, `native_link_accepted_rows=14`,
   `executable_ok_rows=14`, and `local_fail=0`.
 - `zig build distribution-air-release-frontier-boundaries`: ReleaseFast,
   ReleaseSafe, and ReleaseSmall all report `varargs_boundary_rows=2`,
   `vector_boundary_rows=2`, `x87_boundary_rows=2`,
   `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
   `callconv_boundary_rows=1`, `safety_edge_boundary_rows=0`,
-  `pointer_slice_boundary_rows=1`,
+  `pointer_slice_boundary_rows=0`,
   `unexpected_accept_rows=0`,
   `wrong_diagnostic_rows=0`, and `local_fail=0`.
 - `zig build test` and `git diff --check` pass.
@@ -1282,12 +1281,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=668`,
-`generic_codegen_functions=668`, `generic_cfg_functions=668`,
+frontier gate reports `source_rows=14`, `discovered_functions=669`,
+`generic_codegen_functions=669`, `generic_cfg_functions=669`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=668`, `object_failures=0`,
+`object_emitted_functions=669`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1300,9 +1299,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=668`,
-`generic_cfg_functions=668`, `structural_matcher_functions=0`,
-`object_emitted_functions=668`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=669`,
+`generic_cfg_functions=669`, `structural_matcher_functions=0`,
+`object_emitted_functions=669`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -1411,15 +1410,16 @@ ReleaseSafe, and ReleaseSmall and currently reports `varargs_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
 `safety_edge_boundary_rows=0`,
-`pointer_slice_boundary_rows=1`,
+`pointer_slice_boundary_rows=0`,
 `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0` per
 mode. Varargs, vectors, X87/long double, packed/unaligned aggregates, tail
 calls, and non-default call conventions are therefore source-backed fail-closed
 boundaries, not vague docs-only gaps and not accepted executable proof. Checked
 slice-element bounds have moved into the accepted frontier with executable hot
-and trap-path proof; checked slice-element store is a precise pointer/slice
-boundary. Stack-pressure byval forwarding is currently accepted for the Big80
-frontier rows, with the boundary counter held at zero as a regression guard.
+and trap-path proof for both load and store; the pointer/slice boundary counter
+is held at zero as a regression guard. Stack-pressure byval forwarding is
+currently accepted for the Big80 frontier rows, with the boundary counter held
+at zero as a regression guard.
 Typed AIR v2 pointer-callee lowering now resolves operand 0 into a callee value
 for `frontier_indirect_stack_arg_to_registers`, copies it to `%rax`, loads
 incoming stack-passed `i32` parameters into outgoing GPR call slots, and emits

@@ -19,6 +19,10 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.Ma
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try multi_block_rows.lowerGenericCfgCheckedSliceStoreLoadReturn(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try multi_block_rows.lowerGenericCfgGuardedDynamicPointerLoadReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;

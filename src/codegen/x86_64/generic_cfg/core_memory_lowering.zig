@@ -82,6 +82,7 @@ pub const GenericCfgTypedAddress = struct {
 
 const GenericCfgAddressResolverOptions = struct {
     entry: ?ir.BasicBlock = null,
+    extra_entry: ?ir.BasicBlock = null,
     allow_loaded_pointer_slots: bool = true,
     allow_slice_aggregate_extraction: bool = true,
 };
@@ -179,19 +180,47 @@ pub fn genericCfgI64ParamRegThroughIdentityCast(function: ir.Function, block: ir
 }
 
 fn findInstructionInAddressScope(block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, name: []const u8) ?ir.Instruction {
-    return findInstruction(block, name) orelse if (options.entry) |entry| findInstruction(entry, name) else null;
+    if (findInstruction(block, name)) |instruction| return instruction;
+    if (options.entry) |entry| {
+        if (findInstruction(entry, name)) |instruction| return instruction;
+    }
+    if (options.extra_entry) |entry| {
+        if (findInstruction(entry, name)) |instruction| return instruction;
+    }
+    return null;
 }
 
 fn genericCfgStoredValueInAddressScope(block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, slot_name: []const u8, ty: ir.Type) ?ir.Value {
-    return genericCfgStoredValue(block, slot_name, ty) orelse if (options.entry) |entry| genericCfgStoredValue(entry, slot_name, ty) else null;
+    if (genericCfgStoredValue(block, slot_name, ty)) |value| return value;
+    if (options.entry) |entry| {
+        if (genericCfgStoredValue(entry, slot_name, ty)) |value| return value;
+    }
+    if (options.extra_entry) |entry| {
+        if (genericCfgStoredValue(entry, slot_name, ty)) |value| return value;
+    }
+    return null;
 }
 
 fn genericCfgStoredPointerValueInAddressScope(block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, slot_name: []const u8) ?ir.Value {
-    return genericCfgStoredPointerValue(block, slot_name) orelse if (options.entry) |entry| genericCfgStoredPointerValue(entry, slot_name) else null;
+    if (genericCfgStoredPointerValue(block, slot_name)) |value| return value;
+    if (options.entry) |entry| {
+        if (genericCfgStoredPointerValue(entry, slot_name)) |value| return value;
+    }
+    if (options.extra_entry) |entry| {
+        if (genericCfgStoredPointerValue(entry, slot_name)) |value| return value;
+    }
+    return null;
 }
 
 fn genericCfgI64ParamRegThroughAddressScope(function: ir.Function, block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, value: ir.Value) ?ArgReg {
-    return genericCfgI64ParamRegThroughIdentityCast(function, block, value) orelse if (options.entry) |entry| genericCfgI64ParamRegThroughIdentityCast(function, entry, value) else null;
+    if (genericCfgI64ParamRegThroughIdentityCast(function, block, value)) |reg| return reg;
+    if (options.entry) |entry| {
+        if (genericCfgI64ParamRegThroughIdentityCast(function, entry, value)) |reg| return reg;
+    }
+    if (options.extra_entry) |entry| {
+        if (genericCfgI64ParamRegThroughIdentityCast(function, entry, value)) |reg| return reg;
+    }
+    return null;
 }
 
 fn genericCfgI64NegatedParamRegThroughAddressScope(function: ir.Function, block: ir.BasicBlock, options: GenericCfgAddressResolverOptions, value: ir.Value) ?ArgReg {
@@ -269,6 +298,18 @@ pub fn genericCfgTypedScalarLoadAddress(function: ir.Function, block: ir.BasicBl
 pub fn genericCfgTypedScalarLoadAddressAcrossBlocks(function: ir.Function, entry: ir.BasicBlock, block: ir.BasicBlock, load: ir.LoadInst, width: GenericCfgScalarWidth) ?GenericCfgTypedAddress {
     if (!load.ty.eql(width.ty()) or load.attrs.isBarrier()) return null;
     return genericCfgTypedScalarAddressResolved(function, block, load.ptr, width, .{ .entry = entry });
+}
+
+pub fn genericCfgTypedScalarLoadAddressAcrossScopes(
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    extra_entry: ir.BasicBlock,
+    block: ir.BasicBlock,
+    load: ir.LoadInst,
+    width: GenericCfgScalarWidth,
+) ?GenericCfgTypedAddress {
+    if (!load.ty.eql(width.ty()) or load.attrs.isBarrier()) return null;
+    return genericCfgTypedScalarAddressResolved(function, block, load.ptr, width, .{ .entry = entry, .extra_entry = extra_entry });
 }
 
 pub fn genericCfgTypedScalarAddress(function: ir.Function, block: ir.BasicBlock, ptr: ir.Value, width: GenericCfgScalarWidth) ?GenericCfgTypedAddress {
@@ -412,7 +453,7 @@ fn lowerGenericCfgDynamicPointerStoreThenLoadReturn(
     return false;
 }
 
-fn sameGenericCfgTypedAddress(lhs: GenericCfgTypedAddress, rhs: GenericCfgTypedAddress) bool {
+pub fn sameGenericCfgTypedAddress(lhs: GenericCfgTypedAddress, rhs: GenericCfgTypedAddress) bool {
     return lhs.base_reg == rhs.base_reg and lhs.add_index_reg == rhs.add_index_reg and lhs.sub_index_reg == rhs.sub_index_reg and lhs.offset_bytes == rhs.offset_bytes and lhs.width == rhs.width;
 }
 
