@@ -86,10 +86,13 @@ Refactor module-size audit:
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
   (`154` lines) for the struct field-zero branch update row, and
   `terminal_values.zig` (`470` lines) for shared terminal return/value
-  materialization and branch-label helpers. The remaining
-  `core_multi_block_rows.zig` facade/core is `5371` lines; broader
-  error-union and aggregate rows can now move against the shared terminal
-  surface instead of depending on private core helpers.
+  materialization and branch-label helpers. The shared error-union helper
+  surface for direct i64/i32 call checks, try-guard call-result discovery,
+  payload-add recognition, and two-i32 call emission also lives in
+  `error_union_rows.zig`. The remaining `core_multi_block_rows.zig`
+  facade/core is `5191` lines; broader error-union and aggregate rows can now
+  move against shared helper surfaces instead of depending on private core
+  helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
   `generic_cfg_functions=689`, `object_emitted_functions=689`,
@@ -223,6 +226,26 @@ Generic-CFG terminal helper split status:
   and broader aggregate rows out of the core file.
 - Validation logs: `tmp/terminal_values_split_frontier.log` and
   `tmp/terminal_values_split_boundaries.log`. Frontier stayed locked across
+  ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
+
+Generic-CFG error-union helper split status:
+
+- The common error-union helper surface now lives in
+  `src/codegen/x86_64/generic_cfg/error_union_rows.zig`: direct i64/i32 call
+  eligibility, try-guard call-result recognition, payload-add extraction,
+  success payload wrapping, branch-condition override helpers, and two-i32
+  direct-call emission. `core_multi_block_rows.zig` keeps aliases for existing
+  rows.
+- Line count after this slice: `core_multi_block_rows.zig` is 5191 lines and
+  `error_union_rows.zig` is 599 lines. This is still a helper extraction, not a
+  full emitter move; the next error-union backend slice can move one
+  catch/try/wrap emitter family now that these helpers are shared.
+- Validation logs: `tmp/error_union_helpers_split_frontier.log` and
+  `tmp/error_union_helpers_split_boundaries.log`. Frontier stayed locked across
   ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
   `object_emitted_functions=689`, `executable_ok_rows=14`, and
