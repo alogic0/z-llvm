@@ -415,3 +415,12 @@ export fn frontier_error_tag_switch(tag: i32, value: i32) i32 {
         };
     }
 }
+
+export fn frontier_error_tag_branch(tag: i32, value: i32) i32 {
+    if (frontierMaybeErrorTag(tag, value)) |payload| {
+        return payload + 3;
+    } else |err| {
+        if (err == FrontierError.BadTag) return -91;
+        return -92;
+    }
+}

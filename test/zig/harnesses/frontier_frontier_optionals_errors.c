@@ -28,6 +28,7 @@ extern int z_frontier_catch_error_value_switch(int, int, int) __asm__("frontier_
 extern int z_frontier_wrap_error_switch_match(int, int) __asm__("frontier_optionals_errors.frontier_wrap_error_switch_match");
 extern int z_frontier_maybe_error_tag_match(int, int) __asm__("frontier_optionals_errors.frontier_maybe_error_tag_match");
 extern int z_frontier_error_tag_switch(int, int) __asm__("frontier_optionals_errors.frontier_error_tag_switch");
+extern int z_frontier_error_tag_branch(int, int) __asm__("frontier_optionals_errors.frontier_error_tag_branch");
 int main(void) {
     const int ptr_value = 49;
     if (z_frontier_optional_merge(1, 30) != 30) return 1;
@@ -114,5 +115,8 @@ int main(void) {
     if (z_frontier_error_tag_switch(0, 46) != 47) return 24;
     if (z_frontier_error_tag_switch(1, 46) != -47) return 25;
     if (z_frontier_error_tag_switch(2, 46) != -48) return 26;
+    if (z_frontier_error_tag_branch(0, 39) != 42) return 91;
+    if (z_frontier_error_tag_branch(1, 39) != -91) return 92;
+    if (z_frontier_error_tag_branch(2, 39) != -92) return 93;
     return 0;
 }
