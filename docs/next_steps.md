@@ -82,6 +82,32 @@ Typed AIR model split status:
   `generic_cfg_functions=689`, `object_emitted_functions=689`,
   `executable_ok_rows=14`, and `local_fail=0`.
 
+Typed-v2 selected lowerer split status:
+
+- Goal 2 split the selected typed-v2 lowerer families out of
+  `src/zig_air_lowering_typed_v2.zig` while keeping the old file as the public
+  facade. Aggregate and packed-bit compatibility lowering now lives in
+  `src/zig_air_lowering_typed_v2_aggregate.zig`; error-union payload lowering
+  lives in `src/zig_air_lowering_typed_v2_error_union.zig`; optional and
+  maybe-error lowering lives in `src/zig_air_lowering_typed_v2_optional.zig`;
+  slice-sum lowering lives in
+  `src/zig_air_lowering_typed_v2_pointer_slice.zig`; and union-tag payload
+  switch lowering lives in `src/zig_air_lowering_typed_v2_union_tag.zig`.
+  Existing call sites still import `zig_air_lowering_typed_v2.zig`.
+- Line count after the split: `src/zig_air_lowering_typed_v2.zig` is 1055
+  lines; the five new family modules account for 1120 lines total. This is a
+  behavior-preserving split only; the remaining non-family selected lowerers
+  stay in the facade until a later semantic/backend ownership slice moves them.
+- Validation logs: `tmp/typed_v2_family_split_frontier.log` and
+  `tmp/typed_v2_family_split_broad.log`. Frontier stayed locked across
+  ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; broad stayed locked at `source_rows=101`,
+  `discovered_functions=152`, `generic_cfg_functions=152`,
+  `object_emitted_functions=152`, `executable_ok_rows=100`,
+  `runtime_boundary_rows=1`, and `local_fail=0`.
+
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated
 unsupported categories are `aggregate-abi`, `unknown-opcode`, `vector`, `x87`,
