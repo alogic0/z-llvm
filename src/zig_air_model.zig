@@ -2416,8 +2416,9 @@ pub fn typedUnionTagPayloadSwitchSummary(
     const switch_br = singleInstructionByOpcode(structured_air_v2, "switch_br") orelse return null;
     if (switch_br.operands.len != 1 or typedInstOperandIndex(switch_br.operands[0]) != get_tag.index) return null;
     if ((typedDetailU32(switch_br, "cases_len") orelse return null) != 2) return null;
-    if ((typedDetailU32(switch_br, "case0_item0_tag_index") orelse return null) != 0) return null;
-    if ((typedDetailU32(switch_br, "case1_item0_tag_index") orelse return null) != 1) return null;
+    const switch_tag0 = typedDetailU32(switch_br, "case0_item0_tag_index") orelse return null;
+    const switch_tag1 = typedDetailU32(switch_br, "case1_item0_tag_index") orelse return null;
+    if (!((switch_tag0 == 0 and switch_tag1 == 1) or (switch_tag0 == 1 and switch_tag1 == 0))) return null;
 
     const field0 = typedUnionFieldVal(structured_air_v2, 0) orelse return null;
     const field1 = typedUnionFieldVal(structured_air_v2, 1) orelse return null;
@@ -3586,6 +3587,12 @@ test "typed AIR model recognizes union tag payload switch summary" {
     try std.testing.expectEqual(@as(i32, 7), summary.tag0_return_add);
     try std.testing.expectEqual(@as(i32, 5), summary.tag1_store_add);
     try std.testing.expectEqual(@as(i32, 11), summary.tag1_return_add);
+
+    switch_details[1].value = "1";
+    switch_details[2].value = "0";
+    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) != null);
+    switch_details[1].value = "0";
+    switch_details[2].value = "1";
 
     switch_operands[0].value = "0";
     try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) == null);

@@ -104,10 +104,12 @@ switch proof. The patched Zig typed-v2 exporter emits versioned
 `zllvm-union-tag-facts-v1` facts for `set_union_tag` and `get_union_tag`, plus
 `zllvm-switch-facts-v1` case tag indexes for the union-tag `switch_br`. z_llvm
 admits the row from those typed facts and the structural payload data-flow, not
-from a function-name gate, and the C harness checks both `.small` and `.large`
-payload paths across ReleaseFast, ReleaseSafe, and ReleaseSmall. General union
-ABI/layout lowering remains future work; this row only owns the selected
-frontier tag/payload switch shape.
+from a function-name gate. The model now accepts reversed source switch-arm
+ordering when the exported case tag indexes prove the same selected tag set,
+and the C harness checks both `.small` and `.large` payload paths across
+ReleaseFast, ReleaseSafe, and ReleaseSmall. General union ABI/layout lowering
+remains future work; this row only owns the selected frontier tag/payload
+switch shape.
 
 `frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
@@ -200,20 +202,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=673
-structured_functions=673
-generic_codegen_functions=673
-generic_cfg_functions=673
+discovered_functions=674
+structured_functions=674
+generic_codegen_functions=674
+generic_cfg_functions=674
 structural_matcher_functions=0
-structured_air_v2_functions=673
-typed_air_operand_functions=673
+structured_air_v2_functions=674
+typed_air_operand_functions=674
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=673
+generic_lowering_functions=674
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=673
+object_emitted_functions=674
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

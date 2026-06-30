@@ -234,7 +234,7 @@ fn strictExpectations(corpus: Corpus) ?StrictExpectations {
         },
         .frontier => .{
             .source_rows = 14,
-            .functions = 673,
+            .functions = 674,
             .executable = .{
                 .native_link_accepted_rows = 14,
                 .executable_ok_rows = 14,
