@@ -81,7 +81,7 @@ Refactor module-size audit:
   pointer/slice (`181` lines), and union-tag (`102` lines). The facade is
   `1055` lines and still owns selected lowerers that do not yet have a clean
   family boundary.
-- Generic-CFG backend ownership now has `error_union_rows.zig` (`1196` lines)
+- Generic-CFG backend ownership now has `error_union_rows.zig` (`1375` lines)
   for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
   (`154` lines) for the struct field-zero branch update row, and
@@ -96,8 +96,9 @@ Refactor module-size audit:
   `lowerGenericCfgErrorUnionTryRewrapErrorReturn`, with their recognizers.
   `lowerGenericCfgErrorUnionTrySlotUpdateReturn` and its slot load/store
   recognizer also moved, and the shared payload-value-from-call-result helper
-  is now exported from `error_union_rows.zig`. The remaining
-  `core_multi_block_rows.zig` facade/core is `4585` lines; broader error-union
+  is now exported from `error_union_rows.zig`. The try payload-call row and
+  its payload-call argument recognizer also live there. The remaining
+  `core_multi_block_rows.zig` facade/core is `4408` lines; broader error-union
   and aggregate rows can now move against shared helper surfaces instead of
   depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
@@ -328,6 +329,24 @@ Generic-CFG error-union slot-update split status:
   frontier rows or counters changed.
 - Validation logs: `tmp/error_union_slot_update_split_frontier.log` and
   `tmp/error_union_slot_update_split_boundaries.log`. Frontier stayed locked
+  across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
+
+Generic-CFG error-union payload-call split status:
+
+- `lowerGenericCfgErrorUnionTryPayloadCallReturn`, its payload-call argument
+  materializer, and its payload-call recognizer now live in
+  `src/codegen/x86_64/generic_cfg/error_union_rows.zig`. The row imports the
+  existing `emitRaxIntoArgReg` helper from the pointer/slice module; the old
+  core alias was removed because no remaining core row uses it directly.
+- Line count after this slice: `core_multi_block_rows.zig` is 4408 lines and
+  `error_union_rows.zig` is 1375 lines. This is behavior-preserving; no
+  frontier rows or counters changed.
+- Validation logs: `tmp/error_union_payload_call_split_frontier.log` and
+  `tmp/error_union_payload_call_split_boundaries.log`. Frontier stayed locked
   across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
   `object_emitted_functions=689`, `executable_ok_rows=14`, and

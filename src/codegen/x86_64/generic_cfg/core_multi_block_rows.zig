@@ -62,6 +62,7 @@ pub const lowerGenericCfgLoopTryReturn = error_union_rows.lowerGenericCfgLoopTry
 pub const lowerGenericCfgLinearErrorUnionTryChainReturn = error_union_rows.lowerGenericCfgLinearErrorUnionTryChainReturn;
 pub const lowerGenericCfgErrorUnionTryRewrapErrorReturn = error_union_rows.lowerGenericCfgErrorUnionTryRewrapErrorReturn;
 pub const lowerGenericCfgErrorUnionTrySlotUpdateReturn = error_union_rows.lowerGenericCfgErrorUnionTrySlotUpdateReturn;
+pub const lowerGenericCfgErrorUnionTryPayloadCallReturn = error_union_rows.lowerGenericCfgErrorUnionTryPayloadCallReturn;
 pub const lowerGenericCfgStructBranchUpdateReturn = aggregate_rows.lowerGenericCfgStructBranchUpdateReturn;
 pub const genericCfgStructFieldZeroUpdateAdd = aggregate_rows.genericCfgStructFieldZeroUpdateAdd;
 pub const genericCfgStructFieldZeroMergeReturn = aggregate_rows.genericCfgStructFieldZeroMergeReturn;
@@ -1491,7 +1492,6 @@ pub const emitI64ValueIntoArgReg = pointer_slice_rows.emitI64ValueIntoArgReg;
 pub const emitNamedI64ValueIntoArgReg = pointer_slice_rows.emitNamedI64ValueIntoArgReg;
 pub const emitLoadedI64IntoArgReg = pointer_slice_rows.emitLoadedI64IntoArgReg;
 pub const emitComputedI64IntoArgReg = pointer_slice_rows.emitComputedI64IntoArgReg;
-const emitRaxIntoArgReg = pointer_slice_rows.emitRaxIntoArgReg;
 const findInstructionInFunction = pointer_slice_rows.findInstructionInFunction;
 
 pub fn appendGenericCfgPhiBinaryImmediate(
@@ -3648,18 +3648,6 @@ fn trySwitchUsesAllBlocks(
     return true;
 }
 
-const ErrorUnionTryPayloadCallReturn = struct {
-    entry: ir.BasicBlock,
-    call_name: []const u8,
-    call: ir.CallInst,
-    cont_block: ir.BasicBlock,
-    err_block: ir.BasicBlock,
-    payload_call: ir.CallInst,
-    payload_call_args: [2]TryPayloadCallArg,
-    live_arg_reg: ArgReg,
-    success_is_then: bool,
-};
-
 const ErrorUnionTryPhiSlotOverrideReturn = struct {
     entry: ir.BasicBlock,
     call_name: []const u8,
@@ -3673,51 +3661,6 @@ const ErrorUnionTryPhiSlotOverrideReturn = struct {
     payload_add_imm: u8,
     success_is_then: bool,
 };
-
-const TryPayloadCallArg = union(enum) {
-    payload,
-    param: ArgReg,
-};
-
-fn lowerGenericCfgErrorUnionTryPayloadCallReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-) !bool {
-    const plan = errorUnionTryPayloadCallReturn(function) orelse return false;
-    const frame_bytes: u8 = 24;
-    const epilogue_label = try ownedMachineLabel(
-        allocator,
-        machine,
-        "generic_cfg_try_payload_call_{}_generic_cfg_select_end",
-        .{machine.instructions.items.len},
-    );
-
-    try appendStackFrame(allocator, machine, frame_bytes);
-    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = plan.live_arg_reg } });
-    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
-    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
-    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
-    try machine.instructions.append(allocator, .test_eax_eax);
-    try appendGenericCfgConditionalBranch(allocator, machine, if (plan.success_is_then) .je else .jne, plan.cont_block.name);
-
-    try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, plan.cont_block.name);
-    try emitTryPayloadCallArg(allocator, machine, .rdi, plan.payload_call_args[0]);
-    try emitTryPayloadCallArg(allocator, machine, .rsi, plan.payload_call_args[1]);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = plan.payload_call.callee, .ret_ty = plan.payload_call.ret_ty } });
-    try machine.instructions.append(allocator, .{ .and_eax_imm32 = -1 });
-    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
-    try appendStackFrameEnd(allocator, machine, frame_bytes);
-    try appendGenericCfgReturn(allocator, machine);
-    return true;
-}
 
 fn lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn(
     allocator: std.mem.Allocator,
@@ -3772,22 +3715,6 @@ fn lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn(
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
     return true;
-}
-
-fn emitTryPayloadCallArg(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    dst: ArgReg,
-    arg: TryPayloadCallArg,
-) !void {
-    switch (arg) {
-        .payload => {
-            try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-            try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
-            try emitRaxIntoArgReg(allocator, machine, dst);
-        },
-        .param => try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = dst } }),
-    }
 }
 
 fn errorUnionTryPhiSlotOverrideReturn(function: ir.Function) ?ErrorUnionTryPhiSlotOverrideReturn {
@@ -3874,110 +3801,6 @@ fn errorUnionTryPhiSlotOverrideReturn(function: ir.Function) ?ErrorUnionTryPhiSl
         .payload_add_imm = then_success orelse else_success.?,
         .success_is_then = then_success != null,
     };
-}
-
-fn errorUnionTryPayloadCallReturn(function: ir.Function) ?ErrorUnionTryPayloadCallReturn {
-    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 3) return null;
-    const entry = function.blocks.items[0];
-    const entry_condbr = switch (entry.terminator orelse return null) {
-        .condbr => |condbr| condbr,
-        else => return null,
-    };
-    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
-    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
-    const call_instruction = findInstruction(entry, call_name) orelse return null;
-    const call = switch (call_instruction.kind) {
-        .call => |call| call,
-        else => return null,
-    };
-    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
-
-    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
-    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
-    const then_payload_call = payloadCallWrapReturn(function, then_block, call_name);
-    const else_payload_call = payloadCallWrapReturn(function, else_block, call_name);
-    if ((then_payload_call != null) == (else_payload_call != null)) return null;
-    const cont_block = if (then_payload_call != null) then_block else else_block;
-    const err_block = if (then_payload_call != null) else_block else then_block;
-    if (!blockReturnsNamedValue(err_block, call_name, .{ .int = 64 })) return null;
-    const payload_call = then_payload_call orelse else_payload_call.?;
-
-    return .{
-        .entry = entry,
-        .call_name = call_name,
-        .call = call,
-        .cont_block = cont_block,
-        .err_block = err_block,
-        .payload_call = payload_call.call,
-        .payload_call_args = payload_call.args,
-        .live_arg_reg = payload_call.live_arg_reg,
-        .success_is_then = then_payload_call != null,
-    };
-}
-
-const PayloadCallWrapReturn = struct {
-    call: ir.CallInst,
-    args: [2]TryPayloadCallArg,
-    live_arg_reg: ArgReg,
-};
-
-fn payloadCallWrapReturn(function: ir.Function, block: ir.BasicBlock, call_name: []const u8) ?PayloadCallWrapReturn {
-    const ret = switch (block.terminator orelse return null) {
-        .ret => |ret| ret,
-        else => return null,
-    };
-    if (!ret.ty.eql(.{ .int = 64 })) return null;
-    const shl_name = switch (ret.value orelse return null) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const shl_inst = findInstruction(block, shl_name) orelse return null;
-    const shl = switch (shl_inst.kind) {
-        .binary => |binary| binary,
-        else => return null,
-    };
-    if (!shl.ty.eql(.{ .int = 64 }) or shl.op != .shl or !isInt(shl.rhs, 16)) return null;
-    const zext_name = switch (shl.lhs) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const zext_inst = findInstruction(block, zext_name) orelse return null;
-    const zext = switch (zext_inst.kind) {
-        .cast => |cast| cast,
-        else => return null,
-    };
-    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 32 }) or !zext.to_ty.eql(.{ .int = 64 })) return null;
-    const payload_call_name = switch (zext.value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const payload_call_inst = findInstruction(block, payload_call_name) orelse return null;
-    const payload_call = switch (payload_call_inst.kind) {
-        .call => |call| call,
-        else => return null,
-    };
-    if (!supportsDirectI32Call(payload_call) or payload_call.args.items.len != 2) return null;
-
-    var args: [2]TryPayloadCallArg = undefined;
-    var payload_arg_count: usize = 0;
-    var live_arg_reg: ?ArgReg = null;
-    for (payload_call.args.items, 0..) |arg, index| {
-        if (!arg.ty.eql(.{ .int = 32 })) return null;
-        if (payloadValueFromCallResult(block, arg.value, call_name)) {
-            args[index] = .payload;
-            payload_arg_count += 1;
-            continue;
-        }
-        const reg = switch (arg.value) {
-            .named => |name| paramReg(function, name, .{ .int = 32 }) catch return null,
-            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-        };
-        if (live_arg_reg != null and live_arg_reg.? != reg) return null;
-        live_arg_reg = reg;
-        args[index] = .{ .param = reg };
-    }
-    if (payload_arg_count != 1) return null;
-    return .{ .call = payload_call, .args = args, .live_arg_reg = live_arg_reg orelse return null };
 }
 
 fn lowerGenericCfgErrorUnionTryPayloadBranchReturn(
