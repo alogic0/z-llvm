@@ -72,6 +72,7 @@ pub const lowerGenericCfgSwitchThenErrorUnionTryReturn = error_union_rows.lowerG
 pub const lowerGenericCfgErrorUnionSwitchPhiReturn = error_union_rows.lowerGenericCfgErrorUnionSwitchPhiReturn;
 pub const lowerGenericCfgErrorUnionErrorTagSwitchReturn = error_union_rows.lowerGenericCfgErrorUnionErrorTagSwitchReturn;
 pub const lowerGenericCfgErrorUnionErrorTagBranchReturn = error_union_rows.lowerGenericCfgErrorUnionErrorTagBranchReturn;
+pub const lowerGenericCfgErrorUnionCatchValueMergeReturn = error_union_rows.lowerGenericCfgErrorUnionCatchValueMergeReturn;
 pub const lowerGenericCfgStructBranchUpdateReturn = aggregate_rows.lowerGenericCfgStructBranchUpdateReturn;
 pub const genericCfgStructFieldZeroUpdateAdd = aggregate_rows.genericCfgStructFieldZeroUpdateAdd;
 pub const genericCfgStructFieldZeroMergeReturn = aggregate_rows.genericCfgStructFieldZeroMergeReturn;
@@ -1673,27 +1674,6 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     return true;
 }
 
-const ErrorUnionCatchValueMergeReturn = struct {
-    entry: ir.BasicBlock,
-    call_name: []const u8,
-    call: ir.CallInst,
-    payload_block: ir.BasicBlock,
-    fallback_block: ir.BasicBlock,
-    merge_block: ir.BasicBlock,
-    fallback: ErrorUnionCatchFallbackValue,
-    add_imm: i32,
-};
-
-const ErrorUnionCatchFallbackValue = union(enum) {
-    int: i32,
-    param: ArgReg,
-};
-
-const NamedPhi = struct {
-    name: []const u8,
-    phi: ir.PhiInst,
-};
-
 const ErrorUnionCatchSwitchReturn = struct {
     entry: ir.BasicBlock,
     call_name: []const u8,
@@ -1706,63 +1686,6 @@ const ErrorUnionCatchSwitchReturn = struct {
     default_block: ir.BasicBlock,
     merge_block: ir.BasicBlock,
 };
-
-fn lowerGenericCfgErrorUnionCatchValueMergeReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-) !bool {
-    const plan = errorUnionCatchValueMergeReturn(function) orelse return false;
-    const live_fallback_reg: ?ArgReg = switch (plan.fallback) {
-        .param => |reg| reg,
-        .int => null,
-    };
-    const frame_bytes: u8 = if (live_fallback_reg != null) 24 else 8;
-    const fallback_label = try ownedMachineLabel(
-        allocator,
-        machine,
-        "generic_cfg_error_catch_value_{}_fallback",
-        .{machine.instructions.items.len},
-    );
-    const epilogue_label = try ownedMachineLabel(
-        allocator,
-        machine,
-        "generic_cfg_error_catch_value_{}_generic_cfg_select_end",
-        .{machine.instructions.items.len},
-    );
-
-    try appendStackFrame(allocator, machine, frame_bytes);
-    if (live_fallback_reg) |reg| {
-        try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = reg } });
-    }
-    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
-    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
-    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
-    try machine.instructions.append(allocator, .test_eax_eax);
-    try appendGenericCfgConditionalBranch(allocator, machine, .jne, fallback_label);
-
-    try appendGenericCfgBlockLabel(allocator, machine, plan.payload_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
-    if (plan.add_imm != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = plan.add_imm });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, fallback_label);
-    switch (plan.fallback) {
-        .int => |value| try machine.instructions.append(allocator, .{ .mov_imm_eax = value }),
-        .param => |reg| {
-            try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = reg } });
-            try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
-        },
-    }
-    if (plan.add_imm != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = plan.add_imm });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
-    try appendStackFrameEnd(allocator, machine, frame_bytes);
-    try appendGenericCfgReturn(allocator, machine);
-    return true;
-}
 
 fn lowerGenericCfgErrorUnionCatchSwitchReturn(
     allocator: std.mem.Allocator,
@@ -1814,56 +1737,6 @@ fn lowerGenericCfgErrorUnionCatchSwitchReturn(
     try appendGenericCfgBlockLabel(allocator, machine, plan.default_block.name);
     try machine.instructions.append(allocator, .ud2);
     return true;
-}
-
-fn errorUnionCatchValueMergeReturn(function: ir.Function) ?ErrorUnionCatchValueMergeReturn {
-    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len < 4) return null;
-    const entry = function.blocks.items[0];
-    const entry_condbr = switch (entry.terminator orelse return null) {
-        .condbr => |condbr| condbr,
-        else => return null,
-    };
-    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
-    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
-    const call_instruction = findInstruction(entry, call_name) orelse return null;
-    const call = switch (call_instruction.kind) {
-        .call => |call| call,
-        else => return null,
-    };
-    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
-
-    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
-    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
-    const then_target = singleBrTarget(then_block) orelse return null;
-    const else_target = singleBrTarget(else_block) orelse return null;
-    if (!std.mem.eql(u8, then_target, else_target)) return null;
-    const merge_block = function.blocks.items[blockIndex(function, then_target) orelse return null];
-    const named_phi = firstNamedPhi(merge_block) orelse return null;
-    const phi = named_phi.phi;
-    if (!phi.ty.eql(.{ .int = 32 })) return null;
-
-    const then_incoming = phiIncomingForBlock(phi, then_block.name) orelse return null;
-    const else_incoming = phiIncomingForBlock(phi, else_block.name) orelse return null;
-    const then_is_payload = payloadValueFromCallResult(then_block, then_incoming, call_name);
-    const else_is_payload = payloadValueFromCallResult(else_block, else_incoming, call_name);
-    if (then_is_payload == else_is_payload) return null;
-    const payload_block = if (then_is_payload) then_block else else_block;
-    const fallback_block = if (then_is_payload) else_block else then_block;
-    const fallback_value = if (then_is_payload) else_incoming else then_incoming;
-    const fallback = catchFallbackValue(function, fallback_value) orelse return null;
-    const add_imm = phiAddReturnImm(merge_block, named_phi.name) orelse return null;
-    if (!catchValueMergeUsesOnlyExpectedBlocks(function, entry.name, payload_block.name, fallback_block.name, merge_block.name)) return null;
-
-    return .{
-        .entry = entry,
-        .call_name = call_name,
-        .call = call,
-        .payload_block = payload_block,
-        .fallback_block = fallback_block,
-        .merge_block = merge_block,
-        .fallback = fallback,
-        .add_imm = add_imm,
-    };
 }
 
 fn errorUnionCatchSwitchReturn(function: ir.Function) ?ErrorUnionCatchSwitchReturn {
@@ -1939,82 +1812,10 @@ fn phiIncomingForBlock(phi: ir.PhiInst, block_name: []const u8) ?ir.Value {
     return null;
 }
 
-fn firstNamedPhi(block: ir.BasicBlock) ?NamedPhi {
-    if (block.instructions.items.len == 0) return null;
-    const instruction = block.instructions.items[0];
-    const name = instruction.result orelse return null;
-    return .{
-        .name = name,
-        .phi = switch (instruction.kind) {
-            .phi => |phi| phi,
-            else => return null,
-        },
-    };
-}
-
-fn catchFallbackValue(function: ir.Function, value: ir.Value) ?ErrorUnionCatchFallbackValue {
-    return switch (value) {
-        .int => |int| .{ .int = i32Value(int) catch return null },
-        .named => |name| {
-            const reg = paramRegOrNull(function, name, .{ .int = 32 }) catch return null;
-            return .{ .param = reg orelse return null };
-        },
-        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
-    };
-}
-
-fn phiAddReturnImm(block: ir.BasicBlock, phi_name: []const u8) ?i32 {
-    if (block.instructions.items.len != 2) return null;
-    const add_name = block.instructions.items[1].result orelse return null;
-    const add = switch (block.instructions.items[1].kind) {
-        .binary => |binary| binary,
-        else => return null,
-    };
-    if (!add.ty.eql(.{ .int = 32 }) or add.op != .add or !isNamed(add.lhs, phi_name)) return null;
-    const imm = switch (add.rhs) {
-        .int => |int| i32Value(int) catch return null,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const ret = switch (block.terminator orelse return null) {
-        .ret => |ret| ret,
-        else => return null,
-    };
-    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, add_name)) return null;
-    return imm;
-}
-
-fn catchValueMergeUsesOnlyExpectedBlocks(
-    function: ir.Function,
-    entry_name: []const u8,
-    payload_name: []const u8,
-    fallback_name: []const u8,
-    merge_name: []const u8,
-) bool {
-    for (function.blocks.items) |block| {
-        if (std.mem.eql(u8, block.name, entry_name) or
-            std.mem.eql(u8, block.name, payload_name) or
-            std.mem.eql(u8, block.name, fallback_name) or
-            std.mem.eql(u8, block.name, merge_name))
-        {
-            continue;
-        }
-        if (!blockIsUnreachable(block)) return false;
-    }
-    return true;
-}
-
 const ErrorUnionSwitchPhiCase = error_union_rows.ErrorUnionSwitchPhiCase;
 
 const supportsDirectI64Call = error_union_rows.supportsDirectI64Call;
-const supportsDirectI32Call = error_union_rows.supportsDirectI32Call;
 const errorUnionTryGuardCallResult = error_union_rows.errorUnionTryGuardCallResult;
-const blockReturnsNamedValue = error_union_rows.blockReturnsNamedValue;
-const branchConditionParamReg = error_union_rows.branchConditionParamReg;
-const branchKindToSkipOverride = error_union_rows.branchKindToSkipOverride;
-const payloadAddArgFromCallResult = error_union_rows.payloadAddArgFromCallResult;
-const payloadAddFromCallResult = error_union_rows.payloadAddFromCallResult;
-const payloadValueFromCallResult = error_union_rows.payloadValueFromCallResult;
-const successReturnPayloadAdd = error_union_rows.successReturnPayloadAdd;
 const emitTwoI32ArgCallIntoRax = error_union_rows.emitTwoI32ArgCallIntoRax;
 const payloadAddWrapReturnFromCallResult = error_union_rows.payloadAddWrapReturnFromCallResult;
 const errorTagValueFromCallResult = error_union_rows.errorTagValueFromCallResult;
