@@ -29,6 +29,8 @@ const machineBinaryOp = cabi_call_lowering.machineBinaryOp;
 const paramReg = cabi_abi_helpers.paramReg;
 const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
+const blockIndex = cabi_abi_helpers.blockIndex;
+const isNamed = shared.isNamed;
 
 pub fn terminalCondParamReg(function: ir.Function, cond: ir.Value) ?ArgReg {
     const cond_name = switch (cond) {
@@ -68,6 +70,54 @@ pub fn blockHasCondbr(block: ir.BasicBlock) bool {
         .condbr => true,
         else => false,
     };
+}
+
+pub fn blockSwitchTerminator(block: ir.BasicBlock) ?ir.SwitchTerminator {
+    return switch (block.terminator orelse return null) {
+        .@"switch" => |switch_term| switch_term,
+        else => null,
+    };
+}
+
+pub fn commonSwitchMergeBlock(function: ir.Function, switch_term: ir.SwitchTerminator) ?ir.BasicBlock {
+    var target: ?[]const u8 = null;
+    for (switch_term.cases.items) |case| {
+        const block = function.blocks.items[blockIndex(function, case.target) orelse return null];
+        const branch_target = singleBrTarget(block) orelse return null;
+        if (target) |existing| {
+            if (!std.mem.eql(u8, existing, branch_target)) return null;
+        } else {
+            target = branch_target;
+        }
+    }
+    const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
+    const default_target = singleBrTarget(default_block) orelse return null;
+    if (target) |existing| {
+        if (!std.mem.eql(u8, existing, default_target)) return null;
+    } else {
+        target = default_target;
+    }
+    return function.blocks.items[blockIndex(function, target orelse return null) orelse return null];
+}
+
+pub fn firstPhiReturn(function: ir.Function, block: ir.BasicBlock) ?ir.PhiInst {
+    if (block.instructions.items.len != 1) return null;
+    const phi_name = block.instructions.items[0].result orelse return null;
+    const phi = switch (block.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(function.ret_ty) or !isNamed(ret.value orelse return null, phi_name)) return null;
+    return phi;
+}
+
+pub fn blockBranchesTo(block: ir.BasicBlock, target: []const u8) bool {
+    const branch_target = singleBrTarget(block) orelse return false;
+    return std.mem.eql(u8, branch_target, target);
 }
 
 pub fn linearTerminalBranchUsesAllBlocks(

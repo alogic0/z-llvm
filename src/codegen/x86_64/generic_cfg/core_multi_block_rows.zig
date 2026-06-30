@@ -65,6 +65,7 @@ pub const lowerGenericCfgErrorUnionTrySlotUpdateReturn = error_union_rows.lowerG
 pub const lowerGenericCfgErrorUnionTryPayloadCallReturn = error_union_rows.lowerGenericCfgErrorUnionTryPayloadCallReturn;
 pub const lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn = error_union_rows.lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn;
 pub const lowerGenericCfgErrorUnionTryPayloadBranchReturn = error_union_rows.lowerGenericCfgErrorUnionTryPayloadBranchReturn;
+pub const lowerGenericCfgErrorUnionTrySwitchReturn = error_union_rows.lowerGenericCfgErrorUnionTrySwitchReturn;
 pub const lowerGenericCfgStructBranchUpdateReturn = aggregate_rows.lowerGenericCfgStructBranchUpdateReturn;
 pub const genericCfgStructFieldZeroUpdateAdd = aggregate_rows.genericCfgStructFieldZeroUpdateAdd;
 pub const genericCfgStructFieldZeroMergeReturn = aggregate_rows.genericCfgStructFieldZeroMergeReturn;
@@ -74,6 +75,10 @@ const genericCfgTerminalBranchExtraBlocksAreUnreachable = terminal_values.generi
 const singleBrTarget = terminal_values.singleBrTarget;
 const blockIsUnreachable = terminal_values.blockIsUnreachable;
 const blockHasCondbr = terminal_values.blockHasCondbr;
+const blockSwitchTerminator = terminal_values.blockSwitchTerminator;
+const commonSwitchMergeBlock = terminal_values.commonSwitchMergeBlock;
+const firstPhiReturn = terminal_values.firstPhiReturn;
+const blockBranchesTo = terminal_values.blockBranchesTo;
 const linearTerminalBranchUsesAllBlocks = terminal_values.linearTerminalBranchUsesAllBlocks;
 const genericCfgSupportsTerminalReturnBlock = terminal_values.genericCfgSupportsTerminalReturnBlock;
 const genericCfgSupportsNestedTerminalReturnBlock = terminal_values.genericCfgSupportsNestedTerminalReturnBlock;
@@ -2710,67 +2715,6 @@ fn switchPhiUsesAllBlocks(
     return true;
 }
 
-fn lowerGenericCfgErrorUnionTrySwitchReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-) !bool {
-    const plan = errorUnionTrySwitchReturn(function) orelse return false;
-    const frame_bytes: u8 = 24;
-    const epilogue_label = try ownedMachineLabel(
-        allocator,
-        machine,
-        "generic_cfg_try_switch_{}_generic_cfg_select_end",
-        .{machine.instructions.items.len},
-    );
-
-    try appendStackFrame(allocator, machine, frame_bytes);
-    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
-    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
-    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
-    try machine.instructions.append(allocator, .test_eax_eax);
-    try appendGenericCfgConditionalBranch(allocator, machine, .jne, plan.err_block.name);
-
-    try appendGenericCfgBlockLabel(allocator, machine, plan.switch_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
-    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot2 });
-    if (plan.mask != 0) try machine.instructions.append(allocator, .{ .and_eax_imm32 = plan.mask });
-    for (plan.cases[0..plan.case_count]) |case| {
-        try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = case.value });
-        try appendGenericCfgConditionalBranch(allocator, machine, .je, case.block.name);
-    }
-    try machine.instructions.append(allocator, .{ .jmp = plan.default_case.block.name });
-
-    for (plan.cases[0..plan.case_count]) |case| {
-        try appendGenericCfgBlockLabel(allocator, machine, case.block.name);
-        try emitPayloadAddImmWrapFromSlot(allocator, machine, case.add_imm, epilogue_label);
-    }
-    try appendGenericCfgBlockLabel(allocator, machine, plan.default_case.block.name);
-    try emitPayloadAddImmWrapFromSlot(allocator, machine, plan.default_case.add_imm, epilogue_label);
-
-    try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
-    try appendStackFrameEnd(allocator, machine, frame_bytes);
-    try appendGenericCfgReturn(allocator, machine);
-    return true;
-}
-
-fn emitPayloadAddImmWrapFromSlot(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    add_imm: u8,
-    epilogue_label: []const u8,
-) !void {
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot2 });
-    if (add_imm != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = add_imm });
-    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-}
-
 const BranchThenErrorUnionTryReturn = struct {
     entry: ir.BasicBlock,
     try_block: ir.BasicBlock,
@@ -2813,25 +2757,6 @@ const SwitchBothErrorUnionTryReturn = struct {
     default_block: ir.BasicBlock,
     default_stage: BranchTryStage,
     default_success_add_imm: u8,
-};
-
-const ErrorUnionTrySwitchCase = struct {
-    value: i32,
-    block: ir.BasicBlock,
-    add_imm: u8,
-};
-
-const ErrorUnionTrySwitchReturn = struct {
-    entry: ir.BasicBlock,
-    call_name: []const u8,
-    call: ir.CallInst,
-    err_block: ir.BasicBlock,
-    switch_block: ir.BasicBlock,
-    merge_block: ir.BasicBlock,
-    mask: i32,
-    cases: [8]ErrorUnionTrySwitchCase,
-    case_count: usize,
-    default_case: ErrorUnionTrySwitchCase,
 };
 
 fn lowerGenericCfgBranchBothErrorUnionTryReturn(
@@ -3413,230 +3338,8 @@ fn emitPayloadAddImmWrapFromCallSlot(
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 }
 
-fn errorUnionTrySwitchReturn(function: ir.Function) ?ErrorUnionTrySwitchReturn {
-    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len < 6) return null;
-    const entry = function.blocks.items[0];
-    const entry_condbr = switch (entry.terminator orelse return null) {
-        .condbr => |condbr| condbr,
-        else => return null,
-    };
-    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
-    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
-    const call_instruction = findInstruction(entry, call_name) orelse return null;
-    const call = switch (call_instruction.kind) {
-        .call => |call| call,
-        else => return null,
-    };
-    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
-
-    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
-    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
-    const then_is_switch = blockSwitchTerminator(then_block) != null;
-    const else_is_switch = blockSwitchTerminator(else_block) != null;
-    if (then_is_switch == else_is_switch) return null;
-    const switch_block = if (then_is_switch) then_block else else_block;
-    const err_block = if (then_is_switch) else_block else then_block;
-    if (!blockReturnsNamedValue(err_block, call_name, .{ .int = 64 })) return null;
-
-    const switch_term = blockSwitchTerminator(switch_block) orelse return null;
-    if (!switch_term.cond_ty.eql(.{ .int = 32 })) return null;
-    const mask = payloadMaskConst(switch_block, switch_term.cond, call_name) orelse return null;
-    if (switch_term.cases.items.len == 0 or switch_term.cases.items.len > 8) return null;
-    const merge_block = commonSwitchMergeBlock(function, switch_term) orelse return null;
-    const phi = firstPhiReturn(function, merge_block) orelse return null;
-    if (!phi.ty.eql(.{ .int = 64 })) return null;
-
-    var cases: [8]ErrorUnionTrySwitchCase = undefined;
-    for (switch_term.cases.items, 0..) |case, case_index| {
-        if (!case.value_ty.eql(.{ .int = 32 })) return null;
-        const value = switch (case.value) {
-            .int => |int| i32Value(int) catch return null,
-            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-        };
-        const block = function.blocks.items[blockIndex(function, case.target) orelse return null];
-        if (!blockBranchesTo(block, merge_block.name)) return null;
-        cases[case_index] = .{
-            .value = value,
-            .block = block,
-            .add_imm = payloadAddWrapPhiIncoming(function, switch_block, merge_block, phi, block.name, call_name) orelse return null,
-        };
-    }
-    const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
-    if (!blockBranchesTo(default_block, merge_block.name)) return null;
-    const default_case: ErrorUnionTrySwitchCase = .{
-        .value = 0,
-        .block = default_block,
-        .add_imm = payloadAddWrapPhiIncoming(function, switch_block, merge_block, phi, default_block.name, call_name) orelse return null,
-    };
-    if (!trySwitchUsesAllBlocks(function, switch_block.name, err_block.name, merge_block.name, switch_term)) return null;
-
-    return .{
-        .entry = entry,
-        .call_name = call_name,
-        .call = call,
-        .err_block = err_block,
-        .switch_block = switch_block,
-        .merge_block = merge_block,
-        .mask = mask,
-        .cases = cases,
-        .case_count = switch_term.cases.items.len,
-        .default_case = default_case,
-    };
-}
-
-fn blockSwitchTerminator(block: ir.BasicBlock) ?ir.SwitchTerminator {
-    return switch (block.terminator orelse return null) {
-        .@"switch" => |switch_term| switch_term,
-        else => null,
-    };
-}
-
-fn commonSwitchMergeBlock(function: ir.Function, switch_term: ir.SwitchTerminator) ?ir.BasicBlock {
-    var target: ?[]const u8 = null;
-    for (switch_term.cases.items) |case| {
-        const block = function.blocks.items[blockIndex(function, case.target) orelse return null];
-        const branch_target = singleBrTarget(block) orelse return null;
-        if (target) |existing| {
-            if (!std.mem.eql(u8, existing, branch_target)) return null;
-        } else {
-            target = branch_target;
-        }
-    }
-    const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
-    const default_target = singleBrTarget(default_block) orelse return null;
-    if (target) |existing| {
-        if (!std.mem.eql(u8, existing, default_target)) return null;
-    } else {
-        target = default_target;
-    }
-    return function.blocks.items[blockIndex(function, target orelse return null) orelse return null];
-}
-
-fn firstPhiReturn(function: ir.Function, block: ir.BasicBlock) ?ir.PhiInst {
-    if (block.instructions.items.len != 1) return null;
-    const phi_name = block.instructions.items[0].result orelse return null;
-    const phi = switch (block.instructions.items[0].kind) {
-        .phi => |phi| phi,
-        else => return null,
-    };
-    const ret = switch (block.terminator orelse return null) {
-        .ret => |ret| ret,
-        else => return null,
-    };
-    if (!ret.ty.eql(function.ret_ty) or !isNamed(ret.value orelse return null, phi_name)) return null;
-    return phi;
-}
-
-fn blockBranchesTo(block: ir.BasicBlock, target: []const u8) bool {
-    const branch_target = singleBrTarget(block) orelse return false;
-    return std.mem.eql(u8, branch_target, target);
-}
-
-fn payloadMaskConst(block: ir.BasicBlock, value: ir.Value, call_name: []const u8) ?i32 {
-    const mask_name = switch (value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const mask_inst = findInstruction(block, mask_name) orelse return null;
-    const mask = switch (mask_inst.kind) {
-        .binary => |binary| binary,
-        else => return null,
-    };
-    if (!mask.ty.eql(.{ .int = 32 }) or mask.op != .@"and") return null;
-    const rhs = switch (mask.rhs) {
-        .int => |int| i32Value(int) catch return null,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    if (!payloadValueFromCallResult(block, mask.lhs, call_name)) return null;
-    return rhs;
-}
-
-fn payloadAddWrapPhiIncoming(
-    function: ir.Function,
-    payload_scope: ir.BasicBlock,
-    merge_block: ir.BasicBlock,
-    phi: ir.PhiInst,
-    predecessor: []const u8,
-    call_name: []const u8,
-) ?u8 {
-    _ = merge_block;
-    for (phi.incoming.items) |incoming| {
-        if (!std.mem.eql(u8, incoming.block, predecessor)) continue;
-        const value_block = blockByName(function, predecessor) orelse return null;
-        return payloadAddWrapValue(value_block, payload_scope, incoming.value, call_name);
-    }
-    return null;
-}
-
-fn payloadAddWrapValue(value_block: ir.BasicBlock, payload_scope: ir.BasicBlock, value: ir.Value, call_name: []const u8) ?u8 {
-    const shl_name = switch (value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const shl_inst = findInstruction(value_block, shl_name) orelse return null;
-    const shl = switch (shl_inst.kind) {
-        .binary => |binary| binary,
-        else => return null,
-    };
-    if (!shl.ty.eql(.{ .int = 64 }) or shl.op != .shl or !isInt(shl.rhs, 16)) return null;
-    const zext_name = switch (shl.lhs) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const zext_inst = findInstruction(value_block, zext_name) orelse return null;
-    const zext = switch (zext_inst.kind) {
-        .cast => |cast| cast,
-        else => return null,
-    };
-    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 32 }) or !zext.to_ty.eql(.{ .int = 64 })) return null;
-    const add_name = switch (zext.value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const add_inst = findInstruction(value_block, add_name) orelse return null;
-    const add = switch (add_inst.kind) {
-        .binary => |binary| binary,
-        else => return null,
-    };
-    if (!add.ty.eql(.{ .int = 32 }) or add.op != .add) return null;
-    const rhs = switch (add.rhs) {
-        .int => |int| i32Value(int) catch return null,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    if (rhs < 0 or rhs > std.math.maxInt(u8)) return null;
-    if (!payloadValueFromCallResult(payload_scope, add.lhs, call_name)) return null;
-    return @intCast(rhs);
-}
-
-fn trySwitchUsesAllBlocks(
-    function: ir.Function,
-    switch_block: []const u8,
-    err_block: []const u8,
-    merge_block: []const u8,
-    switch_term: ir.SwitchTerminator,
-) bool {
-    for (function.blocks.items, 0..) |block, index| {
-        if (index == 0 or
-            std.mem.eql(u8, block.name, switch_block) or
-            std.mem.eql(u8, block.name, err_block) or
-            std.mem.eql(u8, block.name, merge_block) or
-            std.mem.eql(u8, block.name, switch_term.default_target))
-        {
-            continue;
-        }
-        var matched_case = false;
-        for (switch_term.cases.items) |case| {
-            if (std.mem.eql(u8, block.name, case.target)) {
-                matched_case = true;
-                break;
-            }
-        }
-        if (!matched_case) return false;
-    }
-    return true;
-}
-
 const PayloadBinaryWrapReturn = error_union_rows.PayloadBinaryWrapReturn;
+const payloadAddWrapValue = error_union_rows.payloadAddWrapValue;
 
 const supportsDirectI64Call = error_union_rows.supportsDirectI64Call;
 const supportsDirectI32Call = error_union_rows.supportsDirectI32Call;

@@ -81,16 +81,16 @@ Refactor module-size audit:
   pointer/slice (`181` lines), and union-tag (`102` lines). The facade is
   `1055` lines and still owns selected lowerers that do not yet have a clean
   family boundary.
-- Generic-CFG backend ownership now has `error_union_rows.zig` (`1765` lines)
+- Generic-CFG backend ownership now has `error_union_rows.zig` (`2022` lines)
   for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
   (`154` lines) for the struct field-zero branch update row, and
-  `terminal_values.zig` (`498` lines) for shared terminal return/value
-  materialization, branch-label helpers, and linear terminal topology
-  predicates. The shared error-union helper surface for direct i64/i32 call
-  checks, try-guard call-result discovery, payload-add recognition, and
-  two-i32 call emission also lives in `error_union_rows.zig`. Complete
-  post-terminal error-union emitter families now moved include
+  `terminal_values.zig` (`548` lines) for shared terminal return/value
+  materialization, branch-label helpers, linear terminal topology predicates,
+  and switch merge/phi topology helpers. The shared error-union helper surface
+  for direct i64/i32 call checks, try-guard call-result discovery, payload-add
+  recognition, and two-i32 call emission also lives in `error_union_rows.zig`.
+  Complete post-terminal error-union emitter families now moved include
   `lowerGenericCfgErrorUnionPayloadBranchReturn` and
   `lowerGenericCfgLinearErrorUnionTryChainReturn`, and
   `lowerGenericCfgErrorUnionTryRewrapErrorReturn`, with their recognizers.
@@ -98,10 +98,10 @@ Refactor module-size audit:
   recognizer also moved, and the shared payload-value-from-call-result helper
   is now exported from `error_union_rows.zig`. The try payload-call row and
   its payload-call argument recognizer also live there. The try phi-slot
-  override row and try payload-branch return row now live there as well. The
-  remaining `core_multi_block_rows.zig` facade/core is `4020` lines; broader
-  error-union and aggregate rows can now move against shared helper surfaces
-  instead of depending on private core helpers.
+  override row, try payload-branch return row, and try-switch return row now
+  live there as well. The remaining `core_multi_block_rows.zig` facade/core is
+  `3723` lines; broader error-union and aggregate rows can now move against
+  shared helper surfaces instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
   `generic_cfg_functions=689`, `object_emitted_functions=689`,
@@ -383,6 +383,27 @@ Generic-CFG error-union try payload-branch split status:
   frontier rows or counters changed.
 - Validation logs: `tmp/error_union_payload_branch_split_frontier.log` and
   `tmp/error_union_payload_branch_split_boundaries.log`. Frontier stayed locked
+  across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
+
+Generic-CFG error-union try-switch split status:
+
+- `lowerGenericCfgErrorUnionTrySwitchReturn`, its switch payload mask
+  recognizer, its switch phi payload-wrap recognizer, and its slot-wrapped
+  switch arm emitter now live in
+  `src/codegen/x86_64/generic_cfg/error_union_rows.zig`. Shared switch
+  topology helpers (`blockSwitchTerminator`, `commonSwitchMergeBlock`,
+  `firstPhiReturn`, and `blockBranchesTo`) moved to
+  `src/codegen/x86_64/generic_cfg/terminal_values.zig` for the remaining core
+  switch rows.
+- Line count after this slice: `core_multi_block_rows.zig` is 3723 lines,
+  `error_union_rows.zig` is 2022 lines, and `terminal_values.zig` is 548 lines.
+  This is behavior-preserving; no frontier rows or counters changed.
+- Validation logs: `tmp/error_union_try_switch_split_frontier.log` and
+  `tmp/error_union_try_switch_split_boundaries.log`. Frontier stayed locked
   across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
   `object_emitted_functions=689`, `executable_ok_rows=14`, and
