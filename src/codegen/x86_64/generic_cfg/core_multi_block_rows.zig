@@ -59,6 +59,7 @@ const genericCfgSupportsPointerNullIcmp = core_value_support.genericCfgSupportsP
 const genericCfgSupportsI32Value = core_value_support.genericCfgSupportsI32Value;
 
 pub const lowerGenericCfgLoopTryReturn = error_union_rows.lowerGenericCfgLoopTryReturn;
+pub const lowerGenericCfgLinearErrorUnionTryChainReturn = error_union_rows.lowerGenericCfgLinearErrorUnionTryChainReturn;
 pub const lowerGenericCfgStructBranchUpdateReturn = aggregate_rows.lowerGenericCfgStructBranchUpdateReturn;
 pub const genericCfgStructFieldZeroUpdateAdd = aggregate_rows.genericCfgStructFieldZeroUpdateAdd;
 pub const genericCfgStructFieldZeroMergeReturn = aggregate_rows.genericCfgStructFieldZeroMergeReturn;
@@ -67,6 +68,8 @@ const terminalCondParamReg = terminal_values.terminalCondParamReg;
 const genericCfgTerminalBranchExtraBlocksAreUnreachable = terminal_values.genericCfgTerminalBranchExtraBlocksAreUnreachable;
 const singleBrTarget = terminal_values.singleBrTarget;
 const blockIsUnreachable = terminal_values.blockIsUnreachable;
+const blockHasCondbr = terminal_values.blockHasCondbr;
+const linearTerminalBranchUsesAllBlocks = terminal_values.linearTerminalBranchUsesAllBlocks;
 const genericCfgSupportsTerminalReturnBlock = terminal_values.genericCfgSupportsTerminalReturnBlock;
 const genericCfgSupportsNestedTerminalReturnBlock = terminal_values.genericCfgSupportsNestedTerminalReturnBlock;
 const emitGenericCfgTerminalConditionTrueBranch = terminal_values.emitGenericCfgTerminalConditionTrueBranch;
@@ -2778,22 +2781,6 @@ const ErrorUnionTryPayloadBranchReturn = struct {
     false_op: MachineBinaryOp,
 };
 
-const LinearErrorUnionTryStage = struct {
-    call_name: []const u8,
-    call: ir.CallInst,
-    err_block: ir.BasicBlock,
-    cont_block: ir.BasicBlock,
-};
-
-const LinearErrorUnionTryChain = struct {
-    entry: ir.BasicBlock,
-    first: LinearErrorUnionTryStage,
-    second: LinearErrorUnionTryStage,
-    second_call_first_arg: ArgReg,
-    first_payload_add: u8,
-    success_payload_add: u8,
-};
-
 const BranchThenErrorUnionTryReturn = struct {
     entry: ir.BasicBlock,
     try_block: ir.BasicBlock,
@@ -2856,62 +2843,6 @@ const ErrorUnionTrySwitchReturn = struct {
     case_count: usize,
     default_case: ErrorUnionTrySwitchCase,
 };
-
-fn lowerGenericCfgLinearErrorUnionTryChainReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-) !bool {
-    const chain = linearErrorUnionTryChain(function) orelse return false;
-    const frame_bytes: u8 = 24;
-    const epilogue_label = try ownedMachineLabel(
-        allocator,
-        machine,
-        "generic_cfg_linear_try_chain_{}_generic_cfg_select_end",
-        .{machine.instructions.items.len},
-    );
-
-    try appendStackFrame(allocator, machine, frame_bytes);
-    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = chain.second_call_first_arg } });
-
-    try emitTwoI32ArgCallIntoRax(allocator, machine, function, chain.entry, chain.first.call);
-    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
-    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
-    try machine.instructions.append(allocator, .test_eax_eax);
-    try appendGenericCfgConditionalBranch(allocator, machine, .jne, chain.first.err_block.name);
-
-    try appendGenericCfgBlockLabel(allocator, machine, chain.first.cont_block.name);
-    try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = .rdi } });
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
-    if (chain.first_payload_add != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = chain.first_payload_add });
-    try machine.instructions.append(allocator, .mov_rax_rsi);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = chain.second.call.callee, .ret_ty = chain.second.call.ret_ty } });
-    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
-    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
-    try machine.instructions.append(allocator, .test_eax_eax);
-    try appendGenericCfgConditionalBranch(allocator, machine, .jne, chain.second.err_block.name);
-
-    try appendGenericCfgBlockLabel(allocator, machine, chain.second.cont_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
-    if (chain.success_payload_add != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = chain.success_payload_add });
-    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, chain.first.err_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, chain.second.err_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
-
-    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
-    try appendStackFrameEnd(allocator, machine, frame_bytes);
-    try appendGenericCfgReturn(allocator, machine);
-    return true;
-}
 
 fn lowerGenericCfgBranchBothErrorUnionTryReturn(
     allocator: std.mem.Allocator,
@@ -4605,75 +4536,6 @@ fn payloadValueFromCallResult(block: ir.BasicBlock, value: ir.Value, call_name: 
     return shift.ty.eql(.{ .int = 64 }) and shift.op == .lshr and isInt(shift.rhs, 16) and isNamed(shift.lhs, call_name);
 }
 
-fn linearErrorUnionTryChain(function: ir.Function) ?LinearErrorUnionTryChain {
-    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 5) return null;
-    const entry = function.blocks.items[0];
-    const entry_condbr = switch (entry.terminator orelse return null) {
-        .condbr => |condbr| condbr,
-        else => return null,
-    };
-    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
-    const first_call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
-    const first_call_instruction = findInstruction(entry, first_call_name) orelse return null;
-    const first_call = switch (first_call_instruction.kind) {
-        .call => |call| call,
-        else => return null,
-    };
-    if (!supportsDirectI64Call(first_call) or first_call.args.items.len != 2) return null;
-
-    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
-    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
-    const then_is_cont = blockHasCondbr(then_block);
-    const else_is_cont = blockHasCondbr(else_block);
-    if (then_is_cont == else_is_cont) return null;
-    const first_cont = if (then_is_cont) then_block else else_block;
-    const first_err = if (then_is_cont) else_block else then_block;
-    if (!blockReturnsNamedValue(first_err, first_call_name, .{ .int = 64 })) return null;
-
-    const cont_condbr = switch (first_cont.terminator orelse return null) {
-        .condbr => |condbr| condbr,
-        else => return null,
-    };
-    if (!cont_condbr.cond_ty.eql(.{ .int = 1 })) return null;
-    const second_call_name = errorUnionTryGuardCallResult(first_cont, cont_condbr.cond) orelse return null;
-    const second_call_instruction = findInstruction(first_cont, second_call_name) orelse return null;
-    const second_call = switch (second_call_instruction.kind) {
-        .call => |call| call,
-        else => return null,
-    };
-    if (!supportsDirectI64Call(second_call) or second_call.args.items.len != 2) return null;
-    const second_first_arg = switch (second_call.args.items[0].value) {
-        .named => |name| paramReg(function, name, .{ .int = 32 }) catch return null,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    const first_payload_add = payloadAddArgFromCallResult(first_cont, second_call.args.items[1].value, first_call_name) orelse return null;
-
-    const second_then = function.blocks.items[blockIndex(function, cont_condbr.then_target) orelse return null];
-    const second_else = function.blocks.items[blockIndex(function, cont_condbr.else_target) orelse return null];
-    const second_then_is_success = successReturnPayloadAdd(second_then, second_call_name);
-    const second_else_is_success = successReturnPayloadAdd(second_else, second_call_name);
-    if ((second_then_is_success != null) == (second_else_is_success != null)) return null;
-    const second_cont = if (second_then_is_success != null) second_then else second_else;
-    const second_err = if (second_then_is_success != null) second_else else second_then;
-    if (!blockReturnsNamedValue(second_err, second_call_name, .{ .int = 64 })) return null;
-    if (!linearTerminalBranchUsesAllBlocks(
-        function,
-        blockIndex(function, first_cont.name) orelse return null,
-        blockIndex(function, first_err.name) orelse return null,
-        blockIndex(function, second_cont.name) orelse return null,
-        blockIndex(function, second_err.name) orelse return null,
-    )) return null;
-
-    return .{
-        .entry = entry,
-        .first = .{ .call_name = first_call_name, .call = first_call, .err_block = first_err, .cont_block = first_cont },
-        .second = .{ .call_name = second_call_name, .call = second_call, .err_block = second_err, .cont_block = second_cont },
-        .second_call_first_arg = second_first_arg,
-        .first_payload_add = first_payload_add,
-        .success_payload_add = second_then_is_success orelse second_else_is_success.?,
-    };
-}
-
 const supportsDirectI64Call = error_union_rows.supportsDirectI64Call;
 const supportsDirectI32Call = error_union_rows.supportsDirectI32Call;
 const errorUnionTryGuardCallResult = error_union_rows.errorUnionTryGuardCallResult;
@@ -4701,34 +4563,6 @@ fn emitGenericCfgNestedTerminalBranch(
     try emitGenericCfgTerminalReturnBlockInScope(allocator, machine, function, .{ .entry = entry, .middle = scope, .block = else_block });
     try appendGenericCfgBlockLabel(allocator, machine, then_block.name);
     try emitGenericCfgTerminalReturnBlockInScope(allocator, machine, function, .{ .entry = entry, .middle = scope, .block = then_block });
-}
-
-fn blockHasCondbr(block: ir.BasicBlock) bool {
-    return switch (block.terminator orelse return false) {
-        .condbr => true,
-        else => false,
-    };
-}
-
-fn linearTerminalBranchUsesAllBlocks(
-    function: ir.Function,
-    continuation_index: usize,
-    first_return_index: usize,
-    second_then_index: usize,
-    second_else_index: usize,
-) bool {
-    for (function.blocks.items, 0..) |block, index| {
-        if (index == 0 or index == continuation_index or index == first_return_index or
-            index == second_then_index or index == second_else_index)
-        {
-            continue;
-        }
-        switch (block.terminator orelse return false) {
-            .@"unreachable" => {},
-            else => return false,
-        }
-    }
-    return second_then_index != second_else_index;
 }
 
 pub fn genericCfgSupportsBranchMergeBlock(

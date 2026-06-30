@@ -81,18 +81,19 @@ Refactor module-size audit:
   pointer/slice (`181` lines), and union-tag (`102` lines). The facade is
   `1055` lines and still owns selected lowerers that do not yet have a clean
   family boundary.
-- Generic-CFG backend ownership now has `error_union_rows.zig` (`401` lines)
+- Generic-CFG backend ownership now has `error_union_rows.zig` (`858` lines)
   for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
   (`154` lines) for the struct field-zero branch update row, and
-  `terminal_values.zig` (`470` lines) for shared terminal return/value
-  materialization and branch-label helpers. The shared error-union helper
-  surface for direct i64/i32 call checks, try-guard call-result discovery,
-  payload-add recognition, and two-i32 call emission also lives in
-  `error_union_rows.zig`. The first complete post-terminal error-union emitter
-  moved as well: `lowerGenericCfgErrorUnionPayloadBranchReturn` now lives with
-  its payload-branch recognizers in `error_union_rows.zig`. The remaining
-  `core_multi_block_rows.zig` facade/core is `5083` lines; broader
+  `terminal_values.zig` (`498` lines) for shared terminal return/value
+  materialization, branch-label helpers, and linear terminal topology
+  predicates. The shared error-union helper surface for direct i64/i32 call
+  checks, try-guard call-result discovery, payload-add recognition, and
+  two-i32 call emission also lives in `error_union_rows.zig`. Complete
+  post-terminal error-union emitter families now moved include
+  `lowerGenericCfgErrorUnionPayloadBranchReturn` and
+  `lowerGenericCfgLinearErrorUnionTryChainReturn`, with their recognizers. The
+  remaining `core_multi_block_rows.zig` facade/core is `4917` lines; broader
   error-union and aggregate rows can now move against shared helper surfaces
   instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
@@ -272,6 +273,26 @@ Generic-CFG error-union payload-branch emitter split status:
   `executable_ok_rows=14`, and `local_fail=0`; boundary rows stayed
   fail-closed with `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and
   `local_fail=0`.
+
+Generic-CFG error-union linear try-chain split status:
+
+- `lowerGenericCfgLinearErrorUnionTryChainReturn` and its private
+  two-stage try-chain recognizer now live in
+  `src/codegen/x86_64/generic_cfg/error_union_rows.zig`. Shared linear
+  terminal topology predicates (`blockHasCondbr` and
+  `linearTerminalBranchUsesAllBlocks`) moved into
+  `src/codegen/x86_64/generic_cfg/terminal_values.zig`; the core file keeps
+  aliases for the non-error-union terminal branch rows that still use them.
+- Line count after this slice: `core_multi_block_rows.zig` is 4917 lines,
+  `error_union_rows.zig` is 858 lines, and `terminal_values.zig` is 498 lines.
+  This is behavior-preserving; it does not add new frontier rows.
+- Validation logs: `tmp/error_union_linear_try_split_frontier.log` and
+  `tmp/error_union_linear_try_split_boundaries.log`. Frontier stayed locked
+  across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
 
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated

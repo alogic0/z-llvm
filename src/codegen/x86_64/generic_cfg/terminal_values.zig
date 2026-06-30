@@ -63,6 +63,34 @@ pub fn blockIsUnreachable(block: ir.BasicBlock) bool {
     };
 }
 
+pub fn blockHasCondbr(block: ir.BasicBlock) bool {
+    return switch (block.terminator orelse return false) {
+        .condbr => true,
+        else => false,
+    };
+}
+
+pub fn linearTerminalBranchUsesAllBlocks(
+    function: ir.Function,
+    continuation_index: usize,
+    first_return_index: usize,
+    second_then_index: usize,
+    second_else_index: usize,
+) bool {
+    for (function.blocks.items, 0..) |block, index| {
+        if (index == 0 or index == continuation_index or index == first_return_index or
+            index == second_then_index or index == second_else_index)
+        {
+            continue;
+        }
+        switch (block.terminator orelse return false) {
+            .@"unreachable" => {},
+            else => return false,
+        }
+    }
+    return second_then_index != second_else_index;
+}
+
 pub fn genericCfgSupportsTerminalReturnBlock(function: ir.Function, entry: ir.BasicBlock, block: ir.BasicBlock) bool {
     return genericCfgSupportsTerminalReturnBlockInScope(function, .{ .entry = entry, .block = block });
 }
