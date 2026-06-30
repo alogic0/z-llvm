@@ -86,6 +86,7 @@ Refactor module-size audit:
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
   (`154` lines) for the struct field-zero branch update row,
   `optional_rows.zig` (`299` lines) for optional-pointer return/unwrap rows,
+  `safety_rows.zig` (`91` lines) for shared guarded panic block validation,
   and
   `terminal_values.zig` (`555` lines) for shared terminal return/value
   materialization, branch-label helpers, linear terminal topology predicates,
@@ -105,7 +106,7 @@ Refactor module-size audit:
   branch/switch try family, error-union switch-phi row, error-tag switch
   return row, error-tag branch row, catch value-merge row, and catch-switch row
   now live there as well. The remaining `core_multi_block_rows.zig`
-  facade/core is `1767` lines; broader aggregate rows can now move against
+  facade/core is `1689` lines; broader aggregate rows can now move against
   shared helper surfaces instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
@@ -561,6 +562,24 @@ Generic-CFG optional-pointer backend split status:
 - Validation logs: `tmp/optional_rows_split_frontier.log` and
   `tmp/optional_rows_split_boundaries.log`. Frontier stayed locked across
   ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
+
+Generic-CFG safety panic-helper split status:
+
+- Shared guarded panic block validation now lives in
+  `src/codegen/x86_64/generic_cfg/safety_rows.zig`. This module owns
+  `genericCfgGuardPanicBlock`, including the selected slice panic-block
+  validation helper and the local `llvm.assume` cold-call check. The core file
+  keeps a facade alias for the remaining guarded optional/safety rows.
+- Line count after this slice: `core_multi_block_rows.zig` is 1689 lines,
+  `safety_rows.zig` is 91 lines, and `optional_rows.zig` remains 299 lines.
+  This is behavior-preserving; no frontier rows or counters changed.
+- Validation logs: `tmp/safety_panic_helpers_split_frontier.log` and
+  `tmp/safety_panic_helpers_split_boundaries.log`. Frontier stayed locked
+  across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
   `object_emitted_functions=689`, `executable_ok_rows=14`, and
   `local_fail=0`; boundary rows stayed fail-closed with
