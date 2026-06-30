@@ -136,8 +136,13 @@ The `frontier_error_name_len` row now proves typed-v2 ownership for AIR
 `error_name`: Zig exports the operand tying `error_name` to the selected
 error-set value and z_llvm lowers the sentinel `u8` slice result from typed-v2
 facts without AIR-text recovery or sidecars. The executable proof checks
-`@errorName(err).len` for both selected error values; arbitrary error-name
-payload materialization remains outside this narrow row.
+`@errorName(err).len` for both selected error values. The companion
+`frontier_error_name_three_len` row proves the same typed-v2 path for a
+three-name concrete error set by deriving pointer/length selects from the
+exported error-set names and the runtime error code. It deliberately disables
+the integer-to-error ReleaseSafe validation inside that row, so
+`error_set_has_value` remains a separate safety-check implementation family.
+Arbitrary error-name payload materialization remains outside this narrow row.
 
 `frontier_union_tags.zig` adds the first source-backed tagged-union tag/payload
 switch proof. The patched Zig typed-v2 exporter emits versioned
@@ -246,20 +251,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=690
-structured_functions=690
-generic_codegen_functions=690
-generic_cfg_functions=690
+discovered_functions=691
+structured_functions=691
+generic_codegen_functions=691
+generic_cfg_functions=691
 structural_matcher_functions=0
-structured_air_v2_functions=690
-typed_air_operand_functions=690
+structured_air_v2_functions=691
+typed_air_operand_functions=691
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=690
+generic_lowering_functions=691
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=690
+object_emitted_functions=691
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

@@ -1982,12 +1982,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=690`,
-`generic_codegen_functions=690`, `generic_cfg_functions=690`,
+frontier gate reports `source_rows=14`, `discovered_functions=691`,
+`generic_codegen_functions=691`, `generic_cfg_functions=691`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=690`, `object_failures=0`,
+`object_emitted_functions=691`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -2000,15 +2000,19 @@ The frontier optionals/errors source now includes a typed-v2 `error_name`
 ownership row. Zig exports `error_name` as a typed unary record with the
 error-set operand, and z_llvm lowers the sentinel `u8` slice length path from
 those typed facts. The accepted proof is `@errorName(err).len` for a selected
-two-error-set source row; arbitrary error-name string/payload materialization
-remains future work.
+two-error-set source row plus a three-name concrete error-set row whose
+pointer/length selects are derived from exported error-set names and a runtime
+error code. The three-name row disables integer-to-error runtime validation
+locally, so `error_set_has_value` remains a separate ReleaseSafe safety-check
+family rather than part of this `error_name` claim. Arbitrary error-name
+string/payload materialization remains future work.
 
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=690`,
-`generic_cfg_functions=690`, `structural_matcher_functions=0`,
-`object_emitted_functions=690`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=691`,
+`generic_cfg_functions=691`, `structural_matcher_functions=0`,
+`object_emitted_functions=691`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

@@ -1482,6 +1482,24 @@ pub fn emitGenericCfgIcmpCondition(
         return branch_kind;
     }
 
+    if (icmp.operand_ty.eql(.{ .int = 16 })) {
+        if (icmp.lhs == .int and icmp.rhs != .int) {
+            const rhs_reg = try paramValueReg(function, icmp.rhs, .{ .int = 16 });
+            try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = rhs_reg, .imm = try u16Value(switch (icmp.lhs) {
+                .int => |int| int,
+                else => unreachable,
+            }) } });
+            return branch_kind;
+        }
+        const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 16 });
+        const rhs_imm = switch (icmp.rhs) {
+            .int => |int| try u16Value(int),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = lhs_reg, .imm = rhs_imm } });
+        return branch_kind;
+    }
+
     if (!icmp.operand_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
 
     if (icmp.predicate == .slt and isInt(icmp.rhs, 0)) {
@@ -1521,6 +1539,11 @@ pub fn emitGenericCfgIcmpCondition(
     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
     try appendGenericCfgCompareLocalImm(allocator, machine, .eax, rhs_imm);
     return branch_kind;
+}
+
+fn u16Value(value: i128) !u16 {
+    if (value < 0 or value > std.math.maxInt(u16)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
 }
 
 pub fn lowerI32AddTreeReturn(

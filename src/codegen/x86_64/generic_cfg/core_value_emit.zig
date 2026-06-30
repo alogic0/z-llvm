@@ -222,9 +222,19 @@ fn emitGenericCfgI64SelectIntoRax(
         .icmp => |icmp| icmp,
         else => return error.UnsupportedCodegenInstruction,
     };
-    _ = result_name;
-    const true_label = "generic_cfg_i64_select_true";
-    const end_label = "generic_cfg_i64_generic_cfg_select_end";
+    const label_suffix = machine.instructions.items.len;
+    const true_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_i64_select_{s}_{}_true",
+        .{ result_name, label_suffix },
+    );
+    const end_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_i64_select_{s}_{}_generic_cfg_select_end",
+        .{ result_name, label_suffix },
+    );
     const branch_kind = try cabi_call_lowering.emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
     try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
     try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, select.false_value);
@@ -232,6 +242,18 @@ fn emitGenericCfgI64SelectIntoRax(
     try appendGenericCfgBlockLabel(allocator, machine, true_label);
     try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, select.true_value);
     try appendGenericCfgBlockLabel(allocator, machine, end_label);
+}
+
+fn ownedMachineLabel(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    comptime fmt: []const u8,
+    args: anytype,
+) ![]const u8 {
+    const label = try std.fmt.allocPrint(allocator, fmt, args);
+    errdefer allocator.free(label);
+    try machine.owned_labels.append(allocator, label);
+    return label;
 }
 
 pub fn emitGenericCfgI32AddValueToEax(

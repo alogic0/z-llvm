@@ -495,39 +495,124 @@ fn materializeErrorNameParts(
             };
         },
         .named => |name_value| {
-            const names = air_model.errorSetFirstTwoNames(error_set_type) orelse return air_model.LowerError.UnsupportedAir;
-            const first_ptr = try errorNameStringPointer(self, names[0]);
-            const second_ptr = try errorNameStringPointer(self, names[1]);
-            const selection = try errorNameSelectionFromValue(self, name_value) orelse return air_model.LowerError.UnsupportedAir;
-            const ptr_name = try ownPrint(self.module, "air{}_error_name_selected_ptr", .{instruction_index});
-            try self.block.instructions.append(self.allocator, .{
-                .result = ptr_name,
-                .kind = .{ .select = .{
-                    .cond_ty = .{ .int = 1 },
-                    .cond = selection.cond,
-                    .ty = .ptr,
-                    .true_value = if (selection.true_is_first) first_ptr else second_ptr,
-                    .false_value = if (selection.true_is_first) second_ptr else first_ptr,
-                } },
-            });
-            const len_name = try ownPrint(self.module, "air{}_error_name_selected_len", .{instruction_index});
-            try self.block.instructions.append(self.allocator, .{
-                .result = len_name,
-                .kind = .{ .select = .{
-                    .cond_ty = .{ .int = 1 },
-                    .cond = selection.cond,
-                    .ty = .{ .int = 64 },
-                    .true_value = .{ .int = @intCast(if (selection.true_is_first) names[0].len else names[1].len) },
-                    .false_value = .{ .int = @intCast(if (selection.true_is_first) names[1].len else names[0].len) },
-                } },
-            });
-            return .{
-                .ptr = .{ .named = ptr_name },
-                .len = .{ .named = len_name },
-            };
+            const names = try air_model.errorSetNamesAlloc(self.allocator, error_set_type) orelse return air_model.LowerError.UnsupportedAir;
+            defer self.allocator.free(names);
+            if (try materializeSelectedTwoNameErrorNameParts(self, instruction_index, name_value, names)) |parts| {
+                return parts;
+            }
+            return try materializeDynamicErrorNameParts(self, instruction_index, name_value, names);
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return air_model.LowerError.UnsupportedAir,
     }
+}
+
+fn materializeSelectedTwoNameErrorNameParts(
+    self: anytype,
+    instruction_index: u32,
+    name_value: []const u8,
+    names: []const []const u8,
+) !?ErrorNameParts {
+    if (names.len != 2) return null;
+    const selection = try errorNameSelectionFromValue(self, name_value) orelse return null;
+    const first_ptr = try errorNameStringPointer(self, names[0]);
+    const second_ptr = try errorNameStringPointer(self, names[1]);
+    const ptr_name = try ownPrint(self.module, "air{}_error_name_selected_ptr", .{instruction_index});
+    try self.block.instructions.append(self.allocator, .{
+        .result = ptr_name,
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = selection.cond,
+            .ty = .ptr,
+            .true_value = if (selection.true_is_first) first_ptr else second_ptr,
+            .false_value = if (selection.true_is_first) second_ptr else first_ptr,
+        } },
+    });
+    const len_name = try ownPrint(self.module, "air{}_error_name_selected_len", .{instruction_index});
+    try self.block.instructions.append(self.allocator, .{
+        .result = len_name,
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = selection.cond,
+            .ty = .{ .int = 64 },
+            .true_value = .{ .int = @intCast(if (selection.true_is_first) names[0].len else names[1].len) },
+            .false_value = .{ .int = @intCast(if (selection.true_is_first) names[1].len else names[0].len) },
+        } },
+    });
+    return .{
+        .ptr = .{ .named = ptr_name },
+        .len = .{ .named = len_name },
+    };
+}
+
+fn materializeDynamicErrorNameParts(
+    self: anytype,
+    instruction_index: u32,
+    name_value: []const u8,
+    names: []const []const u8,
+) !ErrorNameParts {
+    if (names.len == 0 or names.len > std.math.maxInt(u16)) return air_model.LowerError.UnsupportedAir;
+    const code_value_name = canonicalErrorNameCodeValue(self, name_value);
+    var selected_ptr = try errorNameStringPointer(self, names[names.len - 1]);
+    var selected_len: ir.Value = .{ .int = @intCast(names[names.len - 1].len) };
+    if (names.len == 1) {
+        return .{ .ptr = selected_ptr, .len = selected_len };
+    }
+
+    var code: usize = names.len - 1;
+    while (code > 0) : (code -= 1) {
+        const name = names[code - 1];
+        const cmp_name = try ownPrint(self.module, "air{}_error_name_is_{}", .{ instruction_index, code });
+        try self.block.instructions.append(self.allocator, .{
+            .result = cmp_name,
+            .kind = .{ .icmp = .{
+                .predicate = .eq,
+                .operand_ty = .{ .int = 16 },
+                .lhs = .{ .named = code_value_name },
+                .rhs = .{ .int = @intCast(code) },
+            } },
+        });
+
+        const ptr_name = try ownPrint(self.module, "air{}_error_name_ptr_{}", .{ instruction_index, code });
+        try self.block.instructions.append(self.allocator, .{
+            .result = ptr_name,
+            .kind = .{ .select = .{
+                .cond_ty = .{ .int = 1 },
+                .cond = .{ .named = cmp_name },
+                .ty = .ptr,
+                .true_value = try errorNameStringPointer(self, name),
+                .false_value = selected_ptr,
+            } },
+        });
+        selected_ptr = .{ .named = ptr_name };
+
+        const len_name = try ownPrint(self.module, "air{}_error_name_len_{}", .{ instruction_index, code });
+        try self.block.instructions.append(self.allocator, .{
+            .result = len_name,
+            .kind = .{ .select = .{
+                .cond_ty = .{ .int = 1 },
+                .cond = .{ .named = cmp_name },
+                .ty = .{ .int = 64 },
+                .true_value = .{ .int = @intCast(name.len) },
+                .false_value = selected_len,
+            } },
+        });
+        selected_len = .{ .named = len_name };
+    }
+    return .{ .ptr = selected_ptr, .len = selected_len };
+}
+
+fn canonicalErrorNameCodeValue(self: anytype, name_value: []const u8) []const u8 {
+    const instruction = findCurrentBlockInstruction(self, name_value) orelse return name_value;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return name_value,
+    };
+    if (cast.op != .bitcast or !cast.from_ty.eql(.{ .int = 16 }) or !cast.to_ty.eql(.{ .int = 16 })) return name_value;
+    const source_name = switch (cast.value) {
+        .named => |source| source,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return name_value,
+    };
+    return canonicalErrorNameCodeValue(self, source_name);
 }
 
 const ErrorNameSelection = struct {

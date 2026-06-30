@@ -225,3 +225,4 @@ pub const typedErrorNameSummary = error_union_model.typedErrorNameSummary;
 pub const typedErrorNameSummaryFromV2 = error_union_model.typedErrorNameSummaryFromV2;
 pub const errorSetNameForCode = error_union_model.errorSetNameForCode;
 pub const errorSetFirstTwoNames = error_union_model.errorSetFirstTwoNames;
+pub const errorSetNamesAlloc = error_union_model.errorSetNamesAlloc;

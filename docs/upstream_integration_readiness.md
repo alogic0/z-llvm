@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=690
-structured_functions=690
-generic_codegen_functions=690
-generic_cfg_functions=690
+discovered_functions=691
+structured_functions=691
+generic_codegen_functions=691
+generic_cfg_functions=691
 structural_matcher_functions=0
-structured_air_v2_functions=690
-typed_air_operand_functions=690
+structured_air_v2_functions=691
+typed_air_operand_functions=691
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=690
+generic_lowering_functions=691
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=690
+object_emitted_functions=691
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 690-function counters above plus `native_link_accepted_rows=14`,
+14-source / 691-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -685,8 +685,13 @@ The frontier optionals/errors proof now includes typed-v2 ownership for AIR
 `error_name`: the patched Zig exporter emits a typed unary record carrying the
 error-set operand, and z_llvm lowers the selected sentinel `u8` slice length
 path from those facts without AIR-text recovery or sidecars. The claim is
-limited to source-backed `@errorName(err).len` behavior for the selected
-two-error-set row; arbitrary error-name payload lowering remains future work.
+limited to source-backed `@errorName(err).len` behavior for selected concrete
+error-set rows. The latest row covers a three-name error set by selecting the
+string pointer and length from exported error-set names and a runtime error
+code. The row disables the integer-to-error ReleaseSafe validation locally, so
+`error_set_has_value` remains a future safety-check lowering family rather than
+part of the `error_name` ownership claim. Arbitrary error-name payload lowering
+remains future work.
 The frontier proof now includes the selected tagged-union tag/payload switch
 row: Zig emits versioned typed-v2 union-tag and switch case facts, and z_llvm
 lowers both tag arms from those facts without AIR text fallback, shape

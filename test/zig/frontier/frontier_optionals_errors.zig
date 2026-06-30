@@ -29,6 +29,12 @@ const FrontierError = error{
     WorseTag,
 };
 
+const FrontierNameError = error{
+    Short,
+    MediumName,
+    VeryLongName,
+};
+
 export fn frontier_error_union_match(tag: i32) i32 {
     const result: FrontierError!i32 = if (tag == 0) 11 else FrontierError.BadTag;
     if (result) |value| {
@@ -482,5 +488,11 @@ export fn frontier_error_catch_const_merge(tag: i32, value: i32) i32 {
 
 export fn frontier_error_name_len(tag: i32) usize {
     const err: FrontierError = if (tag == 0) FrontierError.BadTag else FrontierError.WorseTag;
+    return @errorName(err).len;
+}
+
+export fn frontier_error_name_three_len(code: u16) usize {
+    @setRuntimeSafety(false);
+    const err: FrontierNameError = @errorCast(@errorFromInt(code));
     return @errorName(err).len;
 }

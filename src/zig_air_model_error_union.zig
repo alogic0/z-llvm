@@ -94,6 +94,19 @@ pub fn errorSetFirstTwoNames(type_text: []const u8) ?[2][]const u8 {
     return .{ first, second };
 }
 
+pub fn errorSetNamesAlloc(allocator: std.mem.Allocator, type_text: []const u8) !?[][]const u8 {
+    var fields = errorSetNameIterator(type_text) orelse return null;
+    var names: std.ArrayList([]const u8) = .empty;
+    errdefer names.deinit(allocator);
+    while (fields.next()) |field| {
+        const name = std.mem.trim(u8, field, " ");
+        if (name.len == 0) return null;
+        try names.append(allocator, name);
+    }
+    if (names.items.len == 0) return null;
+    return try names.toOwnedSlice(allocator);
+}
+
 fn isErrorSetType(type_text: []const u8) bool {
     return std.mem.startsWith(u8, type_text, "error{") and std.mem.endsWith(u8, type_text, "}");
 }
