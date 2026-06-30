@@ -82,11 +82,12 @@ Refactor module-size audit:
   `1055` lines and still owns selected lowerers that do not yet have a clean
   family boundary.
 - Generic-CFG backend ownership now has `error_union_rows.zig` (`401` lines)
-  for the self-contained loop-try row and `pointer_slice_rows.zig` (`546`
-  lines) for slice runtime-call argument resolution/emission. The remaining
-  `core_multi_block_rows.zig` facade/core is `5860` lines; aggregate rows were
-  not moved because they still share branch/terminal helper surfaces that need
-  a cleaner extraction first.
+  for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
+  for slice runtime-call argument resolution/emission, and
+  `aggregate_rows.zig` (`154` lines) for the struct field-zero branch update
+  row. The remaining `core_multi_block_rows.zig` facade/core is `5771` lines;
+  broader aggregate rows still wait on a shared branch/terminal helper surface
+  before they can move cleanly.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
   `generic_cfg_functions=689`, `object_emitted_functions=689`,
@@ -176,6 +177,27 @@ Generic-CFG pointer/slice backend split status:
   that helper surface before moving aggregate rows.
 - Validation logs: `tmp/pointer_slice_rows_split_frontier.log` and
   `tmp/pointer_slice_rows_split_expanded.log`. Frontier stayed locked across
+  ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; expanded stayed locked at `source_rows=109`,
+  `discovered_functions=199`, `generic_cfg_functions=199`,
+  `object_emitted_functions=199`, `executable_ok_rows=108`,
+  `runtime_boundary_rows=1`, and `local_fail=0`.
+
+Generic-CFG aggregate backend split status:
+
+- The first cohesive aggregate CFG cluster now lives in
+  `src/codegen/x86_64/generic_cfg/aggregate_rows.zig`. It owns
+  `lowerGenericCfgStructBranchUpdateReturn` and the field-zero update/merge
+  helpers, while `core_multi_block_rows.zig` keeps facade aliases for existing
+  call sites.
+- Line count after this slice: `core_multi_block_rows.zig` is 5771 lines and
+  `aggregate_rows.zig` is 154 lines. This is intentionally the small
+  field-zero update cluster only; larger aggregate construction/return rows
+  still depend on terminal-value helpers in the core file.
+- Validation logs: `tmp/aggregate_rows_split_frontier.log` and
+  `tmp/aggregate_rows_split_expanded.log`. Frontier stayed locked across
   ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
   `object_emitted_functions=689`, `executable_ok_rows=14`, and

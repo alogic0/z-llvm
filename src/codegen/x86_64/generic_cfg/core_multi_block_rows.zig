@@ -8,6 +8,7 @@ const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
 const error_union_rows = @import("error_union_rows.zig");
 const pointer_slice_rows = @import("pointer_slice_rows.zig");
+const aggregate_rows = @import("aggregate_rows.zig");
 
 const std = shared.std;
 const ir = shared.ir;
@@ -52,13 +53,15 @@ const blockIndex = cabi_abi_helpers.blockIndex;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
 
 pub const GenericCfgLoopSumPlan = core_loop_rows.GenericCfgLoopSumPlan;
-const genericCfgPointerSlotParam = core_memory_lowering.genericCfgPointerSlotParam;
-const genericCfgLoadPtrFromSlot = core_memory_lowering.genericCfgLoadPtrFromSlot;
 const genericCfgSupportsBranchIcmp = core_value_support.genericCfgSupportsBranchIcmp;
 const genericCfgSupportsPointerNullIcmp = core_value_support.genericCfgSupportsPointerNullIcmp;
 const genericCfgSupportsI32Value = core_value_support.genericCfgSupportsI32Value;
 
 pub const lowerGenericCfgLoopTryReturn = error_union_rows.lowerGenericCfgLoopTryReturn;
+pub const lowerGenericCfgStructBranchUpdateReturn = aggregate_rows.lowerGenericCfgStructBranchUpdateReturn;
+pub const genericCfgStructFieldZeroUpdateAdd = aggregate_rows.genericCfgStructFieldZeroUpdateAdd;
+pub const genericCfgStructFieldZeroMergeReturn = aggregate_rows.genericCfgStructFieldZeroMergeReturn;
+pub const emitGenericCfgStructFieldZeroUpdatePath = aggregate_rows.emitGenericCfgStructFieldZeroUpdatePath;
 
 fn validateAssumeColdCall(instruction: ir.Instruction) !void {
     if (instruction.removed) return error.UnsupportedCodegenInstruction;
@@ -920,98 +923,6 @@ pub fn genericCfgOptionalPointerMergeHasIncoming(block: ir.BasicBlock, incoming_
         if (std.mem.eql(u8, incoming.block, incoming_block)) return incoming.value.eql(expected);
     }
     return false;
-}
-
-pub fn lowerGenericCfgStructBranchUpdateReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-) !bool {
-    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 2 or function.blocks.items.len != 4) return false;
-    const entry = function.blocks.items[0];
-    if (entry.instructions.items.len != 3) return false;
-    const slot = genericCfgPointerSlotParam(function, entry.instructions.items[0], entry.instructions.items[1]) orelse return false;
-    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
-        .condbr => |condbr| condbr,
-        else => return false,
-    };
-    if (!condbr.cond_ty.eql(.{ .int = 1 })) return false;
-    const then_block = function.blocks.items[blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget];
-    const else_block = function.blocks.items[blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget];
-    const then_target = singleBrTarget(then_block) orelse return false;
-    const else_target = singleBrTarget(else_block) orelse return false;
-    if (!std.mem.eql(u8, then_target, else_target)) return false;
-    const merge_block = function.blocks.items[blockIndex(function, then_target) orelse return error.InvalidBranchTarget];
-
-    const then_add = genericCfgStructFieldZeroUpdateAdd(then_block, slot.slot_name) orelse return false;
-    const else_add = genericCfgStructFieldZeroUpdateAdd(else_block, slot.slot_name) orelse return false;
-    if (!genericCfgStructFieldZeroMergeReturn(merge_block, slot.slot_name)) return false;
-
-    try emitGenericCfgConditionTrueBranch(allocator, machine, function, entry, condbr.cond, then_block.name);
-    try emitGenericCfgStructFieldZeroUpdatePath(allocator, machine, slot.param_reg, else_add);
-    try appendGenericCfgBlockLabel(allocator, machine, then_block.name);
-    try emitGenericCfgStructFieldZeroUpdatePath(allocator, machine, slot.param_reg, then_add);
-    return true;
-}
-
-pub fn genericCfgStructFieldZeroUpdateAdd(block: ir.BasicBlock, slot_name: []const u8) ?i32 {
-    if (block.instructions.items.len != 4) return null;
-    const loaded_ptr = genericCfgLoadPtrFromSlot(block.instructions.items[0], slot_name) orelse return null;
-
-    const load_name = block.instructions.items[1].result orelse return null;
-    const load = switch (block.instructions.items[1].kind) {
-        .load => |load| load,
-        else => return null,
-    };
-    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, loaded_ptr)) return null;
-
-    const add_name = block.instructions.items[2].result orelse return null;
-    const add = switch (block.instructions.items[2].kind) {
-        .binary => |binary| binary,
-        else => return null,
-    };
-    if (add.op != .add or !add.ty.eql(.{ .int = 32 }) or !isNamed(add.lhs, load_name)) return null;
-    const add_imm = switch (add.rhs) {
-        .int => |int| i32Value(int) catch return null,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-
-    const store = switch (block.instructions.items[3].kind) {
-        .store => |store| store,
-        else => return null,
-    };
-    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return null;
-    if (!isNamed(store.value, add_name) or !isNamed(store.ptr, loaded_ptr)) return null;
-    return add_imm;
-}
-
-pub fn genericCfgStructFieldZeroMergeReturn(block: ir.BasicBlock, slot_name: []const u8) bool {
-    if (block.instructions.items.len != 2) return false;
-    const loaded_ptr = genericCfgLoadPtrFromSlot(block.instructions.items[0], slot_name) orelse return false;
-    const load_name = block.instructions.items[1].result orelse return false;
-    const load = switch (block.instructions.items[1].kind) {
-        .load => |load| load,
-        else => return false,
-    };
-    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, loaded_ptr)) return false;
-    const ret = switch (block.terminator orelse return false) {
-        .ret => |ret| ret,
-        else => return false,
-    };
-    return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, load_name);
-}
-
-pub fn emitGenericCfgStructFieldZeroUpdatePath(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    ptr_reg: ArgReg,
-    add_imm: i32,
-) !void {
-    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
-    try machine.instructions.append(allocator, .{ .add_eax_imm32 = add_imm });
-    try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = ptr_reg });
-    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
-    try appendGenericCfgReturn(allocator, machine);
 }
 
 pub fn lowerGenericCfgGuardedOptionalPointerBranchReturn(
