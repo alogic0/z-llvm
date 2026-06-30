@@ -302,7 +302,7 @@ pub fn emitGenericCfgTerminalConditionTrueBranch(
     try emitGenericCfgConditionTrueBranch(allocator, machine, function, block, cond, true_label);
 }
 
-fn emitGenericCfgConditionTrueBranch(
+pub fn emitGenericCfgConditionTrueBranch(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,

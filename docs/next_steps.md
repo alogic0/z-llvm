@@ -87,8 +87,9 @@ Refactor module-size audit:
   (`154` lines) for the struct field-zero branch update row, and
   `terminal_values.zig` (`555` lines) for shared terminal return/value
   materialization, branch-label helpers, linear terminal topology predicates,
-  and switch merge/phi topology helpers. The shared error-union helper surface
-  for direct i64/i32 call checks, try-guard call-result discovery, payload-add
+  switch merge/phi topology helpers, and condition-branch emission. The shared
+  error-union helper surface for direct i64/i32 call checks, try-guard
+  call-result discovery, payload-add
   recognition, and two-i32 call emission also lives in `error_union_rows.zig`.
   Complete post-terminal error-union emitter families now moved include
   `lowerGenericCfgErrorUnionPayloadBranchReturn` and
@@ -102,7 +103,7 @@ Refactor module-size audit:
   branch/switch try family, error-union switch-phi row, error-tag switch
   return row, error-tag branch row, catch value-merge row, and catch-switch row
   now live there as well. The remaining `core_multi_block_rows.zig`
-  facade/core is `2052` lines; broader aggregate rows can now move against
+  facade/core is `2027` lines; broader aggregate rows can now move against
   shared helper surfaces instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
@@ -525,6 +526,25 @@ Generic-CFG error-union catch-switch split status:
   `object_emitted_functions=689`, `executable_ok_rows=14`, and
   `local_fail=0`; boundary rows stayed fail-closed with
   `wrong_diagnostic_rows=0` and `local_fail=0`.
+
+Generic-CFG terminal condition-branch helper split status:
+
+- `emitGenericCfgConditionTrueBranch` is now exported from
+  `src/codegen/x86_64/generic_cfg/terminal_values.zig` instead of being a
+  core-local helper. `core_multi_block_rows.zig` keeps a facade alias for
+  existing optional/branch users, and terminal branch emission continues to use
+  the same helper internally.
+- Line count after this slice: `core_multi_block_rows.zig` is 2027 lines and
+  `terminal_values.zig` remains 555 lines. This is behavior-preserving; no
+  frontier rows or counters changed.
+- Validation logs:
+  `tmp/terminal_condition_branch_helper_split_frontier.log` and
+  `tmp/terminal_condition_branch_helper_split_boundaries.log`. Frontier stayed
+  locked across ReleaseFast, ReleaseSafe, and ReleaseSmall at
+  `source_rows=14`, `discovered_functions=689`,
+  `generic_cfg_functions=689`, `object_emitted_functions=689`,
+  `executable_ok_rows=14`, and `local_fail=0`; boundary rows stayed
+  fail-closed with `wrong_diagnostic_rows=0` and `local_fail=0`.
 
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated

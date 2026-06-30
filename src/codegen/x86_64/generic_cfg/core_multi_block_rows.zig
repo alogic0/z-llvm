@@ -90,6 +90,7 @@ const blockBranchesTo = terminal_values.blockBranchesTo;
 const linearTerminalBranchUsesAllBlocks = terminal_values.linearTerminalBranchUsesAllBlocks;
 const genericCfgSupportsTerminalReturnBlock = terminal_values.genericCfgSupportsTerminalReturnBlock;
 const genericCfgSupportsNestedTerminalReturnBlock = terminal_values.genericCfgSupportsNestedTerminalReturnBlock;
+const emitGenericCfgConditionTrueBranch = terminal_values.emitGenericCfgConditionTrueBranch;
 const emitGenericCfgTerminalConditionTrueBranch = terminal_values.emitGenericCfgTerminalConditionTrueBranch;
 const emitGenericCfgTerminalReturnBlock = terminal_values.emitGenericCfgTerminalReturnBlock;
 const emitGenericCfgTerminalReturnBlockInScope = terminal_values.emitGenericCfgTerminalReturnBlockInScope;
@@ -1915,32 +1916,6 @@ pub fn genericCfgSupportsBranchSideEffects(function: ir.Function, block: ir.Basi
         }
     }
     return true;
-}
-
-pub fn emitGenericCfgConditionTrueBranch(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    cond: ir.Value,
-    true_label: []const u8,
-) !void {
-    const cond_name = switch (cond) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    if (paramRegOrNull(function, cond_name, .{ .int = 1 }) catch null) |reg| {
-        try appendGenericCfgCompareParamZero(allocator, machine, reg);
-        try appendGenericCfgConditionalBranch(allocator, machine, .jne, true_label);
-        return;
-    }
-    const cond_inst = findInstruction(block, cond_name) orelse return error.UnsupportedCodegenValue;
-    const icmp = switch (cond_inst.kind) {
-        .icmp => |icmp| icmp,
-        else => return error.UnsupportedCodegenInstruction,
-    };
-    const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
-    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
 }
 
 pub fn emitGenericCfgBranchPathReturn(
