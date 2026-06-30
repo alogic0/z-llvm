@@ -148,6 +148,15 @@ harness checks valid error values and a child-process trap for an invalid error
 code. Arbitrary sparse/non-dense error-set membership and arbitrary error-name
 payload materialization remain outside this narrow row.
 
+`frontier_mixed_numeric.zig` now includes scalar `@byteSwap` rows for `u16`,
+`u32`, and `u64`. Zig exports AIR `byte_swap` as the versioned
+`zllvm-byte-swap-v1` typed `ty_op` record with an operand ref, integer result
+type, operand text, and bit width. z_llvm lowers those typed facts through the
+generic scalar transform path to x86_64 `rolw`/`bswapl`/`bswapq` instructions,
+so the accepted rows do not leave `llvm.bswap.*` as linker-visible symbols.
+Vector byte swaps, aggregate `byteSwapAllFields`, `u8` identity policy, and
+odd-width integer byte swaps remain future/boundary work.
+
 `frontier_union_tags.zig` adds the first source-backed tagged-union tag/payload
 switch proof. The patched Zig typed-v2 exporter emits versioned
 `zllvm-union-tag-facts-v1` facts for `set_union_tag` and `get_union_tag`, plus
@@ -255,20 +264,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=693
-structured_functions=693
-generic_codegen_functions=693
-generic_cfg_functions=693
+discovered_functions=696
+structured_functions=696
+generic_codegen_functions=696
+generic_cfg_functions=696
 structural_matcher_functions=0
-structured_air_v2_functions=693
-typed_air_operand_functions=693
+structured_air_v2_functions=696
+typed_air_operand_functions=696
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=693
+generic_lowering_functions=696
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=693
+object_emitted_functions=696
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

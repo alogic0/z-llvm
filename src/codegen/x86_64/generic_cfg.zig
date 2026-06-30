@@ -123,6 +123,7 @@ pub const lowerGenericCfgFunction = impl.lowerGenericCfgFunction;
 pub const lowerGenericCfgMultiBlockCallGlobalCheckMain = impl.lowerGenericCfgMultiBlockCallGlobalCheckMain;
 pub const lowerGenericCfgMultiBlockTwoCallCheckMain = impl.lowerGenericCfgMultiBlockTwoCallCheckMain;
 pub const lowerGenericCfgSingleBlockAggregateAbi = impl.lowerGenericCfgSingleBlockAggregateAbi;
+pub const lowerGenericCfgSingleBlockByteSwap = impl.lowerGenericCfgSingleBlockByteSwap;
 pub const lowerGenericCfgSingleBlockCallChainMain = impl.lowerGenericCfgSingleBlockCallChainMain;
 pub const lowerGenericCfgSingleBlockCallCheckMain = impl.lowerGenericCfgSingleBlockCallCheckMain;
 pub const lowerGenericCfgSingleBlockDirectCallMain = impl.lowerGenericCfgSingleBlockDirectCallMain;

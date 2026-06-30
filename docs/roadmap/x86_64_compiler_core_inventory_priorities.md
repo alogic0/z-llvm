@@ -130,7 +130,7 @@ longer make the global top 50.
 | 13 | `union-tag-shape:set_union_tag:opaque` | 3020 | - | - | - | - |
 | 14 | `union-tag-shape:tag_name:opaque` | 806 | - | - | - | - |
 | 15 | `error-union-try:try_cold:pl_op` | 763 | - | - | - | - |
-| 16 | `scalar-transform:byte_swap:opaque` | 760 | - | - | - | - |
+| 16 | `scalar-transform:byte_swap:opaque` | 760 | - | - | stale: frontier now exports/lowers selected scalar `byte_swap` widths (`u16`/`u32`/`u64`); refresh compiler-core-module inventory before using this row for prioritization | - |
 | 17 | `error-union-try:unwrap_errunion_err_ptr:opaque` | 573 | - | - | - | - |
 | 18 | `error-union-try:try_ptr:opaque` | 571 | - | - | - | - |
 | 19 | `scalar-transform:max:opaque` | 429 | - | - | - | - |

@@ -5,6 +5,7 @@ pub const packed_bits = @import("core_single_block_packed_rows.zig");
 pub const pointer = @import("core_single_block_pointer_rows.zig");
 
 pub const lowerGenericCfgSingleBlockScalar = scalar.lowerGenericCfgSingleBlockScalar;
+pub const lowerGenericCfgSingleBlockByteSwap = scalar.lowerGenericCfgSingleBlockByteSwap;
 pub const lowerGenericCfgSingleBlockFp = scalar.lowerGenericCfgSingleBlockFp;
 pub const lowerGenericCfgSingleBlockAggregateAbi = scalar.lowerGenericCfgSingleBlockAggregateAbi;
 pub const lowerGenericCfgSingleBlockI64 = scalar.lowerGenericCfgSingleBlockI64;

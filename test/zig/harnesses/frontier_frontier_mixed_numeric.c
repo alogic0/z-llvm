@@ -3,12 +3,17 @@ extern double z_frontier_double_roundtrip(double, double) __asm__("frontier_mixe
 extern float z_frontier_i32_to_f32_add(int, float) __asm__("frontier_mixed_numeric.frontier_i32_to_f32_add");
 extern float z_frontier_i32_to_f32_mul_add(int, float, float) __asm__("frontier_mixed_numeric.frontier_i32_to_f32_mul_add");
 extern double z_frontier_i32_to_f64_mul_add(int, double, double) __asm__("frontier_mixed_numeric.frontier_i32_to_f64_mul_add");
+extern unsigned short z_frontier_byte_swap_u16(unsigned short) __asm__("frontier_mixed_numeric.frontier_byte_swap_u16");
+extern unsigned int z_frontier_byte_swap_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_byte_swap_u32");
+extern unsigned long long z_frontier_byte_swap_u64(unsigned long long) __asm__("frontier_mixed_numeric.frontier_byte_swap_u64");
 int main(void) {
     if (z_frontier_mixed_float(1.5f, 2.25f) != 3.75f) return 1;
     if (z_frontier_double_roundtrip(9.0, 2.0) != 4.5) return 2;
     if (z_frontier_i32_to_f32_add(4, 1.5f) != 5.5f) return 3;
     if (z_frontier_i32_to_f32_mul_add(3, 2.0f, 1.25f) != 7.25f) return 4;
     if (z_frontier_i32_to_f64_mul_add(4, 2.5, 0.5) != 10.5) return 5;
+    if (z_frontier_byte_swap_u16(0x1234u) != 0x3412u) return 6;
+    if (z_frontier_byte_swap_u32(0x12345678u) != 0x78563412u) return 7;
+    if (z_frontier_byte_swap_u64(0x0123456789abcdefull) != 0xefcdab8967452301ull) return 8;
     return 0;
 }
-

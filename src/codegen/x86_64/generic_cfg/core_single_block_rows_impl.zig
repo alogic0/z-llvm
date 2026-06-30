@@ -133,6 +133,12 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (single_ret) |ret| {
+        if (try lowerGenericCfgByteSwapReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+    }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
         if (try lowerGenericCfgPointerLoadStoreReturn(allocator, machine, function, block, ret)) {
@@ -220,6 +226,111 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
     try appendGenericCfgReturn(allocator, machine);
     machine.codegen_path = .generic_cfg;
     return true;
+}
+
+pub fn lowerGenericCfgSingleBlockByteSwap(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (try lowerGenericCfgByteSwapReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    return false;
+}
+
+fn lowerGenericCfgByteSwapReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    const bits = switch (ret.ty) {
+        .int => |width| width,
+        else => return false,
+    };
+    switch (bits) {
+        16, 32, 64 => {},
+        else => return false,
+    }
+    if (block.instructions.items.len != 1) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const result_name = instruction.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, result_name, ret_name)) return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(call.callee, byteSwapIntrinsicName(bits))) return false;
+    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 1) return false;
+    if (!call.ret_ty.eql(ret.ty) or !call.args.items[0].ty.eql(ret.ty)) return false;
+    const operand_value = call.args.items[0].value;
+
+    switch (bits) {
+        16 => {
+            try emitByteSwapOperandIntoEax(allocator, machine, function, operand_value, ret.ty);
+            try machine.instructions.append(allocator, .{ .rol_ax_imm8 = 8 });
+            try machine.instructions.append(allocator, .{ .and_eax_imm32 = 0xffff });
+        },
+        32 => {
+            try emitByteSwapOperandIntoEax(allocator, machine, function, operand_value, ret.ty);
+            try machine.instructions.append(allocator, .bswap_eax);
+        },
+        64 => {
+            try emitByteSwapOperandIntoRax(allocator, machine, function, operand_value, ret.ty);
+            try machine.instructions.append(allocator, .bswap_rax);
+        },
+        else => unreachable,
+    }
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn byteSwapIntrinsicName(bits: u16) []const u8 {
+    return switch (bits) {
+        16 => "llvm.bswap.i16",
+        32 => "llvm.bswap.i32",
+        64 => "llvm.bswap.i64",
+        else => unreachable,
+    };
+}
+
+fn emitByteSwapOperandIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    value: ir.Value,
+    ty: ir.Type,
+) !void {
+    switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(int) }),
+        .named => |name| try machine.instructions.append(allocator, .{ .mov_arg_eax = try paramReg(function, name, ty) }),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitByteSwapOperandIntoRax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    value: ir.Value,
+    ty: ir.Type,
+) !void {
+    switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_rax = try i64Value(int) }),
+        .named => |name| try machine.instructions.append(allocator, .{ .mov_arg_rax = try paramReg(function, name, ty) }),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
 }
 
 pub fn lowerGenericCfgSingleBlockPointerLoadStore(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -904,6 +1015,10 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         return true;
     }
     if (try lowerGenericCfgTwoI64CallResultsReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgByteSwapReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

@@ -1982,12 +1982,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=693`,
-`generic_codegen_functions=693`, `generic_cfg_functions=693`,
+frontier gate reports `source_rows=14`, `discovered_functions=696`,
+`generic_codegen_functions=696`, `generic_cfg_functions=696`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=693`, `object_failures=0`,
+`object_emitted_functions=696`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -2017,12 +2017,24 @@ error-tag switch family with shared SysV scalar call argument assignment. This
 narrows the measured `wrap_errunion_err` / `unwrap_errunion_err` compiler-core
 gap without adding function-name admission.
 
+The scalar transform frontier now includes typed-v2 ownership for AIR
+`byte_swap` on `u16`, `u32`, and `u64`. Zig exports a versioned
+`zllvm-byte-swap-v1` typed `ty_op` record with the operand ref, integer result
+type, operand text, and bit width. z_llvm validates matching integer
+operand/result widths and lowers the selected scalar widths through the generic
+single-block scalar-transform path to x86_64 `rolw`/`bswapl`/`bswapq`
+instructions. The executable harness checks `0x1234 -> 0x3412`,
+`0x12345678 -> 0x78563412`, and
+`0x0123456789abcdef -> 0xefcdab8967452301`. Vector byte swaps, aggregate
+`byteSwapAllFields`, `u8` identity policy, and odd-width integer byte swaps
+remain future/boundary work.
+
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=693`,
-`generic_cfg_functions=693`, `structural_matcher_functions=0`,
-`object_emitted_functions=693`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=696`,
+`generic_cfg_functions=696`, `structural_matcher_functions=0`,
+`object_emitted_functions=696`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

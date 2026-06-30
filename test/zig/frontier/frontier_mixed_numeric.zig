@@ -17,3 +17,15 @@ export fn frontier_i32_to_f32_mul_add(value: i32, scale: f32, addend: f32) f32 {
 export fn frontier_i32_to_f64_mul_add(value: i32, scale: f64, addend: f64) f64 {
     return @as(f64, @floatFromInt(value)) * scale + addend;
 }
+
+export fn frontier_byte_swap_u16(value: u16) u16 {
+    return @byteSwap(value);
+}
+
+export fn frontier_byte_swap_u32(value: u32) u32 {
+    return @byteSwap(value);
+}
+
+export fn frontier_byte_swap_u64(value: u64) u64 {
+    return @byteSwap(value);
+}

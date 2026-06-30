@@ -20,6 +20,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .binary => try self.lowerTypedBinary(instruction),
         .compare => try self.lowerTypedCompare(instruction),
         .cast => try self.lowerTypedCast(instruction),
+        .byte_swap => try self.lowerTypedByteSwap(instruction),
         .none => return false,
     }
     return true;
@@ -150,6 +151,43 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
     });
     self.values[instruction.index] = .{
         .ty = target_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedByteSwap(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    const bits = switch (source.ty.ir_type) {
+        .int => |width| width,
+        else => return air_model.LowerError.UnsupportedAir,
+    };
+    if (!result_type.ir_type.eql(source.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    switch (bits) {
+        16, 32, 64 => {},
+        else => return air_model.LowerError.UnsupportedAir,
+    }
+
+    const result_name = try self.resultName(instruction.index);
+    var call: ir.CallInst = .{
+        .ret_ty = result_type.ir_type,
+        .callee = switch (bits) {
+            16 => "llvm.bswap.i16",
+            32 => "llvm.bswap.i32",
+            64 => "llvm.bswap.i64",
+            else => unreachable,
+        },
+        .args = .empty,
+    };
+    errdefer call.deinit(self.allocator);
+    try call.args.append(self.allocator, .{ .ty = source.ty.ir_type, .value = source.value });
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .call = call },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
         .value = .{ .named = result_name },
     };
 }
