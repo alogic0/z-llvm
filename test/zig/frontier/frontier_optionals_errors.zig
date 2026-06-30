@@ -361,6 +361,16 @@ export fn frontier_try_catch_map_match(tag: i32, value: i32) i32 {
     }
 }
 
+export fn frontier_catch_error_value_switch(tag: i32, value: i32, delta: i32) i32 {
+    const payload = frontierMaybeErrorTag(tag, value) catch |err| {
+        return switch (err) {
+            FrontierError.BadTag => delta + 20,
+            FrontierError.WorseTag => delta + 30,
+        };
+    };
+    return payload + delta;
+}
+
 fn frontierMaybeErrorTag(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag) {
         0 => value,

@@ -66,6 +66,12 @@ The catch/remap row adds a post-try catch body that switches over the
 unwrapped error tag, returns remapped error-union constants from the cold arms,
 and rewraps the hot payload after arithmetic through typed-v2 block lowering
 and generic CFG backend codegen.
+The scalar catch/value row adds the plain-`i32` variant: a direct error-union
+helper call feeds a catch-side `switch_br` over the unwrapped error tag, each
+error arm returns a value derived from a live ABI parameter, and the success arm
+returns payload arithmetic. The x86_64 generic CFG emitter now spills that live
+`i32` parameter across the helper call and materializes the switch-phi incoming
+values without source-name admission.
 The switch-local try row adds a switch arm whose nested value-producing block
 contains a `try` call; the error edge returns the original error-union value
 and the success edge rewraps payload arithmetic into the outer switch phi.
@@ -206,20 +212,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=676
-structured_functions=676
-generic_codegen_functions=676
-generic_cfg_functions=676
+discovered_functions=677
+structured_functions=677
+generic_codegen_functions=677
+generic_cfg_functions=677
 structural_matcher_functions=0
-structured_air_v2_functions=676
-typed_air_operand_functions=676
+structured_air_v2_functions=677
+typed_air_operand_functions=677
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=676
+generic_lowering_functions=677
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=676
+object_emitted_functions=677
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

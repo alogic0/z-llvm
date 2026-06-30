@@ -2727,12 +2727,19 @@ const ErrorUnionErrorTagSwitchReturn = struct {
     call_name: []const u8,
     call: ir.CallInst,
     payload_block: ir.BasicBlock,
-    payload_add_imm: i32,
+    payload_return: ErrorUnionI32ReturnValue,
     switch_block: ir.BasicBlock,
     cases: [8]ErrorUnionSwitchPhiCase,
     case_count: usize,
     default_block: ir.BasicBlock,
     merge_block: ir.BasicBlock,
+    live_param_reg: ?ArgReg,
+};
+
+const ErrorUnionI32ReturnValue = union(enum) {
+    generic: ir.Value,
+    payload_add_imm: i32,
+    payload_binary: PayloadBinaryWrapReturn,
 };
 
 const ErrorUnionCatchSwitchReturn = struct {
@@ -2822,7 +2829,7 @@ fn lowerGenericCfgErrorUnionErrorTagSwitchReturn(
     function: ir.Function,
 ) !bool {
     const plan = errorUnionErrorTagSwitchReturn(function) orelse return false;
-    const frame_bytes: u8 = 8;
+    const frame_bytes: u8 = if (plan.live_param_reg != null) 24 else 8;
     const epilogue_label = try ownedMachineLabel(
         allocator,
         machine,
@@ -2831,6 +2838,9 @@ fn lowerGenericCfgErrorUnionErrorTagSwitchReturn(
     );
 
     try appendStackFrame(allocator, machine, frame_bytes);
+    if (plan.live_param_reg) |reg| {
+        try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = reg } });
+    }
     try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
     try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
     try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
@@ -2848,14 +2858,12 @@ fn lowerGenericCfgErrorUnionErrorTagSwitchReturn(
 
     for (plan.cases[0..plan.case_count]) |case| {
         try appendGenericCfgBlockLabel(allocator, machine, case.block.name);
-        try emitGenericCfgTerminalI32ValueIntoEax(allocator, machine, function, plan.entry, case.block, case.incoming);
+        try emitErrorUnionI32ReturnValueIntoEax(allocator, machine, function, plan.entry, case.block, .{ .generic = case.incoming }, plan.live_param_reg);
         try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
     }
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.payload_block.name);
-    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
-    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
-    if (plan.payload_add_imm != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = plan.payload_add_imm });
+    try emitErrorUnionI32ReturnValueIntoEax(allocator, machine, function, plan.entry, plan.payload_block, plan.payload_return, plan.live_param_reg);
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
@@ -2937,12 +2945,12 @@ fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwit
 
     const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
     const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
-    const then_payload_add = errorUnionPayloadAddReturn(then_block, call_name);
-    const else_payload_add = errorUnionPayloadAddReturn(else_block, call_name);
-    if ((then_payload_add != null) == (else_payload_add != null)) return null;
-    const payload_block = if (then_payload_add != null) then_block else else_block;
-    const switch_block = if (then_payload_add != null) else_block else then_block;
-    const payload_add_imm = then_payload_add orelse else_payload_add.?;
+    const then_payload_return = errorUnionPayloadI32Return(function, then_block, call_name);
+    const else_payload_return = errorUnionPayloadI32Return(function, else_block, call_name);
+    if ((then_payload_return != null) == (else_payload_return != null)) return null;
+    const payload_block = if (then_payload_return != null) then_block else else_block;
+    const switch_block = if (then_payload_return != null) else_block else then_block;
+    const payload_return = then_payload_return orelse else_payload_return.?;
 
     const switch_term = blockSwitchTerminator(switch_block) orelse return null;
     if (!switch_term.cond_ty.eql(.{ .int = 16 })) return null;
@@ -2953,6 +2961,7 @@ fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwit
     if (!phi.ty.eql(.{ .int = 32 })) return null;
 
     var cases: [8]ErrorUnionSwitchPhiCase = undefined;
+    var live_param_reg = errorUnionI32ReturnLiveParam(function, payload_block, payload_return);
     for (switch_term.cases.items, 0..) |case, case_index| {
         if (!case.value_ty.eql(.{ .int = 16 })) return null;
         const value = switch (case.value) {
@@ -2961,10 +2970,12 @@ fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwit
         };
         const block = function.blocks.items[blockIndex(function, case.target) orelse return null];
         if (!blockBranchesTo(block, merge_block.name)) return null;
+        const incoming = phiIncomingForBlock(phi, block.name) orelse return null;
+        if (!mergeLiveParam(&live_param_reg, errorUnionI32ReturnLiveParam(function, block, .{ .generic = incoming }))) return null;
         cases[case_index] = .{
             .value = value,
             .block = block,
-            .incoming = phiIncomingForBlock(phi, block.name) orelse return null,
+            .incoming = incoming,
         };
     }
     const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
@@ -2976,12 +2987,13 @@ fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwit
         .call_name = call_name,
         .call = call,
         .payload_block = payload_block,
-        .payload_add_imm = payload_add_imm,
+        .payload_return = payload_return,
         .switch_block = switch_block,
         .cases = cases,
         .case_count = switch_term.cases.items.len,
         .default_block = default_block,
         .merge_block = merge_block,
+        .live_param_reg = live_param_reg,
     };
 }
 
@@ -3051,6 +3063,23 @@ fn errorUnionCatchSwitchReturn(function: ir.Function) ?ErrorUnionCatchSwitchRetu
     };
 }
 
+fn errorUnionPayloadI32Return(function: ir.Function, block: ir.BasicBlock, call_name: []const u8) ?ErrorUnionI32ReturnValue {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const ret_value = ret.value orelse return null;
+    if (payloadValueFromCallResult(block, ret_value, call_name)) return .{ .payload_add_imm = 0 };
+    const add_name = switch (ret_value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (payloadAddFromCallResult(block, add_name, call_name)) |imm| return .{ .payload_add_imm = imm };
+    if (payloadBinaryI32Return(function, block, block, call_name)) |binary| return .{ .payload_binary = binary };
+    return null;
+}
+
 fn payloadAddWrapReturnFromCallResult(block: ir.BasicBlock, call_name: []const u8) ?u8 {
     const ret = switch (block.terminator orelse return null) {
         .ret => |ret| ret,
@@ -3073,6 +3102,161 @@ fn errorUnionPayloadAddReturn(block: ir.BasicBlock, call_name: []const u8) ?i32 
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
     return payloadAddFromCallResult(block, add_name, call_name) orelse return null;
+}
+
+fn payloadBinaryI32Return(
+    function: ir.Function,
+    payload_scope: ir.BasicBlock,
+    block: ir.BasicBlock,
+    call_name: []const u8,
+) ?PayloadBinaryWrapReturn {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const binary_name = switch (ret.value orelse return null) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const binary_inst = findInstruction(block, binary_name) orelse return null;
+    const binary = switch (binary_inst.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (!binary.ty.eql(.{ .int = 32 }) or (binary.op != .add and binary.op != .sub)) return null;
+    const payload_on_lhs = payloadValueFromCallResult(payload_scope, binary.lhs, call_name);
+    const payload_on_rhs = payloadValueFromCallResult(payload_scope, binary.rhs, call_name);
+    if (payload_on_lhs == payload_on_rhs) return null;
+    if (binary.op == .sub and !payload_on_lhs) return null;
+    const other_value = if (payload_on_lhs) binary.rhs else binary.lhs;
+    const reg = switch (other_value) {
+        .named => |name| paramReg(function, name, .{ .int = 32 }) catch return null,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const op: MachineBinaryOp = switch (binary.op) {
+        .add => .add,
+        .sub => .sub,
+        else => unreachable,
+    };
+    return .{ .op = op, .reg = reg };
+}
+
+fn errorUnionI32ReturnLiveParam(function: ir.Function, block: ir.BasicBlock, value: ErrorUnionI32ReturnValue) ?ArgReg {
+    return switch (value) {
+        .payload_binary => |binary| binary.reg,
+        .payload_add_imm => null,
+        .generic => |generic| i32ValueLiveParam(function, block, generic),
+    };
+}
+
+fn i32ValueLiveParam(function: ir.Function, block: ir.BasicBlock, value: ir.Value) ?ArgReg {
+    switch (value) {
+        .int => return null,
+        .named => |name| {
+            if (paramRegOrNull(function, name, .{ .int = 32 }) catch null) |reg| return reg;
+            const instruction = findInstruction(block, name) orelse return null;
+            switch (instruction.kind) {
+                .binary => |binary| {
+                    if (!binary.ty.eql(.{ .int = 32 })) return null;
+                    const lhs = i32ValueLiveParam(function, block, binary.lhs);
+                    const rhs = i32ValueLiveParam(function, block, binary.rhs);
+                    if (lhs != null and rhs != null) return null;
+                    return lhs orelse rhs;
+                },
+                else => return null,
+            }
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    }
+}
+
+fn mergeLiveParam(existing: *?ArgReg, candidate: ?ArgReg) bool {
+    const candidate_reg = candidate orelse return true;
+    if (existing.*) |existing_reg| return existing_reg == candidate_reg;
+    existing.* = candidate_reg;
+    return true;
+}
+
+fn emitErrorUnionI32ReturnValueIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    block: ir.BasicBlock,
+    value: ErrorUnionI32ReturnValue,
+    live_param_reg: ?ArgReg,
+) !void {
+    switch (value) {
+        .payload_add_imm => |imm| {
+            try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+            try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+            if (imm != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = imm });
+        },
+        .payload_binary => |binary| {
+            const live_reg = live_param_reg orelse return error.UnsupportedLiveAcrossCall;
+            if (live_reg != binary.reg) return error.UnsupportedLiveAcrossCall;
+            try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+            try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+            try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = binary.reg } });
+            try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = binary.op, .reg = binary.reg } });
+        },
+        .generic => |generic| {
+            if (live_param_reg) |reg| {
+                try emitI32ValueWithLiveParamIntoEax(allocator, machine, function, entry, block, generic, reg);
+            } else {
+                try emitGenericCfgTerminalI32ValueIntoEax(allocator, machine, function, entry, block, generic);
+            }
+        },
+    }
+}
+
+fn emitI32ValueWithLiveParamIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    block: ir.BasicBlock,
+    value: ir.Value,
+    live_param_reg: ArgReg,
+) !void {
+    switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(int) }),
+        .named => |name| {
+            if ((paramRegOrNull(function, name, .{ .int = 32 }) catch null)) |reg| {
+                if (reg == live_param_reg) {
+                    try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = reg } });
+                }
+                try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+                return;
+            }
+            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
+            switch (instruction.kind) {
+                .binary => |binary| {
+                    if (!binary.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+                    try emitI32ValueWithLiveParamIntoEax(allocator, machine, function, entry, block, binary.lhs, live_param_reg);
+                    switch (binary.rhs) {
+                        .int => |int| switch (binary.op) {
+                            .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+                            .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -try i32Value(int) }),
+                            else => return error.UnsupportedCodegenInstruction,
+                        },
+                        .named => |rhs_name| {
+                            const rhs_reg = try paramReg(function, rhs_name, .{ .int = 32 });
+                            if (rhs_reg == live_param_reg) {
+                                try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = rhs_reg } });
+                            }
+                            const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
+                            try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs_reg } });
+                        },
+                        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                    }
+                },
+                else => try emitGenericCfgTerminalI32ValueIntoEax(allocator, machine, function, entry, block, value),
+            }
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
 }
 
 fn errorTagValueFromCallResult(block: ir.BasicBlock, value: ir.Value, call_name: []const u8) bool {
