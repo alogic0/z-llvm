@@ -87,6 +87,13 @@ a live fallback parameter, and the merged value feeds post-merge arithmetic with
 the fallback parameter spilled across the helper call. The companion
 `frontier_error_catch_const_merge` row proves the same merge plan with a
 constant catch fallback.
+The `frontier_try_call_result_match` row covers a post-`try` payload-call
+continuation: the success arm unwraps the helper payload, passes it with a live
+`i32` parameter to a second direct helper call, wraps that call result into the
+error-union return, and the error arm propagates the original error-union
+value. Generic CFG codegen validates the payload-to-call argument data flow and
+spills the live parameter across the first helper call; admission is not based
+on the row or helper name.
 The switch-local try row adds a switch arm whose nested value-producing block
 contains a `try` call; the error edge returns the original error-union value
 and the success edge rewraps payload arithmetic into the outer switch phi.
@@ -227,20 +234,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=682
-structured_functions=682
-generic_codegen_functions=682
-generic_cfg_functions=682
+discovered_functions=685
+structured_functions=685
+generic_codegen_functions=685
+generic_cfg_functions=685
 structural_matcher_functions=0
-structured_air_v2_functions=682
-typed_air_operand_functions=682
+structured_air_v2_functions=685
+typed_air_operand_functions=685
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=682
+generic_lowering_functions=685
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=682
+object_emitted_functions=685
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

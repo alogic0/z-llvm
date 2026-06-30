@@ -43,6 +43,10 @@ fn frontierMaybeTryPayload(tag: i32, value: i32) FrontierError!i32 {
     return FrontierError.WorseTag;
 }
 
+fn frontierPlainAdd(lhs: i32, rhs: i32) i32 {
+    return lhs + rhs;
+}
+
 fn frontierTryAdd(tag: i32, value: i32) FrontierError!i32 {
     const payload = try frontierMaybeTryPayload(tag, value);
     return payload + 7;
@@ -96,6 +100,19 @@ export fn frontier_try_slot_update_match(tag: i32, value: i32, delta: i32) i32 {
         return payload;
     } else |_| {
         return -69;
+    }
+}
+
+fn frontierTryCallResult(tag: i32, value: i32, delta: i32) FrontierError!i32 {
+    const payload = try frontierMaybeTryPayload(tag, value);
+    return frontierPlainAdd(payload, delta);
+}
+
+export fn frontier_try_call_result_match(tag: i32, value: i32, delta: i32) i32 {
+    if (frontierTryCallResult(tag, value, delta)) |payload| {
+        return payload;
+    } else |_| {
+        return -98;
     }
 }
 
