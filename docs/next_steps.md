@@ -108,6 +108,27 @@ Typed-v2 selected lowerer split status:
   `object_emitted_functions=152`, `executable_ok_rows=100`,
   `runtime_boundary_rows=1`, and `local_fail=0`.
 
+Generic-CFG error-union backend split status:
+
+- Goal 3 has started by extracting the self-contained loop-try error-union row
+  from `src/codegen/x86_64/generic_cfg/core_multi_block_rows.zig` into
+  `src/codegen/x86_64/generic_cfg/error_union_rows.zig`. The core file keeps a
+  facade alias for `lowerGenericCfgLoopTryReturn`, so existing backend call
+  sites are unchanged.
+- Line count after this slice: `core_multi_block_rows.zig` is 6351 lines and
+  `error_union_rows.zig` is 401 lines. The remaining error-union terminal
+  branch/catch/wrap emitters still live in `core_multi_block_rows.zig` because
+  they depend on private terminal-value helpers; the next backend split should
+  either move those helpers to a shared terminal-value module or extract the
+  rest of the error-union emitters together with that helper surface.
+- Validation logs: `tmp/error_union_rows_split_frontier.log` and
+  `tmp/error_union_rows_split_boundaries.log`. Frontier stayed locked across
+  ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
+
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated
 unsupported categories are `aggregate-abi`, `unknown-opcode`, `vector`, `x87`,
