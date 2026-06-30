@@ -424,3 +424,8 @@ export fn frontier_error_tag_branch(tag: i32, value: i32) i32 {
         return -92;
     }
 }
+
+export fn frontier_error_catch_default_merge(tag: i32, value: i32, fallback: i32) i32 {
+    const payload = frontierMaybeErrorTag(tag, value) catch fallback;
+    return payload + 4;
+}
