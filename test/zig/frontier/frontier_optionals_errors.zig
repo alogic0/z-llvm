@@ -129,6 +129,21 @@ export fn frontier_catch_return_error_match(tag: i32, value: i32) i32 {
     }
 }
 
+fn frontierTryLocalOverride(tag: i32, value: i32, force_error: i32) FrontierError!i32 {
+    var result = frontierMaybeTryPayload(tag, value);
+    if (force_error != 0) result = FrontierError.BadTag;
+    const payload = try result;
+    return payload + 15;
+}
+
+export fn frontier_try_local_override_match(tag: i32, value: i32, force_error: i32) i32 {
+    if (frontierTryLocalOverride(tag, value, force_error)) |payload| {
+        return payload;
+    } else |_| {
+        return -88;
+    }
+}
+
 fn frontierBranchThenTry(flag: i32, tag: i32, value: i32) FrontierError!i32 {
     if (flag != 0) {
         const payload = try frontierMaybeTryPayload(tag, value);

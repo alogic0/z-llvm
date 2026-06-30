@@ -2631,6 +2631,7 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (try lowerGenericCfgErrorUnionCatchSwitchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryRewrapErrorReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadCallReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTrySlotUpdateReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadBranchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgBranchBothErrorUnionTryReturn(allocator, machine, function)) return true;
@@ -4802,6 +4803,20 @@ const ErrorUnionTryRewrapErrorReturn = struct {
     success_is_then: bool,
 };
 
+const ErrorUnionTryPhiSlotOverrideReturn = struct {
+    entry: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    phi_name: []const u8,
+    override_error: i64,
+    condition_reg: ArgReg,
+    branch_to_after_override: core_cfg_emit.GenericCfgBranchKind,
+    cont_block: ir.BasicBlock,
+    err_block: ir.BasicBlock,
+    payload_add_imm: u8,
+    success_is_then: bool,
+};
+
 const TryPayloadCallArg = union(enum) {
     payload,
     param: ArgReg,
@@ -4878,6 +4893,61 @@ fn lowerGenericCfgErrorUnionTryPayloadCallReturn(
     try emitTryPayloadCallArg(allocator, machine, .rsi, plan.payload_call_args[1]);
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = plan.payload_call.callee, .ret_ty = plan.payload_call.ret_ty } });
     try machine.instructions.append(allocator, .{ .and_eax_imm32 = -1 });
+    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionTryPhiSlotOverrideReturn(function) orelse return false;
+    const frame_bytes: u8 = 24;
+    const after_override_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_try_phi_override_{}_after_override",
+        .{machine.instructions.items.len},
+    );
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_try_phi_override_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = plan.condition_reg } });
+    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+
+    try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = .rcx } });
+    try machine.instructions.append(allocator, .{ .test_arg32 = .rcx });
+    try appendGenericCfgConditionalBranch(allocator, machine, plan.branch_to_after_override, after_override_label);
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = plan.override_error });
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try appendGenericCfgBlockLabel(allocator, machine, after_override_label);
+
+    try appendGenericCfgBlockLabel(allocator, machine, "generic_cfg_try_phi_override_guard");
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, if (plan.success_is_then) .je else .jne, plan.cont_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.cont_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+    if (plan.payload_add_imm != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = plan.payload_add_imm });
     try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 
@@ -4971,6 +5041,92 @@ fn errorUnionTryRewrapErrorReturn(function: ir.Function) ?ErrorUnionTryRewrapErr
         .entry = entry,
         .call_name = call_name,
         .call = call,
+        .cont_block = cont_block,
+        .err_block = err_block,
+        .payload_add_imm = then_success orelse else_success.?,
+        .success_is_then = then_success != null,
+    };
+}
+
+fn errorUnionTryPhiSlotOverrideReturn(function: ir.Function) ?ErrorUnionTryPhiSlotOverrideReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 6) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const condition = branchConditionParamReg(function, entry, entry_condbr.cond) orelse return null;
+
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    if (then_block.instructions.items.len != 0 or else_block.instructions.items.len != 0) return null;
+    const merge_name = singleBrTarget(then_block) orelse return null;
+    if (!std.mem.eql(u8, singleBrTarget(else_block) orelse return null, merge_name)) return null;
+    const merge_block = function.blocks.items[blockIndex(function, merge_name) orelse return null];
+    const merge_condbr = switch (merge_block.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!merge_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const phi_name = errorUnionTryGuardCallResult(merge_block, merge_condbr.cond) orelse return null;
+    const phi_instruction = findInstruction(merge_block, phi_name) orelse return null;
+    const phi = switch (phi_instruction.kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    if (!phi.ty.eql(.{ .int = 64 }) or phi.incoming.items.len != 2) return null;
+
+    var call_name: ?[]const u8 = null;
+    var override_error: ?i64 = null;
+    var override_block: ?[]const u8 = null;
+    for (phi.incoming.items) |incoming| {
+        if (!std.mem.eql(u8, incoming.block, then_block.name) and !std.mem.eql(u8, incoming.block, else_block.name)) return null;
+        switch (incoming.value) {
+            .named => |name| {
+                if (call_name != null) return null;
+                call_name = name;
+            },
+            .int => |int| {
+                if (override_error != null) return null;
+                const value = i64Value(int) catch return null;
+                if (value <= 0 or value > 65535) return null;
+                override_error = value;
+                override_block = incoming.block;
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+        }
+    }
+    const call_result_name = call_name orelse return null;
+    const call_instruction = findInstruction(entry, call_result_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+
+    const then_success = successReturnPayloadAdd(function.blocks.items[blockIndex(function, merge_condbr.then_target) orelse return null], phi_name);
+    const else_success = successReturnPayloadAdd(function.blocks.items[blockIndex(function, merge_condbr.else_target) orelse return null], phi_name);
+    if ((then_success != null) == (else_success != null)) return null;
+    const cont_block = if (then_success != null)
+        function.blocks.items[blockIndex(function, merge_condbr.then_target) orelse return null]
+    else
+        function.blocks.items[blockIndex(function, merge_condbr.else_target) orelse return null];
+    const err_block = if (then_success != null)
+        function.blocks.items[blockIndex(function, merge_condbr.else_target) orelse return null]
+    else
+        function.blocks.items[blockIndex(function, merge_condbr.then_target) orelse return null];
+    if (!blockReturnsNamedValue(err_block, phi_name, .{ .int = 64 })) return null;
+
+    const override_is_then = std.mem.eql(u8, override_block orelse return null, then_block.name);
+    return .{
+        .entry = entry,
+        .call_name = call_result_name,
+        .call = call,
+        .phi_name = phi_name,
+        .override_error = override_error orelse return null,
+        .condition_reg = condition.reg,
+        .branch_to_after_override = branchKindToSkipOverride(condition.predicate, override_is_then) orelse return null,
         .cont_block = cont_block,
         .err_block = err_block,
         .payload_add_imm = then_success orelse else_success.?,
@@ -5630,6 +5786,43 @@ fn blockReturnsNamedValue(block: ir.BasicBlock, name: []const u8, ty: ir.Type) b
         else => return false,
     };
     return ret.ty.eql(ty) and isNamed(ret.value orelse return false, name);
+}
+
+const ZeroParamBranchCondition = struct {
+    reg: ArgReg,
+    predicate: ir.IcmpPredicate,
+};
+
+fn branchConditionParamReg(function: ir.Function, block: ir.BasicBlock, cond: ir.Value) ?ZeroParamBranchCondition {
+    const cond_name = switch (cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const instruction = findInstruction(block, cond_name) orelse return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (!icmp.operand_ty.eql(.{ .int = 32 }) or (icmp.predicate != .eq and icmp.predicate != .ne)) return null;
+    const param_value = if (isInt(icmp.rhs, 0))
+        icmp.lhs
+    else if (isInt(icmp.lhs, 0))
+        icmp.rhs
+    else
+        return null;
+    const reg = switch (param_value) {
+        .named => |name| paramReg(function, name, .{ .int = 32 }) catch return null,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    return .{ .reg = reg, .predicate = icmp.predicate };
+}
+
+fn branchKindToSkipOverride(predicate: ir.IcmpPredicate, override_is_then: bool) ?core_cfg_emit.GenericCfgBranchKind {
+    return switch (predicate) {
+        .ne => if (override_is_then) .je else .jne,
+        .eq => if (override_is_then) .jne else .je,
+        else => null,
+    };
 }
 
 fn payloadAddArgFromCallResult(block: ir.BasicBlock, value: ir.Value, call_name: []const u8) ?u8 {
