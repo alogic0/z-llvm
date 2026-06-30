@@ -18,6 +18,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .arg => try self.lowerTypedArg(instruction),
         .add_with_overflow => try self.lowerTypedAddWithOverflow(instruction),
         .binary => try self.lowerTypedBinary(instruction),
+        .compare => try self.lowerTypedCompare(instruction),
         .cast => try self.lowerTypedCast(instruction),
         .none => return false,
     }

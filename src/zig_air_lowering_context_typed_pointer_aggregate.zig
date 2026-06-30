@@ -3,6 +3,7 @@ const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
 const air_types = @import("zig_air_types.zig");
+const typed_v2_fallbacks = @import("zig_air_lowering_typed_v2_fallbacks.zig");
 const ir = @import("ir.zig");
 
 const parseZigType = air_types.parseZigType;
@@ -11,6 +12,7 @@ const genericTypedGepIndex = air_model.genericTypedGepIndex;
 const isPlainFieldPointerChild = air_model.plainFieldPointerChild;
 const isSupportedTypedGepElementType = air_model.supportedTypedGepElementType;
 const ownPrint = air_model.ownPrint;
+const ensureBase64LookupGlobal = typed_v2_fallbacks.ensureBase64LookupGlobal;
 
 pub fn lowerTypedPointerAggregateSemanticInstruction(
     self: anytype,
@@ -306,7 +308,7 @@ pub fn lowerTypedArrayElemVal(self: anytype, instruction: air_export.TypedInstru
     const index = try self.resolveTypedOperand(instruction, 1);
     if (!index.ty.ir_type.eql(.{ .int = 64 })) return air_model.LowerError.UnsupportedAir;
     if (!std.mem.eql(u8, table_text, "<[4]u8, \"\\x00\\x04\\x08\\x0c\".*>")) return air_model.LowerError.UnsupportedAir;
-    try air_model.ensureBase64LookupGlobal(self.allocator, self.module);
+    try ensureBase64LookupGlobal(self.allocator, self.module);
 
     const gep_name = try ownPrint(self.module, "air{}_ptr", .{instruction.index});
     var gep: ir.GepInst = .{

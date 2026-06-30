@@ -34,6 +34,8 @@ extern int z_frontier_error_tag_switch(int, int) __asm__("frontier_optionals_err
 extern int z_frontier_error_tag_branch(int, int) __asm__("frontier_optionals_errors.frontier_error_tag_branch");
 extern int z_frontier_error_catch_default_merge(int, int, int) __asm__("frontier_optionals_errors.frontier_error_catch_default_merge");
 extern int z_frontier_error_catch_const_merge(int, int) __asm__("frontier_optionals_errors.frontier_error_catch_const_merge");
+void z_frontier_optionals_unwrap_null(void) __asm__("frontier_optionals_errors.unwrapNull");
+void z_frontier_optionals_unwrap_null(void) { __builtin_trap(); }
 int main(void) {
     const int ptr_value = 49;
     if (z_frontier_optional_merge(1, 30) != 30) return 1;

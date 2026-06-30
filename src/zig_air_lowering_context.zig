@@ -169,7 +169,7 @@ pub const LoweringContext = struct {
 
     pub const lowerTypedCall = typed_call.lowerTypedCall;
 
-    fn lowerLegacySemanticInstruction(
+    pub fn lowerLegacySemanticInstruction(
         self: *LoweringContext,
         instruction: air_export.Instruction,
     ) !bool {
@@ -266,7 +266,7 @@ pub const LoweringContext = struct {
         };
     }
 
-    fn extendShiftCount(
+    pub fn extendShiftCount(
         self: *LoweringContext,
         instruction_index: u32,
         lhs_type: ZigType,
@@ -405,7 +405,7 @@ pub const LoweringContext = struct {
         });
     }
 
-    fn lowerCall(self: *LoweringContext, instruction: air_export.Instruction) !void {
+    pub fn lowerCall(self: *LoweringContext, instruction: air_export.Instruction) !void {
         const function_marker = std.mem.indexOf(u8, instruction.payload, "(function '") orelse
             return error.UnsupportedAir;
         const signature_start = std.mem.indexOfScalar(u8, instruction.payload, '<') orelse
@@ -481,7 +481,7 @@ pub const LoweringContext = struct {
         };
     }
 
-    fn lowerAtomicRmw(self: *LoweringContext, instruction: air_export.Instruction) !void {
+    pub fn lowerAtomicRmw(self: *LoweringContext, instruction: air_export.Instruction) !void {
         var fields = splitTopLevel(instruction.payload, ',');
         const pointer = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
         const value = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
@@ -540,7 +540,7 @@ pub const LoweringContext = struct {
         };
     }
 
-    fn lowerAssembly(self: *LoweringContext, instruction: air_export.Instruction) !void {
+    pub fn lowerAssembly(self: *LoweringContext, instruction: air_export.Instruction) !void {
         const payload = std.mem.trim(u8, instruction.payload, " ");
         if (!std.mem.eql(u8, payload, "void, volatile, ~{memory}, \"\"")) return error.UnsupportedAir;
         var call: ir.CallInst = .{
@@ -561,7 +561,7 @@ pub const LoweringContext = struct {
         });
     }
 
-    fn lowerReturn(self: *LoweringContext, instruction: air_export.Instruction) !void {
+    pub fn lowerReturn(self: *LoweringContext, instruction: air_export.Instruction) !void {
         const payload = std.mem.trim(u8, instruction.payload, " ");
         if (self.function_type.return_type.ir_type == .void) {
             self.block.terminator = .{ .ret = .{ .ty = .void } };
@@ -599,7 +599,7 @@ pub const LoweringContext = struct {
         return parseConstant(trimmed) orelse error.UnsupportedAir;
     }
 
-    fn resolveTypedOperand(
+    pub fn resolveTypedOperand(
         self: *LoweringContext,
         instruction: air_export.TypedInstruction,
         operand_index: usize,
@@ -777,15 +777,15 @@ pub const LoweringContext = struct {
         return null;
     }
 
-    fn resultName(self: *LoweringContext, index: u32) ![]const u8 {
+    pub fn resultName(self: *LoweringContext, index: u32) ![]const u8 {
         return ownPrint(self.module, "air{}", .{index});
     }
 
-    fn blockParamName(self: LoweringContext, index: usize) []const u8 {
+    pub fn blockParamName(self: LoweringContext, index: usize) []const u8 {
         return self.function.params.items[index].name;
     }
 
-    fn qualifiedCalleeName(self: *LoweringContext, callee: []const u8) ![]const u8 {
+    pub fn qualifiedCalleeName(self: *LoweringContext, callee: []const u8) ![]const u8 {
         if (std.mem.indexOfScalar(u8, callee, '.') != null) return callee;
         const dot = std.mem.lastIndexOfScalar(u8, self.air_function.name, '.') orelse return callee;
         return ownPrint(self.module, "{s}.{s}", .{ self.air_function.name[0..dot], callee });

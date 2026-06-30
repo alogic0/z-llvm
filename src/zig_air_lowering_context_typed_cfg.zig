@@ -2,6 +2,7 @@ const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
+const air_text = @import("zig_air_text.zig");
 const air_values = @import("zig_air_values.zig");
 const air_types = @import("zig_air_types.zig");
 const ir = @import("ir.zig");
@@ -89,15 +90,13 @@ pub fn lowerTypedSwitchValueBlock(
     instruction: air_export.TypedInstruction,
     body: air_export.StructuredBody,
 ) air_model.LowerError!bool {
-    const switch_instruction = try self.singleSwitchInstruction(body) orelse return false;
+    const switch_instruction = try singleSwitchInstruction(self, body) orelse return false;
     const cond_index = switchInputIndexFromAirText(self.air_function.air_text, switch_instruction.index) orelse
         return air_model.LowerError.UnsupportedAir;
     if (cond_index >= self.values.len) return air_model.LowerError.UnsupportedAir;
     const cond = self.values[cond_index] orelse return air_model.LowerError.UnsupportedAir;
     if (!cond.ty.ir_type.eql(.{ .int = 32 }) and !cond.ty.ir_type.eql(.{ .int = 16 })) return air_model.LowerError.UnsupportedAir;
-    const merge_type = self.typedBlockResultType(instruction) orelse {
-        return air_model.LowerError.UnsupportedAir;
-    };
+    const merge_type = self.typedBlockResultType(instruction) orelse return air_model.LowerError.UnsupportedAir;
     if (merge_type.ir_type == .void) return air_model.LowerError.UnsupportedAir;
 
     var case_values: std.ArrayList(air_model.TypedValue) = .empty;
@@ -386,6 +385,7 @@ pub fn lowerTypedBranchReturnContinueValueBlock(
     if (merge_type.ir_type == .void) return false;
 
     const continue_body = if (then_returns) else_body else then_body;
+    if (view.voidBranchBody(continue_body, instruction.index)) return false;
     const return_body = if (then_returns) then_body else else_body;
     const return_label = try ownPrint(self.module, "block{}_return", .{instruction.index});
     const cont_label = try ownPrint(self.module, "block{}_cont", .{instruction.index});
@@ -579,6 +579,7 @@ pub fn mergeSyntheticErrorUnionSlots(
 
 pub fn typedBlockResultType(self: anytype, instruction: air_export.TypedInstruction) ?ZigType {
     if (parseZigType(instruction.result_type)) |merge_type| return merge_type;
+    if (blockLineResultType(self.air_function.air_text, instruction.index)) |merge_type| return merge_type;
     if (switchLineResultType(self.air_function.air_text, instruction.index)) |merge_type| return merge_type;
     const return_type_text = functionReturnTypeText(self.air_function.type_text) orelse return null;
     if (isErrorUnionTypeText(return_type_text) and self.function_type.return_type.ir_type.eql(.{ .int = 64 })) {
@@ -763,10 +764,10 @@ pub fn lowerTypedReturn(self: anytype, instruction: air_export.TypedInstruction)
 
 fn switchInputIndexFromAirText(function_air_text: []const u8, switch_index: u32) ?u32 {
     const line = switchLine(function_air_text, switch_index) orelse return null;
-    const open = std.mem.indexOf(u8, line, '(') orelse return null;
+    const open = std.mem.indexOfScalar(u8, line, '(') orelse return null;
     const close = std.mem.indexOfScalarPos(u8, line, open + 1, ',') orelse
         std.mem.indexOfScalarPos(u8, line, open + 1, ')') orelse return null;
-    return air_model.instructionRef(std.mem.trim(u8, line[open + 1 .. close], " !"));
+    return air_text.instructionRef(std.mem.trim(u8, line[open + 1 .. close], " !"));
 }
 
 fn collectSwitchCaseValues(
@@ -811,9 +812,31 @@ fn switchLineResultType(function_air_text: []const u8, switch_index: u32) ?ZigTy
     const line = switchLine(function_air_text, switch_index) orelse return null;
     const switch_start = std.mem.indexOf(u8, line, "switch(") orelse return null;
     const type_start = switch_start + "switch(".len;
-    var fields = std.mem.splitSequence(u8, line[type_start..], ",");
+    var fields = air_text.splitTopLevel(line[type_start..], ',');
     const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
     return parseZigType(type_text);
+}
+
+fn blockLineResultType(function_air_text: []const u8, block_index: u32) ?ZigType {
+    const line = blockLine(function_air_text, block_index) orelse return null;
+    const block_start = std.mem.indexOf(u8, line, "block(") orelse return null;
+    const type_start = block_start + "block(".len;
+    var fields = air_text.splitTopLevel(line[type_start..], ',');
+    const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+    return parseZigType(type_text);
+}
+
+fn blockLine(function_air_text: []const u8, block_index: u32) ?[]const u8 {
+    var needle_buffer: [32]u8 = undefined;
+    const needle = std.fmt.bufPrint(&needle_buffer, "%{} = block(", .{block_index}) catch return null;
+    const start: usize = 0;
+    while (std.mem.indexOfPos(u8, function_air_text, start, needle)) |needle_pos| {
+        const line_start = std.mem.lastIndexOfScalar(u8, function_air_text[0..needle_pos], '\n') orelse 0;
+        const adjusted_start = if (line_start == 0) 0 else line_start + 1;
+        const line_end = std.mem.indexOfScalarPos(u8, function_air_text, needle_pos, '\n') orelse function_air_text.len;
+        return function_air_text[adjusted_start..line_end];
+    }
+    return null;
 }
 
 fn switchText(function_air_text: []const u8, switch_index: u32) ?[]const u8 {

@@ -103,6 +103,40 @@ pub fn lowerGenericCfgOptionalPointerReturn(allocator: std.mem.Allocator, machin
     return true;
 }
 
+pub fn lowerGenericCfgCheckedOptionalPointerReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (function.blocks.items.len != 5) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const entry_cond_name = entry.instructions.items[0].result orelse return false;
+    const entry_icmp = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (entry_icmp.predicate != .ne or !genericCfgSupportsPointerNullIcmp(function, entry_icmp)) return false;
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, entry_cond_name)) return false;
+
+    const then_block = blockByName(function, entry_br.then_target) orelse return false;
+    const else_block = blockByName(function, entry_br.else_target) orelse return false;
+    const then_is_guarded = checkedOptionalPointerGuardedBlock(function, then_block) != null;
+    const else_is_guarded = checkedOptionalPointerGuardedBlock(function, else_block) != null;
+    if (then_is_guarded == else_is_guarded) return false;
+    const fallback_block = if (then_is_guarded) else_block else then_block;
+    if (!checkedOptionalPointerFallbackBlock(function, fallback_block)) return false;
+
+    const entry_branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, entry_icmp);
+    try appendGenericCfgConditionalBranch(allocator, machine, entry_branch_kind, entry_br.then_target);
+    try emitCheckedOptionalPointerPath(allocator, machine, function, entry_br.else_target);
+    try emitCheckedOptionalPointerPath(allocator, machine, function, entry_br.then_target);
+    return true;
+}
+
 pub fn lowerGenericCfgGuardedOptionalPointerBranchReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -200,6 +234,121 @@ pub fn lowerGenericCfgGuardedOptionalPointerBranchReturn(
     try appendGenericCfgPhiBinaryImmediate(allocator, machine, phi_binary);
     try appendGenericCfgReturn(allocator, machine);
     return true;
+}
+
+fn emitCheckedOptionalPointerPath(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block_name: []const u8,
+) !void {
+    const block = blockByName(function, block_name) orelse return error.InvalidBranchTarget;
+    try appendGenericCfgBlockLabel(allocator, machine, block.name);
+    if (checkedOptionalPointerGuardedBlock(function, block)) |guard| {
+        const guard_branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, guard.icmp);
+        try appendGenericCfgConditionalBranch(allocator, machine, guard_branch_kind, guard.then_target);
+        try emitCheckedOptionalPointerTerminalBlock(allocator, machine, function, guard.else_target);
+        try emitCheckedOptionalPointerTerminalBlock(allocator, machine, function, guard.then_target);
+        return;
+    }
+    try emitCheckedOptionalPointerReturnBlock(allocator, machine, function, block);
+}
+
+const CheckedOptionalPointerGuard = struct {
+    icmp: ir.IcmpInst,
+    then_target: []const u8,
+    else_target: []const u8,
+};
+
+fn checkedOptionalPointerGuardedBlock(function: ir.Function, block: ir.BasicBlock) ?CheckedOptionalPointerGuard {
+    if (block.instructions.items.len != 1) return null;
+    const cond_name = block.instructions.items[0].result orelse return null;
+    const icmp = switch (block.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != .ne or !genericCfgSupportsPointerNullIcmp(function, icmp)) return null;
+    const terminator = switch (block.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!terminator.cond_ty.eql(.{ .int = 1 }) or !isNamed(terminator.cond, cond_name)) return null;
+    const then_block = blockByName(function, terminator.then_target) orelse return null;
+    const else_block = blockByName(function, terminator.else_target) orelse return null;
+    const then_is_return = checkedOptionalPointerLoadReturnBlock(function, then_block);
+    const else_is_return = checkedOptionalPointerLoadReturnBlock(function, else_block);
+    const then_is_panic = genericCfgNoreturnBlock(then_block);
+    const else_is_panic = genericCfgNoreturnBlock(else_block);
+    if (!((then_is_return and else_is_panic) or (then_is_panic and else_is_return))) return null;
+    return .{ .icmp = icmp, .then_target = terminator.then_target, .else_target = terminator.else_target };
+}
+
+fn checkedOptionalPointerFallbackBlock(function: ir.Function, block: ir.BasicBlock) bool {
+    if (block.instructions.items.len != 0) return false;
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(function.ret_ty) and ret.value != null;
+}
+
+fn checkedOptionalPointerLoadReturnBlock(function: ir.Function, block: ir.BasicBlock) bool {
+    if (block.instructions.items.len != 1) return false;
+    const load_name = block.instructions.items[0].result orelse return false;
+    const load = switch (block.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const ptr_name = switch (load.ptr) {
+        .named => |name| name,
+        else => return false,
+    };
+    if ((paramRegOrNull(function, ptr_name, .ptr) catch null) == null) return false;
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, load_name);
+}
+
+fn emitCheckedOptionalPointerTerminalBlock(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block_name: []const u8,
+) !void {
+    const block = blockByName(function, block_name) orelse return error.InvalidBranchTarget;
+    try appendGenericCfgBlockLabel(allocator, machine, block.name);
+    if (checkedOptionalPointerLoadReturnBlock(function, block)) {
+        return try emitCheckedOptionalPointerReturnBlock(allocator, machine, function, block);
+    }
+    if (genericCfgNoreturnBlock(block)) {
+        return try emitGenericCfgNoreturnCallBlock(allocator, machine, function, block);
+    }
+    return error.UnsupportedCodegenControlFlow;
+}
+
+fn emitCheckedOptionalPointerReturnBlock(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !void {
+    if (block.instructions.items.len == 1) {
+        const load = switch (block.instructions.items[0].kind) {
+            .load => |load| load,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        try core_value_emit.emitGenericCfgLoadI32IntoEax(allocator, machine, function, load.ptr);
+    } else {
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, ret.value orelse return error.UnsupportedCodegenValue);
+    }
+    try appendGenericCfgReturn(allocator, machine);
 }
 
 const GenericCfgOptionalPointerUnwrapPlan = struct {

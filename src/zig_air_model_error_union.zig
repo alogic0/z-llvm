@@ -1,4 +1,5 @@
 const core = @import("zig_air_model_base.zig");
+const untyped = @import("zig_air_model_error_union_untyped.zig");
 const typed_recognizers = @import("zig_air_model_typed_recognizers.zig");
 
 pub const ErrorSwitchSummary = core.ErrorSwitchSummary;
@@ -12,14 +13,14 @@ pub const TypedLoopTrySummary = core.TypedLoopTrySummary;
 pub const TypedLoopTryPostBranchSummary = core.TypedLoopTryPostBranchSummary;
 pub const TypedLoopTryPostSwitchSummary = core.TypedLoopTryPostSwitchSummary;
 
-pub const errorUnionPayloadSummary = core.errorUnionPayloadSummary;
-pub const selectedErrorUnionPayloadShape = core.selectedErrorUnionPayloadShape;
-pub const maybeErrorSummary = core.maybeErrorSummary;
-pub const selectedMaybeErrorShape = core.selectedMaybeErrorShape;
-pub const errorSwitchSummary = core.errorSwitchSummary;
-pub const selectedErrorSwitchShape = core.selectedErrorSwitchShape;
-pub const errorClassifySummary = core.errorClassifySummary;
-pub const selectedErrorClassifyShape = core.selectedErrorClassifyShape;
+pub const errorUnionPayloadSummary = untyped.errorUnionPayloadSummary;
+pub const selectedErrorUnionPayloadShape = untyped.selectedErrorUnionPayloadShape;
+pub const maybeErrorSummary = untyped.maybeErrorSummary;
+pub const selectedMaybeErrorShape = untyped.selectedMaybeErrorShape;
+pub const errorSwitchSummary = untyped.errorSwitchSummary;
+pub const selectedErrorSwitchShape = untyped.selectedErrorSwitchShape;
+pub const errorClassifySummary = untyped.errorClassifySummary;
+pub const selectedErrorClassifyShape = untyped.selectedErrorClassifyShape;
 pub const typedErrorSwitchSummary = typed_recognizers.typedErrorSwitchSummary;
 pub const typedErrorClassifierSummary = typed_recognizers.typedErrorClassifierSummary;
 pub const typedErrorUnionPayloadSummary = typed_recognizers.typedErrorUnionPayloadSummary;

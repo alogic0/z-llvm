@@ -220,7 +220,7 @@ pub fn lowerTypedTryPtr(self: anytype, instruction: air_export.TypedInstruction)
 
     const loaded_union = try self.loadErrorUnionPointerValue(instruction, "tryptr_union");
     const error_bits = try self.emitErrorUnionErrorBits(instruction.index, .{ .named = loaded_union }, "tryptr_errbits");
-    const ok_name = try self.resultName(instruction.index);
+    const ok_name = try ownPrint(self.module, "air{}_tryptr_ok", .{instruction.index});
     try self.block.instructions.append(self.allocator, .{
         .result = ok_name,
         .kind = .{ .icmp = .{
