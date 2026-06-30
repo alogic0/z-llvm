@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=674
-structured_functions=674
-generic_codegen_functions=674
-generic_cfg_functions=674
+discovered_functions=675
+structured_functions=675
+generic_codegen_functions=675
+generic_cfg_functions=675
 structural_matcher_functions=0
-structured_air_v2_functions=674
-typed_air_operand_functions=674
+structured_air_v2_functions=675
+typed_air_operand_functions=675
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=674
+generic_lowering_functions=675
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=674
+object_emitted_functions=675
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 674-function counters above plus `native_link_accepted_rows=14`,
+14-source / 675-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -686,8 +686,9 @@ row: Zig emits versioned typed-v2 union-tag and switch case facts, and z_llvm
 lowers both tag arms from those facts without AIR text fallback, shape
 recognizer ownership, or function-name admission. Reversed source switch-arm
 ordering is accepted only when the exported case tag indexes prove the selected
-tag set. General union ABI/layout lowering remains outside this selected
-frontier row.
+tag set, and either selected tag arm may now prove the payload store as the raw
+second argument or a constant add of that argument. General union ABI/layout
+lowering remains outside this selected frontier row.
 
 Source-backed ABI and pointer/slice boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs

@@ -18,3 +18,11 @@ export fn frontier_union_tag_reversed_arms(flag: i32, value: i32) i32 {
         .small => |payload| payload + 9,
     };
 }
+
+export fn frontier_union_tag_small_payload_add(flag: i32, value: i32) i32 {
+    const tagged: TaggedValue = if (flag == 0) .{ .small = value + 4 } else .{ .large = value };
+    return switch (tagged) {
+        .small => |payload| payload + 5,
+        .large => |payload| payload + 16,
+    };
+}

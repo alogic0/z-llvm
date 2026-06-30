@@ -440,8 +440,10 @@ Execution order:
    that slot, and the `get_union_tag`/`struct_field_val`/`switch_br` path uses
    that same loaded value. The summary now accepts either source switch-arm
    order when the exported case tag indexes prove the selected tag set, and the
-   x86_64 lowering path consumes the summary fields while still emitting the
-   same selected frontier IR.
+   selected payload construction model now proves either tag arm may store the
+   raw second argument or a constant add of that argument. The x86_64 lowering
+   path consumes the summary fields while still emitting the same selected
+   frontier IR.
    The catch/remap row now lowers a post-try catch body that switches over the
    unwrapped error tag, returns remapped error-union constants from the cold
    arms, and rewraps the hot payload after arithmetic through the same
@@ -1372,12 +1374,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=674`,
-`generic_codegen_functions=674`, `generic_cfg_functions=674`,
+frontier gate reports `source_rows=14`, `discovered_functions=675`,
+`generic_codegen_functions=675`, `generic_cfg_functions=675`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=674`, `object_failures=0`,
+`object_emitted_functions=675`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1390,9 +1392,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=674`,
-`generic_cfg_functions=674`, `structural_matcher_functions=0`,
-`object_emitted_functions=674`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=675`,
+`generic_cfg_functions=675`, `structural_matcher_functions=0`,
+`object_emitted_functions=675`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

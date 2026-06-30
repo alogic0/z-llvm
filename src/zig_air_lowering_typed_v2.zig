@@ -2016,11 +2016,20 @@ pub fn lowerTypedV2UnionTagPayloadSwitch(
         } },
     });
     try block.instructions.append(allocator, .{
-        .result = "tag0_result",
+        .result = "tag0_payload",
         .kind = .{ .binary = .{
             .op = .add,
             .ty = .{ .int = 32 },
             .lhs = .{ .named = "arg1" },
+            .rhs = .{ .int = summary.tag0_store_add },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "tag0_result",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "tag0_payload" },
             .rhs = .{ .int = summary.tag0_return_add },
         } },
     });

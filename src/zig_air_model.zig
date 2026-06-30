@@ -882,6 +882,7 @@ pub const PointerSliceAddressSummary = struct {
 };
 
 pub const TypedUnionTagPayloadSwitchSummary = struct {
+    tag0_store_add: i32,
     tag0_return_add: i32,
     tag1_store_add: i32,
     tag1_return_add: i32,
@@ -2433,15 +2434,15 @@ pub fn typedUnionTagPayloadSwitchSummary(
     const tag1_store = typedStoreToPointer(structured_air_v2, field_ptr1.index) orelse return null;
     if (tag0_store.operands.len != 2 or tag1_store.operands.len != 2) return null;
     const arg1 = typedNthI32ArgIndex(structured_air_v2, 1) orelse return null;
-    if (typedInstOperandIndex(tag0_store.operands[1]) != arg1) return null;
 
     const tag0_return_add = typedAddConstUsing(structured_air_v2, field0.index) orelse return null;
     const tag1_return_add = typedAddConstUsing(structured_air_v2, field1.index) orelse return null;
-    const tag1_store_add_result = typedAddConstInstructionUsing(structured_air_v2, arg1) orelse return null;
-    if (typedInstOperandIndex(tag1_store.operands[1]) != tag1_store_add_result.index) return null;
-    const tag1_store_add = tag1_store_add_result.addend;
-    if (tag0_return_add == 0 or tag1_return_add == 0 or tag1_store_add == 0) return null;
+    const tag0_store_add = typedConstAddFromBaseValue(structured_air_v2, tag0_store.operands[1], arg1) orelse return null;
+    const tag1_store_add = typedConstAddFromBaseValue(structured_air_v2, tag1_store.operands[1], arg1) orelse return null;
+    if (tag0_return_add == 0 or tag1_return_add == 0) return null;
+    if (tag0_store_add == 0 and tag1_store_add == 0) return null;
     return .{
+        .tag0_store_add = tag0_store_add,
         .tag0_return_add = tag0_return_add,
         .tag1_store_add = tag1_store_add,
         .tag1_return_add = tag1_return_add,
@@ -3222,6 +3223,20 @@ fn typedAddConstInstructionUsing(structured_air_v2: air_export.StructuredAirV2, 
     return found;
 }
 
+fn typedConstAddFromBaseValue(
+    structured_air_v2: air_export.StructuredAirV2,
+    value_operand: air_export.TypedOperand,
+    base_index: u32,
+) ?i32 {
+    const value_index = typedInstOperandIndex(value_operand) orelse return null;
+    if (value_index == base_index) return 0;
+    const value_instruction = instructionByIndex(structured_air_v2, value_index) orelse return null;
+    if (!std.mem.startsWith(u8, value_instruction.opcode, "add")) return null;
+    if (value_instruction.operands.len != 2) return null;
+    if (typedInstOperandIndex(value_instruction.operands[0]) != base_index) return null;
+    return typedConstI32Operand(value_instruction, 1);
+}
+
 fn typedAddConstUsing(structured_air_v2: air_export.StructuredAirV2, operand_index: u32) ?i32 {
     return (typedAddConstInstructionUsing(structured_air_v2, operand_index) orelse return null).addend;
 }
@@ -3584,9 +3599,18 @@ test "typed AIR model recognizes union tag payload switch summary" {
     const structured_air_v2 = air_export.StructuredAirV2{ .instructions = @constCast(&instructions) };
 
     const summary = typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2).?;
+    try std.testing.expectEqual(@as(i32, 0), summary.tag0_store_add);
     try std.testing.expectEqual(@as(i32, 7), summary.tag0_return_add);
     try std.testing.expectEqual(@as(i32, 5), summary.tag1_store_add);
     try std.testing.expectEqual(@as(i32, 11), summary.tag1_return_add);
+
+    store0_operands[1].value = "3";
+    store1_operands[1].value = "1";
+    const swapped_payload_summary = typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2).?;
+    try std.testing.expectEqual(@as(i32, 5), swapped_payload_summary.tag0_store_add);
+    try std.testing.expectEqual(@as(i32, 0), swapped_payload_summary.tag1_store_add);
+    store0_operands[1].value = "1";
+    store1_operands[1].value = "3";
 
     switch_details[1].value = "1";
     switch_details[2].value = "0";
@@ -3602,7 +3626,7 @@ test "typed AIR model recognizes union tag payload switch summary" {
     try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) == null);
     load_operands[0].value = "18";
 
-    store1_operands[1].value = "1";
+    store1_operands[1].value = "0";
     try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) == null);
 }
 
