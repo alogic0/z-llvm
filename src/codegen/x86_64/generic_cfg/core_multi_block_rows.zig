@@ -2713,9 +2713,17 @@ const ErrorUnionSwitchPhiCase = struct {
     incoming: ir.Value,
 };
 
+const ErrorUnionSwitchCond = union(enum) {
+    param: ArgReg,
+    masked_param: struct {
+        reg: ArgReg,
+        mask: i32,
+    },
+};
+
 const ErrorUnionSwitchPhiReturn = struct {
     entry: ir.BasicBlock,
-    tag_reg: ArgReg,
+    cond: ErrorUnionSwitchCond,
     cases: [8]ErrorUnionSwitchPhiCase,
     case_count: usize,
     default_block: ir.BasicBlock,
@@ -2761,7 +2769,7 @@ fn lowerGenericCfgErrorUnionSwitchPhiReturn(
     function: ir.Function,
 ) !bool {
     const plan = errorUnionSwitchPhiReturn(function) orelse return false;
-    try machine.instructions.append(allocator, .{ .mov_arg_eax = plan.tag_reg });
+    try emitErrorUnionSwitchCondIntoEax(allocator, machine, plan.cond);
     for (plan.cases[0..plan.case_count]) |case| {
         try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = case.value });
         try appendGenericCfgConditionalBranch(allocator, machine, .je, case.block.name);
@@ -2782,13 +2790,9 @@ fn lowerGenericCfgErrorUnionSwitchPhiReturn(
 fn errorUnionSwitchPhiReturn(function: ir.Function) ?ErrorUnionSwitchPhiReturn {
     if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len < 4) return null;
     const entry = function.blocks.items[0];
-    if (entry.instructions.items.len != 0) return null;
     const switch_term = blockSwitchTerminator(entry) orelse return null;
     if (!switch_term.cond_ty.eql(.{ .int = 32 })) return null;
-    const tag_reg = switch (switch_term.cond) {
-        .named => |name| paramRegOrNull(function, name, .{ .int = 32 }) catch return null,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    } orelse return null;
+    const cond = errorUnionSwitchCond(function, entry, switch_term.cond) orelse return null;
     if (switch_term.cases.items.len == 0 or switch_term.cases.items.len > 8) return null;
     const merge_block = commonSwitchMergeBlock(function, switch_term) orelse return null;
     const phi = firstPhiReturn(function, merge_block) orelse return null;
@@ -2815,12 +2819,53 @@ fn errorUnionSwitchPhiReturn(function: ir.Function) ?ErrorUnionSwitchPhiReturn {
 
     return .{
         .entry = entry,
-        .tag_reg = tag_reg,
+        .cond = cond,
         .cases = cases,
         .case_count = switch_term.cases.items.len,
         .default_block = default_block,
         .default_incoming = phiIncomingForBlock(phi, default_block.name) orelse return null,
     };
+}
+
+fn errorUnionSwitchCond(function: ir.Function, entry: ir.BasicBlock, value: ir.Value) ?ErrorUnionSwitchCond {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (entry.instructions.items.len == 0) {
+        const reg = paramRegOrNull(function, name, .{ .int = 32 }) catch return null;
+        return .{ .param = reg orelse return null };
+    }
+    if (entry.instructions.items.len != 1) return null;
+    const instruction = findInstruction(entry, name) orelse return null;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != .@"and" or !binary.ty.eql(.{ .int = 32 })) return null;
+    const reg = switch (binary.lhs) {
+        .named => |lhs| paramRegOrNull(function, lhs, .{ .int = 32 }) catch return null,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    } orelse return null;
+    const mask = switch (binary.rhs) {
+        .int => |int| i32Value(int) catch return null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    return .{ .masked_param = .{ .reg = reg, .mask = mask } };
+}
+
+fn emitErrorUnionSwitchCondIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    cond: ErrorUnionSwitchCond,
+) !void {
+    switch (cond) {
+        .param => |reg| try machine.instructions.append(allocator, .{ .mov_arg_eax = reg }),
+        .masked_param => |masked| {
+            try machine.instructions.append(allocator, .{ .mov_arg_eax = masked.reg });
+            try machine.instructions.append(allocator, .{ .and_eax_imm32 = masked.mask });
+        },
+    }
 }
 
 fn lowerGenericCfgErrorUnionErrorTagSwitchReturn(
