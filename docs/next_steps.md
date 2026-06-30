@@ -81,7 +81,7 @@ Refactor module-size audit:
   pointer/slice (`181` lines), and union-tag (`102` lines). The facade is
   `1055` lines and still owns selected lowerers that do not yet have a clean
   family boundary.
-- Generic-CFG backend ownership now has `error_union_rows.zig` (`1375` lines)
+- Generic-CFG backend ownership now has `error_union_rows.zig` (`1531` lines)
   for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
   (`154` lines) for the struct field-zero branch update row, and
@@ -97,8 +97,9 @@ Refactor module-size audit:
   `lowerGenericCfgErrorUnionTrySlotUpdateReturn` and its slot load/store
   recognizer also moved, and the shared payload-value-from-call-result helper
   is now exported from `error_union_rows.zig`. The try payload-call row and
-  its payload-call argument recognizer also live there. The remaining
-  `core_multi_block_rows.zig` facade/core is `4408` lines; broader error-union
+  its payload-call argument recognizer also live there. The try phi-slot
+  override row now lives there as well. The remaining
+  `core_multi_block_rows.zig` facade/core is `4254` lines; broader error-union
   and aggregate rows can now move against shared helper surfaces instead of
   depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
@@ -347,6 +348,23 @@ Generic-CFG error-union payload-call split status:
   frontier rows or counters changed.
 - Validation logs: `tmp/error_union_payload_call_split_frontier.log` and
   `tmp/error_union_payload_call_split_boundaries.log`. Frontier stayed locked
+  across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
+
+Generic-CFG error-union phi-slot override split status:
+
+- `lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn` and its phi/override
+  recognizer now live in `src/codegen/x86_64/generic_cfg/error_union_rows.zig`.
+  The moved recognizer uses the shared `singleBrTarget` terminal helper rather
+  than a private core helper.
+- Line count after this slice: `core_multi_block_rows.zig` is 4254 lines and
+  `error_union_rows.zig` is 1531 lines. This is behavior-preserving; no
+  frontier rows or counters changed.
+- Validation logs: `tmp/error_union_phi_slot_split_frontier.log` and
+  `tmp/error_union_phi_slot_split_boundaries.log`. Frontier stayed locked
   across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
   `object_emitted_functions=689`, `executable_ok_rows=14`, and
