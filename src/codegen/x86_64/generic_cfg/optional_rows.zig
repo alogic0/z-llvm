@@ -5,6 +5,8 @@ const core_value_emit = @import("core_value_emit.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
 const pointer_slice_rows = @import("pointer_slice_rows.zig");
+const safety_rows = @import("safety_rows.zig");
+const branch_merge_rows = @import("branch_merge_rows.zig");
 const terminal_values = @import("terminal_values.zig");
 
 const std = shared.std;
@@ -15,13 +17,18 @@ const ArgReg = shared.ArgReg;
 const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
 const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
 const appendGenericCfgReturn = core_cfg_emit.appendGenericCfgReturn;
+const appendAlignedDirectCall = shared.appendAlignedDirectCall;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
 const emitGenericCfgIcmpCondition = cabi_call_lowering.emitGenericCfgIcmpCondition;
+const genericCfgSupportsBranchIcmp = core_value_support.genericCfgSupportsBranchIcmp;
 const genericCfgSupportsPointerNullIcmp = core_value_support.genericCfgSupportsPointerNullIcmp;
 const isNamed = shared.isNamed;
 const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;
 const blockIndex = cabi_abi_helpers.blockIndex;
 const emitGenericCfgNoreturnCallBlock = pointer_slice_rows.emitGenericCfgNoreturnCallBlock;
+const genericCfgGuardPanicBlock = safety_rows.genericCfgGuardPanicBlock;
+const appendGenericCfgPhiBinaryImmediate = branch_merge_rows.appendGenericCfgPhiBinaryImmediate;
+const genericCfgPhiBinaryReturn = branch_merge_rows.genericCfgPhiBinaryReturn;
 const emitGenericCfgConditionTrueBranch = terminal_values.emitGenericCfgConditionTrueBranch;
 const singleBrTarget = terminal_values.singleBrTarget;
 
@@ -93,6 +100,105 @@ pub fn lowerGenericCfgOptionalPointerReturn(allocator: std.mem.Allocator, machin
         try emitGenericCfgI32ValueIntoEax(allocator, machine, function, load_block, load_value);
         try appendGenericCfgReturn(allocator, machine);
     }
+    return true;
+}
+
+pub fn lowerGenericCfgGuardedOptionalPointerBranchReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.ptr)) return false;
+    if (function.blocks.items.len != 6) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const outer_cond_name = entry.instructions.items[0].result orelse return false;
+    const outer_icmp = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (!genericCfgSupportsBranchIcmp(function, outer_icmp)) return false;
+    const outer_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!outer_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(outer_br.cond, outer_cond_name)) return false;
+
+    const then_block = blockByName(function, outer_br.then_target) orelse return false;
+    const else_block = blockByName(function, outer_br.else_target) orelse return false;
+    if (then_block.instructions.items.len != 1) return false;
+    const guard_cond_name = then_block.instructions.items[0].result orelse return false;
+    const guard_icmp = switch (then_block.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (guard_icmp.predicate != .ne) return false;
+    if (!genericCfgSupportsPointerNullIcmp(function, guard_icmp)) return false;
+    const guard_br = switch (then_block.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!guard_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(guard_br.cond, guard_cond_name)) return false;
+    const cont_block = blockByName(function, guard_br.then_target) orelse return false;
+    const panic_block = blockByName(function, guard_br.else_target) orelse return false;
+    if (!genericCfgGuardPanicBlock(panic_block)) return false;
+
+    const merge_name = singleBrTarget(cont_block) orelse return false;
+    if (!std.mem.eql(u8, singleBrTarget(else_block) orelse return false, merge_name)) return false;
+    const merge_block = blockByName(function, merge_name) orelse return false;
+    const phi_binary = genericCfgPhiBinaryReturn(merge_block) orelse return false;
+
+    if (cont_block.instructions.items.len != 1) return false;
+    const load_name = cont_block.instructions.items[0].result orelse return false;
+    const load = switch (cont_block.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const ptr_name = switch (load.ptr) {
+        .named => |name| name,
+        else => return false,
+    };
+    if ((paramRegOrNull(function, ptr_name, .ptr) catch null) == null) return false;
+
+    var loaded_incoming = false;
+    var fallback_value: ?ir.Value = null;
+    for (phi_binary.phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, cont_block.name)) {
+            if (!isNamed(incoming.value, load_name)) return false;
+            loaded_incoming = true;
+        } else if (std.mem.eql(u8, incoming.block, else_block.name)) {
+            fallback_value = incoming.value;
+        } else {
+            return false;
+        }
+    }
+    if (!loaded_incoming) return false;
+    const fallback = fallback_value orelse return false;
+
+    const outer_branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, outer_icmp);
+    try appendGenericCfgConditionalBranch(allocator, machine, outer_branch_kind, then_block.name);
+    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, else_block, fallback);
+    try appendGenericCfgPhiBinaryImmediate(allocator, machine, phi_binary);
+    try appendGenericCfgReturn(allocator, machine);
+
+    try appendGenericCfgBlockLabel(allocator, machine, then_block.name);
+    const guard_branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, guard_icmp);
+    try appendGenericCfgConditionalBranch(allocator, machine, guard_branch_kind, cont_block.name);
+    try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
+    const panic_call = switch (panic_block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try appendAlignedDirectCall(allocator, machine, panic_call.callee, .void);
+    try machine.instructions.append(allocator, .ud2);
+
+    try appendGenericCfgBlockLabel(allocator, machine, cont_block.name);
+    try core_value_emit.emitGenericCfgLoadI32IntoEax(allocator, machine, function, load.ptr);
+    try appendGenericCfgPhiBinaryImmediate(allocator, machine, phi_binary);
+    try appendGenericCfgReturn(allocator, machine);
     return true;
 }
 

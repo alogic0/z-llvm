@@ -85,7 +85,8 @@ Refactor module-size audit:
   for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
   (`154` lines) for the struct field-zero branch update row,
-  `optional_rows.zig` (`299` lines) for optional-pointer return/unwrap rows,
+  `optional_rows.zig` (`405` lines) for optional-pointer return/unwrap rows
+  and guarded optional-pointer branch rows,
   `safety_rows.zig` (`91` lines) for shared guarded panic block validation,
   `branch_merge_rows.zig` (`107` lines) for phi-binary and pointer-phi merge
   helpers,
@@ -108,7 +109,7 @@ Refactor module-size audit:
   branch/switch try family, error-union switch-phi row, error-tag switch
   return row, error-tag branch row, catch value-merge row, and catch-switch row
   now live there as well. The remaining `core_multi_block_rows.zig`
-  facade/core is `1598` lines; broader aggregate rows can now move against
+  facade/core is `1500` lines; broader aggregate rows can now move against
   shared helper surfaces instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
@@ -598,6 +599,24 @@ Generic-CFG branch-merge helper split status:
   lines. This is behavior-preserving; no frontier rows or counters changed.
 - Validation logs: `tmp/branch_merge_helpers_split_frontier.log` and
   `tmp/branch_merge_helpers_split_boundaries.log`. Frontier stayed locked
+  across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
+
+Generic-CFG guarded optional-pointer backend split status:
+
+- `lowerGenericCfgGuardedOptionalPointerBranchReturn` now lives in
+  `src/codegen/x86_64/generic_cfg/optional_rows.zig`, consuming the shared
+  branch-merge helpers from `branch_merge_rows.zig` and guarded panic
+  validation from `safety_rows.zig`. The core file keeps a facade alias for
+  dispatcher compatibility.
+- Line count after this slice: `core_multi_block_rows.zig` is 1500 lines and
+  `optional_rows.zig` is 405 lines. This is behavior-preserving; no frontier
+  rows or counters changed.
+- Validation logs: `tmp/optional_guarded_branch_split_frontier.log` and
+  `tmp/optional_guarded_branch_split_boundaries.log`. Frontier stayed locked
   across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
   `object_emitted_functions=689`, `executable_ok_rows=14`, and
