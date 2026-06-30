@@ -64,6 +64,24 @@ IR-writer case routing lives under `src/main_flow_ir_writer*.zig`.
 
 ## Active Cycle
 
+Typed AIR model split status:
+
+- Goal 1 of the refactor milestone split summary data types out of
+  `src/zig_air_model.zig` while keeping it as the public facade. The facade now
+  re-exports family-owned summary types from
+  `src/zig_air_model_error_union.zig`, `src/zig_air_model_union_tag.zig`,
+  `src/zig_air_model_pointer_slice.zig`, `src/zig_air_model_aggregate.zig`,
+  and `src/zig_air_model_optional.zig`. Existing call sites still import
+  `zig_air_model.zig`.
+- Line count before/after: `src/zig_air_model.zig` went from 5507 to 5351
+  lines. The new family modules account for 187 lines total. This is
+  behavior-preserving scaffolding for moving recognizer logic in later slices.
+- Validation log: `tmp/model_summary_split_frontier.log`. Frontier counters
+  stayed locked across ReleaseFast, ReleaseSafe, and ReleaseSmall at
+  `source_rows=14`, `discovered_functions=689`,
+  `generic_cfg_functions=689`, `object_emitted_functions=689`,
+  `executable_ok_rows=14`, and `local_fail=0`.
+
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated
 unsupported categories are `aggregate-abi`, `unknown-opcode`, `vector`, `x87`,

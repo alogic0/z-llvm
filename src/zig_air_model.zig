@@ -2,9 +2,14 @@ const std = @import("std");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
 const air_text = @import("zig_air_text.zig");
+const aggregate_model = @import("zig_air_model_aggregate.zig");
+const error_union_model = @import("zig_air_model_error_union.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
+const optional_model = @import("zig_air_model_optional.zig");
+const pointer_slice_model = @import("zig_air_model_pointer_slice.zig");
 const target_mod = @import("target.zig");
+const union_tag_model = @import("zig_air_model_union_tag.zig");
 
 pub const ZigType = struct {
     ir_type: ir.Type,
@@ -736,22 +741,8 @@ pub fn functionHasRetPtrOp(function: air_export.Function) bool {
     return false;
 }
 
-pub const TableLookupSummary = struct {
-    index_source: u32,
-    mask_or_narrow: u32,
-    index_cast: u32,
-    table_access: u32,
-    return_value: u32,
-};
-
-pub const ErrorSwitchSummary = struct {
-    kind: enum { payload, maybe_error, switch_dispatch, classify },
-    condition: ?u32 = null,
-    error_union_value: ?u32 = null,
-    extracted_value: ?u32 = null,
-    switch_br: ?u32 = null,
-    return_value: ?u32 = null,
-};
+pub const TableLookupSummary = aggregate_model.TableLookupSummary;
+pub const ErrorSwitchSummary = error_union_model.ErrorSwitchSummary;
 
 pub const RuntimeWrapperSummary = struct {
     kind: enum { optional_pointer_main, pointer_load_store_main },
@@ -773,55 +764,12 @@ pub const PanicEdgeSummary = struct {
     return_value: u32,
 };
 
-pub const AggregatePairSummary = struct {
-    kind: enum { first, make },
-    base_ptr: u32,
-    field0_ptr: u32,
-    field1_ptr: ?u32 = null,
-    field0_value: ?u32 = null,
-    field1_value: ?u32 = null,
-    return_value: u32,
-};
-
-pub const ArraySumSummary = struct {
-    aggregate_init: u32,
-    elem_ptr_count: usize,
-    load_count: usize,
-    add_count: usize,
-};
-
-pub const StructSumSummary = struct {
-    field0_ptr: u32,
-    field1_ptr: u32,
-    load_count: usize,
-    add_count: usize,
-};
-
-pub const PackedFieldSummary = struct {
-    kind: enum { read_flag, replace_low },
-    field_ptr: u32,
-    load: ?u32 = null,
-    bitcast: ?u32 = null,
-    trunc: ?u32 = null,
-    store: ?u32 = null,
-};
-
-pub const SliceSumSummary = struct {
-    slice: u32,
-    slice_elem_ptr: u32,
-    ptr_slice_len_ptr: u32,
-    loop: u32,
-};
-
-pub const OptionalShapeSummary = struct {
-    kind: enum { pointer_payload, scalar_payload },
-    optional_value: ?u32 = null,
-    condition: u32,
-    payload: u32,
-    wrap: ?u32 = null,
-    load: ?u32 = null,
-    return_value: ?u32 = null,
-};
+pub const AggregatePairSummary = aggregate_model.AggregatePairSummary;
+pub const ArraySumSummary = aggregate_model.ArraySumSummary;
+pub const StructSumSummary = aggregate_model.StructSumSummary;
+pub const PackedFieldSummary = aggregate_model.PackedFieldSummary;
+pub const SliceSumSummary = pointer_slice_model.SliceSumSummary;
+pub const OptionalShapeSummary = optional_model.OptionalShapeSummary;
 
 pub const IntegerSwitchSummary = struct {
     switch_br: u32,
@@ -851,59 +799,11 @@ pub const IntegerSwitchPlan = struct {
     }
 };
 
-pub const PointerSliceAddressSummary = struct {
-    ptr_add_count: usize = 0,
-    ptr_sub_count: usize = 0,
-    slice_count: usize = 0,
-    slice_ptr_count: usize = 0,
-    slice_len_count: usize = 0,
-    slice_elem_ptr_count: usize = 0,
-    ptr_slice_len_ptr_count: usize = 0,
-    ptr_slice_ptr_ptr_count: usize = 0,
-    load_count: usize = 0,
-    store_count: usize = 0,
-    bounds_check_count: usize = 0,
-    base_pointer_operand: ?[]const u8 = null,
-    dynamic_index_operand: ?[]const u8 = null,
-    constant_index: ?i128 = null,
-    scalar_width_bits: ?u16 = null,
-    slice_source_index: ?u32 = null,
-
-    pub fn hasPointerOrSliceAddress(self: PointerSliceAddressSummary) bool {
-        return self.ptr_add_count != 0 or
-            self.ptr_sub_count != 0 or
-            self.slice_count != 0 or
-            self.slice_ptr_count != 0 or
-            self.slice_len_count != 0 or
-            self.slice_elem_ptr_count != 0 or
-            self.ptr_slice_len_ptr_count != 0 or
-            self.ptr_slice_ptr_ptr_count != 0;
-    }
-};
-
-pub const TypedUnionTagPayloadSwitchSummary = struct {
-    true_tag_index: u32,
-    false_tag_index: u32,
-    tag0_store_add: i32,
-    tag0_return_add: i32,
-    tag1_store_add: i32,
-    tag1_return_add: i32,
-};
-
-pub const TypedOptionalPayloadBranchSummary = struct {
-    threshold: i32,
-    fallback: i32,
-};
-
-pub const TypedOptionalPayloadSummary = struct {
-    fallback: i32,
-};
-
-pub const TypedOptionalPointerSummary = struct {
-    add_imm: i32,
-    fallback: i32,
-    checked_unwrap: bool,
-};
+pub const PointerSliceAddressSummary = pointer_slice_model.PointerSliceAddressSummary;
+pub const TypedUnionTagPayloadSwitchSummary = union_tag_model.TypedUnionTagPayloadSwitchSummary;
+pub const TypedOptionalPayloadBranchSummary = optional_model.TypedOptionalPayloadBranchSummary;
+pub const TypedOptionalPayloadSummary = optional_model.TypedOptionalPayloadSummary;
+pub const TypedOptionalPointerSummary = optional_model.TypedOptionalPointerSummary;
 
 pub const TypedCheckedIntFromFloatSummary = struct {
     operand_ty: ir.Type,
@@ -919,39 +819,17 @@ pub const TypedRuntimeWrapperSummary = struct {
     kind: enum { optional_pointer_main, pointer_load_store_main },
 };
 
-pub const TypedPackedFieldSummary = struct {
-    kind: enum { read_flag, replace_low },
-};
+pub const TypedPackedFieldSummary = aggregate_model.TypedPackedFieldSummary;
 
-pub const TypedSliceLoopSummary = struct {
-    kind: enum { plain_sum, conditional_sum },
-};
+pub const TypedSliceLoopSummary = pointer_slice_model.TypedSliceLoopSummary;
 
 pub const TypedScalarControlSummary = struct {
     kind: enum { accumulator_loop, conditional_slot_update },
 };
 
-pub const TypedLoopTrySummary = struct {
-    callee_name: []const u8,
-    callee_external: bool,
-    call_signature: []const u8,
-    error_return: i32,
-    post_branch: ?TypedLoopTryPostBranchSummary = null,
-    post_switch: ?TypedLoopTryPostSwitchSummary = null,
-};
-
-pub const TypedLoopTryPostBranchSummary = struct {
-    threshold_param_index: usize,
-    true_addend: i32,
-    false_addend: i32,
-};
-
-pub const TypedLoopTryPostSwitchSummary = struct {
-    mask: i32,
-    case0_addend: i32,
-    case1_addend: i32,
-    default_addend: i32,
-};
+pub const TypedLoopTrySummary = error_union_model.TypedLoopTrySummary;
+pub const TypedLoopTryPostBranchSummary = error_union_model.TypedLoopTryPostBranchSummary;
+pub const TypedLoopTryPostSwitchSummary = error_union_model.TypedLoopTryPostSwitchSummary;
 
 pub const TypedInlineAsmSummary = struct {
     memory_barrier: bool,
@@ -965,46 +843,12 @@ pub const TypedDenseIntegerSwitchSummary = struct {
     results: [5]i32,
 };
 
-pub const TypedErrorSwitchSummary = struct {
-    kind: enum { switch_dispatch, classify },
-};
-
-pub const TypedErrorUnionSummary = struct {
-    kind: enum { payload, maybe_error },
-};
-
-pub const TypedErrorUnionPayloadKind = enum {
-    local,
-    call_produced,
-    unsupported,
-};
-
-pub const TypedErrorUnionFlowDiagnostic = enum {
-    missing_operand,
-    missing_call_result_type,
-    missing_branch_target,
-    missing_payload_owner,
-    missing_error_owner,
-    cross_function_fact_required,
-    unsupported_payload_owner,
-    unsupported_shape,
-};
-
-pub const TypedErrorUnionFlow = struct {
-    source_instruction: u32,
-    success_payload_owner: u32,
-    error_owner: u32,
-    call_result_owner: ?u32,
-    post_success_branch_target: ?u32,
-    post_catch_branch_target: ?u32,
-    catch_value_i32: ?i32,
-    payload_kind: TypedErrorUnionPayloadKind,
-};
-
-pub const TypedErrorUnionFlowResult = union(enum) {
-    flow: TypedErrorUnionFlow,
-    diagnostic: TypedErrorUnionFlowDiagnostic,
-};
+pub const TypedErrorSwitchSummary = error_union_model.TypedErrorSwitchSummary;
+pub const TypedErrorUnionSummary = error_union_model.TypedErrorUnionSummary;
+pub const TypedErrorUnionPayloadKind = error_union_model.TypedErrorUnionPayloadKind;
+pub const TypedErrorUnionFlowDiagnostic = error_union_model.TypedErrorUnionFlowDiagnostic;
+pub const TypedErrorUnionFlow = error_union_model.TypedErrorUnionFlow;
+pub const TypedErrorUnionFlowResult = error_union_model.TypedErrorUnionFlowResult;
 
 pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAddressSummary {
     const view = TypedFunctionView.init(function) orelse return null;
