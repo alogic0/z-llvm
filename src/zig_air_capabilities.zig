@@ -136,6 +136,7 @@ pub const OptionalSemanticOp = enum {
 
 pub const ErrorUnionSemanticOp = enum {
     none,
+    error_name,
     is_non_err,
     wrap_payload,
     wrap_err,
@@ -328,6 +329,7 @@ pub fn optionalSemanticOpForOpcode(opcode: []const u8) OptionalSemanticOp {
 }
 
 pub fn errorUnionSemanticOpForOpcode(opcode: []const u8) ErrorUnionSemanticOp {
+    if (std.mem.eql(u8, opcode, "error_name")) return .error_name;
     if (std.mem.eql(u8, opcode, "is_non_err")) return .is_non_err;
     if (std.mem.eql(u8, opcode, "wrap_errunion_payload")) return .wrap_payload;
     if (std.mem.eql(u8, opcode, "wrap_errunion_err")) return .wrap_err;
@@ -900,6 +902,7 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ErrorUnionSemanticOp.try_op, errorUnionSemanticOpForOpcode("try_cold"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.try_ptr, errorUnionSemanticOpForOpcode("try_ptr"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.try_ptr, errorUnionSemanticOpForOpcode("try_ptr_cold"));
+    try std.testing.expectEqual(ErrorUnionSemanticOp.error_name, errorUnionSemanticOpForOpcode("error_name"));
     try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.slice, pointerAggregateSemanticOpForOpcode("slice"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.slice_ptr, pointerAggregateSemanticOpForOpcode("slice_ptr"));

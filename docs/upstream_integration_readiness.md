@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=689
-structured_functions=689
-generic_codegen_functions=689
-generic_cfg_functions=689
+discovered_functions=690
+structured_functions=690
+generic_codegen_functions=690
+generic_cfg_functions=690
 structural_matcher_functions=0
-structured_air_v2_functions=689
-typed_air_operand_functions=689
+structured_air_v2_functions=690
+typed_air_operand_functions=690
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=689
+generic_lowering_functions=690
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=689
+object_emitted_functions=690
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,10 +677,16 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 689-function counters above plus `native_link_accepted_rows=14`,
+14-source / 690-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
+The frontier optionals/errors proof now includes typed-v2 ownership for AIR
+`error_name`: the patched Zig exporter emits a typed unary record carrying the
+error-set operand, and z_llvm lowers the selected sentinel `u8` slice length
+path from those facts without AIR-text recovery or sidecars. The claim is
+limited to source-backed `@errorName(err).len` behavior for the selected
+two-error-set row; arbitrary error-name payload lowering remains future work.
 The frontier proof now includes the selected tagged-union tag/payload switch
 row: Zig emits versioned typed-v2 union-tag and switch case facts, and z_llvm
 lowers both tag arms from those facts without AIR text fallback, shape

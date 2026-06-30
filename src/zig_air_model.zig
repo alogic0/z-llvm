@@ -90,6 +90,7 @@ pub const TypedErrorUnionPayloadKind = error_union_model.TypedErrorUnionPayloadK
 pub const TypedErrorUnionFlowDiagnostic = error_union_model.TypedErrorUnionFlowDiagnostic;
 pub const TypedErrorUnionFlow = error_union_model.TypedErrorUnionFlow;
 pub const TypedErrorUnionFlowResult = error_union_model.TypedErrorUnionFlowResult;
+pub const TypedErrorNameSummary = error_union_model.TypedErrorNameSummary;
 
 pub const pointerSliceAddressSummary = pointer_slice_model.pointerSliceAddressSummary;
 pub const aggregatePairFirstSummary = aggregate_model.aggregatePairFirstSummary;
@@ -220,3 +221,7 @@ pub const typedErrorUnionPayloadSummary = error_union_model.typedErrorUnionPaylo
 pub const typedErrorUnionFlow = error_union_model.typedErrorUnionFlow;
 pub const typedErrorUnionFlowDiagnosticName = error_union_model.typedErrorUnionFlowDiagnosticName;
 pub const typedMaybeErrorSummary = error_union_model.typedMaybeErrorSummary;
+pub const typedErrorNameSummary = error_union_model.typedErrorNameSummary;
+pub const typedErrorNameSummaryFromV2 = error_union_model.typedErrorNameSummaryFromV2;
+pub const errorSetNameForCode = error_union_model.errorSetNameForCode;
+pub const errorSetFirstTwoNames = error_union_model.errorSetFirstTwoNames;

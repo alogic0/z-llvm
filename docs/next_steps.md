@@ -1982,12 +1982,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=689`,
-`generic_codegen_functions=689`, `generic_cfg_functions=689`,
+frontier gate reports `source_rows=14`, `discovered_functions=690`,
+`generic_codegen_functions=690`, `generic_cfg_functions=690`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=689`, `object_failures=0`,
+`object_emitted_functions=690`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1996,13 +1996,19 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `native_link_accepted_rows=14`, `executable_ok_rows=14`,
 `link_only_rows=0`, `runtime_boundary_rows=0`, `llvm_targetmachine_rows=0`,
 `lld_rows=0`, and `local_fail=0`.
+The frontier optionals/errors source now includes a typed-v2 `error_name`
+ownership row. Zig exports `error_name` as a typed unary record with the
+error-set operand, and z_llvm lowers the sentinel `u8` slice length path from
+those typed facts. The accepted proof is `@errorName(err).len` for a selected
+two-error-set source row; arbitrary error-name string/payload materialization
+remains future work.
 
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=689`,
-`generic_cfg_functions=689`, `structural_matcher_functions=0`,
-`object_emitted_functions=689`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=690`,
+`generic_cfg_functions=690`, `structural_matcher_functions=0`,
+`object_emitted_functions=690`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

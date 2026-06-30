@@ -479,3 +479,8 @@ export fn frontier_error_catch_const_merge(tag: i32, value: i32) i32 {
     const payload = frontierMaybeErrorTag(tag, value) catch 6;
     return payload + 4;
 }
+
+export fn frontier_error_name_len(tag: i32) usize {
+    const err: FrontierError = if (tag == 0) FrontierError.BadTag else FrontierError.WorseTag;
+    return @errorName(err).len;
+}

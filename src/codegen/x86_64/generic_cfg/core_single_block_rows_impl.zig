@@ -936,26 +936,97 @@ fn lowerGenericCfgSliceLenReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!ret.ty.eql(.{ .int = 64 })) return false;
-    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+    const len_value = try sliceLenReturnSource(block, ret) orelse return false;
+    if (ret.ty.eql(.{ .int = 32 })) {
+        if (try lowerSelectedI32SliceLenReturn(allocator, machine, function, block, len_value)) return true;
+    }
+    try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, len_value);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerSelectedI32SliceLenReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    len_value: ir.Value,
+) !bool {
+    const len_name = switch (len_value) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    const extract_instruction = findInstruction(block, ret_name) orelse return false;
+    const len_instruction = findInstruction(block, len_name) orelse return false;
+    const select = switch (len_instruction.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 64 })) return false;
+    const true_len = switch (select.true_value) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const false_len = switch (select.false_value) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const cond_name = switch (select.cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const cond_instruction = findInstruction(block, cond_name) orelse return false;
+    const icmp = switch (cond_instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    const true_label = "generic_cfg_slice_len_true";
+    const end_label = "generic_cfg_slice_len_generic_cfg_select_end";
+    const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
+    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = false_len });
+    try machine.instructions.append(allocator, .{ .jmp = end_label });
+    try appendGenericCfgBlockLabel(allocator, machine, true_label);
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = true_len });
+    try appendGenericCfgBlockLabel(allocator, machine, end_label);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn sliceLenReturnSource(block: ir.BasicBlock, ret: anytype) !?ir.Value {
+    if (ret.ty.eql(.{ .int = 64 })) {
+        return try sliceLenSourceFromValue(block, ret.value orelse return error.InvalidRet);
+    }
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const trunc_instruction = findInstruction(block, ret_name) orelse return null;
+    const trunc = switch (trunc_instruction.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 32 })) return null;
+    return try sliceLenSourceFromValue(block, trunc.value);
+}
+
+fn sliceLenSourceFromValue(block: ir.BasicBlock, value: ir.Value) !?ir.Value {
+    const extract_name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const extract_instruction = findInstruction(block, extract_name) orelse return null;
     const extract = switch (extract_instruction.kind) {
         .extractvalue => |extract| extract,
-        else => return false,
+        else => return null,
     };
     if (!extract.aggregate_ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or
         !extract.result_ty.eql(.{ .int = 64 }) or
         !std.mem.eql(u8, extract.indices, "1"))
     {
-        return false;
+        return null;
     }
-    const len_value = sliceAggregateLenValue(block, extract.aggregate, 0) orelse return false;
-    try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, len_value);
-    try machine.instructions.append(allocator, .ret);
-    return true;
+    return sliceAggregateLenValue(block, extract.aggregate, 0);
 }
 
 fn sliceAggregateLenValue(block: ir.BasicBlock, aggregate: ir.Value, depth: u3) ?ir.Value {

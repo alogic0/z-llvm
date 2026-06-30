@@ -224,7 +224,7 @@ fn emitGenericCfgI64SelectIntoRax(
     };
     _ = result_name;
     const true_label = "generic_cfg_i64_select_true";
-    const end_label = "generic_cfg_i64_select_end";
+    const end_label = "generic_cfg_i64_generic_cfg_select_end";
     const branch_kind = try cabi_call_lowering.emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
     try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
     try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, select.false_value);

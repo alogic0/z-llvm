@@ -78,6 +78,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "f32")) return .{ .ir_type = .float };
     if (std.mem.eql(u8, trimmed, "f64")) return .{ .ir_type = .double };
     if (std.mem.eql(u8, trimmed, "f128")) return .{ .ir_type = .fp128 };
+    if (std.mem.eql(u8, trimmed, "anyerror")) return .{ .ir_type = .{ .int = 16 } };
     if (std.mem.eql(u8, trimmed, "extern struct { a: i32, b: f64 }")) {
         return .{ .ir_type = .{ .aggregate = "{ i32, double }" } };
     }
@@ -96,7 +97,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         if (child.ir_type == .ptr) return child;
         return null;
     }
-    if (std.mem.startsWith(u8, trimmed, "[]")) {
+    if (std.mem.startsWith(u8, trimmed, "[]") or std.mem.startsWith(u8, trimmed, "[:0]")) {
         return .{ .ir_type = .{ .aggregate = "{ ptr, i64 }" } };
     }
     if (trimmed.len > 1 and (trimmed[0] == 'u' or trimmed[0] == 'i')) {

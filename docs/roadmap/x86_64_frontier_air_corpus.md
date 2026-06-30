@@ -132,6 +132,12 @@ switch and rewraps all chosen arms, extending the same semantic pointer-slot
 model beyond branch continuations. Broader
 arbitrary compiler-core `try` and pointer-form error-union forms remain a
 separate compiler-core priority.
+The `frontier_error_name_len` row now proves typed-v2 ownership for AIR
+`error_name`: Zig exports the operand tying `error_name` to the selected
+error-set value and z_llvm lowers the sentinel `u8` slice result from typed-v2
+facts without AIR-text recovery or sidecars. The executable proof checks
+`@errorName(err).len` for both selected error values; arbitrary error-name
+payload materialization remains outside this narrow row.
 
 `frontier_union_tags.zig` adds the first source-backed tagged-union tag/payload
 switch proof. The patched Zig typed-v2 exporter emits versioned
@@ -240,20 +246,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=689
-structured_functions=689
-generic_codegen_functions=689
-generic_cfg_functions=689
+discovered_functions=690
+structured_functions=690
+generic_codegen_functions=690
+generic_cfg_functions=690
 structural_matcher_functions=0
-structured_air_v2_functions=689
-typed_air_operand_functions=689
+structured_air_v2_functions=690
+typed_air_operand_functions=690
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=689
+generic_lowering_functions=690
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=689
+object_emitted_functions=690
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

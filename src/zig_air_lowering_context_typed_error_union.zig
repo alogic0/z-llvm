@@ -12,6 +12,7 @@ const ownPrint = air_model.ownPrint;
 
 pub fn lowerTypedErrorUnionSemanticInstruction(self: anytype, instruction: air_export.TypedInstruction) !bool {
     switch (air_capabilities.errorUnionSemanticOpForOpcode(instruction.opcode)) {
+        .error_name => try self.lowerTypedErrorName(instruction),
         .is_non_err => try self.lowerTypedIsNonErr(instruction),
         .wrap_payload => try self.lowerTypedWrapErrorUnionPayload(instruction),
         .wrap_err => try self.lowerTypedWrapErrorUnionErr(instruction),
@@ -24,6 +25,45 @@ pub fn lowerTypedErrorUnionSemanticInstruction(self: anytype, instruction: air_e
         .none => return false,
     }
     return true;
+}
+
+pub fn lowerTypedErrorName(self: anytype, instruction: air_export.TypedInstruction) !void {
+    const summary = (if (self.typed_view) |view|
+        air_model.typedErrorNameSummaryFromV2(view.structured_air_v2, instruction)
+    else
+        air_model.typedErrorNameSummary(instruction)) orelse return air_model.LowerError.UnsupportedAir;
+    const result_type = parseZigType(summary.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!result_type.ir_type.eql(.{ .aggregate = "{ ptr, i64 }" })) return air_model.LowerError.UnsupportedAir;
+    const err = try self.resolveTypedOperand(instruction, 0);
+    if (!err.ty.ir_type.eql(.{ .int = 16 })) return air_model.LowerError.UnsupportedAir;
+
+    const parts = try materializeErrorNameParts(self, instruction.index, summary.error_set_type, err.value);
+    const ptr_name = try ownPrint(self.module, "air{}_error_name_ptr", .{instruction.index});
+    try self.block.instructions.append(self.allocator, .{
+        .result = ptr_name,
+        .kind = .{ .insertvalue = .{
+            .aggregate_ty = result_type.ir_type,
+            .aggregate = .undef,
+            .value_ty = .ptr,
+            .value = parts.ptr,
+            .indices = "0",
+        } },
+    });
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .insertvalue = .{
+            .aggregate_ty = result_type.ir_type,
+            .aggregate = .{ .named = ptr_name },
+            .value_ty = .{ .int = 64 },
+            .value = parts.len,
+            .indices = "1",
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
 }
 
 pub fn lowerTypedIsNonErr(self: anytype, instruction: air_export.TypedInstruction) !void {
@@ -433,6 +473,109 @@ fn typedTryPtrPayloadPointerType(instruction: air_export.TypedInstruction) ?air_
     if (!std.mem.startsWith(u8, trimmed, "<type,") or !std.mem.endsWith(u8, trimmed, ">")) return null;
     const type_text = std.mem.trim(u8, trimmed["<type,".len .. trimmed.len - 1], " ");
     return parseZigType(type_text);
+}
+
+const ErrorNameParts = struct {
+    ptr: ir.Value,
+    len: ir.Value,
+};
+
+fn materializeErrorNameParts(
+    self: anytype,
+    instruction_index: u32,
+    error_set_type: []const u8,
+    err_value: ir.Value,
+) !ErrorNameParts {
+    switch (err_value) {
+        .int => |code| {
+            const name = air_model.errorSetNameForCode(error_set_type, code) orelse return air_model.LowerError.UnsupportedAir;
+            return .{
+                .ptr = try errorNameStringPointer(self, name),
+                .len = .{ .int = @intCast(name.len) },
+            };
+        },
+        .named => |name_value| {
+            const names = air_model.errorSetFirstTwoNames(error_set_type) orelse return air_model.LowerError.UnsupportedAir;
+            const first_ptr = try errorNameStringPointer(self, names[0]);
+            const second_ptr = try errorNameStringPointer(self, names[1]);
+            const selection = try errorNameSelectionFromValue(self, name_value) orelse return air_model.LowerError.UnsupportedAir;
+            const ptr_name = try ownPrint(self.module, "air{}_error_name_selected_ptr", .{instruction_index});
+            try self.block.instructions.append(self.allocator, .{
+                .result = ptr_name,
+                .kind = .{ .select = .{
+                    .cond_ty = .{ .int = 1 },
+                    .cond = selection.cond,
+                    .ty = .ptr,
+                    .true_value = if (selection.true_is_first) first_ptr else second_ptr,
+                    .false_value = if (selection.true_is_first) second_ptr else first_ptr,
+                } },
+            });
+            const len_name = try ownPrint(self.module, "air{}_error_name_selected_len", .{instruction_index});
+            try self.block.instructions.append(self.allocator, .{
+                .result = len_name,
+                .kind = .{ .select = .{
+                    .cond_ty = .{ .int = 1 },
+                    .cond = selection.cond,
+                    .ty = .{ .int = 64 },
+                    .true_value = .{ .int = @intCast(if (selection.true_is_first) names[0].len else names[1].len) },
+                    .false_value = .{ .int = @intCast(if (selection.true_is_first) names[1].len else names[0].len) },
+                } },
+            });
+            return .{
+                .ptr = .{ .named = ptr_name },
+                .len = .{ .named = len_name },
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return air_model.LowerError.UnsupportedAir,
+    }
+}
+
+const ErrorNameSelection = struct {
+    cond: ir.Value,
+    true_is_first: bool,
+};
+
+fn errorNameSelectionFromValue(self: anytype, name_value: []const u8) !?ErrorNameSelection {
+    const instruction = findCurrentBlockInstruction(self, name_value) orelse return null;
+    switch (instruction.kind) {
+        .cast => |cast| {
+            if (cast.op != .bitcast or !cast.from_ty.eql(.{ .int = 16 }) or !cast.to_ty.eql(.{ .int = 16 })) return null;
+            const source_name = switch (cast.value) {
+                .named => |source| source,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+            };
+            return try errorNameSelectionFromValue(self, source_name);
+        },
+        .select => |select| {
+            if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 16 })) return null;
+            const true_code = switch (select.true_value) {
+                .int => |value| value,
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+            };
+            const false_code = switch (select.false_value) {
+                .int => |value| value,
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+            };
+            if (true_code == 1 and false_code == 2) return .{ .cond = select.cond, .true_is_first = true };
+            if (true_code == 2 and false_code == 1) return .{ .cond = select.cond, .true_is_first = false };
+            return null;
+        },
+        else => return null,
+    }
+}
+
+fn findCurrentBlockInstruction(self: anytype, result_name: []const u8) ?ir.Instruction {
+    for (self.block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const result = instruction.result orelse continue;
+        if (std.mem.eql(u8, result, result_name)) return instruction;
+    }
+    return null;
+}
+
+fn errorNameStringPointer(self: anytype, name: []const u8) !ir.Value {
+    const symbol = try self.ensureStringLiteralGlobal(name, name.len);
+    return .{ .named = try ownPrint(self.module, "@{s}", .{symbol}) };
 }
 
 fn errorUnionPointerOperandText(type_text: []const u8) bool {

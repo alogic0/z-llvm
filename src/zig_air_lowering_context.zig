@@ -110,6 +110,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedReturn = typed_cfg.lowerTypedReturn;
 
     pub const lowerTypedErrorUnionSemanticInstruction = typed_error_union.lowerTypedErrorUnionSemanticInstruction;
+    pub const lowerTypedErrorName = typed_error_union.lowerTypedErrorName;
     pub const lowerTypedIsNonErr = typed_error_union.lowerTypedIsNonErr;
     pub const lowerTypedWrapErrorUnionPayload = typed_error_union.lowerTypedWrapErrorUnionPayload;
     pub const lowerTypedWrapErrorUnionErr = typed_error_union.lowerTypedWrapErrorUnionErr;
@@ -708,7 +709,7 @@ pub const LoweringContext = struct {
         return .{ .body = body, .len = len };
     }
 
-    fn ensureStringLiteralGlobal(self: *LoweringContext, body: []const u8, byte_len: usize) ![]const u8 {
+    pub fn ensureStringLiteralGlobal(self: *LoweringContext, body: []const u8, byte_len: usize) ![]const u8 {
         const hash = std.hash.Wyhash.hash(0, body);
         const symbol = try ownPrint(self.module, "__zllvm_string_{x}", .{hash});
         for (self.module.globals.items) |global| {
