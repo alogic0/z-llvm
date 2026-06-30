@@ -168,19 +168,25 @@ Generic-CFG error-union backend split status:
   `src/codegen/x86_64/generic_cfg/error_union_rows.zig`. The core file keeps a
   facade alias for `lowerGenericCfgLoopTryReturn`, so existing backend call
   sites are unchanged.
-- Line count after this slice: `core_multi_block_rows.zig` is 6351 lines and
-  `error_union_rows.zig` is 401 lines. The remaining error-union terminal
-  branch/catch/wrap emitters still live in `core_multi_block_rows.zig` because
-  they depend on private terminal-value helpers; the next backend split should
-  either move those helpers to a shared terminal-value module or extract the
-  rest of the error-union emitters together with that helper surface.
+- Follow-up split: the loop-try family has now moved out of
+  `error_union_rows.zig` into
+  `src/codegen/x86_64/generic_cfg/error_union_loop_rows.zig`. The
+  `error_union_rows.zig` file keeps a facade alias for
+  `lowerGenericCfgLoopTryReturn`; dispatcher call sites are unchanged.
+- Line count after this slice: `core_multi_block_rows.zig` is 1501 lines,
+  `error_union_rows.zig` is 3298 lines, and `error_union_loop_rows.zig` is 401
+  lines. The remaining high-value split target is still `error_union_rows.zig`,
+  with catch/switch/payload-call families now the largest obvious ownership
+  groups.
 - Validation logs: `tmp/error_union_rows_split_frontier.log` and
-  `tmp/error_union_rows_split_boundaries.log`. Frontier stayed locked across
+  `tmp/error_union_rows_split_boundaries.log`; follow-up loop-family validation
+  logs are `tmp/error_union_loop_split_frontier.log` and
+  `tmp/error_union_loop_split_boundaries.log`. Frontier stayed locked across
   ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
-  `object_emitted_functions=689`, `executable_ok_rows=14`, and
-  `local_fail=0`; boundary rows stayed fail-closed with
-  `wrong_diagnostic_rows=0` and `local_fail=0`.
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and `local_fail=0`;
+  boundary rows stayed fail-closed with `wrong_diagnostic_rows=0` and
+  `local_fail=0`.
 
 Generic-CFG pointer/slice backend split status:
 
