@@ -3,6 +3,11 @@ const TaggedValue = union(enum(u8)) {
     large: i32,
 };
 
+const ReorderedTaggedValue = union(enum(u8)) {
+    large: i32,
+    small: i32,
+};
+
 export fn frontier_union_tag_match(flag: i32, value: i32) i32 {
     const tagged: TaggedValue = if (flag == 0) .{ .small = value } else .{ .large = value + 5 };
     return switch (tagged) {
@@ -24,5 +29,13 @@ export fn frontier_union_tag_small_payload_add(flag: i32, value: i32) i32 {
     return switch (tagged) {
         .small => |payload| payload + 5,
         .large => |payload| payload + 16,
+    };
+}
+
+export fn frontier_union_tag_reordered_fields(flag: i32, value: i32) i32 {
+    const tagged: ReorderedTaggedValue = if (flag == 0) .{ .small = value + 2 } else .{ .large = value };
+    return switch (tagged) {
+        .large => |payload| payload + 16,
+        .small => |payload| payload + 7,
     };
 }

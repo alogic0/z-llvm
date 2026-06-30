@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=675
-structured_functions=675
-generic_codegen_functions=675
-generic_cfg_functions=675
+discovered_functions=676
+structured_functions=676
+generic_codegen_functions=676
+generic_cfg_functions=676
 structural_matcher_functions=0
-structured_air_v2_functions=675
-typed_air_operand_functions=675
+structured_air_v2_functions=676
+typed_air_operand_functions=676
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=675
+generic_lowering_functions=676
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=675
+object_emitted_functions=676
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 675-function counters above plus `native_link_accepted_rows=14`,
+14-source / 676-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -687,8 +687,11 @@ lowers both tag arms from those facts without AIR text fallback, shape
 recognizer ownership, or function-name admission. Reversed source switch-arm
 ordering is accepted only when the exported case tag indexes prove the selected
 tag set, and either selected tag arm may now prove the payload store as the raw
-second argument or a constant add of that argument. General union ABI/layout
-lowering remains outside this selected frontier row.
+second argument or a constant add of that argument. The selected lowering now
+uses structured-air branch bodies to map the `cond_br` true/false arms to tag
+indexes, so reordered union field/tag indexes are proven without a function-name
+admission path. General union ABI/layout lowering remains outside this selected
+frontier row.
 
 Source-backed ABI and pointer/slice boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs

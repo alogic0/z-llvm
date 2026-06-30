@@ -1993,9 +1993,10 @@ pub fn lowerTypedV2UnionTagPayloadSwitch(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
     function_type: FunctionType,
+    structured_air: air_export.StructuredAir,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    const summary = air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) orelse return null;
+    const summary = air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2) orelse return null;
 
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
@@ -2057,8 +2058,8 @@ pub fn lowerTypedV2UnionTagPayloadSwitch(
             .cond_ty = .{ .int = 1 },
             .cond = .{ .named = "is_tag0" },
             .ty = .{ .int = 32 },
-            .true_value = .{ .named = "tag0_result" },
-            .false_value = .{ .named = "tag1_result" },
+            .true_value = .{ .named = unionTagResultName(summary.true_tag_index) orelse return null },
+            .false_value = .{ .named = unionTagResultName(summary.false_tag_index) orelse return null },
         } },
     });
     block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
@@ -2068,9 +2069,18 @@ pub fn lowerTypedV2UnionTagPayloadSwitch(
 
 pub fn typedV2UnionTagPayloadSwitchRecords(
     function_type: FunctionType,
+    structured_air: air_export.StructuredAir,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    return air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) != null;
+    return air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2) != null;
+}
+
+fn unionTagResultName(tag_index: u32) ?[]const u8 {
+    return switch (tag_index) {
+        0 => "tag0_result",
+        1 => "tag1_result",
+        else => null,
+    };
 }
 
 pub fn normalizedFpLiteralText(module: *ir.Module, text: []const u8) ![]const u8 {

@@ -882,6 +882,8 @@ pub const PointerSliceAddressSummary = struct {
 };
 
 pub const TypedUnionTagPayloadSwitchSummary = struct {
+    true_tag_index: u32,
+    false_tag_index: u32,
     tag0_store_add: i32,
     tag0_return_add: i32,
     tag1_store_add: i32,
@@ -2368,6 +2370,7 @@ pub fn singleInstructionByOpcode(
 
 pub fn typedUnionTagPayloadSwitchSummary(
     function_type: FunctionType,
+    structured_air: air_export.StructuredAir,
     structured_air_v2: air_export.StructuredAirV2,
 ) ?TypedUnionTagPayloadSwitchSummary {
     if (function_type.params.len != 2 or
@@ -2377,6 +2380,9 @@ pub fn typedUnionTagPayloadSwitchSummary(
     {
         return null;
     }
+    const cond_br = singleInstructionByOpcode(structured_air_v2, "cond_br") orelse return null;
+    const branch_tags = typedUnionBranchTagIndexes(structured_air, structured_air_v2, cond_br.index) orelse return null;
+
     if (typedOpcodeCount(structured_air_v2, "alloc") != 1 or
         typedOpcodeCount(structured_air_v2, "set_union_tag") != 2 or
         typedOpcodeCount(structured_air_v2, "get_union_tag") != 1 or
@@ -2387,6 +2393,7 @@ pub fn typedUnionTagPayloadSwitchSummary(
     {
         return null;
     }
+    if (!typedConditionIsFirstArgEqZero(structured_air_v2, cond_br)) return null;
 
     const alloc = singleInstructionByOpcode(structured_air_v2, "alloc") orelse return null;
     if (!std.mem.startsWith(u8, alloc.result_type, "*")) return null;
@@ -2442,6 +2449,8 @@ pub fn typedUnionTagPayloadSwitchSummary(
     if (tag0_return_add == 0 or tag1_return_add == 0) return null;
     if (tag0_store_add == 0 and tag1_store_add == 0) return null;
     return .{
+        .true_tag_index = branch_tags.true_tag_index,
+        .false_tag_index = branch_tags.false_tag_index,
         .tag0_store_add = tag0_store_add,
         .tag0_return_add = tag0_return_add,
         .tag1_store_add = tag1_store_add,
@@ -3209,6 +3218,54 @@ const TypedConstAddResult = struct {
     addend: i32,
 };
 
+const TypedUnionBranchTags = struct {
+    true_tag_index: u32,
+    false_tag_index: u32,
+};
+
+fn typedUnionBranchTagIndexes(
+    structured_air: air_export.StructuredAir,
+    structured_air_v2: air_export.StructuredAirV2,
+    cond_br_index: u32,
+) ?TypedUnionBranchTags {
+    const then_body = structured_air.body(.then_body, cond_br_index) orelse return null;
+    const else_body = structured_air.body(.else_body, cond_br_index) orelse return null;
+    const true_tag_index = typedUnionSingleSetTagInBody(structured_air_v2, then_body) orelse return null;
+    const false_tag_index = typedUnionSingleSetTagInBody(structured_air_v2, else_body) orelse return null;
+    if (true_tag_index == false_tag_index) return null;
+    if (!((true_tag_index == 0 and false_tag_index == 1) or (true_tag_index == 1 and false_tag_index == 0))) return null;
+    return .{ .true_tag_index = true_tag_index, .false_tag_index = false_tag_index };
+}
+
+fn typedUnionSingleSetTagInBody(
+    structured_air_v2: air_export.StructuredAirV2,
+    body: air_export.StructuredBody,
+) ?u32 {
+    var found: ?u32 = null;
+    for (body.instructions) |instruction_index| {
+        const instruction = instructionByIndex(structured_air_v2, instruction_index) orelse continue;
+        if (!std.mem.eql(u8, instruction.opcode, "set_union_tag")) continue;
+        const tag_index = typedDetailU32(instruction, "tag_index") orelse return null;
+        if (found != null) return null;
+        found = tag_index;
+    }
+    return found;
+}
+
+fn typedConditionIsFirstArgEqZero(
+    structured_air_v2: air_export.StructuredAirV2,
+    cond_br: air_export.TypedInstruction,
+) bool {
+    if (cond_br.operands.len != 1) return false;
+    const condition_index = typedInstOperandIndex(cond_br.operands[0]) orelse return false;
+    const condition = instructionByIndex(structured_air_v2, condition_index) orelse return false;
+    if (!std.mem.eql(u8, condition.opcode, "cmp_eq")) return false;
+    if (condition.operands.len != 2) return false;
+    const arg0 = typedNthI32ArgIndex(structured_air_v2, 0) orelse return false;
+    return typedInstOperandIndex(condition.operands[0]) == arg0 and
+        (typedConstI32Operand(condition, 1) orelse return false) == 0;
+}
+
 fn typedAddConstInstructionUsing(structured_air_v2: air_export.StructuredAirV2, operand_index: u32) ?TypedConstAddResult {
     var found: ?TypedConstAddResult = null;
     for (structured_air_v2.instructions) |instruction| {
@@ -3575,6 +3632,16 @@ test "typed AIR model recognizes union tag payload switch summary" {
     var load_operands = [_]air_export.TypedOperand{
         .{ .kind = "inst", .value = "18", .type_text = "*const TaggedValue" },
     };
+    var cmp_eq_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "i32" },
+        .{ .kind = "const", .value = "zero", .type_text = "i32" },
+    };
+    var cmp_eq_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, 0>" },
+    };
+    var cond_br_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "20", .type_text = "bool" },
+    };
     var instructions = [_]air_export.TypedInstruction{
         .{ .index = 0, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
         .{ .index = 1, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
@@ -3595,10 +3662,29 @@ test "typed AIR model recognizes union tag payload switch summary" {
         .{ .index = 16, .opcode = "struct_field_ptr_index_0", .result_type = "*i32", .data_kind = "field_ptr", .operands = @constCast(&field_ptr0_operands) },
         .{ .index = 17, .opcode = "struct_field_ptr_index_1", .result_type = "*i32", .data_kind = "field_ptr", .operands = @constCast(&field_ptr1_operands) },
         .{ .index = 18, .opcode = "bitcast", .result_type = "*const TaggedValue", .data_kind = "ty_op", .operands = @constCast(&bitcast_operands) },
+        .{ .index = 19, .opcode = "cond_br", .result_type = "noreturn", .data_kind = "cond_br", .operands = @constCast(&cond_br_operands) },
+        .{ .index = 20, .opcode = "cmp_eq", .result_type = "bool", .data_kind = "bin_op", .operands = @constCast(&cmp_eq_operands), .details = @constCast(&cmp_eq_details) },
     };
     const structured_air_v2 = air_export.StructuredAirV2{ .instructions = @constCast(&instructions) };
+    var main_body_instructions = [_]u32{ 0, 1, 2, 20, 19, 3, 4, 5, 6, 11, 12, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18 };
+    var then_body_instructions = [_]u32{ 6, 16, 4 };
+    var else_body_instructions = [_]u32{ 11, 17, 5 };
+    var structured_bodies = [_]air_export.StructuredBody{
+        .{ .kind = .main, .owner = null, .instructions = @constCast(&main_body_instructions) },
+        .{ .kind = .then_body, .owner = 19, .instructions = @constCast(&then_body_instructions) },
+        .{ .kind = .else_body, .owner = 19, .instructions = @constCast(&else_body_instructions) },
+    };
+    const structured_air = air_export.StructuredAir{
+        .instructions = &.{},
+        .bodies = @constCast(&structured_bodies),
+        .branches = &.{},
+        .cond_branches = &.{},
+        .repeats = &.{},
+    };
 
-    const summary = typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2).?;
+    const summary = typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2).?;
+    try std.testing.expectEqual(@as(u32, 0), summary.true_tag_index);
+    try std.testing.expectEqual(@as(u32, 1), summary.false_tag_index);
     try std.testing.expectEqual(@as(i32, 0), summary.tag0_store_add);
     try std.testing.expectEqual(@as(i32, 7), summary.tag0_return_add);
     try std.testing.expectEqual(@as(i32, 5), summary.tag1_store_add);
@@ -3606,28 +3692,36 @@ test "typed AIR model recognizes union tag payload switch summary" {
 
     store0_operands[1].value = "3";
     store1_operands[1].value = "1";
-    const swapped_payload_summary = typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2).?;
+    const swapped_payload_summary = typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2).?;
     try std.testing.expectEqual(@as(i32, 5), swapped_payload_summary.tag0_store_add);
     try std.testing.expectEqual(@as(i32, 0), swapped_payload_summary.tag1_store_add);
     store0_operands[1].value = "1";
     store1_operands[1].value = "3";
 
+    then_body_instructions[0] = 11;
+    else_body_instructions[0] = 6;
+    const swapped_branch_summary = typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2).?;
+    try std.testing.expectEqual(@as(u32, 1), swapped_branch_summary.true_tag_index);
+    try std.testing.expectEqual(@as(u32, 0), swapped_branch_summary.false_tag_index);
+    then_body_instructions[0] = 6;
+    else_body_instructions[0] = 11;
+
     switch_details[1].value = "1";
     switch_details[2].value = "0";
-    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) != null);
+    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2) != null);
     switch_details[1].value = "0";
     switch_details[2].value = "1";
 
     switch_operands[0].value = "0";
-    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) == null);
+    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2) == null);
     switch_operands[0].value = "7";
 
     load_operands[0].value = "0";
-    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) == null);
+    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2) == null);
     load_operands[0].value = "18";
 
     store1_operands[1].value = "0";
-    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air_v2) == null);
+    try std.testing.expect(typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2) == null);
 }
 
 test "typed AIR model recognizes error switch and classifier summaries" {

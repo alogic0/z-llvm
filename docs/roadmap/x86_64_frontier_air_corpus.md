@@ -107,10 +107,13 @@ admits the row from those typed facts and the structural payload data-flow, not
 from a function-name gate. The model now accepts reversed source switch-arm
 ordering when the exported case tag indexes prove the same selected tag set.
 It also proves either selected tag arm may store the raw second argument or a
-constant add of that argument before the payload return add. The C harness
-checks both `.small` and `.large` payload paths across ReleaseFast, ReleaseSafe,
-and ReleaseSmall. General union ABI/layout lowering remains future work; this
-row only owns the selected frontier tag/payload switch shape.
+constant add of that argument before the payload return add. Branch-to-tag
+selection now comes from structured-air then/else bodies, so the reordered-field
+row proves the selected lowering no longer assumes tag index 0 is always the
+true branch. The C harness checks both `.small` and `.large` payload paths
+across ReleaseFast, ReleaseSafe, and ReleaseSmall. General union ABI/layout
+lowering remains future work; this row only owns the selected frontier
+tag/payload switch shape.
 
 `frontier_slice_pointer_arith.zig` now covers the next pointer/slice family
 after `slice_len`: direct `slice_len`, `slice_ptr`, `ptr_slice_ptr_ptr`,
@@ -203,20 +206,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=675
-structured_functions=675
-generic_codegen_functions=675
-generic_cfg_functions=675
+discovered_functions=676
+structured_functions=676
+generic_codegen_functions=676
+generic_cfg_functions=676
 structural_matcher_functions=0
-structured_air_v2_functions=675
-typed_air_operand_functions=675
+structured_air_v2_functions=676
+typed_air_operand_functions=676
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=675
+generic_lowering_functions=676
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=675
+object_emitted_functions=676
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

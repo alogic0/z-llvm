@@ -413,8 +413,11 @@ pub fn firstUnsupported(
         else
             false;
     const typed_union_tag_payload_switch =
-        if (function.structured_air_v2) |structured_air_v2|
-            typedV2UnionTagPayloadSwitchRecords(function_type, structured_air_v2)
+        if (function.structured_air) |structured_air|
+            if (function.structured_air_v2) |structured_air_v2|
+                typedV2UnionTagPayloadSwitchRecords(function_type, structured_air, structured_air_v2)
+            else
+                false
         else
             false;
 
@@ -727,7 +730,7 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2CheckedIntFromFloat(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
-    if (try lowerTypedV2UnionTagPayloadSwitch(allocator, air_function, function_type, structured_air_v2)) |function| {
+    if (try lowerTypedV2UnionTagPayloadSwitch(allocator, air_function, function_type, structured_air, structured_air_v2)) |function| {
         return function;
     }
 
