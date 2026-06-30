@@ -1,0 +1,26 @@
+const core = @import("zig_air_model_base.zig");
+
+pub const UntypedValueSource = core.UntypedValueSource;
+pub const UntypedStore = core.UntypedStore;
+pub const UntypedBinaryRefs = core.UntypedBinaryRefs;
+pub const untypedArgIndexOfType = core.untypedArgIndexOfType;
+pub const untypedAllocType = core.untypedAllocType;
+pub const untypedLoadSourceSlot = core.untypedLoadSourceSlot;
+pub const untypedStore = core.untypedStore;
+pub const untypedBinaryRefs = core.untypedBinaryRefs;
+pub const untypedBinaryRefAndInt = core.untypedBinaryRefAndInt;
+pub const untypedReturnRef = core.untypedReturnRef;
+pub const untypedBranchConditionRef = core.untypedBranchConditionRef;
+pub const untypedInstructionByIndex = core.untypedInstructionByIndex;
+pub const untypedLoadReferencesSlot = core.untypedLoadReferencesSlot;
+pub const untypedFindCompareAgainstArg = core.untypedFindCompareAgainstArg;
+pub const untypedFindAnyLoadFromSlot = core.untypedFindAnyLoadFromSlot;
+pub const untypedFindLastLoadFromSlot = core.untypedFindLastLoadFromSlot;
+pub const untypedFindCastOf = core.untypedFindCastOf;
+pub const untypedFindCastFromSlot = core.untypedFindCastFromSlot;
+pub const untypedFindBinaryUsing = core.untypedFindBinaryUsing;
+pub const untypedFindBinaryUsingConstant = core.untypedFindBinaryUsingConstant;
+pub const untypedFindBinaryFromSlotUsingConstant = core.untypedFindBinaryFromSlotUsingConstant;
+pub const untypedFindSlotBinaryUpdate = core.untypedFindSlotBinaryUpdate;
+pub const untypedReturnUses = core.untypedReturnUses;
+pub const runtimeNavSymbol = core.runtimeNavSymbol;

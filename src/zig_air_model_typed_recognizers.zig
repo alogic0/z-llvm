@@ -1,5 +1,5 @@
 const std = @import("std");
-const core = @import("zig_air_model_helpers_impl_full_core.zig");
+const core = @import("zig_air_model_base.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
 const ir = @import("ir.zig");

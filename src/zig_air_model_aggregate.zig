@@ -1,44 +1,30 @@
-pub const TableLookupSummary = struct {
-    index_source: u32,
-    mask_or_narrow: u32,
-    index_cast: u32,
-    table_access: u32,
-    return_value: u32,
-};
+const core = @import("zig_air_model_base.zig");
+const typed_recognizers = @import("zig_air_model_typed_recognizers.zig");
 
-pub const AggregatePairSummary = struct {
-    kind: enum { first, make },
-    base_ptr: u32,
-    field0_ptr: u32,
-    field1_ptr: ?u32 = null,
-    field0_value: ?u32 = null,
-    field1_value: ?u32 = null,
-    return_value: u32,
-};
+pub const TableLookupSummary = core.TableLookupSummary;
+pub const AggregatePairSummary = core.AggregatePairSummary;
+pub const ArraySumSummary = core.ArraySumSummary;
+pub const StructSumSummary = core.StructSumSummary;
+pub const PackedFieldSummary = core.PackedFieldSummary;
+pub const TypedPackedFieldSummary = core.TypedPackedFieldSummary;
 
-pub const ArraySumSummary = struct {
-    aggregate_init: u32,
-    elem_ptr_count: usize,
-    load_count: usize,
-    add_count: usize,
-};
-
-pub const StructSumSummary = struct {
-    field0_ptr: u32,
-    field1_ptr: u32,
-    load_count: usize,
-    add_count: usize,
-};
-
-pub const PackedFieldSummary = struct {
-    kind: enum { read_flag, replace_low },
-    field_ptr: u32,
-    load: ?u32 = null,
-    bitcast: ?u32 = null,
-    trunc: ?u32 = null,
-    store: ?u32 = null,
-};
-
-pub const TypedPackedFieldSummary = struct {
-    kind: enum { read_flag, replace_low },
-};
+pub const aggregatePairFirstSummary = core.aggregatePairFirstSummary;
+pub const arraySumSummary = core.arraySumSummary;
+pub const selectedArraySumShape = core.selectedArraySumShape;
+pub const structSumSummary = core.structSumSummary;
+pub const selectedStructSumShape = core.selectedStructSumShape;
+pub const packedReadFlagSummary = core.packedReadFlagSummary;
+pub const selectedPackedReadFlagShape = core.selectedPackedReadFlagShape;
+pub const packedReplaceLowSummary = core.packedReplaceLowSummary;
+pub const selectedPackedReplaceLowShape = core.selectedPackedReplaceLowShape;
+pub const aggregateMakePairSummary = core.aggregateMakePairSummary;
+pub const selectedAggregatePairFirstShape = core.selectedAggregatePairFirstShape;
+pub const selectedAggregateMakePairShape = core.selectedAggregateMakePairShape;
+pub const tableLookupSummary = core.tableLookupSummary;
+pub const selectedBase64TableLookupShape = core.selectedBase64TableLookupShape;
+pub const typedPackedReadFlagSummary = typed_recognizers.typedPackedReadFlagSummary;
+pub const typedPackedReplaceLowSummary = typed_recognizers.typedPackedReplaceLowSummary;
+pub const typedAggregatePointerPath = core.typedAggregatePointerPath;
+pub const aggregateIndexPathText = core.aggregateIndexPathText;
+pub const plainFieldPointerChild = core.plainFieldPointerChild;
+pub const aggregateFieldByteOffset = core.aggregateFieldByteOffset;

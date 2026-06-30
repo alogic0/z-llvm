@@ -1,0 +1,154 @@
+const air_export = @import("zig_air_export.zig");
+const air_capabilities = @import("zig_air_capabilities.zig");
+const air_model = @import("zig_air_model.zig");
+const air_semantics = @import("zig_air_semantics.zig");
+const air_types = @import("zig_air_types.zig");
+const ir = @import("ir.zig");
+
+const parseZigType = air_types.parseZigType;
+const binaryOp = air_semantics.binaryOp;
+const isFpType = air_semantics.isFpType;
+const intPredicate = air_semantics.intPredicate;
+const fpPredicate = air_semantics.fpPredicate;
+const castOp = air_semantics.castOp;
+const isShiftOpcode = air_capabilities.isShiftOpcode;
+
+pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_export.TypedInstruction) !bool {
+    switch (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode)) {
+        .arg => try self.lowerTypedArg(instruction),
+        .add_with_overflow => try self.lowerTypedAddWithOverflow(instruction),
+        .binary => try self.lowerTypedBinary(instruction),
+        .cast => try self.lowerTypedCast(instruction),
+        .none => return false,
+    }
+    return true;
+}
+
+pub fn lowerTypedArg(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 0) return air_model.LowerError.UnsupportedAir;
+    const param_index = self.next_arg_index;
+    self.next_arg_index += 1;
+    if (param_index >= self.function_type.params.len) return air_model.LowerError.UnsupportedAir;
+    const parsed_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!parsed_type.ir_type.eql(self.function_type.params[param_index].ir_type)) return air_model.LowerError.UnsupportedAir;
+    self.values[instruction.index] = .{
+        .ty = parsed_type,
+        .value = .{ .named = self.blockParamName(param_index) },
+    };
+}
+
+pub fn lowerTypedBinary(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
+    const lhs = try self.resolveTypedOperand(instruction, 0);
+    var rhs = try self.resolveTypedOperand(instruction, 1);
+    if (!lhs.ty.ir_type.eql(rhs.ty.ir_type)) {
+        if (!isShiftOpcode(instruction.opcode)) return air_model.LowerError.UnsupportedAir;
+        rhs = try self.extendShiftCount(instruction.index, lhs.ty, rhs);
+    }
+    const op = binaryOp(instruction.opcode, lhs.ty) orelse return air_model.LowerError.UnsupportedAir;
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .binary = .{
+            .op = op,
+            .ty = lhs.ty.ir_type,
+            .lhs = lhs.value,
+            .rhs = rhs.value,
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = lhs.ty,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedAddWithOverflow(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
+    const lhs = try self.resolveTypedOperand(instruction, 0);
+    const rhs = try self.resolveTypedOperand(instruction, 1);
+    if (!lhs.ty.ir_type.eql(.{ .int = 32 }) or !rhs.ty.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+    if (!lhs.ty.ir_type.eql(rhs.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!result_type.ir_type.eql(.{ .aggregate = "{ i32, i1 }" })) return air_model.LowerError.UnsupportedAir;
+
+    const result_name = try self.resultName(instruction.index);
+    var call: ir.CallInst = .{
+        .ret_ty = result_type.ir_type,
+        .callee = if (lhs.ty.signed) "llvm.sadd.with.overflow.i32" else "llvm.uadd.with.overflow.i32",
+        .args = .empty,
+    };
+    errdefer call.deinit(self.allocator);
+    try call.args.append(self.allocator, .{ .ty = lhs.ty.ir_type, .value = lhs.value });
+    try call.args.append(self.allocator, .{ .ty = rhs.ty.ir_type, .value = rhs.value });
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .call = call },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedCompare(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
+    const lhs = try self.resolveTypedOperand(instruction, 0);
+    const rhs = try self.resolveTypedOperand(instruction, 1);
+    if (!lhs.ty.ir_type.eql(rhs.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    const result_name = try self.resultName(instruction.index);
+    if (isFpType(lhs.ty.ir_type)) {
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .fcmp = .{
+                .predicate = fpPredicate(instruction.opcode) orelse return air_model.LowerError.UnsupportedAir,
+                .operand_ty = lhs.ty.ir_type,
+                .lhs = lhs.value,
+                .rhs = rhs.value,
+            } },
+        });
+    } else {
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .icmp = .{
+                .predicate = intPredicate(instruction.opcode, lhs.ty.signed) orelse return air_model.LowerError.UnsupportedAir,
+                .operand_ty = lhs.ty.ir_type,
+                .lhs = lhs.value,
+                .rhs = rhs.value,
+            } },
+        });
+    }
+    self.values[instruction.index] = .{
+        .ty = .{ .ir_type = .{ .int = 1 } },
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const target_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (air_capabilities.isBitcastOpcode(instruction.opcode) and
+        source.ty.ir_type == .ptr and target_type.ir_type == .ptr)
+    {
+        self.values[instruction.index] = .{
+            .ty = target_type,
+            .value = source.value,
+        };
+        return;
+    }
+    const op = castOp(instruction.opcode, source.ty, target_type) orelse return air_model.LowerError.UnsupportedAir;
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .cast = .{
+            .op = op,
+            .from_ty = source.ty.ir_type,
+            .value = source.value,
+            .to_ty = target_type.ir_type,
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = target_type,
+        .value = .{ .named = result_name },
+    };
+}

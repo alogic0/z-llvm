@@ -1,40 +1,14 @@
-pub const SliceSumSummary = struct {
-    slice: u32,
-    slice_elem_ptr: u32,
-    ptr_slice_len_ptr: u32,
-    loop: u32,
-};
+const core = @import("zig_air_model_base.zig");
+const typed_recognizers = @import("zig_air_model_typed_recognizers.zig");
 
-pub const PointerSliceAddressSummary = struct {
-    ptr_add_count: usize = 0,
-    ptr_sub_count: usize = 0,
-    slice_count: usize = 0,
-    slice_ptr_count: usize = 0,
-    slice_len_count: usize = 0,
-    slice_elem_ptr_count: usize = 0,
-    ptr_slice_len_ptr_count: usize = 0,
-    ptr_slice_ptr_ptr_count: usize = 0,
-    load_count: usize = 0,
-    store_count: usize = 0,
-    bounds_check_count: usize = 0,
-    base_pointer_operand: ?[]const u8 = null,
-    dynamic_index_operand: ?[]const u8 = null,
-    constant_index: ?i128 = null,
-    scalar_width_bits: ?u16 = null,
-    slice_source_index: ?u32 = null,
+pub const SliceSumSummary = core.SliceSumSummary;
+pub const PointerSliceAddressSummary = core.PointerSliceAddressSummary;
+pub const TypedSliceLoopSummary = core.TypedSliceLoopSummary;
 
-    pub fn hasPointerOrSliceAddress(self: PointerSliceAddressSummary) bool {
-        return self.ptr_add_count != 0 or
-            self.ptr_sub_count != 0 or
-            self.slice_count != 0 or
-            self.slice_ptr_count != 0 or
-            self.slice_len_count != 0 or
-            self.slice_elem_ptr_count != 0 or
-            self.ptr_slice_len_ptr_count != 0 or
-            self.ptr_slice_ptr_ptr_count != 0;
-    }
-};
-
-pub const TypedSliceLoopSummary = struct {
-    kind: enum { plain_sum, conditional_sum },
-};
+pub const pointerSliceAddressSummary = core.pointerSliceAddressSummary;
+pub const sliceSumSummary = core.sliceSumSummary;
+pub const selectedSliceSumShape = core.selectedSliceSumShape;
+pub const typedSliceSumSummary = typed_recognizers.typedSliceSumSummary;
+pub const typedConditionalSliceSumSummary = typed_recognizers.typedConditionalSliceSumSummary;
+pub const typedAccumulatorLoopSummary = typed_recognizers.typedAccumulatorLoopSummary;
+pub const typedConditionalSlotUpdateSummary = typed_recognizers.typedConditionalSlotUpdateSummary;
