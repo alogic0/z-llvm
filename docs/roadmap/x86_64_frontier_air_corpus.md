@@ -139,10 +139,14 @@ facts without AIR-text recovery or sidecars. The executable proof checks
 `@errorName(err).len` for both selected error values. The companion
 `frontier_error_name_three_len` row proves the same typed-v2 path for a
 three-name concrete error set by deriving pointer/length selects from the
-exported error-set names and the runtime error code. It deliberately disables
-the integer-to-error ReleaseSafe validation inside that row, so
-`error_set_has_value` remains a separate safety-check implementation family.
-Arbitrary error-name payload materialization remains outside this narrow row.
+exported error-set names and the runtime error code. ReleaseSafe now keeps the
+integer-to-error validation enabled for that row: Zig exports
+`error_set_has_value` as a versioned typed unary membership record with the
+checked operand and destination error-set type, and z_llvm lowers the selected
+dense concrete error-set membership check from those facts. The executable
+harness checks valid error values and a child-process trap for an invalid error
+code. Arbitrary sparse/non-dense error-set membership and arbitrary error-name
+payload materialization remain outside this narrow row.
 
 `frontier_union_tags.zig` adds the first source-backed tagged-union tag/payload
 switch proof. The patched Zig typed-v2 exporter emits versioned

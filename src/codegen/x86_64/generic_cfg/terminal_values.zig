@@ -4,6 +4,7 @@ const core_value_support = @import("core_value_support.zig");
 const core_value_emit = @import("core_value_emit.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
+const pointer_slice_rows = @import("pointer_slice_rows.zig");
 
 const std = shared.std;
 const ir = shared.ir;
@@ -253,6 +254,11 @@ pub fn terminalBlockCanMaterializeI64Value(function: ir.Function, scope: Termina
                 .call => |call| {
                     break :blk call.ret_ty.eql(.{ .int = 64 }) and call.inline_asm == null and call.callee_value == null;
                 },
+                .extractvalue => |extract| {
+                    if (!extract.result_ty.eql(.{ .int = 64 }) or !std.mem.eql(u8, extract.indices, "1")) break :blk false;
+                    _ = pointer_slice_rows.resolveSliceLengthValue(function, scope.block, value) catch break :blk false;
+                    break :blk true;
+                },
                 else => break :blk false,
             }
         },
@@ -277,10 +283,12 @@ pub fn emitGenericCfgTerminalConditionTrueBranch(
         try emitGenericCfgConditionTrueBranch(allocator, machine, function, block, cond, true_label);
         return;
     };
+    if (try emitGenericCfgAndConditionTrueBranch(allocator, machine, function, block, cond_inst, true_label)) return;
     const icmp = switch (cond_inst.kind) {
         .icmp => |icmp| icmp,
         else => return error.UnsupportedCodegenInstruction,
     };
+    if (try emitGenericCfgTerminalI16IcmpConditionTrueBranch(allocator, machine, function, .{ .entry = entry, .block = block }, icmp, true_label)) return;
     if (icmp.predicate == .ugt and icmp.operand_ty.eql(.{ .int = 32 })) {
         const rhs = switch (icmp.rhs) {
             .int => |int| try i32Value(int),
@@ -300,6 +308,76 @@ pub fn emitGenericCfgTerminalConditionTrueBranch(
         return;
     }
     try emitGenericCfgConditionTrueBranch(allocator, machine, function, block, cond, true_label);
+}
+
+fn emitGenericCfgTerminalI16IcmpConditionTrueBranch(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    scope: TerminalValueScope,
+    icmp: ir.IcmpInst,
+    true_label: []const u8,
+) !bool {
+    if (!icmp.operand_ty.eql(.{ .int = 16 })) return false;
+    switch (icmp.predicate) {
+        .eq, .ne, .slt => {},
+        .ugt, .uge, .ult, .ule, .sgt, .sge, .sle => return false,
+    }
+    const lhs_reg = terminalI16ValueReg(function, scope, icmp.lhs) orelse return false;
+    const rhs_imm = switch (icmp.rhs) {
+        .int => |int| try u16TerminalImm(if (icmp.predicate == .slt) int - 1 else int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = lhs_reg, .imm = rhs_imm } });
+    const branch_kind: core_cfg_emit.GenericCfgBranchKind = switch (icmp.predicate) {
+        .eq => .je,
+        .ne => .jne,
+        .slt => .jle,
+        else => unreachable,
+    };
+    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    return true;
+}
+
+fn terminalI16ValueReg(function: ir.Function, scope: TerminalValueScope, value: ir.Value) ?ArgReg {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if ((paramRegOrNull(function, name, .{ .int = 16 }) catch null)) |reg| return reg;
+    const instruction = terminalScopeInstruction(scope, name) orelse return null;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (cast.op != .bitcast or !cast.from_ty.eql(.{ .int = 16 }) or !cast.to_ty.eql(.{ .int = 16 })) return null;
+    return terminalI16ValueReg(function, scope, cast.value);
+}
+
+fn u16TerminalImm(value: i128) !u16 {
+    if (value < 0 or value > std.math.maxInt(u16)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
+}
+
+fn emitGenericCfgAndConditionTrueBranch(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    cond_inst: ir.Instruction,
+    true_label: []const u8,
+) !bool {
+    const result_name = cond_inst.result orelse return false;
+    const binary = switch (cond_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (binary.op != .@"and" or !binary.ty.eql(.{ .int = 1 })) return false;
+    const rhs_label = try ownedMachineLabel(allocator, machine, ".L_{s}_and_rhs", .{result_name});
+    try emitGenericCfgConditionTrueBranch(allocator, machine, function, block, binary.lhs, rhs_label);
+    try appendGenericCfgBlockLabel(allocator, machine, rhs_label);
+    try emitGenericCfgConditionTrueBranch(allocator, machine, function, block, binary.rhs, true_label);
+    return true;
 }
 
 pub fn emitGenericCfgConditionTrueBranch(
@@ -477,12 +555,28 @@ pub fn emitGenericCfgTerminalI64ValueIntoRaxInScope(
                     }
                     try emitGenericCfgTerminalI32ValueIntoEaxInScope(allocator, machine, function, scope, cast.value);
                 },
-                .select => |select| try emitGenericCfgTerminalI64SelectIntoRax(allocator, machine, function, scope.entry, scope.block, name, select),
+                .select => |select| try emitGenericCfgTerminalI64SelectIntoRax(allocator, machine, function, scope, name, select),
                 .call => |call| try emitGenericCfgTerminalI64CallIntoRax(allocator, machine, function, scoped_instruction.block, call),
+                .extractvalue => try emitGenericCfgTerminalSliceLengthIntoRax(allocator, machine, function, scope, value),
                 else => return error.UnsupportedCodegenInstruction,
             }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitGenericCfgTerminalSliceLengthIntoRax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    scope: TerminalValueScope,
+    value: ir.Value,
+) !void {
+    const len = try pointer_slice_rows.resolveSliceLengthValue(function, scope.block, value);
+    switch (len) {
+        .imm => |imm| try machine.instructions.append(allocator, .{ .mov_imm_rax = imm }),
+        .reg => |reg| try machine.instructions.append(allocator, .{ .mov_arg_rax = reg }),
+        .materialize => |materialized| try emitGenericCfgTerminalI64ValueIntoRaxInScope(allocator, machine, function, scope, materialized),
     }
 }
 
@@ -505,8 +599,7 @@ pub fn emitGenericCfgTerminalI64SelectIntoRax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
-    entry: ir.BasicBlock,
-    block: ir.BasicBlock,
+    scope: TerminalValueScope,
     result_name: []const u8,
     select: ir.SelectInst,
 ) anyerror!void {
@@ -515,7 +608,7 @@ pub fn emitGenericCfgTerminalI64SelectIntoRax(
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
-    const cond_instruction = terminalScopeInstruction(.{ .entry = entry, .block = block }, cond_name) orelse return error.UnsupportedCodegenValue;
+    const cond_instruction = terminalScopeInstruction(scope, cond_name) orelse return error.UnsupportedCodegenValue;
     const icmp = switch (cond_instruction.kind) {
         .icmp => |icmp| icmp,
         else => return error.UnsupportedCodegenInstruction,
@@ -525,20 +618,22 @@ pub fn emitGenericCfgTerminalI64SelectIntoRax(
         allocator,
         machine,
         "generic_cfg_terminal_i64_select_{s}_{s}_{}_true",
-        .{ block.name, result_name, label_suffix },
+        .{ scope.block.name, result_name, label_suffix },
     );
     const end_label = try ownedMachineLabel(
         allocator,
         machine,
-        "generic_cfg_terminal_i64_select_{s}_{s}_{}_end",
-        .{ block.name, result_name, label_suffix },
+        "generic_cfg_terminal_i64_select_{s}_{s}_{}_generic_cfg_select_end",
+        .{ scope.block.name, result_name, label_suffix },
     );
-    const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
-    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
-    try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, entry, block, select.false_value);
+    if (!try emitGenericCfgTerminalI16IcmpConditionTrueBranch(allocator, machine, function, scope, icmp, true_label)) {
+        const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
+        try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    }
+    try emitGenericCfgTerminalI64ValueIntoRaxInScope(allocator, machine, function, scope, select.false_value);
     try machine.instructions.append(allocator, .{ .jmp = end_label });
     try appendGenericCfgBlockLabel(allocator, machine, true_label);
-    try emitGenericCfgTerminalI64ValueIntoRax(allocator, machine, function, entry, block, select.true_value);
+    try emitGenericCfgTerminalI64ValueIntoRaxInScope(allocator, machine, function, scope, select.true_value);
     try appendGenericCfgBlockLabel(allocator, machine, end_label);
 }
 

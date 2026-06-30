@@ -135,7 +135,7 @@ longer make the global top 50.
 | 18 | `error-union-try:try_ptr:opaque` | 571 | - | - | - | - |
 | 19 | `scalar-transform:max:opaque` | 429 | - | - | - | - |
 | 20 | `scalar-transform:min:opaque` | 364 | - | - | - | - |
-| 21 | `error-union-try:error_name:opaque` | 323 | - | - | - | - |
+| 21 | `error-union-try:error_name:opaque` | 323 | - | - | stale: frontier now exports/lowers selected `error_name` and `error_set_has_value`; refresh compiler-core-module inventory before using this row for prioritization | - |
 | 22 | `pointer-address:is_non_null_ptr:un_op` | 263 | - | - | - | - |
 | 23 | `pointer-address:ptr_sub:bin_ty_pl` | 119 | - | - | - | - |
 | 24 | `scalar-transform:abs:opaque` | 64 | - | - | - | - |

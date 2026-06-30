@@ -143,6 +143,10 @@ pub fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, icmp: ir.IcmpIns
         return genericCfgSupportsI8ParamOrConst(function, icmp.lhs) and
             genericCfgSupportsI8ParamOrConst(function, icmp.rhs);
     }
+    if (icmp.operand_ty.eql(.{ .int = 16 })) {
+        return genericCfgSupportsI16ParamOrConst(function, icmp.lhs) and
+            genericCfgSupportsI16ParamOrConst(function, icmp.rhs);
+    }
     if (!icmp.operand_ty.eql(.{ .int = 32 })) return false;
     return genericCfgSupportsI32ParamOrConst(function, icmp.lhs) and
         genericCfgSupportsI32ParamOrConst(function, icmp.rhs);
@@ -398,6 +402,14 @@ pub fn genericCfgSupportsI8ParamOrConst(function: ir.Function, value: ir.Value) 
     return switch (value) {
         .int => |int| int >= 0 and int <= std.math.maxInt(u8),
         .named => |name| (paramRegOrNull(function, name, .{ .int = 8 }) catch null) != null,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+pub fn genericCfgSupportsI16ParamOrConst(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .int => |int| int >= std.math.minInt(i16) and int <= std.math.maxInt(i16),
+        .named => |name| (paramRegOrNull(function, name, .{ .int = 16 }) catch null) != null,
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
 }

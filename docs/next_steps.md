@@ -2002,10 +2002,13 @@ error-set operand, and z_llvm lowers the sentinel `u8` slice length path from
 those typed facts. The accepted proof is `@errorName(err).len` for a selected
 two-error-set source row plus a three-name concrete error-set row whose
 pointer/length selects are derived from exported error-set names and a runtime
-error code. The three-name row disables integer-to-error runtime validation
-locally, so `error_set_has_value` remains a separate ReleaseSafe safety-check
-family rather than part of this `error_name` claim. Arbitrary error-name
-string/payload materialization remains future work.
+error code. The three-name row now keeps ReleaseSafe integer-to-error
+validation enabled: Zig exports `error_set_has_value` as a versioned typed
+unary membership record with the checked operand and destination error-set
+type, and z_llvm lowers the selected dense concrete error-set check from those
+facts. The executable harness checks the valid names and a child-process trap
+for an invalid error code. Arbitrary sparse/non-dense error-set membership and
+arbitrary error-name string/payload materialization remain future work.
 
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with

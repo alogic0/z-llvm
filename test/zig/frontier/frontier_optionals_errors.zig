@@ -492,7 +492,6 @@ export fn frontier_error_name_len(tag: i32) usize {
 }
 
 export fn frontier_error_name_three_len(code: u16) usize {
-    @setRuntimeSafety(false);
     const err: FrontierNameError = @errorCast(@errorFromInt(code));
     return @errorName(err).len;
 }

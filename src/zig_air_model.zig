@@ -68,6 +68,8 @@ pub const IntegerSwitchPlan = model_base.IntegerSwitchPlan;
 pub const PointerSliceAddressSummary = pointer_slice_model.PointerSliceAddressSummary;
 pub const TypedUnionTagPayloadSwitchSummary = union_tag_model.TypedUnionTagPayloadSwitchSummary;
 pub const TypedOptionalPayloadBranchSummary = optional_model.TypedOptionalPayloadBranchSummary;
+pub const TypedErrorSetHasValueSummary = error_union_model.TypedErrorSetHasValueSummary;
+pub const TypedCmpLteErrorsLenSummary = error_union_model.TypedCmpLteErrorsLenSummary;
 pub const TypedOptionalPayloadSummary = optional_model.TypedOptionalPayloadSummary;
 pub const TypedOptionalPointerSummary = optional_model.TypedOptionalPointerSummary;
 
@@ -223,6 +225,8 @@ pub const typedErrorUnionFlowDiagnosticName = error_union_model.typedErrorUnionF
 pub const typedMaybeErrorSummary = error_union_model.typedMaybeErrorSummary;
 pub const typedErrorNameSummary = error_union_model.typedErrorNameSummary;
 pub const typedErrorNameSummaryFromV2 = error_union_model.typedErrorNameSummaryFromV2;
+pub const typedErrorSetHasValueSummary = error_union_model.typedErrorSetHasValueSummary;
+pub const typedCmpLteErrorsLenSummary = error_union_model.typedCmpLteErrorsLenSummary;
 pub const errorSetNameForCode = error_union_model.errorSetNameForCode;
 pub const errorSetFirstTwoNames = error_union_model.errorSetFirstTwoNames;
 pub const errorSetNamesAlloc = error_union_model.errorSetNamesAlloc;

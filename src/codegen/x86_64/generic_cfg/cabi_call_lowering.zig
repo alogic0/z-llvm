@@ -1483,6 +1483,15 @@ pub fn emitGenericCfgIcmpCondition(
     }
 
     if (icmp.operand_ty.eql(.{ .int = 16 })) {
+        if (icmp.predicate == .slt) {
+            const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 16 });
+            const rhs_imm = switch (icmp.rhs) {
+                .int => |int| try u16Value(int - 1),
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = lhs_reg, .imm = rhs_imm } });
+            return .jle;
+        }
         if (icmp.lhs == .int and icmp.rhs != .int) {
             const rhs_reg = try paramValueReg(function, icmp.rhs, .{ .int = 16 });
             try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = rhs_reg, .imm = try u16Value(switch (icmp.lhs) {

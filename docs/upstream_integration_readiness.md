@@ -688,10 +688,14 @@ path from those facts without AIR-text recovery or sidecars. The claim is
 limited to source-backed `@errorName(err).len` behavior for selected concrete
 error-set rows. The latest row covers a three-name error set by selecting the
 string pointer and length from exported error-set names and a runtime error
-code. The row disables the integer-to-error ReleaseSafe validation locally, so
-`error_set_has_value` remains a future safety-check lowering family rather than
-part of the `error_name` ownership claim. Arbitrary error-name payload lowering
-remains future work.
+code. ReleaseSafe now keeps the integer-to-error validation enabled for that
+row: the patched Zig exporter emits a versioned typed unary
+`error_set_has_value` membership record with the checked operand and
+destination error-set type, and z_llvm lowers the selected dense concrete
+error-set membership check from those facts. The executable harness checks
+valid values and child-process trap behavior for an invalid error code.
+Arbitrary sparse/non-dense error-set membership and arbitrary error-name
+payload lowering remain future work.
 The frontier proof now includes the selected tagged-union tag/payload switch
 row: Zig emits versioned typed-v2 union-tag and switch case facts, and z_llvm
 lowers both tag arms from those facts without AIR text fallback, shape

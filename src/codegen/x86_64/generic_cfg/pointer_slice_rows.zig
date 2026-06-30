@@ -184,7 +184,7 @@ pub fn resolveSliceLengthValue(function: ir.Function, block: ir.BasicBlock, valu
                     if (try resolveSliceLengthFromInsertedAggregate(function, block, extract.aggregate)) |len| return len;
                     return .{ .imm = try sliceLengthFromAggregateConstant(extract.aggregate) };
                 },
-                .cast, .load, .binary => return .{ .materialize = value },
+                .cast, .load, .binary, .select => return .{ .materialize = value },
                 .phi => |phi| {
                     if (!phi.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
                     return .{ .materialize = value };

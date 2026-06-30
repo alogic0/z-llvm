@@ -161,6 +161,134 @@ pub fn lowerGenericCfgGuardReturnNoreturn(
     return true;
 }
 
+pub fn lowerGenericCfgLinearGuardedTerminalReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) and !function.ret_ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len != 5) return false;
+
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return false;
+
+    const first = try genericCfgGuardContinuationSplit(function, entry_condbr);
+    const cont_block = first.continuation;
+    const cont_condbr = switch (cont_block.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!cont_condbr.cond_ty.eql(.{ .int = 1 })) return false;
+
+    const second = try genericCfgGuardReturnSplit(function, entry, cont_block, cont_condbr);
+    if (!genericCfgLinearGuardedReturnUsesAllBlocks(function, cont_block.name, first.panic.name, second.panic.name, second.return_block.name)) return false;
+
+    if (first.true_is_continuation) {
+        try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, entry, entry, entry_condbr.cond, cont_block.name);
+        try appendGenericCfgBlockLabel(allocator, machine, first.panic.name);
+        try emitGenericCfgNoreturnCallBlock(allocator, machine, function, first.panic);
+        try appendGenericCfgBlockLabel(allocator, machine, cont_block.name);
+    } else {
+        try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, entry, entry, entry_condbr.cond, first.panic.name);
+        try appendGenericCfgBlockLabel(allocator, machine, cont_block.name);
+    }
+
+    if (second.true_is_return) {
+        try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, entry, cont_block, cont_condbr.cond, second.return_block.name);
+        try appendGenericCfgBlockLabel(allocator, machine, second.panic.name);
+        try emitGenericCfgNoreturnCallBlock(allocator, machine, function, second.panic);
+        try appendGenericCfgBlockLabel(allocator, machine, second.return_block.name);
+        try emitGenericCfgTerminalReturnBlockInScope(allocator, machine, function, .{ .entry = entry, .middle = cont_block, .block = second.return_block });
+    } else {
+        try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, entry, cont_block, cont_condbr.cond, second.panic.name);
+        try emitGenericCfgTerminalReturnBlockInScope(allocator, machine, function, .{ .entry = entry, .middle = cont_block, .block = second.return_block });
+        try appendGenericCfgBlockLabel(allocator, machine, second.panic.name);
+        try emitGenericCfgNoreturnCallBlock(allocator, machine, function, second.panic);
+    }
+
+    if (!first.true_is_continuation) {
+        try appendGenericCfgBlockLabel(allocator, machine, first.panic.name);
+        try emitGenericCfgNoreturnCallBlock(allocator, machine, function, first.panic);
+    }
+    return true;
+}
+
+const GenericCfgGuardContinuationSplit = struct {
+    continuation: ir.BasicBlock,
+    panic: ir.BasicBlock,
+    true_is_continuation: bool,
+};
+
+fn genericCfgGuardContinuationSplit(function: ir.Function, condbr: anytype) !GenericCfgGuardContinuationSplit {
+    const then_block = blockByName(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const else_block = blockByName(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    const then_is_cont = blockHasCondbr(then_block);
+    const else_is_cont = blockHasCondbr(else_block);
+    if (then_is_cont == else_is_cont) return error.UnsupportedCodegenControlFlow;
+    const continuation = if (then_is_cont) then_block else else_block;
+    const panic = if (then_is_cont) else_block else then_block;
+    if (!genericCfgGuardPanicBlock(panic)) return error.UnsupportedCodegenControlFlow;
+    return .{
+        .continuation = continuation,
+        .panic = panic,
+        .true_is_continuation = then_is_cont,
+    };
+}
+
+const GenericCfgGuardReturnSplit = struct {
+    return_block: ir.BasicBlock,
+    panic: ir.BasicBlock,
+    true_is_return: bool,
+};
+
+fn genericCfgGuardReturnSplit(
+    function: ir.Function,
+    entry: ir.BasicBlock,
+    continuation: ir.BasicBlock,
+    condbr: anytype,
+) !GenericCfgGuardReturnSplit {
+    const then_block = blockByName(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const else_block = blockByName(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    const then_is_return = genericCfgSupportsNestedTerminalReturnBlock(function, entry, continuation, then_block);
+    const else_is_return = genericCfgSupportsNestedTerminalReturnBlock(function, entry, continuation, else_block);
+    if (then_is_return == else_is_return) return error.UnsupportedCodegenControlFlow;
+    const return_block = if (then_is_return) then_block else else_block;
+    const panic = if (then_is_return) else_block else then_block;
+    if (!genericCfgGuardPanicBlock(panic)) return error.UnsupportedCodegenControlFlow;
+    return .{
+        .return_block = return_block,
+        .panic = panic,
+        .true_is_return = then_is_return,
+    };
+}
+
+fn genericCfgLinearGuardedReturnUsesAllBlocks(
+    function: ir.Function,
+    continuation_name: []const u8,
+    first_panic_name: []const u8,
+    second_panic_name: []const u8,
+    return_name: []const u8,
+) bool {
+    for (function.blocks.items, 0..) |block, index| {
+        if (index == 0 or
+            std.mem.eql(u8, block.name, continuation_name) or
+            std.mem.eql(u8, block.name, first_panic_name) or
+            std.mem.eql(u8, block.name, second_panic_name) or
+            std.mem.eql(u8, block.name, return_name))
+        {
+            continue;
+        }
+        return false;
+    }
+    return !std.mem.eql(u8, first_panic_name, second_panic_name) and
+        !std.mem.eql(u8, first_panic_name, return_name) and
+        !std.mem.eql(u8, second_panic_name, return_name);
+}
+
 fn lowerGenericCfgGuardReturnBoundsThenNoreturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,

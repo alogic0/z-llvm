@@ -111,6 +111,8 @@ pub const LoweringContext = struct {
 
     pub const lowerTypedErrorUnionSemanticInstruction = typed_error_union.lowerTypedErrorUnionSemanticInstruction;
     pub const lowerTypedErrorName = typed_error_union.lowerTypedErrorName;
+    pub const lowerTypedErrorSetHasValue = typed_error_union.lowerTypedErrorSetHasValue;
+    pub const lowerTypedCmpLteErrorsLen = typed_error_union.lowerTypedCmpLteErrorsLen;
     pub const lowerTypedIsNonErr = typed_error_union.lowerTypedIsNonErr;
     pub const lowerTypedWrapErrorUnionPayload = typed_error_union.lowerTypedWrapErrorUnionPayload;
     pub const lowerTypedWrapErrorUnionErr = typed_error_union.lowerTypedWrapErrorUnionErr;

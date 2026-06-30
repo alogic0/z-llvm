@@ -1,3 +1,6 @@
+#include <sys/wait.h>
+#include <unistd.h>
+
 extern int z_frontier_optional_merge(int, int) __asm__("frontier_optionals_errors.frontier_optional_merge");
 extern int z_frontier_optional_ptr_non_null(const int *) __asm__("frontier_optionals_errors.frontier_optional_ptr_non_null");
 extern int z_frontier_optional_payload_branch(int, int, int) __asm__("frontier_optionals_errors.frontier_optional_payload_branch");
@@ -38,6 +41,25 @@ extern unsigned long z_frontier_error_name_len(int) __asm__("frontier_optionals_
 extern unsigned long z_frontier_error_name_three_len(int) __asm__("frontier_optionals_errors.frontier_error_name_three_len");
 void z_frontier_optionals_unwrap_null(void) __asm__("frontier_optionals_errors.unwrapNull");
 void z_frontier_optionals_unwrap_null(void) { __builtin_trap(); }
+void z_frontier_optionals_invalid_error_code(void) __asm__("frontier_optionals_errors.invalidErrorCode");
+void z_frontier_optionals_invalid_error_code(void) { __builtin_trap(); }
+
+static int expect_death(void (*fn)(void)) {
+    int status = 0;
+    pid_t pid = fork();
+    if (pid < 0) return 100;
+    if (pid == 0) {
+        fn();
+        _exit(101);
+    }
+    if (waitpid(pid, &status, 0) < 0) return 102;
+    return WIFSIGNALED(status) ? 0 : 103;
+}
+
+#ifdef ZLLVM_HARNESS_MODE_ReleaseSafe
+static void death_error_name_invalid_code(void) { (void)z_frontier_error_name_three_len(4); }
+#endif
+
 int main(void) {
     const int ptr_value = 49;
     if (z_frontier_optional_merge(1, 30) != 30) return 1;
@@ -143,5 +165,8 @@ int main(void) {
     if (z_frontier_error_name_three_len(1) != 10) return 107;
     if (z_frontier_error_name_three_len(2) != 5) return 108;
     if (z_frontier_error_name_three_len(3) != 12) return 109;
+#ifdef ZLLVM_HARNESS_MODE_ReleaseSafe
+    if (expect_death(death_error_name_invalid_code) != 0) return 110;
+#endif
     return 0;
 }

@@ -13,6 +13,8 @@ const ownPrint = air_model.ownPrint;
 pub fn lowerTypedErrorUnionSemanticInstruction(self: anytype, instruction: air_export.TypedInstruction) !bool {
     switch (air_capabilities.errorUnionSemanticOpForOpcode(instruction.opcode)) {
         .error_name => try self.lowerTypedErrorName(instruction),
+        .error_set_has_value => try self.lowerTypedErrorSetHasValue(instruction),
+        .cmp_lte_errors_len => try self.lowerTypedCmpLteErrorsLen(instruction),
         .is_non_err => try self.lowerTypedIsNonErr(instruction),
         .wrap_payload => try self.lowerTypedWrapErrorUnionPayload(instruction),
         .wrap_err => try self.lowerTypedWrapErrorUnionErr(instruction),
@@ -25,6 +27,54 @@ pub fn lowerTypedErrorUnionSemanticInstruction(self: anytype, instruction: air_e
         .none => return false,
     }
     return true;
+}
+
+pub fn lowerTypedErrorSetHasValue(self: anytype, instruction: air_export.TypedInstruction) !void {
+    const summary = air_model.typedErrorSetHasValueSummary(instruction) orelse return air_model.LowerError.UnsupportedAir;
+    const result_type = parseZigType(summary.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!result_type.ir_type.eql(.{ .int = 1 })) return air_model.LowerError.UnsupportedAir;
+    const err = try self.resolveTypedOperand(instruction, 0);
+    if (!err.ty.ir_type.eql(.{ .int = 16 })) return air_model.LowerError.UnsupportedAir;
+    if (summary.allowed_count == 0 or summary.allowed_count >= std.math.maxInt(i16)) return air_model.LowerError.UnsupportedAir;
+
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .icmp = .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 16 },
+            .lhs = err.value,
+            .rhs = .{ .int = @as(i128, @intCast(summary.allowed_count + 1)) },
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedCmpLteErrorsLen(self: anytype, instruction: air_export.TypedInstruction) !void {
+    const summary = air_model.typedCmpLteErrorsLenSummary(instruction) orelse return air_model.LowerError.UnsupportedAir;
+    const result_type = parseZigType(summary.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!result_type.ir_type.eql(.{ .int = 1 })) return air_model.LowerError.UnsupportedAir;
+    const err = try self.resolveTypedOperand(instruction, 0);
+    if (!err.ty.ir_type.eql(.{ .int = 16 })) return air_model.LowerError.UnsupportedAir;
+    if (summary.global_error_count >= std.math.maxInt(i16)) return air_model.LowerError.UnsupportedAir;
+
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .icmp = .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 16 },
+            .lhs = err.value,
+            .rhs = .{ .int = @as(i128, @intCast(summary.global_error_count + 1)) },
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
 }
 
 pub fn lowerTypedErrorName(self: anytype, instruction: air_export.TypedInstruction) !void {

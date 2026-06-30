@@ -23,6 +23,21 @@ pub const TypedErrorNameSummary = struct {
     result_type: []const u8,
 };
 
+pub const TypedErrorSetHasValueSummary = struct {
+    instruction_index: u32,
+    operand_index: u32,
+    error_set_type: []const u8,
+    allowed_count: usize,
+    result_type: []const u8,
+};
+
+pub const TypedCmpLteErrorsLenSummary = struct {
+    instruction_index: u32,
+    operand_index: u32,
+    global_error_count: usize,
+    result_type: []const u8,
+};
+
 pub const errorUnionPayloadSummary = untyped.errorUnionPayloadSummary;
 pub const selectedErrorUnionPayloadShape = untyped.selectedErrorUnionPayloadShape;
 pub const maybeErrorSummary = untyped.maybeErrorSummary;
@@ -75,6 +90,46 @@ pub fn typedErrorNameSummaryFromV2(
     };
 }
 
+pub fn typedErrorSetHasValueSummary(instruction: air_export.TypedInstruction) ?TypedErrorSetHasValueSummary {
+    if (!std.mem.eql(u8, instruction.opcode, "error_set_has_value")) return null;
+    if (instruction.operands.len != 1) return null;
+    if (!std.mem.eql(u8, instruction.data_kind, "ty_op")) return null;
+    if (!std.mem.eql(u8, instruction.result_type, "bool")) return null;
+    const contract = core.detail(instruction, "error_set_has_value_contract") orelse return null;
+    if (!std.mem.eql(u8, contract, "zllvm-error-set-has-value-v1")) return null;
+    const error_set_type = std.mem.trim(u8, core.detail(instruction, "error_set_type") orelse return null, " ");
+    if (!isErrorSetType(error_set_type)) return null;
+    const operand_index = core.typedInstOperandIndex(instruction.operands[0]) orelse return null;
+    if (!std.mem.eql(u8, std.mem.trim(u8, instruction.operands[0].type_text, " "), "u16")) return null;
+    const allowed_count = errorSetNameCount(error_set_type) orelse return null;
+    return .{
+        .instruction_index = instruction.index,
+        .operand_index = operand_index,
+        .error_set_type = error_set_type,
+        .allowed_count = allowed_count,
+        .result_type = instruction.result_type,
+    };
+}
+
+pub fn typedCmpLteErrorsLenSummary(instruction: air_export.TypedInstruction) ?TypedCmpLteErrorsLenSummary {
+    if (!std.mem.eql(u8, instruction.opcode, "cmp_lte_errors_len")) return null;
+    if (instruction.operands.len != 1) return null;
+    if (!std.mem.eql(u8, instruction.data_kind, "un_op")) return null;
+    if (!std.mem.eql(u8, instruction.result_type, "bool")) return null;
+    const contract = core.detail(instruction, "cmp_lte_errors_len_contract") orelse return null;
+    if (!std.mem.eql(u8, contract, "zllvm-cmp-lte-errors-len-v1")) return null;
+    const count_text = core.detail(instruction, "global_error_count") orelse return null;
+    const global_error_count = std.fmt.parseUnsigned(usize, count_text, 10) catch return null;
+    const operand_index = core.typedInstOperandIndex(instruction.operands[0]) orelse return null;
+    if (!std.mem.eql(u8, std.mem.trim(u8, instruction.operands[0].type_text, " "), "u16")) return null;
+    return .{
+        .instruction_index = instruction.index,
+        .operand_index = operand_index,
+        .global_error_count = global_error_count,
+        .result_type = instruction.result_type,
+    };
+}
+
 pub fn errorSetNameForCode(type_text: []const u8, code: i128) ?[]const u8 {
     if (code <= 0) return null;
     var fields = errorSetNameIterator(type_text) orelse return null;
@@ -84,6 +139,18 @@ pub fn errorSetNameForCode(type_text: []const u8, code: i128) ?[]const u8 {
         if (current == code and name.len != 0) return name;
     }
     return null;
+}
+
+pub fn errorSetNameCount(type_text: []const u8) ?usize {
+    var fields = errorSetNameIterator(type_text) orelse return null;
+    var count: usize = 0;
+    while (fields.next()) |field| {
+        const name = std.mem.trim(u8, field, " ");
+        if (name.len == 0) return null;
+        count += 1;
+    }
+    if (count == 0) return null;
+    return count;
 }
 
 pub fn errorSetFirstTwoNames(type_text: []const u8) ?[2][]const u8 {
