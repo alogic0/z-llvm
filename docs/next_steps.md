@@ -83,11 +83,13 @@ Refactor module-size audit:
   family boundary.
 - Generic-CFG backend ownership now has `error_union_rows.zig` (`401` lines)
   for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
-  for slice runtime-call argument resolution/emission, and
-  `aggregate_rows.zig` (`154` lines) for the struct field-zero branch update
-  row. The remaining `core_multi_block_rows.zig` facade/core is `5771` lines;
-  broader aggregate rows still wait on a shared branch/terminal helper surface
-  before they can move cleanly.
+  for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
+  (`154` lines) for the struct field-zero branch update row, and
+  `terminal_values.zig` (`470` lines) for shared terminal return/value
+  materialization and branch-label helpers. The remaining
+  `core_multi_block_rows.zig` facade/core is `5371` lines; broader
+  error-union and aggregate rows can now move against the shared terminal
+  surface instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
   `generic_cfg_functions=689`, `object_emitted_functions=689`,
@@ -205,6 +207,27 @@ Generic-CFG aggregate backend split status:
   `discovered_functions=199`, `generic_cfg_functions=199`,
   `object_emitted_functions=199`, `executable_ok_rows=108`,
   `runtime_boundary_rows=1`, and `local_fail=0`.
+
+Generic-CFG terminal helper split status:
+
+- Shared terminal return/value materialization now lives in
+  `src/codegen/x86_64/generic_cfg/terminal_values.zig`. This module owns
+  terminal return-block support checks, terminal i32/i64 value materialization,
+  terminal conditional branch emission, stable machine-label allocation, and
+  small terminal/control-flow predicates such as `singleBrTarget` and
+  `blockIsUnreachable`. `core_multi_block_rows.zig` keeps aliases for the
+  existing backend call sites.
+- Line count after this slice: `core_multi_block_rows.zig` is 5371 lines and
+  `terminal_values.zig` is 470 lines. This is a behavior-preserving split
+  intended to unblock moving the remaining error-union terminal/catch/wrap rows
+  and broader aggregate rows out of the core file.
+- Validation logs: `tmp/terminal_values_split_frontier.log` and
+  `tmp/terminal_values_split_boundaries.log`. Frontier stayed locked across
+  ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
 
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated
