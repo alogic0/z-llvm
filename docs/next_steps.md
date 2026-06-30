@@ -129,6 +129,32 @@ Generic-CFG error-union backend split status:
   `local_fail=0`; boundary rows stayed fail-closed with
   `wrong_diagnostic_rows=0` and `local_fail=0`.
 
+Generic-CFG pointer/slice backend split status:
+
+- Goal 4 extracted the cohesive pointer/slice runtime-call helper cluster from
+  `src/codegen/x86_64/generic_cfg/core_multi_block_rows.zig` into
+  `src/codegen/x86_64/generic_cfg/pointer_slice_rows.zig`. The moved surface
+  owns slice panic/runtime argument resolution and emission helpers such as
+  `resolveSlicePointerValue`, `resolveSliceLengthValue`,
+  `emitSlicePointerIntoRdi`, `emitSliceLengthIntoRsi`, and the selected
+  noreturn slice runtime-call block lowering. `core_multi_block_rows.zig`
+  keeps facade aliases so existing backend call sites are unchanged.
+- Line count after this slice: `core_multi_block_rows.zig` is 5860 lines,
+  `pointer_slice_rows.zig` is 546 lines, and `error_union_rows.zig` remains
+  401 lines. Aggregate CFG rows were not moved in this slice because the
+  obvious struct-field update cluster still depends on shared branch/terminal
+  helpers in `core_multi_block_rows.zig`; the next backend split should extract
+  that helper surface before moving aggregate rows.
+- Validation logs: `tmp/pointer_slice_rows_split_frontier.log` and
+  `tmp/pointer_slice_rows_split_expanded.log`. Frontier stayed locked across
+  ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; expanded stayed locked at `source_rows=109`,
+  `discovered_functions=199`, `generic_cfg_functions=199`,
+  `object_emitted_functions=199`, `executable_ok_rows=108`,
+  `runtime_boundary_rows=1`, and `local_fail=0`.
+
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated
 unsupported categories are `aggregate-abi`, `unknown-opcode`, `vector`, `x87`,
