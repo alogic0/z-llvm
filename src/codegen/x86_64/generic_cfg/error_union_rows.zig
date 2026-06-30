@@ -856,3 +856,126 @@ fn linearErrorUnionTryChain(function: ir.Function) ?LinearErrorUnionTryChain {
         .success_payload_add = second_then_is_success orelse second_else_is_success.?,
     };
 }
+
+const ErrorUnionTryRewrapErrorReturn = struct {
+    entry: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    cont_block: ir.BasicBlock,
+    err_block: ir.BasicBlock,
+    payload_add_imm: u8,
+    success_is_then: bool,
+};
+
+pub fn lowerGenericCfgErrorUnionTryRewrapErrorReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionTryRewrapErrorReturn(function) orelse return false;
+    const frame_bytes: u8 = 8;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_try_rewrap_error_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, if (plan.success_is_then) .je else .jne, plan.cont_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.cont_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+    if (plan.payload_add_imm != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = plan.payload_add_imm });
+    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn errorUnionTryRewrapErrorReturn(function: ir.Function) ?ErrorUnionTryRewrapErrorReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 3) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
+    const call_instruction = findInstruction(entry, call_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    const then_success = successReturnPayloadAdd(then_block, call_name);
+    const else_success = successReturnPayloadAdd(else_block, call_name);
+    if ((then_success != null) == (else_success != null)) return null;
+    const cont_block = if (then_success != null) then_block else else_block;
+    const err_block = if (then_success != null) else_block else then_block;
+    if (!blockReturnsRewrappedErrorBits(err_block, call_name)) return null;
+
+    return .{
+        .entry = entry,
+        .call_name = call_name,
+        .call = call,
+        .cont_block = cont_block,
+        .err_block = err_block,
+        .payload_add_imm = then_success orelse else_success.?,
+        .success_is_then = then_success != null,
+    };
+}
+
+fn blockReturnsRewrappedErrorBits(block: ir.BasicBlock, call_name: []const u8) bool {
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    const zext_name = switch (ret.value orelse return false) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const zext_inst = findInstruction(block, zext_name) orelse return false;
+    const zext = switch (zext_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 16 }) or !zext.to_ty.eql(.{ .int = 64 })) return false;
+    const trunc_name = switch (zext.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const trunc_inst = findInstruction(block, trunc_name) orelse return false;
+    const trunc = switch (trunc_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 16 })) return false;
+    const mask_name = switch (trunc.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const mask_inst = findInstruction(block, mask_name) orelse return false;
+    const mask = switch (mask_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    return mask.ty.eql(.{ .int = 64 }) and mask.op == .@"and" and isNamed(mask.lhs, call_name) and isInt(mask.rhs, 65535);
+}
