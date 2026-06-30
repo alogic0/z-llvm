@@ -89,10 +89,12 @@ Refactor module-size audit:
   materialization and branch-label helpers. The shared error-union helper
   surface for direct i64/i32 call checks, try-guard call-result discovery,
   payload-add recognition, and two-i32 call emission also lives in
-  `error_union_rows.zig`. The remaining `core_multi_block_rows.zig`
-  facade/core is `5191` lines; broader error-union and aggregate rows can now
-  move against shared helper surfaces instead of depending on private core
-  helpers.
+  `error_union_rows.zig`. The first complete post-terminal error-union emitter
+  moved as well: `lowerGenericCfgErrorUnionPayloadBranchReturn` now lives with
+  its payload-branch recognizers in `error_union_rows.zig`. The remaining
+  `core_multi_block_rows.zig` facade/core is `5083` lines; broader
+  error-union and aggregate rows can now move against shared helper surfaces
+  instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
   `generic_cfg_functions=689`, `object_emitted_functions=689`,
@@ -251,6 +253,25 @@ Generic-CFG error-union helper split status:
   `object_emitted_functions=689`, `executable_ok_rows=14`, and
   `local_fail=0`; boundary rows stayed fail-closed with
   `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
+
+Generic-CFG error-union payload-branch emitter split status:
+
+- `lowerGenericCfgErrorUnionPayloadBranchReturn` and its private
+  payload-branch recognizers now live in
+  `src/codegen/x86_64/generic_cfg/error_union_rows.zig`. The core file keeps a
+  facade alias, and the shared `terminalConstI32Return` helper is exported from
+  the error-union module for the remaining error-tag branch code.
+- Line count after this slice: `core_multi_block_rows.zig` is 5083 lines and
+  `error_union_rows.zig` is 715 lines. This is the first complete
+  error-union emitter family moved after the terminal/helper splits.
+- Validation logs: `tmp/error_union_payload_branch_split_frontier.log` and
+  `tmp/error_union_payload_branch_split_boundaries.log`. Frontier stayed
+  locked across ReleaseFast, ReleaseSafe, and ReleaseSmall at
+  `source_rows=14`, `discovered_functions=689`,
+  `generic_cfg_functions=689`, `object_emitted_functions=689`,
+  `executable_ok_rows=14`, and `local_fail=0`; boundary rows stayed
+  fail-closed with `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and
+  `local_fail=0`.
 
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated

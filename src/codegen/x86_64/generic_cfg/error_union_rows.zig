@@ -2,6 +2,7 @@ const shared = @import("core_shared.zig");
 const core_cfg_emit = @import("core_cfg_emit.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
+const terminal_values = @import("terminal_values.zig");
 
 const std = shared.std;
 const ir = shared.ir;
@@ -13,6 +14,8 @@ const appendStackFrameEnd = shared.appendStackFrameEnd;
 const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
 const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
 const appendGenericCfgReturn = core_cfg_emit.appendGenericCfgReturn;
+const appendSysVScalarCallArgsWithBlock = cabi_call_lowering.appendSysVScalarCallArgsWithBlock;
+const blockIndex = cabi_abi_helpers.blockIndex;
 const callIsFastcc = shared.callIsFastcc;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
@@ -22,6 +25,8 @@ const paramReg = cabi_abi_helpers.paramReg;
 const phiHasIncoming = cabi_call_lowering.phiHasIncoming;
 const phiHasIncomingInt = cabi_call_lowering.phiHasIncomingInt;
 const findInstruction = cabi_call_lowering.findInstruction;
+const genericCfgTerminalBranchExtraBlocksAreUnreachable = terminal_values.genericCfgTerminalBranchExtraBlocksAreUnreachable;
+const ownedMachineLabel = terminal_values.ownedMachineLabel;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
 
 pub fn lowerGenericCfgLoopTryReturn(
@@ -596,4 +601,115 @@ pub fn emitTwoI32ArgCallIntoRax(
     if (second_reg != .rsi) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rsi, .src = second_reg } });
     _ = block;
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+}
+
+pub fn lowerGenericCfgErrorUnionPayloadBranchReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len < 3 or function.blocks.items.len > 4) return false;
+    const entry = function.blocks.items[0];
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return false;
+    const call_name = errorUnionTryGuardCallResult(entry, condbr.cond) orelse return false;
+    const call_instruction = findInstruction(entry, call_name) orelse return false;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!supportsDirectI64Call(call)) return false;
+
+    const then_block = function.blocks.items[blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget];
+    const else_block = function.blocks.items[blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget];
+    const then_is_payload = blockReturnsErrUnionPayloadI32(then_block, call_name);
+    const else_is_payload = blockReturnsErrUnionPayloadI32(else_block, call_name);
+    if (then_is_payload == else_is_payload) return false;
+    const payload_block = if (then_is_payload) then_block else else_block;
+    const fallback_block = if (then_is_payload) else_block else then_block;
+    const fallback_value = terminalConstI32Return(fallback_block) orelse return false;
+    if (!genericCfgTerminalBranchExtraBlocksAreUnreachable(
+        function,
+        blockIndex(function, then_block.name) orelse return error.InvalidBranchTarget,
+        blockIndex(function, else_block.name) orelse return error.InvalidBranchTarget,
+    )) return false;
+
+    const frame_bytes: u8 = 8;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_errunion_payload_branch_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, entry, call);
+    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    if (then_is_payload) {
+        try appendGenericCfgConditionalBranch(allocator, machine, .je, payload_block.name);
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = fallback_value });
+        try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+        try appendGenericCfgBlockLabel(allocator, machine, payload_block.name);
+    } else {
+        try appendGenericCfgConditionalBranch(allocator, machine, .jne, payload_block.name);
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = fallback_value });
+        try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+        try appendGenericCfgBlockLabel(allocator, machine, payload_block.name);
+    }
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+pub fn terminalConstI32Return(block: ir.BasicBlock) ?i32 {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const value = switch (ret.value orelse return null) {
+        .int => |int| int,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    return i32Value(value) catch null;
+}
+
+fn blockReturnsErrUnionPayloadI32(block: ir.BasicBlock, call_name: []const u8) bool {
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    const trunc_name = switch (ret.value orelse return false) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const trunc_inst = findInstruction(block, trunc_name) orelse return false;
+    const trunc = switch (trunc_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 32 })) return false;
+    const shift_name = switch (trunc.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const shift_inst = findInstruction(block, shift_name) orelse return false;
+    const shift = switch (shift_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    return shift.ty.eql(.{ .int = 64 }) and shift.op == .lshr and isInt(shift.rhs, 16) and isNamed(shift.lhs, call_name);
 }
