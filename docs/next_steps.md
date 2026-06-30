@@ -64,6 +64,35 @@ IR-writer case routing lives under `src/main_flow_ir_writer*.zig`.
 
 ## Active Cycle
 
+Refactor module-size audit:
+
+- Public facade files remain in place for compatibility:
+  `src/zig_air_model.zig`, `src/zig_air_lowering_typed_v2.zig`, and
+  `src/codegen/x86_64/generic_cfg/core_multi_block_rows.zig`. The refactor
+  milestone deliberately avoided broad call-site rewrites while making family
+  ownership visible.
+- Typed AIR model ownership now has family modules for error-union
+  (`71` lines), union-tag (`8` lines), pointer/slice (`40` lines), aggregate
+  (`44` lines), and optional (`24` lines) summaries. The facade is still
+  `5351` lines because recognizer logic remains to be moved in later semantic
+  slices.
+- Typed-v2 selected lowering ownership now has family modules for aggregate
+  (`370` lines), error-union (`202` lines), optional (`265` lines),
+  pointer/slice (`181` lines), and union-tag (`102` lines). The facade is
+  `1055` lines and still owns selected lowerers that do not yet have a clean
+  family boundary.
+- Generic-CFG backend ownership now has `error_union_rows.zig` (`401` lines)
+  for the self-contained loop-try row and `pointer_slice_rows.zig` (`546`
+  lines) for slice runtime-call argument resolution/emission. The remaining
+  `core_multi_block_rows.zig` facade/core is `5860` lines; aggregate rows were
+  not moved because they still share branch/terminal helper surfaces that need
+  a cleaner extraction first.
+- Current validated frontier counters after the split remain unchanged:
+  `source_rows=14`, `discovered_functions=689`,
+  `generic_cfg_functions=689`, `object_emitted_functions=689`,
+  `executable_ok_rows=14`, and `local_fail=0`. No new frontier rows or
+  counter claims were added in this refactor milestone.
+
 Typed AIR model split status:
 
 - Goal 1 of the refactor milestone split summary data types out of
