@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=691
-structured_functions=691
-generic_codegen_functions=691
-generic_cfg_functions=691
+discovered_functions=693
+structured_functions=693
+generic_codegen_functions=693
+generic_cfg_functions=693
 structural_matcher_functions=0
-structured_air_v2_functions=691
-typed_air_operand_functions=691
+structured_air_v2_functions=693
+typed_air_operand_functions=693
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=691
+generic_lowering_functions=693
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=691
+object_emitted_functions=693
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 691-function counters above plus `native_link_accepted_rows=14`,
+14-source / 693-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -696,6 +696,12 @@ error-set membership check from those facts. The executable harness checks
 valid values and child-process trap behavior for an invalid error code.
 Arbitrary sparse/non-dense error-set membership and arbitrary error-name
 payload lowering remain future work.
+The optionals/errors frontier also covers a selected helper that returns one of
+two errors, a caller catch path that extracts the `i16` error tag, and a switch
+returning distinct scalar classifications. The helper return is lowered from
+typed AIR/generic terminal values, and the caller uses the generic error-tag
+switch path plus shared SysV scalar call argument assignment rather than a
+function-name-specific emitter.
 The frontier proof now includes the selected tagged-union tag/payload switch
 row: Zig emits versioned typed-v2 union-tag and switch case facts, and z_llvm
 lowers both tag arms from those facts without AIR text fallback, shape

@@ -11,6 +11,7 @@ const cabi_boundary_rows = @import("cabi_boundary_rows.zig");
 const cabi_tls_global_lowering = @import("cabi_tls_global_lowering.zig");
 const core_single_block_misc = @import("core_single_block_misc.zig");
 const fp_rows = @import("core_single_block_fp.zig");
+const terminal_values = @import("terminal_values.zig");
 const air_capabilities = @import("../../../zig_air_capabilities.zig");
 const std = shared.std;
 const ir = shared.ir;
@@ -108,6 +109,8 @@ const lowerAggregatePairAbiFamilyReturn = cabi_aggregate_lowering.lowerAggregate
 const lowerScalarFpCastReturn = cabi_boundary_rows.lowerScalarFpCastReturn;
 const lowerSelectedI64ConstReturn = cabi_call_lowering.lowerSelectedI64ConstReturn;
 const lowerStructSumReturn = cabi_aggregate_lowering.lowerStructSumReturn;
+const terminalBlockCanMaterializeI64Value = terminal_values.terminalBlockCanMaterializeI64Value;
+const emitGenericCfgTerminalReturnBlock = terminal_values.emitGenericCfgTerminalReturnBlock;
 const appendLoadStackDispU8Eax = cabi_aggregate_lowering.appendLoadStackDispU8Eax;
 const appendLoadStackDispU16Eax = cabi_aggregate_lowering.appendLoadStackDispU16Eax;
 const appendStoreAlArgPtrDisp = cabi_aggregate_lowering.appendStoreAlArgPtrDisp;
@@ -912,7 +915,36 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgSingleBlockTerminalI64Return(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     return false;
+}
+
+fn lowerGenericCfgSingleBlockTerminalI64Return(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    const ret_value = ret.value orelse return false;
+    if (!singleBlockTerminalI64InstructionsArePure(block)) return false;
+    if (!terminalBlockCanMaterializeI64Value(function, .{ .entry = block, .block = block }, ret_value)) return false;
+    try emitGenericCfgTerminalReturnBlock(allocator, machine, function, block, block);
+    return true;
+}
+
+fn singleBlockTerminalI64InstructionsArePure(block: ir.BasicBlock) bool {
+    for (block.instructions.items) |instruction| {
+        switch (instruction.kind) {
+            .icmp, .select, .cast, .binary => {},
+            else => return false,
+        }
+    }
+    return true;
 }
 
 pub fn lowerGenericCfgSingleBlockSliceLen(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

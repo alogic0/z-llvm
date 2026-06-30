@@ -37,6 +37,7 @@ extern int z_frontier_error_tag_switch(int, int) __asm__("frontier_optionals_err
 extern int z_frontier_error_tag_branch(int, int) __asm__("frontier_optionals_errors.frontier_error_tag_branch");
 extern int z_frontier_error_catch_default_merge(int, int, int) __asm__("frontier_optionals_errors.frontier_error_catch_default_merge");
 extern int z_frontier_error_catch_const_merge(int, int) __asm__("frontier_optionals_errors.frontier_error_catch_const_merge");
+extern int z_frontier_wrap_selected_error_switch(int) __asm__("frontier_optionals_errors.frontier_wrap_selected_error_switch");
 extern unsigned long z_frontier_error_name_len(int) __asm__("frontier_optionals_errors.frontier_error_name_len");
 extern unsigned long z_frontier_error_name_three_len(int) __asm__("frontier_optionals_errors.frontier_error_name_three_len");
 void z_frontier_optionals_unwrap_null(void) __asm__("frontier_optionals_errors.unwrapNull");
@@ -160,6 +161,8 @@ int main(void) {
     if (z_frontier_error_catch_default_merge(1, 38, 5) != 9) return 95;
     if (z_frontier_error_catch_const_merge(0, 38) != 42) return 96;
     if (z_frontier_error_catch_const_merge(1, 38) != 10) return 97;
+    if (z_frontier_wrap_selected_error_switch(0) != -111) return 111;
+    if (z_frontier_wrap_selected_error_switch(1) != -112) return 112;
     if (z_frontier_error_name_len(0) != 6) return 105;
     if (z_frontier_error_name_len(1) != 8) return 106;
     if (z_frontier_error_name_three_len(1) != 10) return 107;

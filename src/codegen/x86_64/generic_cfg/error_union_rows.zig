@@ -226,19 +226,9 @@ pub fn emitTwoI32ArgCallIntoRax(
     block: ir.BasicBlock,
     call: ir.CallInst,
 ) !void {
-    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
-    const first_reg = switch (call.args.items[0].value) {
-        .named => |name| try paramReg(function, name, .{ .int = 32 }),
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    const second_reg = switch (call.args.items[1].value) {
-        .named => |name| try paramReg(function, name, .{ .int = 32 }),
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    if (first_reg != .rdi and second_reg == .rdi) return error.UnsupportedCodegenAbi;
-    if (first_reg != .rdi) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdi, .src = first_reg } });
-    if (second_reg != .rsi) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rsi, .src = second_reg } });
-    _ = block;
+    if (!supportsDirectI64Call(call)) return error.UnsupportedCodegenInstruction;
+    const stack_arg_count = try appendSysVScalarCallArgsWithBlock(allocator, machine, function, block, call);
+    if (stack_arg_count != 0) return error.UnsupportedLiveAcrossCall;
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
 }
 
@@ -2089,7 +2079,7 @@ fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwit
         .call => |call| call,
         else => return null,
     };
-    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+    if (!supportsDirectI64Call(call)) return null;
 
     const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
     const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];

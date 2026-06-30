@@ -1982,12 +1982,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=691`,
-`generic_codegen_functions=691`, `generic_cfg_functions=691`,
+frontier gate reports `source_rows=14`, `discovered_functions=693`,
+`generic_codegen_functions=693`, `generic_cfg_functions=693`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=691`, `object_failures=0`,
+`object_emitted_functions=693`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -2009,13 +2009,20 @@ type, and z_llvm lowers the selected dense concrete error-set check from those
 facts. The executable harness checks the valid names and a child-process trap
 for an invalid error code. Arbitrary sparse/non-dense error-set membership and
 arbitrary error-name string/payload materialization remain future work.
+The latest error-union row adds a source-backed helper that returns a selected
+error, then catches it and switches on the extracted `i16` error tag. z_llvm
+now handles the helper's pure single-block `i64` error-union return through the
+generic terminal-value path and lowers the wrapper through the existing
+error-tag switch family with shared SysV scalar call argument assignment. This
+narrows the measured `wrap_errunion_err` / `unwrap_errunion_err` compiler-core
+gap without adding function-name admission.
 
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=691`,
-`generic_cfg_functions=691`, `structural_matcher_functions=0`,
-`object_emitted_functions=691`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=693`,
+`generic_cfg_functions=693`, `structural_matcher_functions=0`,
+`object_emitted_functions=693`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

@@ -486,6 +486,21 @@ export fn frontier_error_catch_const_merge(tag: i32, value: i32) i32 {
     return payload + 4;
 }
 
+fn frontierWrapSelectedError(tag: i32) FrontierError!i32 {
+    const err: FrontierError = if (tag == 0) FrontierError.BadTag else FrontierError.WorseTag;
+    return err;
+}
+
+export fn frontier_wrap_selected_error_switch(tag: i32) i32 {
+    const payload = frontierWrapSelectedError(tag) catch |err| {
+        return switch (err) {
+            FrontierError.BadTag => -111,
+            FrontierError.WorseTag => -112,
+        };
+    };
+    return payload;
+}
+
 export fn frontier_error_name_len(tag: i32) usize {
     const err: FrontierError = if (tag == 0) FrontierError.BadTag else FrontierError.WorseTag;
     return @errorName(err).len;
