@@ -84,7 +84,9 @@ Refactor module-size audit:
 - Generic-CFG backend ownership now has `error_union_rows.zig` (`3678` lines)
   for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
-  (`154` lines) for the struct field-zero branch update row, and
+  (`154` lines) for the struct field-zero branch update row,
+  `optional_rows.zig` (`299` lines) for optional-pointer return/unwrap rows,
+  and
   `terminal_values.zig` (`555` lines) for shared terminal return/value
   materialization, branch-label helpers, linear terminal topology predicates,
   switch merge/phi topology helpers, and condition-branch emission. The shared
@@ -103,7 +105,7 @@ Refactor module-size audit:
   branch/switch try family, error-union switch-phi row, error-tag switch
   return row, error-tag branch row, catch value-merge row, and catch-switch row
   now live there as well. The remaining `core_multi_block_rows.zig`
-  facade/core is `2027` lines; broader aggregate rows can now move against
+  facade/core is `1767` lines; broader aggregate rows can now move against
   shared helper surfaces instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
@@ -545,6 +547,24 @@ Generic-CFG terminal condition-branch helper split status:
   `generic_cfg_functions=689`, `object_emitted_functions=689`,
   `executable_ok_rows=14`, and `local_fail=0`; boundary rows stayed
   fail-closed with `wrong_diagnostic_rows=0` and `local_fail=0`.
+
+Generic-CFG optional-pointer backend split status:
+
+- `lowerGenericCfgOptionalPointerUnwrapReturn`,
+  `lowerGenericCfgOptionalPointerReturn`, and their optional-pointer
+  phi/load/merge recognizers now live in
+  `src/codegen/x86_64/generic_cfg/optional_rows.zig`. The core file keeps
+  facade aliases for dispatcher compatibility.
+- Line count after this slice: `core_multi_block_rows.zig` is 1767 lines,
+  `optional_rows.zig` is 299 lines, and `terminal_values.zig` remains 555
+  lines. This is behavior-preserving; no frontier rows or counters changed.
+- Validation logs: `tmp/optional_rows_split_frontier.log` and
+  `tmp/optional_rows_split_boundaries.log`. Frontier stayed locked across
+  ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
 
 Compiler-core refactor plan:
 The body-aware compiler-core inventory shows the five highest repeated
