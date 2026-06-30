@@ -414,6 +414,10 @@ Execution order:
    helper's result into the error-union return, and the error block returns the
    original error-union value. The x86_64 generic CFG path admits this by
    validating the payload data flow and live parameter, not by function name.
+   The latest catch-return-error row covers the sibling cold path where
+   `catch |err| return err` explicitly unwraps the error tag and rewraps it as
+   the returned error union; generic CFG validates the `and`/`trunc`/`zext`
+   relation to the original call result before accepting the row.
    The `try_cold:pl_op` slice now routes through the same error-union semantic
    lowering as `try:pl_op`; the cold hint is treated as non-semantic for local
    CFG/codegen while retaining fail-closed typed-v2 ownership. Pointer-form
@@ -1406,12 +1410,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=685`,
-`generic_codegen_functions=685`, `generic_cfg_functions=685`,
+frontier gate reports `source_rows=14`, `discovered_functions=687`,
+`generic_codegen_functions=687`, `generic_cfg_functions=687`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=685`, `object_failures=0`,
+`object_emitted_functions=687`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1424,9 +1428,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=685`,
-`generic_cfg_functions=685`, `structural_matcher_functions=0`,
-`object_emitted_functions=685`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=687`,
+`generic_cfg_functions=687`, `structural_matcher_functions=0`,
+`object_emitted_functions=687`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

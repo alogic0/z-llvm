@@ -94,6 +94,12 @@ error-union return, and the error arm propagates the original error-union
 value. Generic CFG codegen validates the payload-to-call argument data flow and
 spills the live parameter across the first helper call; admission is not based
 on the row or helper name.
+The `frontier_catch_return_error_match` row covers the explicit
+`catch |err| return err` producer shape: the cold path extracts the error bits
+from the direct error-union call, truncates them to the error tag, re-extends
+them into the returned `i64` error-union encoding, and the hot path rewraps
+payload arithmetic. The accepted lowering validates that error-bit data flow
+instead of treating it as the simpler "return original call result" try edge.
 The switch-local try row adds a switch arm whose nested value-producing block
 contains a `try` call; the error edge returns the original error-union value
 and the success edge rewraps payload arithmetic into the outer switch phi.
@@ -234,20 +240,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=685
-structured_functions=685
-generic_codegen_functions=685
-generic_cfg_functions=685
+discovered_functions=687
+structured_functions=687
+generic_codegen_functions=687
+generic_cfg_functions=687
 structural_matcher_functions=0
-structured_air_v2_functions=685
-typed_air_operand_functions=685
+structured_air_v2_functions=687
+typed_air_operand_functions=687
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=685
+generic_lowering_functions=687
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=685
+object_emitted_functions=687
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

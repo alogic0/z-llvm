@@ -116,6 +116,19 @@ export fn frontier_try_call_result_match(tag: i32, value: i32, delta: i32) i32 {
     }
 }
 
+fn frontierCatchReturnError(tag: i32, value: i32) FrontierError!i32 {
+    const payload = frontierMaybeTryPayload(tag, value) catch |err| return err;
+    return payload + 11;
+}
+
+export fn frontier_catch_return_error_match(tag: i32, value: i32) i32 {
+    if (frontierCatchReturnError(tag, value)) |payload| {
+        return payload;
+    } else |_| {
+        return -86;
+    }
+}
+
 fn frontierBranchThenTry(flag: i32, tag: i32, value: i32) FrontierError!i32 {
     if (flag != 0) {
         const payload = try frontierMaybeTryPayload(tag, value);
