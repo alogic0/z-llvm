@@ -472,7 +472,9 @@ Execution order:
    form: the success arm unwraps the payload into a merge phi, the catch arm
    contributes a live fallback `i32` parameter, and the merged value continues
    through arithmetic. The backend now spills that fallback parameter across
-   the direct error-union helper call before materializing the phi result.
+   the direct error-union helper call before materializing the phi result. The
+   companion `frontier_error_catch_const_merge` row proves the same structural
+   merge plan for a constant catch fallback.
    The switch-local try row now lowers a switch arm whose nested value block
    contains a `try` call, returns the original error-union value on the error
    edge, and branches the rewrapped success payload into the outer switch phi;
@@ -1399,12 +1401,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=681`,
-`generic_codegen_functions=681`, `generic_cfg_functions=681`,
+frontier gate reports `source_rows=14`, `discovered_functions=682`,
+`generic_codegen_functions=682`, `generic_cfg_functions=682`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=681`, `object_failures=0`,
+`object_emitted_functions=682`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -1417,9 +1419,9 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=681`,
-`generic_cfg_functions=681`, `structural_matcher_functions=0`,
-`object_emitted_functions=681`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=682`,
+`generic_cfg_functions=682`, `structural_matcher_functions=0`,
+`object_emitted_functions=682`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

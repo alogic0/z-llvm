@@ -84,7 +84,9 @@ error-union helper call.
 The `frontier_error_catch_default_merge` row covers a catch-to-value merge:
 the success arm unwraps the payload into an `i32` phi, the catch arm contributes
 a live fallback parameter, and the merged value feeds post-merge arithmetic with
-the fallback parameter spilled across the helper call.
+the fallback parameter spilled across the helper call. The companion
+`frontier_error_catch_const_merge` row proves the same merge plan with a
+constant catch fallback.
 The switch-local try row adds a switch arm whose nested value-producing block
 contains a `try` call; the error edge returns the original error-union value
 and the success edge rewraps payload arithmetic into the outer switch phi.
@@ -225,20 +227,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=681
-structured_functions=681
-generic_codegen_functions=681
-generic_cfg_functions=681
+discovered_functions=682
+structured_functions=682
+generic_codegen_functions=682
+generic_cfg_functions=682
 structural_matcher_functions=0
-structured_air_v2_functions=681
-typed_air_operand_functions=681
+structured_air_v2_functions=682
+typed_air_operand_functions=682
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=681
+generic_lowering_functions=682
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=681
+object_emitted_functions=682
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
