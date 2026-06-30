@@ -115,6 +115,13 @@ pub fn firstPhiReturn(function: ir.Function, block: ir.BasicBlock) ?ir.PhiInst {
     return phi;
 }
 
+pub fn phiIncomingForBlock(phi: ir.PhiInst, block_name: []const u8) ?ir.Value {
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, block_name)) return incoming.value;
+    }
+    return null;
+}
+
 pub fn blockBranchesTo(block: ir.BasicBlock, target: []const u8) bool {
     const branch_target = singleBrTarget(block) orelse return false;
     return std.mem.eql(u8, branch_target, target);
