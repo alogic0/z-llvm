@@ -33,3 +33,7 @@ export fn frontier_byte_swap_u64(value: u64) u64 {
 export fn frontier_max_i32(left: i32, right: i32) i32 {
     return @max(left, right);
 }
+
+export fn frontier_min_i32(left: i32, right: i32) i32 {
+    return @min(left, right);
+}

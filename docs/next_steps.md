@@ -1982,12 +1982,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=697`,
-`generic_codegen_functions=697`, `generic_cfg_functions=697`,
+frontier gate reports `source_rows=14`, `discovered_functions=698`,
+`generic_codegen_functions=698`, `generic_cfg_functions=698`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=697`, `object_failures=0`,
+`object_emitted_functions=698`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -2028,20 +2028,21 @@ instructions. The executable harness checks `0x1234 -> 0x3412`,
 `0x0123456789abcdef -> 0xefcdab8967452301`. Vector byte swaps, aggregate
 `byteSwapAllFields`, `u8` identity policy, and odd-width integer byte swaps
 remain future/boundary work.
-The same frontier family now includes source-backed typed AIR `max` for a
-selected signed `i32` scalar row. Zig exports `max` as a typed `bin_op` record
-with both operands, z_llvm lowers it to a signed `icmp slt` plus select, and
-the x86_64 generic CFG backend emits the shared signed max instruction pattern.
-The executable harness checks negative/positive and positive/negative operand
-orders. Unsigned max, wider integer max, `min`, vector max/min, and odd-width
-integer forms remain future scalar-transform work.
+The same frontier family now includes source-backed typed AIR `max` and `min`
+for selected signed `i32` scalar rows. Zig exports both opcodes as typed
+`bin_op` records with both operands, z_llvm lowers them to signed `icmp slt`
+plus select forms, and the x86_64 generic CFG backend emits the shared signed
+max/min instruction patterns. The executable harness checks negative/positive
+and positive/negative operand orders for both rows. Unsigned max/min, wider
+integer max/min, vector max/min, and odd-width integer forms remain future
+scalar-transform work.
 
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=697`,
-`generic_cfg_functions=697`, `structural_matcher_functions=0`,
-`object_emitted_functions=697`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=698`,
+`generic_cfg_functions=698`, `structural_matcher_functions=0`,
+`object_emitted_functions=698`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

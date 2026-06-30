@@ -426,12 +426,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=14`, `discovered_functions=697`,
-`generic_codegen_functions=697`, `generic_cfg_functions=697`,
+three release modes at `source_rows=14`, `discovered_functions=698`,
+`generic_codegen_functions=698`, `generic_cfg_functions=698`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=697`, `object_failures=0`,
+`object_emitted_functions=698`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -628,9 +628,10 @@ The mixed numeric frontier now lowers typed AIR v2 `sitofp` plus `fadd` or
 codegen and executable C ABI checks.
 The same frontier file also proves selected scalar transforms: typed AIR
 `byte_swap` for `u16`/`u32`/`u64` lowers to x86_64 rotate/bswap instructions,
-and typed AIR `max` for signed `i32` lowers through generic compare/select to
-the shared signed max machine pattern. Unsigned or wider max, `min`, vectors,
-aggregate byte swaps, and odd-width scalar transforms remain future work.
+and typed AIR `max`/`min` for signed `i32` lower through generic
+compare/select to the shared signed max/min machine patterns. Unsigned or wider
+max/min, vectors, aggregate byte swaps, and odd-width scalar transforms remain
+future work.
 Remaining non-accepted
 blockers are helper graphs with
 stack-passed live values beyond the current selected direct-call/void-call model, broader

@@ -156,11 +156,12 @@ generic scalar transform path to x86_64 `rolw`/`bswapl`/`bswapq` instructions,
 so the accepted rows do not leave `llvm.bswap.*` as linker-visible symbols.
 Vector byte swaps, aggregate `byteSwapAllFields`, `u8` identity policy, and
 odd-width integer byte swaps remain future/boundary work.
-The same source now includes a signed `i32` `@max` row. Zig exports AIR `max`
-as a typed `bin_op` record, z_llvm lowers the operands to a signed
-compare/select form, and the x86_64 generic CFG backend emits the shared signed
-max machine pattern. Unsigned max, wider integer max, `min`, vector max/min,
-and odd-width integer scalar transforms remain future work.
+The same source now includes signed `i32` `@max` and `@min` rows. Zig exports
+AIR `max` and `min` as typed `bin_op` records, z_llvm lowers the operands to
+signed compare/select forms, and the x86_64 generic CFG backend emits the
+shared signed max/min machine patterns. Unsigned max/min, wider integer
+max/min, vector max/min, and odd-width integer scalar transforms remain future
+work.
 
 `frontier_union_tags.zig` adds the first source-backed tagged-union tag/payload
 switch proof. The patched Zig typed-v2 exporter emits versioned
@@ -269,20 +270,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=697
-structured_functions=697
-generic_codegen_functions=697
-generic_cfg_functions=697
+discovered_functions=698
+structured_functions=698
+generic_codegen_functions=698
+generic_cfg_functions=698
 structural_matcher_functions=0
-structured_air_v2_functions=697
-typed_air_operand_functions=697
+structured_air_v2_functions=698
+typed_air_operand_functions=698
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=697
+generic_lowering_functions=698
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=697
+object_emitted_functions=698
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
