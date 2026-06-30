@@ -11,6 +11,7 @@ const pointer_slice_rows = @import("pointer_slice_rows.zig");
 const aggregate_rows = @import("aggregate_rows.zig");
 const optional_rows = @import("optional_rows.zig");
 const safety_rows = @import("safety_rows.zig");
+const branch_merge_rows = @import("branch_merge_rows.zig");
 const terminal_values = @import("terminal_values.zig");
 
 const std = shared.std;
@@ -82,6 +83,11 @@ pub const genericCfgOptionalPointerMergeValue = optional_rows.genericCfgOptional
 pub const genericCfgOptionalPointerLoadValue = optional_rows.genericCfgOptionalPointerLoadValue;
 pub const genericCfgOptionalPointerMergeHasIncoming = optional_rows.genericCfgOptionalPointerMergeHasIncoming;
 pub const genericCfgGuardPanicBlock = safety_rows.genericCfgGuardPanicBlock;
+pub const GenericCfgPointerPhiLoad = branch_merge_rows.GenericCfgPointerPhiLoad;
+pub const GenericCfgPhiBinaryReturn = branch_merge_rows.GenericCfgPhiBinaryReturn;
+pub const appendGenericCfgPhiBinaryImmediate = branch_merge_rows.appendGenericCfgPhiBinaryImmediate;
+pub const genericCfgPhiBinaryReturn = branch_merge_rows.genericCfgPhiBinaryReturn;
+pub const genericCfgPointerPhiLoadReturn = branch_merge_rows.genericCfgPointerPhiLoadReturn;
 pub const lowerGenericCfgStructBranchUpdateReturn = aggregate_rows.lowerGenericCfgStructBranchUpdateReturn;
 pub const genericCfgStructFieldZeroUpdateAdd = aggregate_rows.genericCfgStructFieldZeroUpdateAdd;
 pub const genericCfgStructFieldZeroMergeReturn = aggregate_rows.genericCfgStructFieldZeroMergeReturn;
@@ -1171,18 +1177,6 @@ pub const emitLoadedI64IntoArgReg = pointer_slice_rows.emitLoadedI64IntoArgReg;
 pub const emitComputedI64IntoArgReg = pointer_slice_rows.emitComputedI64IntoArgReg;
 const findInstructionInFunction = pointer_slice_rows.findInstructionInFunction;
 
-pub fn appendGenericCfgPhiBinaryImmediate(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    phi_binary: GenericCfgPhiBinaryReturn,
-) !void {
-    switch (phi_binary.op) {
-        .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = phi_binary.imm }),
-        .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -phi_binary.imm }),
-        else => return error.UnsupportedCodegenInstruction,
-    }
-}
-
 pub fn lowerGenericCfgBranchMergeReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 4) return false;
     const entry = function.blocks.items[0];
@@ -1408,91 +1402,6 @@ pub fn genericCfgSupportsBranchMergeBlock(
         }
     }
     return true;
-}
-
-pub const GenericCfgPointerPhiLoad = struct {
-    phi_name: []const u8,
-    load_name: []const u8,
-    phi: ir.PhiInst,
-};
-
-pub const GenericCfgPhiBinaryReturn = struct {
-    phi_name: []const u8,
-    binary_name: []const u8,
-    phi: ir.PhiInst,
-    op: ir.BinaryOp,
-    imm: i32,
-};
-
-pub fn genericCfgPhiBinaryReturn(merge_block: ir.BasicBlock) ?GenericCfgPhiBinaryReturn {
-    if (merge_block.instructions.items.len != 2) return null;
-    const phi_instruction = merge_block.instructions.items[0];
-    const binary_instruction = merge_block.instructions.items[1];
-    if (phi_instruction.removed or binary_instruction.removed) return null;
-    const phi_name = phi_instruction.result orelse return null;
-    const binary_name = binary_instruction.result orelse return null;
-    const phi = switch (phi_instruction.kind) {
-        .phi => |phi| phi,
-        else => return null,
-    };
-    if (!phi.ty.eql(.{ .int = 32 }) or phi.incoming.items.len != 2) return null;
-    const binary = switch (binary_instruction.kind) {
-        .binary => |binary| binary,
-        else => return null,
-    };
-    if (!binary.ty.eql(.{ .int = 32 }) or !isNamed(binary.lhs, phi_name)) return null;
-    const imm = switch (binary.rhs) {
-        .int => |int| i32Value(int) catch return null,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    switch (binary.op) {
-        .add, .sub => {},
-        else => return null,
-    }
-    const ret = switch (merge_block.terminator orelse return null) {
-        .ret => |ret| ret,
-        else => return null,
-    };
-    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, binary_name)) return null;
-    return .{
-        .phi_name = phi_name,
-        .binary_name = binary_name,
-        .phi = phi,
-        .op = binary.op,
-        .imm = imm,
-    };
-}
-
-pub fn genericCfgPointerPhiLoadReturn(function: ir.Function, merge_block: ir.BasicBlock) ?GenericCfgPointerPhiLoad {
-    if (merge_block.instructions.items.len != 2) return null;
-    const phi_instruction = merge_block.instructions.items[0];
-    const load_instruction = merge_block.instructions.items[1];
-    if (phi_instruction.removed or load_instruction.removed) return null;
-    const phi_name = phi_instruction.result orelse return null;
-    const load_name = load_instruction.result orelse return null;
-    const phi = switch (phi_instruction.kind) {
-        .phi => |phi| phi,
-        else => return null,
-    };
-    if (!phi.ty.eql(.ptr) or phi.incoming.items.len != 2) return null;
-    for (phi.incoming.items) |incoming| {
-        const ptr_name = switch (incoming.value) {
-            .named => |name| name,
-            else => return null,
-        };
-        if ((paramRegOrNull(function, ptr_name, .ptr) catch null) == null) return null;
-    }
-    const load = switch (load_instruction.kind) {
-        .load => |load| load,
-        else => return null,
-    };
-    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, phi_name)) return null;
-    const ret = switch (merge_block.terminator orelse return null) {
-        .ret => |ret| ret,
-        else => return null,
-    };
-    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, load_name)) return null;
-    return .{ .phi_name = phi_name, .load_name = load_name, .phi = phi };
 }
 
 pub fn lowerGenericCfgDynamicPointerLoadReturn(
