@@ -81,7 +81,7 @@ Refactor module-size audit:
   pointer/slice (`181` lines), and union-tag (`102` lines). The facade is
   `1055` lines and still owns selected lowerers that do not yet have a clean
   family boundary.
-- Generic-CFG backend ownership now has `error_union_rows.zig` (`3547` lines)
+- Generic-CFG backend ownership now has `error_union_rows.zig` (`3678` lines)
   for the self-contained loop-try row, `pointer_slice_rows.zig` (`546` lines)
   for slice runtime-call argument resolution/emission, `aggregate_rows.zig`
   (`154` lines) for the struct field-zero branch update row, and
@@ -100,10 +100,10 @@ Refactor module-size audit:
   its payload-call argument recognizer also live there. The try phi-slot
   override row, try payload-branch return row, try-switch return row,
   branch/switch try family, error-union switch-phi row, error-tag switch
-  return row, error-tag branch row, and catch value-merge row now live there as
-  well. The remaining `core_multi_block_rows.zig` facade/core is `2192` lines; broader
-  error-union and aggregate rows can now move against shared helper surfaces
-  instead of depending on private core helpers.
+  return row, error-tag branch row, catch value-merge row, and catch-switch row
+  now live there as well. The remaining `core_multi_block_rows.zig`
+  facade/core is `2052` lines; broader aggregate rows can now move against
+  shared helper surfaces instead of depending on private core helpers.
 - Current validated frontier counters after the split remain unchanged:
   `source_rows=14`, `discovered_functions=689`,
   `generic_cfg_functions=689`, `object_emitted_functions=689`,
@@ -502,6 +502,24 @@ Generic-CFG error-union catch value-merge split status:
   lines. This is behavior-preserving; no frontier rows or counters changed.
 - Validation logs: `tmp/error_union_catch_value_split_frontier.log` and
   `tmp/error_union_catch_value_split_boundaries.log`. Frontier stayed locked
+  across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=689`, `generic_cfg_functions=689`,
+  `object_emitted_functions=689`, `executable_ok_rows=14`, and
+  `local_fail=0`; boundary rows stayed fail-closed with
+  `wrong_diagnostic_rows=0` and `local_fail=0`.
+
+Generic-CFG error-union catch-switch split status:
+
+- `lowerGenericCfgErrorUnionCatchSwitchReturn`, its catch payload/switch
+  recognizer, and its catch-switch plan data now live in
+  `src/codegen/x86_64/generic_cfg/error_union_rows.zig`. The core file keeps a
+  facade alias for dispatcher compatibility; catch-shaped error-union rows are
+  no longer implemented in `core_multi_block_rows.zig`.
+- Line count after this slice: `core_multi_block_rows.zig` is 2052 lines,
+  `error_union_rows.zig` is 3678 lines, and `terminal_values.zig` is 555
+  lines. This is behavior-preserving; no frontier rows or counters changed.
+- Validation logs: `tmp/error_union_catch_switch_split_frontier.log` and
+  `tmp/error_union_catch_switch_split_boundaries.log`. Frontier stayed locked
   across ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=689`, `generic_cfg_functions=689`,
   `object_emitted_functions=689`, `executable_ok_rows=14`, and
