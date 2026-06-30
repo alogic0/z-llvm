@@ -193,7 +193,7 @@ pub fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.Basi
         .icmp => |icmp| icmp,
         else => return false,
     };
-    if (genericCfgSupportsSminSelect(function, select, cond)) return true;
+    if (genericCfgSupportsSminSelect(function, select, cond) or genericCfgSupportsSmaxSelect(function, select, cond)) return true;
     if (!genericCfgSupportsSingleBlockIcmp(function, cond)) return false;
     return genericCfgSupportsSingleBlockI32Value(function, block, select.true_value) and
         genericCfgSupportsSingleBlockI32Value(function, block, select.false_value);
@@ -210,6 +210,21 @@ pub fn genericCfgSupportsSminSelect(function: ir.Function, select: ir.SelectInst
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
     if (!isNamed(select.true_value, lhs) or !isNamed(select.false_value, rhs)) return false;
+    return (paramRegOrNull(function, lhs, .{ .int = 32 }) catch null) != null and
+        (paramRegOrNull(function, rhs, .{ .int = 32 }) catch null) != null;
+}
+
+pub fn genericCfgSupportsSmaxSelect(function: ir.Function, select: ir.SelectInst, icmp: ir.IcmpInst) bool {
+    if (icmp.predicate != .slt or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    const lhs = switch (icmp.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const rhs = switch (icmp.rhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!isNamed(select.true_value, rhs) or !isNamed(select.false_value, lhs)) return false;
     return (paramRegOrNull(function, lhs, .{ .int = 32 }) catch null) != null and
         (paramRegOrNull(function, rhs, .{ .int = 32 }) catch null) != null;
 }

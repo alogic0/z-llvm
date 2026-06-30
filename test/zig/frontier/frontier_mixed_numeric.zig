@@ -29,3 +29,7 @@ export fn frontier_byte_swap_u32(value: u32) u32 {
 export fn frontier_byte_swap_u64(value: u64) u64 {
     return @byteSwap(value);
 }
+
+export fn frontier_max_i32(left: i32, right: i32) i32 {
+    return @max(left, right);
+}

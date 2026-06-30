@@ -119,6 +119,7 @@ pub const ScalarSemanticOp = enum {
     compare,
     cast,
     byte_swap,
+    max,
 };
 
 pub const MemorySemanticOp = enum {
@@ -316,6 +317,7 @@ pub fn scalarSemanticOpForOpcode(opcode: []const u8) ScalarSemanticOp {
     if (std.mem.startsWith(u8, opcode, "cmp_")) return .compare;
     if (isCastOpcode(opcode)) return .cast;
     if (std.mem.eql(u8, opcode, "byte_swap")) return .byte_swap;
+    if (std.mem.eql(u8, opcode, "max")) return .max;
     return .none;
 }
 
@@ -888,6 +890,7 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ScalarSemanticOp.compare, scalarSemanticOpForOpcode("cmp_eq"));
     try std.testing.expectEqual(ScalarSemanticOp.cast, scalarSemanticOpForOpcode("intcast"));
     try std.testing.expectEqual(ScalarSemanticOp.byte_swap, scalarSemanticOpForOpcode("byte_swap"));
+    try std.testing.expectEqual(ScalarSemanticOp.max, scalarSemanticOpForOpcode("max"));
     try std.testing.expectEqual(SemanticDomain.memory, semanticDomainForOpcode("load"));
     try std.testing.expectEqual(MemorySemanticOp.alloc, memorySemanticOpForOpcode("alloc"));
     try std.testing.expectEqual(MemorySemanticOp.load, memorySemanticOpForOpcode("load"));

@@ -88,6 +88,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .and_edi_imm8 => |value| try writer.print("\tandl ${}, %edi\n", .{value}),
             .load_rax_rdi_u8_eax => try writer.writeAll("\tmovzbl (%rax,%rdi), %eax\n"),
             .smin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovgl %esi, %eax\n"),
+            .smax_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovll %esi, %eax\n"),
             .shift_mix_i32_edi_esi_eax => try writer.writeAll("\tmovl %esi, %ecx\n\tandl $31, %ecx\n\tmovl %edi, %eax\n\tshll %cl, %eax\n\tmovl %edi, %edx\n\tshrl %cl, %edx\n\txorl %edx, %eax\n"),
             .replace_low_i8_dil_sil_al => try writer.writeAll("\tmovl %edi, %eax\n\tandl $-8, %eax\n\tmovl %esi, %edx\n\tandl $7, %edx\n\torl %edx, %eax\n"),
             .read_flag_i8_dil_al => try writer.writeAll("\txorl %eax, %eax\n\ttestb %dil, %dil\n\tsets %al\n"),

@@ -6,6 +6,7 @@ const air_types = @import("zig_air_types.zig");
 const ir = @import("ir.zig");
 
 const parseZigType = air_types.parseZigType;
+const ownPrint = air_model.ownPrint;
 const binaryOp = air_semantics.binaryOp;
 const isFpType = air_semantics.isFpType;
 const intPredicate = air_semantics.intPredicate;
@@ -21,6 +22,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .compare => try self.lowerTypedCompare(instruction),
         .cast => try self.lowerTypedCast(instruction),
         .byte_swap => try self.lowerTypedByteSwap(instruction),
+        .max => try self.lowerTypedMax(instruction),
         .none => return false,
     }
     return true;
@@ -185,6 +187,41 @@ pub fn lowerTypedByteSwap(self: anytype, instruction: air_export.TypedInstructio
     try self.block.instructions.append(self.allocator, .{
         .result = result_name,
         .kind = .{ .call = call },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedMax(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
+    const lhs = try self.resolveTypedOperand(instruction, 0);
+    const rhs = try self.resolveTypedOperand(instruction, 1);
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!lhs.ty.ir_type.eql(rhs.ty.ir_type) or !result_type.ir_type.eql(lhs.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    if (!lhs.ty.signed or !lhs.ty.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+
+    const cmp_name = try ownPrint(self.module, "air{}_max_cmp", .{instruction.index});
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = cmp_name,
+        .kind = .{ .icmp = .{
+            .predicate = .slt,
+            .operand_ty = lhs.ty.ir_type,
+            .lhs = lhs.value,
+            .rhs = rhs.value,
+        } },
+    });
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = cmp_name },
+            .ty = lhs.ty.ir_type,
+            .true_value = rhs.value,
+            .false_value = lhs.value,
+        } },
     });
     self.values[instruction.index] = .{
         .ty = result_type,

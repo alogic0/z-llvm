@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=696
-structured_functions=696
-generic_codegen_functions=696
-generic_cfg_functions=696
+discovered_functions=697
+structured_functions=697
+generic_codegen_functions=697
+generic_cfg_functions=697
 structural_matcher_functions=0
-structured_air_v2_functions=696
-typed_air_operand_functions=696
+structured_air_v2_functions=697
+typed_air_operand_functions=697
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=696
+generic_lowering_functions=697
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=696
+object_emitted_functions=697
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 696-function counters above plus `native_link_accepted_rows=14`,
+14-source / 697-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -709,6 +709,11 @@ type, and bit width, and z_llvm lowers those facts to x86_64
 `rolw`/`bswapl`/`bswapq` without preserving `llvm.bswap.*` as unresolved
 linker symbols. Vector byte swaps, aggregate `byteSwapAllFields`, `u8`
 identity policy, and odd-width integer byte swaps remain future/boundary work.
+The same proof now includes typed AIR `max` for a selected signed `i32` row:
+Zig exports the operands as a typed `bin_op`, z_llvm lowers them to a signed
+compare/select, and x86_64 emits the shared signed max pattern with executable
+C ABI checks. Unsigned max, wider integer max, `min`, vector max/min, and
+odd-width scalar forms remain future work.
 The frontier proof now includes the selected tagged-union tag/payload switch
 row: Zig emits versioned typed-v2 union-tag and switch case facts, and z_llvm
 lowers both tag arms from those facts without AIR text fallback, shape

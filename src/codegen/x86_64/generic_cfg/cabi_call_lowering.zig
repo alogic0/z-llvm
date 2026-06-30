@@ -61,6 +61,7 @@ const registerParamRegOrNull = cabi_abi_helpers.registerParamRegOrNull;
 const advanceSysVParamCursors = cabi_abi_helpers.advanceSysVParamCursors;
 const genericCfgSupportsI1Param = core_value_support.genericCfgSupportsI1Param;
 const genericCfgSupportsSminSelect = core_value_support.genericCfgSupportsSminSelect;
+const genericCfgSupportsSmaxSelect = core_value_support.genericCfgSupportsSmaxSelect;
 const genericCfgSupportsSingleBlockI32Value = core_value_support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsI64Value = core_value_support.genericCfgSupportsI64Value;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
@@ -1360,6 +1361,7 @@ pub fn lowerGenericCfgSelectReturnValue(
             else => return error.UnsupportedCodegenInstruction,
         };
         if (try lowerGenericCfgSminSelectReturn(allocator, machine, function, select, cond)) return;
+        if (try lowerGenericCfgSmaxSelectReturn(allocator, machine, function, select, cond)) return;
         const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, cond);
         try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
     }
@@ -1438,6 +1440,28 @@ pub fn lowerGenericCfgSminSelectReturn(
     if ((try paramReg(function, lhs, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
     if ((try paramReg(function, rhs, .{ .int = 32 })) != .rsi) return error.UnsupportedCodegenAbi;
     try machine.instructions.append(allocator, .smin_i32_edi_esi_eax);
+    return true;
+}
+
+pub fn lowerGenericCfgSmaxSelectReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    select: ir.SelectInst,
+    icmp: ir.IcmpInst,
+) !bool {
+    if (!genericCfgSupportsSmaxSelect(function, select, icmp)) return false;
+    const lhs = switch (icmp.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const rhs = switch (icmp.rhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if ((try paramReg(function, lhs, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+    if ((try paramReg(function, rhs, .{ .int = 32 })) != .rsi) return error.UnsupportedCodegenAbi;
+    try machine.instructions.append(allocator, .smax_i32_edi_esi_eax);
     return true;
 }
 

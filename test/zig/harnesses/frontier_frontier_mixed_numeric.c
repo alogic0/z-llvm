@@ -6,6 +6,7 @@ extern double z_frontier_i32_to_f64_mul_add(int, double, double) __asm__("fronti
 extern unsigned short z_frontier_byte_swap_u16(unsigned short) __asm__("frontier_mixed_numeric.frontier_byte_swap_u16");
 extern unsigned int z_frontier_byte_swap_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_byte_swap_u32");
 extern unsigned long long z_frontier_byte_swap_u64(unsigned long long) __asm__("frontier_mixed_numeric.frontier_byte_swap_u64");
+extern int z_frontier_max_i32(int, int) __asm__("frontier_mixed_numeric.frontier_max_i32");
 int main(void) {
     if (z_frontier_mixed_float(1.5f, 2.25f) != 3.75f) return 1;
     if (z_frontier_double_roundtrip(9.0, 2.0) != 4.5) return 2;
@@ -15,5 +16,7 @@ int main(void) {
     if (z_frontier_byte_swap_u16(0x1234u) != 0x3412u) return 6;
     if (z_frontier_byte_swap_u32(0x12345678u) != 0x78563412u) return 7;
     if (z_frontier_byte_swap_u64(0x0123456789abcdefull) != 0xefcdab8967452301ull) return 8;
+    if (z_frontier_max_i32(-7, 5) != 5) return 9;
+    if (z_frontier_max_i32(9, -2) != 9) return 10;
     return 0;
 }
