@@ -680,7 +680,18 @@ Layer: semantic lowering and CFG lowering.
   at `source_rows=9`, `discovered_functions=14`,
   `union_payload_boundary_rows=1`, `wrong_diagnostic_rows=0`, and
   `local_fail=0`.
-- [ ] Refresh inventory and show the union-tag bucket reduced.
+- [x] Refresh inventory and show the union-tag bucket reduced.
+
+  ReleaseFast compiler-core-module inventory was refreshed in
+  `tmp/compiler_core_module_releasefast_after_union_tag.log`. The measured
+  unknown `union-tag-shape` bucket is now only `tag_name:opaque count=807`
+  with first source/function
+  `../ziglang/src/main.zig / print_targets.cmdTargets`. The previously
+  prioritized typed union-tag operations are visible as normal opcode counts
+  rather than unknown buckets: `get_union_tag count=6057`,
+  `union_init count=4624`, and `set_union_tag count=3020`. `tag_name` remains
+  a source-backed fail-closed runtime/string boundary via
+  `frontier_tag_name_boundary.zig`, not an accepted lowering claim.
 
 ### 6. Optional Shape
 
