@@ -57,7 +57,7 @@ Layer: typed AIR facts, semantic lowering, CFG lowering.
 
 - [x] Lower `unwrap_errunion_err` from typed operands.
 - [x] Lower `wrap_errunion_err` from typed operands.
-- [ ] Lower `wrap_errunion_payload` for compiler-core-shaped payload flows.
+- [x] Lower `wrap_errunion_payload` for compiler-core-shaped payload flows.
 - [ ] Lower `try` with payload continuation.
 - [ ] Lower `try` with error return.
 - [x] Lower discarded-payload chained `try` in `Error!void` helpers.
