@@ -63,7 +63,7 @@ Layer: typed AIR facts, semantic lowering, CFG lowering.
 - [x] Lower discarded-payload chained `try` in `Error!void` helpers.
 - [x] Lower catch/error cleanup before rewrapped error return.
 - [ ] Lower `try` with catch-side branch/merge.
-- [ ] Lower `try_cold`.
+- [x] Lower `try_cold`.
 - [ ] Lower `try_ptr`.
 - [ ] Lower `unwrap_errunion_err_ptr`.
 - [ ] Prove direct helper-call error-union returns without compatibility
