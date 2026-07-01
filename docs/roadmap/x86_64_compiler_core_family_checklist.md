@@ -182,7 +182,16 @@ Layer: semantic layout, ABI planner, backend.
   `tmp/frontier_counter_update.log` reports all three release modes at
   `generic_cfg_functions=722`, `object_emitted_functions=722`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Prove at least one aggregate field/payload executable row.
+- [x] Prove at least one aggregate field/payload executable row.
+
+  Field/payload executable proof is covered by the C harness checks for
+  `frontier_mixed_call_make_read_int`,
+  `frontier_mixed_call_make_read_float`, and
+  `frontier_mixed_field_write_before_call`. These rows prove aggregate
+  call-result field reads and field-store-before-call payload construction
+  through stable native-link executable checks. Saved evidence:
+  `tmp/frontier_counter_update.log` reports all three release modes at
+  `native_link_accepted_rows=14`, `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Keep unsupported packed/unaligned/oversized forms fail-closed.
 - [ ] Refresh inventory and show the aggregate ABI bucket reduced or
   reclassified.
