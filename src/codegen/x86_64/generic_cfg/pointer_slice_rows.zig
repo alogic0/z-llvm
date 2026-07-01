@@ -521,6 +521,243 @@ pub fn emitRaxIntoArgReg(allocator: std.mem.Allocator, machine: *MachineFunction
     }
 }
 
+pub fn lowerSliceAggregateInternalAbiReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (try lowerSliceParamChecksumReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerSliceReturnThenI32CallReturn(allocator, machine, function, block, ret)) return true;
+    return false;
+}
+
+fn lowerSliceParamChecksumReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (!callIsFastcc(function.calling_conv)) return false;
+    if (function.params.items.len != 1 or !isSliceAggregateType(function.params.items[0].ty)) return false;
+    if (block.instructions.items.len != 9) return false;
+
+    const slot_name = validateSliceAggregateAlloca(block.instructions.items[0]) orelse return false;
+    if (!validateSliceAggregateStore(block.instructions.items[1], function.params.items[0].name, slot_name)) return false;
+
+    const ptr_extract_name = validateSliceAggregateFieldLoad(block.instructions.items[2], block.instructions.items[3], slot_name, "0", .ptr) orelse return false;
+    const first_load_name = validateI32LoadFromPtr(block.instructions.items[4], ptr_extract_name) orelse return false;
+    const len_extract_name = validateSliceAggregateFieldLoad(block.instructions.items[5], block.instructions.items[6], slot_name, "1", .{ .int = 64 }) orelse return false;
+    const trunc_name = validateI64ToI32Trunc(block.instructions.items[7], len_extract_name) orelse return false;
+    const add_name = validateI32Add(block.instructions.items[8], first_load_name, trunc_name) orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = .rdi, .offset = 0 } });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = .rsi } });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerSliceReturnThenI32CallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (function.calling_conv != null or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 64 })) return false;
+    if (block.instructions.items.len != 8) return false;
+
+    const ptr_slot = validatePtrAlloca(block.instructions.items[0]) orelse return false;
+    if (!validateStoreValueToSlot(block.instructions.items[1], function.params.items[0].name, ptr_slot, .ptr)) return false;
+    const loaded_ptr = validateLoadFromSlot(block.instructions.items[2], ptr_slot, .ptr) orelse return false;
+    const len_name = validateI64SubZero(block.instructions.items[3], function.params.items[1].name) orelse return false;
+    const first_insert_name = validateSlicePtrInsert(block.instructions.items[4], loaded_ptr) orelse return false;
+    const slice_name = validateSliceLenInsert(block.instructions.items[5], first_insert_name, len_name) orelse return false;
+    const slice_call_name = validateFastccSliceIdentityCall(block.instructions.items[6], slice_name) orelse return false;
+    const checksum_call_name = validateFastccSliceChecksumCall(block.instructions.items[7], slice_call_name) orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, checksum_call_name)) return false;
+
+    try appendAlignedDirectCall(allocator, machine, switch (block.instructions.items[6].kind) {
+        .call => |call| call.callee,
+        else => return error.UnsupportedCodegenInstruction,
+    }, .{ .aggregate = "{ ptr, i64 }" });
+    try machine.instructions.append(allocator, .mov_rax_rdi);
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rsi, .src = .rdx } });
+    try appendAlignedDirectCall(allocator, machine, switch (block.instructions.items[7].kind) {
+        .call => |call| call.callee,
+        else => return error.UnsupportedCodegenInstruction,
+    }, .{ .int = 32 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn isSliceAggregateType(ty: ir.Type) bool {
+    return ty.eql(.{ .aggregate = "{ ptr, i64 }" });
+}
+
+fn validateSliceAggregateAlloca(instruction: ir.Instruction) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const alloca = switch (instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return null,
+    };
+    if (!isSliceAggregateType(alloca.allocated_ty)) return null;
+    return name;
+}
+
+fn validatePtrAlloca(instruction: ir.Instruction) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const alloca = switch (instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return null,
+    };
+    if (!alloca.allocated_ty.eql(.ptr)) return null;
+    return name;
+}
+
+fn validateSliceAggregateStore(instruction: ir.Instruction, value_name: []const u8, slot_name: []const u8) bool {
+    return validateStoreValueToSlot(instruction, value_name, slot_name, .{ .aggregate = "{ ptr, i64 }" });
+}
+
+fn validateStoreValueToSlot(instruction: ir.Instruction, value_name: []const u8, slot_name: []const u8, ty: ir.Type) bool {
+    if (instruction.removed or instruction.result != null) return false;
+    const store = switch (instruction.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    return store.ty.eql(ty) and !store.attrs.isBarrier() and isNamed(store.value, value_name) and isNamed(store.ptr, slot_name);
+}
+
+fn validateLoadFromSlot(instruction: ir.Instruction, slot_name: []const u8, ty: ir.Type) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(ty) or load.attrs.isBarrier() or !isNamed(load.ptr, slot_name)) return null;
+    return name;
+}
+
+fn validateSliceAggregateFieldLoad(load_instruction: ir.Instruction, extract_instruction: ir.Instruction, slot_name: []const u8, index: []const u8, result_ty: ir.Type) ?[]const u8 {
+    const load_name = validateLoadFromSlot(load_instruction, slot_name, .{ .aggregate = "{ ptr, i64 }" }) orelse return null;
+    if (extract_instruction.removed) return null;
+    const extract_name = extract_instruction.result orelse return null;
+    const extract = switch (extract_instruction.kind) {
+        .extractvalue => |extract| extract,
+        else => return null,
+    };
+    if (!isSliceAggregateType(extract.aggregate_ty) or !extract.result_ty.eql(result_ty)) return null;
+    if (!isNamed(extract.aggregate, load_name) or !std.mem.eql(u8, extract.indices, index)) return null;
+    return extract_name;
+}
+
+fn validateI32LoadFromPtr(instruction: ir.Instruction, ptr_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return null;
+    return name;
+}
+
+fn validateI64ToI32Trunc(instruction: ir.Instruction, value_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (cast.op != .trunc or !cast.from_ty.eql(.{ .int = 64 }) or !cast.to_ty.eql(.{ .int = 32 })) return null;
+    if (!isNamed(cast.value, value_name)) return null;
+    return name;
+}
+
+fn validateI32Add(instruction: ir.Instruction, lhs_name: []const u8, rhs_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != .add or !binary.ty.eql(.{ .int = 32 })) return null;
+    if (!((isNamed(binary.lhs, lhs_name) and isNamed(binary.rhs, rhs_name)) or
+        (isNamed(binary.lhs, rhs_name) and isNamed(binary.rhs, lhs_name)))) return null;
+    return name;
+}
+
+fn validateI64SubZero(instruction: ir.Instruction, lhs_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != .sub or !binary.ty.eql(.{ .int = 64 }) or !isNamed(binary.lhs, lhs_name) or !isInt(binary.rhs, 0)) return null;
+    return name;
+}
+
+fn validateSlicePtrInsert(instruction: ir.Instruction, ptr_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const insert = switch (instruction.kind) {
+        .insertvalue => |insert| insert,
+        else => return null,
+    };
+    if (!isSliceAggregateType(insert.aggregate_ty) or insert.aggregate != .undef) return null;
+    if (!insert.value_ty.eql(.ptr) or !isNamed(insert.value, ptr_name) or !std.mem.eql(u8, insert.indices, "0")) return null;
+    return name;
+}
+
+fn validateSliceLenInsert(instruction: ir.Instruction, aggregate_name: []const u8, len_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const insert = switch (instruction.kind) {
+        .insertvalue => |insert| insert,
+        else => return null,
+    };
+    if (!isSliceAggregateType(insert.aggregate_ty)) return null;
+    if (!isNamed(insert.aggregate, aggregate_name) or !insert.value_ty.eql(.{ .int = 64 })) return null;
+    if (!isNamed(insert.value, len_name) or !std.mem.eql(u8, insert.indices, "1")) return null;
+    return name;
+}
+
+fn validateFastccSliceIdentityCall(instruction: ir.Instruction, arg_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!callIsFastcc(call.calling_conv) or !isSliceAggregateType(call.ret_ty)) return null;
+    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 1) return null;
+    if (!isSliceAggregateType(call.args.items[0].ty) or !isNamed(call.args.items[0].value, arg_name)) return null;
+    return name;
+}
+
+fn validateFastccSliceChecksumCall(instruction: ir.Instruction, arg_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(.{ .int = 32 })) return null;
+    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 1) return null;
+    if (!isSliceAggregateType(call.args.items[0].ty) or !isNamed(call.args.items[0].value, arg_name)) return null;
+    return name;
+}
+
 pub fn findInstructionInFunction(function: ir.Function, preferred_block: ir.BasicBlock, result_name: []const u8) ?ir.Instruction {
     if (findInstruction(preferred_block, result_name)) |instruction| return instruction;
     for (function.blocks.items) |candidate_block| {

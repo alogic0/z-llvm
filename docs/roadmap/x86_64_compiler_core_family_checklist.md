@@ -120,7 +120,19 @@ Layer: semantic layout, ABI planner, backend.
   `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
   at `generic_cfg_functions=716`, `object_emitted_functions=716`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower slice arguments and returns as `{ ptr, len }` aggregates.
+- [x] Lower slice arguments and returns as `{ ptr, len }` aggregates.
+
+  `frontier_slice_pointer_arith.zig` now includes a C-compatible exported
+  wrapper that constructs `[]const i32`, calls an internal Zig `fastcc` helper
+  returning a slice as `{ ptr, len }`, and passes that returned slice to another
+  internal Zig `fastcc` helper that consumes pointer and length to produce a
+  scalar checksum. The C harness validates the scalar wrapper result, so the
+  accepted proof exercises Zig internal slice aggregate argument and return
+  lowering while keeping exported ABI C-compatible. Saved evidence:
+  `tmp/frontier_slice_internal_abi_focused.log` reports ReleaseFast at
+  `generic_cfg_functions=719`, `structural_matcher_functions=0`,
+  `object_emitted_functions=719`, and `local_fail=0`; the strict
+  all-release-mode frontier evidence is `tmp/frontier_counter_update.log`.
 - [ ] Lower aggregate field/payload reads used after calls.
 - [ ] Lower aggregate field/payload writes before calls.
 - [ ] Prove at least one direct-call aggregate row.

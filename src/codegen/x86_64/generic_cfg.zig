@@ -1,5 +1,6 @@
 const impl = @import("generic_cfg/core.zig");
 const cabi = @import("generic_cfg/cabi.zig");
+const pointer_slice_rows = @import("generic_cfg/pointer_slice_rows.zig");
 
 pub const appendAlignedDirectCallPreservingI32Param = impl.appendAlignedDirectCallPreservingI32Param;
 pub const appendAlignedDirectCallPreservingI32Params = impl.appendAlignedDirectCallPreservingI32Params;
@@ -153,6 +154,7 @@ pub const lowerSelectedInfiniteLoop = cabi.lowerSelectedInfiniteLoop;
 pub const lowerSelectedIssue339TestFoo = cabi.lowerSelectedIssue339TestFoo;
 pub const lowerSelectedLibfuzzerDebugO0 = cabi.lowerSelectedLibfuzzerDebugO0;
 pub const lowerSliceSumLoop = impl.lowerSliceSumLoop;
+pub const lowerSliceAggregateInternalAbiReturn = pointer_slice_rows.lowerSliceAggregateInternalAbiReturn;
 pub const lowerStartTrampoline = cabi.lowerStartTrampoline;
 pub const lowerUnreachableStub = impl.lowerUnreachableStub;
 pub const lowerVolatileAbsoluteStore = impl.lowerVolatileAbsoluteStore;

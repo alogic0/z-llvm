@@ -141,6 +141,23 @@ export fn frontier_slice_len_from_ptr(values: [*]const i32, len: usize) usize {
     return slice.len;
 }
 
+noinline fn frontierSliceParamChecksum(slice: []const i32) i32 {
+    @setRuntimeSafety(false);
+    return slice[0] + @as(i32, @intCast(slice.len));
+}
+
+noinline fn frontierSliceIdentity(slice: []const i32) []const i32 {
+    @setRuntimeSafety(false);
+    return slice;
+}
+
+export fn frontier_slice_internal_abi_checksum(values: [*]const i32, len: usize) i32 {
+    @setRuntimeSafety(false);
+    const slice = values[0..len];
+    const returned = frontierSliceIdentity(slice);
+    return frontierSliceParamChecksum(returned);
+}
+
 export fn frontier_slice_ptr_load(values: [*]const i32, len: usize, index: usize) i32 {
     const slice = values[0..len];
     const ptr = slice.ptr + index;

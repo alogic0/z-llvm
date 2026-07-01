@@ -12,6 +12,7 @@ const cabi_tls_global_lowering = @import("cabi_tls_global_lowering.zig");
 const core_single_block_misc = @import("core_single_block_misc.zig");
 const fp_rows = @import("core_single_block_fp.zig");
 const terminal_values = @import("terminal_values.zig");
+const pointer_slice_rows = @import("pointer_slice_rows.zig");
 const air_capabilities = @import("../../../zig_air_capabilities.zig");
 const std = shared.std;
 const ir = shared.ir;
@@ -107,6 +108,7 @@ const lowerPointerVolatileRoundtripReturn = cabi_boundary_rows.lowerPointerVolat
 const lowerRuntimeArraySumPreoptHelper = cabi_aggregate_lowering.lowerRuntimeArraySumPreoptHelper;
 const lowerRuntimeStructSumPreoptHelper = cabi_aggregate_lowering.lowerRuntimeStructSumPreoptHelper;
 const lowerAggregatePairAbiFamilyReturn = cabi_aggregate_lowering.lowerAggregatePairAbiFamilyReturn;
+const lowerSliceAggregateInternalAbiReturn = pointer_slice_rows.lowerSliceAggregateInternalAbiReturn;
 const lowerScalarFpCastReturn = cabi_boundary_rows.lowerScalarFpCastReturn;
 const lowerSelectedI64ConstReturn = cabi_call_lowering.lowerSelectedI64ConstReturn;
 const lowerStructSumReturn = cabi_aggregate_lowering.lowerStructSumReturn;
@@ -944,6 +946,10 @@ pub fn lowerGenericCfgSingleBlockAggregateAbi(allocator: std.mem.Allocator, mach
         else => return false,
     };
     if (try lowerGenericCfgSliceLenReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerSliceAggregateInternalAbiReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

@@ -26,6 +26,7 @@ extern int z_frontier_ptr_add_store_const_runtime_i32(int *, unsigned long, int)
 extern int z_frontier_ptr_slot_load(const int *, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_ptr_slot_load");
 extern int z_frontier_ptr_slot_store(int *, unsigned long, int) __asm__("frontier_slice_pointer_arith.frontier_ptr_slot_store");
 extern unsigned long z_frontier_slice_len_from_ptr(const int *, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_len_from_ptr");
+extern int z_frontier_slice_internal_abi_checksum(const int *, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_internal_abi_checksum");
 extern int z_frontier_slice_ptr_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_ptr_load");
 extern int z_frontier_slice_elem_ptr_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_elem_ptr_load");
 extern int z_frontier_slice_elem_ptr_store(int *, unsigned long, unsigned long, int) __asm__("frontier_slice_pointer_arith.frontier_slice_elem_ptr_store");
@@ -85,6 +86,7 @@ int main(void) {
     if (z_frontier_ptr_add_store(mutable_values, 2, 17) != 17) return 7;
     if (mutable_values[2] != 17) return 8;
     if (z_frontier_slice_len_from_ptr(values, 5) != 5UL) return 9;
+    if (z_frontier_slice_internal_abi_checksum(values, 5) != 8) return 45;
     if (z_frontier_slice_ptr_load(values, 5, 4) != 21) return 10;
     if (z_frontier_slice_elem_ptr_load(values, 5, 2) != 8) return 11;
     if (z_frontier_slice_elem_ptr_store(mutable_values, 5, 3, 19) != 19) return 12;

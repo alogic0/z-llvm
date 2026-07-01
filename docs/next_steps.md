@@ -29,25 +29,7 @@ Stay in the same family until:
 
 ## Active Blocker
 
-Active family: aggregate ABI at scale.
-
-Blocked checklist item: lower slice arguments and returns as `{ ptr, len }`
-aggregates.
-
-Exact failure: a source-backed probe that exported `[]const i32` parameters and
-returns in `test/zig/frontier/frontier_slice_pointer_arith.zig` failed before
-z_llvm lowering. Patched Zig rejected the source during AIR export:
-
-```text
-test/zig/frontier/frontier_slice_pointer_arith.zig:144:36: error: parameter of type '[]const i32' not allowed in function with calling convention 'x86_64_sysv'
-```
-
-Saved log: `tmp/frontier_slice_aggregate_abi.log`.
-
-Recommended next action: do not retry exported slice signatures as C ABI rows.
-Either prove slice-as-aggregate ownership through an internal helper/direct-call
-shape where Zig permits `[]T`, or reclassify this checklist item as a Zig ABI
-frontier separate from C ABI executable harnesses.
+None.
 
 When the worker stops, record only:
 
