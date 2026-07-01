@@ -34,6 +34,13 @@ pub const TypedOptionalPayloadExtractionSummary = struct {
     payload_type_text: []const u8,
 };
 
+pub const TypedOptionalPointerCheckSummary = struct {
+    instruction_index: u32,
+    pointer_index: ?u32,
+    pointer_operand_text: []const u8,
+    pointer_type_text: []const u8,
+};
+
 fn untypedFieldPtrIndex(instruction: air_export.Instruction) ?usize {
     const prefix = "struct_field_ptr_index_";
     if (!std.mem.startsWith(u8, instruction.opcode, prefix)) return null;
@@ -133,6 +140,25 @@ pub fn typedOptionalPayloadExtractionSummary(instruction: air_export.TypedInstru
         .optional_index = typedInstOperandIndex(instruction.operands[0]) orelse return null,
         .optional_type_text = optional_type,
         .payload_type_text = payload_type,
+    };
+}
+
+pub fn typedOptionalPointerCheckSummary(instruction: air_export.TypedInstruction) ?TypedOptionalPointerCheckSummary {
+    if (air_capabilities.optionalSemanticOpForOpcode(instruction.opcode) != .is_non_null) return null;
+    if (instruction.operands.len != 1) return null;
+    const result_type = std.mem.trim(u8, instruction.result_type, " ");
+    if (!isBoolLikeResultTypeText(result_type)) return null;
+    const pointer_type = std.mem.trim(u8, instruction.operands[0].type_text, " ");
+    const payload_type = if (std.mem.startsWith(u8, pointer_type, "?"))
+        std.mem.trim(u8, pointer_type[1..], " ")
+    else
+        pointer_type;
+    if (!isPointerLikeTypeText(payload_type)) return null;
+    return .{
+        .instruction_index = instruction.index,
+        .pointer_index = typedInstOperandIndex(instruction.operands[0]),
+        .pointer_operand_text = instruction.operands[0].value,
+        .pointer_type_text = pointer_type,
     };
 }
 
@@ -367,10 +393,23 @@ fn typedNthI32ArgIndex(structured_air_v2: air_export.StructuredAirV2, wanted: us
     return null;
 }
 
+fn isPointerLikeTypeText(text: []const u8) bool {
+    return std.mem.startsWith(u8, text, "*") or
+        std.mem.startsWith(u8, text, "[*") or
+        std.mem.startsWith(u8, text, "[:") or
+        std.mem.startsWith(u8, text, "[]");
+}
+
+fn isBoolLikeResultTypeText(text: []const u8) bool {
+    return std.mem.eql(u8, text, "bool") or
+        std.mem.eql(u8, text, "i1") or
+        std.mem.eql(u8, text, "typed-result");
+}
+
 test "typed optional model recognizes wrap_optional operand relation" {
     const operand = [_]air_export.TypedOperand{.{
         .kind = "inst",
-        .value = "%0",
+        .value = "0",
         .type_text = "i32",
     }};
     const instruction = air_export.TypedInstruction{
@@ -391,7 +430,7 @@ test "typed optional model recognizes wrap_optional operand relation" {
 test "typed optional model rejects unrelated wrap_optional types" {
     const operand = [_]air_export.TypedOperand{.{
         .kind = "inst",
-        .value = "%0",
+        .value = "0",
         .type_text = "i64",
     }};
     const instruction = air_export.TypedInstruction{
@@ -408,7 +447,7 @@ test "typed optional model rejects unrelated wrap_optional types" {
 test "typed optional model recognizes optional_payload operand relation" {
     const operand = [_]air_export.TypedOperand{.{
         .kind = "inst",
-        .value = "%4",
+        .value = "4",
         .type_text = "?*const i32",
     }};
     const instruction = air_export.TypedInstruction{
@@ -429,7 +468,7 @@ test "typed optional model recognizes optional_payload operand relation" {
 test "typed optional model rejects unrelated optional_payload types" {
     const operand = [_]air_export.TypedOperand{.{
         .kind = "inst",
-        .value = "%4",
+        .value = "4",
         .type_text = "?i32",
     }};
     const instruction = air_export.TypedInstruction{
@@ -441,4 +480,99 @@ test "typed optional model rejects unrelated optional_payload types" {
     };
 
     try std.testing.expect(typedOptionalPayloadExtractionSummary(instruction) == null);
+}
+
+test "typed optional model recognizes optional pointer check" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "2",
+        .type_text = "?*const i32",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 7,
+        .opcode = "is_non_null",
+        .result_type = "bool",
+        .data_kind = "un_op",
+        .operands = &operand,
+    };
+
+    const summary = typedOptionalPointerCheckSummary(instruction).?;
+    try std.testing.expectEqual(@as(u32, 7), summary.instruction_index);
+    try std.testing.expectEqual(@as(?u32, 2), summary.pointer_index);
+    try std.testing.expectEqualStrings("2", summary.pointer_operand_text);
+    try std.testing.expectEqualStrings("?*const i32", summary.pointer_type_text);
+}
+
+test "typed optional model recognizes raw pointer null check opcode" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "2",
+        .type_text = "*const i32",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 7,
+        .opcode = "is_non_null_ptr",
+        .result_type = "i1",
+        .data_kind = "un_op",
+        .operands = &operand,
+    };
+
+    const summary = typedOptionalPointerCheckSummary(instruction).?;
+    try std.testing.expectEqual(@as(?u32, 2), summary.pointer_index);
+    try std.testing.expectEqualStrings("*const i32", summary.pointer_type_text);
+}
+
+test "typed optional model recognizes argument pointer null check" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "arg",
+        .value = "arg0",
+        .type_text = "?*const i32",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 7,
+        .opcode = "is_non_null",
+        .result_type = "bool",
+        .data_kind = "un_op",
+        .operands = &operand,
+    };
+
+    const summary = typedOptionalPointerCheckSummary(instruction).?;
+    try std.testing.expect(summary.pointer_index == null);
+    try std.testing.expectEqualStrings("arg0", summary.pointer_operand_text);
+}
+
+test "typed optional model recognizes exported typed-result pointer check" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "3",
+        .type_text = "?*const i32",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 4,
+        .opcode = "is_non_null",
+        .result_type = "typed-result",
+        .data_kind = "un_op",
+        .operands = &operand,
+    };
+
+    const summary = typedOptionalPointerCheckSummary(instruction).?;
+    try std.testing.expectEqual(@as(?u32, 3), summary.pointer_index);
+    try std.testing.expectEqualStrings("?*const i32", summary.pointer_type_text);
+}
+
+test "typed optional model rejects scalar optional check as pointer check" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "2",
+        .type_text = "?i32",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 7,
+        .opcode = "is_non_null",
+        .result_type = "bool",
+        .data_kind = "un_op",
+        .operands = &operand,
+    };
+
+    try std.testing.expect(typedOptionalPointerCheckSummary(instruction) == null);
 }

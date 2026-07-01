@@ -16,7 +16,7 @@ pub fn lowerTypedOptionalSemanticInstruction(self: anytype, instruction: air_exp
 }
 
 pub fn lowerTypedIsNonNull(self: anytype, instruction: air_export.TypedInstruction) !void {
-    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    _ = air_model.typedOptionalPointerCheckSummary(instruction) orelse return air_model.LowerError.UnsupportedAir;
     const pointer = try self.resolveTypedOperand(instruction, 0);
     if (pointer.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
     const result_name = try self.resultName(instruction.index);

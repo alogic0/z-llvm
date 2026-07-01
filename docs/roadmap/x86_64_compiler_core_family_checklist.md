@@ -714,7 +714,13 @@ Layer: semantic lowering and CFG lowering.
   payload value. This covers the generic typed-v2 payload extraction instruction
   used by the accepted optional scalar and pointer rows; broader branch/merge
   ownership is tracked separately below.
-- [ ] Lower optional pointer checks.
+- [x] Lower optional pointer checks.
+  Completed in `src/zig_air_model_optional.zig` by adding
+  `typedOptionalPointerCheckSummary` for typed-v2 `is_non_null` /
+  `is_non_null_ptr` pointer-shaped operands. The typed lowering context now
+  delegates admission to the model before emitting the existing null compare.
+  Scalar optional presence checks remain outside this item and are tracked by
+  the branch/merge flow entries below.
 - [ ] Lower optional pointer payload extraction.
 - [ ] Lower optional branch/merge flows.
 - [ ] Lower optional return/catch-style flows that appear in compiler-core
