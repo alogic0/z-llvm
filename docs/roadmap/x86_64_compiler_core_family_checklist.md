@@ -423,7 +423,19 @@ Layer: typed AIR parser and address-form lowering.
 
 Layer: aggregate semantic lowering.
 
-- [ ] Lower `slice_len`.
+- [x] Lower `slice_len`.
+
+  `slice_len` is already lowerable through the typed pointer/slice path. The
+  source-backed proof is `frontier_slice_len_from_ptr` in
+  `frontier_slice_pointer_arith.zig`, where a pointer/length slice is
+  constructed and `.len` is returned through the C executable harness. Strict
+  frontier evidence in `tmp/frontier_pointer_branch_merge.log` reports all
+  three release modes at `generic_cfg_functions=724`,
+  `object_emitted_functions=724`, `executable_ok_rows=14`, and `local_fail=0`.
+  The refreshed ReleaseFast compiler-core-module inventory,
+  `tmp/compiler_core_module_releasefast_after_pointer_slice724.log`, still
+  reports raw `slice_len count=13774`, but the only current
+  `aggregate-shape` unknown bucket is `array_to_slice:ty_op`.
 - [ ] Lower `slice`.
 - [ ] Lower `array_to_slice`.
 - [ ] Lower aggregate construction from typed operands.
