@@ -61,6 +61,30 @@ test "x86_64 encoding emits expected add args bytes" {
     try std.testing.expectEqualSlices(u8, &.{ 0x89, 0xf8, 0x01, 0xf0, 0xc3 }, bytes);
 }
 
+test "x86_64 encoding sizes i64 add before direct call relocation" {
+    var machine = codegen.x86_64.MachineFunction.init("add64_call", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+    try machine.instructions.append(std.testing.allocator, .{ .add_arg64_rax = .rsi });
+    try machine.instructions.append(std.testing.allocator, .sub_rsp_8);
+    try machine.instructions.append(std.testing.allocator, .{ .direct_call = .{ .symbol = "callee", .ret_ty = .{ .int = 64 } } });
+    try machine.instructions.append(std.testing.allocator, .add_rsp_8);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .add_arg64_rax = .rsi }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x8b, 0xc7,
+        0x48, 0x01, 0xf0,
+        0x48, 0x83, 0xec,
+        0x08, 0xe8, 0x00,
+        0x00, 0x00, 0x00,
+        0x48, 0x83, 0xc4,
+        0x08, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding sizes nonzero frame spill slots" {
     var machine = codegen.x86_64.MachineFunction.init("frame_slots", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

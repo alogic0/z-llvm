@@ -3,6 +3,7 @@ const air_aggregate_construction = @import("zig_air_aggregate_construction.zig")
 const air_aggregate_copy = @import("zig_air_aggregate_copy.zig");
 const air_export = @import("zig_air_export.zig");
 const air_model = @import("zig_air_model.zig");
+const air_types = @import("zig_air_types.zig");
 const ir = @import("ir.zig");
 const type_layout = @import("zig_air_type_layout.zig");
 
@@ -18,6 +19,7 @@ const typedSingleInstructionByOpcode = air_model.singleInstructionByOpcode;
 const shortFunctionName = air_model.shortFunctionName;
 const ownPrint = air_model.ownPrint;
 const irCallingConvention = air_model.irCallingConvention;
+const parseZigType = air_types.parseZigType;
 
 fn lowerRegisterAggregateMake(
     allocator: std.mem.Allocator,
@@ -66,12 +68,210 @@ fn lowerRegisterAggregateMake(
 }
 pub fn lowerTypedV2SmallIntegerAggregateAbi(
     allocator: std.mem.Allocator,
+    module: *ir.Module,
     air_function: air_export.Function,
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
+    if (try lowerRegisterAggregateFieldWriteBeforeCall(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     if (!typedV2RegisterAggregateRecords(function_type, structured_air_v2)) return null;
     return try lowerRegisterAggregateMake(allocator, air_function, function_type, structured_air_v2);
+}
+
+const FieldWriteCallSummary = struct {
+    aggregate_ty: ir.Type,
+    alloc_index: u32,
+    load_index: u32,
+    call_instruction: air_export.TypedInstruction,
+    call_result_ty: ir.Type,
+    store_count: usize,
+    stores: [8]FieldStore,
+};
+
+const FieldStore = struct {
+    path: [4]usize = undefined,
+    path_len: usize = 0,
+    value_index: u32,
+    ty: ir.Type,
+};
+
+fn lowerRegisterAggregateFieldWriteBeforeCall(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const summary = registerAggregateFieldWriteBeforeCallSummary(function_type, structured_air_v2) orelse return null;
+    var function = ir.Function.init(shortFunctionName(air_function.name), summary.call_result_ty);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    const arg_names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7" };
+    for (function_type.params, 0..) |param, index| {
+        try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_names[index] });
+    }
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    var aggregate_value: ir.Value = .undef;
+    const field_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "field6", "field7" };
+    for (summary.stores[0..summary.store_count], 0..) |store, index| {
+        const value = try lowerTypedAggregateStoreValue(allocator, module, &block, function_type, structured_air_v2, store.value_index);
+        try block.instructions.append(allocator, .{
+            .result = field_names[index],
+            .kind = .{ .insertvalue = .{
+                .aggregate_ty = summary.aggregate_ty,
+                .aggregate = aggregate_value,
+                .value_ty = store.ty,
+                .value = value,
+                .indices = air_model.aggregateIndexPathText(store.path[0..store.path_len]) orelse return error.UnsupportedAir,
+            } },
+        });
+        aggregate_value = .{ .named = field_names[index] };
+    }
+
+    const callee_text = typedDetail(summary.call_instruction, "callee_text") orelse return error.UnsupportedAir;
+    const parsed_callee = typedCallee(callee_text) orelse return error.UnsupportedAir;
+    if (parsed_callee.external) return error.UnsupportedAir;
+    const dot = std.mem.lastIndexOfScalar(u8, air_function.name, '.') orelse return error.UnsupportedAir;
+    var call: ir.CallInst = .{
+        .ret_ty = summary.call_result_ty,
+        .callee = try ownPrint(module, "{s}.{s}", .{ air_function.name[0..dot], parsed_callee.name }),
+        .calling_conv = "fastcc",
+        .args = .empty,
+    };
+    errdefer call.deinit(allocator);
+    try call.args.append(allocator, .{ .ty = summary.aggregate_ty, .value = aggregate_value });
+    try block.instructions.append(allocator, .{ .result = "call", .kind = .{ .call = call } });
+    block.terminator = .{ .ret = .{ .ty = summary.call_result_ty, .value = .{ .named = "call" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn registerAggregateFieldWriteBeforeCallSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?FieldWriteCallSummary {
+    if (function_type.return_type.ir_type == .aggregate or function_type.params.len == 0 or function_type.params.len > 8) return null;
+    var alloc_instruction: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "alloc")) continue;
+        if (alloc_instruction != null) return null;
+        alloc_instruction = instruction;
+    }
+    const alloc = alloc_instruction orelse return null;
+    const allocated_text = typedDetail(alloc, "allocated_type") orelse return null;
+    const aggregate_ty = (parseZigType(allocated_text) orelse return null).ir_type;
+    if (!isSysVRegisterAggregateCandidate(aggregate_ty)) return null;
+
+    var summary = FieldWriteCallSummary{
+        .aggregate_ty = aggregate_ty,
+        .alloc_index = alloc.index,
+        .load_index = 0,
+        .call_instruction = undefined,
+        .call_result_ty = function_type.return_type.ir_type,
+        .store_count = 0,
+        .stores = undefined,
+    };
+    var saw_undefined_store = false;
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "load")) {
+            if (instruction.operands.len != 1) return null;
+            const load_base = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return null;
+            if (load_base != alloc.index) return null;
+            if (summary.load_index != 0) return null;
+            summary.load_index = instruction.index;
+            continue;
+        }
+        if (std.mem.eql(u8, instruction.opcode, "call")) {
+            if (instruction.operands.len != 2) return null;
+            const call_arg = air_model.typedInstOperandIndex(instruction.operands[1]) orelse return null;
+            if (call_arg != summary.load_index or summary.load_index == 0) return null;
+            summary.call_instruction = instruction;
+            continue;
+        }
+        if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
+        if (instruction.operands.len != 2) return null;
+        const ptr_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return null;
+        if (ptr_index == alloc.index and air_model.isTypedConstOperand(instruction.operands[1])) {
+            const text = typedDetail(instruction, "operand1_text") orelse return null;
+            if (std.mem.indexOf(u8, text, "undefined") == null) return null;
+            saw_undefined_store = true;
+            continue;
+        }
+        if (summary.store_count >= summary.stores.len) return null;
+        const value_index = air_model.typedInstOperandIndex(instruction.operands[1]) orelse return null;
+        var path: [4]usize = undefined;
+        const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_index, alloc.index, &path) orelse return null;
+        if (path_len == 0) return null;
+        const value_ty = (parseZigType(instruction.operands[1].type_text) orelse return null).ir_type;
+        summary.stores[summary.store_count] = .{
+            .path = path,
+            .path_len = path_len,
+            .value_index = value_index,
+            .ty = value_ty,
+        };
+        summary.store_count += 1;
+    }
+    if (!saw_undefined_store or summary.load_index == 0 or summary.call_instruction.index == 0 or summary.store_count == 0) return null;
+    return summary;
+}
+
+fn lowerTypedAggregateStoreValue(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    block: *ir.BasicBlock,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+    value_index: u32,
+) !ir.Value {
+    if (value_index < function_type.params.len) return .{ .named = argName(value_index) orelse return error.UnsupportedAir };
+    const instruction = air_model.instructionByIndex(structured_air_v2, value_index) orelse return error.UnsupportedAir;
+    const op = typedAggregateBinaryOp(instruction.opcode) orelse return error.UnsupportedAir;
+    if (instruction.operands.len != 2) return error.UnsupportedAir;
+    const ty = (parseZigType(instruction.result_type) orelse return error.UnsupportedAir).ir_type;
+    if (!ty.eql(.{ .int = 64 }) and !ty.eql(.{ .int = 32 })) return error.UnsupportedAir;
+    const lhs = try typedValueOperand(function_type, instruction.operands[0]);
+    const rhs = try typedValueOperand(function_type, instruction.operands[1]);
+    const result = try ownPrint(module, "v{}", .{value_index});
+    try block.instructions.append(allocator, .{ .result = result, .kind = .{ .binary = .{
+        .op = op,
+        .ty = ty,
+        .lhs = lhs,
+        .rhs = rhs,
+    } } });
+    return .{ .named = result };
+}
+
+fn typedAggregateBinaryOp(opcode: []const u8) ?ir.BinaryOp {
+    if (ir.BinaryOp.parse(opcode)) |op| return op;
+    if (!std.mem.endsWith(u8, opcode, "_safe")) return null;
+    return ir.BinaryOp.parse(opcode[0 .. opcode.len - "_safe".len]);
+}
+
+fn typedValueOperand(
+    function_type: FunctionType,
+    operand: air_export.TypedOperand,
+) !ir.Value {
+    if (air_model.typedInstOperandIndex(operand)) |index| {
+        if (index >= function_type.params.len) return error.UnsupportedAir;
+        return .{ .named = argName(index) orelse return error.UnsupportedAir };
+    }
+    if (air_model.isTypedConstOperand(operand)) {
+        const text = operand.value;
+        const int = std.fmt.parseInt(i128, text, 10) catch return error.UnsupportedAir;
+        return .{ .int = int };
+    }
+    return error.UnsupportedAir;
+}
+
+fn argName(index: u32) ?[]const u8 {
+    const names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7" };
+    if (index >= names.len) return null;
+    return names[index];
 }
 
 pub fn typedV2RegisterAggregateRecords(

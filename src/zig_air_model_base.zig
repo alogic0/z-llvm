@@ -708,16 +708,52 @@ pub fn operandTextDetail(instruction: air_export.TypedInstruction, operand_index
 }
 
 pub fn instructionMissingRequiredDetail(instruction: air_export.TypedInstruction) ?[]const u8 {
-    if (air_capabilities.isCallOpcode(instruction.opcode)) {
+    const is_call = air_capabilities.isCallOpcode(instruction.opcode);
+    if (is_call) {
         if (detail(instruction, "callee_text") == null) return "missing_callee_text";
         if (detail(instruction, "call_signature") == null) return "missing_call_signature";
     }
     for (instruction.operands, 0..) |operand, operand_index| {
+        if (is_call and operand_index == 0 and isTypedConstOperand(operand)) continue;
         if (isTypedConstOperand(operand) and operandTextDetail(instruction, operand_index) == null) {
             return "missing_const_text";
         }
     }
     return null;
+}
+
+test "typed AIR call detail validation accepts callee const detail fields" {
+    var operands = [_]air_export.TypedOperand{
+        .{ .kind = "const", .value = "42", .type_text = "fn (i64) i64" },
+        .{ .kind = "inst", .value = "7", .type_text = "i64" },
+    };
+    var details = [_]air_export.TypedDetail{
+        .{ .key = "callee_text", .value = "(function 'helper')" },
+        .{ .key = "call_signature", .value = "fn (i64) i64" },
+    };
+    const instruction = air_export.TypedInstruction{
+        .index = 8,
+        .opcode = "call",
+        .result_type = "i64",
+        .data_kind = "call",
+        .operands = &operands,
+        .details = &details,
+    };
+    try std.testing.expect(instructionMissingRequiredDetail(instruction) == null);
+}
+
+test "typed AIR non-call const operands still require operand text" {
+    var operands = [_]air_export.TypedOperand{
+        .{ .kind = "const", .value = "1", .type_text = "i64" },
+    };
+    const instruction = air_export.TypedInstruction{
+        .index = 3,
+        .opcode = "br",
+        .result_type = "noreturn",
+        .data_kind = "br",
+        .operands = &operands,
+    };
+    try std.testing.expectEqualStrings("missing_const_text", instructionMissingRequiredDetail(instruction).?);
 }
 
 pub fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) usize {
@@ -1616,7 +1652,11 @@ pub fn typedAggregatePointerPath(
     path: *[4]usize,
 ) ?usize {
     const typed_instruction = instructionByIndex(structured_air_v2, instruction_index) orelse return null;
-    if (typed_instruction.index == ret_ptr_index and air_capabilities.isRetPtrOpcode(typed_instruction.opcode)) return 0;
+    if (typed_instruction.index == ret_ptr_index and
+        (air_capabilities.isRetPtrOpcode(typed_instruction.opcode) or std.mem.eql(u8, typed_instruction.opcode, "alloc")))
+    {
+        return 0;
+    }
     if (isTypedFieldPtrDataKind(typed_instruction.data_kind)) {
         if (typed_instruction.operands.len != 1) return null;
         const base_index = typedInstOperandIndex(typed_instruction.operands[0]) orelse return null;

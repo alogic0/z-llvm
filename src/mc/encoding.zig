@@ -537,7 +537,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .push_byval_tail_arg_ptr => |copy| pushByvalTailArgPtrSize(copy.reg, copy.offset, copy.len),
         .push_byval_tail_stack_ptr => |copy| pushByvalTailStackPtrSize(copy.len),
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
-        .add_arg64_rax => |reg| if (reg.rexR()) 3 else 2,
+        .add_arg64_rax => 3,
         .add_arg_high32_eax => |reg| (if (reg.rexR()) @as(u32, 3) else 3) + 6,
         .add_stack_disp8_eax => 4,
         .add_stack_disp8_rax => 5,

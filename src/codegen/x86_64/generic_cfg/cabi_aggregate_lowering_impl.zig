@@ -10,6 +10,7 @@ const x86_64_match = @import("../match.zig");
 const x86_64_machine = @import("../machine.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
+const core_value_emit = @import("core_value_emit.zig");
 
 const ArgReg = x86_64_types.ArgReg;
 const FrameIndex = x86_64_types.FrameIndex;
@@ -40,6 +41,8 @@ const advanceSysVParamCursors = cabi_abi_helpers.advanceSysVParamCursors;
 const paramReg = cabi_abi_helpers.paramReg;
 const paramRegWithInitialGpr = cabi_abi_helpers.paramRegWithInitialGpr;
 const paramValueReg = cabi_abi_helpers.paramValueReg;
+const sysvIntegerParamRegOrNull = cabi_abi_helpers.sysvIntegerParamRegOrNull;
+const emitGenericCfgI64ValueIntoRax = core_value_emit.emitGenericCfgI64ValueIntoRax;
 
 const appendSysVCallTargetWithStackArgs = x86_64_emit.appendSysVCallTargetWithStackArgs;
 const appendDirectCallWithStackArgs = x86_64_emit.appendDirectCallWithStackArgs;
@@ -69,6 +72,7 @@ pub fn lowerAggregateAbiReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    if (try lowerRegisterAggregateConstructedArgCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMemoryAggregateCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateCallFieldReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateDirectCallReturn(allocator, machine, function, block, ret)) return true;
@@ -82,6 +86,192 @@ pub fn lowerAggregateAbiReturn(
     if (try lowerTruncI64ArgReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMakePairReturn(allocator, machine, function, block, ret)) return true;
     return false;
+}
+
+pub fn lowerRegisterAggregateConstructedArgCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!ret.ty.eql(.{ .int = 32 }) and !ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.float) and !ret.ty.eql(.double)) or
+        !ret.ty.eql(function.ret_ty) or block.instructions.items.len < 3) return false;
+    const call_inst = block.instructions.items[block.instructions.items.len - 1];
+    if (call_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, call_name)) return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null or !call.ret_ty.eql(ret.ty)) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (call.args.items.len != 1) return false;
+    const aggregate_arg = call.args.items[0];
+    const aggregate_name = switch (aggregate_arg.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const classification = classifySysVAggregate(aggregate_arg.ty) catch return false;
+    if (classification.kind != .register or classification.eightbyte_count == 0) return false;
+
+    var leaves: [8]AggregateReturnLeaf = undefined;
+    const leaf_count = try collectConstructedAggregateLeaves(block, aggregate_arg.ty, aggregate_name, &leaves);
+    if (leaf_count == 0) return false;
+    try emitConstructedRegisterAggregateCallArg(allocator, machine, function, block, leaves[0..leaf_count], classification);
+    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, 0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn collectConstructedAggregateLeaves(
+    block: ir.BasicBlock,
+    aggregate_ty: ir.Type,
+    final_name: []const u8,
+    leaves: *[8]AggregateReturnLeaf,
+) !usize {
+    var reversed: [8]AggregateReturnLeaf = undefined;
+    var count: usize = 0;
+    var current: ir.Value = .{ .named = final_name };
+    while (true) {
+        switch (current) {
+            .undef => break,
+            .named => |name| {
+                if (count >= reversed.len) return error.UnsupportedCodegenAbi;
+                const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenInstruction;
+                const insert = switch (instruction.kind) {
+                    .insertvalue => |insert| insert,
+                    else => return error.UnsupportedCodegenInstruction,
+                };
+                if (!insert.aggregate_ty.eql(aggregate_ty)) return error.UnsupportedCodegenType;
+                const offset = try aggregateInsertByteOffset(aggregate_ty, insert.indices, insert.value_ty);
+                reversed[count] = .{ .value = insert.value, .ty = insert.value_ty, .offset = offset };
+                count += 1;
+                current = insert.aggregate;
+            },
+            .int, .fp, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        }
+    }
+    var index: usize = 0;
+    while (index < count) : (index += 1) {
+        leaves[index] = reversed[count - 1 - index];
+        if (index != 0 and leaves[index].offset <= leaves[index - 1].offset) return error.UnsupportedCodegenAbi;
+    }
+    return count;
+}
+
+fn emitConstructedRegisterAggregateCallArg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    leaves: []const AggregateReturnLeaf,
+    classification: SysVAggregateClassification,
+) !void {
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    for (leaves) |leaf| {
+        const eightbyte_index: usize = @intCast(leaf.offset / 8);
+        if (eightbyte_index >= classification.eightbyte_count) return error.UnsupportedCodegenAbi;
+        switch (classification.eightbytes[eightbyte_index] orelse return error.UnsupportedCodegenAbi) {
+            .integer => {
+                const dst = try ArgReg.fromIndex(gpr_index);
+                try emitConstructedIntegerLeafIntoArgReg(allocator, machine, function, block, leaf, dst);
+                gpr_index += 1;
+            },
+            .sse => {
+                const dst = try XmmReg.fromIndex(sse_index);
+                try emitConstructedSseLeafIntoXmm(allocator, machine, function, leaf, dst);
+                sse_index += 1;
+            },
+        }
+    }
+}
+
+fn emitConstructedIntegerLeafIntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    leaf: AggregateReturnLeaf,
+    dst: ArgReg,
+) !void {
+    if (!leaf.ty.eql(.{ .int = 64 }) and !leaf.ty.eql(.ptr)) return error.UnsupportedCodegenType;
+    switch (leaf.value) {
+        .named => |name| {
+            if (try sysvIntegerParamRegOrNull(function, name, leaf.ty)) |src| {
+                if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = src } });
+                return;
+            }
+            const instruction = findInstruction(block, name) orelse {
+                try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, leaf.value);
+                try moveRaxIntoArgReg(allocator, machine, dst);
+                return;
+            };
+            const binary = switch (instruction.kind) {
+                .binary => |binary| binary,
+                else => {
+                    try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, leaf.value);
+                    try moveRaxIntoArgReg(allocator, machine, dst);
+                    return;
+                },
+            };
+            if (!binary.ty.eql(.{ .int = 64 }) or binary.op != .add) return error.UnsupportedCodegenInstruction;
+            try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, binary.lhs);
+            const rhs_name = switch (binary.rhs) {
+                .named => |rhs_name| rhs_name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            try machine.instructions.append(allocator, .{ .add_arg64_rax = try paramReg(function, rhs_name, .{ .int = 64 }) });
+            try moveRaxIntoArgReg(allocator, machine, dst);
+        },
+        .int => |value| try appendMoveImmToAggregateArgReg(allocator, machine, dst, value),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitConstructedSseLeafIntoXmm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    leaf: AggregateReturnLeaf,
+    dst: XmmReg,
+) !void {
+    switch (leaf.value) {
+        .named => |name| {
+            const src_index = try fpParamIndex(function, name, leaf.ty);
+            const src = try XmmReg.fromIndex(src_index);
+            if (src != dst) try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = src } });
+        },
+        .fp => if (leaf.ty.eql(.float))
+            try appendMoveImm32ToXmm(allocator, machine, dst, try x86_64_match.fp32TextBits(leaf.value))
+        else if (leaf.ty.eql(.double))
+            try appendMoveImm64ToXmm(allocator, machine, dst, try x86_64_match.fp64TextBits(leaf.value))
+        else
+            return error.UnsupportedCodegenType,
+        .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn moveRaxIntoArgReg(allocator: std.mem.Allocator, machine: *MachineFunction, dst: ArgReg) !void {
+    switch (dst) {
+        .rdi => try machine.instructions.append(allocator, .mov_rax_rdi),
+        .rsi => try machine.instructions.append(allocator, .mov_rax_rsi),
+        .rdx, .rcx, .r8, .r9 => return error.UnsupportedCodegenAbi,
+    }
+}
+
+fn appendMoveImmToAggregateArgReg(allocator: std.mem.Allocator, machine: *MachineFunction, dst: ArgReg, value: i128) !void {
+    if (value < std.math.minInt(i64) or value > std.math.maxInt(i64)) return error.UnsupportedCodegenValue;
+    switch (dst) {
+        .rdi => try machine.instructions.append(allocator, .{ .mov_imm_rdi = @intCast(value) }),
+        .rsi => try machine.instructions.append(allocator, .{ .mov_imm_rsi = @intCast(value) }),
+        .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = @intCast(value) }),
+        .rcx => try machine.instructions.append(allocator, .{ .mov_imm_rcx = @intCast(value) }),
+        .r8 => try machine.instructions.append(allocator, .{ .mov_imm_r8 = @intCast(value) }),
+        .r9 => try machine.instructions.append(allocator, .{ .mov_imm_r9 = @intCast(value) }),
+    }
 }
 
 pub fn lowerMemoryAggregateCallReturn(

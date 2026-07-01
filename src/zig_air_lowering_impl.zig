@@ -646,7 +646,7 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2AggregatePairAbi(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
-    if (try lowerTypedV2SmallIntegerAggregateAbi(allocator, air_function, function_type, structured_air_v2)) |function| {
+    if (try lowerTypedV2SmallIntegerAggregateAbi(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2SretIntegerAggregateAbi(allocator, module, air_function, function_type, structured_air_v2)) |function| {

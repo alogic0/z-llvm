@@ -145,7 +145,21 @@ Layer: semantic layout, ABI planner, backend.
   at `generic_cfg_functions=721`, `structural_matcher_functions=0`,
   `object_emitted_functions=721`, and `local_fail=0`; the strict all-release
   frontier evidence is `tmp/frontier_counter_update.log`.
-- [ ] Lower aggregate field/payload writes before calls.
+- [x] Lower aggregate field/payload writes before calls.
+
+  `frontier_sysv_aggregate_classes.zig` now includes a C ABI wrapper that
+  initializes a local `{ i64, double }` aggregate through field stores, loads the
+  aggregate value, and calls a noinline helper that consumes the aggregate. The
+  typed-v2 aggregate lowerer validates the alloc -> field_ptr -> store -> load
+  -> call -> return dataflow, normalizes `add_safe` to the hot-path arithmetic
+  value for ReleaseSafe, and the generic CFG aggregate ABI path emits the
+  constructed register aggregate call argument without source-name admission.
+  Saved evidence: `tmp/frontier_aggregate_field_write_before_call_releasefast.log`
+  and `tmp/frontier_aggregate_field_write_before_call_releasefast_exec.log`
+  prove the focused ReleaseFast row/object/executable path; the strict
+  all-release-mode frontier evidence in `tmp/frontier_counter_update.log`
+  reports `generic_cfg_functions=722`, `object_emitted_functions=722`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Prove at least one direct-call aggregate row.
 - [ ] Prove at least one returned-aggregate row.
 - [ ] Prove at least one aggregate field/payload executable row.
