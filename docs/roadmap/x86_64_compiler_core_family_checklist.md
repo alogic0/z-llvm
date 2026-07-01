@@ -82,7 +82,23 @@ Layer: semantic layout, ABI planner, backend.
   `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
   at `generic_cfg_functions=716`, `object_emitted_functions=716`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower struct returns through sret memory.
+- [x] Lower struct returns through sret memory.
+
+  Existing frontier proof covers normal supported-leaf MEMORY aggregate returns
+  through hidden sret pointers for flat integer aggregates, nested aggregates,
+  array-backed aggregates, float/double aggregates, pointer/float/integer mixed
+  aggregates, and direct plus pointer-callee copy/forwarding paths.
+  Representative rows include `frontier_big3_make`,
+  `frontier_big20_copy`, `frontier_direct_big32_copy`,
+  `frontier_indirect_big80_copy`, `frontier_stack_source_big81_copy`,
+  `frontier_big_nested_copy`, `frontier_big_array_copy`,
+  `frontier_big_double_copy`, `frontier_big_float_copy`,
+  `frontier_big_ptr_double_copy`, and `frontier_big_deep_mixed_copy` in
+  `frontier_sysv_sret_byval.zig`, with C ABI executable checks in
+  `frontier_frontier_sysv_sret_byval.c`. Saved gate evidence:
+  `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
+  at `generic_cfg_functions=716`, `object_emitted_functions=716`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower array arguments and returns.
 - [ ] Lower slice arguments and returns as `{ ptr, len }` aggregates.
 - [ ] Lower aggregate field/payload reads used after calls.
