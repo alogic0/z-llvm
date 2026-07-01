@@ -347,7 +347,20 @@ Layer: typed AIR parser and address-form lowering.
   `frontier_globals_tls.zig` executable-ok in ReleaseFast, ReleaseSafe, and
   ReleaseSmall, with all modes at `generic_cfg_functions=723`,
   `object_emitted_functions=723`, and `local_fail=0`.
-- [ ] Prove pointer arithmetic with load/store.
+- [x] Prove pointer arithmetic with load/store.
+
+  `frontier_slice_pointer_arith.zig` contains source-backed pointer arithmetic
+  rows for runtime `ptr_add`, comptime `ptr_add`, chained pointer addition,
+  `ptr_sub`, constant+runtime offsets, and scalar load/store through derived
+  pointers for i8/i16/i32/i64 element widths. The C harness
+  `frontier_frontier_slice_pointer_arith.c` checks both load and store results,
+  including `frontier_ptr_add_load_const_runtime_u8/u16/u32/u64`,
+  `frontier_ptr_add_store_u8/u16/u64`,
+  `frontier_ptr_add_store_const_runtime_i32`, and the `ptr_sub` load rows.
+  Strict executable evidence in `tmp/frontier_is_non_null_ptr.log` reports
+  `frontier_slice_pointer_arith.zig` executable-ok in ReleaseFast, ReleaseSafe,
+  and ReleaseSmall with all modes at `generic_cfg_functions=723`,
+  `object_emitted_functions=723`, and `local_fail=0`.
 - [ ] Prove slice pointer extraction.
 - [ ] Prove slice length extraction.
 - [ ] Prove pointer/slice values across a branch merge.
