@@ -41,7 +41,15 @@ Layer: semantic layout, ABI planner, backend.
   `tmp/compiler_core_module_releasefast_aggregate_layout_facts_enabled.log`
   reports `aggregate_layout_facts=5824` with real module context, generated
   imports available, no stubs, and `instruction_payload_scan=1`.
-- [ ] Lower struct arguments passed in registers.
+- [x] Lower struct arguments passed in registers.
+
+  Existing frontier proof covers register-passed INTEGER, SSE/SSE,
+  INTEGER/SSE, SSE/INTEGER, nested, shifted, direct-call, and indirect-call
+  struct arguments through `frontier_sysv_aggregate_classes.zig` and
+  `frontier_sysv_abi.zig`. Saved gate evidence:
+  `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
+  at `generic_cfg_functions=716`, `object_emitted_functions=716`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower struct arguments passed through memory.
 - [ ] Lower struct returns in registers.
 - [ ] Lower struct returns through sret memory.
