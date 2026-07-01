@@ -50,7 +50,22 @@ Layer: semantic layout, ABI planner, backend.
   `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
   at `generic_cfg_functions=716`, `object_emitted_functions=716`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower struct arguments passed through memory.
+- [x] Lower struct arguments passed through memory.
+
+  Existing frontier proof covers stack-passed INTEGER aggregates, SSE/SSE
+  aggregates, mixed INTEGER/SSE and SSE/INTEGER aggregates, nested mixed
+  aggregates, direct and pointer-callee forwarding, and deep-stack aggregate
+  forwarding after register exhaustion. Representative rows include
+  `frontier_stack_array_pair_call_sum_after_six`,
+  `frontier_deep_stack_array_pair_call_sum_after_six`,
+  `frontier_stack_array_double_forward_after_pressure`,
+  `frontier_stack_reverse_mixed_forward_after_pressure`, and
+  `frontier_stack_nested_mixed_forward_after_pressure` in
+  `frontier_sysv_aggregate_classes.zig`, with C ABI executable checks in
+  `frontier_frontier_sysv_aggregate_classes.c`. Saved gate evidence:
+  `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
+  at `generic_cfg_functions=716`, `object_emitted_functions=716`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower struct returns in registers.
 - [ ] Lower struct returns through sret memory.
 - [ ] Lower array arguments and returns.
