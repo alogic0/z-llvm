@@ -84,6 +84,11 @@ where the success continuation returns ordinary `i32` arithmetic. The generic
 CFG backend validates the try guard, error-tag extraction, helper-call argument
 flow, generic success return, and live-parameter spill/reload instead of
 admitting either row by function name.
+The companion `Error!void` catch-switch row covers the `root.main() catch |err|
+switch (err)` topology from `std/start.zig`: the catch side switches over the
+unwrapped `i16` error tag into a merge phi, while the success continuation
+returns a generic terminal `i32` expression. The same error-tag switch planner
+now handles payload and void-success forms.
 The producer-side `frontier_wrap_error_switch_match` row covers a masked
 integer switch that returns either a wrapped payload or wrapped error constants
 through an `i64` error-union phi. The x86_64 switch-to-phi path now accepts a
@@ -293,20 +298,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=707
-structured_functions=707
-generic_codegen_functions=707
-generic_cfg_functions=707
+discovered_functions=708
+structured_functions=708
+generic_codegen_functions=708
+generic_cfg_functions=708
 structural_matcher_functions=0
-structured_air_v2_functions=707
-typed_air_operand_functions=707
+structured_air_v2_functions=708
+typed_air_operand_functions=708
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=707
+generic_lowering_functions=708
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=707
+object_emitted_functions=708
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

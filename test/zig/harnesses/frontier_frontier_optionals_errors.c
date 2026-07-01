@@ -34,6 +34,7 @@ extern int z_frontier_try_catch_branch_map_match(int, int) __asm__("frontier_opt
 extern int z_frontier_catch_error_value_switch(int, int, int) __asm__("frontier_optionals_errors.frontier_catch_error_value_switch");
 extern int z_frontier_catch_error_call_match(int, int, int) __asm__("frontier_optionals_errors.frontier_catch_error_call_match");
 extern int z_frontier_try_void_catch_match(int, int) __asm__("frontier_optionals_errors.frontier_try_void_catch_match");
+extern int z_frontier_try_void_catch_switch(int, int) __asm__("frontier_optionals_errors.frontier_try_void_catch_switch");
 extern int z_frontier_wrap_error_switch_match(int, int) __asm__("frontier_optionals_errors.frontier_wrap_error_switch_match");
 extern int z_frontier_wrap_error_branch_match(int) __asm__("frontier_optionals_errors.frontier_wrap_error_branch_match");
 extern int z_frontier_maybe_error_tag_match(int, int) __asm__("frontier_optionals_errors.frontier_maybe_error_tag_match");
@@ -158,6 +159,9 @@ int main(void) {
     if (z_frontier_try_void_catch_match(0, 5) != 12) return 121;
     if (z_frontier_try_void_catch_match(1, 5) != 46) return 122;
     if (z_frontier_try_void_catch_match(2, 5) != 48) return 123;
+    if (z_frontier_try_void_catch_switch(0, 5) != 22) return 124;
+    if (z_frontier_try_void_catch_switch(1, 5) != 16) return 125;
+    if (z_frontier_try_void_catch_switch(2, 5) != 18) return 126;
     if (z_frontier_wrap_error_switch_match(0, 41) != 42) return 88;
     if (z_frontier_wrap_error_switch_match(1, 41) != -86) return 89;
     if (z_frontier_wrap_error_switch_match(2, 41) != -87) return 90;

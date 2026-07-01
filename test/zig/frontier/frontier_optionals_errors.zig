@@ -468,6 +468,16 @@ export fn frontier_try_void_catch_match(tag: i32, base: i32) i32 {
     return base + 7;
 }
 
+export fn frontier_try_void_catch_switch(tag: i32, base: i32) i32 {
+    frontierMaybeVoid(tag) catch |err| {
+        return switch (err) {
+            FrontierError.BadTag => base + 11,
+            FrontierError.WorseTag => base + 13,
+        };
+    };
+    return base + 17;
+}
+
 fn frontierWrapErrorSwitch(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag & 3) {
         0 => value,

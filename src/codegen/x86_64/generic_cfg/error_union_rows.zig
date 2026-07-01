@@ -1676,8 +1676,8 @@ const ErrorUnionErrorTagSwitchReturn = struct {
     entry: ir.BasicBlock,
     call_name: []const u8,
     call: ir.CallInst,
-    payload_block: ir.BasicBlock,
-    payload_return: ErrorUnionI32ReturnValue,
+    success_block: ir.BasicBlock,
+    success_return: ErrorUnionI32ReturnValue,
     switch_block: ir.BasicBlock,
     cases: [8]ErrorUnionSwitchPhiCase,
     case_count: usize,
@@ -1826,7 +1826,7 @@ pub fn lowerGenericCfgErrorUnionErrorTagSwitchReturn(
     try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
     try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
     try machine.instructions.append(allocator, .test_eax_eax);
-    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.payload_block.name);
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.success_block.name);
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.switch_block.name);
     try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
@@ -1843,8 +1843,8 @@ pub fn lowerGenericCfgErrorUnionErrorTagSwitchReturn(
         try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
     }
 
-    try appendGenericCfgBlockLabel(allocator, machine, plan.payload_block.name);
-    try emitErrorUnionI32ReturnValueIntoEax(allocator, machine, function, plan.entry, plan.payload_block, plan.payload_return, plan.live_param_reg);
+    try appendGenericCfgBlockLabel(allocator, machine, plan.success_block.name);
+    try emitErrorUnionI32ReturnValueIntoEax(allocator, machine, function, plan.entry, plan.success_block, plan.success_return, plan.live_param_reg);
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
@@ -2243,23 +2243,22 @@ fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwit
 
     const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
     const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
-    const then_payload_return = errorUnionPayloadI32Return(function, then_block, call_name);
-    const else_payload_return = errorUnionPayloadI32Return(function, else_block, call_name);
-    if ((then_payload_return != null) == (else_payload_return != null)) return null;
-    const payload_block = if (then_payload_return != null) then_block else else_block;
-    const switch_block = if (then_payload_return != null) else_block else then_block;
-    const payload_return = then_payload_return orelse else_payload_return.?;
+    const then_is_switch = errorUnionErrorTagSwitchBlock(then_block, call_name);
+    const else_is_switch = errorUnionErrorTagSwitchBlock(else_block, call_name);
+    if (then_is_switch == else_is_switch) return null;
+    const success_block = if (then_is_switch) else_block else then_block;
+    const switch_block = if (then_is_switch) then_block else else_block;
+    const success_return = errorUnionPayloadI32Return(function, success_block, call_name) orelse
+        errorUnionGenericI32Return(success_block) orelse return null;
 
     const switch_term = blockSwitchTerminator(switch_block) orelse return null;
-    if (!switch_term.cond_ty.eql(.{ .int = 16 })) return null;
-    if (!errorTagValueFromCallResult(switch_block, switch_term.cond, call_name)) return null;
     if (switch_term.cases.items.len == 0 or switch_term.cases.items.len > 8) return null;
     const merge_block = exhaustiveSwitchMergeBlock(function, switch_term) orelse return null;
     const phi = firstPhiReturn(function, merge_block) orelse return null;
     if (!phi.ty.eql(.{ .int = 32 })) return null;
 
     var cases: [8]ErrorUnionSwitchPhiCase = undefined;
-    var live_param_reg = errorUnionI32ReturnLiveParam(function, payload_block, payload_return);
+    var live_param_reg = errorUnionI32ReturnLiveParam(function, success_block, success_return);
     for (switch_term.cases.items, 0..) |case, case_index| {
         if (!case.value_ty.eql(.{ .int = 16 })) return null;
         const value = switch (case.value) {
@@ -2278,14 +2277,14 @@ fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwit
     }
     const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
     if (!blockIsUnreachable(default_block)) return null;
-    if (!errorTagSwitchUsesAllBlocks(function, payload_block.name, switch_block.name, merge_block.name, switch_term)) return null;
+    if (!errorTagSwitchUsesAllBlocks(function, success_block.name, switch_block.name, merge_block.name, switch_term)) return null;
 
     return .{
         .entry = entry,
         .call_name = call_name,
         .call = call,
-        .payload_block = payload_block,
-        .payload_return = payload_return,
+        .success_block = success_block,
+        .success_return = success_return,
         .switch_block = switch_block,
         .cases = cases,
         .case_count = switch_term.cases.items.len,
@@ -2293,6 +2292,11 @@ fn errorUnionErrorTagSwitchReturn(function: ir.Function) ?ErrorUnionErrorTagSwit
         .merge_block = merge_block,
         .live_param_reg = live_param_reg,
     };
+}
+
+fn errorUnionErrorTagSwitchBlock(block: ir.BasicBlock, call_name: []const u8) bool {
+    const switch_term = blockSwitchTerminator(block) orelse return false;
+    return switch_term.cond_ty.eql(.{ .int = 16 }) and errorTagValueFromCallResult(block, switch_term.cond, call_name);
 }
 
 fn errorUnionErrorTagBranchReturn(function: ir.Function) ?ErrorUnionErrorTagBranchReturn {
