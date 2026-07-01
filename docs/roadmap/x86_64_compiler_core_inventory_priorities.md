@@ -18,6 +18,9 @@ The selected-mode summary lines use the same format as the all-mode output.
 Inventory logs must contain a complete summary for the selected mode; empty or
 incomplete logs are not evidence.
 
+The implementation checklist for closing these recurring families one by one is
+`docs/roadmap/x86_64_compiler_core_family_checklist.md`.
+
 It does not claim lowering, object emission, native linking, or executable
 proof. The slice uses the real `../ziglang/build.zig` compiler executable
 module graph with generated imports available, no stubs, and
