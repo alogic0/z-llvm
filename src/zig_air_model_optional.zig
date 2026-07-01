@@ -20,6 +20,13 @@ pub const TypedOptionalPayloadBranchSummary = core.TypedOptionalPayloadBranchSum
 pub const TypedOptionalPayloadSummary = core.TypedOptionalPayloadSummary;
 pub const TypedOptionalPointerSummary = core.TypedOptionalPointerSummary;
 
+pub const TypedWrapOptionalSummary = struct {
+    instruction_index: u32,
+    payload_index: u32,
+    optional_type_text: []const u8,
+    payload_type_text: []const u8,
+};
+
 fn untypedFieldPtrIndex(instruction: air_export.Instruction) ?usize {
     const prefix = "struct_field_ptr_index_";
     if (!std.mem.startsWith(u8, instruction.opcode, prefix)) return null;
@@ -88,6 +95,22 @@ pub fn optionalPayloadSummary(function: air_export.Function) ?OptionalShapeSumma
 
 pub fn selectedOptionalPayloadShape(function: air_export.Function) bool {
     return optionalPayloadSummary(function) != null;
+}
+
+pub fn typedWrapOptionalSummary(instruction: air_export.TypedInstruction) ?TypedWrapOptionalSummary {
+    if (!std.mem.eql(u8, instruction.opcode, "wrap_optional")) return null;
+    if (instruction.operands.len != 1) return null;
+    const optional_type = std.mem.trim(u8, instruction.result_type, " ");
+    if (!std.mem.startsWith(u8, optional_type, "?")) return null;
+    const payload_type = std.mem.trim(u8, instruction.operands[0].type_text, " ");
+    const optional_payload_type = std.mem.trim(u8, optional_type[1..], " ");
+    if (!std.mem.eql(u8, payload_type, optional_payload_type)) return null;
+    return .{
+        .instruction_index = instruction.index,
+        .payload_index = typedInstOperandIndex(instruction.operands[0]) orelse return null,
+        .optional_type_text = optional_type,
+        .payload_type_text = payload_type,
+    };
 }
 
 pub fn typedOptionalPayloadBranchSummary(
@@ -319,4 +342,42 @@ fn typedNthI32ArgIndex(structured_air_v2: air_export.StructuredAirV2, wanted: us
         seen += 1;
     }
     return null;
+}
+
+test "typed optional model recognizes wrap_optional operand relation" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "%0",
+        .type_text = "i32",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 4,
+        .opcode = "wrap_optional",
+        .result_type = "?i32",
+        .data_kind = "ty_op",
+        .operands = &operand,
+    };
+
+    const summary = typedWrapOptionalSummary(instruction).?;
+    try std.testing.expectEqual(@as(u32, 4), summary.instruction_index);
+    try std.testing.expectEqual(@as(u32, 0), summary.payload_index);
+    try std.testing.expectEqualStrings("?i32", summary.optional_type_text);
+    try std.testing.expectEqualStrings("i32", summary.payload_type_text);
+}
+
+test "typed optional model rejects unrelated wrap_optional types" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "%0",
+        .type_text = "i64",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 4,
+        .opcode = "wrap_optional",
+        .result_type = "?i32",
+        .data_kind = "ty_op",
+        .operands = &operand,
+    };
+
+    try std.testing.expect(typedWrapOptionalSummary(instruction) == null);
 }

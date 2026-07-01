@@ -37,9 +37,8 @@ pub fn lowerTypedIsNonNull(self: anytype, instruction: air_export.TypedInstructi
 }
 
 pub fn lowerTypedWrapOptional(self: anytype, instruction: air_export.TypedInstruction) !void {
-    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
-    if (!std.mem.startsWith(u8, instruction.result_type, "?")) return air_model.LowerError.UnsupportedAir;
-    const optional_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    const summary = air_model.typedWrapOptionalSummary(instruction) orelse return air_model.LowerError.UnsupportedAir;
+    const optional_type = parseZigType(summary.optional_type_text) orelse return air_model.LowerError.UnsupportedAir;
     const payload = try self.resolveTypedOperand(instruction, 0);
     if (!payload.ty.ir_type.eql(optional_type.ir_type)) return air_model.LowerError.UnsupportedAir;
     self.values[instruction.index] = .{

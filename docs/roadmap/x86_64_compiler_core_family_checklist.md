@@ -697,7 +697,16 @@ Layer: semantic lowering and CFG lowering.
 
 Layer: semantic lowering and CFG lowering.
 
-- [ ] Lower generic `wrap_optional`.
+- [x] Lower generic `wrap_optional`.
+  Completed in `src/zig_air_model_optional.zig` by adding
+  `typedWrapOptionalSummary`, which validates the typed-v2 operand/result
+  relation before `src/zig_air_lowering_context_typed_optional.zig` materializes
+  the optional value. This keeps accepted `wrap_optional` lowering model-owned
+  and fail-closed without source/function-name admission. ReleaseFast
+  compiler-core inventory still reports `wrap_optional count=6461`, first
+  source/function `../ziglang/src/main.zig / SemanticVersion.parse`; this item
+  closes the generic typed lowering ownership piece, not the full optional
+  branch/merge family.
 - [ ] Lower optional payload extraction.
 - [ ] Lower optional pointer checks.
 - [ ] Lower optional pointer payload extraction.
