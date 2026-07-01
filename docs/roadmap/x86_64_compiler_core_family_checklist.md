@@ -493,7 +493,18 @@ Layer: aggregate semantic lowering.
   `discovered_functions=730`, `generic_cfg_functions=730`,
   `object_emitted_functions=730`, `executable_ok_rows=14`, and
   `local_fail=0`.
-- [ ] Prove source-backed array-to-slice conversion.
+- [x] Prove source-backed array-to-slice conversion.
+
+  Source-backed array-to-slice conversion is proven by
+  `frontier_array_to_slice_len` and `frontier_array_to_slice_runtime_load` in
+  `frontier_slice_pointer_arith.zig`. Both rows use real Zig coercion from
+  `*const [4]i32` to `[]const i32`; the first proves the derived slice length
+  and the second proves a runtime-index load through the converted slice. The
+  rows remain covered by the latest strict frontier evidence in
+  `tmp/frontier_aggregate_projection.log` at `source_rows=14`,
+  `discovered_functions=730`, `generic_cfg_functions=730`,
+  `object_emitted_functions=730`, `executable_ok_rows=14`, and
+  `local_fail=0`.
 - [ ] Prove source-backed aggregate projection after construction.
 - [ ] Keep unsupported aggregate element/layout forms fail-closed.
 - [ ] Refresh inventory and show the aggregate-shape bucket reduced.
