@@ -252,7 +252,18 @@ Layer: typed AIR facts, semantic lowering, CFG lowering.
 
 Layer: typed AIR parser and address-form lowering.
 
-- [ ] Lower `ptr_slice_len_ptr`.
+- [x] Lower `ptr_slice_len_ptr`.
+
+  Existing source-backed proof is `frontier_slice_len_from_ptr` in
+  `frontier_slice_pointer_arith.zig`, where a `values[0..len]` slice is built
+  from pointer + length and `.len` is returned through the executable C harness.
+  The latest focused compiler-core ReleaseFast inventory,
+  `tmp/compiler_core_module_releasefast_after_aggregate722.log`, still counts
+  raw `ptr_slice_len_ptr` opcodes (`count=17471`) but reports
+  `unknown_opcode category=pointer-address count=0`, so this form is now
+  classified as known/lowerable rather than an unsupported inventory bucket.
+  Strict executable evidence remains `tmp/frontier_counter_update.log` with
+  `executable_ok_rows=14` and `local_fail=0`.
 - [ ] Lower `ptr_slice_ptr_ptr`.
 - [ ] Lower `slice_ptr`.
 - [ ] Lower `ptr_add`.
