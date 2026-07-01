@@ -37,3 +37,7 @@ export fn frontier_max_i32(left: i32, right: i32) i32 {
 export fn frontier_min_i32(left: i32, right: i32) i32 {
     return @min(left, right);
 }
+
+export fn frontier_abs_i32(value: i32) u32 {
+    return @abs(value);
+}

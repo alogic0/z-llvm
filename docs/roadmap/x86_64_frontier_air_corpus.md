@@ -162,6 +162,13 @@ signed compare/select forms, and the x86_64 generic CFG backend emits the
 shared signed max/min machine patterns. Unsigned max/min, wider integer
 max/min, vector max/min, and odd-width integer scalar transforms remain future
 work.
+The same scalar-transform family now includes selected signed `i32` `@abs`.
+Zig exports AIR `abs` as a versioned `zllvm-abs-v1` typed `ty_op` record with
+the operand ref, result type, bit width, and operand signedness. z_llvm lowers
+the supported `i32 -> u32` form through generic compare/sub/select IR, and the
+C harness checks positive, negative, and zero inputs. Wider integer abs, vector
+abs, odd-width integer abs, and explicit ReleaseSafe overflow/minInt
+negative-path proof remain future work.
 
 `frontier_union_tags.zig` adds the first source-backed tagged-union tag/payload
 switch proof. The patched Zig typed-v2 exporter emits versioned
@@ -270,20 +277,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=698
-structured_functions=698
-generic_codegen_functions=698
-generic_cfg_functions=698
+discovered_functions=699
+structured_functions=699
+generic_codegen_functions=699
+generic_cfg_functions=699
 structural_matcher_functions=0
-structured_air_v2_functions=698
-typed_air_operand_functions=698
+structured_air_v2_functions=699
+typed_air_operand_functions=699
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=698
+generic_lowering_functions=699
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=698
+object_emitted_functions=699
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

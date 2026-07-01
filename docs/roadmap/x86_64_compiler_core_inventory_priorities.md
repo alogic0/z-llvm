@@ -138,7 +138,7 @@ longer make the global top 50.
 | 21 | `error-union-try:error_name:opaque` | 323 | - | - | stale: frontier now exports/lowers selected `error_name` and `error_set_has_value`; refresh compiler-core-module inventory before using this row for prioritization | - |
 | 22 | `pointer-address:is_non_null_ptr:un_op` | 263 | - | - | - | - |
 | 23 | `pointer-address:ptr_sub:bin_ty_pl` | 119 | - | - | - | - |
-| 24 | `scalar-transform:abs:opaque` | 64 | - | - | - | - |
+| 24 | `scalar-transform:abs:opaque` | 64 | - | - | stale: frontier now exports/lowers selected signed `i32` scalar `abs`; refresh compiler-core-module inventory before using this row for broader abs prioritization | - |
 | 25 | `scalar-transform:shr_exact:bin_op` | 49 | - | - | - | - |
 | 26 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
 | 27 | `vector:reduce:opaque` | 22 | - | - | - | - |

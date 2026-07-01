@@ -1982,12 +1982,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=698`,
-`generic_codegen_functions=698`, `generic_cfg_functions=698`,
+frontier gate reports `source_rows=14`, `discovered_functions=699`,
+`generic_codegen_functions=699`, `generic_cfg_functions=699`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=698`, `object_failures=0`,
+`object_emitted_functions=699`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -2036,13 +2036,21 @@ max/min instruction patterns. The executable harness checks negative/positive
 and positive/negative operand orders for both rows. Unsigned max/min, wider
 integer max/min, vector max/min, and odd-width integer forms remain future
 scalar-transform work.
+The scalar-transform path also now owns the selected signed `i32` `@abs` row.
+Zig exports AIR `abs` as the versioned `zllvm-abs-v1` typed `ty_op` record
+with the operand ref, result type, bit width, and operand signedness. z_llvm
+validates the signed `i32` operand and unsigned `u32` result, lowers the value
+to signed compare plus `0 - x` and `select`, and the executable harness checks
+positive, negative, and zero inputs. Wider integer abs, vector abs, odd-width
+integer abs, and explicit ReleaseSafe overflow/minInt negative-path proof remain
+future scalar-transform work.
 
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=698`,
-`generic_cfg_functions=698`, `structural_matcher_functions=0`,
-`object_emitted_functions=698`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=699`,
+`generic_cfg_functions=699`, `structural_matcher_functions=0`,
+`object_emitted_functions=699`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

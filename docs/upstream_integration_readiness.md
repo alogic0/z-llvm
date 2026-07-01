@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=698
-structured_functions=698
-generic_codegen_functions=698
-generic_cfg_functions=698
+discovered_functions=699
+structured_functions=699
+generic_codegen_functions=699
+generic_cfg_functions=699
 structural_matcher_functions=0
-structured_air_v2_functions=698
-typed_air_operand_functions=698
+structured_air_v2_functions=699
+typed_air_operand_functions=699
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=698
+generic_lowering_functions=699
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=698
+object_emitted_functions=699
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 698-function counters above plus `native_link_accepted_rows=14`,
+14-source / 699-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -714,6 +714,12 @@ The same proof now includes typed AIR `max` and `min` for selected signed
 them to signed compare/select forms, and x86_64 emits the shared signed
 max/min patterns with executable C ABI checks. Unsigned max/min, wider integer
 max/min, vector max/min, and odd-width scalar forms remain future work.
+The selected signed `i32` `@abs` scalar row is also typed-AIR owned: Zig
+exports `abs` as a versioned `zllvm-abs-v1` typed `ty_op` record, z_llvm
+validates the `i32 -> u32` form, lowers it through generic compare/sub/select
+IR, and the executable harness checks positive, negative, and zero inputs.
+Wider integer abs, vector abs, odd-width abs, and explicit ReleaseSafe
+overflow/minInt negative-path proof remain future work.
 The frontier proof now includes the selected tagged-union tag/payload switch
 row: Zig emits versioned typed-v2 union-tag and switch case facts, and z_llvm
 lowers both tag arms from those facts without AIR text fallback, shape

@@ -24,6 +24,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .byte_swap => try self.lowerTypedByteSwap(instruction),
         .max => try self.lowerTypedMax(instruction),
         .min => try self.lowerTypedMin(instruction),
+        .abs => try self.lowerTypedAbs(instruction),
         .none => return false,
     }
     return true;
@@ -257,6 +258,50 @@ pub fn lowerTypedMin(self: anytype, instruction: air_export.TypedInstruction) !v
             .ty = lhs.ty.ir_type,
             .true_value = lhs.value,
             .false_value = rhs.value,
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedAbs(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!source.ty.signed or !source.ty.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+    if (result_type.signed or !result_type.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+
+    const cmp_name = try ownPrint(self.module, "air{}_abs_cmp", .{instruction.index});
+    const neg_name = try ownPrint(self.module, "air{}_abs_neg", .{instruction.index});
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = cmp_name,
+        .kind = .{ .icmp = .{
+            .predicate = .slt,
+            .operand_ty = source.ty.ir_type,
+            .lhs = source.value,
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    try self.block.instructions.append(self.allocator, .{
+        .result = neg_name,
+        .kind = .{ .binary = .{
+            .op = .sub,
+            .ty = source.ty.ir_type,
+            .lhs = .{ .int = 0 },
+            .rhs = source.value,
+        } },
+    });
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = cmp_name },
+            .ty = source.ty.ir_type,
+            .true_value = .{ .named = neg_name },
+            .false_value = source.value,
         } },
     });
     self.values[instruction.index] = .{
