@@ -99,7 +99,27 @@ Layer: semantic layout, ABI planner, backend.
   `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
   at `generic_cfg_functions=716`, `object_emitted_functions=716`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower array arguments and returns.
+- [x] Lower array arguments and returns.
+
+  Existing frontier proof covers array-backed aggregate arguments and returns in
+  both register and MEMORY classes. Representative register rows include
+  `frontier_array_pair_sum`, `frontier_array_pair_make`,
+  `frontier_stack_array_pair_call_sum_after_six`,
+  `frontier_array_double_make`,
+  `frontier_register_array_double_call_sum_after_eight`,
+  `frontier_deep_stack_array_double_call_sum`, `frontier_float_array_make`,
+  and `frontier_indirect_array_double_make` in
+  `frontier_sysv_aggregate_classes.zig`. Representative MEMORY rows include
+  `frontier_big_array_copy`, `frontier_big_double_array_copy`,
+  `frontier_big_float_array_copy`, `frontier_big_array_mixed_copy`,
+  `frontier_big_nested_array_mixed_copy`,
+  `frontier_big_struct_array_mixed_copy`, and
+  `frontier_big_deep_mixed_copy` in `frontier_sysv_sret_byval.zig`. The C ABI
+  harnesses validate these array arguments and returned arrays through native
+  executable checks. Saved gate evidence:
+  `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
+  at `generic_cfg_functions=716`, `object_emitted_functions=716`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower slice arguments and returns as `{ ptr, len }` aggregates.
 - [ ] Lower aggregate field/payload reads used after calls.
 - [ ] Lower aggregate field/payload writes before calls.
