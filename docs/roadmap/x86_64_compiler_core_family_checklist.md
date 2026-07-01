@@ -480,7 +480,19 @@ Layer: aggregate semantic lowering.
   `source_rows=14`, `discovered_functions=730`,
   `generic_cfg_functions=730`, `object_emitted_functions=730`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Prove source-backed slice construction.
+- [x] Prove source-backed slice construction.
+
+  Source-backed slice construction is proven by `frontier_slice_len_from_ptr`,
+  `frontier_slice_internal_abi_checksum`, `frontier_slice_ptr_load`, and the
+  checked/unchecked slice element rows in `frontier_slice_pointer_arith.zig`.
+  These rows build `values[0..len]` slices from real Zig source, consume the
+  resulting `{ ptr, len }` value through length extraction, pointer extraction,
+  internal Zig slice ABI calls, load/store, and bounds-checked element access.
+  Latest strict frontier evidence in `tmp/frontier_aggregate_projection.log`
+  keeps all three release modes green at `source_rows=14`,
+  `discovered_functions=730`, `generic_cfg_functions=730`,
+  `object_emitted_functions=730`, `executable_ok_rows=14`, and
+  `local_fail=0`.
 - [ ] Prove source-backed array-to-slice conversion.
 - [ ] Prove source-backed aggregate projection after construction.
 - [ ] Keep unsupported aggregate element/layout forms fail-closed.
