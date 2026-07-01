@@ -361,8 +361,8 @@ Source-backed ABI and pointer/slice boundary proof is green for all three modes 
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=6
-discovered_functions=10
+source_rows=7
+discovered_functions=12
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
@@ -371,7 +371,7 @@ tail_call_boundary_rows=1
 callconv_boundary_rows=1
 stack_pressure_boundary_rows=0
 safety_edge_boundary_rows=0
-pointer_slice_boundary_rows=0
+pointer_slice_boundary_rows=2
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -388,7 +388,9 @@ rows is now accepted in the frontier corpus; the boundary gate keeps
 bounds CFG is accepted in the strict frontier corpus, so
 `safety_edge_boundary_rows=0` is now a regression guard rather than an active
 boundary. Checked slice-element stores are also accepted in the strict frontier
-corpus, so `pointer_slice_boundary_rows=0` is now a regression guard.
+corpus. The active `pointer_slice_boundary_rows=2` entries cover volatile and
+atomic derived-pointer forms that remain fail-closed with
+`UnsupportedPointerSliceAbi`.
 
 Executable ABI proof is green for all three modes:
 

@@ -124,6 +124,7 @@ const source_boundaries = [_]SourceBoundary{
     .{ .source_fragment = "frontier_packed_aggregate_boundary.zig", .category = .packed_aggregate, .expected_rows = 2, .source_failure_rows = 2 },
     .{ .source_fragment = "frontier_tail_call_boundary.zig", .category = .tail_call, .expected_rows = 1 },
     .{ .source_fragment = "frontier_callconv_boundary.zig", .category = .non_default_callconv, .expected_rows = 1 },
+    .{ .source_fragment = "frontier_pointer_slice_boundary.zig", .category = .pointer_slice, .expected_rows = 2 },
 };
 
 fn sourceBoundary(source: []const u8) ?SourceBoundary {
@@ -138,7 +139,7 @@ pub fn expectedFrontierBoundarySummary() ExpectedSummary {
     for (source_boundaries) |boundary| counts.add(boundary.category, boundary.expected_rows);
     return .{
         .source_rows = source_boundaries.len,
-        .discovered_functions = 10,
+        .discovered_functions = 12,
         .counts = counts,
     };
 }
@@ -151,7 +152,9 @@ pub fn categoryForUnsupported(source: []const u8, diagnostic: air_lowering.Diagn
         .vector, .x87, .stack_pressure => if (std.mem.eql(u8, diagnostic.opcode, "function-type") and
             diagnostic.reason == .function_type) return boundary.category,
         .tail_call => return .tail_call,
-        .packed_aggregate, .non_default_callconv, .safety_edge, .pointer_slice => {},
+        .pointer_slice => if (std.mem.eql(u8, diagnostic.opcode, "atomic_load") and
+            diagnostic.reason == .opcode) return .pointer_slice,
+        .packed_aggregate, .non_default_callconv, .safety_edge => {},
     }
     return null;
 }
@@ -188,6 +191,10 @@ pub fn categoryForCodegenFailure(source: []const u8, err: anyerror) ?Category {
                 .pointer_slice => .pointer_slice,
                 else => null,
             }
+        else
+            null,
+        error.UnsupportedCodegenInstruction => if (boundary) |entry|
+            if (entry.category == .pointer_slice) .pointer_slice else null
         else
             null,
         error.UnsupportedCodegenAbi => if (boundary) |entry|
@@ -241,14 +248,14 @@ test "frontier ABI boundary counts update by category" {
 
 test "frontier ABI boundary expected summary is registry-owned" {
     const expected = expectedFrontierBoundarySummary();
-    try std.testing.expectEqual(@as(usize, 6), expected.source_rows);
-    try std.testing.expectEqual(@as(usize, 10), expected.discovered_functions);
+    try std.testing.expectEqual(@as(usize, 7), expected.source_rows);
+    try std.testing.expectEqual(@as(usize, 12), expected.discovered_functions);
     try std.testing.expectEqual(@as(usize, 2), expected.counts.varargs_rows);
     try std.testing.expectEqual(@as(usize, 1), expected.counts.tail_call_rows);
     try std.testing.expectEqual(@as(usize, 0), expected.counts.safety_edge_rows);
-    try std.testing.expectEqual(@as(usize, 0), expected.counts.pointer_slice_rows);
-    try std.testing.expect(expected.matches(6, 10, expected.counts));
-    try std.testing.expect(!expected.matches(6, 11, expected.counts));
+    try std.testing.expectEqual(@as(usize, 2), expected.counts.pointer_slice_rows);
+    try std.testing.expect(expected.matches(7, 12, expected.counts));
+    try std.testing.expect(!expected.matches(7, 11, expected.counts));
 }
 
 test "frontier ABI boundary source row counts are explicit" {

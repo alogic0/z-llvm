@@ -393,8 +393,18 @@ Layer: typed AIR parser and address-form lowering.
   `tmp/frontier_pointer_branch_merge.log` reports all three release modes at
   `source_rows=14`, `generic_cfg_functions=724`,
   `object_emitted_functions=724`, `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Keep unsupported address spaces and volatile/atomic pointer forms
+- [x] Keep unsupported address spaces and volatile/atomic pointer forms
   fail-closed.
+
+  `frontier_pointer_slice_boundary.zig` now covers volatile and atomic
+  derived-pointer forms: a volatile pointer load through pointer arithmetic and
+  an `@atomicLoad` through a derived pointer. The boundary registry classifies
+  both as `pointer-slice` with `UnsupportedPointerSliceAbi`, and
+  `tmp/frontier_pointer_slice_boundary.log` reports all three release modes at
+  `source_rows=7`, `discovered_functions=12`,
+  `pointer_slice_boundary_rows=2`, `wrong_diagnostic_rows=0`, and
+  `local_fail=0`. Address-space-specific pointer rows remain future work until
+  a source-backed x86_64 release shape is selected.
 - [ ] Refresh inventory and show the pointer-address bucket reduced.
 
 ### 4. Aggregate-Shape Ops

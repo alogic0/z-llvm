@@ -765,13 +765,13 @@ frontier row.
 Source-backed ABI and pointer/slice boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs
 `test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
-ReleaseSmall and currently reports per mode: `source_rows=6`,
-`discovered_functions=10`, `varargs_boundary_rows=2`,
+ReleaseSmall and currently reports per mode: `source_rows=7`,
+`discovered_functions=12`, `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
 `safety_edge_boundary_rows=0`,
-`pointer_slice_boundary_rows=0`,
+`pointer_slice_boundary_rows=2`,
 `unexpected_accept_rows=0`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries for
