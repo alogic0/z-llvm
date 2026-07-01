@@ -467,10 +467,19 @@ Layer: aggregate semantic lowering.
   frontier evidence in `tmp/frontier_aggregate_init.log` reports all three
   release modes at `source_rows=14`, `discovered_functions=728`,
   `generic_cfg_functions=728`, `object_emitted_functions=728`,
-  `executable_ok_rows=14`, and `local_fail=0`. The broad aggregate projection
-  item remains open; this cycle only added the minimal typed field-value
-  consumer needed by the construction proof.
-- [ ] Lower aggregate projection from typed operands.
+  `executable_ok_rows=14`, and `local_fail=0`. That cycle only added the
+  minimal typed field-value consumer needed by the construction proof.
+- [x] Lower aggregate projection from typed operands.
+
+  `struct_field_val` over aggregate operands now lowers through the aggregate
+  semantic domain with layout-checked field indexes and result types.
+  `frontier_aggregate_projection_tuple_second` proves an internal aggregate
+  parameter projection and scalar C ABI wrapper without function-name
+  admission. Strict frontier evidence in
+  `tmp/frontier_aggregate_projection.log` reports all three release modes at
+  `source_rows=14`, `discovered_functions=730`,
+  `generic_cfg_functions=730`, `object_emitted_functions=730`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Prove source-backed slice construction.
 - [ ] Prove source-backed array-to-slice conversion.
 - [ ] Prove source-backed aggregate projection after construction.

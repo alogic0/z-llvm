@@ -32,3 +32,11 @@ export fn frontier_aggregate_init_tuple_sum(a: usize, b: usize) usize {
     const pair = frontierAggregateInitTuple(a, b);
     return pair[0] + pair[1];
 }
+
+noinline fn frontierAggregateTupleSecond(pair: struct { usize, usize }) usize {
+    return pair[1];
+}
+
+export fn frontier_aggregate_projection_tuple_second(a: usize, b: usize) usize {
+    return frontierAggregateTupleSecond(.{ a, b });
+}
