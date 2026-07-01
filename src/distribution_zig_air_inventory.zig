@@ -9,6 +9,7 @@ const UnknownOpcodePairMap = std.array_hash_map.String(UnknownOpcodePairStat);
 const Options = struct {
     slice: InventorySlice = .all,
     mode: ?Mode = null,
+    preserve_temp: bool = false,
 };
 
 const InventorySlice = enum {
@@ -279,7 +280,7 @@ pub fn main(init: std.process.Init) !void {
             try runSlice(init, zig_emitter, mode, .compiler_core);
         }
         if (options.slice == .compiler_core_module or options.slice == .all) {
-            try runCompilerCoreModuleSlice(init, zig_emitter, mode);
+            try runCompilerCoreModuleSlice(init, zig_emitter, mode, options.preserve_temp);
         }
     }
 }
@@ -298,6 +299,8 @@ fn parseOptions(args: std.process.Args) !Options {
             } else {
                 options.mode = try Mode.parse(value);
             }
+        } else if (std.mem.eql(u8, arg, "--preserve-temp")) {
+            options.preserve_temp = true;
         } else {
             return error.UnsupportedDistributionInventoryArgument;
         }
@@ -454,7 +457,7 @@ fn sliceAllowsBoundaries(slice: InventorySlice) bool {
     };
 }
 
-fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, mode: Mode) !void {
+fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, mode: Mode, preserve_success_temp: bool) !void {
     const allocator = init.gpa;
     const io = init.io;
     const slice = InventorySlice.compiler_core_module;
@@ -584,6 +587,13 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
     }
     printCompilerCoreModuleProgress(slice, mode, descriptor_path, "summary-start");
     try printSummary(allocator, slice, mode, counters);
+    if (preserve_success_temp) {
+        preserve_temp = true;
+        std.debug.print(
+            "inventory-progress slice={s} mode={s} phase=preserve-temp temp_path={s} export_path={s} stdout_path={s} stderr_path={s}\n",
+            .{ slice.cliName(), mode.name(), temp_path, descriptor_path, stdout_path, stderr_path },
+        );
+    }
     printCompilerCoreModuleProgress(slice, mode, descriptor_path, "complete");
 }
 

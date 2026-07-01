@@ -198,7 +198,7 @@ actionable evidence. Empty or incomplete logs are not evidence.
 
 | Mode | Sources | Real module context | Generated imports available | Stubbed imports | Functions | Functions with body | Declarations without body | Instructions | Globals | TLS globals | Boundary sources |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ReleaseFast | 1 | 1 | 1 | 0 | 61341 | 61341 | 0 | 6291825 | 59640 | 15 | 0 |
+| ReleaseFast | 1 | 1 | 1 | 0 | 61375 | 61375 | 0 | 6298207 | 59693 | 16 | 0 |
 | ReleaseSafe | 1 | 1 | 1 | 0 | 61951 | 61951 | 0 | 6842493 | 60751 | 14 | 0 |
 | ReleaseSmall | 1 | 1 | 1 | 0 | 59837 | 59837 | 0 | 4178468 | 55096 | 16 | 0 |
 
@@ -206,7 +206,7 @@ Compiler-core module body-aware category signals:
 
 | Mode | Calls | Loads | Stores | Stack slots | Branches | Loops/backedges | Switches | Atomics | Inline asm |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ReleaseFast | 330045 | 589168 | 315333 | 372519 | 1037603 | 25436 | 15599 | 620 | 87 |
+| ReleaseFast | 330413 | 589486 | 315463 | 372867 | 1039278 | 25448 | 15608 | 620 | 87 |
 | ReleaseSafe | 414768 | 598366 | 317492 | 385116 | 1243546 | 25710 | 15618 | 619 | 88 |
 | ReleaseSmall | 324995 | 577888 | 310553 | 366867 | 981856 | 24996 | 15463 | 615 | 86 |
 
@@ -234,7 +234,7 @@ Top body opcode signals:
 
 | Mode | Highest opcode counts |
 | --- | --- |
-| ReleaseFast | `dbg_stmt=1583492`, `block=483000`, `br=444826`, `alloc=372519`, `call=330045`, `store=315333`, `bitcast=291356`, `load=589064` |
+| ReleaseFast | `dbg_stmt=1585147`, `load=589382`, `block=483814`, `br=445586`, `alloc=372867`, `call=330413`, `store=315463`, `bitcast=291574` |
 | ReleaseSafe | `dbg_stmt=1608158`, `block=552975`, `br=514565`, `call=414768`, `alloc=385116`, `store_safe=268309`, `load=598263` |
 | ReleaseSmall | `block=461641`, `br=412562`, `alloc=366867`, `call=324995`, `store=310553`, `bitcast=286673`, `load=577785` |
 
