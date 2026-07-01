@@ -382,7 +382,17 @@ Layer: typed AIR parser and address-form lowering.
   `tmp/frontier_is_non_null_ptr.log`, reports
   `frontier_slice_pointer_arith.zig` executable-ok in all three release modes
   with `local_fail=0`.
-- [ ] Prove pointer/slice values across a branch merge.
+- [x] Prove pointer/slice values across a branch merge.
+
+  `frontier_pointer_branch_merge_load` in
+  `frontier_slice_pointer_arith.zig` now proves a real source-backed branch
+  selection of pointer values: Zig lowers the `if` expression to a typed-v2
+  pointer `select`, the existing generic CFG single-block pointer-select load
+  path owns the load, and the C harness checks both true and false pointer
+  selections. Strict executable evidence in
+  `tmp/frontier_pointer_branch_merge.log` reports all three release modes at
+  `source_rows=14`, `generic_cfg_functions=724`,
+  `object_emitted_functions=724`, `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Keep unsupported address spaces and volatile/atomic pointer forms
   fail-closed.
 - [ ] Refresh inventory and show the pointer-address bucket reduced.

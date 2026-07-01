@@ -136,6 +136,11 @@ export fn frontier_ptr_slot_store(values: [*]i32, index: usize, value: i32) i32 
     return ptr[index];
 }
 
+export fn frontier_pointer_branch_merge_load(first: *const i32, second: *const i32, flag: i32) i32 {
+    const ptr = if (flag != 0) first else second;
+    return ptr.*;
+}
+
 export fn frontier_slice_len_from_ptr(values: [*]const i32, len: usize) usize {
     const slice = values[0..len];
     return slice.len;

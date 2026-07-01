@@ -19,6 +19,7 @@ extern unsigned char z_frontier_ptr_add_load_const_runtime_u8(const unsigned cha
 extern unsigned short z_frontier_ptr_add_load_const_runtime_u16(const unsigned short *, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_ptr_add_load_const_runtime_u16");
 extern unsigned int z_frontier_ptr_add_load_const_runtime_u32(const unsigned int *, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_ptr_add_load_const_runtime_u32");
 extern unsigned long long z_frontier_ptr_add_load_const_runtime_u64(const unsigned long long *, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_ptr_add_load_const_runtime_u64");
+extern int z_frontier_pointer_branch_merge_load(const int *, const int *, int) __asm__("frontier_slice_pointer_arith.frontier_pointer_branch_merge_load");
 extern unsigned char z_frontier_ptr_add_store_u8(unsigned char *, unsigned long, unsigned char) __asm__("frontier_slice_pointer_arith.frontier_ptr_add_store_u8");
 extern unsigned short z_frontier_ptr_add_store_u16(unsigned short *, unsigned long, unsigned short) __asm__("frontier_slice_pointer_arith.frontier_ptr_add_store_u16");
 extern unsigned long long z_frontier_ptr_add_store_u64(unsigned long long *, unsigned long, unsigned long long) __asm__("frontier_slice_pointer_arith.frontier_ptr_add_store_u64");
@@ -108,6 +109,8 @@ int main(void) {
     if (mutable_longs[3] != 5555ULL) return 22;
     if (z_frontier_ptr_add_store_const_runtime_i32(mutable_values, 2, 31) != 31) return 28;
     if (mutable_values[3] != 31) return 29;
+    if (z_frontier_pointer_branch_merge_load(&values[2], &values[4], 1) != 8) return 46;
+    if (z_frontier_pointer_branch_merge_load(&values[2], &values[4], 0) != 21) return 47;
     if (z_frontier_ptr_slot_load(values, 2) != 13) return 30;
     if (z_frontier_ptr_slot_store(mutable_values, 1, 43) != 43) return 31;
     if (mutable_values[2] != 43) return 32;
