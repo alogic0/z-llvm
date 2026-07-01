@@ -707,7 +707,13 @@ Layer: semantic lowering and CFG lowering.
   source/function `../ziglang/src/main.zig / SemanticVersion.parse`; this item
   closes the generic typed lowering ownership piece, not the full optional
   branch/merge family.
-- [ ] Lower optional payload extraction.
+- [x] Lower optional payload extraction.
+  Completed in `src/zig_air_model_optional.zig` by adding
+  `typedOptionalPayloadExtractionSummary`, which validates the optional operand
+  and payload result relation before the typed lowering context extracts the
+  payload value. This covers the generic typed-v2 payload extraction instruction
+  used by the accepted optional scalar and pointer rows; broader branch/merge
+  ownership is tracked separately below.
 - [ ] Lower optional pointer checks.
 - [ ] Lower optional pointer payload extraction.
 - [ ] Lower optional branch/merge flows.

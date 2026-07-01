@@ -1,4 +1,3 @@
-const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
@@ -48,10 +47,9 @@ pub fn lowerTypedWrapOptional(self: anytype, instruction: air_export.TypedInstru
 }
 
 pub fn lowerTypedOptionalPayload(self: anytype, instruction: air_export.TypedInstruction) !void {
-    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
-    const payload_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    const summary = air_model.typedOptionalPayloadExtractionSummary(instruction) orelse return air_model.LowerError.UnsupportedAir;
+    const payload_type = parseZigType(summary.payload_type_text) orelse return air_model.LowerError.UnsupportedAir;
     const optional = try self.resolveTypedOperand(instruction, 0);
-    if (!std.mem.startsWith(u8, instruction.operands[0].type_text, "?")) return air_model.LowerError.UnsupportedAir;
     if (payload_type.ir_type == .ptr) {
         if (optional.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
     } else {
