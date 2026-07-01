@@ -50,7 +50,7 @@ pub fn emitGenericCfgBranchSideEffects(
                 try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
                 try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
             },
-            .load, .binary, .call => {},
+            .load, .binary, .cast, .call => {},
             else => return error.UnsupportedCodegenInstruction,
         }
     }
@@ -105,7 +105,12 @@ pub fn emitGenericCfgI32ValueIntoEax(
                             switch (rhs_instruction.kind) {
                                 .load => |rhs_load| switch (genericCfgI32Address(function, rhs_load.ptr) orelse return error.UnsupportedCodegenValue) {
                                     .tls => |symbol| try machine.instructions.append(allocator, .{ .add_tls_i32_eax = symbol }),
-                                    .param, .global => return error.UnsupportedCodegenValue,
+                                    .global => {
+                                        if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return error.UnsupportedCodegenValue;
+                                        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, binary.rhs);
+                                        try emitGenericCfgI32AddValueToEax(allocator, machine, function, block, binary.lhs);
+                                    },
+                                    .param => return error.UnsupportedCodegenValue,
                                 },
                                 .binary, .select, .call => {
                                     if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return error.UnsupportedCodegenValue;

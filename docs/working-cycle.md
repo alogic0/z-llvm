@@ -141,11 +141,33 @@ When an architectural choice appears, choose the option that:
 8.  Minimizes Zig stage4 rebuilds.
 9.  Can be validated with focused frontier gates.
 
-Record the decision in `docs/next_steps.md` before or with the implementation.
+Record the decision in `docs/next_steps.md` before or with the implementation
+only when the decision blocks, changes active family, or needs review. Routine
+narrow hook-contract facts should be recorded in the family checklist and commit
+message instead.
+
+### Narrow Hook-Contract Exception
+
+The worker may continue without stopping when all of these are true:
+
+- the active checklist item requires one missing typed-v2 fact;
+- the change is a narrow additive or versioned export in `../ziglang`;
+- the change does not redesign the AIR export format;
+- the change does not remove or weaken existing facts;
+- the change does not introduce source-name, case-id, or AIR-text recovery;
+- unsupported variants remain fail-closed;
+- the z_llvm consumer and source-backed proof are implemented in the same
+  cycle.
+
+This exception exists so compiler-core family items can make normal progress
+when Zig has the semantic data but the current typed-v2 export omitted one
+operand, type, block, or control-flow fact.
 
 Stop for architectural review only if the choice would require:
 
-- changing the public hook contract with `../ziglang`;
+- broad, ambiguous, or cross-family hook-contract changes in `../ziglang`;
+- changing existing hook fact semantics instead of adding a narrow versioned
+  fact;
 - broad redesign of the AIR export format;
 - abandoning an existing documented milestone;
 - making an x86_64-only rule appear target-independent;

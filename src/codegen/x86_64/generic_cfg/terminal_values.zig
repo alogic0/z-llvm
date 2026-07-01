@@ -19,6 +19,7 @@ const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditio
 const appendGenericCfgReturn = core_cfg_emit.appendGenericCfgReturn;
 const appendSysVScalarCallArgsWithBlock = cabi_call_lowering.appendSysVScalarCallArgsWithBlock;
 const callIsFastcc = shared.callIsFastcc;
+const emitGenericCfgI32AddValueToEax = core_value_emit.emitGenericCfgI32AddValueToEax;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
 const emitGenericCfgIcmpCondition = cabi_call_lowering.emitGenericCfgIcmpCondition;
 const findInstruction = cabi_call_lowering.findInstruction;
@@ -28,7 +29,6 @@ const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
 const isInt = shared.isInt;
 const machineBinaryOp = cabi_call_lowering.machineBinaryOp;
-const paramReg = cabi_abi_helpers.paramReg;
 const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
 const blockIndex = cabi_abi_helpers.blockIndex;
@@ -523,8 +523,19 @@ pub fn emitGenericCfgTerminalI32ValueIntoEaxInScope(
                         },
                         .named => |rhs_name| {
                             const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
-                            const rhs_reg = try paramReg(function, rhs_name, .{ .int = 32 });
-                            try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs_reg } });
+                            if (paramRegOrNull(function, rhs_name, .{ .int = 32 }) catch null) |rhs_reg| {
+                                try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs_reg } });
+                                return;
+                            }
+                            if (op != .add) return error.UnsupportedCodegenInstruction;
+                            const rhs_instruction = terminalScopeInstruction(scope, rhs_name) orelse return error.UnsupportedCodegenValue;
+                            switch (rhs_instruction.kind) {
+                                .load => {
+                                    try emitGenericCfgTerminalI32ValueIntoEaxInScope(allocator, machine, function, scope, binary.rhs);
+                                    try emitGenericCfgI32AddValueToEax(allocator, machine, function, scope.block, binary.lhs);
+                                },
+                                else => return error.UnsupportedCodegenInstruction,
+                            }
                         },
                         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                     }

@@ -35,6 +35,8 @@ const FrontierNameError = error{
     VeryLongName,
 };
 
+var frontier_error_cleanup_counter: i32 = 0;
+
 export fn frontier_error_union_match(tag: i32) i32 {
     const result: FrontierError!i32 = if (tag == 0) 11 else FrontierError.BadTag;
     if (result) |value| {
@@ -512,6 +514,20 @@ export fn frontier_try_discard_payload_chain_match(first: i32, second: i32, valu
         return frontierClassifyCaughtError(err, base);
     };
     return base + 29;
+}
+
+fn frontierTryCleanupRewrap(tag: i32, value: i32, delta: i32) FrontierError!void {
+    _ = frontierMaybeTryPayload(tag, value) catch |err| {
+        frontier_error_cleanup_counter += delta;
+        return err;
+    };
+}
+
+export fn frontier_try_cleanup_rewrap_match(tag: i32, value: i32, delta: i32, base: i32) i32 {
+    frontierTryCleanupRewrap(tag, value, delta) catch {
+        return base + frontier_error_cleanup_counter + 43;
+    };
+    return base + frontier_error_cleanup_counter + 31;
 }
 
 fn frontierWrapErrorSwitch(tag: i32, value: i32) FrontierError!i32 {

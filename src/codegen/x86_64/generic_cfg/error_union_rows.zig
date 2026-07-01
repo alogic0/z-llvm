@@ -1,5 +1,6 @@
 const shared = @import("core_shared.zig");
 const core_cfg_emit = @import("core_cfg_emit.zig");
+const core_value_emit = @import("core_value_emit.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_call_lowering = @import("cabi_call_lowering.zig");
 const terminal_values = @import("terminal_values.zig");
@@ -17,6 +18,7 @@ const appendStackFrameEnd = shared.appendStackFrameEnd;
 const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
 const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
 const appendGenericCfgReturn = core_cfg_emit.appendGenericCfgReturn;
+const appendAlignedCallPreservingI32Params = cabi_call_lowering.appendAlignedCallPreservingI32Params;
 const appendSysVScalarCallArgsWithBlock = cabi_call_lowering.appendSysVScalarCallArgsWithBlock;
 const blockIndex = cabi_abi_helpers.blockIndex;
 const blockHasCondbr = terminal_values.blockHasCondbr;
@@ -30,7 +32,9 @@ const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
 const isInt = shared.isInt;
 const isNamed = shared.isNamed;
+const LiveParamSet = cabi_call_lowering.LiveParamSet;
 const machineBinaryOp = cabi_call_lowering.machineBinaryOp;
+const noteLiveValueSet = cabi_call_lowering.noteLiveValueSet;
 const paramReg = cabi_abi_helpers.paramReg;
 const phiHasIncoming = cabi_call_lowering.phiHasIncoming;
 const phiHasIncomingInt = cabi_call_lowering.phiHasIncomingInt;
@@ -43,6 +47,7 @@ const emitGenericCfgTerminalConditionTrueBranch = terminal_values.emitGenericCfg
 const emitGenericCfgTerminalI32ValueIntoEax = terminal_values.emitGenericCfgTerminalI32ValueIntoEax;
 const emitGenericCfgTerminalI64ValueIntoRax = terminal_values.emitGenericCfgTerminalI64ValueIntoRax;
 const emitGenericCfgTerminalReturnBlock = terminal_values.emitGenericCfgTerminalReturnBlock;
+const emitGenericCfgBranchSideEffects = core_value_emit.emitGenericCfgBranchSideEffects;
 const genericCfgSupportsTerminalReturnBlock = terminal_values.genericCfgSupportsTerminalReturnBlock;
 const phiIncomingForBlock = terminal_values.phiIncomingForBlock;
 const singleBrTarget = terminal_values.singleBrTarget;
@@ -681,6 +686,15 @@ const ErrorUnionTryRewrapErrorReturn = struct {
     success_is_then: bool,
 };
 
+const ErrorUnionTryVoidRewrapErrorReturn = struct {
+    entry: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    cont_block: ir.BasicBlock,
+    err_block: ir.BasicBlock,
+    success_is_then: bool,
+};
+
 pub const PayloadBinaryWrapReturn = struct {
     op: MachineBinaryOp,
     reg: ArgReg,
@@ -731,6 +745,7 @@ pub fn lowerGenericCfgErrorUnionTryRewrapErrorReturn(
     try appendGenericCfgConditionalBranch(allocator, machine, if (plan.success_is_then) .je else .jne, plan.cont_block.name);
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
+    try emitGenericCfgBranchSideEffects(allocator, machine, function, plan.err_block);
     try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
     try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
@@ -740,6 +755,43 @@ pub fn lowerGenericCfgErrorUnionTryRewrapErrorReturn(
     try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
     if (plan.payload_add_imm != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = plan.payload_add_imm });
     try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+pub fn lowerGenericCfgErrorUnionTryVoidRewrapErrorReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionTryVoidRewrapErrorReturn(function) orelse return false;
+    const frame_bytes: u8 = 8;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_try_void_rewrap_error_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, if (plan.success_is_then) .je else .jne, plan.cont_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.err_block.name);
+    try emitGenericCfgBranchSideEffects(allocator, machine, function, plan.err_block);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.cont_block.name);
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 });
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
@@ -781,6 +833,41 @@ fn errorUnionTryRewrapErrorReturn(function: ir.Function) ?ErrorUnionTryRewrapErr
         .err_block = err_block,
         .payload_add_imm = then_success orelse else_success.?,
         .success_is_then = then_success != null,
+    };
+}
+
+fn errorUnionTryVoidRewrapErrorReturn(function: ir.Function) ?ErrorUnionTryVoidRewrapErrorReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 3) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
+    const call_instruction = findInstruction(entry, call_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    const then_success = blockReturnsI64Zero(then_block);
+    const else_success = blockReturnsI64Zero(else_block);
+    if (then_success == else_success) return null;
+    const cont_block = if (then_success) then_block else else_block;
+    const err_block = if (then_success) else_block else then_block;
+    if (!blockReturnsRewrappedErrorBits(err_block, call_name)) return null;
+
+    return .{
+        .entry = entry,
+        .call_name = call_name,
+        .call = call,
+        .cont_block = cont_block,
+        .err_block = err_block,
+        .success_is_then = then_success,
     };
 }
 
@@ -1937,6 +2024,15 @@ const ErrorUnionCatchCallReturn = struct {
     live_param_reg: ArgReg,
 };
 
+const ErrorUnionCatchTerminalReturn = struct {
+    entry: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    success_block: ir.BasicBlock,
+    catch_block: ir.BasicBlock,
+    live_params: LiveParamSet,
+};
+
 const ErrorSetParamSwitchCase = struct {
     value: u16,
     block: ir.BasicBlock,
@@ -2272,6 +2368,26 @@ pub fn lowerGenericCfgErrorUnionCatchCallReturn(
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+pub fn lowerGenericCfgErrorUnionCatchTerminalReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionCatchTerminalReturn(function) orelse return false;
+
+    try appendAlignedCallPreservingI32Params(allocator, machine, function, plan.call, plan.live_params, .{ .direct = plan.call.callee });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.success_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.catch_block.name);
+    try emitGenericCfgTerminalReturnBlock(allocator, machine, function, plan.entry, plan.catch_block);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.success_block.name);
+    try emitGenericCfgTerminalReturnBlock(allocator, machine, function, plan.entry, plan.success_block);
     return true;
 }
 
@@ -2738,6 +2854,49 @@ fn errorUnionCatchCallReturn(function: ir.Function) ?ErrorUnionCatchCallReturn {
         .catch_call = catch_call.call,
         .live_param_reg = live_param_reg orelse return null,
     };
+}
+
+fn errorUnionCatchTerminalReturn(function: ir.Function) ?ErrorUnionCatchTerminalReturn {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 3) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
+    const call_instruction = findInstruction(entry, call_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call)) return null;
+
+    const success_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const catch_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    if (!genericCfgSupportsTerminalReturnBlock(function, entry, success_block)) return null;
+    if (!genericCfgSupportsTerminalReturnBlock(function, entry, catch_block)) return null;
+
+    var live_params: LiveParamSet = .{};
+    noteTerminalReturnLiveParams(function, success_block, &live_params) catch return null;
+    noteTerminalReturnLiveParams(function, catch_block, &live_params) catch return null;
+
+    return .{
+        .entry = entry,
+        .call_name = call_name,
+        .call = call,
+        .success_block = success_block,
+        .catch_block = catch_block,
+        .live_params = live_params,
+    };
+}
+
+fn noteTerminalReturnLiveParams(function: ir.Function, block: ir.BasicBlock, live_params: *LiveParamSet) !void {
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    try noteLiveValueSet(function, block, ret.value orelse return error.InvalidRet, live_params);
 }
 
 const CatchErrorCallReturn = struct {

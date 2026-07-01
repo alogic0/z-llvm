@@ -100,7 +100,8 @@ pub fn genericCfgSupportsSingleBlockBinary(function: ir.Function, block: ir.Basi
                     if (binary.op != .add or !load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
                     return switch (genericCfgI32Address(function, load.ptr) orelse return false) {
                         .tls => true,
-                        .param, .global => false,
+                        .global => genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs),
+                        .param => false,
                     };
                 },
                 .binary, .select, .call => {

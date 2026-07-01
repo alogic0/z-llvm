@@ -64,6 +64,7 @@ const aggregateGepByteOffset = cabi_aggregate_lowering.aggregateGepByteOffset;
 const genericCfgSupportsBranchIcmp = core_value_support.genericCfgSupportsBranchIcmp;
 const genericCfgSupportsPointerParam = core_value_support.genericCfgSupportsPointerParam;
 const genericCfgSupportsSingleBlockScalar = core_value_support.genericCfgSupportsSingleBlockScalar;
+const genericCfgSupportsSingleBlockScalarInstruction = core_value_support.genericCfgSupportsSingleBlockScalarInstruction;
 const genericCfgSupportsSingleBlockI32Value = core_value_support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsSingleBlockStore = core_value_support.genericCfgSupportsSingleBlockStore;
 const globalSymbolName = shared.globalSymbolName;
@@ -2396,6 +2397,10 @@ pub fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *Ma
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgSingleBlockVoidEffects(allocator, machine, function, block)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (block.instructions.items.len == 1) {
         const instruction = block.instructions.items[0];
         if (instruction.removed) return false;
@@ -2441,6 +2446,43 @@ pub fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *Ma
     }
     try appendGenericCfgReturn(allocator, machine);
     machine.codegen_path = .generic_cfg;
+    return true;
+}
+
+fn lowerGenericCfgSingleBlockVoidEffects(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !bool {
+    if (block.instructions.items.len == 0) return false;
+    var saw_effect = false;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) return false;
+        if (!genericCfgSupportsSingleBlockScalarInstruction(function, block, instruction)) return false;
+        switch (instruction.kind) {
+            .store => saw_effect = true,
+            .call => |call| {
+                if (instruction.result != null or call.ret_ty != .void) return false;
+                saw_effect = true;
+            },
+            .load, .binary, .icmp, .select => {},
+            .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return false,
+        }
+    }
+    if (!saw_effect) return false;
+    for (block.instructions.items, 0..) |instruction, instruction_index| {
+        switch (instruction.kind) {
+            .store => |store| {
+                try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
+                try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
+            },
+            .call => |call| try emitGenericCfgVoidCall(allocator, machine, function, block, instruction_index, call),
+            .load, .binary, .icmp, .select => {},
+            .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => unreachable,
+        }
+    }
+    try appendGenericCfgReturn(allocator, machine);
     return true;
 }
 

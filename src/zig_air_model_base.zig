@@ -240,12 +240,27 @@ pub const TypedFunctionView = struct {
         structured_body: air_export.StructuredBody,
         target_block: u32,
     ) bool {
-        const branch_index = self.singleSemanticInstruction(structured_body) orelse return false;
-        const branch = self.instruction(branch_index) orelse return false;
-        if (!air_capabilities.isBrOpcode(branch.opcode) or branch.operands.len != 2) return false;
-        const target = blockTarget(branch.operands[0]) orelse return false;
-        if (target != target_block) return false;
-        return typedVoidConstOperand(branch, 1) orelse false;
+        var saw_branch = false;
+        for (structured_body.instructions) |instruction_index| {
+            const typed_instruction = self.instruction(instruction_index) orelse return false;
+            const typed_capability = self.capability(typed_instruction);
+            if (typed_capability.status == .ignored_metadata) continue;
+            if (air_capabilities.isBrOpcode(typed_instruction.opcode)) {
+                if (saw_branch or typed_instruction.operands.len != 2) return false;
+                const target = blockTarget(typed_instruction.operands[0]) orelse return false;
+                if (target != target_block) return false;
+                if (!(typedVoidConstOperand(typed_instruction, 1) orelse false)) return false;
+                saw_branch = true;
+                continue;
+            }
+            if (saw_branch) return false;
+            if (!discardedVoidBranchValueInstruction(typed_instruction)) return false;
+        }
+        return saw_branch;
+    }
+
+    fn discardedVoidBranchValueInstruction(candidate: air_export.TypedInstruction) bool {
+        return air_capabilities.errorUnionSemanticOpForOpcode(candidate.opcode) == .unwrap_payload;
     }
 
     pub fn voidGuardBlock(

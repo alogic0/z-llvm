@@ -63,6 +63,7 @@ const genericCfgSupportsI32Value = core_value_support.genericCfgSupportsI32Value
 pub const lowerGenericCfgLoopTryReturn = error_union_rows.lowerGenericCfgLoopTryReturn;
 pub const lowerGenericCfgLinearErrorUnionTryChainReturn = error_union_rows.lowerGenericCfgLinearErrorUnionTryChainReturn;
 pub const lowerGenericCfgLinearErrorUnionDiscardPayloadTryChainReturn = error_union_rows.lowerGenericCfgLinearErrorUnionDiscardPayloadTryChainReturn;
+pub const lowerGenericCfgErrorUnionTryVoidRewrapErrorReturn = error_union_rows.lowerGenericCfgErrorUnionTryVoidRewrapErrorReturn;
 pub const lowerGenericCfgErrorUnionTryRewrapErrorReturn = error_union_rows.lowerGenericCfgErrorUnionTryRewrapErrorReturn;
 pub const lowerGenericCfgErrorUnionTrySlotUpdateReturn = error_union_rows.lowerGenericCfgErrorUnionTrySlotUpdateReturn;
 pub const lowerGenericCfgErrorUnionTryPayloadCallReturn = error_union_rows.lowerGenericCfgErrorUnionTryPayloadCallReturn;
@@ -80,6 +81,7 @@ pub const lowerGenericCfgErrorUnionCatchValueMergeReturn = error_union_rows.lowe
 pub const lowerGenericCfgErrorUnionCatchSwitchReturn = error_union_rows.lowerGenericCfgErrorUnionCatchSwitchReturn;
 pub const lowerGenericCfgErrorUnionCatchBranchReturn = error_union_rows.lowerGenericCfgErrorUnionCatchBranchReturn;
 pub const lowerGenericCfgErrorUnionCatchCallReturn = error_union_rows.lowerGenericCfgErrorUnionCatchCallReturn;
+pub const lowerGenericCfgErrorUnionCatchTerminalReturn = error_union_rows.lowerGenericCfgErrorUnionCatchTerminalReturn;
 pub const lowerGenericCfgErrorSetParamSwitchReturn = error_union_rows.lowerGenericCfgErrorSetParamSwitchReturn;
 pub const lowerGenericCfgOptionalPointerUnwrapReturn = optional_rows.lowerGenericCfgOptionalPointerUnwrapReturn;
 pub const lowerGenericCfgOptionalPointerReturn = optional_rows.lowerGenericCfgOptionalPointerReturn;
@@ -1287,7 +1289,9 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (try lowerGenericCfgErrorUnionCatchSwitchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionCatchBranchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionCatchCallReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgErrorUnionCatchTerminalReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorSetParamSwitchReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgErrorUnionTryVoidRewrapErrorReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryRewrapErrorReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadCallReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn(allocator, machine, function)) return true;
