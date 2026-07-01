@@ -66,7 +66,22 @@ Layer: semantic layout, ABI planner, backend.
   `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
   at `generic_cfg_functions=716`, `object_emitted_functions=716`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower struct returns in registers.
+- [x] Lower struct returns in registers.
+
+  Existing frontier proof covers register aggregate returns for INTEGER/INTEGER,
+  INTEGER/SSE, SSE/INTEGER, SSE/SSE, nested, array-backed, direct helper, and
+  pointer-callee helper paths. Representative rows include
+  `frontier_mixed_make`, `frontier_double_pair_make`,
+  `frontier_float_array_make`, `frontier_reverse_mixed_make`,
+  `frontier_nested_pair_make`, `frontier_array_pair_make`,
+  `frontier_array_double_make`, `frontier_nested_mixed_make`,
+  `frontier_indirect_array_double_make`, and
+  `frontier_indirect_nested_mixed_make` in
+  `frontier_sysv_aggregate_classes.zig`, with C ABI executable checks in
+  `frontier_frontier_sysv_aggregate_classes.c`. Saved gate evidence:
+  `tmp/frontier_error_union_cleanup_rewrap.log` reports all three release modes
+  at `generic_cfg_functions=716`, `object_emitted_functions=716`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower struct returns through sret memory.
 - [ ] Lower array arguments and returns.
 - [ ] Lower slice arguments and returns as `{ ptr, len }` aggregates.
