@@ -81,6 +81,10 @@ integer switch that returns either a wrapped payload or wrapped error constants
 through an `i64` error-union phi. The x86_64 switch-to-phi path now accepts a
 single entry-local `arg & const` condition, while still requiring the arms and
 default to branch to one proven merge phi.
+The `frontier_wrap_error_branch_match` row covers the direct branch variant:
+terminal `cond_br` arms return wrapped error constants without a merge phi,
+proving the existing typed-v2 terminal branch path owns selected
+`wrap_errunion_err` constants outside the switch shape.
 The `frontier_error_tag_branch` row covers the branch classifier variant:
 `unwrap_errunion_err` feeds an `i16` equality guard and two terminal constant
 returns, while the success arm reuses payload arithmetic from the same direct
@@ -281,20 +285,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=701
-structured_functions=701
-generic_codegen_functions=701
-generic_cfg_functions=701
+discovered_functions=703
+structured_functions=703
+generic_codegen_functions=703
+generic_cfg_functions=703
 structural_matcher_functions=0
-structured_air_v2_functions=701
-typed_air_operand_functions=701
+structured_air_v2_functions=703
+typed_air_operand_functions=703
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=701
+generic_lowering_functions=703
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=701
+object_emitted_functions=703
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
