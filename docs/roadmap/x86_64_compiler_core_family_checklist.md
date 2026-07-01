@@ -748,7 +748,12 @@ Layer: semantic lowering and CFG lowering.
   and ReleaseSmall at `source_rows=14`, `discovered_functions=734`,
   `generic_cfg_functions=734`, `object_emitted_functions=734`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Prove one optional pointer executable row.
+- [x] Prove one optional pointer executable row.
+  Completed by the accepted `frontier_optional_ptr_non_null` and
+  `frontier_optional_ptr_field_non_null` rows, whose C harness checks cover
+  non-null payload loads and null fallbacks. The same strict frontier proof in
+  `tmp/frontier_optional_return.log` keeps these pointer optional rows
+  object-emitted, native-linked, and executable across all three release modes.
 - [ ] Keep unsupported nested optional/error-union mixes fail-closed until
   modeled.
 - [ ] Refresh inventory and show the optional-shape bucket reduced.
