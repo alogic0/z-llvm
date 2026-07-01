@@ -264,7 +264,17 @@ Layer: typed AIR parser and address-form lowering.
   classified as known/lowerable rather than an unsupported inventory bucket.
   Strict executable evidence remains `tmp/frontier_counter_update.log` with
   `executable_ok_rows=14` and `local_fail=0`.
-- [ ] Lower `ptr_slice_ptr_ptr`.
+- [x] Lower `ptr_slice_ptr_ptr`.
+
+  Existing source-backed proof is in `frontier_slice_ptr_load`,
+  `frontier_slice_ptr_const_runtime_load`, and
+  `frontier_slice_ptr_const_runtime_store`, where `slice.ptr` is extracted from
+  a pointer/length slice and then used for derived load/store addressing. The
+  focused compiler-core ReleaseFast inventory log still counts raw
+  `ptr_slice_ptr_ptr` opcodes (`count=6343`) but keeps
+  `unknown_opcode category=pointer-address count=0`, so this opcode is now
+  known/lowerable rather than an unsupported pointer-address bucket. Strict
+  executable evidence remains `tmp/frontier_counter_update.log`.
 - [ ] Lower `slice_ptr`.
 - [ ] Lower `ptr_add`.
 - [ ] Lower `ptr_sub`.
