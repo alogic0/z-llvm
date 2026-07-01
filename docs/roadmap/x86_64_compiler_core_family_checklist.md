@@ -296,7 +296,15 @@ Layer: typed AIR parser and address-form lowering.
   element widths. The focused compiler-core ReleaseFast inventory log still
   counts raw `ptr_add` opcodes (`count=14279`) while reporting
   `unknown_opcode category=pointer-address count=0`.
-- [ ] Lower `ptr_sub`.
+- [x] Lower `ptr_sub`.
+
+  `ptr_sub` is covered by `frontier_ptr_sub_const_load`,
+  `frontier_ptr_sub_runtime_load`, and
+  `frontier_ptr_sub_runtime_rcx_load` in `frontier_slice_pointer_arith.zig`.
+  The executable harness proves constant-backstep, runtime-backstep, and
+  non-primary-register runtime index forms. The focused compiler-core
+  ReleaseFast inventory log counts raw `ptr_sub` opcodes (`count=119`) while
+  keeping the pointer-address unsupported bucket at zero.
 - [ ] Lower `is_non_null_ptr` from a real source shape.
 - [ ] Lower `runtime_nav_ptr` or classify it as a runtime boundary.
 - [ ] Prove pointer arithmetic with load/store.
