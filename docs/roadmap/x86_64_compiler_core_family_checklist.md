@@ -6,8 +6,8 @@ task list. Each item should be closed by a reusable semantic/lowering/backend
 abstraction, source-backed frontier rows, object/native-link/executable proof
 where applicable, and refreshed inventory evidence.
 
-Use `docs/working-cycle.md` for the worker loop. Use
-`docs/roadmap/x86_64_compiler_core_inventory_priorities.md` for the latest
+Use [`docs/working-cycle.md`](../working-cycle.md) for the worker loop. Use
+[`docs/roadmap/x86_64_compiler_core_inventory_priorities.md`](x86_64_compiler_core_inventory_priorities.md) for the latest
 counts and first-source evidence.
 
 ## Completion Rule
@@ -24,81 +24,252 @@ A family is complete only when all applicable release modes have evidence for:
 - refreshed inventory showing the targeted unsupported bucket reduced or
   reclassified.
 
-## Primary Families
+## Implementation Checklist
 
-The "first closure target" is the smallest meaningful slice that should reduce
-the measured compiler-core bucket. It is not the whole family. It should be
-large enough to prove the reusable abstraction and small enough to validate in
-one worker cycle.
+Families are sorted by current priority. Each checkbox is a recurring
+implementation slice that should be closed with the completion rule above. Add
+new subitems when refreshed inventory exposes a new concrete pair inside the
+same family.
 
-| Status | Family | Current priority | Main implementation layer |
-| --- | --- | --- | --- |
-| [ ] | aggregate ABI at scale | highest | semantic layout, ABI planner, backend |
-| [ ] | error-union try/wrap/unwrap | highest | typed AIR facts, CFG lowering |
-| [ ] | pointer/slice/address forms | high | typed AIR parser, address lowering |
-| [ ] | aggregate-shape ops | high | aggregate semantic lowering |
-| [ ] | union-tag shape | high | semantic lowering, CFG lowering |
-| [ ] | optional shape | medium | semantic lowering, CFG lowering |
-| [ ] | vector forms | medium | ABI planner, backend |
-| [ ] | scalar transforms | medium | semantic lowering, backend |
-| [ ] | safety runtime paths | medium | safety-edge CFG, runtime boundary |
-| [ ] | float math | medium-low | backend, runtime boundary |
-| [ ] | select shape | low but enabling | semantic lowering, CFG lowering |
+### 1. Aggregate ABI At Scale
 
-## First Closure Targets
+Layer: semantic layout, ABI planner, backend.
 
-- aggregate ABI at scale:
-  close structs, arrays, and slices in calls and returns beyond the selected
-  frontier rows. The first target should include one direct call, one return,
-  and one aggregate field/payload use that reaches object/native-link proof.
-- error-union try/wrap/unwrap:
-  close the high-count `unwrap_errunion_err`, `wrap_errunion_err`, and `try`
-  forms first. Then add pointer and cold variants: `try_ptr`,
-  `unwrap_errunion_err_ptr`, and `try_cold`.
-- pointer/slice/address forms:
-  close `ptr_slice_len_ptr`, `ptr_add`, `slice_ptr`, and
-  `ptr_slice_ptr_ptr` first. Then add `is_non_null_ptr`, `ptr_sub`, and
-  `runtime_nav_ptr` if inventory still shows them.
-- aggregate-shape ops:
-  close `slice_len`, `slice`, and `array_to_slice` as source-backed typed
-  aggregate operations, not source-name special cases.
-- union-tag shape:
-  close `get_union_tag`, `union_init`, `set_union_tag`, and `tag_name`.
-  Include at least one payload read and one switch/branch over the tag.
-- optional shape:
-  close generic `wrap_optional`, optional payload extraction, optional pointer
-  checks, and non-selected catch/branch flows that still appear in compiler-core
+- [ ] Own aggregate layout facts from typed/model data for compiler-core rows.
+- [ ] Lower struct arguments passed in registers.
+- [ ] Lower struct arguments passed through memory.
+- [ ] Lower struct returns in registers.
+- [ ] Lower struct returns through sret memory.
+- [ ] Lower array arguments and returns.
+- [ ] Lower slice arguments and returns as `{ ptr, len }` aggregates.
+- [ ] Lower aggregate field/payload reads used after calls.
+- [ ] Lower aggregate field/payload writes before calls.
+- [ ] Prove at least one direct-call aggregate row.
+- [ ] Prove at least one returned-aggregate row.
+- [ ] Prove at least one aggregate field/payload executable row.
+- [ ] Keep unsupported packed/unaligned/oversized forms fail-closed.
+- [ ] Refresh inventory and show the aggregate ABI bucket reduced or
+  reclassified.
+
+### 2. Error-Union Try/Wrap/Unwrap
+
+Layer: typed AIR facts, semantic lowering, CFG lowering.
+
+- [ ] Lower `unwrap_errunion_err` from typed operands.
+- [ ] Lower `wrap_errunion_err` from typed operands.
+- [ ] Lower `wrap_errunion_payload` for compiler-core-shaped payload flows.
+- [ ] Lower `try` with payload continuation.
+- [ ] Lower `try` with error return.
+- [x] Lower discarded-payload chained `try` in `Error!void` helpers.
+- [ ] Lower `try` with catch-side branch/merge.
+- [ ] Lower `try_cold`.
+- [ ] Lower `try_ptr`.
+- [ ] Lower `unwrap_errunion_err_ptr`.
+- [ ] Prove direct helper-call error-union returns without compatibility
+  emitters.
+- [ ] Prove branch-only wrapped error-union returns.
+- [ ] Prove loop or switch continuation after `try`.
+- [ ] Keep pointer/cold/error-name subforms fail-closed until facts exist.
+- [ ] Refresh inventory and show the error-union try bucket reduced.
+
+### 3. Pointer/Slice/Address Forms
+
+Layer: typed AIR parser and address-form lowering.
+
+- [ ] Lower `ptr_slice_len_ptr`.
+- [ ] Lower `ptr_slice_ptr_ptr`.
+- [ ] Lower `slice_ptr`.
+- [ ] Lower `ptr_add`.
+- [ ] Lower `ptr_sub`.
+- [ ] Lower `is_non_null_ptr` from a real source shape.
+- [ ] Lower `runtime_nav_ptr` or classify it as a runtime boundary.
+- [ ] Prove pointer arithmetic with load/store.
+- [ ] Prove slice pointer extraction.
+- [ ] Prove slice length extraction.
+- [ ] Prove pointer/slice values across a branch merge.
+- [ ] Keep unsupported address spaces and volatile/atomic pointer forms
+  fail-closed.
+- [ ] Refresh inventory and show the pointer-address bucket reduced.
+
+### 4. Aggregate-Shape Ops
+
+Layer: aggregate semantic lowering.
+
+- [ ] Lower `slice_len`.
+- [ ] Lower `slice`.
+- [ ] Lower `array_to_slice`.
+- [ ] Lower aggregate construction from typed operands.
+- [ ] Lower aggregate projection from typed operands.
+- [ ] Prove source-backed slice construction.
+- [ ] Prove source-backed array-to-slice conversion.
+- [ ] Prove source-backed aggregate projection after construction.
+- [ ] Keep unsupported aggregate element/layout forms fail-closed.
+- [ ] Refresh inventory and show the aggregate-shape bucket reduced.
+
+### 5. Union-Tag Shape
+
+Layer: semantic lowering and CFG lowering.
+
+- [ ] Lower `get_union_tag`.
+- [ ] Lower `set_union_tag`.
+- [ ] Lower `union_init`.
+- [ ] Lower `tag_name` or classify it as a runtime/string boundary.
+- [ ] Lower payload reads guarded by tag checks.
+- [ ] Lower switch over a union tag.
+- [ ] Lower branch over a union tag.
+- [ ] Prove one tag-only executable row.
+- [ ] Prove one tag-plus-payload executable row.
+- [ ] Keep unsupported payload layouts and inactive-payload reads fail-closed.
+- [ ] Refresh inventory and show the union-tag bucket reduced.
+
+### 6. Optional Shape
+
+Layer: semantic lowering and CFG lowering.
+
+- [ ] Lower generic `wrap_optional`.
+- [ ] Lower optional payload extraction.
+- [ ] Lower optional pointer checks.
+- [ ] Lower optional pointer payload extraction.
+- [ ] Lower optional branch/merge flows.
+- [ ] Lower optional return/catch-style flows that appear in compiler-core
   inventory.
-- vector forms:
-  close a narrow `shuffle_one` subset first, with fail-closed diagnostics for
-  unsupported vector widths and element types. Then evaluate `reduce` and
-  `splat`.
-- scalar transforms:
-  close remaining integer transforms after the selected scalar rows:
-  `clz`, `ctz`, `popcount`, `shl_exact`, `shr_exact`, `bit_reverse`, `neg`,
-  and broader widths/types for already-covered `byte_swap`, `max`, `min`, and
-  `abs`.
-- safety runtime paths:
-  close checked overflow operations and ReleaseSafe runtime-call shapes:
-  `add_with_overflow`, `sub_with_overflow`, `mul_with_overflow`, and
-  `shl_with_overflow`.
-- float math:
-  classify each builtin as local lowering, runtime call, or explicit boundary.
-  Start with `sqrt`, `floor`, `ceil`, `round`, and `trunc_float`; leave logs
-  and trig as runtime/boundary until there is distribution evidence.
-- select shape:
-  close generic `select` for scalar integer and pointer values first. Vector
-  selects belong with the vector family.
+- [ ] Prove one optional scalar executable row.
+- [ ] Prove one optional pointer executable row.
+- [ ] Keep unsupported nested optional/error-union mixes fail-closed until
+  modeled.
+- [ ] Refresh inventory and show the optional-shape bucket reduced.
 
-## Boundary And Backend Families
+### 7. Safety Runtime Paths
 
-| Status | Family | Current priority | Expected policy |
-| --- | --- | --- | --- |
-| [ ] | packed aggregates | high boundary | implement common aligned forms; keep unsupported packed/unaligned forms fail-closed |
-| [ ] | x87 surfaces | boundary | decide explicit boundary vs limited lowering for distribution-relevant uses |
-| [ ] | varargs | boundary | implement or explicitly hand off C ABI varargs boundaries |
-| [ ] | inline asm | boundary | preserve strict fail-closed diagnostics unless a real distribution row requires support |
-| [ ] | debug metadata | boundary | keep transform skip/salvage policy explicit; do not count as codegen replacement |
+Layer: safety-edge CFG and runtime boundary.
+
+- [ ] Lower or classify `add_with_overflow`.
+- [ ] Lower or classify `sub_with_overflow`.
+- [ ] Lower or classify `mul_with_overflow`.
+- [ ] Lower or classify `shl_with_overflow`.
+- [ ] Lower checked integer cast paths used by ReleaseSafe.
+- [ ] Lower checked shift/exact arithmetic paths used by ReleaseSafe.
+- [ ] Prove one non-trapping executable row.
+- [ ] Prove one trapping row with child-process death checks when practical.
+- [ ] Keep cold panic/runtime helper ownership explicit.
+- [ ] Refresh ReleaseSafe inventory and show the safety-runtime bucket reduced
+  or reclassified.
+
+### 8. Scalar Transforms
+
+Layer: semantic lowering and backend.
+
+- [ ] Broaden `byte_swap` beyond selected widths if inventory still shows it.
+- [ ] Broaden `max` beyond selected signed `i32`.
+- [ ] Broaden `min` beyond selected signed `i32`.
+- [ ] Broaden `abs` beyond selected signed `i32`, with non-integer facts
+  fail-closed.
+- [ ] Lower `clz`.
+- [ ] Lower `ctz`.
+- [ ] Lower `popcount`.
+- [ ] Lower `bit_reverse`.
+- [ ] Lower `shl_exact`.
+- [ ] Lower `shr_exact`.
+- [ ] Lower integer `neg`.
+- [ ] Prove signed and unsigned width variants where compiler-core inventory
+  shows both.
+- [ ] Refresh inventory and show scalar-transform buckets reduced.
+
+### 9. Vector Forms
+
+Layer: ABI planner and backend.
+
+- [ ] Decide the supported first vector element types and widths.
+- [ ] Lower a narrow `shuffle_one` subset.
+- [ ] Lower `splat` for the selected vector subset.
+- [ ] Lower `reduce` for the selected vector subset.
+- [ ] Add fail-closed diagnostics for unsupported vector widths.
+- [ ] Add fail-closed diagnostics for unsupported element types.
+- [ ] Prove one source-backed vector executable row if ABI-stable.
+- [ ] Otherwise prove object/native-link boundary diagnostics.
+- [ ] Refresh inventory and show the vector bucket reduced or reclassified.
+
+### 10. Packed Aggregates
+
+Layer: ABI planner and backend.
+
+- [ ] Separate aligned packed aggregates from unaligned/bitfield-like forms.
+- [ ] Implement common aligned packed aggregate loads.
+- [ ] Implement common aligned packed aggregate stores.
+- [ ] Implement common aligned packed aggregate call arguments.
+- [ ] Keep unaligned or target-sensitive forms fail-closed.
+- [ ] Prove one aligned packed aggregate executable row.
+- [ ] Refresh inventory and show the packed-aggregate bucket reduced or
+  reclassified.
+
+### 11. Float Math
+
+Layer: backend and runtime boundary.
+
+- [ ] Classify each float builtin as local lowering, runtime call, or explicit
+  boundary.
+- [ ] Lower or call-boundary `sqrt`.
+- [ ] Lower or call-boundary `floor`.
+- [ ] Lower or call-boundary `ceil`.
+- [ ] Lower or call-boundary `round`.
+- [ ] Lower or call-boundary `trunc_float`.
+- [ ] Classify `exp`, `exp2`, `log`, `log2`, and `log10`.
+- [ ] Classify `sin`, `cos`, and `tan`.
+- [ ] Prove one local-lowered executable row or one explicit runtime-call
+  boundary row.
+- [ ] Refresh inventory and show float-math buckets reduced or reclassified.
+
+### 12. Select Shape
+
+Layer: semantic lowering and CFG lowering.
+
+- [ ] Lower scalar integer `select`.
+- [ ] Lower pointer `select`.
+- [ ] Lower boolean/select condition normalization.
+- [ ] Keep vector `select` with the vector family.
+- [ ] Prove one source-backed scalar executable row.
+- [ ] Refresh inventory and show the select-shape bucket reduced.
+
+### 13. x87 Surfaces
+
+Layer: ABI planner and backend boundary.
+
+- [ ] Identify concrete x87 source/type surfaces from refreshed inventory.
+- [ ] Decide explicit boundary vs limited lowering for distribution-relevant
+  uses.
+- [ ] Add fail-closed diagnostics for unsupported x87 forms.
+- [ ] If limited support is chosen, prove one object/native-link row.
+- [ ] Refresh inventory and show the x87 bucket reduced or reclassified.
+
+### 14. Varargs
+
+Layer: ABI planner and call lowering.
+
+- [ ] Identify concrete varargs source surfaces from refreshed inventory.
+- [ ] Decide whether z_llvm owns varargs lowering or keeps a C ABI handoff
+  boundary.
+- [ ] Add fail-closed diagnostics for unsupported varargs forms.
+- [ ] Prove one boundary row or one supported varargs object/native-link row.
+- [ ] Refresh inventory and show the varargs bucket reduced or reclassified.
+
+### 15. Inline Asm
+
+Layer: CFG lowering and backend boundary.
+
+- [ ] Identify concrete inline asm surfaces from refreshed inventory.
+- [ ] Preserve strict fail-closed diagnostics by default.
+- [ ] Implement only if a real x86_64 distribution row requires support.
+- [ ] If implemented, start with a minimal no-output/no-clobber form.
+- [ ] Refresh inventory and show the inline-asm bucket reduced or reclassified.
+
+### 16. Debug Metadata
+
+Layer: metadata policy.
+
+- [ ] Keep debug metadata outside codegen replacement counters.
+- [ ] Keep transform skip/salvage policy explicit.
+- [ ] Ensure debug metadata does not hide executable/codegen failures.
+- [ ] Add diagnostics if debug metadata suppresses a transform pass.
 
 ## Per-Family Worker Template
 

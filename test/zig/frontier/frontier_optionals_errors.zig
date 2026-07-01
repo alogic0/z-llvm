@@ -502,6 +502,18 @@ export fn frontier_try_void_chain_match(first: i32, second: i32, base: i32) i32 
     return base + 23;
 }
 
+fn frontierTryDiscardPayloadChain(first: i32, second: i32, value: i32) FrontierError!void {
+    _ = try frontierMaybeTryPayload(first, value);
+    _ = try frontierMaybeTryPayload(second, value + 3);
+}
+
+export fn frontier_try_discard_payload_chain_match(first: i32, second: i32, value: i32, base: i32) i32 {
+    frontierTryDiscardPayloadChain(first, second, value) catch |err| {
+        return frontierClassifyCaughtError(err, base);
+    };
+    return base + 29;
+}
+
 fn frontierWrapErrorSwitch(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag & 3) {
         0 => value,

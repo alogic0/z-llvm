@@ -62,6 +62,7 @@ const genericCfgSupportsI32Value = core_value_support.genericCfgSupportsI32Value
 
 pub const lowerGenericCfgLoopTryReturn = error_union_rows.lowerGenericCfgLoopTryReturn;
 pub const lowerGenericCfgLinearErrorUnionTryChainReturn = error_union_rows.lowerGenericCfgLinearErrorUnionTryChainReturn;
+pub const lowerGenericCfgLinearErrorUnionDiscardPayloadTryChainReturn = error_union_rows.lowerGenericCfgLinearErrorUnionDiscardPayloadTryChainReturn;
 pub const lowerGenericCfgErrorUnionTryRewrapErrorReturn = error_union_rows.lowerGenericCfgErrorUnionTryRewrapErrorReturn;
 pub const lowerGenericCfgErrorUnionTrySlotUpdateReturn = error_union_rows.lowerGenericCfgErrorUnionTrySlotUpdateReturn;
 pub const lowerGenericCfgErrorUnionTryPayloadCallReturn = error_union_rows.lowerGenericCfgErrorUnionTryPayloadCallReturn;
@@ -1277,6 +1278,7 @@ pub const lowerGenericCfgErrorUnionPayloadBranchReturn = error_union_rows.lowerG
 pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 }) and !function.ret_ty.eql(.{ .int = 64 })) return false;
     if (try lowerGenericCfgLinearErrorUnionTryChainReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgLinearErrorUnionDiscardPayloadTryChainReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTrySwitchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionSwitchPhiReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionErrorTagSwitchReturn(allocator, machine, function)) return true;

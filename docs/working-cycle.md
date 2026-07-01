@@ -13,8 +13,9 @@ interrupts.
 
 One cycle means:
 
-1.  Choose exactly one concrete goal.
-2.  Implement only that goal.
+1.  Choose one active family milestone and one concrete checklist item inside
+    that family.
+2.  Implement only that checklist item.
 3.  Run focused validation.
 4.  Save important logs under `tmp/`.
 5.  Update docs, counters, or readiness notes when ownership or evidence
@@ -42,20 +43,36 @@ Do not revert mid-cycle work unless explicitly asked.
 
 At the start of every cycle:
 
-1.  Read `docs/next_steps.md`.
-2.  Check the latest saved logs under `tmp/`.
-3.  Pick the highest-value goal that removes ownership debt toward the x86_64
-    Zig codegen replacement milestone without hiding x86_64 assumptions in
-    generic code.
+1.  Read
+    `docs/roadmap/x86_64_compiler_core_family_checklist.md`.
+2.  Read `docs/next_steps.md` for active slice notes and any current blocker.
+3.  Check the latest saved logs under `tmp/`.
+4.  Pick the highest-priority unchecked family that has actionable evidence.
+5.  Inside that family, pick exactly one unchecked checklist item for the
+    current cycle.
+
+The family is the milestone. The checklist item is the cycle goal. Stay inside
+the same family and implement item by item until one of these happens:
+
+- the family checklist is complete;
+- refreshed inventory shows a different family is now clearly higher value;
+- the next item requires an architectural-review stop;
+- validation exposes an unexpected blocker.
+
+When a checklist item is completed, check it off in
+`docs/roadmap/x86_64_compiler_core_family_checklist.md` in the same commit as
+the implementation and evidence update.
 
 Prefer goals in this order:
 
-1.  Replace compatibility or temporary static tables with Zig-owned facts or
+1.  Complete the highest-priority actionable item in the active family
+    checklist.
+2.  Replace compatibility or temporary static tables with Zig-owned facts or
     provider contracts.
-2.  Remove nominal/name-specific admission.
-3.  Replace shape recognizers with typed AIR or semantic facts.
-4.  Expand object/native-link/executable proof after ownership improves.
-5.  Do docs-only cleanup only when it unblocks implementation clarity.
+3.  Remove nominal/name-specific admission.
+4.  Replace shape recognizers with typed AIR or semantic facts.
+5.  Expand object/native-link/executable proof after ownership improves.
+6.  Do docs-only cleanup only when it unblocks implementation clarity.
 
 Do not choose docs-only work while clear implementation debt remains.
 Do not bundle unrelated goals into one commit.
@@ -161,8 +178,25 @@ them by moving rows to exported facts or proven function-local evidence.
 
 ## Progress Metrics
 
-Each cycle report should include the counters it changed. For aggregate layout
-ownership, report:
+Each cycle report should include the checklist item it completed and the
+counters it changed. For compiler-core family work, report:
+
+```text
+family=<name from x86_64_compiler_core_family_checklist.md>
+item=<completed checklist item>
+checklist_before=<unchecked or partial>
+checklist_after=<checked>
+inventory_bucket_before=N or not refreshed
+inventory_bucket_after=N or not refreshed
+frontier_source_rows=N
+frontier_functions=N
+frontier_executable_ok_rows=N
+frontier_local_fail=N
+boundary_unexpected_accept_rows=N
+boundary_wrong_diagnostic_rows=N
+```
+
+For aggregate layout ownership, also report:
 
 ```text
 exported_facts=N
@@ -180,32 +214,38 @@ boundary_wrong_diagnostic_rows=N
 
 Measurable forward progress means:
 
-- `temporary_static_facts` goes down;
-- `exported_facts` goes up;
-- `fallback_table` stays `removed`;
+- one checklist item in the active family is checked off with implementation
+  evidence;
+- the targeted inventory bucket goes down, or unsupported forms are explicitly
+  reclassified as fail-closed boundaries;
+- compatibility emitters, static facts, sidecars, name matching, or selected
+  case handling go down;
 - x86_64-specific assumptions remain in explicit x86_64/ABI/provider code;
 - `frontier_local_fail` stays `0`;
 - `boundary_unexpected_accept_rows` stays `0`;
 - `boundary_wrong_diagnostic_rows` stays `0`;
 - accepted rows use stronger ownership, not broader name matching.
 
-For non-aggregate cycles, report replacement-matrix movement instead:
-mode/target/stage/status before and after, fallback rows removed, boundary
-rows clarified, and focused gate health.
+For non-family work, report replacement-matrix movement instead:
+mode/target/stage/status before and after, fallback rows removed, boundary rows
+clarified, and focused gate health. Non-family work should be rare while the
+compiler-core family checklist has actionable unchecked items.
 
 Example cycle result:
 
 ```text
 Before:
-exported_facts=0
-temporary_static_facts=45
-fallback_table=removed
+family=error-union try/wrap/unwrap
+item=Lower try with payload continuation
+checklist_before=unchecked
+inventory_bucket_before=237172
 frontier_local_fail=0
 
 After:
-exported_facts=3
-temporary_static_facts=42
-fallback_table=removed
+family=error-union try/wrap/unwrap
+item=Lower try with payload continuation
+checklist_after=checked
+inventory_bucket_after=lower or pending refresh
 frontier_local_fail=0
 ```
 
@@ -213,29 +253,91 @@ That is progress. A cycle that only renames code without improving ownership,
 proof, diagnostics, or maintainability is not enough unless it unblocks the
 next implementation cycle.
 
+## Documentation Update Policy
+
+Normal implementation cycles should update as few docs as possible.
+
+For a completed checklist item, update only:
+
+1.  `docs/roadmap/x86_64_compiler_core_family_checklist.md`;
+2.  generated counter sections via `tools/update_doc_counters.zig`, only when
+    counters changed.
+
+Do not update `docs/next_steps.md` unless:
+
+- the active family is blocked;
+- the next item needs a hook-contract or architectural decision;
+- the worker changes active family;
+- the worker stops with a blocker.
+
+Do not update readiness, matrix, frontier, inventory, or build-step docs unless:
+
+- a whole family is completed;
+- a replacement claim changes;
+- a boundary policy changes;
+- a build step or command changes;
+- a milestone gate is promoted.
+
+The checklist is the per-cycle progress ledger. Other docs are milestone or
+reference documents, not routine cycle logs.
+
 ## Validation Policy
 
 Use focused validation by default.
 
-For aggregate layout/provider work, prefer:
+### Minimum Measuring Rules
+
+Do not measure the same state repeatedly. A cycle should run the smallest proof
+that can validate the completed checklist item.
+
+Use this order:
+
+1.  Read existing logs first. If a fresh log already proves the unchanged
+    counter or inventory state, cite it instead of rerunning the same gate.
+2.  Run the narrowest focused row, case, or family gate that exercises the
+    touched code.
+3.  Run `zig build test` for shared parser/model/lowering/backend changes.
+4.  Run full frontier or boundary gates only when accepted rows, boundary rows,
+    diagnostics, or documented counters changed.
+5.  Run inventory only when choosing a new family, completing a family, or
+    proving that a targeted inventory bucket dropped or was reclassified.
+6.  Run `distribution-all` only for milestone confirmation, shared build
+    orchestration changes, or an explicitly documented reason.
+
+For a normal implementation cycle that does not change documented counters, the
+minimum validation is:
 
 ```text
 zig build test
-zig run tools/audit_aggregate_layout_providers.zig > tmp/aggregate_layout_provider_audit.log
-zig build distribution-air-release-frontier > tmp/frontier_counter_update.log 2>&1
-zig build distribution-air-release-frontier-boundaries \
-    > tmp/frontier_boundary_counter_update.log 2>&1
-zig run tools/update_doc_counters.zig -- \
-    --gate=distribution-air-release-frontier \
-    --from-log=tmp/frontier_counter_update.log
-zig run tools/update_doc_counters.zig -- \
-    --gate=distribution-air-release-frontier-boundaries \
-    --from-log=tmp/frontier_boundary_counter_update.log
+focused row/case/family gate > tmp/<family>_<item>_<gate>.log 2>&1
 git diff --check
 ```
 
-Run `distribution-all` only for a broad milestone confirmation, shared build
-orchestration changes, or a documented reason in the active goal.
+Use stable, descriptive `tmp/` log names. Do not create new counter logs just
+to preserve identical numbers.
+
+### Counter And Inventory Refreshes
+
+Run `tools/update_doc_counters.zig` only when the relevant counter actually
+changed or when closing a family/milestone. Do not run counter updaters as a
+routine proof of a small local edit.
+
+Run `distribution-air-release-frontier` only when:
+
+- a source-backed accepted frontier row was added or removed;
+- `source_rows`, `discovered_functions`, `object_emitted_functions`, or
+  executable counts changed;
+- a family completion claim depends on the full frontier staying green.
+
+Run `distribution-air-release-frontier-boundaries` only when:
+
+- a boundary row was added or removed;
+- fail-closed diagnostics changed;
+- a completed item claims unsupported subforms remain correctly rejected.
+
+For aggregate layout/provider work, run
+`tools/audit_aggregate_layout_providers.zig` only when provider precedence,
+exported facts, sidecars, temporary facts, or boundary providers changed.
 
 For compiler-core inventory refreshes, prefer per-mode runs such as
 `zig build distribution-zig-air-inventory --
@@ -252,14 +354,17 @@ After each clean commit, report:
 
 ```text
 commit=<hash>
-goal=<one sentence>
+family=<active family milestone>
+item=<completed checklist item>
+goal=<one sentence summary>
 architectural_choice=<none or short decision>
 validation=<commands/logs>
 progress_before=<key counters>
 progress_after=<key counters>
 target_scope=<x86_64 only, or named cross-target boundary>
 remaining_blocker=<one sentence>
-next_goal=<one sentence>
+next_family=<same family or new family>
+next_item=<next unchecked checklist item>
 git_status=clean
 ```
 
