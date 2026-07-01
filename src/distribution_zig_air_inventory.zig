@@ -714,8 +714,32 @@ fn scanLargeDescriptor(
         }
     }
 
+    var pending_function_begin: ?[]const u8 = null;
+    if (function_count > 0) {
+        while (true) {
+            const line = try takeLine(reader);
+            if (std.mem.startsWith(u8, line, "aggregate_layout_facts_bytes=")) {
+                const len = try parseUnsignedLine(usize, line["aggregate_layout_facts_bytes=".len..]);
+                try skipFramedBytes(reader, len);
+                continue;
+            }
+            if (std.mem.startsWith(u8, line, "error_union_call_facts_bytes=")) {
+                const len = try parseUnsignedLine(usize, line["error_union_call_facts_bytes=".len..]);
+                try skipFramedBytes(reader, len);
+                continue;
+            }
+            pending_function_begin = line;
+            break;
+        }
+    }
+
     for (0..function_count) |_| {
-        try expectLine(reader, "function_begin");
+        if (pending_function_begin) |line| {
+            if (!std.mem.eql(u8, line, "function_begin")) return error.InvalidInventoryDescriptor;
+            pending_function_begin = null;
+        } else {
+            try expectLine(reader, "function_begin");
+        }
         const function_name = try readFramedSmall(allocator, reader, "name_bytes");
         defer allocator.free(function_name);
         const type_text = try readFramedSmall(allocator, reader, "type_bytes");

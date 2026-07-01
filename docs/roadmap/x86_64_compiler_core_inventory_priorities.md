@@ -27,7 +27,7 @@ module graph with generated imports available, no stubs, and
 
 | Mode | Functions | Instructions | Calls | Branches | Loops | Switches | Loads | Stores | Stack slots | Unsupported functions | Unsupported opcodes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ReleaseFast | 61341 | 6291825 | 330045 | 1037603 | 25436 | 15599 | 589168 | 315333 | 372519 | 56231 | 367030 |
+| ReleaseFast | 61375 | 6298207 | 330413 | 1039278 | 25448 | 15608 | 589486 | 315463 | 372867 | 56263 | 367516 |
 | ReleaseSafe | 61951 | 6842493 | 414768 | 1243546 | 25710 | 15618 | 598366 | 317492 | 385116 | 57216 | 407240 |
 | ReleaseSmall | 59837 | 4178468 | 324995 | 981856 | 24996 | 15463 | 577888 | 310553 | 366867 | 54849 | 333877 |
 
@@ -39,12 +39,12 @@ category.
 
 | Category | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| aggregate-abi | 2256445 | 2338212 | 2206792 | `../ziglang/src/main.zig` | `global` | partially supported | semantic lowering, ABI planner, backend |
-| unknown-opcode | 367030 | 407240 | 333877 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | AIR parser, CFG lowering |
-| vector | 15820 | 16024 | 15808 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
-| x87 | 6194 | 6220 | 6550 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
-| packed-aggregate | 5039 | 5548 | 4863 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
-| varargs | 738 | 745 | 827 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, call lowering |
+| aggregate-abi | 2324784 | 2338212 | 2206792 | `../ziglang/src/main.zig` | `global` | partially supported | semantic lowering, ABI planner, backend |
+| unknown-opcode | 367516 | 407240 | 333877 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | AIR parser, CFG lowering |
+| vector | 16200 | 16024 | 15808 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
+| x87 | 6444 | 6220 | 6550 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
+| packed-aggregate | 5364 | 5548 | 4863 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
+| varargs | 747 | 745 | 827 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, call lowering |
 | inline-asm | 21 | 22 | 20 | `../ziglang/src/main.zig` | `start._start` | partially supported boundary | CFG lowering, backend |
 
 ## Aggregate Surface Split
@@ -69,14 +69,14 @@ the output contract is:
 | runtime-libs | ReleaseFast | 10118 | 43101 | 19497 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
 | runtime-libs | ReleaseSafe | 10179 | 47078 | 20214 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
 | runtime-libs | ReleaseSmall | 4964 | 23801 | 10554 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
-| compiler-core-module | ReleaseFast | 410592 | 1325299 | 931146 | `tmp/compiler_core_module_releasefast_inventory.log` |
+| compiler-core-module | ReleaseFast | 410781 | 1392398 | 932386 | `tmp/compiler_core_module_releasefast_after_abs_hook_fix.log` |
 | compiler-core-standalone-probe | ReleaseFast | 0 | 85 | 2 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 | compiler-core-standalone-probe | ReleaseSafe | 0 | 85 | 2 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 | compiler-core-standalone-probe | ReleaseSmall | 0 | 0 | 0 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 
 The full `compiler-core-module` all-mode refresh remains milestone-cost. The
 ReleaseFast per-mode refresh completed in
-`tmp/compiler_core_module_releasefast_inventory.log`; ReleaseSafe and
+`tmp/compiler_core_module_releasefast_after_abs_hook_fix.log`; ReleaseSafe and
 ReleaseSmall should be refreshed separately with `--mode` when their counters
 need the same split.
 
@@ -95,12 +95,12 @@ longer make the global top 50.
 
 | Subcategory | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| error-union-try | 236821 | 238174 | 231997 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
-| pointer-address | 50417 | 59226 | 49313 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
-| aggregate-shape | 30599 | 64537 | 29881 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | aggregate semantic lowering, ABI planner |
-| vector | 26154 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
-| union-tag-shape | 14507 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
-| optional-shape | 6454 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
+| error-union-try | 237172 | 238174 | 231997 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
+| pointer-address | 50442 | 59226 | 49313 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
+| aggregate-shape | 30615 | 64537 | 29881 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | aggregate semantic lowering, ABI planner |
+| vector | 26240 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
+| union-tag-shape | 14508 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
+| optional-shape | 6461 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
 | scalar-transform | 1842 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `main.buildOutputType` | unsupported inventory family | semantic lowering, backend |
 | float-math | 87 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `math.pow.pow__anon_62528` | unsupported inventory family | backend, runtime boundary |
 | select-shape | 5 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` | partially supported | semantic lowering, CFG lowering |
@@ -115,46 +115,46 @@ longer make the global top 50.
 
 | Rank | ReleaseFast | Count | ReleaseSafe | Count | ReleaseSmall | Count |
 | ---: | --- | ---: | --- | ---: | --- | ---: |
-| 1 | `error-union-try:unwrap_errunion_err:ty_op` | 84377 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
-| 2 | `error-union-try:wrap_errunion_err:ty_op` | 76608 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
-| 3 | `error-union-try:try:pl_op` | 73606 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
-| 4 | `vector:shuffle_one:opaque` | 26122 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
-| 5 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17458 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
-| 6 | `aggregate-shape:slice_len:ty_op` | 13768 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
-| 7 | `pointer-address:slice_ptr:ty_op` | 11920 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |
-| 8 | `aggregate-shape:slice:bin_ty_pl` | 10895 | `safety-runtime:intcast_safe:ty_op` | 11185 | `aggregate-shape:slice:bin_ty_pl` | 10603 |
-| 9 | `optional-shape:wrap_optional:ty_op` | 6454 | `aggregate-shape:slice:bin_ty_pl` | 10942 | `other:wrap_optional:ty_op` | 6359 |
+| 1 | `error-union-try:unwrap_errunion_err:ty_op` | 84519 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
+| 2 | `error-union-try:wrap_errunion_err:ty_op` | 76713 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
+| 3 | `error-union-try:try:pl_op` | 73710 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
+| 4 | `vector:shuffle_one:opaque` | 26208 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
+| 5 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17471 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
+| 6 | `pointer-address:ptr_add:bin_ty_pl` | 14279 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
+| 7 | `aggregate-shape:slice_len:ty_op` | 13774 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |
+| 8 | `pointer-address:slice_ptr:ty_op` | 11926 | `safety-runtime:intcast_safe:ty_op` | 11185 | `aggregate-shape:slice:bin_ty_pl` | 10603 |
+| 9 | `aggregate-shape:slice:bin_ty_pl` | 10901 | `aggregate-shape:slice:bin_ty_pl` | 10942 | `other:wrap_optional:ty_op` | 6359 |
 | 10 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6343 | `other:get_union_tag:opaque` | 10923 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6250 |
-| 11 | `union-tag-shape:get_union_tag:opaque` | 6057 | - | - | - | - |
+| 11 | `union-tag-shape:get_union_tag:ty_op` | 6057 | - | - | - | - |
 | 12 | `union-tag-shape:union_init:opaque` | 4624 | - | - | - | - |
-| 13 | `union-tag-shape:set_union_tag:opaque` | 3020 | - | - | - | - |
-| 14 | `union-tag-shape:tag_name:opaque` | 806 | - | - | - | - |
+| 13 | `union-tag-shape:set_union_tag:bin_op` | 3020 | - | - | - | - |
+| 14 | `union-tag-shape:tag_name:opaque` | 807 | - | - | - | - |
 | 15 | `error-union-try:try_cold:pl_op` | 763 | - | - | - | - |
-| 16 | `scalar-transform:byte_swap:opaque` | 760 | - | - | stale: frontier now exports/lowers selected scalar `byte_swap` widths (`u16`/`u32`/`u64`); refresh compiler-core-module inventory before using this row for prioritization | - |
-| 17 | `error-union-try:unwrap_errunion_err_ptr:opaque` | 573 | - | - | - | - |
-| 18 | `error-union-try:try_ptr:opaque` | 571 | - | - | - | - |
-| 19 | `scalar-transform:max:opaque` | 429 | - | - | stale: frontier now exports/lowers selected signed `i32` scalar `max`; refresh compiler-core-module inventory before using this row for broader max/min prioritization | - |
-| 20 | `scalar-transform:min:opaque` | 364 | - | - | stale: frontier now exports/lowers selected signed `i32` scalar `min`; refresh compiler-core-module inventory before using this row for broader max/min prioritization | - |
-| 21 | `error-union-try:error_name:opaque` | 323 | - | - | stale: frontier now exports/lowers selected `error_name` and `error_set_has_value`; refresh compiler-core-module inventory before using this row for prioritization | - |
+| 16 | `scalar-transform:byte_swap:ty_op` | 760 | - | - | selected scalar widths are exported/lowered in frontier; remaining compiler-core count is broader inventory signal | - |
+| 17 | `error-union-try:unwrap_errunion_err_ptr:ty_op` | 573 | - | - | - | - |
+| 18 | `error-union-try:try_ptr:try_ptr` | 571 | - | - | - | - |
+| 19 | `scalar-transform:max:bin_op` | 429 | - | - | selected signed `i32` frontier row is covered; remaining compiler-core count is broader width/type coverage | - |
+| 20 | `scalar-transform:min:bin_op` | 364 | - | - | selected signed `i32` frontier row is covered; remaining compiler-core count is broader width/type coverage | - |
+| 21 | `error-union-try:error_name:un_op` | 323 | - | - | selected `error_name` and `error_set_has_value` frontier rows are covered; remaining compiler-core count is broader usage | - |
 | 22 | `pointer-address:is_non_null_ptr:un_op` | 263 | - | - | - | - |
 | 23 | `pointer-address:ptr_sub:bin_ty_pl` | 119 | - | - | - | - |
-| 24 | `scalar-transform:abs:opaque` | 64 | - | - | stale: frontier now exports/lowers selected signed `i32` scalar `abs`; refresh compiler-core-module inventory before using this row for broader abs prioritization | - |
-| 25 | `scalar-transform:shr_exact:bin_op` | 49 | - | - | - | - |
-| 26 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
-| 27 | `vector:reduce:opaque` | 22 | - | - | - | - |
-| 28 | `scalar-transform:neg:opaque` | 22 | - | - | - | - |
-| 29 | `float-math:round:opaque` | 10 | - | - | - | - |
-| 30 | `float-math:ceil:opaque` | 7 | - | - | - | - |
-| 31 | `float-math:exp:opaque` | 7 | - | - | - | - |
-| 32 | `float-math:log:opaque` | 7 | - | - | - | - |
-| 33 | `float-math:sqrt:opaque` | 7 | - | - | - | - |
-| 34 | `float-math:floor:opaque` | 6 | - | - | - | - |
-| 35 | `float-math:log2:opaque` | 6 | - | - | - | - |
-| 36 | `float-math:mul_add:opaque` | 6 | - | - | - | - |
-| 37 | `float-math:trunc_float:opaque` | 6 | - | - | - | - |
-| 38 | `float-math:cos:opaque` | 5 | - | - | - | - |
-| 39 | `select-shape:select:pl_op` | 5 | - | - | - | - |
-| 40 | `scalar-transform:shl_sat:bin_op` | 2 | - | - | - | - |
+| 24 | `scalar-transform:abs:ty_op` | 64 | - | - | selected signed `i32` frontier row is covered; non-integer abs now exports fail-closed facts instead of crashing | - |
+| 25 | `safety-runtime:add_with_overflow:bin_ty_pl` | 62 | - | - | - | - |
+| 26 | `scalar-transform:clz:opaque` | 51 | - | - | - | - |
+| 27 | `scalar-transform:shr_exact:bin_op` | 49 | - | - | - | - |
+| 28 | `scalar-transform:ctz:opaque` | 48 | - | - | - | - |
+| 29 | `safety-runtime:sub_with_overflow:bin_ty_pl` | 44 | - | - | - | - |
+| 30 | `pointer-address:runtime_nav_ptr:ty_nav` | 41 | - | - | - | - |
+| 31 | `safety-runtime:mul_with_overflow:bin_ty_pl` | 31 | - | - | - | - |
+| 32 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
+| 33 | `scalar-transform:neg:opaque` | 22 | - | - | - | - |
+| 34 | `vector:reduce:opaque` | 22 | - | - | - | - |
+| 35 | `scalar-transform:popcount:opaque` | 19 | - | - | - | - |
+| 36 | `float-math:round:opaque` | 10 | - | - | - | - |
+| 37 | `vector:splat:opaque` | 10 | - | - | - | - |
+| 38 | `scalar-transform:bit_reverse:opaque` | 9 | - | - | - | - |
+| 39 | `float-math:ceil:opaque` | 7 | - | - | - | - |
+| 40 | `float-math:exp:opaque` | 7 | - | - | - | - |
 
 ## Top Opcode Categories
 

@@ -2061,6 +2061,15 @@ to signed compare plus `0 - x` and `select`, and the executable harness checks
 positive, negative, and zero inputs. Wider integer abs, vector abs, odd-width
 integer abs, and explicit ReleaseSafe overflow/minInt negative-path proof remain
 future scalar-transform work.
+The Zig exporter is now total over non-integer AIR `abs` as well: it guards
+`intInfo` with `isAbiInt`, keeps integer `zllvm-abs-v1` records unchanged, and
+emits a typed unsupported non-integer record instead of crashing on float abs
+seen in compiler-rt paths such as `compiler_rt.tan.tanq`. The focused
+ReleaseFast compiler-core-module refresh
+`tmp/compiler_core_module_releasefast_after_abs_hook_fix.log` completed with
+`functions=61375`, `instructions_total=6298207`, `calls=330413`, and
+`unsupported_opcodes=367516`; ReleaseSafe and ReleaseSmall were not refreshed in
+this cycle.
 
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
