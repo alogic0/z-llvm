@@ -133,9 +133,30 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     const source = try self.resolveTypedOperand(instruction, 0);
     const target_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (source.ty.ir_type.eql(target_type.ir_type)) {
+        if (source.ty.ir_type == .ptr and instruction.index < self.synthetic_union_tag_slots.len) {
+            if (air_model.typedInstOperandIndex(instruction.operands[0])) |source_index| {
+                if (source_index < self.synthetic_union_tag_slots.len) {
+                    self.synthetic_union_tag_slots[instruction.index] = self.synthetic_union_tag_slots[source_index];
+                }
+            }
+        }
+        self.values[instruction.index] = .{
+            .ty = target_type,
+            .value = source.value,
+        };
+        return;
+    }
     if (air_capabilities.isBitcastOpcode(instruction.opcode) and
         source.ty.ir_type == .ptr and target_type.ir_type == .ptr)
     {
+        if (instruction.index < self.synthetic_union_tag_slots.len) {
+            if (air_model.typedInstOperandIndex(instruction.operands[0])) |source_index| {
+                if (source_index < self.synthetic_union_tag_slots.len) {
+                    self.synthetic_union_tag_slots[instruction.index] = self.synthetic_union_tag_slots[source_index];
+                }
+            }
+        }
         self.values[instruction.index] = .{
             .ty = target_type,
             .value = source.value,

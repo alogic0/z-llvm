@@ -5,11 +5,23 @@ const ir = @import("ir.zig");
 
 pub fn lowerTypedUnionTagSemanticInstruction(self: anytype, instruction: air_export.TypedInstruction) !bool {
     switch (air_capabilities.unionTagSemanticOpForOpcode(instruction.opcode)) {
+        .init => try self.lowerTypedUnionInit(instruction),
         .set_tag => try self.lowerTypedSetUnionTag(instruction),
         .get_tag => try self.lowerTypedGetUnionTag(instruction),
         .none => return false,
     }
     return true;
+}
+
+pub fn lowerTypedUnionInit(self: anytype, instruction: air_export.TypedInstruction) !void {
+    const summary = air_model.typedUnionInitSummary(instruction) orelse return air_model.LowerError.UnsupportedAir;
+    if (summary.payload_index >= self.values.len) return air_model.LowerError.UnsupportedAir;
+    _ = self.values[summary.payload_index] orelse return air_model.LowerError.UnsupportedAir;
+    const tag_ty: ir.Type = .{ .int = summary.bit_width };
+    self.values[instruction.index] = .{
+        .ty = .{ .ir_type = tag_ty },
+        .value = .{ .int = summary.field_index },
+    };
 }
 
 pub fn lowerTypedSetUnionTag(self: anytype, instruction: air_export.TypedInstruction) !void {

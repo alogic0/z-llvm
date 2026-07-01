@@ -78,6 +78,7 @@ pub const LoweringContext = struct {
     synthetic_pointer_payloads: []?TypedValue,
     synthetic_error_union_slots: []?TypedValue,
     synthetic_union_tag_slots: []?TypedValue,
+    synthetic_union_field_ptrs: []?air_model.SyntheticUnionFieldPointer,
     next_arg_index: usize = 0,
 
     // Typed lowering dispatch and domain-specific lowering operations.
@@ -104,6 +105,7 @@ pub const LoweringContext = struct {
     pub const typedBlockBranchValue = typed_cfg.typedBlockBranchValue;
     pub const lowerTypedBranchMergeBlock = typed_cfg.lowerTypedBranchMergeBlock;
     pub const mergeSyntheticErrorUnionSlots = typed_cfg.mergeSyntheticErrorUnionSlots;
+    pub const mergeSyntheticUnionTagSlots = typed_cfg.mergeSyntheticUnionTagSlots;
     pub const typedBlockResultType = typed_cfg.typedBlockResultType;
     pub const lowerTypedBranchBodyToMerge = typed_cfg.lowerTypedBranchBodyToMerge;
     pub const lowerTypedBranchBodyToOpenContinuation = typed_cfg.lowerTypedBranchBodyToOpenContinuation;
@@ -146,6 +148,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedLoadFromSlicePtrPtr = typed_memory.lowerTypedLoadFromSlicePtrPtr;
     pub const lowerTypedStore = typed_memory.lowerTypedStore;
     pub const lowerTypedStoreToSyntheticErrorUnionSlot = typed_memory.lowerTypedStoreToSyntheticErrorUnionSlot;
+    pub const lowerTypedStoreToSyntheticUnionField = typed_memory.lowerTypedStoreToSyntheticUnionField;
 
     pub const lowerTypedOptionalSemanticInstruction = typed_optional.lowerTypedOptionalSemanticInstruction;
     pub const lowerTypedIsNonNull = typed_optional.lowerTypedIsNonNull;
@@ -153,6 +156,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedOptionalPayload = typed_optional.lowerTypedOptionalPayload;
 
     pub const lowerTypedUnionTagSemanticInstruction = typed_union_tag.lowerTypedUnionTagSemanticInstruction;
+    pub const lowerTypedUnionInit = typed_union_tag.lowerTypedUnionInit;
     pub const lowerTypedSetUnionTag = typed_union_tag.lowerTypedSetUnionTag;
     pub const lowerTypedGetUnionTag = typed_union_tag.lowerTypedGetUnionTag;
 
@@ -171,6 +175,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedRuntimeNavPtr = typed_pointer_aggregate.lowerTypedRuntimeNavPtr;
     pub const lowerTypedArrayElemVal = typed_pointer_aggregate.lowerTypedArrayElemVal;
     pub const lowerTypedFieldPtr = typed_pointer_aggregate.lowerTypedFieldPtr;
+    pub const lowerTypedSyntheticUnionFieldPtr = typed_pointer_aggregate.lowerTypedSyntheticUnionFieldPtr;
 
     pub const lowerTypedAggregateSemanticInstruction = typed_aggregate.lowerTypedAggregateSemanticInstruction;
     pub const lowerTypedAggregateInit = typed_aggregate.lowerTypedAggregateInit;

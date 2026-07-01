@@ -587,6 +587,9 @@ fn lowerFunction(
     const synthetic_union_tag_slots = try allocator.alloc(?TypedValue, air_function.instruction_count);
     defer allocator.free(synthetic_union_tag_slots);
     @memset(synthetic_union_tag_slots, null);
+    const synthetic_union_field_ptrs = try allocator.alloc(?air_model.SyntheticUnionFieldPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_union_field_ptrs);
+    @memset(synthetic_union_field_ptrs, null);
 
     var context: LoweringContext = .{
         .allocator = allocator,
@@ -601,6 +604,7 @@ fn lowerFunction(
         .synthetic_pointer_payloads = synthetic_pointer_payloads,
         .synthetic_error_union_slots = synthetic_error_union_slots,
         .synthetic_union_tag_slots = synthetic_union_tag_slots,
+        .synthetic_union_field_ptrs = synthetic_union_field_ptrs,
     };
 
     for (air_function.instructions) |instruction| {
@@ -767,6 +771,9 @@ fn lowerFunctionTypedV2(
     const synthetic_union_tag_slots = try allocator.alloc(?TypedValue, air_function.instruction_count);
     defer allocator.free(synthetic_union_tag_slots);
     @memset(synthetic_union_tag_slots, null);
+    const synthetic_union_field_ptrs = try allocator.alloc(?air_model.SyntheticUnionFieldPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_union_field_ptrs);
+    @memset(synthetic_union_field_ptrs, null);
     const typed_view = air_model.TypedFunctionView.init(air_function) orelse return error.UnsupportedAir;
 
     var context: LoweringContext = .{
@@ -784,6 +791,7 @@ fn lowerFunctionTypedV2(
         .synthetic_pointer_payloads = synthetic_pointer_payloads,
         .synthetic_error_union_slots = synthetic_error_union_slots,
         .synthetic_union_tag_slots = synthetic_union_tag_slots,
+        .synthetic_union_field_ptrs = synthetic_union_field_ptrs,
     };
 
     for (main_body.instructions) |instruction_index| {

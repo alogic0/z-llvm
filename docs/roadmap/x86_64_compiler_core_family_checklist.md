@@ -570,7 +570,23 @@ Layer: semantic lowering and CFG lowering.
   ownership while payload-bearing union layouts remain fail-closed for the
   later payload-read and `union_init` checklist items. Validation:
   `tmp/set_union_tag_build_test.log` and `tmp/frontier_set_union_tag.log`.
-- [ ] Lower `union_init`.
+- [x] Lower `union_init`.
+
+  `union_init` is now a union-tag semantic opcode in the capability registry.
+  The Zig typed-v2 exporter emits a narrow `zllvm-union-tag-facts-v1`
+  `field_index` plus `bit_width` record for `union_init`, and z_llvm consumes it
+  through `TypedUnionInitSummary`. The typed lowerer represents selected
+  tag-only union values as scalar tag values, records synthetic union slots for
+  alloc/set-tag/store/load paths, and merges branch-local tag writes with a phi
+  at conditional joins. The source-backed proof
+  `frontier_union_init_tag_only` in `frontier_union_tags.zig` uses a direct
+  Zig union-to-tag cast and avoids `std.meta.activeTag` helper calls, so the row
+  exercises typed-v2 union construction/tag facts rather than a selected
+  runtime wrapper. Validation: `tmp/check_stage4_union_init.log`,
+  `tmp/union_init_build_test.log`, `tmp/frontier_union_init.log`, and
+  `tmp/frontier_union_init_boundaries.log`. Frontier counters are now
+  `source_rows=14`, `discovered_functions=731`, `generic_cfg_functions=731`,
+  `object_emitted_functions=731`, `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower `tag_name` or classify it as a runtime/string boundary.
 - [ ] Lower payload reads guarded by tag checks.
 - [ ] Lower switch over a union tag.

@@ -160,6 +160,7 @@ pub const ErrorUnionSemanticOp = enum {
 
 pub const UnionTagSemanticOp = enum {
     none,
+    init,
     set_tag,
     get_tag,
 };
@@ -378,6 +379,7 @@ pub fn errorUnionSemanticOpForOpcode(opcode: []const u8) ErrorUnionSemanticOp {
 }
 
 pub fn unionTagSemanticOpForOpcode(opcode: []const u8) UnionTagSemanticOp {
+    if (std.mem.eql(u8, opcode, "union_init")) return .init;
     if (std.mem.eql(u8, opcode, "set_union_tag")) return .set_tag;
     if (std.mem.eql(u8, opcode, "get_union_tag")) return .get_tag;
     return .none;
@@ -962,8 +964,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ErrorUnionSemanticOp.error_set_has_value, errorUnionSemanticOpForOpcode("error_set_has_value"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.cmp_lte_errors_len, errorUnionSemanticOpForOpcode("cmp_lte_errors_len"));
     try std.testing.expectEqual(SemanticDomain.union_tag, semanticDomainForOpcode("get_union_tag"));
+    try std.testing.expectEqual(UnionTagSemanticOp.init, unionTagSemanticOpForOpcode("union_init"));
     try std.testing.expectEqual(UnionTagSemanticOp.set_tag, unionTagSemanticOpForOpcode("set_union_tag"));
     try std.testing.expectEqual(UnionTagSemanticOp.get_tag, unionTagSemanticOpForOpcode("get_union_tag"));
+    try std.testing.expect(typedV2CanLower(opcodeCapability("union_init")));
     try std.testing.expect(typedV2CanLower(opcodeCapability("set_union_tag")));
     try std.testing.expect(typedV2CanLower(opcodeCapability("get_union_tag")));
     try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));

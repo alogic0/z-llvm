@@ -6,7 +6,27 @@ const typed_recognizers = @import("zig_air_model_typed_recognizers.zig");
 pub const TypedUnionTagPayloadSwitchSummary = core.TypedUnionTagPayloadSwitchSummary;
 pub const TypedUnionTagGetSummary = core.TypedUnionTagGetSummary;
 pub const TypedUnionTagSetSummary = core.TypedUnionTagSetSummary;
+pub const TypedUnionInitSummary = core.TypedUnionInitSummary;
 pub const typedUnionTagPayloadSwitchSummary = typed_recognizers.typedUnionTagPayloadSwitchSummary;
+
+pub fn typedUnionInitSummary(instruction: air_export.TypedInstruction) ?TypedUnionInitSummary {
+    if (!std.mem.eql(u8, instruction.opcode, "union_init")) return null;
+    if (instruction.operands.len != 1) return null;
+    const payload_index = core.typedInstOperandIndex(instruction.operands[0]) orelse return null;
+    const field_index_text = core.detail(instruction, "field_index") orelse return null;
+    const bit_width_text = core.detail(instruction, "bit_width") orelse return null;
+    const field_index = std.fmt.parseInt(u32, field_index_text, 10) catch return null;
+    const bit_width = std.fmt.parseInt(u16, bit_width_text, 10) catch return null;
+    switch (bit_width) {
+        8, 16, 32, 64 => {},
+        else => return null,
+    }
+    return .{
+        .payload_index = payload_index,
+        .field_index = field_index,
+        .bit_width = bit_width,
+    };
+}
 
 pub fn typedUnionTagSetSummary(instruction: air_export.TypedInstruction) ?TypedUnionTagSetSummary {
     if (!std.mem.eql(u8, instruction.opcode, "set_union_tag")) return null;
@@ -41,6 +61,37 @@ pub fn typedUnionTagGetSummary(instruction: air_export.TypedInstruction) ?TypedU
         .operand_index = operand_index,
         .bit_width = bit_width,
     };
+}
+
+test "typed AIR model recognizes union init summary" {
+    var operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "4", .type_text = "i32" },
+    };
+    var details = [_]air_export.TypedDetail{
+        .{ .key = "field_index", .value = "1" },
+        .{ .key = "bit_width", .value = "8" },
+    };
+    const summary = typedUnionInitSummary(.{
+        .index = 8,
+        .opcode = "union_init",
+        .result_type = "TaggedValue",
+        .data_kind = "ty_pl",
+        .operands = @constCast(&operands),
+        .details = @constCast(&details),
+    }).?;
+    try std.testing.expectEqual(@as(u32, 4), summary.payload_index);
+    try std.testing.expectEqual(@as(u32, 1), summary.field_index);
+    try std.testing.expectEqual(@as(u16, 8), summary.bit_width);
+
+    details[1].value = "0";
+    try std.testing.expect(typedUnionInitSummary(.{
+        .index = 8,
+        .opcode = "union_init",
+        .result_type = "TaggedValue",
+        .data_kind = "ty_pl",
+        .operands = @constCast(&operands),
+        .details = @constCast(&details),
+    }) == null);
 }
 
 test "typed AIR model recognizes set union tag summary" {

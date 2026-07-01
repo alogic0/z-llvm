@@ -381,6 +381,7 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
     if (result_type.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
     const field_child = result_type.pointer_child orelse return air_model.LowerError.UnsupportedAir;
     const field_index = air_model.fieldIndex(instruction) orelse return air_model.LowerError.UnsupportedAir;
+    if (try self.lowerTypedSyntheticUnionFieldPtr(instruction, result_type, field_index)) return;
     const source_ty = aggregate_ptr.ty.pointer_child;
     if (source_ty) |known_source_ty| {
         if (aggregateFieldByteOffset(known_source_ty, field_child, field_index)) |offset| {
@@ -439,6 +440,38 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
         .ty = result_type,
         .value = .{ .named = result_name },
     };
+}
+
+pub fn lowerTypedSyntheticUnionFieldPtr(
+    self: anytype,
+    instruction: air_export.TypedInstruction,
+    result_type: air_model.ZigType,
+    field_index: i128,
+) !bool {
+    const field_index_u32 = std.math.cast(u32, field_index) orelse return air_model.LowerError.UnsupportedAir;
+    const slot_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (slot_index >= self.synthetic_union_tag_slots.len or instruction.index >= self.synthetic_union_field_ptrs.len) {
+        return air_model.LowerError.UnsupportedAir;
+    }
+    if (self.synthetic_union_tag_slots[slot_index] == null and !typedUnionTagSlotAlloc(self, slot_index)) return false;
+    self.synthetic_union_field_ptrs[instruction.index] = .{
+        .slot_index = slot_index,
+        .field_index = field_index_u32,
+    };
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .undef,
+    };
+    return true;
+}
+
+fn typedUnionTagSlotAlloc(self: anytype, instruction_index: u32) bool {
+    const view = self.typed_view orelse return false;
+    for (view.structured_air_v2.instructions) |candidate| {
+        const summary = air_model.typedUnionTagSetSummary(candidate) orelse continue;
+        if (summary.pointer_index == instruction_index) return true;
+    }
+    return false;
 }
 
 fn typedGepIndexIsZero(value: ir.Value) bool {

@@ -35,6 +35,11 @@ pub const TypedValue = struct {
     value: ir.Value,
 };
 
+pub const SyntheticUnionFieldPointer = struct {
+    slot_index: u32,
+    field_index: u32,
+};
+
 pub const TypedBranchMergeResult = struct {
     value: ?TypedValue,
     predecessor_label: []const u8,
@@ -1009,6 +1014,12 @@ pub const TypedUnionTagGetSummary = struct {
 pub const TypedUnionTagSetSummary = struct {
     pointer_index: u32,
     tag_index: u32,
+    bit_width: u16,
+};
+
+pub const TypedUnionInitSummary = struct {
+    payload_index: u32,
+    field_index: u32,
     bit_width: u16,
 };
 

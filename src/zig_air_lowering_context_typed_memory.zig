@@ -19,6 +19,13 @@ pub fn lowerTypedMemorySemanticInstruction(self: anytype, instruction: air_expor
 
 pub fn lowerTypedAlloca(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (instruction.operands.len != 0) return air_model.LowerError.UnsupportedAir;
+    if (typedUnionTagSlotAlloc(self, instruction.index)) {
+        self.values[instruction.index] = .{
+            .ty = .{ .ir_type = .ptr },
+            .value = .undef,
+        };
+        return;
+    }
     const pointer_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     const allocated_type = pointer_type.pointer_child orelse return air_model.LowerError.UnsupportedAir;
     if (errorUnionPointerOperandText(instruction.result_type) and allocated_type.eql(.{ .int = 64 })) {
@@ -102,6 +109,9 @@ pub fn lowerTypedLoadFromSyntheticUnionTagSlot(self: anytype, instruction: air_e
     if (pointer_index >= self.synthetic_union_tag_slots.len) return air_model.LowerError.UnsupportedAir;
     const loaded = self.synthetic_union_tag_slots[pointer_index] orelse return false;
     self.values[instruction.index] = loaded;
+    if (instruction.index < self.synthetic_union_tag_slots.len) {
+        self.synthetic_union_tag_slots[instruction.index] = loaded;
+    }
     return true;
 }
 
@@ -174,8 +184,9 @@ pub fn lowerTypedLoadFromSlicePtrPtr(self: anytype, instruction: air_export.Type
 pub fn lowerTypedStore(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
     const pointer = try self.resolveTypedOperand(instruction, 0);
-    const value = try self.resolveTypedOperand(instruction, 1);
     if (pointer.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
+    if (try self.lowerTypedStoreToSyntheticUnionField(instruction)) return;
+    const value = try self.resolveTypedOperand(instruction, 1);
     if (try self.lowerTypedStoreToSyntheticErrorUnionSlot(instruction, value)) return;
     try self.block.instructions.append(self.allocator, .{
         .result = null,
@@ -199,6 +210,26 @@ pub fn lowerTypedStoreToSyntheticErrorUnionSlot(
     if (!value.ty.ir_type.eql(.{ .int = 64 })) return air_model.LowerError.UnsupportedAir;
     self.synthetic_error_union_slots[pointer_index] = value;
     return true;
+}
+
+pub fn lowerTypedStoreToSyntheticUnionField(
+    self: anytype,
+    instruction: air_export.TypedInstruction,
+) !bool {
+    const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (pointer_index >= self.synthetic_union_field_ptrs.len) return air_model.LowerError.UnsupportedAir;
+    const field_ptr = self.synthetic_union_field_ptrs[pointer_index] orelse return false;
+    if (field_ptr.slot_index >= self.synthetic_union_tag_slots.len) return air_model.LowerError.UnsupportedAir;
+    return true;
+}
+
+fn typedUnionTagSlotAlloc(self: anytype, instruction_index: u32) bool {
+    const view = self.typed_view orelse return false;
+    for (view.structured_air_v2.instructions) |candidate| {
+        const summary = air_model.typedUnionTagSetSummary(candidate) orelse continue;
+        if (summary.pointer_index == instruction_index) return true;
+    }
+    return false;
 }
 
 fn errorUnionPointerOperandText(type_text: []const u8) bool {

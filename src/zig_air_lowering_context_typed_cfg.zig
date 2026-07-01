@@ -489,6 +489,13 @@ pub fn lowerTypedBranchMergeBlock(
     defer self.allocator.free(true_error_union_slots);
     const false_error_union_slots = try self.allocator.alloc(?air_model.TypedValue, self.synthetic_error_union_slots.len);
     defer self.allocator.free(false_error_union_slots);
+    const entry_union_tag_slots = try self.allocator.alloc(?air_model.TypedValue, self.synthetic_union_tag_slots.len);
+    defer self.allocator.free(entry_union_tag_slots);
+    @memcpy(entry_union_tag_slots, self.synthetic_union_tag_slots);
+    const true_union_tag_slots = try self.allocator.alloc(?air_model.TypedValue, self.synthetic_union_tag_slots.len);
+    defer self.allocator.free(true_union_tag_slots);
+    const false_union_tag_slots = try self.allocator.alloc(?air_model.TypedValue, self.synthetic_union_tag_slots.len);
+    defer self.allocator.free(false_union_tag_slots);
 
     var finished = self.block.*;
     finished.terminator = .{ .condbr = .{
@@ -501,11 +508,15 @@ pub fn lowerTypedBranchMergeBlock(
     try self.function.blocks.append(self.allocator, finished);
 
     @memcpy(self.synthetic_error_union_slots, entry_error_union_slots);
+    @memcpy(self.synthetic_union_tag_slots, entry_union_tag_slots);
     const true_result = try self.lowerTypedBranchBodyToMerge(instruction.index, then_body, then_label, merge_label, merge_type_or_null);
     @memcpy(true_error_union_slots, self.synthetic_error_union_slots);
+    @memcpy(true_union_tag_slots, self.synthetic_union_tag_slots);
     @memcpy(self.synthetic_error_union_slots, entry_error_union_slots);
+    @memcpy(self.synthetic_union_tag_slots, entry_union_tag_slots);
     const false_result = try self.lowerTypedBranchBodyToMerge(instruction.index, else_body, else_label, merge_label, merge_type_or_null);
     @memcpy(false_error_union_slots, self.synthetic_error_union_slots);
+    @memcpy(false_union_tag_slots, self.synthetic_union_tag_slots);
 
     self.block.* = ir.BasicBlock.init(merge_label);
     if (true_result.value) |true_branch| {
@@ -534,6 +545,13 @@ pub fn lowerTypedBranchMergeBlock(
         true_error_union_slots,
         false_error_union_slots,
     );
+    try self.mergeSyntheticUnionTagSlots(
+        instruction.index,
+        true_result.predecessor_label,
+        false_result.predecessor_label,
+        true_union_tag_slots,
+        false_union_tag_slots,
+    );
 }
 
 pub fn mergeSyntheticErrorUnionSlots(
@@ -558,6 +576,47 @@ pub fn mergeSyntheticErrorUnionSlots(
                 continue;
             }
             const result_name = try ownPrint(self.module, "air{}_slot{}_merge", .{ block_index, slot_index });
+            var phi: ir.PhiInst = .{ .ty = true_value.ty.ir_type, .incoming = .empty };
+            errdefer phi.deinit(self.allocator);
+            try phi.incoming.append(self.allocator, .{ .value = true_value.value, .block = true_predecessor_label });
+            try phi.incoming.append(self.allocator, .{ .value = false_value.value, .block = false_predecessor_label });
+            try self.block.instructions.append(self.allocator, .{
+                .result = result_name,
+                .kind = .{ .phi = phi },
+            });
+            merged_slot.* = .{
+                .ty = true_value.ty,
+                .value = .{ .named = result_name },
+            };
+        } else {
+            if (false_slot != null) return air_model.LowerError.UnsupportedAir;
+            merged_slot.* = null;
+        }
+    }
+}
+
+pub fn mergeSyntheticUnionTagSlots(
+    self: anytype,
+    block_index: u32,
+    true_predecessor_label: []const u8,
+    false_predecessor_label: []const u8,
+    true_slots: []const ?air_model.TypedValue,
+    false_slots: []const ?air_model.TypedValue,
+) air_model.LowerError!void {
+    if (true_slots.len != self.synthetic_union_tag_slots.len or
+        false_slots.len != self.synthetic_union_tag_slots.len)
+        return air_model.LowerError.UnsupportedAir;
+    for (self.synthetic_union_tag_slots, 0..) |*merged_slot, slot_index| {
+        const true_slot = true_slots[slot_index];
+        const false_slot = false_slots[slot_index];
+        if (true_slot) |true_value| {
+            const false_value = false_slot orelse return air_model.LowerError.UnsupportedAir;
+            if (!true_value.ty.ir_type.eql(false_value.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+            if (true_value.value.eql(false_value.value)) {
+                merged_slot.* = true_value;
+                continue;
+            }
+            const result_name = try ownPrint(self.module, "air{}_union_slot{}_merge", .{ block_index, slot_index });
             var phi: ir.PhiInst = .{ .ty = true_value.ty.ir_type, .incoming = .empty };
             errdefer phi.deinit(self.allocator);
             try phi.incoming.append(self.allocator, .{ .value = true_value.value, .block = true_predecessor_label });
