@@ -643,7 +643,16 @@ Layer: semantic lowering and CFG lowering.
   `source_rows=14`, `discovered_functions=732`,
   `generic_cfg_functions=732`, `object_emitted_functions=732`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Prove one tag-only executable row.
+- [x] Prove one tag-only executable row.
+
+  `frontier_union_init_tag_only` is the tag-only executable proof. It uses
+  typed-v2 `union_init`/tag facts and returns scalar tag-derived results
+  without reading payload fields. The C harness checks both `.small` and
+  `.large` construction paths. Current strict frontier evidence:
+  `tmp/frontier_union_tag_branch.log` reports all three release modes at
+  `source_rows=14`, `discovered_functions=732`,
+  `generic_cfg_functions=732`, `object_emitted_functions=732`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Prove one tag-plus-payload executable row.
 - [ ] Keep unsupported payload layouts and inactive-payload reads fail-closed.
 - [ ] Refresh inventory and show the union-tag bucket reduced.
