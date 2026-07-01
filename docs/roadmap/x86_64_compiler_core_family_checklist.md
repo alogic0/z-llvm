@@ -172,7 +172,16 @@ Layer: semantic layout, ABI planner, backend.
   `tmp/frontier_counter_update.log` reports all three release modes at
   `generic_cfg_functions=722`, `object_emitted_functions=722`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Prove at least one returned-aggregate row.
+- [x] Prove at least one returned-aggregate row.
+
+  Returned aggregate proof is covered by `frontier_mixed_call_make`,
+  `frontier_float_array_call_make`, and `frontier_nested_mixed_call_make`, which
+  directly return helper-produced aggregates through the x86_64 SysV register
+  aggregate path. The C harness verifies returned field contents for INTEGER/SSE
+  mixed and SSE aggregate forms. Saved evidence:
+  `tmp/frontier_counter_update.log` reports all three release modes at
+  `generic_cfg_functions=722`, `object_emitted_functions=722`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Prove at least one aggregate field/payload executable row.
 - [ ] Keep unsupported packed/unaligned/oversized forms fail-closed.
 - [ ] Refresh inventory and show the aggregate ABI bucket reduced or
