@@ -600,7 +600,22 @@ Layer: semantic lowering and CFG lowering.
   `tmp/frontier_tag_name_boundaries.log` reports `source_rows=8`,
   `discovered_functions=13`, `tag_name_boundary_rows=1`,
   `wrong_diagnostic_rows=0`, and `local_fail=0` in all three release modes.
-- [ ] Lower payload reads guarded by tag checks.
+- [x] Lower payload reads guarded by tag checks.
+
+  Payload reads guarded by tag checks are covered by the existing
+  `TypedUnionTagPayloadSwitchSummary`: the model requires a `get_union_tag`
+  result to feed `switch_br`, verifies both selected `struct_field_val`
+  payload reads come from the loaded union value, and validates that the
+  payload field stores and branch-selected tag indexes are coherent before the
+  typed-v2 lowerer emits the scalar result path. Source-backed executable rows
+  include `frontier_union_tag_match`,
+  `frontier_union_tag_reversed_arms`,
+  `frontier_union_tag_small_payload_add`, and
+  `frontier_union_tag_reordered_fields`; the C harness checks both arms for
+  each row. Saved strict frontier evidence:
+  `tmp/frontier_union_init.log` reports `source_rows=14`,
+  `discovered_functions=731`, `generic_cfg_functions=731`,
+  `executable_ok_rows=14`, and `local_fail=0` in all three release modes.
 - [ ] Lower switch over a union tag.
 - [ ] Lower branch over a union tag.
 - [ ] Prove one tag-only executable row.
