@@ -305,6 +305,17 @@ Layer: typed AIR parser and address-form lowering.
   non-primary-register runtime index forms. The focused compiler-core
   ReleaseFast inventory log counts raw `ptr_sub` opcodes (`count=119`) while
   keeping the pointer-address unsupported bucket at zero.
+- [x] Record first-source selectors for known pointer opcodes.
+
+  The inventory now retains `first_source` and `first_function` on raw
+  `opcode` and `top_opcode` rows, not only on unsupported categories. Focused
+  ReleaseFast compiler-core-module evidence in
+  `tmp/compiler_core_module_releasefast_opcode_first_sources.log` reports
+  `is_non_null_ptr count=263 first_source=../ziglang/src/main.zig
+  first_function=main.serveUpdateResults` and `runtime_nav_ptr count=41
+  first_source=../ziglang/src/main.zig
+  first_function=Io.Threaded.Thread.checkCancel`. This makes the next
+  pointer/slice items source-selectable without guessing source shapes.
 - [ ] Lower `is_non_null_ptr` from a real source shape.
 - [ ] Lower `runtime_nav_ptr` or classify it as a runtime boundary.
 - [ ] Prove pointer arithmetic with load/store.

@@ -163,8 +163,12 @@ longer make the global top 50.
 
 ## Top Opcode Categories
 
-The inventory now emits `top_opcode` lines for each mode. These are the highest
-body opcode counts, not necessarily the highest implementation gaps.
+The inventory now emits `opcode` and `top_opcode` lines for each mode. These
+are body opcode counts, not necessarily the highest implementation gaps. Raw
+opcode rows now include `first_source` and `first_function`, so known/lowerable
+opcodes that are not in an unknown bucket can still be selected for the next
+source-backed reduction. The focused ReleaseFast selector refresh is
+`tmp/compiler_core_module_releasefast_opcode_first_sources.log`.
 
 | Rank | ReleaseFast | Count | ReleaseSafe | Count | ReleaseSmall | Count |
 | ---: | --- | ---: | --- | ---: | --- | ---: |

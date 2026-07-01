@@ -4,6 +4,7 @@ const air_export = @import("zig_air_export.zig");
 
 const target_triple = "x86_64-linux-gnu";
 const StringCountMap = std.array_hash_map.String(usize);
+const OpcodeCountMap = std.array_hash_map.String(OpcodeStat);
 const UnknownOpcodePairMap = std.array_hash_map.String(UnknownOpcodePairStat);
 
 const Options = struct {
@@ -182,6 +183,17 @@ const UnknownOpcodePairStat = struct {
     }
 };
 
+const OpcodeStat = struct {
+    count: usize = 0,
+    first_source: ?[]const u8 = null,
+    first_function: ?[]const u8 = null,
+
+    fn deinit(self: *OpcodeStat, allocator: std.mem.Allocator) void {
+        if (self.first_source) |value| allocator.free(value);
+        if (self.first_function) |value| allocator.free(value);
+    }
+};
+
 const TextFeatureContext = enum {
     metadata,
     abi,
@@ -239,7 +251,7 @@ const Counters = struct {
     unknown_opcode_categories: [unknown_opcode_category_count]CategoryStat = [_]CategoryStat{.{}} ** unknown_opcode_category_count,
     aggregate_surface_categories: [aggregate_surface_category_count]CategoryStat = [_]CategoryStat{.{}} ** aggregate_surface_category_count,
     boundary_categories: [boundary_category_count]CategoryStat = [_]CategoryStat{.{}} ** boundary_category_count,
-    opcode_counts: StringCountMap = .empty,
+    opcode_counts: OpcodeCountMap = .empty,
     data_kind_counts: StringCountMap = .empty,
     unknown_opcode_pair_counts: UnknownOpcodePairMap = .empty,
     callconv_counts: StringCountMap = .empty,
@@ -249,7 +261,7 @@ const Counters = struct {
         for (&self.unknown_opcode_categories) |*category| category.deinit(allocator);
         for (&self.aggregate_surface_categories) |*category| category.deinit(allocator);
         for (&self.boundary_categories) |*category| category.deinit(allocator);
-        freeStringCountMap(allocator, &self.opcode_counts);
+        freeOpcodeCountMap(allocator, &self.opcode_counts);
         freeStringCountMap(allocator, &self.data_kind_counts);
         freeUnknownOpcodePairMap(allocator, &self.unknown_opcode_pair_counts);
         freeStringCountMap(allocator, &self.callconv_counts);
@@ -1121,7 +1133,7 @@ fn accountOpcode(
     unsupported_in_function: *bool,
 ) !void {
     counters.instructions_total += 1;
-    try countString(allocator, &counters.opcode_counts, opcode);
+    try countOpcode(allocator, &counters.opcode_counts, opcode, source, function);
     try countString(allocator, &counters.data_kind_counts, data_kind);
 
     const category = air_export.categoryForOpcode(opcode);
@@ -1495,13 +1507,20 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
             },
         );
     }
-    for (counters.opcode_counts.keys(), counters.opcode_counts.values()) |opcode, count| {
+    for (counters.opcode_counts.keys(), counters.opcode_counts.values()) |opcode, stat| {
         try writer.print(
-            "opcode slice={s} mode={s} name={s} count={}\n",
-            .{ slice.cliName(), mode.name(), opcode, count },
+            "opcode slice={s} mode={s} name={s} count={} first_source={s} first_function={s}\n",
+            .{
+                slice.cliName(),
+                mode.name(),
+                opcode,
+                stat.count,
+                stat.first_source orelse "-",
+                stat.first_function orelse "-",
+            },
         );
     }
-    try printTopStringMap(allocator, writer, slice, mode, "top_opcode", &counters.opcode_counts, 20);
+    try printTopOpcodeMap(allocator, writer, slice, mode, "top_opcode", &counters.opcode_counts, 20);
     for (counters.data_kind_counts.keys(), counters.data_kind_counts.values()) |data_kind, count| {
         try writer.print(
             "data_kind slice={s} mode={s} name={s} count={}\n",
@@ -1558,6 +1577,35 @@ fn printTopStringMap(
         try writer.print(
             "{s} slice={s} mode={s} rank={} name={s} count={}\n",
             .{ line_name, slice.cliName(), mode.name(), rank, entry.name, entry.count },
+        );
+    }
+}
+
+fn printTopOpcodeMap(
+    allocator: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    slice: InventorySlice,
+    mode: Mode,
+    line_name: []const u8,
+    map: *const OpcodeCountMap,
+    limit: usize,
+) !void {
+    var entries = try allocator.alloc(UnknownOpcodePairTopEntry, map.count());
+    defer allocator.free(entries);
+    for (map.keys(), map.values(), 0..) |name, stat, index| {
+        entries[index] = .{
+            .name = name,
+            .count = stat.count,
+            .first_source = stat.first_source orelse "-",
+            .first_function = stat.first_function orelse "-",
+        };
+    }
+    std.sort.heap(UnknownOpcodePairTopEntry, entries, {}, unknownOpcodePairTopLessThan);
+    const top_count = @min(limit, entries.len);
+    for (entries[0..top_count], 1..) |entry, rank| {
+        try writer.print(
+            "{s} slice={s} mode={s} rank={} name={s} count={} first_source={s} first_function={s}\n",
+            .{ line_name, slice.cliName(), mode.name(), rank, entry.name, entry.count, entry.first_source, entry.first_function },
         );
     }
 }
@@ -1818,8 +1866,41 @@ fn countString(allocator: std.mem.Allocator, map: *StringCountMap, key: []const 
     try map.put(allocator, owned_key, 1);
 }
 
+fn countOpcode(
+    allocator: std.mem.Allocator,
+    map: *OpcodeCountMap,
+    opcode: []const u8,
+    source: []const u8,
+    function: []const u8,
+) !void {
+    if (map.getIndex(opcode)) |index| {
+        map.values()[index].count += 1;
+        return;
+    }
+    const owned_key = try allocator.dupe(u8, opcode);
+    errdefer allocator.free(owned_key);
+    const first_source = try allocator.dupe(u8, source);
+    errdefer allocator.free(first_source);
+    const first_function = try allocator.dupe(u8, function);
+    errdefer allocator.free(first_function);
+    try map.put(allocator, owned_key, .{
+        .count = 1,
+        .first_source = first_source,
+        .first_function = first_function,
+    });
+}
+
 fn freeStringCountMap(allocator: std.mem.Allocator, map: *StringCountMap) void {
     for (map.keys()) |key| allocator.free(key);
+    map.deinit(allocator);
+    map.* = .empty;
+}
+
+fn freeOpcodeCountMap(allocator: std.mem.Allocator, map: *OpcodeCountMap) void {
+    for (map.keys(), map.values()) |key, *value| {
+        allocator.free(key);
+        value.deinit(allocator);
+    }
     map.deinit(allocator);
     map.* = .empty;
 }
