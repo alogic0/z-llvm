@@ -77,6 +77,7 @@ pub const lowerGenericCfgErrorUnionErrorTagSwitchReturn = error_union_rows.lower
 pub const lowerGenericCfgErrorUnionErrorTagBranchReturn = error_union_rows.lowerGenericCfgErrorUnionErrorTagBranchReturn;
 pub const lowerGenericCfgErrorUnionCatchValueMergeReturn = error_union_rows.lowerGenericCfgErrorUnionCatchValueMergeReturn;
 pub const lowerGenericCfgErrorUnionCatchSwitchReturn = error_union_rows.lowerGenericCfgErrorUnionCatchSwitchReturn;
+pub const lowerGenericCfgErrorUnionCatchBranchReturn = error_union_rows.lowerGenericCfgErrorUnionCatchBranchReturn;
 pub const lowerGenericCfgOptionalPointerUnwrapReturn = optional_rows.lowerGenericCfgOptionalPointerUnwrapReturn;
 pub const lowerGenericCfgOptionalPointerReturn = optional_rows.lowerGenericCfgOptionalPointerReturn;
 pub const lowerGenericCfgCheckedOptionalPointerReturn = optional_rows.lowerGenericCfgCheckedOptionalPointerReturn;
@@ -1280,6 +1281,7 @@ pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, m
     if (try lowerGenericCfgErrorUnionErrorTagBranchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionCatchValueMergeReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionCatchSwitchReturn(allocator, machine, function)) return true;
+    if (try lowerGenericCfgErrorUnionCatchBranchReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryRewrapErrorReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPayloadCallReturn(allocator, machine, function)) return true;
     if (try lowerGenericCfgErrorUnionTryPhiSlotOverrideReturn(allocator, machine, function)) return true;

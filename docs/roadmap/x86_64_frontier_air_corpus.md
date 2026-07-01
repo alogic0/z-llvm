@@ -66,6 +66,10 @@ The catch/remap row adds a post-try catch body that switches over the
 unwrapped error tag, returns remapped error-union constants from the cold arms,
 and rewraps the hot payload after arithmetic through typed-v2 block lowering
 and generic CFG backend codegen.
+The catch/branch remap sibling covers the same unwrapped error-tag ownership
+with `cond_br` instead of `switch_br`: z_llvm proves the direct helper call,
+try guard, tag compare, terminal packed error returns, and payload add/rewrap
+return from typed-v2/generic CFG facts without source-name admission.
 The scalar catch/value row adds the plain-`i32` variant: a direct error-union
 helper call feeds a catch-side `switch_br` over the unwrapped error tag, each
 error arm returns a value derived from a live ABI parameter, and the success arm
@@ -277,20 +281,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=699
-structured_functions=699
-generic_codegen_functions=699
-generic_cfg_functions=699
+discovered_functions=701
+structured_functions=701
+generic_codegen_functions=701
+generic_cfg_functions=701
 structural_matcher_functions=0
-structured_air_v2_functions=699
-typed_air_operand_functions=699
+structured_air_v2_functions=701
+typed_air_operand_functions=701
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=699
+generic_lowering_functions=701
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=699
+object_emitted_functions=701
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

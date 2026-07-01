@@ -401,6 +401,14 @@ fn frontierTryCatchMap(tag: i32, value: i32) FrontierError!i32 {
     return payload + 6;
 }
 
+fn frontierTryCatchBranchMap(tag: i32, value: i32) FrontierError!i32 {
+    const payload = frontierMaybeErrorTag(tag, value) catch |err| {
+        if (err == FrontierError.BadTag) return FrontierError.WorseTag;
+        return FrontierError.BadTag;
+    };
+    return payload + 8;
+}
+
 export fn frontier_try_catch_map_match(tag: i32, value: i32) i32 {
     if (frontierTryCatchMap(tag, value)) |payload| {
         return payload;
@@ -408,6 +416,17 @@ export fn frontier_try_catch_map_match(tag: i32, value: i32) i32 {
         return switch (err) {
             FrontierError.BadTag => -71,
             FrontierError.WorseTag => -72,
+        };
+    }
+}
+
+export fn frontier_try_catch_branch_map_match(tag: i32, value: i32) i32 {
+    if (frontierTryCatchBranchMap(tag, value)) |payload| {
+        return payload;
+    } else |err| {
+        return switch (err) {
+            FrontierError.BadTag => -113,
+            FrontierError.WorseTag => -114,
         };
     }
 }

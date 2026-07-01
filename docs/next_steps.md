@@ -1031,6 +1031,10 @@ Execution order:
    unwrapped error tag, returns remapped error-union constants from the cold
    arms, and rewraps the hot payload after arithmetic through the same
    typed-v2 block/branch and generic CFG backend path.
+   The catch/branch remap sibling now lowers the equivalent two-arm
+   `cond_br` shape: the generic CFG plan proves the direct error-union helper
+   call, try guard, error-tag compare, two terminal packed error returns, and
+   payload add/rewrap return without a selected function-name gate.
    The `frontier_catch_error_value_switch` row adds the scalar-return variant:
    a direct error-union helper call feeds a catch-side `switch_br` over the
    unwrapped error tag, each error arm returns an `i32` expression using a live
@@ -1982,12 +1986,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=699`,
-`generic_codegen_functions=699`, `generic_cfg_functions=699`,
+frontier gate reports `source_rows=14`, `discovered_functions=701`,
+`generic_codegen_functions=701`, `generic_cfg_functions=701`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=699`, `object_failures=0`,
+`object_emitted_functions=701`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -2016,6 +2020,13 @@ generic terminal-value path and lowers the wrapper through the existing
 error-tag switch family with shared SysV scalar call argument assignment. This
 narrows the measured `wrap_errunion_err` / `unwrap_errunion_err` compiler-core
 gap without adding function-name admission.
+The follow-up catch/branch row covers the same catch-side unwrapped error tag
+flow with an `if`/`cond_br` instead of `switch_br`: the generic CFG backend now
+validates that the helper call feeds the try guard, the cold branch compares
+the extracted `i16` tag, each branch arm returns a packed `i64` error-union
+constant, and the hot path rewraps payload arithmetic. This keeps
+`unwrap_errunion_err` plus `wrap_errunion_err` ownership structural rather than
+source-name admitted.
 
 The scalar transform frontier now includes typed-v2 ownership for AIR
 `byte_swap` on `u16`, `u32`, and `u64`. Zig exports a versioned
@@ -2048,9 +2059,9 @@ future scalar-transform work.
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=699`,
-`generic_cfg_functions=699`, `structural_matcher_functions=0`,
-`object_emitted_functions=699`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=701`,
+`generic_cfg_functions=701`, `structural_matcher_functions=0`,
+`object_emitted_functions=701`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

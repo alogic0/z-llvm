@@ -1725,6 +1725,20 @@ const ErrorUnionCatchSwitchReturn = struct {
     merge_block: ir.BasicBlock,
 };
 
+const ErrorUnionCatchBranchReturn = struct {
+    entry: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    payload_block: ir.BasicBlock,
+    payload_add_imm: u8,
+    branch_block: ir.BasicBlock,
+    error_value: i32,
+    true_block: ir.BasicBlock,
+    true_value: i64,
+    false_block: ir.BasicBlock,
+    false_value: i64,
+};
+
 pub const ErrorUnionI32ReturnValue = union(enum) {
     generic: ir.Value,
     payload_add_imm: i32,
@@ -1957,6 +1971,54 @@ pub fn lowerGenericCfgErrorUnionCatchSwitchReturn(
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.default_block.name);
     try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+pub fn lowerGenericCfgErrorUnionCatchBranchReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionCatchBranchReturn(function) orelse return false;
+    const frame_bytes: u8 = 8;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_error_catch_branch_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.payload_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.branch_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = plan.error_value });
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.true_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.false_block.name);
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = plan.false_value });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.true_block.name);
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = plan.true_value });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.payload_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 16 });
+    if (plan.payload_add_imm != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = plan.payload_add_imm });
+    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 16 });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
     return true;
 }
 
@@ -2304,6 +2366,58 @@ fn errorUnionCatchSwitchReturn(function: ir.Function) ?ErrorUnionCatchSwitchRetu
     };
 }
 
+fn errorUnionCatchBranchReturn(function: ir.Function) ?ErrorUnionCatchBranchReturn {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len < 5) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
+    const call_instruction = findInstruction(entry, call_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    const then_payload_add = payloadAddWrapReturnFromCallResult(then_block, call_name);
+    const else_payload_add = payloadAddWrapReturnFromCallResult(else_block, call_name);
+    if ((then_payload_add != null) == (else_payload_add != null)) return null;
+    const payload_block = if (then_payload_add != null) then_block else else_block;
+    const branch_block = if (then_payload_add != null) else_block else then_block;
+    const payload_add_imm = then_payload_add orelse else_payload_add.?;
+
+    const branch_condbr = switch (branch_block.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!branch_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const error_value = errorTagIcmpValueFromCallResult(branch_block, branch_condbr.cond, call_name) orelse return null;
+    const true_block = function.blocks.items[blockIndex(function, branch_condbr.then_target) orelse return null];
+    const false_block = function.blocks.items[blockIndex(function, branch_condbr.else_target) orelse return null];
+    const true_value = terminalConstI64Return(true_block) orelse return null;
+    const false_value = terminalConstI64Return(false_block) orelse return null;
+    if (!errorTagBranchUsesOnlyExpectedBlocks(function, entry.name, payload_block.name, branch_block.name, true_block.name, false_block.name)) return null;
+
+    return .{
+        .entry = entry,
+        .call_name = call_name,
+        .call = call,
+        .payload_block = payload_block,
+        .payload_add_imm = payload_add_imm,
+        .branch_block = branch_block,
+        .error_value = error_value,
+        .true_block = true_block,
+        .true_value = true_value,
+        .false_block = false_block,
+        .false_value = false_value,
+    };
+}
+
 pub fn errorUnionPayloadI32Return(function: ir.Function, block: ir.BasicBlock, call_name: []const u8) ?ErrorUnionI32ReturnValue {
     const ret = switch (block.terminator orelse return null) {
         .ret => |ret| ret,
@@ -2328,6 +2442,19 @@ pub fn payloadAddWrapReturnFromCallResult(block: ir.BasicBlock, call_name: []con
     };
     if (!ret.ty.eql(.{ .int = 64 })) return null;
     return payloadAddWrapValue(block, block, ret.value orelse return null, call_name);
+}
+
+fn terminalConstI64Return(block: ir.BasicBlock) ?i64 {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 64 })) return null;
+    const value = switch (ret.value orelse return null) {
+        .int => |int| int,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    return i64Value(value) catch null;
 }
 
 fn payloadBinaryI32Return(
