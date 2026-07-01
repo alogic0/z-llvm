@@ -93,6 +93,10 @@ fn errorUnionConstantCode(type_text: []const u8, value_text: []const u8) ?i128 {
         const error_set_text = ty[0 .. marker + 1];
         return errorSetConstantCode(error_set_text, value);
     }
+    if (std.mem.eql(u8, value, "{}")) {
+        const payload_type = std.mem.trim(u8, ty[marker + 2 ..], " ");
+        if (std.mem.eql(u8, payload_type, "void")) return 0;
+    }
     const payload = std.fmt.parseInt(i128, value, 10) catch return null;
     return payload << 16;
 }
@@ -179,6 +183,8 @@ pub fn cStringLiteralByteLen(body: []const u8) ?usize {
 test "parse static AIR constants" {
     const parsed = parseConstant("<i32, 42>") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(@as(i128, 42), parsed.value.int);
+    const error_union_void = parseConstant("<error{Bad}!void, {}>") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(@as(i128, 0), error_union_void.value.int);
 }
 
 test "parse symbol pointers" {

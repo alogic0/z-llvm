@@ -455,6 +455,19 @@ export fn frontier_catch_error_call_match(tag: i32, value: i32, base: i32) i32 {
     return payload + base;
 }
 
+fn frontierMaybeVoid(tag: i32) FrontierError!void {
+    if (tag == 0) return;
+    if (tag == 1) return FrontierError.BadTag;
+    return FrontierError.WorseTag;
+}
+
+export fn frontier_try_void_catch_match(tag: i32, base: i32) i32 {
+    frontierMaybeVoid(tag) catch |err| {
+        return frontierClassifyCaughtError(err, base);
+    };
+    return base + 7;
+}
+
 fn frontierWrapErrorSwitch(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag & 3) {
         0 => value,

@@ -268,6 +268,29 @@ pub const TypedFunctionView = struct {
         return self.voidGuardBlock(block_index, then_body, else_body);
     }
 
+    pub fn errorUnionVoidReturnContinueBlockByIndex(self: TypedFunctionView, block_index: u32) bool {
+        if (std.mem.indexOf(u8, self.function.type_text, "}!void") == null) return false;
+        const block_body = self.body(.block, block_index) orelse return false;
+        var cond_index: ?u32 = null;
+        for (block_body.instructions) |instruction_index| {
+            const typed_instruction = self.instruction(instruction_index) orelse return false;
+            const typed_capability = self.capability(typed_instruction);
+            if (typed_capability.status == .ignored_metadata) continue;
+            if (air_capabilities.isCondBrOpcode(typed_instruction.opcode)) {
+                if (cond_index != null or typed_instruction.operands.len != 1) return false;
+                cond_index = instruction_index;
+                continue;
+            }
+            if (cond_index != null) return false;
+            if (!air_capabilities.typedV2CanLower(typed_capability) or air_capabilities.isBlockOpcode(typed_instruction.opcode)) return false;
+        }
+        const cond = cond_index orelse return false;
+        const then_body = self.body(.then_body, cond) orelse return false;
+        const else_body = self.body(.else_body, cond) orelse return false;
+        return (self.bodyEndsInReturn(then_body) and self.voidBranchBody(else_body, block_index)) or
+            (self.bodyEndsInReturn(else_body) and self.voidBranchBody(then_body, block_index));
+    }
+
     pub fn containsVoidGuardBlockInstruction(self: TypedFunctionView, instruction_index: u32) bool {
         for (self.structured_air.bodies) |structured_body| {
             if (structured_body.kind != .block) continue;
@@ -288,8 +311,43 @@ pub const TypedFunctionView = struct {
         return false;
     }
 
+    pub fn containsErrorUnionVoidReturnContinueBlockInstruction(self: TypedFunctionView, instruction_index: u32) bool {
+        for (self.structured_air.bodies) |structured_body| {
+            if (structured_body.kind != .block) continue;
+            const owner = structured_body.owner orelse continue;
+            if (!self.errorUnionVoidReturnContinueBlockByIndex(owner)) continue;
+            if (self.containsInstruction(structured_body, instruction_index)) return true;
+            const cond_index = self.blockCondInstructionIndex(structured_body) orelse continue;
+            const then_body = self.body(.then_body, cond_index) orelse continue;
+            const else_body = self.body(.else_body, cond_index) orelse continue;
+            if (self.containsInstruction(then_body, instruction_index) or
+                self.containsInstruction(else_body, instruction_index))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn blockCondInstructionIndex(self: TypedFunctionView, structured_body: air_export.StructuredBody) ?u32 {
+        var cond_index: ?u32 = null;
+        for (structured_body.instructions) |instruction_index| {
+            const typed_instruction = self.instruction(instruction_index) orelse return null;
+            const typed_capability = self.capability(typed_instruction);
+            if (typed_capability.status == .ignored_metadata) continue;
+            if (air_capabilities.isCondBrOpcode(typed_instruction.opcode)) {
+                if (cond_index != null) return null;
+                cond_index = instruction_index;
+                continue;
+            }
+            if (cond_index != null) return null;
+        }
+        return cond_index;
+    }
+
     pub fn genericCfgBlock(self: TypedFunctionView, block_index: u32) bool {
         if (self.genericCfgSwitchBlock(block_index)) return true;
+        if (self.errorUnionVoidReturnContinueBlockByIndex(block_index)) return true;
         const block_body = self.body(.block, block_index) orelse return false;
         var cond_index: ?u32 = null;
         for (block_body.instructions) |instruction_index| {

@@ -456,6 +456,7 @@ pub fn firstUnsupported(
         if (air_capabilities.isBlockOpcode(instruction.opcode)) {
             if (isSimpleSelectBlock(function, instruction.index)) continue;
             if (typed_view != null and typed_view.?.voidGuardBlockByIndex(instruction.index)) continue;
+            if (typed_view != null and typed_view.?.errorUnionVoidReturnContinueBlockByIndex(instruction.index)) continue;
             if (typed_view != null and typed_view.?.genericCfgBlock(instruction.index)) continue;
             if (typed_view != null and typed_view.?.containsGenericCfgBlockInstruction(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
@@ -466,6 +467,7 @@ pub fn firstUnsupported(
         {
             if (belongsToSimpleSelectBlock(function, instruction.index)) continue;
             if (typed_view != null and typed_view.?.containsVoidGuardBlockInstruction(instruction.index)) continue;
+            if (typed_view != null and typed_view.?.containsErrorUnionVoidReturnContinueBlockInstruction(instruction.index)) continue;
             if (typed_view != null and typed_view.?.containsGenericCfgBlockInstruction(instruction.index)) continue;
             if (typed_view != null and typed_view.?.terminalErrorUnionCondBr(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };

@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=705
-structured_functions=705
-generic_codegen_functions=705
-generic_cfg_functions=705
+discovered_functions=707
+structured_functions=707
+generic_codegen_functions=707
+generic_cfg_functions=707
 structural_matcher_functions=0
-structured_air_v2_functions=705
-typed_air_operand_functions=705
+structured_air_v2_functions=707
+typed_air_operand_functions=707
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=705
+generic_lowering_functions=707
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=705
+object_emitted_functions=707
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 705-function counters above plus `native_link_accepted_rows=14`,
+14-source / 707-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -707,11 +707,11 @@ compares the unwrapped `i16` tag and returns packed `i64` error-union
 constants, while the success path rewraps payload arithmetic. This closes a
 branch-owned `unwrap_errunion_err` / `wrap_errunion_err` shape without AIR text
 recovery or source-name admission.
-The catch/helper-call row now covers the next compiler-core-shaped sibling:
-the catch block forwards the extracted `i16` error tag and a live `i32`
-parameter to a private helper call, while the success block returns payload
-arithmetic. This is tied to the refreshed ReleaseFast compiler-core
-`try:pl_op` / `unwrap_errunion_err:ty_op` family and is admitted by typed AIR
+The catch/helper-call rows now cover the next compiler-core-shaped siblings:
+one catches a payload-returning error-union helper, and the newer row catches
+an `Error!void` helper where the success continuation returns ordinary `i32`
+arithmetic. Both are tied to the refreshed ReleaseFast compiler-core
+`try:pl_op` / `unwrap_errunion_err:ty_op` family and are admitted by typed AIR
 and generic CFG data flow, not by row name.
 The producer-side branch row now also proves terminal `cond_br` arms that
 return wrapped error constants directly, so `wrap_errunion_err` is not limited

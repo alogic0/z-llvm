@@ -76,13 +76,14 @@ error arm returns a value derived from a live ABI parameter, and the success arm
 returns payload arithmetic. The x86_64 generic CFG emitter now spills that live
 `i32` parameter across the helper call and materializes the switch-phi incoming
 values without source-name admission.
-The catch/helper-call row reduces the refreshed compiler-core
-`try:pl_op` / `unwrap_errunion_err:ty_op` shape from `start.posixCallMainAndExit`:
-the catch block forwards the extracted `i16` error tag plus a live `i32`
-parameter into a private helper call, while the success block returns payload
-arithmetic. The generic CFG backend validates the try guard, error-tag
-extraction, helper-call argument flow, and live-parameter spill/reload instead
-of admitting the row by function name.
+The catch/helper-call rows reduce refreshed compiler-core
+`try:pl_op` / `unwrap_errunion_err:ty_op` shapes from
+`start.posixCallMainAndExit` and `main.main`: one row catches an error-union
+payload helper, and the newer `Error!void` row catches a void-success helper
+where the success continuation returns ordinary `i32` arithmetic. The generic
+CFG backend validates the try guard, error-tag extraction, helper-call argument
+flow, generic success return, and live-parameter spill/reload instead of
+admitting either row by function name.
 The producer-side `frontier_wrap_error_switch_match` row covers a masked
 integer switch that returns either a wrapped payload or wrapped error constants
 through an `i64` error-union phi. The x86_64 switch-to-phi path now accepts a
@@ -292,20 +293,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=705
-structured_functions=705
-generic_codegen_functions=705
-generic_cfg_functions=705
+discovered_functions=707
+structured_functions=707
+generic_codegen_functions=707
+generic_cfg_functions=707
 structural_matcher_functions=0
-structured_air_v2_functions=705
-typed_air_operand_functions=705
+structured_air_v2_functions=707
+typed_air_operand_functions=707
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=705
+generic_lowering_functions=707
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=705
+object_emitted_functions=707
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

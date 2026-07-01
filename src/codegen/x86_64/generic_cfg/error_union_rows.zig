@@ -1752,8 +1752,8 @@ const ErrorUnionCatchCallReturn = struct {
     entry: ir.BasicBlock,
     call_name: []const u8,
     call: ir.CallInst,
-    payload_block: ir.BasicBlock,
-    payload_return: ErrorUnionI32ReturnValue,
+    success_block: ir.BasicBlock,
+    success_return: ErrorUnionI32ReturnValue,
     catch_block: ir.BasicBlock,
     catch_call: ir.CallInst,
     live_param_reg: ArgReg,
@@ -2077,7 +2077,7 @@ pub fn lowerGenericCfgErrorUnionCatchCallReturn(
     try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
     try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
     try machine.instructions.append(allocator, .test_eax_eax);
-    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.payload_block.name);
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.success_block.name);
 
     try appendGenericCfgBlockLabel(allocator, machine, plan.catch_block.name);
     try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
@@ -2087,8 +2087,8 @@ pub fn lowerGenericCfgErrorUnionCatchCallReturn(
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = plan.catch_call.callee, .ret_ty = plan.catch_call.ret_ty } });
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 
-    try appendGenericCfgBlockLabel(allocator, machine, plan.payload_block.name);
-    try emitErrorUnionI32ReturnValueIntoEax(allocator, machine, function, plan.entry, plan.payload_block, plan.payload_return, plan.live_param_reg);
+    try appendGenericCfgBlockLabel(allocator, machine, plan.success_block.name);
+    try emitErrorUnionI32ReturnValueIntoEax(allocator, machine, function, plan.entry, plan.success_block, plan.success_return, plan.live_param_reg);
     try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
 
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
@@ -2530,27 +2530,28 @@ fn errorUnionCatchCallReturn(function: ir.Function) ?ErrorUnionCatchCallReturn {
         .call => |call| call,
         else => return null,
     };
-    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+    if (!supportsDirectI64Call(call)) return null;
 
     const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
     const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
-    const then_payload_return = errorUnionPayloadI32Return(function, then_block, call_name);
-    const else_payload_return = errorUnionPayloadI32Return(function, else_block, call_name);
-    if ((then_payload_return != null) == (else_payload_return != null)) return null;
-    const payload_block = if (then_payload_return != null) then_block else else_block;
-    const catch_block = if (then_payload_return != null) else_block else then_block;
-    const payload_return = then_payload_return orelse else_payload_return.?;
-    const catch_call = catchErrorCallReturn(function, catch_block, call_name) orelse return null;
+    const then_catch_call = catchErrorCallReturn(function, then_block, call_name);
+    const else_catch_call = catchErrorCallReturn(function, else_block, call_name);
+    if ((then_catch_call != null) == (else_catch_call != null)) return null;
+    const success_block = if (then_catch_call != null) else_block else then_block;
+    const catch_block = if (then_catch_call != null) then_block else else_block;
+    const catch_call = then_catch_call orelse else_catch_call.?;
+    const success_return = errorUnionPayloadI32Return(function, success_block, call_name) orelse
+        errorUnionGenericI32Return(success_block) orelse return null;
     var live_param_reg: ?ArgReg = catch_call.live_param_reg;
-    if (!mergeLiveParam(&live_param_reg, errorUnionI32ReturnLiveParam(function, payload_block, payload_return))) return null;
-    if (!catchCallUsesOnlyExpectedBlocks(function, entry.name, payload_block.name, catch_block.name)) return null;
+    if (!mergeLiveParam(&live_param_reg, errorUnionI32ReturnLiveParam(function, success_block, success_return))) return null;
+    if (!catchCallUsesOnlyExpectedBlocks(function, entry.name, success_block.name, catch_block.name)) return null;
 
     return .{
         .entry = entry,
         .call_name = call_name,
         .call = call,
-        .payload_block = payload_block,
-        .payload_return = payload_return,
+        .success_block = success_block,
+        .success_return = success_return,
         .catch_block = catch_block,
         .catch_call = catch_call.call,
         .live_param_reg = live_param_reg orelse return null,
@@ -2690,6 +2691,15 @@ pub fn errorUnionPayloadI32Return(function: ir.Function, block: ir.BasicBlock, c
     if (payloadAddFromCallResult(block, add_name, call_name)) |imm| return .{ .payload_add_imm = imm };
     if (payloadBinaryI32Return(function, block, block, call_name)) |binary| return .{ .payload_binary = binary };
     return null;
+}
+
+fn errorUnionGenericI32Return(block: ir.BasicBlock) ?ErrorUnionI32ReturnValue {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    return .{ .generic = ret.value orelse return null };
 }
 
 pub fn payloadAddWrapReturnFromCallResult(block: ir.BasicBlock, call_name: []const u8) ?u8 {

@@ -1992,12 +1992,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=705`,
-`generic_codegen_functions=705`, `generic_cfg_functions=705`,
+frontier gate reports `source_rows=14`, `discovered_functions=707`,
+`generic_codegen_functions=707`, `generic_cfg_functions=707`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=705`, `object_failures=0`,
+`object_emitted_functions=707`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -2034,13 +2034,14 @@ constant, and the hot path rewraps payload arithmetic. This keeps
 `unwrap_errunion_err` plus `wrap_errunion_err` ownership structural rather than
 source-name admitted.
 The latest catch/helper-call row is reduced from the refreshed ReleaseFast
-compiler-core `start.posixCallMainAndExit` family: after the try guard, the
-catch block forwards the extracted `i16` error tag and a live `i32` parameter
-to a private classifier helper while the success block returns payload
-arithmetic. The backend now validates the `try:pl_op` guard,
-`unwrap_errunion_err:ty_op` extraction, helper-call argument flow, and
-live-parameter spill/reload structurally, narrowing that compiler-core family
-without AIR text recovery or source-name admission.
+compiler-core `start.posixCallMainAndExit` / `main.main` family: an `Error!void`
+helper feeds a `try:pl_op` guard, the catch block forwards the extracted `i16`
+error tag and a live `i32` parameter to a private classifier helper, and the
+success continuation returns ordinary `i32` arithmetic rather than an
+error-union payload. The backend now admits the shape by validating the
+`unwrap_errunion_err:ty_op` extraction, helper-call argument flow, generic
+success return value, and live-parameter spill/reload structurally, narrowing
+that compiler-core family without AIR text recovery or source-name admission.
 
 The scalar transform frontier now includes typed-v2 ownership for AIR
 `byte_swap` on `u16`, `u32`, and `u64`. Zig exports a versioned
@@ -2082,9 +2083,9 @@ this cycle.
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=705`,
-`generic_cfg_functions=705`, `structural_matcher_functions=0`,
-`object_emitted_functions=705`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=707`,
+`generic_cfg_functions=707`, `structural_matcher_functions=0`,
+`object_emitted_functions=707`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
