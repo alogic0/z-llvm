@@ -70,7 +70,8 @@ Layer: typed AIR facts, semantic lowering, CFG lowering.
   emitters.
 - [x] Prove branch-only wrapped error-union returns.
 - [x] Prove loop or switch continuation after `try`.
-- [ ] Keep pointer/cold/error-name subforms fail-closed until facts exist.
+- [x] Keep pointer/cold/error-name subforms covered by typed facts or
+  fail-closed until facts exist.
 - [ ] Refresh inventory and show the error-union try bucket reduced.
 
 ### 3. Pointer/Slice/Address Forms
