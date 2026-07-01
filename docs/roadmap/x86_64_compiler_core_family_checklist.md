@@ -405,7 +405,19 @@ Layer: typed AIR parser and address-form lowering.
   `pointer_slice_boundary_rows=2`, `wrong_diagnostic_rows=0`, and
   `local_fail=0`. Address-space-specific pointer rows remain future work until
   a source-backed x86_64 release shape is selected.
-- [ ] Refresh inventory and show the pointer-address bucket reduced.
+- [x] Refresh inventory and show the pointer-address bucket reduced.
+
+  Focused ReleaseFast compiler-core-module inventory was refreshed after the
+  pointer/slice frontier reached 724 functions:
+  `tmp/compiler_core_module_releasefast_after_pointer_slice724.log`. The
+  summary reports `functions=61375`, `instructions_total=6298207`,
+  `unsupported_functions=55852`, and `unsupported_opcodes=47087`, while the
+  pointer-address bucket remains closed:
+  `unknown_opcode category=pointer-address count=0 first_source=-
+  first_function=-`. Raw pointer-address opcodes still appear as known opcode
+  counts, for example `ptr_sub count=119`, but they are no longer classified as
+  unsupported inventory blockers in ReleaseFast. ReleaseSafe and ReleaseSmall
+  were not refreshed for this checklist item.
 
 ### 4. Aggregate-Shape Ops
 
