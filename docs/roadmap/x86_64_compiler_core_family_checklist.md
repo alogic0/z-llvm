@@ -727,7 +727,12 @@ Layer: semantic lowering and CFG lowering.
   optional-pointer rows. This keeps pointer-payload extraction distinct from the
   scalar optional payload path while reusing the generic typed-v2 payload
   extraction model.
-- [ ] Lower optional branch/merge flows.
+- [x] Lower optional branch/merge flows.
+  Completed by tightening `typedOptionalPayloadSummary` so selected scalar
+  optional branch/merge lowering proves guard, wrap, null-check, payload, and
+  fallback branch data flow. The richer payload-branch row was already
+  data-flow checked; this removes the remaining count-only scalar optional merge
+  admission.
 - [ ] Lower optional return/catch-style flows that appear in compiler-core
   inventory.
 - [ ] Prove one optional scalar executable row.

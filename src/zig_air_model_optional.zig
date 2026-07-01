@@ -242,6 +242,24 @@ pub fn typedOptionalPayloadSummary(
     {
         return null;
     }
+    const arg0 = typedNthI32ArgIndex(structured_air_v2, 0) orelse return null;
+    const arg1 = typedNthI32ArgIndex(structured_air_v2, 1) orelse return null;
+    const maybe_guard = typedBinaryInstConstRhs(structured_air_v2, "cmp_neq", arg0, 0) orelse return null;
+    if (!typedCondBrUses(structured_air_v2, maybe_guard)) return null;
+
+    const wrap_optional = singleInstructionByOpcode(structured_air_v2, "wrap_optional") orelse return null;
+    _ = typedWrapOptionalSummary(wrap_optional) orelse return null;
+    if (typedInstOperandIndex(wrap_optional.operands[0]) != arg1) return null;
+
+    const is_non_null = singleInstructionByOpcode(structured_air_v2, "is_non_null") orelse return null;
+    const optional_payload = singleInstructionByOpcode(structured_air_v2, "optional_payload") orelse return null;
+    _ = typedOptionalPayloadExtractionSummary(optional_payload) orelse return null;
+    if (is_non_null.operands.len != 1 or optional_payload.operands.len != 1) return null;
+    const optional_value = typedInstOperandIndex(is_non_null.operands[0]) orelse return null;
+    if (!typedBranchCarriesInstToBlock(structured_air_v2, optional_value, wrap_optional.index)) return null;
+    if (typedInstOperandIndex(optional_payload.operands[0]) != optional_value) return null;
+    if (!typedCondBrUses(structured_air_v2, is_non_null.index)) return null;
+
     return .{ .fallback = typedLastBranchI32ConstValue(structured_air_v2) orelse return null };
 }
 
@@ -352,6 +370,18 @@ fn typedCondBrUses(structured_air_v2: air_export.StructuredAirV2, condition_inde
         if (!std.mem.eql(u8, instruction.opcode, "cond_br")) continue;
         if (instruction.operands.len == 0) continue;
         if (typedInstOperandIndex(instruction.operands[0]) == condition_index) return true;
+    }
+    return false;
+}
+
+fn typedBranchCarriesInstToBlock(structured_air_v2: air_export.StructuredAirV2, block_index: u32, value_index: u32) bool {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "br")) continue;
+        if (instruction.operands.len != 2) continue;
+        if (!std.mem.eql(u8, instruction.operands[0].kind, "block")) continue;
+        const target = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch continue;
+        if (target != block_index) continue;
+        if (typedInstOperandIndex(instruction.operands[1]) == value_index) return true;
     }
     return false;
 }
