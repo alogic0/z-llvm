@@ -653,7 +653,20 @@ Layer: semantic lowering and CFG lowering.
   `source_rows=14`, `discovered_functions=732`,
   `generic_cfg_functions=732`, `object_emitted_functions=732`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Prove one tag-plus-payload executable row.
+- [x] Prove one tag-plus-payload executable row.
+
+  Tag-plus-payload executable proof is covered by the union-tag payload rows in
+  `frontier_union_tags.zig`: `frontier_union_tag_match`,
+  `frontier_union_tag_reversed_arms`,
+  `frontier_union_tag_small_payload_add`,
+  `frontier_union_tag_reordered_fields`, and
+  `frontier_union_tag_branch`. The C harness checks both payload arms for
+  each accepted source shape, including switch-based and branch-based tag
+  dispatch. Current strict frontier evidence:
+  `tmp/frontier_union_tag_branch.log` reports all three release modes at
+  `source_rows=14`, `discovered_functions=732`,
+  `generic_cfg_functions=732`, `object_emitted_functions=732`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Keep unsupported payload layouts and inactive-payload reads fail-closed.
 - [ ] Refresh inventory and show the union-tag bucket reduced.
 
