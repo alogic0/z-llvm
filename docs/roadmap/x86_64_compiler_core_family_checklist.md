@@ -516,7 +516,15 @@ Layer: aggregate semantic lowering.
   `source_rows=14`, `discovered_functions=730`,
   `generic_cfg_functions=730`, `object_emitted_functions=730`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Keep unsupported aggregate element/layout forms fail-closed.
+- [x] Keep unsupported aggregate element/layout forms fail-closed.
+
+  Unsupported packed/unaligned aggregate ABI forms remain boundary-owned by
+  `frontier_packed_aggregate_boundary.zig`. The boundary gate keeps them out
+  of accepted frontier proof with targeted `UnsupportedPackedAggregateAbi`
+  diagnostics. Latest saved boundary evidence in
+  `tmp/frontier_aggregate_projection_boundaries.log` reports
+  `packed_aggregate_boundary_rows=2`, `wrong_diagnostic_rows=0`, and
+  `local_fail=0` across ReleaseFast, ReleaseSafe, and ReleaseSmall.
 - [ ] Refresh inventory and show the aggregate-shape bucket reduced.
 
 ### 5. Union-Tag Shape
