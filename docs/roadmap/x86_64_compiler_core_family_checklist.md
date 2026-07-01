@@ -361,7 +361,17 @@ Layer: typed AIR parser and address-form lowering.
   `frontier_slice_pointer_arith.zig` executable-ok in ReleaseFast, ReleaseSafe,
   and ReleaseSmall with all modes at `generic_cfg_functions=723`,
   `object_emitted_functions=723`, and `local_fail=0`.
-- [ ] Prove slice pointer extraction.
+- [x] Prove slice pointer extraction.
+
+  `frontier_slice_pointer_arith.zig` proves `slice.ptr` extraction through
+  `frontier_slice_ptr_load`,
+  `frontier_slice_ptr_const_runtime_load`, and
+  `frontier_slice_ptr_const_runtime_store`. These rows construct slices from
+  pointer+length inputs, extract the pointer, apply runtime or constant+runtime
+  offsets, and then load or store through the derived pointer. The C harness
+  validates all three rows, and `tmp/frontier_is_non_null_ptr.log` reports
+  `frontier_slice_pointer_arith.zig` executable-ok in ReleaseFast, ReleaseSafe,
+  and ReleaseSmall with `local_fail=0`.
 - [ ] Prove slice length extraction.
 - [ ] Prove pointer/slice values across a branch merge.
 - [ ] Keep unsupported address spaces and volatile/atomic pointer forms
