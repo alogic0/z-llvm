@@ -228,6 +228,7 @@ const Counters = struct {
     aggregate_opcode_shapes: usize = 0,
     aggregate_metadata_type_surfaces: usize = 0,
     aggregate_abi_type_surfaces: usize = 0,
+    aggregate_layout_facts: usize = 0,
     pointer_uses: usize = 0,
     slice_uses: usize = 0,
     optional_uses: usize = 0,
@@ -486,7 +487,6 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
     var env_map = try cloneEnvironment(allocator, init.environ_map);
     defer env_map.deinit();
     try env_map.put("ZLLVM_AIR_EXPORT_PATH", descriptor_path);
-    try env_map.put("ZLLVM_DISABLE_AGGREGATE_LAYOUT_FACTS", "1");
 
     const argv = [_][]const u8{
         zig_emitter,
@@ -618,6 +618,7 @@ fn accountModule(
     counters.inventory_ok_sources += 1;
     counters.modules += 1;
     counters.globals += module.globals.len;
+    if (module.aggregate_layout_facts) |provider| counters.aggregate_layout_facts += provider.facts.len;
 
     var function_names = std.StringHashMap(void).init(allocator);
     defer function_names.deinit();
@@ -730,7 +731,7 @@ fn scanLargeDescriptor(
             const line = try takeLine(reader);
             if (std.mem.startsWith(u8, line, "aggregate_layout_facts_bytes=")) {
                 const len = try parseUnsignedLine(usize, line["aggregate_layout_facts_bytes=".len..]);
-                try skipFramedBytes(reader, len);
+                counters.aggregate_layout_facts += try countAggregateLayoutFactsFrame(reader, len);
                 continue;
             }
             if (std.mem.startsWith(u8, line, "error_union_call_facts_bytes=")) {
@@ -821,6 +822,40 @@ fn scanFramedText(
 fn skipFramedBytes(reader: *std.Io.Reader, len: usize) !void {
     try reader.discardAll64(len);
     try reader.discardAll(1);
+}
+
+fn countAggregateLayoutFactsFrame(reader: *std.Io.Reader, len: usize) !usize {
+    var remaining = len;
+    var count: usize = 0;
+    var at_line_start = true;
+    var matching_fact_prefix: usize = 0;
+    const fact_prefix = "fact ";
+    while (remaining > 0) {
+        const chunk_len = @min(remaining, 64 * 1024);
+        const chunk = try reader.take(chunk_len);
+        for (chunk) |byte| {
+            if (at_line_start) {
+                if (byte == fact_prefix[matching_fact_prefix]) {
+                    matching_fact_prefix += 1;
+                    if (matching_fact_prefix == fact_prefix.len) {
+                        count += 1;
+                        at_line_start = false;
+                        matching_fact_prefix = 0;
+                    }
+                    continue;
+                }
+                at_line_start = false;
+                matching_fact_prefix = 0;
+            }
+            if (byte == '\n') {
+                at_line_start = true;
+                matching_fact_prefix = 0;
+            }
+        }
+        remaining -= chunk.len;
+    }
+    try reader.discardAll(1);
+    return count;
 }
 
 fn accountChunkFeatures(
@@ -1369,7 +1404,7 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
         },
     );
     try writer.print(
-        " varargs_uses={} vector_uses={} x87_uses={} packed_unaligned_aggregate_uses={} atomics={} inline_asm={} loads={} stores={} allocas={} switches={} loops={} branches={} aggregate_types={} aggregate_opcode_shapes={} aggregate_metadata_type_surfaces={} aggregate_abi_type_surfaces={} pointer_uses={} slice_uses={} optional_uses={} error_union_uses={} unsupported_functions={} unsupported_opcodes={} local_fail=0\n",
+        " varargs_uses={} vector_uses={} x87_uses={} packed_unaligned_aggregate_uses={} atomics={} inline_asm={} loads={} stores={} allocas={} switches={} loops={} branches={} aggregate_types={} aggregate_opcode_shapes={} aggregate_metadata_type_surfaces={} aggregate_abi_type_surfaces={} aggregate_layout_facts={} pointer_uses={} slice_uses={} optional_uses={} error_union_uses={} unsupported_functions={} unsupported_opcodes={} local_fail=0\n",
         .{
             counters.varargs_uses,
             counters.vector_uses,
@@ -1387,6 +1422,7 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
             counters.aggregate_opcode_shapes,
             counters.aggregate_metadata_type_surfaces,
             counters.aggregate_abi_type_surfaces,
+            counters.aggregate_layout_facts,
             counters.pointer_uses,
             counters.slice_uses,
             counters.optional_uses,

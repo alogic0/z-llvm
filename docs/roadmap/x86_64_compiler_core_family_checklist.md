@@ -35,7 +35,12 @@ same family.
 
 Layer: semantic layout, ABI planner, backend.
 
-- [ ] Own aggregate layout facts from typed/model data for compiler-core rows.
+- [x] Own aggregate layout facts from typed/model data for compiler-core rows.
+
+  ReleaseFast compiler-core-module refresh evidence:
+  `tmp/compiler_core_module_releasefast_aggregate_layout_facts_enabled.log`
+  reports `aggregate_layout_facts=5824` with real module context, generated
+  imports available, no stubs, and `instruction_payload_scan=1`.
 - [ ] Lower struct arguments passed in registers.
 - [ ] Lower struct arguments passed through memory.
 - [ ] Lower struct returns in registers.

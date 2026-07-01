@@ -30,7 +30,7 @@ module graph with generated imports available, no stubs, and
 
 | Mode | Functions | Instructions | Calls | Branches | Loops | Switches | Loads | Stores | Stack slots | Unsupported functions | Unsupported opcodes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ReleaseFast | 61375 | 6298207 | 330413 | 1039278 | 25448 | 15608 | 589486 | 315463 | 372867 | 56263 | 367516 |
+| ReleaseFast | 61375 | 6298207 | 330413 | 1039278 | 25448 | 15608 | 589486 | 315463 | 372867 | 55852 | 47087 |
 | ReleaseSafe | 61951 | 6842493 | 414768 | 1243546 | 25710 | 15618 | 598366 | 317492 | 385116 | 57216 | 407240 |
 | ReleaseSmall | 59837 | 4178468 | 324995 | 981856 | 24996 | 15463 | 577888 | 310553 | 366867 | 54849 | 333877 |
 
@@ -43,7 +43,7 @@ category.
 | Category | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
 | aggregate-abi | 2324784 | 2338212 | 2206792 | `../ziglang/src/main.zig` | `global` | partially supported | semantic lowering, ABI planner, backend |
-| unknown-opcode | 367516 | 407240 | 333877 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | AIR parser, CFG lowering |
+| unknown-opcode | 47087 | 407240 | 333877 | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | AIR parser, CFG lowering |
 | vector | 16200 | 16024 | 15808 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
 | x87 | 6444 | 6220 | 6550 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
 | packed-aggregate | 5364 | 5548 | 4863 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
@@ -60,6 +60,8 @@ fields:
   data kinds, operands, details, and other non-ABI metadata surfaces.
 - `aggregate_abi_type_surfaces`: aggregate type text seen in function
   signatures and call/return/argument instruction contexts.
+- `aggregate_layout_facts`: Zig-emitted
+  `zllvm-aggregate-layout-facts-v1` records counted from descriptors.
 
 This preserves the existing `aggregate_types` and
 `unsupported category=aggregate-abi` totals for compatibility while giving the
@@ -67,19 +69,19 @@ next implementation slice a cleaner signal. The old compiler-core-module
 baseline above predates these split counters; the latest focused validation of
 the output contract is:
 
-| Slice | Mode | aggregate_opcode_shapes | aggregate_metadata_type_surfaces | aggregate_abi_type_surfaces | Log |
-| --- | --- | ---: | ---: | ---: | --- |
-| runtime-libs | ReleaseFast | 10118 | 43101 | 19497 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
-| runtime-libs | ReleaseSafe | 10179 | 47078 | 20214 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
-| runtime-libs | ReleaseSmall | 4964 | 23801 | 10554 | `tmp/runtime_libs_aggregate_surface_inventory.log` |
-| compiler-core-module | ReleaseFast | 410781 | 1392398 | 932386 | `tmp/compiler_core_module_releasefast_after_abs_hook_fix.log` |
-| compiler-core-standalone-probe | ReleaseFast | 0 | 85 | 2 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
-| compiler-core-standalone-probe | ReleaseSafe | 0 | 85 | 2 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
-| compiler-core-standalone-probe | ReleaseSmall | 0 | 0 | 0 | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
+| Slice | Mode | aggregate_opcode_shapes | aggregate_metadata_type_surfaces | aggregate_abi_type_surfaces | aggregate_layout_facts | Log |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| runtime-libs | ReleaseFast | 10118 | 45414 | 19497 | 187 | `tmp/runtime_libs_aggregate_layout_facts_enabled.log` |
+| runtime-libs | ReleaseSafe | 10179 | 47078 | 20214 | not refreshed | `tmp/runtime_libs_aggregate_surface_inventory.log` |
+| runtime-libs | ReleaseSmall | 4964 | 23801 | 10554 | not refreshed | `tmp/runtime_libs_aggregate_surface_inventory.log` |
+| compiler-core-module | ReleaseFast | 410781 | 1392400 | 932386 | 5824 | `tmp/compiler_core_module_releasefast_aggregate_layout_facts_enabled.log` |
+| compiler-core-standalone-probe | ReleaseFast | 0 | 85 | 2 | not refreshed | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
+| compiler-core-standalone-probe | ReleaseSafe | 0 | 85 | 2 | not refreshed | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
+| compiler-core-standalone-probe | ReleaseSmall | 0 | 0 | 0 | not refreshed | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 
 The full `compiler-core-module` all-mode refresh remains milestone-cost. The
-ReleaseFast per-mode refresh completed in
-`tmp/compiler_core_module_releasefast_after_abs_hook_fix.log`; ReleaseSafe and
+ReleaseFast per-mode refresh completed with aggregate fact counting in
+`tmp/compiler_core_module_releasefast_aggregate_layout_facts_enabled.log`; ReleaseSafe and
 ReleaseSmall should be refreshed separately with `--mode` when their counters
 need the same split.
 
@@ -98,17 +100,17 @@ longer make the global top 50.
 
 | Subcategory | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| error-union-try | 237172 | 238174 | 231997 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
-| pointer-address | 50442 | 59226 | 49313 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
-| aggregate-shape | 30615 | 64537 | 29881 | `../ziglang/src/main.zig` | `start.posixCallMainAndExit` | partially supported | aggregate semantic lowering, ABI planner |
+| error-union-try | 0 | 238174 | 231997 | - | - | ReleaseFast typed/model-owned bucket reclassified; ReleaseSafe/ReleaseSmall not refreshed | semantic lowering, CFG lowering |
+| pointer-address | 0 | 59226 | 49313 | - | - | ReleaseFast known/lowerable bucket reclassified; ReleaseSafe/ReleaseSmall not refreshed | typed AIR parser, address-form lowering |
+| aggregate-shape | 5940 | 64537 | 29881 | `../ziglang/src/main.zig` | `Build.Cache.Directory.join` | partially supported | aggregate semantic lowering, ABI planner |
 | vector | 26240 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
 | union-tag-shape | 14508 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
 | optional-shape | 6461 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
-| scalar-transform | 1842 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `main.buildOutputType` | unsupported inventory family | semantic lowering, backend |
+| scalar-transform | 225 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `mem.Alignment.fromByteUnits` | unsupported inventory family | semantic lowering, backend |
 | float-math | 87 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `math.pow.pow__anon_62528` | unsupported inventory family | backend, runtime boundary |
 | select-shape | 5 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` | partially supported | semantic lowering, CFG lowering |
 | other | 0 | 33949 | 22545 | - / `debug.FullPanic((function 'panicImpl')).reachedUnreachable` | - / needs refresh | no ReleaseFast residual rows | AIR parser, capability registry |
-| safety-runtime | 144 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
+| safety-runtime | 82 | 11354 | 141 | `../ziglang/src/main.zig` | `math.sub__anon_41274` / `os.linux.tls.initStatic` | partially supported | safety-edge CFG, runtime boundary |
 | call-shape | 0 | 0 | 0 | - | - | no measured unknown rows | ABI planner |
 | debug-metadata | 0 | 0 | 0 | - | - | handled outside unknown-opcode | metadata skip policy |
 | memory-shape | 0 | 0 | 0 | - | - | no measured unknown rows | memory lowering |
@@ -118,36 +120,36 @@ longer make the global top 50.
 
 | Rank | ReleaseFast | Count | ReleaseSafe | Count | ReleaseSmall | Count |
 | ---: | --- | ---: | --- | ---: | --- | ---: |
-| 1 | `error-union-try:unwrap_errunion_err:ty_op` | 84519 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
-| 2 | `error-union-try:wrap_errunion_err:ty_op` | 76713 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
-| 3 | `error-union-try:try:pl_op` | 73710 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
-| 4 | `vector:shuffle_one:opaque` | 26208 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
-| 5 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17471 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
-| 6 | `pointer-address:ptr_add:bin_ty_pl` | 14279 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
-| 7 | `aggregate-shape:slice_len:ty_op` | 13774 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |
-| 8 | `pointer-address:slice_ptr:ty_op` | 11926 | `safety-runtime:intcast_safe:ty_op` | 11185 | `aggregate-shape:slice:bin_ty_pl` | 10603 |
-| 9 | `aggregate-shape:slice:bin_ty_pl` | 10901 | `aggregate-shape:slice:bin_ty_pl` | 10942 | `other:wrap_optional:ty_op` | 6359 |
-| 10 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6343 | `other:get_union_tag:opaque` | 10923 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6250 |
-| 11 | `union-tag-shape:get_union_tag:ty_op` | 6057 | - | - | - | - |
-| 12 | `union-tag-shape:union_init:opaque` | 4624 | - | - | - | - |
-| 13 | `union-tag-shape:set_union_tag:bin_op` | 3020 | - | - | - | - |
-| 14 | `union-tag-shape:tag_name:opaque` | 807 | - | - | - | - |
-| 15 | `error-union-try:try_cold:pl_op` | 763 | - | - | - | - |
-| 16 | `scalar-transform:byte_swap:ty_op` | 760 | - | - | selected scalar widths are exported/lowered in frontier; remaining compiler-core count is broader inventory signal | - |
-| 17 | `error-union-try:unwrap_errunion_err_ptr:ty_op` | 573 | - | - | - | - |
-| 18 | `error-union-try:try_ptr:try_ptr` | 571 | - | - | - | - |
-| 19 | `scalar-transform:max:bin_op` | 429 | - | - | selected signed `i32` frontier row is covered; remaining compiler-core count is broader width/type coverage | - |
-| 20 | `scalar-transform:min:bin_op` | 364 | - | - | selected signed `i32` frontier row is covered; remaining compiler-core count is broader width/type coverage | - |
-| 21 | `error-union-try:error_name:un_op` | 323 | - | - | selected `error_name` and `error_set_has_value` frontier rows are covered; remaining compiler-core count is broader usage | - |
-| 22 | `pointer-address:is_non_null_ptr:un_op` | 263 | - | - | - | - |
-| 23 | `pointer-address:ptr_sub:bin_ty_pl` | 119 | - | - | - | - |
-| 24 | `scalar-transform:abs:ty_op` | 64 | - | - | selected signed `i32` frontier row is covered; non-integer abs now exports fail-closed facts instead of crashing | - |
-| 25 | `safety-runtime:add_with_overflow:bin_ty_pl` | 62 | - | - | - | - |
-| 26 | `scalar-transform:clz:opaque` | 51 | - | - | - | - |
-| 27 | `scalar-transform:shr_exact:bin_op` | 49 | - | - | - | - |
-| 28 | `scalar-transform:ctz:opaque` | 48 | - | - | - | - |
-| 29 | `safety-runtime:sub_with_overflow:bin_ty_pl` | 44 | - | - | - | - |
-| 30 | `pointer-address:runtime_nav_ptr:ty_nav` | 41 | - | - | - | - |
+| 1 | `vector:shuffle_one:opaque` | 26208 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
+| 2 | `union-tag-shape:get_union_tag:ty_op` | 6057 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
+| 3 | `aggregate-shape:array_to_slice:ty_op` | 5940 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
+| 4 | `union-tag-shape:union_init:opaque` | 4624 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
+| 5 | `union-tag-shape:set_union_tag:bin_op` | 3020 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
+| 6 | `union-tag-shape:tag_name:opaque` | 807 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
+| 7 | `scalar-transform:clz:opaque` | 51 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |
+| 8 | `scalar-transform:shr_exact:bin_op` | 49 | `safety-runtime:intcast_safe:ty_op` | 11185 | `aggregate-shape:slice:bin_ty_pl` | 10603 |
+| 9 | `scalar-transform:ctz:opaque` | 48 | `aggregate-shape:slice:bin_ty_pl` | 10942 | `other:wrap_optional:ty_op` | 6359 |
+| 10 | `safety-runtime:sub_with_overflow:bin_ty_pl` | 44 | `other:get_union_tag:opaque` | 10923 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6250 |
+| 11 | `safety-runtime:mul_with_overflow:bin_ty_pl` | 31 | - | - | - | - |
+| 12 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
+| 13 | `scalar-transform:neg:opaque` | 22 | - | - | - | - |
+| 14 | `vector:reduce:opaque` | 22 | - | - | - | - |
+| 15 | `scalar-transform:popcount:opaque` | 19 | - | - | - | - |
+| 16 | `float-math:round:opaque` | 10 | - | - | - | - |
+| 17 | `vector:splat:opaque` | 10 | - | - | - | - |
+| 18 | `scalar-transform:bit_reverse:opaque` | 9 | - | - | - | - |
+| 19 | `float-math:ceil:opaque` | 7 | - | - | - | - |
+| 20 | `float-math:exp:opaque` | 7 | - | - | - | - |
+| 21 | `float-math:log:opaque` | 7 | - | - | - | - |
+| 22 | `float-math:sqrt:opaque` | 7 | - | - | - | - |
+| 23 | `safety-runtime:shl_with_overflow:opaque` | 7 | - | - | - | - |
+| 24 | `float-math:floor:opaque` | 6 | - | - | - | - |
+| 25 | `float-math:log2:opaque` | 6 | - | - | - | - |
+| 26 | `float-math:mul_add:opaque` | 6 | - | - | - | - |
+| 27 | `float-math:trunc_float:opaque` | 6 | - | - | - | - |
+| 28 | `float-math:cos:opaque` | 5 | - | - | - | - |
+| 29 | `float-math:exp2:opaque` | 5 | - | - | - | - |
+| 30 | `float-math:log10:opaque` | 5 | - | - | - | - |
 | 31 | `safety-runtime:mul_with_overflow:bin_ty_pl` | 31 | - | - | - | - |
 | 32 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
 | 33 | `scalar-transform:neg:opaque` | 22 | - | - | - | - |
@@ -250,7 +252,7 @@ families where the inventory does not yet record per-opcode first examples.
 | Rank | Category/opcode | ReleaseFast | ReleaseSafe | ReleaseSmall | First source/function | Status | Likely implementation layer |
 | ---: | --- | ---: | ---: | ---: | --- | --- | --- |
 | 1 | aggregate-abi | 2256445 | 2338212 | 2206792 | `../ziglang/src/main.zig` / `global` | partially supported | semantic lowering, ABI planner, backend |
-| 2 | unknown-opcode: error-union-try | 236821 | 238174 | 231997 | `../ziglang/src/main.zig` / `start.posixCallMainAndExit` | partially supported | semantic lowering, CFG lowering |
+| 2 | unknown-opcode: vector | 26240 | not refreshed | not refreshed | `../ziglang/src/main.zig` / `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
 | 3 | `dbg_stmt` / debug metadata | 1582916 | 1608158 | 0 | - | runtime/metadata boundary | AIR parser, verifier policy |
 | 4 | `load` | 588943 | 598263 | 577785 | - | supported subset | CFG lowering, backend |
 | 5 | `block` | 482697 | 552975 | 461641 | - | supported subset | CFG lowering |
@@ -262,7 +264,7 @@ families where the inventory does not yet record per-opcode first examples.
 | 11 | field pointer data kind | 292995 | 294691 | 288670 | - | partially supported | semantic lowering, address-form lowering |
 | 12 | `cond_br` | 90901 | 157143 | 88955 | - | supported subset | CFG lowering, safety-edge lowering |
 | 13 | `arg` | 126700 | 127909 | 122648 | - | supported subset | AIR parser, ABI planner |
-| 14 | unknown-opcode: pointer-address | 50417 | 59226 | 49313 | `../ziglang/src/main.zig` / `start.posixCallMainAndExit` | partially supported | typed AIR parser, address-form lowering |
+| 14 | unknown-opcode: union-tag-shape | 14508 | not refreshed | not refreshed | `../ziglang/src/main.zig` / `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
 | 15 | `struct_field_ptr_index_0` | 97671 | 98304 | 95363 | - | partially supported | aggregate layout, address-form lowering |
 | 16 | vector | 15820 | 16024 | 15808 | `../ziglang/src/main.zig` / `global` | unsupported boundary | ABI planner, backend |
 | 17 | X87/f80/f128 | 6194 | 6220 | 6550 | `../ziglang/src/main.zig` / `global` | unsupported boundary | ABI planner, backend |
