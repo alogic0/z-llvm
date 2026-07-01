@@ -133,7 +133,18 @@ Layer: semantic layout, ABI planner, backend.
   `generic_cfg_functions=719`, `structural_matcher_functions=0`,
   `object_emitted_functions=719`, and `local_fail=0`; the strict
   all-release-mode frontier evidence is `tmp/frontier_counter_update.log`.
-- [ ] Lower aggregate field/payload reads used after calls.
+- [x] Lower aggregate field/payload reads used after calls.
+
+  `frontier_sysv_aggregate_classes.zig` now includes C ABI wrappers that call a
+  noinline helper returning `{ i64, double }`, store that returned aggregate, and
+  read either the integer or SSE field. The generic aggregate ABI lowerer
+  validates the call-result -> aggregate slot -> field-load -> return dataflow
+  and emits the selected SysV aggregate return register field without
+  source-name admission. Saved evidence:
+  `tmp/frontier_aggregate_call_read_fields_releasefast.log` reports ReleaseFast
+  at `generic_cfg_functions=721`, `structural_matcher_functions=0`,
+  `object_emitted_functions=721`, and `local_fail=0`; the strict all-release
+  frontier evidence is `tmp/frontier_counter_update.log`.
 - [ ] Lower aggregate field/payload writes before calls.
 - [ ] Prove at least one direct-call aggregate row.
 - [ ] Prove at least one returned-aggregate row.

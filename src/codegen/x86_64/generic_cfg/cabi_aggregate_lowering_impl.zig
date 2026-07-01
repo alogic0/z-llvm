@@ -70,6 +70,7 @@ pub fn lowerAggregateAbiReturn(
     ret: anytype,
 ) !bool {
     if (try lowerMemoryAggregateCallReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerRegisterAggregateCallFieldReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateDirectCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
@@ -1747,6 +1748,184 @@ pub fn sysvAggregateRegisterNeeds(classification: SysVAggregateClassification) S
 
 pub fn sysvAggregateRegisterNeedsBefore(classification: SysVAggregateClassification, limit: usize) SysVRegisterNeeds {
     return sysv_abi.aggregateRegisterNeedsBefore(classification, limit);
+}
+
+pub fn lowerRegisterAggregateCallFieldReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    if (!(ret.ty.eql(.{ .int = 64 }) or ret.ty.eql(.{ .int = 32 }) or ret.ty.eql(.float) or ret.ty.eql(.double))) return false;
+    if (block.instructions.items.len != 4 and block.instructions.items.len != 5) return false;
+
+    const call_inst = block.instructions.items[0];
+    const alloca_inst = block.instructions.items[1];
+    const store_inst = block.instructions.items[2];
+    if (call_inst.removed or alloca_inst.removed or store_inst.removed) return false;
+
+    const call_result = call_inst.result orelse return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.inline_asm != null or call.tail_kind != null or call.callee_value != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+
+    const aggregate_ty = call.ret_ty;
+    const classification = classifySysVAggregate(aggregate_ty) catch return false;
+    if (classification.kind != .register) return false;
+
+    const alloca_name = alloca_inst.result orelse return false;
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    if (!alloca.allocated_ty.eql(aggregate_ty)) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.value, call_result) or !isNamed(store.ptr, alloca_name)) return false;
+
+    const field_offset: u64 = if (block.instructions.items.len == 4) offset: {
+        const load_inst = block.instructions.items[3];
+        const load_name = validateAggregateFieldLoad(load_inst, ret.ty, alloca_name) orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+        break :offset 0;
+    } else offset: {
+        const gep_inst = block.instructions.items[3];
+        const load_inst = block.instructions.items[4];
+        if (gep_inst.removed or load_inst.removed) return false;
+        const gep_name = gep_inst.result orelse return false;
+        const gep = switch (gep_inst.kind) {
+            .gep => |gep| gep,
+            else => return false,
+        };
+        if (!isNamed(gep.ptr, alloca_name)) return false;
+        const computed_offset = aggregateGepByteOffset(try x86_64SysVDataLayout(), aggregate_ty, gep) orelse return false;
+        const load_name = validateAggregateFieldLoad(load_inst, ret.ty, gep_name) orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+        break :offset computed_offset;
+    };
+    _ = aggregateFieldIndexAtOffset(aggregate_ty, field_offset, ret.ty) orelse return false;
+
+    const stack_arg_count = appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
+        else => if (sysv_abi.isBoundaryError(err)) return false else return err,
+    };
+    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    try emitSysVAggregateReturnField(allocator, machine, classification, field_offset, ret.ty);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateAggregateFieldLoad(instruction: ir.Instruction, ty: ir.Type, ptr_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(ty) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return null;
+    return name;
+}
+
+fn emitSysVAggregateReturnField(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    classification: SysVAggregateClassification,
+    field_offset: u64,
+    field_ty: ir.Type,
+) !void {
+    if (classification.kind != .register) return error.UnsupportedCodegenAbi;
+    const field_eightbyte = field_offset / 8;
+    if (field_eightbyte >= classification.eightbytes.len) return error.UnsupportedCodegenAbi;
+    const field_class = classification.eightbytes[@intCast(field_eightbyte)] orelse return error.UnsupportedCodegenAbi;
+    const prior = sysvAggregateRegisterNeedsBefore(classification, @intCast(field_eightbyte));
+    return switch (field_class) {
+        .integer => emitSysVIntegerAggregateReturnField(allocator, machine, prior.gpr, field_offset % 8, field_ty),
+        .sse => emitSysVSseAggregateReturnField(allocator, machine, prior.sse, field_offset % 8, field_ty),
+    };
+}
+
+fn emitSysVIntegerAggregateReturnField(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    return_gpr_index: usize,
+    offset_in_eightbyte: u64,
+    field_ty: ir.Type,
+) !void {
+    if (field_ty.eql(.{ .int = 64 })) {
+        if (offset_in_eightbyte != 0) return error.UnsupportedCodegenAbi;
+        switch (return_gpr_index) {
+            0 => {},
+            1 => try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdx }),
+            else => return error.UnsupportedCodegenAbi,
+        }
+        return;
+    }
+    if (field_ty.eql(.{ .int = 32 })) {
+        switch (return_gpr_index) {
+            0 => {
+                if (offset_in_eightbyte == 4) {
+                    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 32 });
+                } else if (offset_in_eightbyte != 0) {
+                    return error.UnsupportedCodegenAbi;
+                }
+            },
+            1 => {
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdx });
+                if (offset_in_eightbyte == 4) {
+                    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 32 });
+                } else if (offset_in_eightbyte != 0) {
+                    return error.UnsupportedCodegenAbi;
+                }
+            },
+            else => return error.UnsupportedCodegenAbi,
+        }
+        return;
+    }
+    return error.UnsupportedCodegenAbi;
+}
+
+fn emitSysVSseAggregateReturnField(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    return_sse_index: usize,
+    offset_in_eightbyte: u64,
+    field_ty: ir.Type,
+) !void {
+    const source = switch (return_sse_index) {
+        0 => XmmReg.xmm0,
+        1 => XmmReg.xmm1,
+        else => return error.UnsupportedCodegenAbi,
+    };
+    if (field_ty.eql(.double)) {
+        if (offset_in_eightbyte != 0) return error.UnsupportedCodegenAbi;
+        switch (source) {
+            .xmm0 => {},
+            .xmm1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
+            .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = source } }),
+        }
+        return;
+    }
+    if (field_ty.eql(.float)) {
+        switch (source) {
+            .xmm0 => {},
+            .xmm1, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = source } }),
+        }
+        if (offset_in_eightbyte == 4) {
+            try machine.instructions.append(allocator, .{ .shufps_high_f32_to_low = .xmm0 });
+        } else if (offset_in_eightbyte != 0) {
+            return error.UnsupportedCodegenAbi;
+        }
+        return;
+    }
+    return error.UnsupportedCodegenAbi;
 }
 
 pub fn lowerRegisterAggregateDirectCallReturn(

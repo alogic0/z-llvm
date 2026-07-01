@@ -18,6 +18,8 @@ extern long long z_frontier_mixed_int(struct Mixed) __asm__("frontier_sysv_aggre
 extern double z_frontier_mixed_float(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_float");
 extern struct Mixed z_frontier_mixed_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_make");
 extern struct Mixed z_frontier_mixed_call_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_call_make");
+extern long long z_frontier_mixed_call_make_read_int(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_call_make_read_int");
+extern double z_frontier_mixed_call_make_read_float(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_call_make_read_float");
 extern long long z_frontier_stack_mixed_call_int(long long, long long, long long, long long, long long, long long, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_mixed_call_int");
 extern long long z_frontier_stack_mixed_call_int_after_pressure(long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_mixed_call_int_after_pressure");
 extern double z_frontier_stack_mixed_call_float_after_pressure(long long, long long, long long, long long, long long, long long, double, double, double, double, double, double, double, double, struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_stack_mixed_call_float_after_pressure");
@@ -118,6 +120,8 @@ int main(void) {
     if (made.a != 77 || made.b != 9.5) return 3;
     struct Mixed call_made = z_frontier_mixed_call_make(81, 10.5);
     if (call_made.a != 81 || call_made.b != 10.5) return 14;
+    if (z_frontier_mixed_call_make_read_int(91, 12.5) != 91) return 96;
+    if (z_frontier_mixed_call_make_read_float(93, 14.5) != 14.5) return 97;
     if (z_frontier_stack_mixed_call_int(1, 2, 3, 4, 5, 6, value) != 123456789LL) return 48;
     if (z_frontier_stack_mixed_call_int_after_pressure(1, 2, 3, 4, 5, 6, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, value) != 123456789LL) return 76;
     if (z_frontier_stack_mixed_call_float_after_pressure(1, 2, 3, 4, 5, 6, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, value) != 6.25) return 77;
@@ -241,4 +245,3 @@ int main(void) {
     if (made_packed_reverse.a != 73.5 || made_packed_reverse.b != 79 || made_packed_reverse.c != 83) return 27;
     return 0;
 }
-
