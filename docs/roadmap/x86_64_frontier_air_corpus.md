@@ -306,6 +306,7 @@ Current frontier ABI boundary seed:
 - `test/zig/frontier_boundaries/frontier_callconv_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_pointer_slice_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_tag_name_boundary.zig`
+- `test/zig/frontier_boundaries/frontier_union_payload_boundary.zig`
 
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
@@ -362,8 +363,8 @@ Source-backed ABI and pointer/slice boundary proof is green for all three modes 
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=8
-discovered_functions=13
+source_rows=9
+discovered_functions=14
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
@@ -374,6 +375,7 @@ stack_pressure_boundary_rows=0
 safety_edge_boundary_rows=0
 pointer_slice_boundary_rows=2
 tag_name_boundary_rows=1
+union_payload_boundary_rows=1
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -396,7 +398,9 @@ atomic derived-pointer forms that remain fail-closed with
 source-backed `@tagName` string/sentinel-slice lowering; ReleaseFast reaches
 `tag_name`, while ReleaseSafe/ReleaseSmall can fail earlier at the associated
 `is_named_enum_value` guard, and both forms are classified as the same
-runtime/string boundary.
+runtime/string boundary. The `union_payload_boundary_rows=1` row covers a
+non-selected three-tag payload switch shape and keeps unsupported union payload
+layouts fail-closed.
 
 Executable ABI proof is green for all three modes:
 

@@ -667,7 +667,19 @@ Layer: semantic lowering and CFG lowering.
   `source_rows=14`, `discovered_functions=732`,
   `generic_cfg_functions=732`, `object_emitted_functions=732`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Keep unsupported payload layouts and inactive-payload reads fail-closed.
+- [x] Keep unsupported payload layouts and inactive-payload reads fail-closed.
+
+  Unsupported union payload layouts are now source-backed in the boundary gate.
+  `frontier_union_payload_boundary.zig` exercises a non-selected three-tag
+  payload switch shape and is classified as `union-payload` with
+  `UnsupportedUnionPayloadBoundary`. ReleaseFast can fail before a typed-v2
+  branch summary is available, while ReleaseSafe/ReleaseSmall can reach
+  `switch_br/control_flow_shape`; both diagnostics are accepted only for this
+  source-backed boundary. Saved evidence:
+  `tmp/frontier_union_payload_boundaries.log` reports all three release modes
+  at `source_rows=9`, `discovered_functions=14`,
+  `union_payload_boundary_rows=1`, `wrong_diagnostic_rows=0`, and
+  `local_fail=0`.
 - [ ] Refresh inventory and show the union-tag bucket reduced.
 
 ### 6. Optional Shape
