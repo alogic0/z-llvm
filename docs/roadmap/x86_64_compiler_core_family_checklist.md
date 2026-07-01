@@ -505,7 +505,17 @@ Layer: aggregate semantic lowering.
   `discovered_functions=730`, `generic_cfg_functions=730`,
   `object_emitted_functions=730`, `executable_ok_rows=14`, and
   `local_fail=0`.
-- [ ] Prove source-backed aggregate projection after construction.
+- [x] Prove source-backed aggregate projection after construction.
+
+  `frontier_aggregate_projection_tuple_second` constructs a `{ usize, usize }`
+  tuple from source operands, passes it to an internal Zig helper, projects
+  field `1` through typed `struct_field_val`, and verifies the projected value
+  through the C executable harness. This proves aggregate construction and
+  projection as a connected source-backed flow. Strict frontier evidence in
+  `tmp/frontier_aggregate_projection.log` reports all three release modes at
+  `source_rows=14`, `discovered_functions=730`,
+  `generic_cfg_functions=730`, `object_emitted_functions=730`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Keep unsupported aggregate element/layout forms fail-closed.
 - [ ] Refresh inventory and show the aggregate-shape bucket reduced.
 
