@@ -525,7 +525,19 @@ Layer: aggregate semantic lowering.
   `tmp/frontier_aggregate_projection_boundaries.log` reports
   `packed_aggregate_boundary_rows=2`, `wrong_diagnostic_rows=0`, and
   `local_fail=0` across ReleaseFast, ReleaseSafe, and ReleaseSmall.
-- [ ] Refresh inventory and show the aggregate-shape bucket reduced.
+- [x] Refresh inventory and show the aggregate-shape bucket reduced.
+
+  ReleaseFast compiler-core-module inventory was refreshed in
+  `tmp/compiler_core_module_releasefast_after_aggregate730.log`. The measured
+  `aggregate-shape` unknown bucket is now `count=0`; the prior
+  `array_to_slice:ty_op count=5940` bucket is no longer an unknown blocker.
+  Raw aggregate-family opcodes remain visible for prioritization, including
+  `aggregate_init count=19914`, `slice_len count=13774`,
+  `struct_field_val count=9933`, and `array_to_slice count=5940`, but these are
+  classified as known/supported surfaces rather than unknown aggregate-shape
+  blockers. The next measured unknown implementation family is union-tag shape:
+  `get_union_tag:ty_op count=6057`, `union_init:opaque count=4624`,
+  `set_union_tag:bin_op count=3020`, and `tag_name:opaque count=807`.
 
 ### 5. Union-Tag Shape
 
