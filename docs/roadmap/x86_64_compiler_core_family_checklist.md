@@ -543,7 +543,24 @@ Layer: aggregate semantic lowering.
 
 Layer: semantic lowering and CFG lowering.
 
-- [ ] Lower `get_union_tag`.
+- [x] Lower `get_union_tag`.
+
+  `get_union_tag` is now a union-tag semantic opcode in the capability
+  registry. The Zig typed-v2 exporter emits the narrow
+  `zllvm-union-tag-facts-v1` `bit_width` fact for the tag result, and
+  z_llvm consumes it through `TypedUnionTagGetSummary` in the split union-tag
+  model. The typed lowerer accepts scalar tag values with supported integer
+  widths and fails closed for raw aggregate union operands until the follow-up
+  `set_union_tag` and `union_init` items own construction/layout. This cycle
+  does not refresh compiler-core inventory; the measured pre-cycle bucket
+  remains `get_union_tag:ty_op count=6057` in
+  `tmp/compiler_core_module_releasefast_after_aggregate730.log` until the
+  family refresh item runs. Validation:
+  `tmp/get_union_tag_build_test.log` and `tmp/frontier_get_union_tag.log`.
+  The stage4 emitter check was attempted in
+  `tmp/check_stage4_get_union_tag_after_commit_direct.log` but is blocked by
+  the pre-existing stage4 binary/`../ziglang` HEAD mismatch after hook commit
+  `b45a663b8`.
 - [ ] Lower `set_union_tag`.
 - [ ] Lower `union_init`.
 - [ ] Lower `tag_name` or classify it as a runtime/string boundary.

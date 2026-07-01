@@ -97,6 +97,7 @@ pub const SemanticDomain = enum {
     memory,
     optional,
     error_union,
+    union_tag,
     pointer_aggregate,
     aggregate,
 
@@ -107,6 +108,7 @@ pub const SemanticDomain = enum {
             .memory => "memory",
             .optional => "optional",
             .error_union => "error-union",
+            .union_tag => "union-tag",
             .pointer_aggregate => "pointer-aggregate",
             .aggregate => "aggregate",
         };
@@ -154,6 +156,11 @@ pub const ErrorUnionSemanticOp = enum {
     unwrap_err_ptr,
     try_op,
     try_ptr,
+};
+
+pub const UnionTagSemanticOp = enum {
+    none,
+    get_tag,
 };
 
 pub const PointerAggregateSemanticOp = enum {
@@ -319,6 +326,7 @@ fn semanticDomainFromOperationIds(opcode: []const u8) SemanticDomain {
     if (memorySemanticOpForOpcode(opcode) != .none) return .memory;
     if (optionalSemanticOpForOpcode(opcode) != .none) return .optional;
     if (errorUnionSemanticOpForOpcode(opcode) != .none) return .error_union;
+    if (unionTagSemanticOpForOpcode(opcode) != .none) return .union_tag;
     if (pointerAggregateSemanticOpForOpcode(opcode) != .none) return .pointer_aggregate;
     if (aggregateSemanticOpForOpcode(opcode) != .none) return .aggregate;
     return .none;
@@ -365,6 +373,11 @@ pub fn errorUnionSemanticOpForOpcode(opcode: []const u8) ErrorUnionSemanticOp {
     if (std.mem.eql(u8, opcode, "unwrap_errunion_err_ptr")) return .unwrap_err_ptr;
     if (std.mem.eql(u8, opcode, "try") or std.mem.eql(u8, opcode, "try_cold")) return .try_op;
     if (std.mem.eql(u8, opcode, "try_ptr") or std.mem.eql(u8, opcode, "try_ptr_cold")) return .try_ptr;
+    return .none;
+}
+
+pub fn unionTagSemanticOpForOpcode(opcode: []const u8) UnionTagSemanticOp {
+    if (std.mem.eql(u8, opcode, "get_union_tag")) return .get_tag;
     return .none;
 }
 
@@ -946,6 +959,9 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ErrorUnionSemanticOp.error_name, errorUnionSemanticOpForOpcode("error_name"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.error_set_has_value, errorUnionSemanticOpForOpcode("error_set_has_value"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.cmp_lte_errors_len, errorUnionSemanticOpForOpcode("cmp_lte_errors_len"));
+    try std.testing.expectEqual(SemanticDomain.union_tag, semanticDomainForOpcode("get_union_tag"));
+    try std.testing.expectEqual(UnionTagSemanticOp.get_tag, unionTagSemanticOpForOpcode("get_union_tag"));
+    try std.testing.expect(typedV2CanLower(opcodeCapability("get_union_tag")));
     try std.testing.expectEqual(SemanticDomain.pointer_aggregate, semanticDomainForOpcode("ptr_add"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.slice, pointerAggregateSemanticOpForOpcode("slice"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.array_to_slice, pointerAggregateSemanticOpForOpcode("array_to_slice"));

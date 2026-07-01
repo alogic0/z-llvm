@@ -12,6 +12,7 @@ const typed_dispatch = @import("zig_air_lowering_context_typed_dispatch.zig");
 const typed_error_union = @import("zig_air_lowering_context_typed_error_union.zig");
 const typed_memory = @import("zig_air_lowering_context_typed_memory.zig");
 const typed_optional = @import("zig_air_lowering_context_typed_optional.zig");
+const typed_union_tag = @import("zig_air_lowering_context_typed_union_tag.zig");
 const typed_pointer_aggregate = @import("zig_air_lowering_context_typed_pointer_aggregate.zig");
 const typed_aggregate = @import("zig_air_lowering_context_typed_aggregate.zig");
 const typed_scalar = @import("zig_air_lowering_context_typed_scalar.zig");
@@ -149,6 +150,9 @@ pub const LoweringContext = struct {
     pub const lowerTypedWrapOptional = typed_optional.lowerTypedWrapOptional;
     pub const lowerTypedOptionalPayload = typed_optional.lowerTypedOptionalPayload;
 
+    pub const lowerTypedUnionTagSemanticInstruction = typed_union_tag.lowerTypedUnionTagSemanticInstruction;
+    pub const lowerTypedGetUnionTag = typed_union_tag.lowerTypedGetUnionTag;
+
     pub const lowerTypedPointerAggregateSemanticInstruction =
         typed_pointer_aggregate.lowerTypedPointerAggregateSemanticInstruction;
     pub const lowerTypedSlice = typed_pointer_aggregate.lowerTypedSlice;
@@ -190,7 +194,7 @@ pub const LoweringContext = struct {
             .scalar => try self.lowerLegacyScalarSemanticInstruction(instruction),
             .memory => try self.lowerLegacyMemorySemanticInstruction(instruction),
             .pointer_aggregate => try self.lowerLegacyPointerAggregateSemanticInstruction(instruction),
-            .optional, .error_union, .aggregate, .none => false,
+            .optional, .error_union, .union_tag, .aggregate, .none => false,
         };
         return lowered;
     }

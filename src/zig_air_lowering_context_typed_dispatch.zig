@@ -31,6 +31,7 @@ pub fn lowerTypedSemanticInstruction(self: anytype, instruction: air_export.Type
         .memory => try self.lowerTypedMemorySemanticInstruction(instruction),
         .optional => try self.lowerTypedOptionalSemanticInstruction(instruction),
         .error_union => try self.lowerTypedErrorUnionSemanticInstruction(instruction),
+        .union_tag => try self.lowerTypedUnionTagSemanticInstruction(instruction),
         .pointer_aggregate => try self.lowerTypedPointerAggregateSemanticInstruction(instruction),
         .aggregate => try self.lowerTypedAggregateSemanticInstruction(instruction),
         .none => false,

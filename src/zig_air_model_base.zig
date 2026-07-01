@@ -1001,6 +1001,11 @@ pub const TypedUnionTagPayloadSwitchSummary = struct {
     tag1_return_add: i32,
 };
 
+pub const TypedUnionTagGetSummary = struct {
+    operand_index: u32,
+    bit_width: u16,
+};
+
 pub const TypedOptionalPayloadBranchSummary = struct {
     threshold: i32,
     fallback: i32,
