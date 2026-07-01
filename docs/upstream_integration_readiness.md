@@ -765,20 +765,23 @@ frontier row.
 Source-backed ABI and pointer/slice boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs
 `test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
-ReleaseSmall and currently reports per mode: `source_rows=7`,
-`discovered_functions=12`, `varargs_boundary_rows=2`,
+ReleaseSmall and currently reports per mode: `source_rows=8`,
+`discovered_functions=13`, `varargs_boundary_rows=2`,
 `vector_boundary_rows=2`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
 `safety_edge_boundary_rows=0`,
 `pointer_slice_boundary_rows=2`,
+`tag_name_boundary_rows=1`,
 `unexpected_accept_rows=0`,
 `wrong_diagnostic_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. These rows prove explicit fail-closed ABI boundaries for
-varargs, vectors, long-double/X87, packed aggregates, tail calls, and
-non-default call conventions. Checked slice-element loads and stores moved into
-the accepted strict frontier corpus with executable hot/trap-path proof, so the
-pointer/slice boundary counter is now a zero regression guard. The prior
+varargs, vectors, long-double/X87, packed aggregates, tail calls,
+non-default call conventions, pointer/slice volatile and atomic forms, and
+union `@tagName` string/sentinel-slice lowering. Checked slice-element loads and
+stores moved into the accepted strict frontier corpus with executable
+hot/trap-path proof, while the two remaining pointer/slice boundary rows are
+volatile and atomic derived-pointer forms. The prior
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 stack-source forwarding
 boundary is now
 accepted in the strict frontier corpus, and the boundary counter remains at

@@ -305,6 +305,7 @@ Current frontier ABI boundary seed:
 - `test/zig/frontier_boundaries/frontier_tail_call_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_callconv_boundary.zig`
 - `test/zig/frontier_boundaries/frontier_pointer_slice_boundary.zig`
+- `test/zig/frontier_boundaries/frontier_tag_name_boundary.zig`
 
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
@@ -361,8 +362,8 @@ Source-backed ABI and pointer/slice boundary proof is green for all three modes 
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=7
-discovered_functions=12
+source_rows=8
+discovered_functions=13
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
@@ -372,6 +373,7 @@ callconv_boundary_rows=1
 stack_pressure_boundary_rows=0
 safety_edge_boundary_rows=0
 pointer_slice_boundary_rows=2
+tag_name_boundary_rows=1
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
@@ -380,7 +382,7 @@ local_fail=0
 ```
 
 These boundary rows are expected unsupported source-backed ABI surfaces. They
-are not counted in the accepted 14-source / 669-function strict frontier
+are not counted in the accepted 14-source / 731-function strict frontier
 executable proof. Stack-pressure forwarding for the previous
 Big80/Big81/Big96/Big128/Big160/Big192/Big224/Big256 indirect and stack-source
 rows is now accepted in the frontier corpus; the boundary gate keeps
@@ -390,7 +392,11 @@ bounds CFG is accepted in the strict frontier corpus, so
 boundary. Checked slice-element stores are also accepted in the strict frontier
 corpus. The active `pointer_slice_boundary_rows=2` entries cover volatile and
 atomic derived-pointer forms that remain fail-closed with
-`UnsupportedPointerSliceAbi`.
+`UnsupportedPointerSliceAbi`. The `tag_name_boundary_rows=1` row covers
+source-backed `@tagName` string/sentinel-slice lowering; ReleaseFast reaches
+`tag_name`, while ReleaseSafe/ReleaseSmall can fail earlier at the associated
+`is_named_enum_value` guard, and both forms are classified as the same
+runtime/string boundary.
 
 Executable ABI proof is green for all three modes:
 

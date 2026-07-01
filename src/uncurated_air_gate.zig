@@ -604,7 +604,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
         else
             1;
         std.debug.print(
-            "summary uncurated-zig-air-abi-boundaries mode={s} corpus={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} varargs_boundary_rows={} vector_boundary_rows={} x87_boundary_rows={} packed_aggregate_boundary_rows={} tail_call_boundary_rows={} callconv_boundary_rows={} stack_pressure_boundary_rows={} safety_edge_boundary_rows={} pointer_slice_boundary_rows={} unexpected_accept_rows={} wrong_diagnostic_rows={} llvm_targetmachine_rows=0 lld_rows=0 local_fail={}\n",
+            "summary uncurated-zig-air-abi-boundaries mode={s} corpus={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} varargs_boundary_rows={} vector_boundary_rows={} x87_boundary_rows={} packed_aggregate_boundary_rows={} tail_call_boundary_rows={} callconv_boundary_rows={} stack_pressure_boundary_rows={} safety_edge_boundary_rows={} pointer_slice_boundary_rows={} tag_name_boundary_rows={} unexpected_accept_rows={} wrong_diagnostic_rows={} llvm_targetmachine_rows=0 lld_rows=0 local_fail={}\n",
             .{
                 mode.name(),
                 options.corpus.name(),
@@ -619,6 +619,7 @@ fn runMode(init: std.process.Init, options: Options) !void {
                 boundary_counts.stack_pressure_rows,
                 boundary_counts.safety_edge_rows,
                 boundary_counts.pointer_slice_rows,
+                boundary_counts.tag_name_rows,
                 unexpected_accept_rows,
                 wrong_diagnostic_rows,
                 boundary_local_fail,

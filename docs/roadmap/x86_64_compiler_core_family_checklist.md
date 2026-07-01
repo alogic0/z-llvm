@@ -587,7 +587,19 @@ Layer: semantic lowering and CFG lowering.
   `tmp/frontier_union_init_boundaries.log`. Frontier counters are now
   `source_rows=14`, `discovered_functions=731`, `generic_cfg_functions=731`,
   `object_emitted_functions=731`, `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower `tag_name` or classify it as a runtime/string boundary.
+- [x] Lower `tag_name` or classify it as a runtime/string boundary.
+
+  `tag_name` is now a source-backed runtime/string boundary rather than an
+  unknown union-tag blocker. `frontier_tag_name_boundary.zig` exercises
+  `@tagName` on a tagged-union value; ReleaseFast reaches `tag_name`, while
+  ReleaseSafe/ReleaseSmall can fail earlier at the associated
+  `is_named_enum_value` guard. Both diagnostics are classified as the
+  `tag-name` boundary with `UnsupportedTagNameBoundary`, keeping string and
+  sentinel-slice ownership out of accepted lowering until a future typed-v2
+  string fact/runtime-string lowering cycle. Saved evidence:
+  `tmp/frontier_tag_name_boundaries.log` reports `source_rows=8`,
+  `discovered_functions=13`, `tag_name_boundary_rows=1`,
+  `wrong_diagnostic_rows=0`, and `local_fail=0` in all three release modes.
 - [ ] Lower payload reads guarded by tag checks.
 - [ ] Lower switch over a union tag.
 - [ ] Lower branch over a union tag.

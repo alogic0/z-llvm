@@ -689,6 +689,7 @@ source-backed fail-closed varargs/vector/X87/packed aggregate/tail-call/callconv
 `tail_call_boundary_rows=1`, `callconv_boundary_rows=1`,
 `stack_pressure_boundary_rows=0`, `safety_edge_boundary_rows=0`,
 `pointer_slice_boundary_rows=2`,
+`tag_name_boundary_rows=1`,
 `unexpected_accept_rows=0`, `wrong_diagnostic_rows=0`, and `local_fail=0`,
 while arbitrary non-selected sret/byval copies,
 full varargs/vector/X87/packed implementation, stack-passed live-value scheduling beyond the current selected model,
