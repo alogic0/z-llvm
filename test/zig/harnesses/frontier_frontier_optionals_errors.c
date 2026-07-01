@@ -6,6 +6,7 @@ extern int z_frontier_optional_ptr_non_null(const int *) __asm__("frontier_optio
 struct FrontierOptionalPtrBox { const int *ptr; };
 extern int z_frontier_optional_ptr_field_non_null(const struct FrontierOptionalPtrBox *) __asm__("frontier_optionals_errors.frontier_optional_ptr_field_non_null");
 extern int z_frontier_optional_payload_branch(int, int, int) __asm__("frontier_optionals_errors.frontier_optional_payload_branch");
+extern int z_frontier_optional_return_match(int, int) __asm__("frontier_optionals_errors.frontier_optional_return_match");
 extern int z_frontier_error_payload(int, int) __asm__("frontier_optionals_errors.frontier_error_payload");
 extern int z_frontier_error_union_match(int) __asm__("frontier_optionals_errors.frontier_error_union_match");
 extern int z_frontier_try_match(int, int) __asm__("frontier_optionals_errors.frontier_try_match");
@@ -85,6 +86,8 @@ int main(void) {
     if (z_frontier_optional_payload_branch(1, 30, 4) != 34) return 51;
     if (z_frontier_optional_payload_branch(1, 10, 3) != 7) return 52;
     if (z_frontier_optional_payload_branch(0, 30, 4) != -63) return 53;
+    if (z_frontier_optional_return_match(1, 35) != 42) return 138;
+    if (z_frontier_optional_return_match(0, 35) != -74) return 139;
     if (z_frontier_error_payload(0, 40) != 42) return 3;
     if (z_frontier_error_union_match(0) != 14) return 4;
     if (z_frontier_error_union_match(1) != -22) return 5;

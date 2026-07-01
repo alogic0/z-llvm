@@ -1360,6 +1360,7 @@ pub fn lowerGenericCfgSelectReturnValue(
             .icmp => |icmp| icmp,
             else => return error.UnsupportedCodegenInstruction,
         };
+        if (try lowerGenericCfgCallResultZeroSelectReturn(allocator, machine, function, block, select, cond)) return;
         if (try lowerGenericCfgSminSelectReturn(allocator, machine, function, select, cond)) return;
         if (try lowerGenericCfgSmaxSelectReturn(allocator, machine, function, select, cond)) return;
         const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, cond);
@@ -1370,6 +1371,77 @@ pub fn lowerGenericCfgSelectReturnValue(
     try appendGenericCfgBlockLabel(allocator, machine, true_label);
     try lowerGenericCfgI32ValueIntoEax(allocator, machine, function, block, select.true_value, depth +| 1);
     try appendGenericCfgBlockLabel(allocator, machine, end_label);
+}
+
+fn lowerGenericCfgCallResultZeroSelectReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    select: ir.SelectInst,
+    icmp: ir.IcmpInst,
+) !bool {
+    if (!select.ty.eql(.{ .int = 32 }) or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    const call_value = if (isInt(icmp.rhs, 0))
+        icmp.lhs
+    else if (isInt(icmp.lhs, 0))
+        icmp.rhs
+    else
+        return false;
+    const call_name = switch (call_value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const call_instruction_index = findInstructionIndex(block, call_name) orelse return false;
+    const call_instruction = block.instructions.items[call_instruction_index];
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!call.ret_ty.eql(.{ .int = 32 })) return false;
+    if (!valueEquals(select.true_value, call_value) and !valueEquals(select.false_value, call_value)) return false;
+    const branch_kind: GenericCfgBranchKind = switch (icmp.predicate) {
+        .eq => .je,
+        .ne => .jne,
+        .slt, .sgt, .sle, .sge, .ult, .ugt, .ule, .uge => return false,
+    };
+    const true_label = "generic_cfg_call_result_select_true";
+    const end_label = "generic_cfg_call_result_generic_cfg_select_end";
+    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, call_value);
+    try appendGenericCfgCompareLocalImm(allocator, machine, .eax, 0);
+    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    if (!valueEquals(select.false_value, call_value)) {
+        try lowerGenericCfgI32ValueIntoEax(allocator, machine, function, block, select.false_value, 1);
+    }
+    try machine.instructions.append(allocator, .{ .jmp = end_label });
+    try appendGenericCfgBlockLabel(allocator, machine, true_label);
+    if (!valueEquals(select.true_value, call_value)) {
+        try lowerGenericCfgI32ValueIntoEax(allocator, machine, function, block, select.true_value, 1);
+    }
+    try appendGenericCfgBlockLabel(allocator, machine, end_label);
+    return true;
+}
+
+fn valueEquals(a: ir.Value, b: ir.Value) bool {
+    return switch (a) {
+        .named => |a_name| switch (b) {
+            .named => |b_name| std.mem.eql(u8, a_name, b_name),
+            else => false,
+        },
+        .int => |a_int| switch (b) {
+            .int => |b_int| a_int == b_int,
+            else => false,
+        },
+        .fp => |a_fp| switch (b) {
+            .fp => |b_fp| std.mem.eql(u8, a_fp, b_fp),
+            else => false,
+        },
+        .undef => b == .undef,
+        .poison => b == .poison,
+        .null_value => b == .null_value,
+        .zero_initializer => b == .zero_initializer,
+        .vector, .constant_expr => false,
+    };
 }
 
 pub fn lowerGenericCfgI32ValueIntoEax(

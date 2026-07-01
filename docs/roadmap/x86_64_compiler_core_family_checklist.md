@@ -733,8 +733,13 @@ Layer: semantic lowering and CFG lowering.
   fallback branch data flow. The richer payload-branch row was already
   data-flow checked; this removes the remaining count-only scalar optional merge
   admission.
-- [ ] Lower optional return/catch-style flows that appear in compiler-core
+- [x] Lower optional return/catch-style flows that appear in compiler-core
   inventory.
+  Completed by adding a model-owned helper-return optional summary that proves
+  a direct internal `?i32` helper call feeds `is_non_null`, `optional_payload`,
+  fallback branch, and terminal return data flow. The accepted frontier row
+  `frontier_optional_return_match` now exercises the call-produced optional
+  return path without source-name admission or AIR-text recovery.
 - [ ] Prove one optional scalar executable row.
 - [ ] Prove one optional pointer executable row.
 - [ ] Keep unsupported nested optional/error-union mixes fail-closed until

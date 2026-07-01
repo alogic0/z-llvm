@@ -30,6 +30,16 @@ export fn frontier_optional_payload_branch(flag: i32, value: i32, delta: i32) i3
     return -63;
 }
 
+fn frontierMaybeOptionalReturn(flag: i32, value: i32) ?i32 {
+    if (flag != 0) return value + 7;
+    return null;
+}
+
+export fn frontier_optional_return_match(flag: i32, value: i32) i32 {
+    const maybe_value = frontierMaybeOptionalReturn(flag, value);
+    return maybe_value orelse -74;
+}
+
 export fn frontier_error_payload(flag: i32, value: i32) i32 {
     _ = flag;
     return value + 2;

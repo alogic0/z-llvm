@@ -230,6 +230,7 @@ pub fn typedOptionalPayloadSummary(
     {
         return null;
     }
+    if (typedOptionalCallReturnSummary(structured_air_v2)) |summary| return summary;
     if (typedOpcodeCount(structured_air_v2, "arg") != 2 or
         typedOpcodeCount(structured_air_v2, "block") != 2 or
         typedOpcodeCount(structured_air_v2, "cmp_neq") != 1 or
@@ -261,6 +262,33 @@ pub fn typedOptionalPayloadSummary(
     if (!typedCondBrUses(structured_air_v2, is_non_null.index)) return null;
 
     return .{ .fallback = typedLastBranchI32ConstValue(structured_air_v2) orelse return null };
+}
+
+fn typedOptionalCallReturnSummary(structured_air_v2: air_export.StructuredAirV2) ?TypedOptionalPayloadSummary {
+    const call = singleCallInstruction(structured_air_v2) orelse return null;
+    const call_details = callDetails(call) orelse return null;
+    const callee = call_details.callee orelse return null;
+    if (callee.external) return null;
+    if (!std.mem.endsWith(u8, call_details.signature_text, "?i32")) return null;
+    if (call.operands.len != 3) return null;
+    if (typedInstOperandIndex(call.operands[1]) != typedNthI32ArgIndex(structured_air_v2, 0)) return null;
+    if (typedInstOperandIndex(call.operands[2]) != typedNthI32ArgIndex(structured_air_v2, 1)) return null;
+
+    const is_non_null = singleInstructionByOpcode(structured_air_v2, "is_non_null") orelse return null;
+    const optional_payload = singleInstructionByOpcode(structured_air_v2, "optional_payload") orelse return null;
+    _ = typedOptionalPayloadExtractionSummary(optional_payload) orelse return null;
+    if (is_non_null.operands.len != 1 or optional_payload.operands.len != 1) return null;
+    if (typedInstOperandIndex(is_non_null.operands[0]) != call.index) return null;
+    if (typedInstOperandIndex(optional_payload.operands[0]) != call.index) return null;
+    if (!typedCondBrUses(structured_air_v2, is_non_null.index)) return null;
+
+    return .{
+        .kind = .helper_return,
+        .fallback = typedLastBranchOrReturnI32ConstValue(structured_air_v2) orelse return null,
+        .callee_name = callee.name,
+        .callee_external = callee.external,
+        .call_signature = call_details.signature_text,
+    };
 }
 
 pub fn typedOptionalPointerSummary(
@@ -307,6 +335,16 @@ fn singleInstructionByOpcode(structured_air_v2: air_export.StructuredAirV2, expe
     var found: ?air_export.TypedInstruction = null;
     for (structured_air_v2.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, expected_opcode)) continue;
+        if (found != null) return null;
+        found = instruction;
+    }
+    return found;
+}
+
+fn singleCallInstruction(structured_air_v2: air_export.StructuredAirV2) ?air_export.TypedInstruction {
+    var found: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_capabilities.isCallOpcode(instruction.opcode)) continue;
         if (found != null) return null;
         found = instruction;
     }
@@ -411,15 +449,16 @@ fn typedLastBranchI32ConstValue(structured_air_v2: air_export.StructuredAirV2) ?
 }
 
 fn typedLastBranchOrReturnI32ConstValue(structured_air_v2: air_export.StructuredAirV2) ?i32 {
+    var found: ?i32 = null;
     for (structured_air_v2.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, "ret") and !std.mem.eql(u8, instruction.opcode, "ret_safe")) {
             if (!std.mem.eql(u8, instruction.opcode, "br")) continue;
         }
         if (instruction.operands.len != 1 and instruction.operands.len != 2) continue;
         const index: usize = if (instruction.operands.len == 1) 0 else 1;
-        return typedConstI32Operand(instruction, index) orelse return null;
+        found = typedConstI32Operand(instruction, index) orelse continue;
     }
-    return null;
+    return found;
 }
 
 fn typedNthI32ArgIndex(structured_air_v2: air_export.StructuredAirV2, wanted: usize) ?u32 {
@@ -652,4 +691,68 @@ test "typed optional model rejects scalar optional check as pointer check" {
     };
 
     try std.testing.expect(typedOptionalPointerCheckSummary(instruction) == null);
+}
+
+test "typed optional model recognizes helper-return optional payload flow" {
+    var call_operands = [_]air_export.TypedOperand{
+        .{ .kind = "const", .value = "809", .type_text = "fn (i32, i32) ?i32" },
+        .{ .kind = "inst", .value = "0", .type_text = "i32" },
+        .{ .kind = "inst", .value = "1", .type_text = "i32" },
+    };
+    var call_details = [_]air_export.TypedDetail{
+        .{ .key = "callee_text", .value = "<fn (i32, i32) ?i32, (function 'frontierMaybeOptionalReturn')>" },
+        .{ .key = "call_signature", .value = "fn (i32, i32) ?i32" },
+    };
+    var optional_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "3", .type_text = "?i32" },
+    };
+    var payload_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "3", .type_text = "?i32" },
+    };
+    var payload_br_operands = [_]air_export.TypedOperand{
+        .{ .kind = "block", .value = "6", .type_text = "block" },
+        .{ .kind = "inst", .value = "8", .type_text = "i32" },
+    };
+    var fallback_br_operands = [_]air_export.TypedOperand{
+        .{ .kind = "block", .value = "6", .type_text = "block" },
+        .{ .kind = "const", .value = "814", .type_text = "i32" },
+    };
+    var fallback_br_details = [_]air_export.TypedDetail{
+        .{ .key = "operand1_text", .value = "<i32, -74>" },
+    };
+    var cond_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "7", .type_text = "bool" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "6", .type_text = "i32" },
+    };
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 3, .opcode = "call", .result_type = "call-result", .data_kind = "call", .operands = &call_operands, .details = &call_details },
+        .{ .index = 6, .opcode = "block", .result_type = "block-result", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 7, .opcode = "is_non_null", .result_type = "typed-result", .data_kind = "un_op", .operands = &optional_operands },
+        .{ .index = 8, .opcode = "optional_payload", .result_type = "i32", .data_kind = "ty_op", .operands = &payload_operands },
+        .{ .index = 9, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &payload_br_operands },
+        .{ .index = 10, .opcode = "br", .result_type = "noreturn", .data_kind = "br", .operands = &fallback_br_operands, .details = &fallback_br_details },
+        .{ .index = 11, .opcode = "cond_br", .result_type = "noreturn", .data_kind = "cond_br", .operands = &cond_operands },
+        .{ .index = 13, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = &ret_operands },
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = &instructions };
+    var params = [_]core.ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const function_type = FunctionType{
+        .params = &params,
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+
+    const summary = typedOptionalPayloadSummary(function_type, structured_air_v2).?;
+    try std.testing.expectEqual(.helper_return, summary.kind);
+    try std.testing.expectEqual(@as(i32, -74), summary.fallback);
+    try std.testing.expectEqualStrings("frontierMaybeOptionalReturn", summary.callee_name);
+    try std.testing.expectEqualStrings("fn (i32, i32) ?i32", summary.call_signature);
 }

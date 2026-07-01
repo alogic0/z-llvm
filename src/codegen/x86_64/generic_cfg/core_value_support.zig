@@ -78,7 +78,8 @@ pub fn genericCfgSupportsSingleBlockScalar(function: ir.Function) bool {
 pub fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, block: ir.BasicBlock, instruction: ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |binary| genericCfgSupportsSingleBlockBinary(function, block, binary),
-        .icmp => |icmp| genericCfgSupportsSingleBlockIcmp(function, icmp),
+        .icmp => |icmp| genericCfgSupportsSingleBlockIcmp(function, icmp) or
+            genericCfgSupportsCallResultZeroIcmp(block, icmp),
         .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
         .load => |load| genericCfgSupportsSingleBlockLoad(function, load),
         .store => |store| genericCfgSupportsSingleBlockStore(function, block, store),
@@ -195,9 +196,33 @@ pub fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.Basi
         else => return false,
     };
     if (genericCfgSupportsSminSelect(function, select, cond) or genericCfgSupportsSmaxSelect(function, select, cond)) return true;
-    if (!genericCfgSupportsSingleBlockIcmp(function, cond)) return false;
+    if (!genericCfgSupportsSingleBlockIcmp(function, cond) and !genericCfgSupportsCallResultZeroIcmp(block, cond)) return false;
     return genericCfgSupportsSingleBlockI32Value(function, block, select.true_value) and
         genericCfgSupportsSingleBlockI32Value(function, block, select.false_value);
+}
+
+fn genericCfgSupportsCallResultZeroIcmp(block: ir.BasicBlock, icmp: ir.IcmpInst) bool {
+    if (!icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    switch (icmp.predicate) {
+        .eq, .ne => {},
+        .slt, .sgt, .sle, .sge, .ult, .ugt, .ule, .uge => return false,
+    }
+    const call_value = if (isInt(icmp.rhs, 0))
+        icmp.lhs
+    else if (isInt(icmp.lhs, 0))
+        icmp.rhs
+    else
+        return false;
+    const call_name = switch (call_value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const instruction = findInstruction(block, call_name) orelse return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    return call.ret_ty.eql(.{ .int = 32 });
 }
 
 pub fn genericCfgSupportsSminSelect(function: ir.Function, select: ir.SelectInst, icmp: ir.IcmpInst) bool {

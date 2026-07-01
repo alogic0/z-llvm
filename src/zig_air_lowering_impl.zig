@@ -659,6 +659,9 @@ fn lowerFunctionTypedV2(
 
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
+    if (try lowerTypedV2OptionalPayload(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     if (try lowerTypedV2ArraySum(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
@@ -692,9 +695,6 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2MaybeError(allocator, air_function, function_type, structured_air_v2)) |function| {
-        return function;
-    }
-    if (try lowerTypedV2OptionalPayload(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2OptionalPayloadBranch(allocator, air_function, function_type, structured_air_v2)) |function| {

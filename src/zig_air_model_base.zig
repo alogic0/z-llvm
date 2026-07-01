@@ -1031,7 +1031,11 @@ pub const TypedOptionalPayloadBranchSummary = struct {
 };
 
 pub const TypedOptionalPayloadSummary = struct {
+    kind: enum { local_merge, helper_return } = .local_merge,
     fallback: i32,
+    callee_name: []const u8 = "",
+    callee_external: bool = false,
+    call_signature: []const u8 = "",
 };
 
 pub const TypedOptionalPointerSummary = struct {
