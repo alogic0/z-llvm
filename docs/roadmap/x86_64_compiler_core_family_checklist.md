@@ -436,7 +436,15 @@ Layer: aggregate semantic lowering.
   `tmp/compiler_core_module_releasefast_after_pointer_slice724.log`, still
   reports raw `slice_len count=13774`, but the only current
   `aggregate-shape` unknown bucket is `array_to_slice:ty_op`.
-- [ ] Lower `slice`.
+- [x] Lower `slice`.
+
+  Typed-v2 `slice` construction is covered by the existing
+  `frontier_slice_pointer_arith.zig` rows that build `values[0..len]` slices
+  and consume them through `.len`, `.ptr`, element load/store, checked element
+  access, and internal Zig slice-ABI helper calls. The refreshed ReleaseFast
+  compiler-core-module inventory reports raw `slice count=10901`, while the
+  current `aggregate-shape` unknown bucket remains only
+  `array_to_slice:ty_op`.
 - [ ] Lower `array_to_slice`.
 - [ ] Lower aggregate construction from typed operands.
 - [ ] Lower aggregate projection from typed operands.
