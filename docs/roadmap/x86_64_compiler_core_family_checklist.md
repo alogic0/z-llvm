@@ -65,7 +65,7 @@ Layer: typed AIR facts, semantic lowering, CFG lowering.
 - [x] Lower `try` with catch-side branch/merge.
 - [x] Lower `try_cold`.
 - [x] Lower `try_ptr`.
-- [ ] Lower `unwrap_errunion_err_ptr`.
+- [x] Lower `unwrap_errunion_err_ptr`.
 - [ ] Prove direct helper-call error-union returns without compatibility
   emitters.
 - [ ] Prove branch-only wrapped error-union returns.
