@@ -721,7 +721,12 @@ Layer: semantic lowering and CFG lowering.
   delegates admission to the model before emitting the existing null compare.
   Scalar optional presence checks remain outside this item and are tracked by
   the branch/merge flow entries below.
-- [ ] Lower optional pointer payload extraction.
+- [x] Lower optional pointer payload extraction.
+  Completed by adding `typedOptionalPointerPayloadExtractionSummary` and making
+  `typedOptionalPointerSummary` require the pointer payload relation for accepted
+  optional-pointer rows. This keeps pointer-payload extraction distinct from the
+  scalar optional payload path while reusing the generic typed-v2 payload
+  extraction model.
 - [ ] Lower optional branch/merge flows.
 - [ ] Lower optional return/catch-style flows that appear in compiler-core
   inventory.

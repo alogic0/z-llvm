@@ -41,6 +41,8 @@ pub const TypedOptionalPointerCheckSummary = struct {
     pointer_type_text: []const u8,
 };
 
+pub const TypedOptionalPointerPayloadExtractionSummary = TypedOptionalPayloadExtractionSummary;
+
 fn untypedFieldPtrIndex(instruction: air_export.Instruction) ?usize {
     const prefix = "struct_field_ptr_index_";
     if (!std.mem.startsWith(u8, instruction.opcode, prefix)) return null;
@@ -162,6 +164,12 @@ pub fn typedOptionalPointerCheckSummary(instruction: air_export.TypedInstruction
     };
 }
 
+pub fn typedOptionalPointerPayloadExtractionSummary(instruction: air_export.TypedInstruction) ?TypedOptionalPointerPayloadExtractionSummary {
+    const summary = typedOptionalPayloadExtractionSummary(instruction) orelse return null;
+    if (!isPointerLikeTypeText(summary.payload_type_text)) return null;
+    return summary;
+}
+
 pub fn typedOptionalPayloadBranchSummary(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -267,6 +275,8 @@ pub fn typedOptionalPointerSummary(
     {
         return null;
     }
+    const payload = singleInstructionByOpcode(structured_air_v2, "optional_payload") orelse return null;
+    _ = typedOptionalPointerPayloadExtractionSummary(payload) orelse return null;
 
     return .{
         .add_imm = typedFirstI32ConstOperandForOpcodes(structured_air_v2, &.{ "add", "add_safe" }, 1) orelse 0,
@@ -480,6 +490,43 @@ test "typed optional model rejects unrelated optional_payload types" {
     };
 
     try std.testing.expect(typedOptionalPayloadExtractionSummary(instruction) == null);
+}
+
+test "typed optional model recognizes optional pointer payload extraction" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "9",
+        .type_text = "?*const i32",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 11,
+        .opcode = "optional_payload",
+        .result_type = "*const i32",
+        .data_kind = "ty_op",
+        .operands = &operand,
+    };
+
+    const summary = typedOptionalPointerPayloadExtractionSummary(instruction).?;
+    try std.testing.expectEqual(@as(u32, 11), summary.instruction_index);
+    try std.testing.expectEqual(@as(u32, 9), summary.optional_index);
+    try std.testing.expectEqualStrings("*const i32", summary.payload_type_text);
+}
+
+test "typed optional model rejects scalar optional payload as pointer payload" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "4",
+        .type_text = "?i32",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 15,
+        .opcode = "optional_payload",
+        .result_type = "i32",
+        .data_kind = "ty_op",
+        .operands = &operand,
+    };
+
+    try std.testing.expect(typedOptionalPointerPayloadExtractionSummary(instruction) == null);
 }
 
 test "typed optional model recognizes optional pointer check" {
