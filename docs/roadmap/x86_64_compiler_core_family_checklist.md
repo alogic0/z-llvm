@@ -72,7 +72,13 @@ Layer: typed AIR facts, semantic lowering, CFG lowering.
 - [x] Prove loop or switch continuation after `try`.
 - [x] Keep pointer/cold/error-name subforms covered by typed facts or
   fail-closed until facts exist.
-- [ ] Refresh inventory and show the error-union try bucket reduced.
+- [x] Refresh inventory and show the error-union try bucket reduced.
+
+  ReleaseFast refresh evidence:
+  `tmp/compiler_core_module_releasefast_after_error_union_capabilities.log`
+  reports `unknown_opcode category=error-union-try count=0` after the
+  capability registry stopped counting typed-v2 lowerable error-union opcodes as
+  unknown inventory opcodes.
 
 ### 3. Pointer/Slice/Address Forms
 

@@ -247,7 +247,10 @@ pub fn opcodeCapability(opcode: []const u8) OpcodeCapability {
     const straight_line_lowerable = isStraightLineLowerableOpcode(opcode);
     const typed_v2_lowerable = isTypedV2LowerableOpcode(opcode);
     const boundary_reason = boundaryReasonForOpcode(opcode);
-    const inventory_known = category != .other or isInventoryKnownOtherOpcode(opcode);
+    const inventory_known = category != .other or
+        typed_v2_lowerable or
+        boundary_reason != null or
+        isInventoryKnownOtherOpcode(opcode);
     const status = opcodeStatus(ignored_metadata, typed_v2_lowerable, inventory_known, boundary_reason);
     return .{
         .category = category,
@@ -833,6 +836,10 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(isInventoryKnownOpcode("assembly"));
     try std.testing.expect(!isTypedV2LowerableOpcode("assembly"));
     try std.testing.expect(!isInventoryKnownOpcode("definitely_unknown_opcode"));
+    try std.testing.expect(isInventoryKnownOpcode("try"));
+    try std.testing.expect(isInventoryKnownOpcode("try_cold"));
+    try std.testing.expect(isInventoryKnownOpcode("unwrap_errunion_err"));
+    try std.testing.expect(isInventoryKnownOpcode("wrap_errunion_err"));
     try std.testing.expectEqual(UnknownOpcodeCategory.pointer_address, unknownOpcodeCategory("slice_ptr", "none"));
     try std.testing.expectEqual(UnknownOpcodeCategory.error_union_try, unknownOpcodeCategory("try_ptr", "error_union"));
     try std.testing.expectEqual(UnknownOpcodeCategory.safety_runtime, unknownOpcodeCategory("panic_cold", "none"));
