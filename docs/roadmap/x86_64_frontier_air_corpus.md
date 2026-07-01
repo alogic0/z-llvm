@@ -95,6 +95,12 @@ payload expression on the success edge, and rewraps the original error tag on
 the failure edge. Typed-v2 lowering now represents the void try continuation as
 a void value instead of requiring an `i32` payload, while the returned
 `Error!i32` payload and error wraps remain driven by generic CFG data flow.
+The `frontier_try_void_chain_match` row covers repeated compiler-core
+`Error!void` try chains: two sequential void-success `try` operations execute
+inside an `Error!void` helper, the final success returns void, and the caller
+catch path classifies the propagated error. This is reduced from the preserved
+ReleaseFast `main.main` / `print_targets.cmdTargets` descriptor shape and uses
+the same typed-v2 try ownership rather than a row-name recognizer.
 The producer-side `frontier_wrap_error_switch_match` row covers a masked
 integer switch that returns either a wrapped payload or wrapped error constants
 through an `i64` error-union phi. The x86_64 switch-to-phi path now accepts a
@@ -304,20 +310,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=710
-structured_functions=710
-generic_codegen_functions=710
-generic_cfg_functions=710
+discovered_functions=712
+structured_functions=712
+generic_codegen_functions=712
+generic_cfg_functions=712
 structural_matcher_functions=0
-structured_air_v2_functions=710
-typed_air_operand_functions=710
+structured_air_v2_functions=712
+typed_air_operand_functions=712
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=710
+generic_lowering_functions=712
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=710
+object_emitted_functions=712
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

@@ -1992,12 +1992,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=14`, `discovered_functions=710`,
-`generic_codegen_functions=710`, `generic_cfg_functions=710`,
+frontier gate reports `source_rows=14`, `discovered_functions=712`,
+`generic_codegen_functions=712`, `generic_cfg_functions=712`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=710`, `object_failures=0`,
+`object_emitted_functions=712`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=5`, `tls_rows=1`,
@@ -2055,6 +2055,12 @@ expression on the success edge, and rewraps the original error tag on the
 failure edge. The typed-v2 try lowerer now treats void payload continuations as
 void/undef values instead of requiring an `i32` payload while preserving the
 existing fail-closed path for unsupported payload types.
+The `frontier_try_void_chain_match` row covers the same compiler-core family
+from the repeated-try side: an `Error!void` helper performs two sequential
+`try` operations over `Error!void` calls and returns void on final success,
+while the caller catch path classifies the propagated error. This mirrors the
+preserved `main.main` / `print_targets.cmdTargets` descriptor shape without
+AIR-text recovery or source-name admission.
 
 The scalar transform frontier now includes typed-v2 ownership for AIR
 `byte_swap` on `u16`, `u32`, and `u64`. Zig exports a versioned
@@ -2096,9 +2102,9 @@ this cycle.
 The new strict `zig build distribution-air-release-frontier` gate runs this
 isolated frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with
 object progress, executable progress, and strict counter checks. It requires
-`source_rows=14`, `discovered_functions=710`,
-`generic_cfg_functions=710`, `structural_matcher_functions=0`,
-`object_emitted_functions=710`, `native_link_accepted_rows=14`,
+`source_rows=14`, `discovered_functions=712`,
+`generic_cfg_functions=712`, `structural_matcher_functions=0`,
+`object_emitted_functions=712`, `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.

@@ -631,20 +631,20 @@ ReleaseFast/ReleaseSafe/ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=710
-structured_functions=710
-generic_codegen_functions=710
-generic_cfg_functions=710
+discovered_functions=712
+structured_functions=712
+generic_codegen_functions=712
+generic_cfg_functions=712
 structural_matcher_functions=0
-structured_air_v2_functions=710
-typed_air_operand_functions=710
+structured_air_v2_functions=712
+typed_air_operand_functions=712
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=710
+generic_lowering_functions=712
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=710
+object_emitted_functions=712
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -677,7 +677,7 @@ local_fail=0
 The strict `zig build distribution-air-release-frontier` gate runs the isolated
 frontier corpus in ReleaseFast, ReleaseSafe, and ReleaseSmall with object
 progress, executable progress, and strict counter checks. It requires the
-14-source / 710-function counters above plus `native_link_accepted_rows=14`,
+14-source / 712-function counters above plus `native_link_accepted_rows=14`,
 `executable_ok_rows=14`, `link_only_rows=0`, `runtime_boundary_rows=0`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode.
@@ -723,6 +723,12 @@ compiler-core `try:pl_op` family from inside an `Error!i32` helper: the inner
 the success payload, and the cold path rewraps the original error tag. This
 extends typed-v2 try lowering to void payload continuations without adding an
 AIR-text recovery path.
+The follow-up `frontier_try_void_chain_match` row covers the repeated
+`Error!void` try-chain shape seen in the preserved ReleaseFast compiler-core
+descriptor: two sequential void-success `try` operations inside an
+`Error!void` helper, final void success, and a caller catch classifier for the
+propagated error. Admission remains typed-v2/generic-CFG data-flow based, not
+row-name based.
 The producer-side branch row now also proves terminal `cond_br` arms that
 return wrapped error constants directly, so `wrap_errunion_err` is not limited
 to the previous switch-to-phi frontier proof.

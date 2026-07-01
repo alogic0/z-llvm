@@ -490,6 +490,18 @@ export fn frontier_try_void_payload_match(tag: i32, base: i32) i32 {
     return payload + base;
 }
 
+fn frontierTryVoidChain(first: i32, second: i32) FrontierError!void {
+    try frontierMaybeVoid(first);
+    try frontierMaybeVoid(second);
+}
+
+export fn frontier_try_void_chain_match(first: i32, second: i32, base: i32) i32 {
+    frontierTryVoidChain(first, second) catch |err| {
+        return frontierClassifyCaughtError(err, base);
+    };
+    return base + 23;
+}
+
 fn frontierWrapErrorSwitch(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag & 3) {
         0 => value,
