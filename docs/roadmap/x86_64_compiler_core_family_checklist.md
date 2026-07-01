@@ -69,7 +69,7 @@ Layer: typed AIR facts, semantic lowering, CFG lowering.
 - [x] Prove direct helper-call error-union returns without compatibility
   emitters.
 - [x] Prove branch-only wrapped error-union returns.
-- [ ] Prove loop or switch continuation after `try`.
+- [x] Prove loop or switch continuation after `try`.
 - [ ] Keep pointer/cold/error-name subforms fail-closed until facts exist.
 - [ ] Refresh inventory and show the error-union try bucket reduced.
 
