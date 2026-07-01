@@ -262,7 +262,8 @@ pub fn lowerTypedTry(self: anytype, instruction: air_export.TypedInstruction) ai
         return air_model.LowerError.UnsupportedAir;
     }
     const payload_type = errorUnionPayloadType(instruction.operands[0].type_text) orelse return air_model.LowerError.UnsupportedAir;
-    if (!payload_type.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+    const payload_is_void = payload_type.ir_type == .void;
+    if (!payload_is_void and !payload_type.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
 
     const error_bits = try self.emitErrorUnionErrorBits(instruction.index, err_union.value, "try_errbits");
     const ok_name = try ownPrint(self.module, "air{}_try_ok", .{instruction.index});
@@ -295,10 +296,12 @@ pub fn lowerTypedTry(self: anytype, instruction: air_export.TypedInstruction) ai
     self.block.* = ir.BasicBlock.init(cont_label);
     try self.function.blocks.append(self.allocator, err_block);
 
-    const payload_name = try self.decodeErrorUnionPayload(instruction.index, err_union.value);
     self.values[instruction.index] = .{
         .ty = payload_type,
-        .value = .{ .named = payload_name },
+        .value = if (payload_is_void)
+            .undef
+        else
+            .{ .named = try self.decodeErrorUnionPayload(instruction.index, err_union.value) },
     };
 }
 
