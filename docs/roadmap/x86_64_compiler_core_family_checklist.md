@@ -286,7 +286,16 @@ Layer: typed AIR parser and address-form lowering.
   counts raw `slice_ptr` opcodes (`count=11926`) while reporting
   `unknown_opcode category=pointer-address count=0`, so the form is known and
   no longer an unsupported pointer-address bucket.
-- [ ] Lower `ptr_add`.
+- [x] Lower `ptr_add`.
+
+  `ptr_add` is covered by `frontier_dynamic_ptr_add`,
+  `frontier_comptime_ptr_add`, `frontier_chained_ptr_add`, the scalar-width
+  `frontier_ptr_add_load_*` rows, and the `frontier_ptr_add_store_*` rows in
+  `frontier_slice_pointer_arith.zig`. The C harness proves runtime index,
+  comptime offset, chained offset, load, and store forms across i8/i16/i32/i64
+  element widths. The focused compiler-core ReleaseFast inventory log still
+  counts raw `ptr_add` opcodes (`count=14279`) while reporting
+  `unknown_opcode category=pointer-address count=0`.
 - [ ] Lower `ptr_sub`.
 - [ ] Lower `is_non_null_ptr` from a real source shape.
 - [ ] Lower `runtime_nav_ptr` or classify it as a runtime boundary.
