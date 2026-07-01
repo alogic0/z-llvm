@@ -316,7 +316,23 @@ Layer: typed AIR parser and address-form lowering.
   first_source=../ziglang/src/main.zig
   first_function=Io.Threaded.Thread.checkCancel`. This makes the next
   pointer/slice items source-selectable without guessing source shapes.
-- [ ] Lower `is_non_null_ptr` from a real source shape.
+- [x] Lower `is_non_null_ptr` from a real source shape.
+
+  Focused ReleaseFast compiler-core-module selector evidence in
+  `tmp/compiler_core_module_releasefast_opcode_first_sources.log` reported
+  `is_non_null_ptr count=263 first_source=../ziglang/src/main.zig
+  first_function=main.serveUpdateResults`. The reduced frontier proof is
+  `frontier_optional_ptr_field_non_null` in
+  `frontier_optionals_errors.zig`, which mirrors the compiler-core optional
+  pointer field shape: a pointer field is loaded from a struct pointer, checked
+  for non-null, then the payload is loaded on the hot path. The typed-v2 field
+  pointer lowerer now accepts unknown aggregate layout only for proven
+  offset-zero plain pointer fields, and the x86_64 generic CFG optional-row
+  backend validates the field-load -> null-guard -> hot load/add return/null
+  return dataflow without source-name admission. Saved strict frontier evidence
+  `tmp/frontier_is_non_null_ptr.log` reports all three release modes at
+  `source_rows=14`, `generic_cfg_functions=723`,
+  `object_emitted_functions=723`, `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower `runtime_nav_ptr` or classify it as a runtime boundary.
 - [ ] Prove pointer arithmetic with load/store.
 - [ ] Prove slice pointer extraction.

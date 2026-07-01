@@ -3,6 +3,8 @@
 
 extern int z_frontier_optional_merge(int, int) __asm__("frontier_optionals_errors.frontier_optional_merge");
 extern int z_frontier_optional_ptr_non_null(const int *) __asm__("frontier_optionals_errors.frontier_optional_ptr_non_null");
+struct FrontierOptionalPtrBox { const int *ptr; };
+extern int z_frontier_optional_ptr_field_non_null(const struct FrontierOptionalPtrBox *) __asm__("frontier_optionals_errors.frontier_optional_ptr_field_non_null");
 extern int z_frontier_optional_payload_branch(int, int, int) __asm__("frontier_optionals_errors.frontier_optional_payload_branch");
 extern int z_frontier_error_payload(int, int) __asm__("frontier_optionals_errors.frontier_error_payload");
 extern int z_frontier_error_union_match(int) __asm__("frontier_optionals_errors.frontier_error_union_match");
@@ -72,10 +74,14 @@ static void death_error_name_invalid_code(void) { (void)z_frontier_error_name_th
 
 int main(void) {
     const int ptr_value = 49;
+    const struct FrontierOptionalPtrBox ptr_box = { &ptr_value };
+    const struct FrontierOptionalPtrBox null_ptr_box = { 0 };
     if (z_frontier_optional_merge(1, 30) != 30) return 1;
     if (z_frontier_optional_merge(0, 30) != -17) return 2;
     if (z_frontier_optional_ptr_non_null(&ptr_value) != 49) return 27;
     if (z_frontier_optional_ptr_non_null(0) != -49) return 28;
+    if (z_frontier_optional_ptr_field_non_null(&ptr_box) != 54) return 29;
+    if (z_frontier_optional_ptr_field_non_null(&null_ptr_box) != -54) return 31;
     if (z_frontier_optional_payload_branch(1, 30, 4) != 34) return 51;
     if (z_frontier_optional_payload_branch(1, 10, 3) != 7) return 52;
     if (z_frontier_optional_payload_branch(0, 30, 4) != -63) return 53;

@@ -31,6 +31,7 @@ const appendGenericCfgPhiBinaryImmediate = branch_merge_rows.appendGenericCfgPhi
 const genericCfgPhiBinaryReturn = branch_merge_rows.genericCfgPhiBinaryReturn;
 const emitGenericCfgConditionTrueBranch = terminal_values.emitGenericCfgConditionTrueBranch;
 const singleBrTarget = terminal_values.singleBrTarget;
+const i32Value = shared.i32Value;
 
 pub fn lowerGenericCfgOptionalPointerUnwrapReturn(
     allocator: std.mem.Allocator,
@@ -99,6 +100,47 @@ pub fn lowerGenericCfgOptionalPointerReturn(allocator: std.mem.Allocator, machin
         try appendGenericCfgBlockLabel(allocator, machine, load_label);
         try emitGenericCfgI32ValueIntoEax(allocator, machine, function, load_block, load_value);
         try appendGenericCfgReturn(allocator, machine);
+    }
+    return true;
+}
+
+pub fn lowerGenericCfgOptionalPointerFieldLoadReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = genericCfgOptionalPointerFieldLoadPlan(function) orelse return false;
+    const hot_is_then = std.mem.eql(u8, plan.then_target, plan.hot_block.name);
+    const null_is_then = std.mem.eql(u8, plan.then_target, plan.null_block.name);
+    if (!hot_is_then and !null_is_then) return false;
+
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = plan.base_reg, .offset = plan.field_offset } });
+    try machine.instructions.append(allocator, .test_rax_rax);
+
+    if (plan.non_null_is_true) {
+        if (hot_is_then) {
+            try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.null_block.name);
+            try emitGenericCfgOptionalPointerFieldHotReturn(allocator, machine, plan);
+            try appendGenericCfgBlockLabel(allocator, machine, plan.null_block.name);
+            try emitGenericCfgOptionalPointerFieldNullReturn(allocator, machine, plan);
+        } else {
+            try appendGenericCfgConditionalBranch(allocator, machine, .jne, plan.hot_block.name);
+            try emitGenericCfgOptionalPointerFieldNullReturn(allocator, machine, plan);
+            try appendGenericCfgBlockLabel(allocator, machine, plan.hot_block.name);
+            try emitGenericCfgOptionalPointerFieldHotReturn(allocator, machine, plan);
+        }
+    } else {
+        if (null_is_then) {
+            try appendGenericCfgConditionalBranch(allocator, machine, .jne, plan.hot_block.name);
+            try emitGenericCfgOptionalPointerFieldNullReturn(allocator, machine, plan);
+            try appendGenericCfgBlockLabel(allocator, machine, plan.hot_block.name);
+            try emitGenericCfgOptionalPointerFieldHotReturn(allocator, machine, plan);
+        } else {
+            try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.null_block.name);
+            try emitGenericCfgOptionalPointerFieldHotReturn(allocator, machine, plan);
+            try appendGenericCfgBlockLabel(allocator, machine, plan.null_block.name);
+            try emitGenericCfgOptionalPointerFieldNullReturn(allocator, machine, plan);
+        }
     }
     return true;
 }
@@ -252,6 +294,180 @@ fn emitCheckedOptionalPointerPath(
         return;
     }
     try emitCheckedOptionalPointerReturnBlock(allocator, machine, function, block);
+}
+
+const GenericCfgOptionalPointerFieldLoadPlan = struct {
+    base_reg: ArgReg,
+    field_offset: u8,
+    then_target: []const u8,
+    non_null_is_true: bool,
+    hot_block: ir.BasicBlock,
+    null_block: ir.BasicBlock,
+    add_imm: i32,
+    null_value: i32,
+};
+
+fn genericCfgOptionalPointerFieldLoadPlan(function: ir.Function) ?GenericCfgOptionalPointerFieldLoadPlan {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return null;
+    if (!function.params.items[0].ty.eql(.ptr) or function.blocks.items.len != 3) return null;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len < 3) return null;
+
+    const cond_inst = entry.instructions.items[entry.instructions.items.len - 1];
+    const cond_name = cond_inst.result orelse return null;
+    const icmp = switch (cond_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (!icmp.operand_ty.eql(.ptr)) return null;
+    const non_null_is_true = switch (icmp.predicate) {
+        .ne => true,
+        .eq => false,
+        else => return null,
+    };
+    const payload_name = pointerNullIcmpNamedOperand(icmp) orelse return null;
+    const payload_load = findInstruction(entry, payload_name) orelse return null;
+    const load_field = switch (payload_load.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load_field.ty.eql(.ptr) or load_field.attrs.isBarrier()) return null;
+    const base_name = switch (load_field.ptr) {
+        .named => |name| name,
+        else => return null,
+    };
+    const base_reg = optionalPointerFieldBaseReg(function, entry, base_name) orelse return null;
+
+    const condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, cond_name)) return null;
+    const then_block = blockByName(function, condbr.then_target) orelse return null;
+    const else_block = blockByName(function, condbr.else_target) orelse return null;
+    const then_hot = optionalPointerFieldHotReturn(then_block, payload_name);
+    const else_hot = optionalPointerFieldHotReturn(else_block, payload_name);
+    const then_null = optionalPointerFieldNullReturn(function, then_block);
+    const else_null = optionalPointerFieldNullReturn(function, else_block);
+    if ((then_hot != null) == (else_hot != null)) return null;
+    if ((then_null != null) == (else_null != null)) return null;
+
+    return .{
+        .base_reg = base_reg,
+        .field_offset = 0,
+        .then_target = condbr.then_target,
+        .non_null_is_true = non_null_is_true,
+        .hot_block = if (then_hot != null) then_block else else_block,
+        .null_block = if (then_null != null) then_block else else_block,
+        .add_imm = then_hot orelse else_hot.?,
+        .null_value = then_null orelse else_null.?,
+    };
+}
+
+fn optionalPointerFieldBaseReg(function: ir.Function, entry: ir.BasicBlock, base_name: []const u8) ?ArgReg {
+    if (paramRegOrNull(function, base_name, .ptr) catch null) |reg| return reg;
+    const base_load_inst = findInstruction(entry, base_name) orelse return null;
+    const base_load = switch (base_load_inst.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!base_load.ty.eql(.ptr) or base_load.attrs.isBarrier()) return null;
+    const slot_name = switch (base_load.ptr) {
+        .named => |name| name,
+        else => return null,
+    };
+    for (entry.instructions.items) |instruction| {
+        const store = switch (instruction.kind) {
+            .store => |store| store,
+            else => continue,
+        };
+        if (!store.ty.eql(.ptr) or store.attrs.isBarrier() or !isNamed(store.ptr, slot_name)) continue;
+        const stored_name = switch (store.value) {
+            .named => |name| name,
+            else => return null,
+        };
+        return paramRegOrNull(function, stored_name, .ptr) catch null;
+    }
+    return null;
+}
+
+fn pointerNullIcmpNamedOperand(icmp: ir.IcmpInst) ?[]const u8 {
+    if (icmp.lhs == .null_value) return switch (icmp.rhs) {
+        .named => |name| name,
+        else => null,
+    };
+    if (icmp.rhs == .null_value) return switch (icmp.lhs) {
+        .named => |name| name,
+        else => null,
+    };
+    return null;
+}
+
+fn optionalPointerFieldHotReturn(block: ir.BasicBlock, payload_name: []const u8) ?i32 {
+    if (block.instructions.items.len == 0 or block.instructions.items.len > 2) return null;
+    const load_name = block.instructions.items[0].result orelse return null;
+    const load = switch (block.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, payload_name)) return null;
+
+    var ret_source: ir.Value = .{ .named = load_name };
+    var add_imm: i32 = 0;
+    if (block.instructions.items.len == 2) {
+        const binary_name = block.instructions.items[1].result orelse return null;
+        const binary = switch (block.instructions.items[1].kind) {
+            .binary => |binary| binary,
+            else => return null,
+        };
+        if (!binary.ty.eql(.{ .int = 32 }) or binary.op != .add or !isNamed(binary.lhs, load_name)) return null;
+        add_imm = switch (binary.rhs) {
+            .int => |value| i32Value(value) catch return null,
+            else => return null,
+        };
+        ret_source = .{ .named = binary_name };
+    }
+
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !(ret.value orelse return null).eql(ret_source)) return null;
+    return add_imm;
+}
+
+fn optionalPointerFieldNullReturn(function: ir.Function, block: ir.BasicBlock) ?i32 {
+    if (block.instructions.items.len != 0) return null;
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(function.ret_ty)) return null;
+    return switch (ret.value orelse return null) {
+        .int => |value| i32Value(value) catch return null,
+        else => null,
+    };
+}
+
+fn emitGenericCfgOptionalPointerFieldHotReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    plan: GenericCfgOptionalPointerFieldLoadPlan,
+) !void {
+    _ = plan.hot_block;
+    try machine.instructions.append(allocator, .load_rax_ptr_eax);
+    if (plan.add_imm != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = plan.add_imm });
+    try appendGenericCfgReturn(allocator, machine);
+}
+
+fn emitGenericCfgOptionalPointerFieldNullReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    plan: GenericCfgOptionalPointerFieldLoadPlan,
+) !void {
+    _ = plan.null_block;
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = plan.null_value });
+    try appendGenericCfgReturn(allocator, machine);
 }
 
 const CheckedOptionalPointerGuard = struct {
@@ -549,6 +765,15 @@ pub fn genericCfgOptionalPointerMergeHasIncoming(block: ir.BasicBlock, incoming_
 fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
     for (function.blocks.items) |block| {
         if (std.mem.eql(u8, block.name, name)) return block;
+    }
+    return null;
+}
+
+fn findInstruction(block: ir.BasicBlock, name: []const u8) ?ir.Instruction {
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const result = instruction.result orelse continue;
+        if (std.mem.eql(u8, result, name)) return instruction;
     }
     return null;
 }

@@ -10,6 +10,17 @@ export fn frontier_optional_ptr_non_null(ptr: ?*const i32) i32 {
     return -49;
 }
 
+const FrontierOptionalPtrBox = extern struct {
+    ptr: ?*const i32,
+};
+
+export fn frontier_optional_ptr_field_non_null(box: *const FrontierOptionalPtrBox) i32 {
+    if (box.ptr) |ptr| {
+        return ptr.* + 5;
+    }
+    return -54;
+}
+
 export fn frontier_optional_payload_branch(flag: i32, value: i32, delta: i32) i32 {
     const maybe_value: ?i32 = if (flag != 0) value else null;
     if (maybe_value) |payload| {

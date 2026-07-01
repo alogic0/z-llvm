@@ -342,39 +342,50 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
     if (result_type.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
     const field_child = result_type.pointer_child orelse return air_model.LowerError.UnsupportedAir;
     const field_index = air_model.fieldIndex(instruction) orelse return air_model.LowerError.UnsupportedAir;
-    const source_ty = aggregate_ptr.ty.pointer_child orelse return air_model.LowerError.UnsupportedAir;
-    if (aggregateFieldByteOffset(source_ty, field_child, field_index)) |offset| {
-        if (offset == 0) {
+    const source_ty = aggregate_ptr.ty.pointer_child;
+    if (source_ty) |known_source_ty| {
+        if (aggregateFieldByteOffset(known_source_ty, field_child, field_index)) |offset| {
+            if (offset == 0) {
+                self.values[instruction.index] = .{
+                    .ty = result_type,
+                    .value = aggregate_ptr.value,
+                };
+                return;
+            }
+            const result_name = try self.resultName(instruction.index);
+            var gep: ir.GepInst = .{
+                .source_ty = .{ .int = 8 },
+                .ptr = aggregate_ptr.value,
+                .indices = .empty,
+            };
+            errdefer gep.deinit(self.allocator);
+            try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = offset } });
+            try self.block.instructions.append(self.allocator, .{
+                .result = result_name,
+                .kind = .{ .gep = gep },
+            });
             self.values[instruction.index] = .{
                 .ty = result_type,
-                .value = aggregate_ptr.value,
+                .value = .{ .named = result_name },
             };
             return;
         }
-        const result_name = try self.resultName(instruction.index);
-        var gep: ir.GepInst = .{
-            .source_ty = .{ .int = 8 },
-            .ptr = aggregate_ptr.value,
-            .indices = .empty,
-        };
-        errdefer gep.deinit(self.allocator);
-        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = offset } });
-        try self.block.instructions.append(self.allocator, .{
-            .result = result_name,
-            .kind = .{ .gep = gep },
-        });
+    }
+
+    if (field_index == 0 and isPlainFieldPointerChild(field_child)) {
         self.values[instruction.index] = .{
             .ty = result_type,
-            .value = .{ .named = result_name },
+            .value = aggregate_ptr.value,
         };
         return;
     }
 
     if (!isPlainFieldPointerChild(field_child)) return air_model.LowerError.UnsupportedAir;
+    const known_source_ty = source_ty orelse return air_model.LowerError.UnsupportedAir;
 
     const result_name = try self.resultName(instruction.index);
     var gep: ir.GepInst = .{
-        .source_ty = source_ty,
+        .source_ty = known_source_ty,
         .ptr = aggregate_ptr.value,
         .indices = .empty,
     };
