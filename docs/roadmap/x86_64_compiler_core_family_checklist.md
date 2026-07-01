@@ -192,7 +192,19 @@ Layer: semantic layout, ABI planner, backend.
   through stable native-link executable checks. Saved evidence:
   `tmp/frontier_counter_update.log` reports all three release modes at
   `native_link_accepted_rows=14`, `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Keep unsupported packed/unaligned/oversized forms fail-closed.
+- [x] Keep unsupported packed/unaligned/oversized forms fail-closed.
+
+  Packed/unaligned aggregate ABI remains an explicit source-backed boundary:
+  `test/zig/frontier_boundaries/frontier_packed_aggregate_boundary.zig`
+  reports `UnsupportedPackedAggregateAbi` for packed aggregate argument and
+  return forms. The current strict boundary log,
+  `tmp/frontier_boundary_counter_update.log`, reports
+  `packed_aggregate_boundary_rows=2`, `unexpected_accept_rows=0`,
+  `wrong_diagnostic_rows=0`, and `local_fail=0` in all three release modes.
+  Normal supported-leaf large MEMORY aggregates are not boundary-owned anymore;
+  the accepted frontier covers generated BigN sret/byval rows through `Big256`.
+  Larger or unsupported leaf/layout forms remain fail-closed by the x86_64 SysV
+  planner rather than silently falling back.
 - [ ] Refresh inventory and show the aggregate ABI bucket reduced or
   reclassified.
 
