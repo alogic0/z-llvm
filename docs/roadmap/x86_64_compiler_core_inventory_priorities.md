@@ -42,7 +42,7 @@ category.
 
 | Category | ReleaseFast | ReleaseSafe | ReleaseSmall | First source | First function | Current status | Likely layer |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| aggregate-abi | 2324784 | 2338212 | 2206792 | `../ziglang/src/main.zig` | `global` | partially supported | semantic lowering, ABI planner, backend |
+| aggregate-abi | 2324786 | 2338212 | 2206792 | `../ziglang/src/main.zig` | `global` | partially supported | semantic lowering, ABI planner, backend |
 | unknown-opcode | 47087 | 407240 | 333877 | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | AIR parser, CFG lowering |
 | vector | 16200 | 16024 | 15808 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
 | x87 | 6444 | 6220 | 6550 | `../ziglang/src/main.zig` | `global` | unsupported boundary | ABI planner, backend |
@@ -74,14 +74,14 @@ the output contract is:
 | runtime-libs | ReleaseFast | 10118 | 45414 | 19497 | 187 | `tmp/runtime_libs_aggregate_layout_facts_enabled.log` |
 | runtime-libs | ReleaseSafe | 10179 | 47078 | 20214 | not refreshed | `tmp/runtime_libs_aggregate_surface_inventory.log` |
 | runtime-libs | ReleaseSmall | 4964 | 23801 | 10554 | not refreshed | `tmp/runtime_libs_aggregate_surface_inventory.log` |
-| compiler-core-module | ReleaseFast | 410781 | 1392400 | 932386 | 5824 | `tmp/compiler_core_module_releasefast_aggregate_layout_facts_enabled.log` |
+| compiler-core-module | ReleaseFast | 410781 | 1392400 | 932386 | 5824 | `tmp/compiler_core_module_releasefast_after_aggregate722.log` |
 | compiler-core-standalone-probe | ReleaseFast | 0 | 85 | 2 | not refreshed | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 | compiler-core-standalone-probe | ReleaseSafe | 0 | 85 | 2 | not refreshed | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 | compiler-core-standalone-probe | ReleaseSmall | 0 | 0 | 0 | not refreshed | `tmp/compiler_core_standalone_aggregate_surface_inventory.log` |
 
 The full `compiler-core-module` all-mode refresh remains milestone-cost. The
 ReleaseFast per-mode refresh completed with aggregate fact counting in
-`tmp/compiler_core_module_releasefast_aggregate_layout_facts_enabled.log`; ReleaseSafe and
+`tmp/compiler_core_module_releasefast_after_aggregate722.log`; ReleaseSafe and
 ReleaseSmall should be refreshed separately with `--mode` when their counters
 need the same split.
 
@@ -251,7 +251,7 @@ families where the inventory does not yet record per-opcode first examples.
 
 | Rank | Category/opcode | ReleaseFast | ReleaseSafe | ReleaseSmall | First source/function | Status | Likely implementation layer |
 | ---: | --- | ---: | ---: | ---: | --- | --- | --- |
-| 1 | aggregate-abi | 2256445 | 2338212 | 2206792 | `../ziglang/src/main.zig` / `global` | partially supported | semantic lowering, ABI planner, backend |
+| 1 | aggregate-abi | 2324786 | 2338212 | 2206792 | `../ziglang/src/main.zig` / `global` | partially supported | semantic lowering, ABI planner, backend |
 | 2 | unknown-opcode: vector | 26240 | not refreshed | not refreshed | `../ziglang/src/main.zig` / `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
 | 3 | `dbg_stmt` / debug metadata | 1582916 | 1608158 | 0 | - | runtime/metadata boundary | AIR parser, verifier policy |
 | 4 | `load` | 588943 | 598263 | 577785 | - | supported subset | CFG lowering, backend |

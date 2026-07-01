@@ -205,8 +205,19 @@ Layer: semantic layout, ABI planner, backend.
   the accepted frontier covers generated BigN sret/byval rows through `Big256`.
   Larger or unsupported leaf/layout forms remain fail-closed by the x86_64 SysV
   planner rather than silently falling back.
-- [ ] Refresh inventory and show the aggregate ABI bucket reduced or
+- [x] Refresh inventory and show the aggregate ABI bucket reduced or
   reclassified.
+
+  Focused ReleaseFast compiler-core-module refresh
+  `tmp/compiler_core_module_releasefast_after_aggregate722.log` completed with
+  real module context, generated imports available, no stubs, and
+  `instruction_payload_scan=1`. The aggregate ABI bucket remains the largest
+  measured family at `aggregate-abi=2324786`, but it is now split into
+  `aggregate_opcode_shapes=410781`, `aggregate_metadata_type_surfaces=1392400`,
+  `aggregate_abi_type_surfaces=932386`, and `aggregate_layout_facts=5824`.
+  This reclassifies the remaining work as broad aggregate ABI/type-layout
+  ownership rather than an unknown selected-row blocker; ReleaseSafe and
+  ReleaseSmall inventory refresh remain milestone-cost and were not rerun.
 
 ### 2. Error-Union Try/Wrap/Unwrap
 
