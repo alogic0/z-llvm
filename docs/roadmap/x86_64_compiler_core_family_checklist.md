@@ -333,7 +333,20 @@ Layer: typed AIR parser and address-form lowering.
   `tmp/frontier_is_non_null_ptr.log` reports all three release modes at
   `source_rows=14`, `generic_cfg_functions=723`,
   `object_emitted_functions=723`, `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower `runtime_nav_ptr` or classify it as a runtime boundary.
+- [x] Lower `runtime_nav_ptr` or classify it as a runtime boundary.
+
+  This form is already lowerable from typed-v2 `ty_nav` facts rather than a
+  runtime boundary: the Zig exporter records `nav_fqn`, and z_llvm lowers it to
+  an IR symbol value without AIR-text recovery. Existing source-backed proof is
+  `frontier_globals_tls.frontier_tls_branch`, whose saved AIR descriptor
+  `tmp/uncurated_zig_air_releasefast_3056277/frontier_globals_tls.air` contains
+  `runtime_nav_ptr(*i32, 'frontier_globals_tls.frontier_tls')` and typed-v2
+  `nav_fqn` records. The x86_64 generic CFG address path classifies that symbol
+  as local-exec TLS and emits load/store TLS instructions. Strict executable
+  evidence in `tmp/frontier_is_non_null_ptr.log` reports
+  `frontier_globals_tls.zig` executable-ok in ReleaseFast, ReleaseSafe, and
+  ReleaseSmall, with all modes at `generic_cfg_functions=723`,
+  `object_emitted_functions=723`, and `local_fail=0`.
 - [ ] Prove pointer arithmetic with load/store.
 - [ ] Prove slice pointer extraction.
 - [ ] Prove slice length extraction.
