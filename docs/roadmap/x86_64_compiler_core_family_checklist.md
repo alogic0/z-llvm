@@ -616,7 +616,19 @@ Layer: semantic lowering and CFG lowering.
   `tmp/frontier_union_init.log` reports `source_rows=14`,
   `discovered_functions=731`, `generic_cfg_functions=731`,
   `executable_ok_rows=14`, and `local_fail=0` in all three release modes.
-- [ ] Lower switch over a union tag.
+- [x] Lower switch over a union tag.
+
+  Union-tag switch ownership is part of `TypedUnionTagPayloadSwitchSummary`.
+  The model requires exactly one `switch_br`, proves its operand is the
+  `get_union_tag` instruction, validates `cases_len=2`, and accepts either
+  case order through the exported `case*_item0_tag_index` details. The
+  typed-v2 lowerer then emits the selected result with a normal compare/select
+  IR shape rather than depending on source names. Source-backed rows
+  `frontier_union_tag_match` and `frontier_union_tag_reversed_arms` prove both
+  normal and reversed switch arm order, with executable checks for each arm in
+  `frontier_frontier_union_tags.c`. Saved evidence:
+  `tmp/frontier_union_init.log` reports all three release modes at
+  `generic_cfg_functions=731`, `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower branch over a union tag.
 - [ ] Prove one tag-only executable row.
 - [ ] Prove one tag-plus-payload executable row.
