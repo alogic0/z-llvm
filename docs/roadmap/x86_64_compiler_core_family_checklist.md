@@ -160,7 +160,18 @@ Layer: semantic layout, ABI planner, backend.
   all-release-mode frontier evidence in `tmp/frontier_counter_update.log`
   reports `generic_cfg_functions=722`, `object_emitted_functions=722`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Prove at least one direct-call aggregate row.
+- [x] Prove at least one direct-call aggregate row.
+
+  Direct aggregate call proof is now covered by source-backed rows in
+  `frontier_sysv_aggregate_classes.zig`, including
+  `frontier_mixed_field_write_before_call` -> `helperMixedInt(Mixed)` and the
+  existing `frontier_float_pair_call_sum` -> `helperFloatPairSum(FloatPair)`.
+  Both are C-harness executable-proven as part of the module harness, while the
+  accepted lowering uses typed-v2/model-owned aggregate facts and generic CFG
+  call lowering rather than source-name admission. Saved evidence:
+  `tmp/frontier_counter_update.log` reports all three release modes at
+  `generic_cfg_functions=722`, `object_emitted_functions=722`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Prove at least one returned-aggregate row.
 - [ ] Prove at least one aggregate field/payload executable row.
 - [ ] Keep unsupported packed/unaligned/oversized forms fail-closed.
