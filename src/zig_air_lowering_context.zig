@@ -77,6 +77,7 @@ pub const LoweringContext = struct {
     typed_v2_fallback: ?*?TypedV2Fallback = null,
     synthetic_pointer_payloads: []?TypedValue,
     synthetic_error_union_slots: []?TypedValue,
+    synthetic_union_tag_slots: []?TypedValue,
     next_arg_index: usize = 0,
 
     // Typed lowering dispatch and domain-specific lowering operations.
@@ -140,6 +141,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedLoad = typed_memory.lowerTypedLoad;
     pub const lowerTypedLoadFromSyntheticPointerPayload = typed_memory.lowerTypedLoadFromSyntheticPointerPayload;
     pub const lowerTypedLoadFromSyntheticErrorUnionSlot = typed_memory.lowerTypedLoadFromSyntheticErrorUnionSlot;
+    pub const lowerTypedLoadFromSyntheticUnionTagSlot = typed_memory.lowerTypedLoadFromSyntheticUnionTagSlot;
     pub const lowerTypedLoadFromSliceLenPtr = typed_memory.lowerTypedLoadFromSliceLenPtr;
     pub const lowerTypedLoadFromSlicePtrPtr = typed_memory.lowerTypedLoadFromSlicePtrPtr;
     pub const lowerTypedStore = typed_memory.lowerTypedStore;
@@ -151,6 +153,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedOptionalPayload = typed_optional.lowerTypedOptionalPayload;
 
     pub const lowerTypedUnionTagSemanticInstruction = typed_union_tag.lowerTypedUnionTagSemanticInstruction;
+    pub const lowerTypedSetUnionTag = typed_union_tag.lowerTypedSetUnionTag;
     pub const lowerTypedGetUnionTag = typed_union_tag.lowerTypedGetUnionTag;
 
     pub const lowerTypedPointerAggregateSemanticInstruction =

@@ -561,7 +561,15 @@ Layer: semantic lowering and CFG lowering.
   `tmp/check_stage4_get_union_tag_after_commit_direct.log` but is blocked by
   the pre-existing stage4 binary/`../ziglang` HEAD mismatch after hook commit
   `b45a663b8`.
-- [ ] Lower `set_union_tag`.
+- [x] Lower `set_union_tag`.
+
+  `set_union_tag` now uses the same `zllvm-union-tag-facts-v1` typed-v2
+  contract as `get_union_tag`: the Zig exporter emits `tag_index` and
+  `bit_width`, and z_llvm records the selected scalar tag in a synthetic
+  union-tag slot. Loads from that slot can feed `get_union_tag` for tag-only
+  ownership while payload-bearing union layouts remain fail-closed for the
+  later payload-read and `union_init` checklist items. Validation:
+  `tmp/set_union_tag_build_test.log` and `tmp/frontier_set_union_tag.log`.
 - [ ] Lower `union_init`.
 - [ ] Lower `tag_name` or classify it as a runtime/string boundary.
 - [ ] Lower payload reads guarded by tag checks.

@@ -1006,6 +1006,12 @@ pub const TypedUnionTagGetSummary = struct {
     bit_width: u16,
 };
 
+pub const TypedUnionTagSetSummary = struct {
+    pointer_index: u32,
+    tag_index: u32,
+    bit_width: u16,
+};
+
 pub const TypedOptionalPayloadBranchSummary = struct {
     threshold: i32,
     fallback: i32,

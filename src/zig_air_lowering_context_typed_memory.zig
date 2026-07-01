@@ -43,6 +43,7 @@ pub fn lowerTypedLoad(self: anytype, instruction: air_export.TypedInstruction) !
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     if (try self.lowerTypedLoadFromSyntheticPointerPayload(instruction)) return;
     if (try self.lowerTypedLoadFromSyntheticErrorUnionSlot(instruction)) return;
+    if (try self.lowerTypedLoadFromSyntheticUnionTagSlot(instruction)) return;
     if (try self.lowerTypedLoadFromSlicePtrPtr(instruction)) return;
     if (try self.lowerTypedLoadFromSliceLenPtr(instruction)) return;
     const pointer = try self.resolveTypedOperand(instruction, 0);
@@ -92,6 +93,14 @@ pub fn lowerTypedLoadFromSyntheticErrorUnionSlot(self: anytype, instruction: air
         break :blk loaded.ty;
     };
     if (!result_type.ir_type.eql(loaded.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    self.values[instruction.index] = loaded;
+    return true;
+}
+
+pub fn lowerTypedLoadFromSyntheticUnionTagSlot(self: anytype, instruction: air_export.TypedInstruction) !bool {
+    const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (pointer_index >= self.synthetic_union_tag_slots.len) return air_model.LowerError.UnsupportedAir;
+    const loaded = self.synthetic_union_tag_slots[pointer_index] orelse return false;
     self.values[instruction.index] = loaded;
     return true;
 }

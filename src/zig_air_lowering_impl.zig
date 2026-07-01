@@ -584,6 +584,9 @@ fn lowerFunction(
     const synthetic_error_union_slots = try allocator.alloc(?TypedValue, air_function.instruction_count);
     defer allocator.free(synthetic_error_union_slots);
     @memset(synthetic_error_union_slots, null);
+    const synthetic_union_tag_slots = try allocator.alloc(?TypedValue, air_function.instruction_count);
+    defer allocator.free(synthetic_union_tag_slots);
+    @memset(synthetic_union_tag_slots, null);
 
     var context: LoweringContext = .{
         .allocator = allocator,
@@ -597,6 +600,7 @@ fn lowerFunction(
         .structured_air_v2 = null,
         .synthetic_pointer_payloads = synthetic_pointer_payloads,
         .synthetic_error_union_slots = synthetic_error_union_slots,
+        .synthetic_union_tag_slots = synthetic_union_tag_slots,
     };
 
     for (air_function.instructions) |instruction| {
@@ -760,6 +764,9 @@ fn lowerFunctionTypedV2(
     const synthetic_error_union_slots = try allocator.alloc(?TypedValue, air_function.instruction_count);
     defer allocator.free(synthetic_error_union_slots);
     @memset(synthetic_error_union_slots, null);
+    const synthetic_union_tag_slots = try allocator.alloc(?TypedValue, air_function.instruction_count);
+    defer allocator.free(synthetic_union_tag_slots);
+    @memset(synthetic_union_tag_slots, null);
     const typed_view = air_model.TypedFunctionView.init(air_function) orelse return error.UnsupportedAir;
 
     var context: LoweringContext = .{
@@ -776,6 +783,7 @@ fn lowerFunctionTypedV2(
         .typed_v2_fallback = typed_v2_fallback,
         .synthetic_pointer_payloads = synthetic_pointer_payloads,
         .synthetic_error_union_slots = synthetic_error_union_slots,
+        .synthetic_union_tag_slots = synthetic_union_tag_slots,
     };
 
     for (main_body.instructions) |instruction_index| {
