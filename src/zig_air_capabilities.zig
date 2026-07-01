@@ -98,6 +98,7 @@ pub const SemanticDomain = enum {
     optional,
     error_union,
     pointer_aggregate,
+    aggregate,
 
     pub fn name(self: SemanticDomain) []const u8 {
         return switch (self) {
@@ -107,6 +108,7 @@ pub const SemanticDomain = enum {
             .optional => "optional",
             .error_union => "error-union",
             .pointer_aggregate => "pointer-aggregate",
+            .aggregate => "aggregate",
         };
     }
 };
@@ -167,6 +169,12 @@ pub const PointerAggregateSemanticOp = enum {
     runtime_nav_ptr,
     array_elem_val,
     field_ptr,
+};
+
+pub const AggregateSemanticOp = enum {
+    none,
+    init,
+    field_val,
 };
 
 pub const CfgLoweringOp = enum {
@@ -312,6 +320,7 @@ fn semanticDomainFromOperationIds(opcode: []const u8) SemanticDomain {
     if (optionalSemanticOpForOpcode(opcode) != .none) return .optional;
     if (errorUnionSemanticOpForOpcode(opcode) != .none) return .error_union;
     if (pointerAggregateSemanticOpForOpcode(opcode) != .none) return .pointer_aggregate;
+    if (aggregateSemanticOpForOpcode(opcode) != .none) return .aggregate;
     return .none;
 }
 
@@ -371,6 +380,12 @@ pub fn pointerAggregateSemanticOpForOpcode(opcode: []const u8) PointerAggregateS
     if (std.mem.eql(u8, opcode, "runtime_nav_ptr")) return .runtime_nav_ptr;
     if (std.mem.eql(u8, opcode, "array_elem_val")) return .array_elem_val;
     if (isFieldPtrOpcode(opcode)) return .field_ptr;
+    return .none;
+}
+
+pub fn aggregateSemanticOpForOpcode(opcode: []const u8) AggregateSemanticOp {
+    if (std.mem.eql(u8, opcode, "aggregate_init")) return .init;
+    if (std.mem.eql(u8, opcode, "struct_field_val")) return .field_val;
     return .none;
 }
 
@@ -945,6 +960,9 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(PointerAggregateSemanticOp.runtime_nav_ptr, pointerAggregateSemanticOpForOpcode("runtime_nav_ptr"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.array_elem_val, pointerAggregateSemanticOpForOpcode("array_elem_val"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.field_ptr, pointerAggregateSemanticOpForOpcode("struct_field_ptr"));
+    try std.testing.expectEqual(SemanticDomain.aggregate, semanticDomainForOpcode("aggregate_init"));
+    try std.testing.expectEqual(AggregateSemanticOp.init, aggregateSemanticOpForOpcode("aggregate_init"));
+    try std.testing.expectEqual(AggregateSemanticOp.field_val, aggregateSemanticOpForOpcode("struct_field_val"));
     try std.testing.expect(isFieldPtrIndexOpcode("struct_field_ptr_index_0", 0));
     try std.testing.expect(isFieldPtrIndexOpcode("struct_field_ptr_index_1", 1));
     try std.testing.expect(!isFieldPtrIndexOpcode("struct_field_ptr_index_1", 0));

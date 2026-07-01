@@ -194,7 +194,11 @@ pub fn categoryForCodegenFailure(source: []const u8, err: anyerror) ?Category {
         else
             null,
         error.UnsupportedCodegenInstruction => if (boundary) |entry|
-            if (entry.category == .pointer_slice) .pointer_slice else null
+            switch (entry.category) {
+                .pointer_slice => .pointer_slice,
+                .tail_call => .tail_call,
+                else => null,
+            }
         else
             null,
         error.UnsupportedCodegenAbi => if (boundary) |entry|

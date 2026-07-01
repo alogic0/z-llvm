@@ -23,3 +23,12 @@ export fn frontier_nested_field_left_b(record: *const Outer) i32 {
 export fn frontier_nested_field_right_a(record: *const Outer) i32 {
     return record.right.a;
 }
+
+noinline fn frontierAggregateInitTuple(a: usize, b: usize) struct { usize, usize } {
+    return .{ a, b };
+}
+
+export fn frontier_aggregate_init_tuple_sum(a: usize, b: usize) usize {
+    const pair = frontierAggregateInitTuple(a, b);
+    return pair[0] + pair[1];
+}

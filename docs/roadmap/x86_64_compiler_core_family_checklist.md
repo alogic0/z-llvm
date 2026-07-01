@@ -455,7 +455,21 @@ Layer: aggregate semantic lowering.
   `source_rows=14`, `discovered_functions=726`,
   `generic_cfg_functions=726`, `object_emitted_functions=726`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower aggregate construction from typed operands.
+- [x] Lower aggregate construction from typed operands.
+
+  `aggregate_init` is now a model-owned aggregate semantic op and lowers
+  typed-v2 operands into an aggregate value through layout-checked
+  `insertvalue` construction. `frontier_aggregate_init_tuple_sum` proves a
+  source-backed internal helper returning a constructed `{ usize, usize }`
+  tuple, with the exported wrapper consuming the fields through scalar C ABI
+  executable proof. The backend also handles the resulting register-aggregate
+  helper call/spill/field-load/add shape without source-name admission. Strict
+  frontier evidence in `tmp/frontier_aggregate_init.log` reports all three
+  release modes at `source_rows=14`, `discovered_functions=728`,
+  `generic_cfg_functions=728`, `object_emitted_functions=728`,
+  `executable_ok_rows=14`, and `local_fail=0`. The broad aggregate projection
+  item remains open; this cycle only added the minimal typed field-value
+  consumer needed by the construction proof.
 - [ ] Lower aggregate projection from typed operands.
 - [ ] Prove source-backed slice construction.
 - [ ] Prove source-backed array-to-slice conversion.

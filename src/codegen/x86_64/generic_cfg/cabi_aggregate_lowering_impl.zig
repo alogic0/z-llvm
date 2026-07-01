@@ -74,6 +74,7 @@ pub fn lowerAggregateAbiReturn(
 ) !bool {
     if (try lowerRegisterAggregateConstructedArgCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMemoryAggregateCallReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerRegisterAggregateCallIntegerFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateCallFieldReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateDirectCallReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateReturn(allocator, machine, function, block, ret)) return true;
@@ -781,6 +782,166 @@ pub const AggregateIntegerFieldLoad = struct {
 pub const AggregateIntegerAddTerm = struct {
     offset: u64,
 };
+
+pub fn lowerRegisterAggregateCallIntegerFieldAddReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!ret.ty.eql(.{ .int = 32 }) and !ret.ty.eql(.{ .int = 64 })) or !function.ret_ty.eql(ret.ty)) return false;
+    if (block.instructions.items.len < 6) return false;
+
+    const call_inst = block.instructions.items[0];
+    const alloca_inst = block.instructions.items[1];
+    const store_inst = block.instructions.items[2];
+    if (call_inst.removed or alloca_inst.removed or store_inst.removed) return false;
+
+    const call_result = call_inst.result orelse return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.inline_asm != null or call.tail_kind != null or call.callee_value != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+
+    const aggregate_ty = call.ret_ty;
+    const classification = classifySysVAggregate(aggregate_ty) catch return false;
+    if (classification.kind != .register) return false;
+
+    const alloca_name = alloca_inst.result orelse return false;
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    if (!alloca.allocated_ty.eql(aggregate_ty)) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.value, call_result) or !isNamed(store.ptr, alloca_name)) return false;
+
+    var pointer_offsets = std.StringHashMap(u64).init(allocator);
+    defer pointer_offsets.deinit();
+    try pointer_offsets.put(alloca_name, 0);
+
+    var field_loads = std.StringHashMap(AggregateIntegerFieldLoad).init(allocator);
+    defer field_loads.deinit();
+
+    const layout = try x86_64SysVDataLayout();
+    for (block.instructions.items[3..]) |instruction| {
+        if (instruction.removed) return false;
+        switch (instruction.kind) {
+            .gep => |gep| {
+                const result = instruction.result orelse return false;
+                const base_name = switch (gep.ptr) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                const base_offset = pointer_offsets.get(base_name) orelse return false;
+                const offset = aggregateGepByteOffset(layout, aggregate_ty, gep) orelse return false;
+                try pointer_offsets.put(result, base_offset + offset);
+            },
+            .load => |load| {
+                const result = instruction.result orelse return false;
+                if (!load.ty.eql(ret.ty) or load.attrs.isBarrier()) return false;
+                const ptr_name = switch (load.ptr) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                const offset = pointer_offsets.get(ptr_name) orelse return false;
+                _ = aggregateFieldIndexAtOffset(aggregate_ty, offset, load.ty) orelse return false;
+                try field_loads.put(result, .{ .offset = offset });
+            },
+            .binary => |binary| {
+                if (binary.op != .add or !binary.ty.eql(ret.ty)) return false;
+            },
+            .phi, .fcmp, .icmp, .select, .cast, .freeze, .alloca, .store, .call, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+        }
+    }
+
+    var terms: [8]AggregateIntegerAddTerm = undefined;
+    var term_count: usize = 0;
+    if (!try collectAggregateIntegerAddTerms(block, ret.value orelse return error.InvalidRet, ret.ty, field_loads, &terms, &term_count)) return false;
+    if (term_count < 2) return false;
+    sortAggregateIntegerTerms(terms[0..term_count]);
+
+    const stack_arg_count = appendSysVScalarCallArgs(allocator, machine, function, call) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi, error.UnsupportedCodegenType, error.UnsupportedCodegenValue => return false,
+        else => if (sysv_abi.isBoundaryError(err)) return false else return err,
+    };
+    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    try emitAggregateIntegerReturnTerm(allocator, machine, classification, terms[0], ret.ty, true);
+    for (terms[1..term_count]) |term| {
+        try emitAggregateIntegerReturnTerm(allocator, machine, classification, term, ret.ty, false);
+    }
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn sortAggregateIntegerTerms(terms: []AggregateIntegerAddTerm) void {
+    var index: usize = 1;
+    while (index < terms.len) : (index += 1) {
+        var cursor = index;
+        while (cursor > 0 and terms[cursor - 1].offset > terms[cursor].offset) : (cursor -= 1) {
+            std.mem.swap(AggregateIntegerAddTerm, &terms[cursor - 1], &terms[cursor]);
+        }
+    }
+}
+
+fn emitAggregateIntegerReturnTerm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    classification: SysVAggregateClassification,
+    term: AggregateIntegerAddTerm,
+    ty: ir.Type,
+    first: bool,
+) !void {
+    if (classification.kind != .register) return error.UnsupportedCodegenAbi;
+    const field_eightbyte = term.offset / 8;
+    if (field_eightbyte >= classification.eightbytes.len) return error.UnsupportedCodegenAbi;
+    const field_class = classification.eightbytes[@intCast(field_eightbyte)] orelse return error.UnsupportedCodegenAbi;
+    if (field_class != .integer) return error.UnsupportedCodegenAbi;
+    const prior = sysvAggregateRegisterNeedsBefore(classification, @intCast(field_eightbyte));
+    const offset_in_eightbyte = term.offset % 8;
+
+    if (ty.eql(.{ .int = 64 })) {
+        if (offset_in_eightbyte != 0) return error.UnsupportedCodegenAbi;
+        switch (prior.gpr) {
+            0 => if (!first) return error.UnsupportedCodegenAbi,
+            1 => if (first)
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdx })
+            else
+                try machine.instructions.append(allocator, .{ .add_arg64_rax = .rdx }),
+            else => return error.UnsupportedCodegenAbi,
+        }
+        return;
+    }
+
+    if (!ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenAbi;
+    switch (prior.gpr) {
+        0 => switch (offset_in_eightbyte) {
+            0 => if (!first) return error.UnsupportedCodegenAbi,
+            4 => if (first) {
+                try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 32 });
+            } else {
+                return error.UnsupportedCodegenAbi;
+            },
+            else => return error.UnsupportedCodegenAbi,
+        },
+        1 => switch (offset_in_eightbyte) {
+            0 => if (first)
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdx })
+            else
+                try machine.instructions.append(allocator, .{ .add_arg64_rax = .rdx }),
+            4 => return error.UnsupportedCodegenAbi,
+            else => return error.UnsupportedCodegenAbi,
+        },
+        else => return error.UnsupportedCodegenAbi,
+    }
+}
 
 pub const AggregateDoubleFieldLoad = struct {
     offset: u64,

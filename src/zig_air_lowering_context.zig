@@ -13,6 +13,7 @@ const typed_error_union = @import("zig_air_lowering_context_typed_error_union.zi
 const typed_memory = @import("zig_air_lowering_context_typed_memory.zig");
 const typed_optional = @import("zig_air_lowering_context_typed_optional.zig");
 const typed_pointer_aggregate = @import("zig_air_lowering_context_typed_pointer_aggregate.zig");
+const typed_aggregate = @import("zig_air_lowering_context_typed_aggregate.zig");
 const typed_scalar = @import("zig_air_lowering_context_typed_scalar.zig");
 const typed_cfg = @import("zig_air_lowering_context_typed_cfg.zig");
 const typed_call = @import("zig_air_lowering_context_typed_call.zig");
@@ -164,6 +165,10 @@ pub const LoweringContext = struct {
     pub const lowerTypedArrayElemVal = typed_pointer_aggregate.lowerTypedArrayElemVal;
     pub const lowerTypedFieldPtr = typed_pointer_aggregate.lowerTypedFieldPtr;
 
+    pub const lowerTypedAggregateSemanticInstruction = typed_aggregate.lowerTypedAggregateSemanticInstruction;
+    pub const lowerTypedAggregateInit = typed_aggregate.lowerTypedAggregateInit;
+    pub const lowerTypedStructFieldVal = typed_aggregate.lowerTypedStructFieldVal;
+
     pub const lowerTypedScalarSemanticInstruction = typed_scalar.lowerTypedScalarSemanticInstruction;
     pub const lowerTypedArg = typed_scalar.lowerTypedArg;
     pub const lowerTypedBinary = typed_scalar.lowerTypedBinary;
@@ -185,7 +190,7 @@ pub const LoweringContext = struct {
             .scalar => try self.lowerLegacyScalarSemanticInstruction(instruction),
             .memory => try self.lowerLegacyMemorySemanticInstruction(instruction),
             .pointer_aggregate => try self.lowerLegacyPointerAggregateSemanticInstruction(instruction),
-            .optional, .error_union, .none => false,
+            .optional, .error_union, .aggregate, .none => false,
         };
         return lowered;
     }
