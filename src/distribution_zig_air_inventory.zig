@@ -466,12 +466,17 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
     );
     defer allocator.free(temp_path);
     try std.Io.Dir.cwd().createDirPath(io, temp_path);
-    defer std.Io.Dir.cwd().deleteTree(io, temp_path) catch {};
+    var preserve_temp = false;
+    defer if (!preserve_temp) std.Io.Dir.cwd().deleteTree(io, temp_path) catch {};
 
     const descriptor_path = try std.fs.path.join(allocator, &.{ temp_path, "compiler.air" });
     defer allocator.free(descriptor_path);
     const zig_cache_path = try std.fs.path.join(allocator, &.{ temp_path, "zig-cache" });
     defer allocator.free(zig_cache_path);
+    const stdout_path = try std.fs.path.join(allocator, &.{ temp_path, "zig-build.stdout" });
+    defer allocator.free(stdout_path);
+    const stderr_path = try std.fs.path.join(allocator, &.{ temp_path, "zig-build.stderr" });
+    defer allocator.free(stderr_path);
 
     printCompilerCoreModuleProgress(slice, mode, descriptor_path, "prepare");
 
@@ -505,18 +510,42 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
         allocator.free(build_result.stdout);
         allocator.free(build_result.stderr);
     }
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = stdout_path, .data = build_result.stdout });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = stderr_path, .data = build_result.stderr });
     switch (build_result.term) {
         .exited => |code| if (code != 0) {
+            preserve_temp = true;
             std.debug.print(
-                "inventory-module-context-failure slice={s} mode={s} exit_code={} stdout={s} stderr={s}\n",
-                .{ slice.cliName(), mode.name(), code, firstLine(build_result.stdout), firstLine(build_result.stderr) },
+                "inventory-module-context-failure slice={s} mode={s} exit_code={} temp_path={s} export_path={s} stdout_path={s} stderr_path={s} stdout={s} stderr={s}\n",
+                .{
+                    slice.cliName(),
+                    mode.name(),
+                    code,
+                    temp_path,
+                    descriptor_path,
+                    stdout_path,
+                    stderr_path,
+                    firstLine(build_result.stdout),
+                    firstLine(build_result.stderr),
+                },
             );
             return error.ZigCompilerModuleInventoryFailed;
         },
         else => {
+            preserve_temp = true;
             std.debug.print(
-                "inventory-module-context-failure slice={s} mode={s} term={s} stdout={s} stderr={s}\n",
-                .{ slice.cliName(), mode.name(), termName(build_result.term), firstLine(build_result.stdout), firstLine(build_result.stderr) },
+                "inventory-module-context-failure slice={s} mode={s} term={s} temp_path={s} export_path={s} stdout_path={s} stderr_path={s} stdout={s} stderr={s}\n",
+                .{
+                    slice.cliName(),
+                    mode.name(),
+                    termName(build_result.term),
+                    temp_path,
+                    descriptor_path,
+                    stdout_path,
+                    stderr_path,
+                    firstLine(build_result.stdout),
+                    firstLine(build_result.stderr),
+                },
             );
             return error.ZigCompilerModuleInventoryFailed;
         },
