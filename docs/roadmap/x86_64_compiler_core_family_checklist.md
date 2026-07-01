@@ -372,7 +372,16 @@ Layer: typed AIR parser and address-form lowering.
   validates all three rows, and `tmp/frontier_is_non_null_ptr.log` reports
   `frontier_slice_pointer_arith.zig` executable-ok in ReleaseFast, ReleaseSafe,
   and ReleaseSmall with `local_fail=0`.
-- [ ] Prove slice length extraction.
+- [x] Prove slice length extraction.
+
+  `frontier_slice_len_from_ptr` constructs a `[]const i32` from pointer+length
+  inputs and returns `slice.len`; the C harness checks
+  `z_frontier_slice_len_from_ptr(values, 5) == 5`. This proves typed-v2 slice
+  construction plus `slice_len` lowering through generic CFG and x86_64 return
+  codegen. The same strict frontier log,
+  `tmp/frontier_is_non_null_ptr.log`, reports
+  `frontier_slice_pointer_arith.zig` executable-ok in all three release modes
+  with `local_fail=0`.
 - [ ] Prove pointer/slice values across a branch merge.
 - [ ] Keep unsupported address spaces and volatile/atomic pointer forms
   fail-closed.
