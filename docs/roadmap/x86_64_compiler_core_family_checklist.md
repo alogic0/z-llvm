@@ -740,7 +740,14 @@ Layer: semantic lowering and CFG lowering.
   fallback branch, and terminal return data flow. The accepted frontier row
   `frontier_optional_return_match` now exercises the call-produced optional
   return path without source-name admission or AIR-text recovery.
-- [ ] Prove one optional scalar executable row.
+- [x] Prove one optional scalar executable row.
+  Completed by `frontier_optional_return_match` in
+  `test/zig/frontier/frontier_optionals_errors.zig`, with C harness checks for
+  both present and null helper-return paths. `tmp/frontier_optional_return.log`
+  proves object/native-link/executable success across ReleaseFast, ReleaseSafe,
+  and ReleaseSmall at `source_rows=14`, `discovered_functions=734`,
+  `generic_cfg_functions=734`, `object_emitted_functions=734`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Prove one optional pointer executable row.
 - [ ] Keep unsupported nested optional/error-union mixes fail-closed until
   modeled.
