@@ -22,7 +22,7 @@ const callIsFastcc = shared.callIsFastcc;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
 const emitGenericCfgIcmpCondition = cabi_call_lowering.emitGenericCfgIcmpCondition;
 const findInstruction = cabi_call_lowering.findInstruction;
-const genericCfgSupportsI32Value = core_value_support.genericCfgSupportsI32Value;
+const genericCfgSupportsSingleBlockI32Value = core_value_support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsSingleBlockIcmp = core_value_support.genericCfgSupportsSingleBlockIcmp;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
@@ -166,7 +166,8 @@ pub fn genericCfgSupportsTerminalReturnBlockInScope(function: ir.Function, scope
     if (!ret.ty.eql(function.ret_ty)) return false;
     const ret_value = ret.value orelse return false;
     if (function.ret_ty.eql(.{ .int = 32 })) {
-        return genericCfgSupportsI32Value(function, ret_value) or terminalBlockCanMaterializeI32Value(function, scope, ret_value);
+        return genericCfgSupportsSingleBlockI32Value(function, scope.block, ret_value) or
+            terminalBlockCanMaterializeI32Value(function, scope, ret_value);
     }
     return terminalBlockCanMaterializeI64Value(function, scope, ret_value);
 }

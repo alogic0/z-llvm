@@ -441,6 +441,20 @@ export fn frontier_catch_error_value_switch(tag: i32, value: i32, delta: i32) i3
     return payload + delta;
 }
 
+fn frontierClassifyCaughtError(err: FrontierError, base: i32) i32 {
+    return switch (err) {
+        FrontierError.BadTag => base + 41,
+        FrontierError.WorseTag => base + 43,
+    };
+}
+
+export fn frontier_catch_error_call_match(tag: i32, value: i32, base: i32) i32 {
+    const payload = frontierMaybeErrorTag(tag, value) catch |err| {
+        return frontierClassifyCaughtError(err, base);
+    };
+    return payload + base;
+}
+
 fn frontierWrapErrorSwitch(tag: i32, value: i32) FrontierError!i32 {
     return switch (tag & 3) {
         0 => value,

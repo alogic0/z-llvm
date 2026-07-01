@@ -21,7 +21,7 @@ pub fn sysvIntegerParamReg(function: ir.Function, name: []const u8, ty: ir.Type)
 }
 
 pub fn sysvIntegerParamRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg {
-    if (!ty.eql(.{ .int = 32 }) and !ty.eql(.{ .int = 64 }) and !ty.eql(.ptr)) return error.UnsupportedCodegenType;
+    if (!isSysVIntegerParamType(ty)) return error.UnsupportedCodegenType;
     return try paramRegOrNull(function, name, ty);
 }
 

@@ -337,7 +337,7 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
         const assignment = plan.assignments.items[index];
         switch (assignment) {
             .gpr => |dst| {
-                if (!arg.ty.eql(.{ .int = 32 }) and !arg.ty.eql(.{ .int = 64 }) and arg.ty != .ptr) return error.UnsupportedCodegenType;
+                if (!cabi_abi_helpers.isSysVIntegerParamType(arg.ty)) return error.UnsupportedCodegenType;
                 switch (arg.value) {
                     .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
                     .null_value => if (arg.ty == .ptr)
@@ -358,8 +358,8 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
                                 else
                                     .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
                             }
-                        } else if (arg.ty.eql(.{ .int = 32 })) {
-                            try appendLoadStackDispArg32(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, .{ .int = 32 })) + incoming_stack_adjust);
+                        } else if (arg.ty.eql(.{ .int = 1 }) or arg.ty.eql(.{ .int = 8 }) or arg.ty.eql(.{ .int = 16 }) or arg.ty.eql(.{ .int = 32 })) {
+                            try appendLoadStackDispArg32(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, arg.ty)) + incoming_stack_adjust);
                         } else if (arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr) {
                             try appendLoadStackDispArg64(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, arg.ty)) + incoming_stack_adjust);
                         }

@@ -69,6 +69,15 @@ pub fn supportsDirectI32Call(call: ir.CallInst) bool {
     return true;
 }
 
+fn supportsDirectI16I32ToI32Call(call: ir.CallInst) bool {
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.inline_asm != null or call.callee_value != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    for (call.args.items) |arg| {
+        if (!arg.ty.eql(.{ .int = 16 }) and !arg.ty.eql(.{ .int = 32 })) return false;
+    }
+    return true;
+}
+
 pub fn errorUnionTryGuardCallResult(block: ir.BasicBlock, cond: ir.Value) ?[]const u8 {
     const cond_name = switch (cond) {
         .named => |name| name,
@@ -1739,6 +1748,32 @@ const ErrorUnionCatchBranchReturn = struct {
     false_value: i64,
 };
 
+const ErrorUnionCatchCallReturn = struct {
+    entry: ir.BasicBlock,
+    call_name: []const u8,
+    call: ir.CallInst,
+    payload_block: ir.BasicBlock,
+    payload_return: ErrorUnionI32ReturnValue,
+    catch_block: ir.BasicBlock,
+    catch_call: ir.CallInst,
+    live_param_reg: ArgReg,
+};
+
+const ErrorSetParamSwitchCase = struct {
+    value: u16,
+    block: ir.BasicBlock,
+    incoming: ir.Value,
+};
+
+const ErrorSetParamSwitchReturn = struct {
+    entry: ir.BasicBlock,
+    tag_reg: ArgReg,
+    cases: [8]ErrorSetParamSwitchCase,
+    case_count: usize,
+    default_block: ir.BasicBlock,
+    merge_block: ir.BasicBlock,
+};
+
 pub const ErrorUnionI32ReturnValue = union(enum) {
     generic: ir.Value,
     payload_add_imm: i32,
@@ -2019,6 +2054,69 @@ pub fn lowerGenericCfgErrorUnionCatchBranchReturn(
     try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+pub fn lowerGenericCfgErrorUnionCatchCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorUnionCatchCallReturn(function) orelse return false;
+    const frame_bytes: u8 = 24;
+    const epilogue_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_error_catch_call_{}_generic_cfg_select_end",
+        .{machine.instructions.items.len},
+    );
+
+    try appendStackFrame(allocator, machine, frame_bytes);
+    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = plan.live_param_reg } });
+    try emitTwoI32ArgCallIntoRax(allocator, machine, function, plan.entry, plan.call);
+    try machine.instructions.append(allocator, .{ .spill_rax_rsp = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, plan.payload_block.name);
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.catch_block.name);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 65535 });
+    try machine.instructions.append(allocator, .mov_rax_rdi);
+    try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{ .frame_index = .slot2, .reg = .rsi } });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = plan.catch_call.callee, .ret_ty = plan.catch_call.ret_ty } });
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.payload_block.name);
+    try emitErrorUnionI32ReturnValueIntoEax(allocator, machine, function, plan.entry, plan.payload_block, plan.payload_return, plan.live_param_reg);
+    try machine.instructions.append(allocator, .{ .jmp = epilogue_label });
+
+    try appendGenericCfgBlockLabel(allocator, machine, epilogue_label);
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+pub fn lowerGenericCfgErrorSetParamSwitchReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const plan = errorSetParamSwitchReturn(function) orelse return false;
+    for (plan.cases[0..plan.case_count]) |case| {
+        try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = plan.tag_reg, .imm = case.value } });
+        try appendGenericCfgConditionalBranch(allocator, machine, .je, case.block.name);
+    }
+    try machine.instructions.append(allocator, .{ .jmp = plan.default_block.name });
+
+    for (plan.cases[0..plan.case_count]) |case| {
+        try appendGenericCfgBlockLabel(allocator, machine, case.block.name);
+        try emitGenericCfgTerminalI32ValueIntoEax(allocator, machine, function, plan.entry, case.block, case.incoming);
+        try appendGenericCfgReturn(allocator, machine);
+    }
+
+    try appendGenericCfgBlockLabel(allocator, machine, plan.default_block.name);
+    try machine.instructions.append(allocator, .ud2);
     return true;
 }
 
@@ -2416,6 +2514,165 @@ fn errorUnionCatchBranchReturn(function: ir.Function) ?ErrorUnionCatchBranchRetu
         .false_block = false_block,
         .false_value = false_value,
     };
+}
+
+fn errorUnionCatchCallReturn(function: ir.Function) ?ErrorUnionCatchCallReturn {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 3) return null;
+    const entry = function.blocks.items[0];
+    const entry_condbr = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_condbr.cond_ty.eql(.{ .int = 1 })) return null;
+    const call_name = errorUnionTryGuardCallResult(entry, entry_condbr.cond) orelse return null;
+    const call_instruction = findInstruction(entry, call_name) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI64Call(call) or call.args.items.len != 2) return null;
+
+    const then_block = function.blocks.items[blockIndex(function, entry_condbr.then_target) orelse return null];
+    const else_block = function.blocks.items[blockIndex(function, entry_condbr.else_target) orelse return null];
+    const then_payload_return = errorUnionPayloadI32Return(function, then_block, call_name);
+    const else_payload_return = errorUnionPayloadI32Return(function, else_block, call_name);
+    if ((then_payload_return != null) == (else_payload_return != null)) return null;
+    const payload_block = if (then_payload_return != null) then_block else else_block;
+    const catch_block = if (then_payload_return != null) else_block else then_block;
+    const payload_return = then_payload_return orelse else_payload_return.?;
+    const catch_call = catchErrorCallReturn(function, catch_block, call_name) orelse return null;
+    var live_param_reg: ?ArgReg = catch_call.live_param_reg;
+    if (!mergeLiveParam(&live_param_reg, errorUnionI32ReturnLiveParam(function, payload_block, payload_return))) return null;
+    if (!catchCallUsesOnlyExpectedBlocks(function, entry.name, payload_block.name, catch_block.name)) return null;
+
+    return .{
+        .entry = entry,
+        .call_name = call_name,
+        .call = call,
+        .payload_block = payload_block,
+        .payload_return = payload_return,
+        .catch_block = catch_block,
+        .catch_call = catch_call.call,
+        .live_param_reg = live_param_reg orelse return null,
+    };
+}
+
+const CatchErrorCallReturn = struct {
+    call: ir.CallInst,
+    live_param_reg: ArgReg,
+};
+
+fn catchErrorCallReturn(function: ir.Function, block: ir.BasicBlock, call_name: []const u8) ?CatchErrorCallReturn {
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return null;
+    const call_result = switch (ret.value orelse return null) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const call_instruction = findInstruction(block, call_result) orelse return null;
+    const call = switch (call_instruction.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!supportsDirectI16I32ToI32Call(call) or call.args.items.len != 2) return null;
+
+    var error_arg_count: usize = 0;
+    var live_param_reg: ?ArgReg = null;
+    for (call.args.items) |arg| {
+        if (arg.ty.eql(.{ .int = 16 }) and errorTagValueFromCallResult(block, arg.value, call_name)) {
+            error_arg_count += 1;
+            continue;
+        }
+        if (!arg.ty.eql(.{ .int = 32 })) return null;
+        const reg = switch (arg.value) {
+            .named => |name| paramReg(function, name, .{ .int = 32 }) catch return null,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+        };
+        if (live_param_reg != null and live_param_reg.? != reg) return null;
+        live_param_reg = reg;
+    }
+    if (error_arg_count != 1) return null;
+    return .{ .call = call, .live_param_reg = live_param_reg orelse return null };
+}
+
+fn catchCallUsesOnlyExpectedBlocks(function: ir.Function, entry: []const u8, payload: []const u8, catch_block: []const u8) bool {
+    for (function.blocks.items) |block| {
+        if (std.mem.eql(u8, block.name, entry) or
+            std.mem.eql(u8, block.name, payload) or
+            std.mem.eql(u8, block.name, catch_block))
+        {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+fn errorSetParamSwitchReturn(function: ir.Function) ?ErrorSetParamSwitchReturn {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len < 3) return null;
+    const entry = function.blocks.items[0];
+    const switch_term = blockSwitchTerminator(entry) orelse return null;
+    if (!switch_term.cond_ty.eql(.{ .int = 16 }) or switch_term.cases.items.len == 0 or switch_term.cases.items.len > 8) return null;
+    const cond_name = switch (switch_term.cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const tag_reg = paramReg(function, cond_name, .{ .int = 16 }) catch return null;
+
+    const merge_block = exhaustiveSwitchMergeBlock(function, switch_term) orelse return null;
+    const phi = firstPhiReturn(function, merge_block) orelse return null;
+    if (!phi.ty.eql(.{ .int = 32 })) return null;
+
+    var cases: [8]ErrorSetParamSwitchCase = undefined;
+    for (switch_term.cases.items, 0..) |case, case_index| {
+        if (!case.value_ty.eql(.{ .int = 16 })) return null;
+        const value_i32 = switch (case.value) {
+            .int => |int| i32Value(int) catch return null,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+        };
+        if (value_i32 < 0 or value_i32 > std.math.maxInt(u16)) return null;
+        const block = function.blocks.items[blockIndex(function, case.target) orelse return null];
+        if (!blockBranchesTo(block, merge_block.name)) return null;
+        cases[case_index] = .{
+            .value = @intCast(value_i32),
+            .block = block,
+            .incoming = phiIncomingForBlock(phi, block.name) orelse return null,
+        };
+    }
+    const default_block = function.blocks.items[blockIndex(function, switch_term.default_target) orelse return null];
+    if (!blockIsUnreachable(default_block)) return null;
+    if (!errorSetSwitchUsesAllBlocks(function, entry.name, default_block.name, merge_block.name, switch_term)) return null;
+    return .{
+        .entry = entry,
+        .tag_reg = tag_reg,
+        .cases = cases,
+        .case_count = switch_term.cases.items.len,
+        .default_block = default_block,
+        .merge_block = merge_block,
+    };
+}
+
+fn errorSetSwitchUsesAllBlocks(function: ir.Function, entry: []const u8, default_block: []const u8, merge_block: []const u8, switch_term: ir.SwitchTerminator) bool {
+    for (function.blocks.items) |block| {
+        if (std.mem.eql(u8, block.name, entry) or
+            std.mem.eql(u8, block.name, default_block) or
+            std.mem.eql(u8, block.name, merge_block))
+        {
+            continue;
+        }
+        var expected_case = false;
+        for (switch_term.cases.items) |case| {
+            if (std.mem.eql(u8, block.name, case.target)) {
+                expected_case = true;
+                break;
+            }
+        }
+        if (!expected_case) return false;
+    }
+    return true;
 }
 
 pub fn errorUnionPayloadI32Return(function: ir.Function, block: ir.BasicBlock, call_name: []const u8) ?ErrorUnionI32ReturnValue {
