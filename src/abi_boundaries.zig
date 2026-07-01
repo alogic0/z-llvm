@@ -13,6 +13,7 @@ pub const Category = enum {
     pointer_slice,
     tag_name,
     union_payload,
+    optional_error_mix,
 
     pub fn name(self: Category) []const u8 {
         return switch (self) {
@@ -27,6 +28,7 @@ pub const Category = enum {
             .pointer_slice => "pointer-slice",
             .tag_name => "tag-name",
             .union_payload => "union-payload",
+            .optional_error_mix => "optional-error-mix",
         };
     }
 
@@ -43,6 +45,7 @@ pub const Category = enum {
             .pointer_slice => "UnsupportedPointerSliceAbi",
             .tag_name => "UnsupportedTagNameBoundary",
             .union_payload => "UnsupportedUnionPayloadBoundary",
+            .optional_error_mix => "UnsupportedOptionalErrorMixBoundary",
         };
     }
 
@@ -59,6 +62,7 @@ pub const Category = enum {
             .pointer_slice => error.UnsupportedPointerSliceAbi,
             .tag_name => error.UnsupportedCodegenInstruction,
             .union_payload => error.UnsupportedCodegenControlFlow,
+            .optional_error_mix => error.UnsupportedCodegenControlFlow,
         };
     }
 };
@@ -75,6 +79,7 @@ pub const Counts = struct {
     pointer_slice_rows: usize = 0,
     tag_name_rows: usize = 0,
     union_payload_rows: usize = 0,
+    optional_error_mix_rows: usize = 0,
 
     pub fn add(self: *Counts, category: Category, amount: usize) void {
         switch (category) {
@@ -89,6 +94,7 @@ pub const Counts = struct {
             .pointer_slice => self.pointer_slice_rows += amount,
             .tag_name => self.tag_name_rows += amount,
             .union_payload => self.union_payload_rows += amount,
+            .optional_error_mix => self.optional_error_mix_rows += amount,
         }
     }
 
@@ -103,7 +109,8 @@ pub const Counts = struct {
             self.safety_edge_rows == other.safety_edge_rows and
             self.pointer_slice_rows == other.pointer_slice_rows and
             self.tag_name_rows == other.tag_name_rows and
-            self.union_payload_rows == other.union_payload_rows;
+            self.union_payload_rows == other.union_payload_rows and
+            self.optional_error_mix_rows == other.optional_error_mix_rows;
     }
 };
 
@@ -141,6 +148,7 @@ const source_boundaries = [_]SourceBoundary{
     .{ .source_fragment = "frontier_pointer_slice_boundary.zig", .category = .pointer_slice, .expected_rows = 2 },
     .{ .source_fragment = "frontier_tag_name_boundary.zig", .category = .tag_name, .expected_rows = 1 },
     .{ .source_fragment = "frontier_union_payload_boundary.zig", .category = .union_payload, .expected_rows = 1 },
+    .{ .source_fragment = "frontier_optional_error_mix_boundary.zig", .category = .optional_error_mix, .expected_rows = 2 },
 };
 
 fn sourceBoundary(source: []const u8) ?SourceBoundary {
@@ -155,7 +163,7 @@ pub fn expectedFrontierBoundarySummary() ExpectedSummary {
     for (source_boundaries) |boundary| counts.add(boundary.category, boundary.expected_rows);
     return .{
         .source_rows = source_boundaries.len,
-        .discovered_functions = 14,
+        .discovered_functions = 16,
         .counts = counts,
     };
 }
@@ -178,6 +186,8 @@ pub fn categoryForUnsupported(source: []const u8, diagnostic: air_lowering.Diagn
             diagnostic.reason == .control_flow_shape) or
             (std.mem.eql(u8, diagnostic.opcode, "lowering") and
                 diagnostic.reason == .instruction_type)) return .union_payload,
+        .optional_error_mix => if (std.mem.eql(u8, diagnostic.opcode, "cond_br") and
+            diagnostic.reason == .control_flow_shape) return .optional_error_mix,
         .packed_aggregate, .non_default_callconv, .safety_edge => {},
     }
     return null;
@@ -214,6 +224,7 @@ pub fn categoryForCodegenFailure(source: []const u8, err: anyerror) ?Category {
                 .safety_edge => .safety_edge,
                 .pointer_slice => .pointer_slice,
                 .union_payload => .union_payload,
+                .optional_error_mix => .optional_error_mix,
                 else => null,
             }
         else
@@ -253,6 +264,7 @@ test "frontier ABI boundary metadata names diagnostics" {
     try std.testing.expectEqualStrings("UnsupportedPointerSliceAbi", Category.pointer_slice.diagnosticName());
     try std.testing.expectEqualStrings("UnsupportedTagNameBoundary", Category.tag_name.diagnosticName());
     try std.testing.expectEqualStrings("UnsupportedUnionPayloadBoundary", Category.union_payload.diagnosticName());
+    try std.testing.expectEqualStrings("UnsupportedOptionalErrorMixBoundary", Category.optional_error_mix.diagnosticName());
 }
 
 test "frontier ABI boundary counts update by category" {
@@ -264,6 +276,7 @@ test "frontier ABI boundary counts update by category" {
     counts.add(.pointer_slice, 1);
     counts.add(.tag_name, 1);
     counts.add(.union_payload, 1);
+    counts.add(.optional_error_mix, 2);
 
     try std.testing.expectEqual(@as(usize, 2), counts.varargs_rows);
     try std.testing.expectEqual(@as(usize, 1), counts.callconv_rows);
@@ -272,6 +285,7 @@ test "frontier ABI boundary counts update by category" {
     try std.testing.expectEqual(@as(usize, 1), counts.pointer_slice_rows);
     try std.testing.expectEqual(@as(usize, 1), counts.tag_name_rows);
     try std.testing.expectEqual(@as(usize, 1), counts.union_payload_rows);
+    try std.testing.expectEqual(@as(usize, 2), counts.optional_error_mix_rows);
     try std.testing.expectEqual(@as(usize, 0), counts.vector_rows);
     try std.testing.expect(counts.eql(.{
         .varargs_rows = 2,
@@ -281,21 +295,23 @@ test "frontier ABI boundary counts update by category" {
         .pointer_slice_rows = 1,
         .tag_name_rows = 1,
         .union_payload_rows = 1,
+        .optional_error_mix_rows = 2,
     }));
 }
 
 test "frontier ABI boundary expected summary is registry-owned" {
     const expected = expectedFrontierBoundarySummary();
-    try std.testing.expectEqual(@as(usize, 9), expected.source_rows);
-    try std.testing.expectEqual(@as(usize, 14), expected.discovered_functions);
+    try std.testing.expectEqual(@as(usize, 10), expected.source_rows);
+    try std.testing.expectEqual(@as(usize, 16), expected.discovered_functions);
     try std.testing.expectEqual(@as(usize, 2), expected.counts.varargs_rows);
     try std.testing.expectEqual(@as(usize, 1), expected.counts.tail_call_rows);
     try std.testing.expectEqual(@as(usize, 0), expected.counts.safety_edge_rows);
     try std.testing.expectEqual(@as(usize, 2), expected.counts.pointer_slice_rows);
     try std.testing.expectEqual(@as(usize, 1), expected.counts.tag_name_rows);
     try std.testing.expectEqual(@as(usize, 1), expected.counts.union_payload_rows);
-    try std.testing.expect(expected.matches(9, 14, expected.counts));
-    try std.testing.expect(!expected.matches(9, 13, expected.counts));
+    try std.testing.expectEqual(@as(usize, 2), expected.counts.optional_error_mix_rows);
+    try std.testing.expect(expected.matches(10, 16, expected.counts));
+    try std.testing.expect(!expected.matches(10, 15, expected.counts));
 }
 
 test "frontier ABI boundary source row counts are explicit" {

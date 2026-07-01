@@ -754,8 +754,14 @@ Layer: semantic lowering and CFG lowering.
   non-null payload loads and null fallbacks. The same strict frontier proof in
   `tmp/frontier_optional_return.log` keeps these pointer optional rows
   object-emitted, native-linked, and executable across all three release modes.
-- [ ] Keep unsupported nested optional/error-union mixes fail-closed until
+- [x] Keep unsupported nested optional/error-union mixes fail-closed until
   modeled.
+  Completed by `frontier_optional_error_mix_boundary` in
+  `test/zig/frontier_boundaries/frontier_optional_error_mix_boundary.zig`.
+  The boundary gate now has a dedicated `optional-error-mix` category with
+  `optional_error_mix_boundary_rows=2`, `wrong_diagnostic_rows=0`, and
+  `local_fail=0` in `tmp/frontier_optional_mix_boundary.log`; accepted frontier
+  executable counters were not refreshed in this boundary-only cycle.
 - [ ] Refresh inventory and show the optional-shape bucket reduced.
 
 ### 7. Safety Runtime Paths

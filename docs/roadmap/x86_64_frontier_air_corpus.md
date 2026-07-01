@@ -363,8 +363,8 @@ Source-backed ABI and pointer/slice boundary proof is green for all three modes 
 `zig build distribution-air-release-frontier-boundaries`:
 
 ```text
-source_rows=9
-discovered_functions=14
+source_rows=10
+discovered_functions=16
 varargs_boundary_rows=2
 vector_boundary_rows=2
 x87_boundary_rows=2
@@ -376,6 +376,7 @@ safety_edge_boundary_rows=0
 pointer_slice_boundary_rows=2
 tag_name_boundary_rows=1
 union_payload_boundary_rows=1
+optional_error_mix_boundary_rows=2
 unexpected_accept_rows=0
 wrong_diagnostic_rows=0
 llvm_targetmachine_rows=0
