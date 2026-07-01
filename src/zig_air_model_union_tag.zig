@@ -4,10 +4,12 @@ const core = @import("zig_air_model_base.zig");
 const typed_recognizers = @import("zig_air_model_typed_recognizers.zig");
 
 pub const TypedUnionTagPayloadSwitchSummary = core.TypedUnionTagPayloadSwitchSummary;
+pub const TypedUnionTagPayloadBranchSummary = core.TypedUnionTagPayloadBranchSummary;
 pub const TypedUnionTagGetSummary = core.TypedUnionTagGetSummary;
 pub const TypedUnionTagSetSummary = core.TypedUnionTagSetSummary;
 pub const TypedUnionInitSummary = core.TypedUnionInitSummary;
 pub const typedUnionTagPayloadSwitchSummary = typed_recognizers.typedUnionTagPayloadSwitchSummary;
+pub const typedUnionTagPayloadBranchSummary = typed_recognizers.typedUnionTagPayloadBranchSummary;
 
 pub fn typedUnionInitSummary(instruction: air_export.TypedInstruction) ?TypedUnionInitSummary {
     if (!std.mem.eql(u8, instruction.opcode, "union_init")) return null;

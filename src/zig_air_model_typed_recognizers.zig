@@ -62,6 +62,7 @@ const IntegerSwitchArm = core.IntegerSwitchArm;
 const IntegerSwitchPlan = core.IntegerSwitchPlan;
 const PointerSliceAddressSummary = core.PointerSliceAddressSummary;
 const TypedUnionTagPayloadSwitchSummary = core.TypedUnionTagPayloadSwitchSummary;
+const TypedUnionTagPayloadBranchSummary = core.TypedUnionTagPayloadBranchSummary;
 const TypedOptionalPayloadBranchSummary = core.TypedOptionalPayloadBranchSummary;
 const TypedOptionalPayloadSummary = core.TypedOptionalPayloadSummary;
 const TypedOptionalPointerSummary = core.TypedOptionalPointerSummary;
@@ -264,6 +265,77 @@ pub fn typedUnionTagPayloadSwitchSummary(
     const tag1_store_add = typedConstAddFromBaseValue(structured_air_v2, tag1_store.operands[1], arg1) orelse return null;
     if (tag0_return_add == 0 or tag1_return_add == 0) return null;
     if (tag0_store_add == 0 and tag1_store_add == 0) return null;
+    return .{
+        .true_tag_index = branch_tags.true_tag_index,
+        .false_tag_index = branch_tags.false_tag_index,
+        .tag0_store_add = tag0_store_add,
+        .tag0_return_add = tag0_return_add,
+        .tag1_store_add = tag1_store_add,
+        .tag1_return_add = tag1_return_add,
+    };
+}
+
+pub fn typedUnionTagPayloadBranchSummary(
+    function_type: FunctionType,
+    structured_air: air_export.StructuredAir,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedUnionTagPayloadBranchSummary {
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return null;
+    }
+    if (typedOpcodeCount(structured_air_v2, "set_union_tag") != 2 or
+        typedOpcodeCount(structured_air_v2, "switch_br") != 0 or
+        typedOpcodeCount(structured_air_v2, "struct_field_val") != 0 or
+        typedStoreOpcodeCount(structured_air_v2) != 2 or
+        typedReturnOpcodeCount(structured_air_v2) != 2)
+    {
+        return null;
+    }
+
+    const construction_cond = typedConstructionCondBr(structured_air_v2) orelse return null;
+    const branch_tags = typedUnionBranchTagIndexes(structured_air, structured_air_v2, construction_cond.index) orelse return null;
+
+    const alloc = typedUnionSetTagAlloc(structured_air_v2) orelse return null;
+    if (!std.mem.startsWith(u8, alloc.result_type, "*")) return null;
+
+    const field_ptr0 = typedUnionFieldPtrFromBase(structured_air_v2, 0, alloc.index) orelse return null;
+    const field_ptr1 = typedUnionFieldPtrFromBase(structured_air_v2, 1, alloc.index) orelse return null;
+    const tag0_store = typedStoreToPointer(structured_air_v2, field_ptr0.index) orelse return null;
+    const tag1_store = typedStoreToPointer(structured_air_v2, field_ptr1.index) orelse return null;
+    if (tag0_store.operands.len != 2 or tag1_store.operands.len != 2) return null;
+
+    var saw_tag0 = false;
+    var saw_tag1 = false;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "set_union_tag")) continue;
+        if (instruction.operands.len != 2) return null;
+        if (typedInstOperandIndex(instruction.operands[0]) != alloc.index) return null;
+        const tag_index = typedDetailU32(instruction, "tag_index") orelse return null;
+        switch (tag_index) {
+            0 => saw_tag0 = true,
+            1 => saw_tag1 = true,
+            else => return null,
+        }
+    }
+    if (!saw_tag0 or !saw_tag1) return null;
+
+    const branch_source = typedUnionTagPayloadBranchSource(structured_air, structured_air_v2, alloc.index) orelse return null;
+    const tag_branch = branch_source.branch;
+    if (tag_branch.true_tag_index != 0 and tag_branch.true_tag_index != 1) return null;
+
+    const arg1 = typedNthI32ArgIndex(structured_air_v2, 1) orelse return null;
+    const tag0_store_add = typedConstAddFromBaseValue(structured_air_v2, tag0_store.operands[1], arg1) orelse return null;
+    const tag1_store_add = typedConstAddFromBaseValue(structured_air_v2, tag1_store.operands[1], arg1) orelse return null;
+    if (tag0_store_add == 0 and tag1_store_add == 0) return null;
+
+    const tag0_return_add = typedLoadedUnionFieldReturnAdd(structured_air_v2, branch_source.union_pointer_index, 0) orelse return null;
+    const tag1_return_add = typedLoadedUnionFieldReturnAdd(structured_air_v2, branch_source.union_pointer_index, 1) orelse return null;
+    if (tag0_return_add == 0 or tag1_return_add == 0) return null;
+
     return .{
         .true_tag_index = branch_tags.true_tag_index,
         .false_tag_index = branch_tags.false_tag_index,
@@ -1010,6 +1082,24 @@ fn typedUnionFieldPtr(structured_air_v2: air_export.StructuredAirV2, field_index
     return singleInstructionByOpcode(structured_air_v2, opcode);
 }
 
+fn typedUnionFieldPtrFromBase(
+    structured_air_v2: air_export.StructuredAirV2,
+    field_index: usize,
+    base_index: u32,
+) ?air_export.TypedInstruction {
+    var opcode_buffer: [64]u8 = undefined;
+    const opcode = std.fmt.bufPrint(&opcode_buffer, "struct_field_ptr_index_{}", .{field_index}) catch return null;
+    var found: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
+        if (instruction.operands.len != 1) return null;
+        if (typedInstOperandIndex(instruction.operands[0]) != base_index) continue;
+        if (found != null) return null;
+        found = instruction;
+    }
+    return found;
+}
+
 fn typedStoreToPointer(structured_air_v2: air_export.StructuredAirV2, pointer_index: u32) ?air_export.TypedInstruction {
     var found: ?air_export.TypedInstruction = null;
     for (structured_air_v2.instructions) |instruction| {
@@ -1020,6 +1110,21 @@ fn typedStoreToPointer(structured_air_v2: air_export.StructuredAirV2, pointer_in
         found = instruction;
     }
     return found;
+}
+
+fn typedUnionSetTagAlloc(structured_air_v2: air_export.StructuredAirV2) ?air_export.TypedInstruction {
+    var alloc_index: ?u32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "set_union_tag")) continue;
+        if (instruction.operands.len != 2) return null;
+        const pointer_index = typedInstOperandIndex(instruction.operands[0]) orelse return null;
+        if (alloc_index != null and alloc_index.? != pointer_index) return null;
+        alloc_index = pointer_index;
+    }
+    const index = alloc_index orelse return null;
+    const alloc = instructionByIndex(structured_air_v2, index) orelse return null;
+    if (!std.mem.eql(u8, alloc.opcode, "alloc")) return null;
+    return alloc;
 }
 
 fn typedUnionValueLoadedFromAlloc(
@@ -1035,6 +1140,161 @@ fn typedUnionValueLoadedFromAlloc(
         return load_pointer.operands.len == 1 and typedInstOperandIndex(load_pointer.operands[0]) == alloc_index;
     }
     return load_pointer_index == alloc_index;
+}
+
+fn typedUnionLoadedPointerFromAlloc(
+    structured_air_v2: air_export.StructuredAirV2,
+    value_index: u32,
+    alloc_index: u32,
+) ?u32 {
+    const load = instructionByIndex(structured_air_v2, value_index) orelse return null;
+    if (!std.mem.eql(u8, load.opcode, "load") or load.operands.len != 1) return null;
+    const load_pointer_index = typedInstOperandIndex(load.operands[0]) orelse return null;
+    const load_pointer = instructionByIndex(structured_air_v2, load_pointer_index) orelse return null;
+    if (std.mem.eql(u8, load_pointer.opcode, "bitcast")) {
+        if (load_pointer.operands.len != 1 or typedInstOperandIndex(load_pointer.operands[0]) != alloc_index) return null;
+        return load_pointer.index;
+    }
+    if (load_pointer_index == alloc_index) return alloc_index;
+    return null;
+}
+
+const TypedUnionTagCompareBranch = struct {
+    true_tag_index: u32,
+    cond_br_index: u32,
+};
+
+const TypedUnionTagPayloadBranchSource = struct {
+    union_pointer_index: u32,
+    branch: TypedUnionTagCompareBranch,
+};
+
+fn typedUnionTagPayloadBranchSource(
+    structured_air: air_export.StructuredAir,
+    structured_air_v2: air_export.StructuredAirV2,
+    alloc_index: u32,
+) ?TypedUnionTagPayloadBranchSource {
+    var found: ?TypedUnionTagPayloadBranchSource = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "get_union_tag")) continue;
+        if (instruction.operands.len != 1) return null;
+        const union_value_index = typedInstOperandIndex(instruction.operands[0]) orelse return null;
+        const union_pointer_index = typedUnionLoadedPointerFromAlloc(structured_air_v2, union_value_index, alloc_index) orelse continue;
+        const branch = typedUnionTagCompareBranch(structured_air, structured_air_v2, instruction.index) orelse continue;
+        if (found != null) return null;
+        found = .{ .union_pointer_index = union_pointer_index, .branch = branch };
+    }
+    return found;
+}
+
+fn typedUnionTagCompareBranch(
+    structured_air: air_export.StructuredAir,
+    structured_air_v2: air_export.StructuredAirV2,
+    get_tag_index: u32,
+) ?TypedUnionTagCompareBranch {
+    var found: ?TypedUnionTagCompareBranch = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "cmp_eq")) continue;
+        if (instruction.operands.len != 2) continue;
+        if (typedInstOperandIndex(instruction.operands[0]) != get_tag_index) continue;
+        const cond_br_index = typedCondBrUsingCondition(structured_air_v2, instruction.index) orelse return null;
+        if (!typedCondBrHasReturnBody(structured_air, structured_air_v2, cond_br_index)) continue;
+        const rhs_text = operandTextDetail(instruction, 1) orelse return null;
+        const tag_index = typedUnionTagIndexForConstText(structured_air_v2, rhs_text) orelse return null;
+        if (found != null) return null;
+        found = .{ .true_tag_index = tag_index, .cond_br_index = cond_br_index };
+    }
+    return found;
+}
+
+fn typedCondBrUsingCondition(
+    structured_air_v2: air_export.StructuredAirV2,
+    condition_index: u32,
+) ?u32 {
+    var found: ?u32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "cond_br")) continue;
+        if (instruction.operands.len != 1) return null;
+        if (typedInstOperandIndex(instruction.operands[0]) != condition_index) continue;
+        if (found != null) return null;
+        found = instruction.index;
+    }
+    return found;
+}
+
+fn typedCondBrHasReturnBody(
+    structured_air: air_export.StructuredAir,
+    structured_air_v2: air_export.StructuredAirV2,
+    cond_br_index: u32,
+) bool {
+    const then_body = structured_air.body(.then_body, cond_br_index) orelse return false;
+    if (typedBodyHasReturn(structured_air_v2, then_body)) return true;
+    const else_body = structured_air.body(.else_body, cond_br_index) orelse return false;
+    return typedBodyHasReturn(structured_air_v2, else_body);
+}
+
+fn typedBodyHasReturn(
+    structured_air_v2: air_export.StructuredAirV2,
+    body: air_export.StructuredBody,
+) bool {
+    for (body.instructions) |instruction_index| {
+        const instruction = instructionByIndex(structured_air_v2, instruction_index) orelse continue;
+        if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) return true;
+    }
+    return false;
+}
+
+fn typedUnionTagIndexForConstText(
+    structured_air_v2: air_export.StructuredAirV2,
+    text: []const u8,
+) ?u32 {
+    var found: ?u32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "set_union_tag")) continue;
+        if (instruction.operands.len != 2) return null;
+        const tag_text = operandTextDetail(instruction, 1) orelse return null;
+        if (!std.mem.eql(u8, tag_text, text)) continue;
+        const tag_index = typedDetailU32(instruction, "tag_index") orelse return null;
+        if (found != null and found.? != tag_index) return null;
+        found = tag_index;
+    }
+    return found;
+}
+
+fn typedLoadedUnionFieldReturnAdd(
+    structured_air_v2: air_export.StructuredAirV2,
+    union_pointer_index: u32,
+    field_index: usize,
+) ?i32 {
+    const field_ptr = typedUnionFieldPtrFromBase(structured_air_v2, field_index, union_pointer_index) orelse return null;
+    const load = typedLoadFromPointer(structured_air_v2, field_ptr.index) orelse return null;
+    const add = typedAddConstInstructionUsing(structured_air_v2, load.index) orelse return null;
+    if (!typedReturnUsesValue(structured_air_v2, add.index)) return null;
+    return add.addend;
+}
+
+fn typedLoadFromPointer(
+    structured_air_v2: air_export.StructuredAirV2,
+    pointer_index: u32,
+) ?air_export.TypedInstruction {
+    var found: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "load")) continue;
+        if (instruction.operands.len != 1) continue;
+        if (typedInstOperandIndex(instruction.operands[0]) != pointer_index) continue;
+        if (found != null) return null;
+        found = instruction;
+    }
+    return found;
+}
+
+fn typedReturnUsesValue(structured_air_v2: air_export.StructuredAirV2, value_index: u32) bool {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "ret") and !std.mem.eql(u8, instruction.opcode, "ret_safe")) continue;
+        if (instruction.operands.len != 1) continue;
+        if (typedInstOperandIndex(instruction.operands[0]) == value_index) return true;
+    }
+    return false;
 }
 
 const TypedConstAddResult = struct {
@@ -1088,6 +1348,17 @@ fn typedConditionIsFirstArgEqZero(
     const arg0 = typedNthI32ArgIndex(structured_air_v2, 0) orelse return false;
     return typedInstOperandIndex(condition.operands[0]) == arg0 and
         (typedConstI32Operand(condition, 1) orelse return false) == 0;
+}
+
+fn typedConstructionCondBr(structured_air_v2: air_export.StructuredAirV2) ?air_export.TypedInstruction {
+    var found: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "cond_br")) continue;
+        if (!typedConditionIsFirstArgEqZero(structured_air_v2, instruction)) continue;
+        if (found != null) return null;
+        found = instruction;
+    }
+    return found;
 }
 
 fn typedAddConstInstructionUsing(structured_air_v2: air_export.StructuredAirV2, operand_index: u32) ?TypedConstAddResult {

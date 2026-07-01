@@ -15,7 +15,26 @@ pub fn lowerTypedV2UnionTagPayloadSwitch(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     const summary = air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2) orelse return null;
+    return lowerTypedV2UnionTagPayloadSummary(allocator, air_function, function_type, summary);
+}
 
+pub fn lowerTypedV2UnionTagPayloadBranch(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air: air_export.StructuredAir,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const summary = air_model.typedUnionTagPayloadBranchSummary(function_type, structured_air, structured_air_v2) orelse return null;
+    return lowerTypedV2UnionTagPayloadSummary(allocator, air_function, function_type, summary);
+}
+
+fn lowerTypedV2UnionTagPayloadSummary(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    summary: air_model.TypedUnionTagPayloadSwitchSummary,
+) !?ir.Function {
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
@@ -91,6 +110,14 @@ pub fn typedV2UnionTagPayloadSwitchRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     return air_model.typedUnionTagPayloadSwitchSummary(function_type, structured_air, structured_air_v2) != null;
+}
+
+pub fn typedV2UnionTagPayloadBranchRecords(
+    function_type: FunctionType,
+    structured_air: air_export.StructuredAir,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return air_model.typedUnionTagPayloadBranchSummary(function_type, structured_air, structured_air_v2) != null;
 }
 
 fn unionTagResultName(tag_index: u32) ?[]const u8 {

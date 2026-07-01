@@ -68,6 +68,7 @@ pub const IntegerSwitchPlan = model_base.IntegerSwitchPlan;
 
 pub const PointerSliceAddressSummary = pointer_slice_model.PointerSliceAddressSummary;
 pub const TypedUnionTagPayloadSwitchSummary = union_tag_model.TypedUnionTagPayloadSwitchSummary;
+pub const TypedUnionTagPayloadBranchSummary = union_tag_model.TypedUnionTagPayloadBranchSummary;
 pub const TypedUnionInitSummary = union_tag_model.TypedUnionInitSummary;
 pub const TypedUnionTagGetSummary = union_tag_model.TypedUnionTagGetSummary;
 pub const TypedUnionTagSetSummary = union_tag_model.TypedUnionTagSetSummary;
@@ -204,6 +205,7 @@ pub const instructionByIndex = model_base.instructionByIndex;
 pub const singleInstructionByOpcode = model_base.singleInstructionByOpcode;
 
 pub const typedUnionTagPayloadSwitchSummary = union_tag_model.typedUnionTagPayloadSwitchSummary;
+pub const typedUnionTagPayloadBranchSummary = union_tag_model.typedUnionTagPayloadBranchSummary;
 pub const typedUnionInitSummary = union_tag_model.typedUnionInitSummary;
 pub const typedUnionTagSetSummary = union_tag_model.typedUnionTagSetSummary;
 pub const typedUnionTagGetSummary = union_tag_model.typedUnionTagGetSummary;

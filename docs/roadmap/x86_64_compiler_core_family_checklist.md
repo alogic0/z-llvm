@@ -629,7 +629,20 @@ Layer: semantic lowering and CFG lowering.
   `frontier_frontier_union_tags.c`. Saved evidence:
   `tmp/frontier_union_init.log` reports all three release modes at
   `generic_cfg_functions=731`, `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower branch over a union tag.
+- [x] Lower branch over a union tag.
+
+  Branch-over-tag ownership is now covered by
+  `TypedUnionTagPayloadBranchSummary`. The model proves the constructor
+  branch writes one of two union tags, then proves a later `cmp_eq` over
+  `get_union_tag` feeds a real return-bearing `cond_br`. ReleaseSafe's cold
+  inactive-field guard blocks are accepted only when the same loaded union/tag
+  data-flow proves the hot payload access is coherent. The source-backed row
+  `frontier_union_tag_branch` in `frontier_union_tags.zig` checks both arms
+  through the C ABI harness. Saved strict frontier evidence:
+  `tmp/frontier_union_tag_branch.log` reports all three release modes at
+  `source_rows=14`, `discovered_functions=732`,
+  `generic_cfg_functions=732`, `object_emitted_functions=732`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Prove one tag-only executable row.
 - [ ] Prove one tag-plus-payload executable row.
 - [ ] Keep unsupported payload layouts and inactive-payload reads fail-closed.

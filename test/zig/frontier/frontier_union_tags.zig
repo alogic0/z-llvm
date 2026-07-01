@@ -50,3 +50,10 @@ export fn frontier_union_init_tag_only(flag: i32, value: i32) i32 {
     const tag = @as(@typeInfo(WideTagValue).@"union".tag_type.?, tagged);
     return @intFromEnum(tag) + 41;
 }
+
+export fn frontier_union_tag_branch(flag: i32, value: i32) i32 {
+    const tagged: TaggedValue = if (flag == 0) .{ .small = value + 6 } else .{ .large = value + 8 };
+    const tag = @as(@typeInfo(TaggedValue).@"union".tag_type.?, tagged);
+    if (tag == .small) return tagged.small + 3;
+    return tagged.large + 5;
+}

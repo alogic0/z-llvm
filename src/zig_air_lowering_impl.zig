@@ -129,6 +129,7 @@ const typedV2RuntimePointerLoadStoreMainRecords = typed_v2.typedV2RuntimePointer
 const typedV2MixCAddMayPanicRecords = typed_v2.typedV2MixCAddMayPanicRecords;
 const typedV2CheckedIntFromFloatRecords = typed_v2.typedV2CheckedIntFromFloatRecords;
 const typedV2UnionTagPayloadSwitchRecords = typed_v2.typedV2UnionTagPayloadSwitchRecords;
+const typedV2UnionTagPayloadBranchRecords = typed_v2.typedV2UnionTagPayloadBranchRecords;
 const lowerTypedV2ArraySum = legacy.lowerTypedV2ArraySum;
 const lowerTypedV2AggregatePairAbi = legacy.lowerTypedV2AggregatePairAbi;
 const lowerTypedV2SmallIntegerAggregateAbi = typed_v2.lowerTypedV2SmallIntegerAggregateAbi;
@@ -154,6 +155,7 @@ const lowerTypedV2RuntimePointerLoadStoreMain = typed_v2.lowerTypedV2RuntimePoin
 const lowerTypedV2MixCAddMayPanic = typed_v2.lowerTypedV2MixCAddMayPanic;
 const lowerTypedV2CheckedIntFromFloat = typed_v2.lowerTypedV2CheckedIntFromFloat;
 const lowerTypedV2UnionTagPayloadSwitch = typed_v2.lowerTypedV2UnionTagPayloadSwitch;
+const lowerTypedV2UnionTagPayloadBranch = typed_v2.lowerTypedV2UnionTagPayloadBranch;
 
 const lowerErrorClassify = typed_v2_fallbacks.lowerErrorClassify;
 const lowerErrorSwitch = typed_v2_fallbacks.lowerErrorSwitch;
@@ -417,6 +419,14 @@ pub fn firstUnsupported(
                 false
         else
             false;
+    const typed_union_tag_payload_branch =
+        if (function.structured_air) |structured_air|
+            if (function.structured_air_v2) |structured_air_v2|
+                typedV2UnionTagPayloadBranchRecords(function_type, structured_air, structured_air_v2)
+            else
+                false
+        else
+            false;
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
@@ -446,6 +456,7 @@ pub fn firstUnsupported(
         mixCAddMayPanicShape(function) or
         typed_checked_int_from_float or
         typed_union_tag_payload_switch or
+        typed_union_tag_payload_branch or
         typed_maybe_error)
     {
         return null;
@@ -738,6 +749,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2UnionTagPayloadSwitch(allocator, air_function, function_type, structured_air, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2UnionTagPayloadBranch(allocator, air_function, function_type, structured_air, structured_air_v2)) |function| {
         return function;
     }
 

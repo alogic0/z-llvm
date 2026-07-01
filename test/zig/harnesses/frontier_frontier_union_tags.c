@@ -3,6 +3,7 @@ extern int z_frontier_union_tag_reversed_arms(int, int) __asm__("frontier_union_
 extern int z_frontier_union_tag_small_payload_add(int, int) __asm__("frontier_union_tags.frontier_union_tag_small_payload_add");
 extern int z_frontier_union_tag_reordered_fields(int, int) __asm__("frontier_union_tags.frontier_union_tag_reordered_fields");
 extern int z_frontier_union_init_tag_only(int, int) __asm__("frontier_union_tags.frontier_union_init_tag_only");
+extern int z_frontier_union_tag_branch(int, int) __asm__("frontier_union_tags.frontier_union_tag_branch");
 
 int main(void) {
     if (z_frontier_union_tag_match(0, 35) != 42) return 1;
@@ -15,5 +16,7 @@ int main(void) {
     if (z_frontier_union_tag_reordered_fields(1, 26) != 42) return 8;
     if (z_frontier_union_init_tag_only(0, 9) != 41) return 9;
     if (z_frontier_union_init_tag_only(1, 9) != 42) return 10;
+    if (z_frontier_union_tag_branch(0, 33) != 42) return 11;
+    if (z_frontier_union_tag_branch(1, 29) != 42) return 12;
     return 0;
 }

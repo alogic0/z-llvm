@@ -1047,7 +1047,9 @@ pub fn lowerTypedV2CheckedIntFromFloat(
 }
 
 pub const lowerTypedV2UnionTagPayloadSwitch = typed_v2_union_tag.lowerTypedV2UnionTagPayloadSwitch;
+pub const lowerTypedV2UnionTagPayloadBranch = typed_v2_union_tag.lowerTypedV2UnionTagPayloadBranch;
 pub const typedV2UnionTagPayloadSwitchRecords = typed_v2_union_tag.typedV2UnionTagPayloadSwitchRecords;
+pub const typedV2UnionTagPayloadBranchRecords = typed_v2_union_tag.typedV2UnionTagPayloadBranchRecords;
 
 pub fn normalizedFpLiteralText(module: *ir.Module, text: []const u8) ![]const u8 {
     if (std.mem.indexOfAny(u8, text, ".eExX") != null) return ownPrint(module, "{s}", .{text});
