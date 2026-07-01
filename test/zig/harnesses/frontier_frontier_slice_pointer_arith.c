@@ -32,6 +32,8 @@ extern int z_frontier_slice_ptr_load(const int *, unsigned long, unsigned long) 
 extern int z_frontier_slice_elem_ptr_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_elem_ptr_load");
 extern int z_frontier_slice_elem_ptr_store(int *, unsigned long, unsigned long, int) __asm__("frontier_slice_pointer_arith.frontier_slice_elem_ptr_store");
 extern int z_frontier_array_pointer_slice_load(const int (*)[4], unsigned long) __asm__("frontier_slice_pointer_arith.frontier_array_pointer_slice_load");
+extern unsigned long z_frontier_array_to_slice_len(const int (*)[4]) __asm__("frontier_slice_pointer_arith.frontier_array_to_slice_len");
+extern int z_frontier_array_to_slice_runtime_load(const int (*)[4], unsigned long) __asm__("frontier_slice_pointer_arith.frontier_array_to_slice_runtime_load");
 extern int z_frontier_slice_ptr_const_runtime_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_slice_ptr_const_runtime_load");
 extern int z_frontier_slice_ptr_const_runtime_store(int *, unsigned long, unsigned long, int) __asm__("frontier_slice_pointer_arith.frontier_slice_ptr_const_runtime_store");
 extern int z_frontier_checked_slice_elem_ptr_load(const int *, unsigned long, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_checked_slice_elem_ptr_load");
@@ -93,6 +95,8 @@ int main(void) {
     if (z_frontier_slice_elem_ptr_store(mutable_values, 5, 3, 19) != 19) return 12;
     if (mutable_values[3] != 19) return 13;
     if (z_frontier_array_pointer_slice_load((const int (*)[4])values, 3) != 13) return 44;
+    if (z_frontier_array_to_slice_len((const int (*)[4])values) != 4UL) return 48;
+    if (z_frontier_array_to_slice_runtime_load((const int (*)[4])values, 2) != 8) return 49;
     if (z_frontier_ptr_add_load_u8(bytes, 2) != 19) return 14;
     if (z_frontier_ptr_add_load_u16(shorts, 1) != 29) return 15;
     if (z_frontier_ptr_add_load_u64(longs, 3) != 404ULL) return 16;

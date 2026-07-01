@@ -429,9 +429,9 @@ Layer: aggregate semantic lowering.
   source-backed proof is `frontier_slice_len_from_ptr` in
   `frontier_slice_pointer_arith.zig`, where a pointer/length slice is
   constructed and `.len` is returned through the C executable harness. Strict
-  frontier evidence in `tmp/frontier_pointer_branch_merge.log` reports all
-  three release modes at `generic_cfg_functions=724`,
-  `object_emitted_functions=724`, `executable_ok_rows=14`, and `local_fail=0`.
+  frontier evidence in `tmp/frontier_array_to_slice.log` reports all three
+  release modes at `generic_cfg_functions=726`,
+  `object_emitted_functions=726`, `executable_ok_rows=14`, and `local_fail=0`.
   The refreshed ReleaseFast compiler-core-module inventory,
   `tmp/compiler_core_module_releasefast_after_pointer_slice724.log`, still
   reports raw `slice_len count=13774`, but the only current
@@ -443,9 +443,18 @@ Layer: aggregate semantic lowering.
   and consume them through `.len`, `.ptr`, element load/store, checked element
   access, and internal Zig slice-ABI helper calls. The refreshed ReleaseFast
   compiler-core-module inventory reports raw `slice count=10901`, while the
-  current `aggregate-shape` unknown bucket remains only
-  `array_to_slice:ty_op`.
-- [ ] Lower `array_to_slice`.
+  previous `aggregate-shape` unknown bucket was `array_to_slice:ty_op`.
+- [x] Lower `array_to_slice`.
+
+  `array_to_slice` is now a model-owned pointer aggregate semantic op and
+  lowers typed-v2 pointer-to-array operands into the shared `{ ptr, i64 }`
+  slice aggregate. `frontier_array_to_slice_len` proves the derived length and
+  `frontier_array_to_slice_runtime_load` proves runtime-index load through the
+  resulting slice. The strict frontier gate
+  `tmp/frontier_array_to_slice.log` reports all three release modes at
+  `source_rows=14`, `discovered_functions=726`,
+  `generic_cfg_functions=726`, `object_emitted_functions=726`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower aggregate construction from typed operands.
 - [ ] Lower aggregate projection from typed operands.
 - [ ] Prove source-backed slice construction.

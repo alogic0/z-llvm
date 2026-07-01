@@ -20,6 +20,7 @@ pub fn lowerTypedPointerAggregateSemanticInstruction(
 ) !bool {
     switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
         .slice => try self.lowerTypedSlice(instruction),
+        .array_to_slice => try self.lowerTypedArrayToSlice(instruction),
         .slice_ptr => try self.lowerTypedSlicePtr(instruction),
         .slice_ptr_ptr => try self.lowerTypedSlicePtrPtr(instruction),
         .slice_elem_ptr => try self.lowerTypedSliceElemPtr(instruction),
@@ -61,6 +62,44 @@ pub fn lowerTypedSlice(self: anytype, instruction: air_export.TypedInstruction) 
             .aggregate = .{ .named = ptr_name },
             .value_ty = .{ .int = 64 },
             .value = len.value,
+            .indices = "1",
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedArrayToSlice(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const ptr = try self.resolveTypedOperand(instruction, 0);
+    if (ptr.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!result_type.ir_type.eql(.{ .aggregate = "{ ptr, i64 }" })) return air_model.LowerError.UnsupportedAir;
+
+    const array_len = air_types.arrayLengthFromTypeText(instruction.operands[0].type_text) orelse return air_model.LowerError.UnsupportedAir;
+    if (array_len > std.math.maxInt(i64)) return air_model.LowerError.UnsupportedAir;
+
+    const ptr_name = try ownPrint(self.module, "air{}_array_to_slice_ptr", .{instruction.index});
+    try self.block.instructions.append(self.allocator, .{
+        .result = ptr_name,
+        .kind = .{ .insertvalue = .{
+            .aggregate_ty = result_type.ir_type,
+            .aggregate = .undef,
+            .value_ty = .ptr,
+            .value = ptr.value,
+            .indices = "0",
+        } },
+    });
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .insertvalue = .{
+            .aggregate_ty = result_type.ir_type,
+            .aggregate = .{ .named = ptr_name },
+            .value_ty = .{ .int = 64 },
+            .value = .{ .int = @intCast(array_len) },
             .indices = "1",
         } },
     });

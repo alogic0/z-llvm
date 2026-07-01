@@ -32,6 +32,11 @@ pub fn pointerSliceAddressSummary(function: air_export.Function) ?PointerSliceAd
                 summary.slice_source_index = instruction.index;
                 updatePointerSliceAddressOperands(&summary, instruction);
             },
+            .array_to_slice => {
+                summary.array_to_slice_count += 1;
+                summary.slice_source_index = instruction.index;
+                updatePointerSliceAddressOperands(&summary, instruction);
+            },
             .slice_ptr => {
                 summary.slice_ptr_count += 1;
                 updatePointerSliceAddressOperands(&summary, instruction);
@@ -139,7 +144,7 @@ pub fn sliceSumSummary(function: air_export.Function) ?SliceSumSummary {
             .slice => slice = slice orelse instruction.index,
             .slice_elem_ptr => slice_elem_ptr = slice_elem_ptr orelse instruction.index,
             .slice_len_ptr => ptr_slice_len_ptr = ptr_slice_len_ptr orelse instruction.index,
-            .none, .runtime_nav_ptr, .array_elem_val, .field_ptr, .ptr_gep, .slice_ptr, .slice_ptr_ptr, .slice_len => {},
+            .none, .runtime_nav_ptr, .array_to_slice, .array_elem_val, .field_ptr, .ptr_gep, .slice_ptr, .slice_ptr_ptr, .slice_len => {},
         }
         if (loop == null and std.mem.eql(u8, instruction.opcode, "loop")) {
             loop = instruction.index;

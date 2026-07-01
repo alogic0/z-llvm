@@ -151,6 +151,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedPointerAggregateSemanticInstruction =
         typed_pointer_aggregate.lowerTypedPointerAggregateSemanticInstruction;
     pub const lowerTypedSlice = typed_pointer_aggregate.lowerTypedSlice;
+    pub const lowerTypedArrayToSlice = typed_pointer_aggregate.lowerTypedArrayToSlice;
     pub const lowerTypedSliceLenPtr = typed_pointer_aggregate.lowerTypedSliceLenPtr;
     pub const lowerTypedSlicePtr = typed_pointer_aggregate.lowerTypedSlicePtr;
     pub const lowerTypedSliceLen = typed_pointer_aggregate.lowerTypedSliceLen;
@@ -223,7 +224,7 @@ pub const LoweringContext = struct {
         switch (air_capabilities.pointerAggregateSemanticOpForOpcode(instruction.opcode)) {
             .runtime_nav_ptr => try self.lowerRuntimeNavPtr(instruction),
             .array_elem_val => try self.lowerArrayElemVal(instruction),
-            .slice, .slice_ptr, .slice_ptr_ptr, .slice_elem_ptr, .slice_len, .slice_len_ptr, .ptr_gep, .field_ptr, .none => return false,
+            .slice, .array_to_slice, .slice_ptr, .slice_ptr_ptr, .slice_elem_ptr, .slice_len, .slice_len_ptr, .ptr_gep, .field_ptr, .none => return false,
         }
         return true;
     }

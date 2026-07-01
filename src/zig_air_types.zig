@@ -190,6 +190,19 @@ pub fn parseZigArrayType(trimmed: []const u8) ?ZigType {
     return .{ .ir_type = .{ .aggregate = aggregate_text } };
 }
 
+pub fn arrayLengthFromTypeText(text: []const u8) ?u64 {
+    const trimmed = std.mem.trim(u8, text, " ");
+    const array_text = if (isPointerType(trimmed))
+        pointerChildText(trimmed) orelse return null
+    else
+        trimmed;
+    if (array_text.len < 4 or array_text[0] != '[') return null;
+    const close_index = std.mem.indexOfScalar(u8, array_text, ']') orelse return null;
+    const count_text = array_text[1..close_index];
+    if (std.mem.indexOfScalar(u8, count_text, ':') != null) return null;
+    return std.fmt.parseInt(u64, count_text, 10) catch null;
+}
+
 pub fn pointerLoadResultType(text: []const u8) ?ZigType {
     const child_text = pointerChildText(std.mem.trim(u8, text, " ")) orelse return null;
     return parseZigType(child_text);
@@ -265,6 +278,14 @@ test "parse frontier BigN array-backed byval types generically" {
 
     const parsed = parseZigType("frontier_sysv_sret_byval.Big256") orelse return error.TestExpectedEqual;
     try std.testing.expectEqualStrings("{ [256 x i64] }", parsed.ir_type.aggregate);
+}
+
+test "parse array length from typed AIR array and pointer forms" {
+    try std.testing.expectEqual(@as(?u64, 4), arrayLengthFromTypeText("[4]i32"));
+    try std.testing.expectEqual(@as(?u64, 4096), arrayLengthFromTypeText("*[4096]u8"));
+    try std.testing.expectEqual(@as(?u64, 1), arrayLengthFromTypeText("*const [1][]const u8"));
+    try std.testing.expectEqual(@as(?u64, null), arrayLengthFromTypeText("*const [4:0]u8"));
+    try std.testing.expectEqual(@as(?u64, null), arrayLengthFromTypeText("[]const u8"));
 }
 
 test "classify error union type text and payload type" {
