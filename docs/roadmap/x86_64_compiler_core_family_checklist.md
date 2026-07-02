@@ -895,7 +895,17 @@ Layer: safety-edge CFG and runtime boundary.
 
 Layer: semantic lowering and backend.
 
-- [ ] Broaden `byte_swap` beyond selected widths if inventory still shows it.
+- [x] Broaden `byte_swap` beyond selected widths if inventory still shows it.
+  The selected scalar byte-swap frontier already covers u16/u32/u64 through
+  typed-v2 scalar facts and x86_64 lowering. The latest ReleaseSafe
+  compiler-core inventory
+  `tmp/compiler_core_module_releasesafe_after_safety_runtime.log` shows
+  `opcode name=byte_swap count=760` as a normal opcode count, not a
+  `top_unknown_opcode_pair`; the older ReleaseFast
+  `scalar-transform:byte_swap:ty_op` entry in
+  `tmp/compiler_core_module_releasefast_after_abs_hook_fix.log` is stale from
+  before the byte-swap ownership cycle. Vector byte-swap and aggregate
+  `@byteSwapAllFields` remain outside this scalar item.
 - [ ] Broaden `max` beyond selected signed `i32`.
 - [ ] Broaden `min` beyond selected signed `i32`.
 - [ ] Broaden `abs` beyond selected signed `i32`, with non-integer facts
