@@ -27,6 +27,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .max => try self.lowerTypedMax(instruction),
         .min => try self.lowerTypedMin(instruction),
         .abs => try self.lowerTypedAbs(instruction),
+        .clz => try self.lowerTypedClz(instruction),
         .none => return false,
     }
     return true;
@@ -352,6 +353,53 @@ pub fn lowerTypedAbs(self: anytype, instruction: air_export.TypedInstruction) !v
             .false_value = source.value,
         } },
     });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedClz(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    const result_bits = switch (result_type.ir_type) {
+        .int => |bits| bits,
+        else => return air_model.LowerError.UnsupportedAir,
+    };
+    if (!source.ty.ir_type.eql(.{ .int = 32 }) or result_type.signed or result_bits > 32) {
+        return air_model.LowerError.UnsupportedAir;
+    }
+
+    const wide_result_name = if (result_type.ir_type.eql(.{ .int = 32 }))
+        try self.resultName(instruction.index)
+    else
+        try ownPrint(self.module, "air{}_clz_i32", .{instruction.index});
+    var call: ir.CallInst = .{
+        .ret_ty = .{ .int = 32 },
+        .callee = "llvm.ctlz.i32",
+        .args = .empty,
+    };
+    errdefer call.deinit(self.allocator);
+    try call.args.append(self.allocator, .{ .ty = source.ty.ir_type, .value = source.value });
+    try call.args.append(self.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } });
+    try self.block.instructions.append(self.allocator, .{
+        .result = wide_result_name,
+        .kind = .{ .call = call },
+    });
+    const result_name = if (result_type.ir_type.eql(.{ .int = 32 })) wide_result_name else name: {
+        const narrowed_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = narrowed_name,
+            .kind = .{ .cast = .{
+                .op = .trunc,
+                .from_ty = .{ .int = 32 },
+                .value = .{ .named = wide_result_name },
+                .to_ty = result_type.ir_type,
+            } },
+        });
+        break :name narrowed_name;
+    };
     self.values[instruction.index] = .{
         .ty = result_type,
         .value = .{ .named = result_name },

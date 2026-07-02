@@ -145,6 +145,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgClzReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
@@ -346,6 +350,61 @@ fn lowerGenericCfgAbsReturn(
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 64 }) or !isNamed(select.cond, cmp_name)) return false;
     if (!isNamed(select.true_value, neg_name) or !isNamed(select.false_value, source_name)) return false;
     try machine.instructions.append(allocator, .abs_i64_rdi_rax);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn lowerGenericCfgClzReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(function.ret_ty) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1 and block.instructions.items.len != 3) return false;
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed) return false;
+    const call_result_name = call_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (block.instructions.items.len == 1) {
+        if (!std.mem.eql(u8, call_result_name, ret_name)) return false;
+    } else {
+        const trunc_inst = block.instructions.items[1];
+        const zext_inst = block.instructions.items[2];
+        if (trunc_inst.removed or zext_inst.removed) return false;
+        const trunc_name = trunc_inst.result orelse return false;
+        const zext_name = zext_inst.result orelse return false;
+        if (!std.mem.eql(u8, zext_name, ret_name)) return false;
+        const trunc = switch (trunc_inst.kind) {
+            .cast => |cast| cast,
+            else => return false,
+        };
+        if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 32 }) or !trunc.to_ty.eql(.{ .int = 6 }) or !isNamed(trunc.value, call_result_name)) return false;
+        const zext = switch (zext_inst.kind) {
+            .cast => |cast| cast,
+            else => return false,
+        };
+        if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 6 }) or !zext.to_ty.eql(.{ .int = 32 }) or !isNamed(zext.value, trunc_name)) return false;
+    }
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(call.callee, "llvm.ctlz.i32")) return false;
+    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 2) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 })) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[1].ty.eql(.{ .int = 1 })) return false;
+    if (!isInt(call.args.items[1].value, 0)) return false;
+    const source_name = switch (call.args.items[0].value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if ((try paramReg(function, source_name, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+    try machine.instructions.append(allocator, .clz_i32_edi_eax);
     try appendGenericCfgReturn(allocator, machine);
     return true;
 }

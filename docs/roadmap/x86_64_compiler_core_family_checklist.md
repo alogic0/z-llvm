@@ -939,7 +939,19 @@ Layer: semantic lowering and backend.
   `executable_ok_rows=14`, and `local_fail=0`. The earlier non-integer AIR
   `abs` hook guard keeps non-integer facts exported without crashing, while
   z_llvm lowering remains fail-closed for non-integer/vector forms.
-- [ ] Lower `clz`.
+- [x] Lower `clz`.
+  Added `frontier_mixed_numeric.frontier_clz_u32`, which lowers scalar
+  `@clz(u32)` through the typed-v2 `zllvm-clz-v1` `ty_op` contract. The Zig
+  result is `u6`, so z_llvm lowers the operation as `llvm.ctlz.i32` plus the
+  typed `trunc u32 -> u6` / `zext u6 -> u32` chain used by the source row.
+  x86_64 emits a reusable `clz_i32_edi_eax` sequence that returns 32 for zero
+  input. The C harness checks leading-zero counts for high-bit, low-bit, zero,
+  and mid-range values. Strict frontier evidence in
+  `tmp/frontier_clz_u32.log` reports ReleaseFast, ReleaseSafe, and ReleaseSmall
+  at `source_rows=14`, `discovered_functions=743`,
+  `generic_cfg_functions=743`, `object_emitted_functions=743`,
+  `executable_ok_rows=14`, and `local_fail=0`. Wider widths, vector forms, and
+  `ctz`/`popcount`/`bit_reverse` remain separate scalar-transform items.
 - [ ] Lower `ctz`.
 - [ ] Lower `popcount`.
 - [ ] Lower `bit_reverse`.

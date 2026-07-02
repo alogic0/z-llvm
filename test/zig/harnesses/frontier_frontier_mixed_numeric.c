@@ -12,6 +12,7 @@ extern int z_frontier_min_i32(int, int) __asm__("frontier_mixed_numeric.frontier
 extern unsigned int z_frontier_min_u32(unsigned int, unsigned int) __asm__("frontier_mixed_numeric.frontier_min_u32");
 extern unsigned int z_frontier_abs_i32(int) __asm__("frontier_mixed_numeric.frontier_abs_i32");
 extern unsigned long long z_frontier_abs_i64(long long) __asm__("frontier_mixed_numeric.frontier_abs_i64");
+extern unsigned int z_frontier_clz_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_clz_u32");
 int main(void) {
     if (z_frontier_mixed_float(1.5f, 2.25f) != 3.75f) return 1;
     if (z_frontier_double_roundtrip(9.0, 2.0) != 4.5) return 2;
@@ -35,5 +36,9 @@ int main(void) {
     if (z_frontier_abs_i64(0x123456789ll) != 0x123456789ull) return 20;
     if (z_frontier_abs_i64(-0x123456789ll) != 0x123456789ull) return 21;
     if (z_frontier_abs_i64(0) != 0ull) return 22;
+    if (z_frontier_clz_u32(0x80000000u) != 0u) return 23;
+    if (z_frontier_clz_u32(0x00000001u) != 31u) return 24;
+    if (z_frontier_clz_u32(0u) != 32u) return 25;
+    if (z_frontier_clz_u32(0x00f00000u) != 8u) return 26;
     return 0;
 }
