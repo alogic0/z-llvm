@@ -109,6 +109,15 @@ list and the visible record of progress. Evidence summaries under
   path (per-instruction selection, then liveness/pressure, then spills as
   real rows prove the need); `shape_recognizer_functions=0` held on the
   real-row gate.
+
+  Priority evidence (2026-07-02): the very first real row
+  (`math.raiseInvalid`, item 6, commit `9d591215`) regressed the captured
+  `control_flow_calls.call_chain` distribution row through a recognizer
+  conflict; the fix required reordering the recognizer chain plus a new
+  whole-function pre-pass. Each such ordering constraint is fragility debt.
+  If real-row fix cycles keep producing recognizer reorders or pre-pass
+  special cases, pull this item forward instead of continuing
+  recognizer-by-recognizer.
 - [ ] 16. ABI-level differential harness: same real function compiled by
   stock LLVM Zig and z_llvm behind a shared input-generating C harness;
   outputs, exit codes, and ReleaseSafe panic behavior compared; runs on
