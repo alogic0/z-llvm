@@ -526,6 +526,7 @@ pub fn emitGenericCfgTerminalI32ValueIntoEaxInScope(
                             .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
                             .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -try i32Value(int) }),
                             .@"and" => try machine.instructions.append(allocator, .{ .and_eax_imm32 = try i32BitPattern(int) }),
+                            .@"or" => try machine.instructions.append(allocator, .{ .or_eax_imm32 = try i32BitPattern(int) }),
                             .shl, .lshr => {
                                 const shift = try i32Value(int);
                                 if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;

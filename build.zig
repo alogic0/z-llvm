@@ -75,6 +75,7 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "distribution-linker-boundary", "Run linker/CRT ownership boundary gate", "tools/run_distribution_linker_boundary.zig");
     addToolStep(b, "distribution-aarch64-boundary", "Run AArch64 object target boundary gate", "tools/run_distribution_aarch64_object_boundary.zig");
     addToolStep(b, "distribution-all", "Run selected distribution gates, native-link proof/probe, and boundary gates", "tools/run_distribution_all_gates.zig");
+    addToolStepWithArgs(b, "distribution-real-rows", "Run ranked real compiler-core rows through staged replacement gate", "tools/run_distribution_real_rows.zig");
     addToolStep(b, "distribution-no-llvm", "Run the selected no-LLVM-codegen distribution subset", "tools/run_distribution_no_llvm_codegen_subset.zig");
     addToolStep(b, "distribution-boundary", "Run conservative distribution boundary gates", "tools/run_distribution_boundary_gates.zig");
     addToolStepWithArgs(b, "distribution-native-link", "Run selected native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig");

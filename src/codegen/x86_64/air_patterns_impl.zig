@@ -347,6 +347,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     var machine = MachineFunction.init(symbolName(function.name), function.ret_ty);
     errdefer machine.deinit(allocator);
 
+    if (try lowerSingleStackSlotCallFunction(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerGenericCfgSingleBlockSliceLen(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -1129,9 +1134,9 @@ pub fn lowerStraightLineReturn(
     switch (terminator) {
         .ret => |ret| {
             if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
+            if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try air_patterns_abi_bridge.lowerAggregatePairAbiFamilyReturn(allocator, machine, function, block, ret)) return;
             if (try air_patterns_fp_descriptor_rows.lowerDescriptorFpCheckMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try air_patterns_cfg.lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try air_patterns_cfg.lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
             if (try air_patterns_cfg.lowerRuntimePhiSelectReturn(allocator, machine, function, block, ret)) return;
@@ -1443,6 +1448,20 @@ pub fn lowerSelectedUmlFixSatI64Return(
     return true;
 }
 
+fn lowerSingleStackSlotCallFunction(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret);
+}
+
 pub fn lowerSingleStackSlotCallReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -1473,7 +1492,7 @@ pub fn lowerSingleStackSlotCallReturn(
         .alloca => |alloca| alloca,
         else => return false,
     };
-    if (!alloca.allocated_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+    if (!alloca.allocated_ty.eql(.{ .int = 32 })) return false;
 
     const store = switch (store_inst.kind) {
         .store => |store| store,
@@ -1500,7 +1519,7 @@ pub fn lowerSingleStackSlotCallReturn(
     const arg = call.args.items[0];
     if (!arg.ty.eql(.{ .int = 32 }) or !isNamed(arg.value, load_result)) return false;
 
-    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .sub_rsp_24);
     try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
         .frame_index = .slot0,
         .reg = store_reg,
@@ -1509,11 +1528,8 @@ pub fn lowerSingleStackSlotCallReturn(
         .reg = .rdi,
         .frame_index = .slot0,
     } });
-    try machine.instructions.append(allocator, .{ .direct_call = .{
-        .symbol = call.callee,
-        .ret_ty = call.ret_ty,
-    } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+    try machine.instructions.append(allocator, .add_rsp_24);
     try machine.instructions.append(allocator, .ret);
     return true;
 }

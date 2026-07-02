@@ -1,9 +1,9 @@
 	.text
 	.globl call_stack_slot
 call_stack_slot:
-	subq $8, %rsp
+	subq $24, %rsp
 	movl %edi, (%rsp)
 	movl (%rsp), %edi
 	callq callee
-	addq $8, %rsp
+	addq $24, %rsp
 	retq

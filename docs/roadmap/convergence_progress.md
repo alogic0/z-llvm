@@ -70,8 +70,14 @@ list and the visible record of progress. Evidence summaries under
 
   Closed by `docs/evidence/real_candidates_releasefast_v1.summary`, with
   candidate rows in `docs/evidence/real_candidates_releasefast_v1.tsv`.
-- [ ] 6. `distribution-real-rows --limit=1` gate exists and is wired into
+- [x] 6. `distribution-real-rows --limit=1` gate exists and is wired into
   `distribution-all`, reporting the staged `real_*` counters.
+
+  Closed by `docs/evidence/real_rows_limit1.summary`, which validates rank
+  1 (`../ziglang/src/main.zig/math.raiseInvalid`) through typed lowering,
+  x86_64 object emission, and native link in ReleaseFast, ReleaseSafe, and
+  ReleaseSmall. Execution is skipped for this row because the candidate is
+  marked `assumed_nondeterministic`.
 - [ ] 7. First real compiler-core function green through its applicable
   stages in all three release modes (expect multiple fix cycles; each fix
   cycle is its own commit, this box closes on the first green run).
@@ -138,11 +144,11 @@ summaries.
 
 | Counter | Value | Modes | Evidence | Denominator (candidate hash / selector / pin) |
 | --- | ---: | --- | --- | --- |
-| real_functions_lowered | - | - | - | - |
-| real_objects_emitted | - | - | - | - |
-| real_native_linked | - | - | - | - |
-| real_executed | - | - | - | - |
-| real_programs_ok | - | - | - | - |
+| real_functions_lowered | 1 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_objects_emitted | 1 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_native_linked | 1 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_programs_ok | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 | unsupported_functions (ReleaseFast, compiler-core-module) | 55479 | ReleaseFast | `docs/evidence/real_candidates_releasefast_v1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 
 Fixture-frontier counters (`generic_cfg_functions=753`,

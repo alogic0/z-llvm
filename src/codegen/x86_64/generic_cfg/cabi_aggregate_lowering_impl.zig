@@ -2353,6 +2353,21 @@ fn isTwoI32PairAggregate(ty: ir.Type) bool {
         leaves[1].offset == 4 and leaves[1].ty.eql(.{ .int = 32 });
 }
 
+fn isPairAggregateAllocaForSretCall(ty: ir.Type, call: ir.CallInst) bool {
+    if (isTwoI32PairAggregate(ty)) return true;
+    if (call.args.items.len == 0) return false;
+    const text = switch (ty) {
+        .aggregate => |aggregate_text| aggregate_text,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return false,
+    };
+    const attrs = call.args.items[0].attrs orelse return false;
+    const marker = "sret(";
+    const start = std.mem.indexOf(u8, attrs, marker) orelse return false;
+    const after_marker = attrs[start + marker.len ..];
+    const end = std.mem.indexOfScalar(u8, after_marker, ')') orelse return false;
+    return std.mem.eql(u8, text, after_marker[0..end]);
+}
+
 fn isSretPairSlotArg(arg: ir.CallArg, slot_name: []const u8) bool {
     return arg.ty.eql(.ptr) and callArgAttrsContain(arg, "sret(") and isNamed(arg.value, slot_name);
 }
@@ -2415,13 +2430,13 @@ pub fn lowerRuntimeAggregatePairMainReturn(
         .alloca => |alloca| alloca,
         else => return false,
     };
-    if (!isTwoI32PairAggregate(alloca.allocated_ty)) return false;
 
     const make_pair = switch (make_pair_inst.kind) {
         .call => |call| call,
         else => return false,
     };
     if (!isMakePairSretCall(make_pair, pair_slot_name)) return false;
+    if (!isPairAggregateAllocaForSretCall(alloca.allocated_ty, make_pair)) return false;
 
     const pair_first = switch (pair_first_inst.kind) {
         .call => |call| call,

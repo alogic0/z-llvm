@@ -86,6 +86,7 @@ pub fn emitGenericCfgI32ValueIntoEax(
                             .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
                             .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -try i32Value(int) }),
                             .@"and" => try machine.instructions.append(allocator, .{ .and_eax_imm32 = try i32BitPattern(int) }),
+                            .@"or" => try machine.instructions.append(allocator, .{ .or_eax_imm32 = try i32BitPattern(int) }),
                             .shl => {
                                 const shift = try i32Value(int);
                                 if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;

@@ -39,25 +39,27 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-02 after convergence-progress item 5:
+Stop state recorded 2026-07-02 after convergence-progress item 6:
 
-- Active convergence-progress item: 6,
-  `distribution-real-rows --limit=1` gate exists and is wired into
-  `distribution-all`.
-- Current staged `real_*` counters: unopened (`real_functions_lowered=-`,
-  `real_objects_emitted=-`, `real_native_linked=-`, `real_executed=-`,
-  `real_programs_ok=-`).
+- Active convergence-progress item: 7, first real compiler-core function
+  green through its applicable stages in all three release modes.
+- First failing real row: `-`.
+- First failing stage: `-`.
+- Current staged `real_*` counters: `real_functions_lowered=1`,
+  `real_objects_emitted=1`, `real_native_linked=1`, `real_executed=0`,
+  `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_releasefast_v1.tsv`,
   hash
   `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`,
   selector `real-candidate-selector-v1`, Zig pin
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
-- Current inventory counter:
-  `unsupported_functions (ReleaseFast, compiler-core-module)=55479`, cited
-  by `docs/evidence/real_candidates_releasefast_v1.summary`.
-- Recommended next action: implement item 6 using the ranked candidate file
-  as the denominator for the first `distribution-real-rows --limit=1` gate.
+- Saved log path: `tmp/real_rows_limit1.log`.
+- Tracked evidence summary: `docs/evidence/real_rows_limit1.summary`.
+- Recommended next action: validate and close item 7 with
+  `zig build distribution-real-rows -- --strict --limit=1`; if it stays
+  green in all three modes, switch strict mode on in `distribution-all` and
+  proceed to item 8 (`--limit=10`).
 
 When the worker stops, record only:
 

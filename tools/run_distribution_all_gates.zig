@@ -16,6 +16,7 @@ const tools = [_]Tool{
     .{ .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--pipeline=preopt"} },
     .{ .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--ir-writer"} },
     .{ .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--release-source-owned"} },
+    .{ .path = "tools/run_distribution_real_rows.zig", .args = &.{"--limit=1"} },
     .{ .path = "tools/run_native_link_object_inspection.zig", .args = &.{"--release-source-owned"} },
     .{ .path = "tools/run_distribution_native_link_m5.zig", .args = &.{"--release-source-owned"} },
     .{ .path = "tools/probe_native_linker_compatibility.zig", .args = &.{"--release-source-owned"} },
