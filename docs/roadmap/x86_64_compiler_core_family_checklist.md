@@ -1150,7 +1150,16 @@ Layer: ABI planner and backend.
   `generic_cfg_functions=753`, `object_emitted_functions=753`,
   `executable_ok_rows=14`, and `local_fail=0`; boundary evidence remains green
   in `tmp/frontier_vector_reduce_boundaries.log`.
-- [ ] Add fail-closed diagnostics for unsupported vector widths.
+- [x] Add fail-closed diagnostics for unsupported vector widths.
+
+  Added `frontier_vector_unsupported_width`, a scalar C ABI wrapper that
+  constructs a `@Vector(16, u8)` with `@splat` and reads lane 15. This keeps
+  exported vector ABI out of the accepted frontier while proving that
+  unsupported vector semantic widths fail closed as `UnsupportedVectorAbi`.
+  Saved boundary evidence:
+  `tmp/frontier_vector_width_boundaries.log` reports all three release modes at
+  `source_rows=10`, `discovered_functions=17`,
+  `vector_boundary_rows=3`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
 - [ ] Add fail-closed diagnostics for unsupported element types.
 - [ ] Prove one source-backed vector executable row if ABI-stable.
 - [ ] Otherwise prove object/native-link boundary diagnostics.

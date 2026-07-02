@@ -684,7 +684,7 @@ and stack-sourced Big40/Big48/Big64/Big80/Big81/Big96/Big128/Big160/Big192/Big22
 byval stack-copy tails through `[21 x i8]`, `[22 x i8]`, and `[23 x i8]`,
 source-backed fail-closed varargs/vector/X87/packed aggregate/tail-call/callconv boundary proof through
 `distribution-air-release-frontier-boundaries` with
-`varargs_boundary_rows=2`, `vector_boundary_rows=2`,
+`varargs_boundary_rows=2`, `vector_boundary_rows=3`,
 `x87_boundary_rows=2`, `packed_aggregate_boundary_rows=2`,
 `tail_call_boundary_rows=1`, `callconv_boundary_rows=1`,
 `stack_pressure_boundary_rows=0`, `safety_edge_boundary_rows=0`,
