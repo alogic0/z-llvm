@@ -141,6 +141,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgAbsReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
@@ -295,6 +299,53 @@ fn lowerGenericCfgByteSwapReturn(
         },
         else => unreachable,
     }
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn lowerGenericCfgAbsReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(function.ret_ty) or !ret.ty.eql(.{ .int = 64 })) return false;
+    if (block.instructions.items.len != 3) return false;
+    const cmp_inst = block.instructions.items[0];
+    const neg_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (cmp_inst.removed or neg_inst.removed or select_inst.removed) return false;
+    const cmp_name = cmp_inst.result orelse return false;
+    const neg_name = neg_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, select_name, ret_name)) return false;
+    const cmp = switch (cmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (cmp.predicate != .slt or !cmp.operand_ty.eql(.{ .int = 64 }) or !isInt(cmp.rhs, 0)) return false;
+    const source_name = switch (cmp.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if ((try paramReg(function, source_name, .{ .int = 64 })) != .rdi) return error.UnsupportedCodegenAbi;
+    const neg = switch (neg_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (neg.op != .sub or !neg.ty.eql(.{ .int = 64 }) or !isInt(neg.lhs, 0) or !isNamed(neg.rhs, source_name)) return false;
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 64 }) or !isNamed(select.cond, cmp_name)) return false;
+    if (!isNamed(select.true_value, neg_name) or !isNamed(select.false_value, source_name)) return false;
+    try machine.instructions.append(allocator, .abs_i64_rdi_rax);
     try appendGenericCfgReturn(allocator, machine);
     return true;
 }

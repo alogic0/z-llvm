@@ -49,3 +49,7 @@ export fn frontier_min_u32(left: u32, right: u32) u32 {
 export fn frontier_abs_i32(value: i32) u32 {
     return @abs(value);
 }
+
+export fn frontier_abs_i64(value: i64) u64 {
+    return @abs(value);
+}

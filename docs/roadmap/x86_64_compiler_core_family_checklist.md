@@ -926,8 +926,19 @@ Layer: semantic lowering and backend.
   `generic_cfg_functions=741`, `object_emitted_functions=741`,
   `executable_ok_rows=14`, and `local_fail=0`. Wider unsigned/signed integer
   min widths remain future scalar-transform work.
-- [ ] Broaden `abs` beyond selected signed `i32`, with non-integer facts
+- [x] Broaden `abs` beyond selected signed `i32`, with non-integer facts
   fail-closed.
+  Added `frontier_mixed_numeric.frontier_abs_i64`, which lowers signed `i64`
+  `@abs` through the typed-v2 scalar path and a generic single-block abs
+  recognizer for the `icmp slt value, 0` / `sub 0, value` / `select` shape.
+  x86_64 emits a reusable `abs_i64_rdi_rax` sequence. The C harness checks
+  positive, negative, and zero values. Strict frontier evidence in
+  `tmp/frontier_abs_i64.log` reports ReleaseFast, ReleaseSafe, and ReleaseSmall
+  at `source_rows=14`, `discovered_functions=742`,
+  `generic_cfg_functions=742`, `object_emitted_functions=742`,
+  `executable_ok_rows=14`, and `local_fail=0`. The earlier non-integer AIR
+  `abs` hook guard keeps non-integer facts exported without crashing, while
+  z_llvm lowering remains fail-closed for non-integer/vector forms.
 - [ ] Lower `clz`.
 - [ ] Lower `ctz`.
 - [ ] Lower `popcount`.

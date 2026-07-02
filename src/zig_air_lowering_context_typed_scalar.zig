@@ -314,8 +314,12 @@ pub fn lowerTypedAbs(self: anytype, instruction: air_export.TypedInstruction) !v
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     const source = try self.resolveTypedOperand(instruction, 0);
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
-    if (!source.ty.signed or !source.ty.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
-    if (result_type.signed or !result_type.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+    if (!source.ty.signed) return air_model.LowerError.UnsupportedAir;
+    switch (source.ty.ir_type) {
+        .int => |bits| if (bits != 32 and bits != 64) return air_model.LowerError.UnsupportedAir,
+        else => return air_model.LowerError.UnsupportedAir,
+    }
+    if (result_type.signed or !result_type.ir_type.eql(source.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
 
     const cmp_name = try ownPrint(self.module, "air{}_abs_cmp", .{instruction.index});
     const neg_name = try ownPrint(self.module, "air{}_abs_neg", .{instruction.index});
