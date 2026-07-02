@@ -83,9 +83,20 @@ pub fn emitGenericCfgI32ValueIntoEax(
                         .int => |int| switch (binary.op) {
                             .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
                             .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -try i32Value(int) }),
+                            .shl => {
+                                const shift = try i32Value(int);
+                                if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
+                                if (shift != 0) try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                            },
                             else => return error.UnsupportedCodegenInstruction,
                         },
                         .named => |rhs_name| {
+                            if (binary.op == .shl) {
+                                const shift = singleBlockI32Constant(block, .{ .named = rhs_name }) orelse return error.UnsupportedCodegenValue;
+                                if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
+                                if (shift != 0) try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                                return;
+                            }
                             const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
                             if (try registerParamRegOrNull(function, rhs_name, .{ .int = 32 })) |rhs| {
                                 try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
@@ -125,11 +136,41 @@ pub fn emitGenericCfgI32ValueIntoEax(
                 },
                 .call => |call| try emitGenericCfgI32CallIntoEax(allocator, machine, function, block, instruction_index, call),
                 .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select, 0),
-                .phi, .icmp, .fcmp, .cast, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
+                .cast => |cast| {
+                    if (singleBlockI32CastConstant(block, cast) == null) return error.UnsupportedCodegenInstruction;
+                },
+                .phi, .icmp, .fcmp, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
             }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
+}
+
+fn singleBlockI32Constant(block: ir.BasicBlock, value: ir.Value) ?i64 {
+    return switch (value) {
+        .int => |int| i64Value(int) catch null,
+        .named => |name| blk: {
+            const instruction = findInstruction(block, name) orelse break :blk null;
+            break :blk switch (instruction.kind) {
+                .cast => |cast| singleBlockI32CastConstant(block, cast),
+                else => null,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+    };
+}
+
+fn singleBlockI32CastConstant(block: ir.BasicBlock, cast: ir.CastInst) ?i64 {
+    switch (cast.op) {
+        .zext, .sext, .bitcast => {},
+        else => return null,
+    }
+    if (!cast.to_ty.eql(.{ .int = 32 })) return null;
+    switch (cast.from_ty) {
+        .int => |bits| if (bits > 32) return null,
+        else => return null,
+    }
+    return singleBlockI32Constant(block, cast.value);
 }
 
 pub fn emitGenericCfgI64ValueIntoRax(

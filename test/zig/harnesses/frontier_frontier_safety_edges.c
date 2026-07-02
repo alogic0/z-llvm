@@ -9,6 +9,7 @@ extern int z_frontier_explicit_ssub_overflow(int, int) __asm__("frontier_safety_
 extern unsigned z_frontier_explicit_usub_overflow(unsigned, unsigned) __asm__("frontier_safety_edges.frontier_explicit_usub_overflow");
 extern int z_frontier_explicit_smul_overflow(int) __asm__("frontier_safety_edges.frontier_explicit_smul_overflow");
 extern unsigned z_frontier_explicit_ushl_overflow(unsigned) __asm__("frontier_safety_edges.frontier_explicit_ushl_overflow");
+extern unsigned z_frontier_checked_shl_exact(unsigned) __asm__("frontier_safety_edges.frontier_checked_shl_exact");
 extern int z_frontier_bounds_guard(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_guard");
 extern int z_frontier_bounds_direct(const int *, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_direct");
 extern int z_frontier_bounds_panic(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_panic");
@@ -29,6 +30,8 @@ void z_frontier_safety_int_part_oob(void) __asm__("frontier_safety_edges.integer
 void z_frontier_safety_int_part_oob(void) { __builtin_trap(); }
 void z_frontier_safety_unwrap_null(void) __asm__("frontier_safety_edges.unwrapNull");
 void z_frontier_safety_unwrap_null(void) { __builtin_trap(); }
+void z_frontier_safety_shl_overflow(void) __asm__("frontier_safety_edges.shlOverflow");
+void z_frontier_safety_shl_overflow(void) { __builtin_trap(); }
 void z_frontier_safety_default_panic(const unsigned char *ptr, unsigned long len) __asm__("debug.defaultPanic");
 void z_frontier_safety_default_panic(const unsigned char *ptr, unsigned long len) { (void)ptr; (void)len; __builtin_trap(); }
 static int expect_death(void (*fn)(void)) {
@@ -58,6 +61,7 @@ static void death_explicit_ushl_overflow(void) { (void)z_frontier_explicit_ushl_
 static void death_bounds_panic(void) { int values[1] = { 7 }; (void)z_frontier_bounds_panic(values, 1, 2); }
 static void death_optional_unwrap(void) { int value = 41; (void)z_frontier_optional_unwrap(0, &value); }
 static void death_int_from_float(void) { (void)z_frontier_int_from_float_checked(2147483648.0f); }
+static void death_checked_shl_exact(void) { (void)z_frontier_checked_shl_exact(0x80000000u); }
 #endif
 int main(void) {
     int value = 41;
@@ -70,6 +74,7 @@ int main(void) {
     if (z_frontier_explicit_usub_overflow(31u, 9u) != 22u) return 29;
     if (z_frontier_explicit_smul_overflow(7) != 42) return 32;
     if (z_frontier_explicit_ushl_overflow(21u) != 42u) return 34;
+    if (z_frontier_checked_shl_exact(21u) != 42u) return 36;
     if (z_frontier_bounds_guard(&value, 1, 0) != 41) return 3;
     if (z_frontier_bounds_direct(values, 2) != 77) return 4;
     if (z_frontier_bounds_panic(values, 3, 2) != 77) return 22;
@@ -98,6 +103,7 @@ int main(void) {
     if (expect_death(death_bounds_panic) != 0) return 17;
     if (expect_death(death_optional_unwrap) != 0) return 18;
     if (expect_death(death_int_from_float) != 0) return 19;
+    if (expect_death(death_checked_shl_exact) != 0) return 37;
 #endif
     return 0;
 }

@@ -46,6 +46,10 @@ export fn frontier_explicit_ushl_overflow(value: u32) u32 {
     return checked[0];
 }
 
+export fn frontier_checked_shl_exact(value: u32) u32 {
+    return @shlExact(value, 1);
+}
+
 export fn frontier_bounds_guard(value: *const i32, len: usize, index: usize) i32 {
     _ = len;
     _ = index;

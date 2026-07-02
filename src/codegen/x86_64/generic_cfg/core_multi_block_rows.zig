@@ -897,6 +897,27 @@ pub fn lowerGenericCfgStackCheckedAddReturn(
     if (function.blocks.items.len != 3) return false;
 
     const entry = function.blocks.items[0];
+    if (genericCfgDirectCheckedOverflow(entry)) |checked| {
+        const panic_block = blockByName(function, checked.overflow_target) orelse return error.InvalidBranchTarget;
+        const ok_block = blockByName(function, checked.ret_target) orelse return error.InvalidBranchTarget;
+        try genericCfgValidateDirectCheckedOverflowRet(ok_block, checked.call_name);
+
+        try emitGenericCfgCheckedAddIntoEax(allocator, machine, function, checked.call);
+        try appendGenericCfgConditionalBranch(allocator, machine, checked.branch_kind, panic_block.name);
+        try appendGenericCfgReturn(allocator, machine);
+
+        try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
+        try emitGenericCfgNoreturnCallBlock(allocator, machine, function, panic_block);
+        return true;
+    } else |err| switch (err) {
+        error.UnsupportedCodegenInstruction,
+        error.UnsupportedCodegenType,
+        error.UnsupportedCodegenValue,
+        error.BlockWithoutTerminator,
+        error.UnsupportedCodegenControlFlow,
+        => {},
+    }
+
     const checked = genericCfgStackCheckedAdd(entry) catch |err| switch (err) {
         error.UnsupportedCodegenInstruction,
         error.UnsupportedCodegenType,
@@ -917,6 +938,95 @@ pub fn lowerGenericCfgStackCheckedAddReturn(
     try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
     try emitGenericCfgNoreturnCallBlock(allocator, machine, function, panic_block);
     return true;
+}
+
+const GenericCfgDirectCheckedOverflow = struct {
+    call: ir.CallInst,
+    call_name: []const u8,
+    branch_kind: core_cfg_emit.GenericCfgBranchKind,
+    overflow_target: []const u8,
+    ret_target: []const u8,
+};
+
+fn genericCfgDirectCheckedOverflow(entry: ir.BasicBlock) !GenericCfgDirectCheckedOverflow {
+    if (entry.instructions.items.len != 3) return error.UnsupportedCodegenInstruction;
+    const call_name = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const overflow_name = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    const cond_name = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+    if (!call.ret_ty.eql(.{ .aggregate = "{ i32, i1 }" })) return error.UnsupportedCodegenType;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[1].ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+    const branch_kind = checkedOverflowBranchKind(call.callee) orelse return error.UnsupportedCodegenInstruction;
+
+    const overflow_extract = switch (entry.instructions.items[1].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!overflow_extract.aggregate_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or
+        !overflow_extract.result_ty.eql(.{ .int = 1 }) or
+        !isNamed(overflow_extract.aggregate, call_name) or
+        !std.mem.eql(u8, overflow_extract.indices, "1"))
+    {
+        return error.UnsupportedCodegenInstruction;
+    }
+
+    const cmp = switch (entry.instructions.items[2].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!cmp.operand_ty.eql(.{ .int = 1 }) or !isNamed(cmp.lhs, overflow_name) or !isInt(cmp.rhs, 0)) {
+        return error.UnsupportedCodegenInstruction;
+    }
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, cond_name)) return error.UnsupportedCodegenValue;
+
+    const BranchTargets = struct {
+        ret: []const u8,
+        overflow: []const u8,
+    };
+    const targets: BranchTargets = switch (cmp.predicate) {
+        .eq => .{ .ret = condbr.then_target, .overflow = condbr.else_target },
+        .ne => .{ .ret = condbr.else_target, .overflow = condbr.then_target },
+        else => return error.UnsupportedCodegenInstruction,
+    };
+
+    return .{
+        .call = call,
+        .call_name = call_name,
+        .branch_kind = branch_kind,
+        .overflow_target = targets.overflow,
+        .ret_target = targets.ret,
+    };
+}
+
+fn genericCfgValidateDirectCheckedOverflowRet(ok: ir.BasicBlock, call_name: []const u8) !void {
+    if (ok.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const value_name = ok.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const value_extract = switch (ok.instructions.items[0].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!value_extract.aggregate_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or
+        !value_extract.result_ty.eql(.{ .int = 32 }) or
+        !isNamed(value_extract.aggregate, call_name) or
+        !std.mem.eql(u8, value_extract.indices, "0"))
+    {
+        return error.UnsupportedCodegenInstruction;
+    }
+    const ret = switch (ok.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, value_name)) return error.UnsupportedCodegenValue;
 }
 
 const GenericCfgStackCheckedAdd = struct {

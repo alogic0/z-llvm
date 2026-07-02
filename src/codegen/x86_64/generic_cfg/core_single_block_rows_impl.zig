@@ -218,8 +218,8 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
                     try emitGenericCfgVoidCall(allocator, machine, function, block, instruction_index, call);
                 }
             },
-            .binary, .icmp, .select, .load => {},
-            .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
+            .binary, .icmp, .select, .load, .cast => {},
+            .phi, .fcmp, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
         }
     }
     const ret_value = ret.value orelse return error.InvalidRet;

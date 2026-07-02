@@ -689,7 +689,9 @@ fn isArithmeticOpcode(opcode: []const u8) bool {
         "bit_or",
         "xor",
         "shl",
+        "shl_exact",
         "shr",
+        "shr_exact",
     };
     for (arithmetic) |candidate| {
         if (std.mem.eql(u8, opcode, candidate)) return true;

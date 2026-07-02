@@ -11,6 +11,7 @@ const globalSymbolName = shared.globalSymbolName;
 const isCalleeName = shared.isCalleeName;
 const isInt = shared.isInt;
 const isNamed = shared.isNamed;
+const i64Value = shared.i64Value;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
 
 const blockIndex = cabi_abi_helpers.blockIndex;
@@ -84,12 +85,18 @@ pub fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, blo
         .load => |load| genericCfgSupportsSingleBlockLoad(function, load),
         .store => |store| genericCfgSupportsSingleBlockStore(function, block, store),
         .call => |call| genericCfgSupportsSingleBlockCall(function, block, instruction.result, call),
-        .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
+        .cast => |cast| genericCfgSupportsSingleBlockI32Cast(block, cast),
+        .phi, .fcmp, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
     };
 }
 
 pub fn genericCfgSupportsSingleBlockBinary(function: ir.Function, block: ir.BasicBlock, binary: ir.BinaryInst) bool {
     if (!binary.ty.eql(.{ .int = 32 })) return false;
+    if (binary.op == .shl) {
+        if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return false;
+        const shift = singleBlockI32Constant(block, binary.rhs) orelse return false;
+        return shift >= 0 and shift <= 31;
+    }
     if (machineBinaryOp(binary.op) == null) return false;
     if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return false;
     switch (binary.rhs) {
@@ -110,6 +117,7 @@ pub fn genericCfgSupportsSingleBlockBinary(function: ir.Function, block: ir.Basi
                         genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs) and
                         genericCfgSupportsSingleBlockI32Value(function, block, binary.rhs);
                 },
+                .cast => |cast| return binary.op == .add and genericCfgSupportsSingleBlockI32Cast(block, cast),
                 else => return false,
             }
         },
@@ -271,10 +279,38 @@ pub fn genericCfgSupportsSingleBlockI32Value(function: ir.Function, maybe_block:
                 .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
                 .load => |load| genericCfgSupportsSingleBlockLoad(function, load),
                 .call => |call| genericCfgSupportsSingleBlockCall(function, block, instruction.result, call),
-                .icmp, .phi, .fcmp, .cast, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
+                .cast => |cast| genericCfgSupportsSingleBlockI32Cast(block, cast),
+                .icmp, .phi, .fcmp, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
             };
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsSingleBlockI32Cast(block: ir.BasicBlock, cast: ir.CastInst) bool {
+    switch (cast.op) {
+        .zext, .sext, .bitcast => {},
+        else => return false,
+    }
+    if (!cast.to_ty.eql(.{ .int = 32 })) return false;
+    switch (cast.from_ty) {
+        .int => |bits| if (bits > 32) return false,
+        else => return false,
+    }
+    return singleBlockI32Constant(block, cast.value) != null;
+}
+
+fn singleBlockI32Constant(block: ir.BasicBlock, value: ir.Value) ?i64 {
+    return switch (value) {
+        .int => |int| i64Value(int) catch null,
+        .named => |name| blk: {
+            const instruction = findInstruction(block, name) orelse break :blk null;
+            break :blk switch (instruction.kind) {
+                .cast => |cast| if (genericCfgSupportsSingleBlockI32Cast(block, cast)) singleBlockI32Constant(block, cast.value) else null,
+                else => null,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
     };
 }
 

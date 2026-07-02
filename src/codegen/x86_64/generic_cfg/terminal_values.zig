@@ -209,6 +209,11 @@ pub fn terminalBlockCanMaterializeI32Value(function: ir.Function, scope: Termina
             switch (instruction.kind) {
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 32 })) break :blk false;
+                    if (binary.op == .shl) {
+                        const shift = terminalScopeI32Constant(scope, binary.rhs) orelse break :blk false;
+                        if (shift < 0 or shift > 31) break :blk false;
+                        break :blk terminalBlockCanMaterializeI32Value(function, scope, binary.lhs);
+                    }
                     if (machineBinaryOp(binary.op) == null) break :blk false;
                     break :blk terminalBlockCanMaterializeI32Value(function, scope, binary.lhs) and
                         terminalBlockCanMaterializeI32Value(function, scope, binary.rhs);
@@ -519,9 +524,20 @@ pub fn emitGenericCfgTerminalI32ValueIntoEaxInScope(
                         .int => |int| switch (binary.op) {
                             .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
                             .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -try i32Value(int) }),
+                            .shl => {
+                                const shift = try i32Value(int);
+                                if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
+                                if (shift != 0) try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                            },
                             else => return error.UnsupportedCodegenInstruction,
                         },
                         .named => |rhs_name| {
+                            if (binary.op == .shl) {
+                                const shift = terminalScopeI32Constant(scope, .{ .named = rhs_name }) orelse return error.UnsupportedCodegenValue;
+                                if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
+                                if (shift != 0) try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                                return;
+                            }
                             const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
                             if (paramRegOrNull(function, rhs_name, .{ .int = 32 }) catch null) |rhs_reg| {
                                 try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs_reg } });
@@ -550,6 +566,31 @@ pub fn emitGenericCfgTerminalI32ValueIntoEaxInScope(
             }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn terminalScopeI32Constant(scope: TerminalValueScope, value: ir.Value) ?i64 {
+    switch (value) {
+        .int => |int| return i64Value(int) catch null,
+        .named => |name| {
+            const instruction = terminalScopeInstruction(scope, name) orelse return null;
+            return switch (instruction.kind) {
+                .cast => |cast| blk: {
+                    switch (cast.op) {
+                        .zext, .sext, .bitcast => {},
+                        else => break :blk null,
+                    }
+                    if (!cast.to_ty.eql(.{ .int = 32 })) break :blk null;
+                    switch (cast.from_ty) {
+                        .int => |bits| if (bits > 32) break :blk null,
+                        else => break :blk null,
+                    }
+                    break :blk terminalScopeI32Constant(scope, cast.value);
+                },
+                else => null,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     }
 }
 

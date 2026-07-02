@@ -832,7 +832,19 @@ Layer: safety-edge CFG and runtime boundary.
   `discovered_functions=738`, `object_emitted_functions=738`,
   `executable_ok_rows=14`, and `local_fail=0`. Broader integer cast families
   beyond the current checked int-from-float subset remain future work.
-- [ ] Lower checked shift/exact arithmetic paths used by ReleaseSafe.
+- [x] Lower checked shift/exact arithmetic paths used by ReleaseSafe.
+  Completed for the selected unsigned i32 `@shlExact(value, 1)` subset by
+  treating `shl_exact`/`shr_exact` as typed scalar binary opcodes, adding
+  immediate i32 shift-return support for zexted constant shift counts, and
+  adding a direct `llvm.ushl.with.overflow.i32` safety CFG recognizer for the
+  ReleaseSafe `call -> extract overflow -> cmp -> branch -> extract value`
+  shape. The accepted `frontier_checked_shl_exact` row proves the hot path in
+  all release modes and the ReleaseSafe cold `shlOverflow` path through the C
+  harness child-process death check. General dynamic exact shifts, signed
+  exact-shift safety variants, and wider integer exact-shift families remain
+  fail-closed future work. `tmp/frontier_shl_exact.log` proves all three release
+  modes at `source_rows=14`, `discovered_functions=739`,
+  `object_emitted_functions=739`, `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Prove one non-trapping executable row.
 - [ ] Prove one trapping row with child-process death checks when practical.
 - [ ] Keep cold panic/runtime helper ownership explicit.
