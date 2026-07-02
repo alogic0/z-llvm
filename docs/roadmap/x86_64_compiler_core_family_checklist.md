@@ -775,7 +775,19 @@ Layer: semantic lowering and CFG lowering.
 
 Layer: safety-edge CFG and runtime boundary.
 
-- [ ] Lower or classify `add_with_overflow`.
+- [x] Lower or classify `add_with_overflow`.
+  Classified as owned for the current signed/unsigned i32 safety-runtime subset.
+  Typed-v2 scalar lowering emits `llvm.sadd.with.overflow.i32` or
+  `llvm.uadd.with.overflow.i32` from typed operands, and generic CFG/codegen
+  owns the hot value path plus cold integer-overflow runtime edge. The accepted
+  frontier rows `frontier_explicit_sadd_overflow` and
+  `frontier_explicit_uadd_overflow` have stable non-trapping checks and
+  child-process death checks in `frontier_frontier_safety_edges.c`; the latest
+  strict frontier proof in `tmp/frontier_optional_return.log` reports
+  `source_rows=14`, `discovered_functions=734`, `object_emitted_functions=734`,
+  `executable_ok_rows=14`, and `local_fail=0`. The focused ReleaseFast
+  compiler-core inventory still sees normal `add_with_overflow count=62`, but
+  it is no longer in the top unknown safety-runtime bucket.
 - [ ] Lower or classify `sub_with_overflow`.
 - [ ] Lower or classify `mul_with_overflow`.
 - [ ] Lower or classify `shl_with_overflow`.
