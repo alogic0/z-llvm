@@ -979,7 +979,21 @@ Layer: semantic lowering and backend.
   `object_emitted_functions=745`, `executable_ok_rows=14`, and `local_fail=0`.
   Wider widths, feature-policy modeling for non-POPCNT x86_64 baselines, vector
   forms, and `bit_reverse` remain separate scalar-transform work.
-- [ ] Lower `bit_reverse`.
+- [x] Lower `bit_reverse`.
+  Added `frontier_mixed_numeric.frontier_bit_reverse_u32`, which lowers scalar
+  `@bitReverse(u32)` through the typed-v2 `zllvm-bit-reverse-v1` `ty_op`
+  contract and the shared scalar-transform lowering path. z_llvm materializes
+  `llvm.bitreverse.i32` from typed facts, and x86_64 lowers that intrinsic with
+  a reusable `bit_reverse_i32_edi_eax` sequence instead of emitting an external
+  symbol. The shared direct-call helper also fail-closes this intrinsic into the
+  local pseudo after normal SysV argument assignment, preventing native-link
+  unresolved-symbol regressions. The C harness checks mixed patterns, zero, and
+  all-bits values. Strict frontier evidence in
+  `tmp/frontier_bit_reverse_u32.log` reports ReleaseFast, ReleaseSafe, and
+  ReleaseSmall at `source_rows=14`, `discovered_functions=746`,
+  `generic_cfg_functions=746`, `object_emitted_functions=746`,
+  `executable_ok_rows=14`, and `local_fail=0`. Wider widths, vector forms, and
+  aggregate bit-reversal remain future scalar-transform work.
 - [ ] Lower `shl_exact`.
 - [ ] Lower `shr_exact`.
 - [ ] Lower integer `neg`.

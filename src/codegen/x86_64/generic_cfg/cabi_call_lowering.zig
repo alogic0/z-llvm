@@ -2290,6 +2290,7 @@ pub fn lowerGenericCfgGprDirectCallReturn(
     };
     if (!call.ret_ty.eql(ret.ty) or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (call.callee_value == null and std.mem.startsWith(u8, call.callee, "llvm.")) return false;
 
     if (call.callee_value) |callee_value| {
         const callee_name = switch (callee_value) {

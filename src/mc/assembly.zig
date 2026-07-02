@@ -56,6 +56,28 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .clz_i32_edi_eax => try writer.writeAll("\tmovl $32, %eax\n\ttestl %edi, %edi\n\tje 1f\n\tbsrl %edi, %eax\n\txorl $31, %eax\n1:\n"),
             .ctz_i32_edi_eax => try writer.writeAll("\tmovl $32, %eax\n\ttestl %edi, %edi\n\tje 1f\n\tbsfl %edi, %eax\n1:\n"),
             .popcount_i32_edi_eax => try writer.writeAll("\tpopcntl %edi, %eax\n"),
+            .bit_reverse_i32_edi_eax => try writer.writeAll(
+                "\tmovl %edi, %eax\n" ++
+                    "\tbswapl %eax\n" ++
+                    "\tmovl %eax, %edx\n" ++
+                    "\tshrl $4, %eax\n" ++
+                    "\tandl $252645135, %eax\n" ++
+                    "\tandl $252645135, %edx\n" ++
+                    "\tshll $4, %edx\n" ++
+                    "\torl %edx, %eax\n" ++
+                    "\tmovl %eax, %edx\n" ++
+                    "\tshrl $2, %eax\n" ++
+                    "\tandl $858993459, %eax\n" ++
+                    "\tandl $858993459, %edx\n" ++
+                    "\tshll $2, %edx\n" ++
+                    "\torl %edx, %eax\n" ++
+                    "\tmovl %eax, %edx\n" ++
+                    "\tshrl $1, %eax\n" ++
+                    "\tandl $1431655765, %eax\n" ++
+                    "\tandl $1431655765, %edx\n" ++
+                    "\tshll $1, %edx\n" ++
+                    "\torl %edx, %eax\n",
+            ),
             .bswap_eax => try writer.writeAll("\tbswapl %eax\n"),
             .bswap_rax => try writer.writeAll("\tbswapq %rax\n"),
             .rol_ax_imm8 => |amount| try writer.print("\trolw ${}, %ax\n", .{amount}),

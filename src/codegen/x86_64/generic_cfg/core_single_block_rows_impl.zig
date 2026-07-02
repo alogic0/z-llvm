@@ -158,6 +158,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgBitReverseReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
@@ -391,6 +395,16 @@ fn lowerGenericCfgPopcountReturn(
     ret: anytype,
 ) !bool {
     return lowerGenericCfgBitCountReturn(allocator, machine, function, block, ret, "llvm.ctpop.i32", .popcount_i32_edi_eax, false);
+}
+
+fn lowerGenericCfgBitReverseReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    return lowerGenericCfgBitCountReturn(allocator, machine, function, block, ret, "llvm.bitreverse.i32", .bit_reverse_i32_edi_eax, false);
 }
 
 fn lowerGenericCfgZeroCountReturn(

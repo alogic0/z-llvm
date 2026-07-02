@@ -30,6 +30,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .clz => try self.lowerTypedClz(instruction),
         .ctz => try self.lowerTypedCtz(instruction),
         .popcount => try self.lowerTypedPopcount(instruction),
+        .bit_reverse => try self.lowerTypedBitReverse(instruction),
         .none => return false,
     }
     return true;
@@ -371,6 +372,32 @@ pub fn lowerTypedCtz(self: anytype, instruction: air_export.TypedInstruction) !v
 
 pub fn lowerTypedPopcount(self: anytype, instruction: air_export.TypedInstruction) !void {
     try self.lowerTypedBitCount(instruction, "llvm.ctpop.i32", "popcount", false);
+}
+
+pub fn lowerTypedBitReverse(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!source.ty.ir_type.eql(.{ .int = 32 }) or !result_type.ir_type.eql(source.ty.ir_type)) {
+        return air_model.LowerError.UnsupportedAir;
+    }
+
+    const result_name = try self.resultName(instruction.index);
+    var call: ir.CallInst = .{
+        .ret_ty = result_type.ir_type,
+        .callee = "llvm.bitreverse.i32",
+        .args = .empty,
+    };
+    errdefer call.deinit(self.allocator);
+    try call.args.append(self.allocator, .{ .ty = source.ty.ir_type, .value = source.value });
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .call = call },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
 }
 
 pub fn lowerTypedZeroCount(self: anytype, instruction: air_export.TypedInstruction, callee: []const u8, label: []const u8) !void {

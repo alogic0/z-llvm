@@ -16,6 +16,7 @@ const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditio
 const callIsFastcc = shared.callIsFastcc;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
+const isCalleeName = shared.isCalleeName;
 const isNamed = shared.isNamed;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
 
@@ -374,6 +375,17 @@ pub fn emitGenericCfgI32CallIntoEax(
     instruction_index: usize,
     call: ir.CallInst,
 ) !void {
+    if (isCalleeName(call.callee, "llvm.bitreverse.i32")) {
+        if (call.callee_value != null or call.inline_asm != null or !call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+        if (!call.args.items[0].ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+        const source_name = switch (call.args.items[0].value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        if ((try paramReg(function, source_name, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .bit_reverse_i32_edi_eax);
+        return;
+    }
     if (genericCfgSupportsSminIntrinsicCall(function, call)) {
         const lhs_name = switch (call.args.items[0].value) {
             .named => |name| name,

@@ -65,3 +65,7 @@ export fn frontier_ctz_u32(value: u32) u32 {
 export fn frontier_popcount_u32(value: u32) u32 {
     return @popCount(value);
 }
+
+export fn frontier_bit_reverse_u32(value: u32) u32 {
+    return @bitReverse(value);
+}

@@ -15,6 +15,7 @@ extern unsigned long long z_frontier_abs_i64(long long) __asm__("frontier_mixed_
 extern unsigned int z_frontier_clz_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_clz_u32");
 extern unsigned int z_frontier_ctz_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_ctz_u32");
 extern unsigned int z_frontier_popcount_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_popcount_u32");
+extern unsigned int z_frontier_bit_reverse_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_bit_reverse_u32");
 int main(void) {
     if (z_frontier_mixed_float(1.5f, 2.25f) != 3.75f) return 1;
     if (z_frontier_double_roundtrip(9.0, 2.0) != 4.5) return 2;
@@ -50,5 +51,9 @@ int main(void) {
     if (z_frontier_popcount_u32(0xffffffffu) != 32u) return 32;
     if (z_frontier_popcount_u32(0x80000001u) != 2u) return 33;
     if (z_frontier_popcount_u32(0x00f0000fu) != 8u) return 34;
+    if (z_frontier_bit_reverse_u32(0x01234567u) != 0xe6a2c480u) return 35;
+    if (z_frontier_bit_reverse_u32(0x89abcdefu) != 0xf7b3d591u) return 36;
+    if (z_frontier_bit_reverse_u32(0u) != 0u) return 37;
+    if (z_frontier_bit_reverse_u32(0xffffffffu) != 0xffffffffu) return 38;
     return 0;
 }

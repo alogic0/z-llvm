@@ -68,6 +68,11 @@ pub fn appendDirectCallWithStackArgs(
     ret_ty: ir.Type,
     stack_arg_count: usize,
 ) !void {
+    if (std.mem.eql(u8, symbol, "llvm.bitreverse.i32")) {
+        if (stack_arg_count != 0 or !ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
+        try machine.instructions.append(allocator, .bit_reverse_i32_edi_eax);
+        return;
+    }
     if (stack_arg_count == 0) return appendAlignedDirectCall(allocator, machine, symbol, ret_ty);
     try appendDirectCall(allocator, machine, symbol, ret_ty);
     try appendStackArgCallCleanup(allocator, machine, stack_arg_count);
