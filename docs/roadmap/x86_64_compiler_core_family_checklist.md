@@ -1039,7 +1039,22 @@ Layer: semantic lowering and backend.
   `neg`.
 - [ ] Prove signed and unsigned width variants where compiler-core inventory
   shows both.
-- [ ] Refresh inventory and show scalar-transform buckets reduced.
+- [x] Refresh inventory and show scalar-transform buckets reduced.
+
+  Focused ReleaseFast compiler-core-module inventory was refreshed in
+  `tmp/compiler_core_module_releasefast_after_scalar_neg.log` after the scalar
+  `byte_swap`, `max`, `min`, `abs`, `clz`, `ctz`, `popcount`, `bit_reverse`,
+  `shl_exact`, `shr_exact`, and floating-point `neg` cycles. The run completed
+  with real module context, generated imports available, no stubs, and
+  `instruction_payload_scan=1`; it reports `functions=61377`,
+  `instructions_total=6299667`, and `local_fail=0`. The scalar-transform
+  unknown bucket is now down to `scalar-transform:shl_sat:bin_op count=2`
+  (`Io.Threaded.Group.waitForCancelWithSignaling`) while the covered scalar
+  opcodes appear as normal opcode counts, including `byte_swap=760`,
+  `max=429`, `min=364`, `abs=64`, `clz=51`, `ctz=48`, `popcount=19`,
+  `bit_reverse=9`, `shl_exact=25`, `shr_exact=49`, and `neg=22`.
+  ReleaseSafe and ReleaseSmall inventory refresh remain milestone-cost and
+  were not rerun for this scalar-family refresh.
 
 ### 9. Vector Forms
 
