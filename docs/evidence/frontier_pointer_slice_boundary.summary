@@ -1,0 +1,28 @@
+# Gate Evidence Summary
+
+schema_version: 1
+log_path: `tmp/frontier_pointer_slice_boundary.log`
+command: `zig build distribution-air-release-frontier`
+z_llvm_commit: `258fc996b8ec06ad802f6c8ad2562ed7cefe9d84`
+ziglang_pin: `0b4de5989cd4e258e539b3e31e913119d54bfb15`
+process_exit_status: `0`
+first_failure_line: `none`
+
+## Ratchet Metadata
+
+candidate_file_hash: `n/a`
+selector_version: `n/a`
+mode: `n/a`
+limit: `n/a`
+ratchet_migration_note: `n/a`
+
+## Summary Lines
+
+```text
+summary uncurated-zig-air mode=ReleaseFast corpus=frontier-boundaries target=x86_64-linux-gnu source_rows=7 discovered_functions=12 structured_functions=2 generic_codegen_functions=0 generic_cfg_functions=0 structural_matcher_functions=0 structured_air_v1_functions=2 structured_air_v2_functions=2 typed_air_type_functions=2 typed_air_operand_functions=2 legacy_air_text_lowering_functions=0 typed_v2_fallback_functions=2 generic_lowering_functions=2 shape_recognizer_functions=0 unsupported_functions=7 codegen_failures=0 case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source=- first_unsupported_function=- first_unsupported_opcode=- top_unsupported_construct=- top_unsupported_count=0 first_typed_v2_fallback_function=frontier_varargs_boundary.frontier_indirect_varargs_boundary first_typed_v2_fallback_opcode=call first_typed_v2_fallback_data_kind=call first_typed_v2_fallback_reason=lowering_validation top_typed_v2_fallback_reason=lowering_validation:call:call top_typed_v2_fallback_count=2 local_fail=0
+summary uncurated-zig-air-abi-boundaries mode=ReleaseFast corpus=frontier-boundaries target=x86_64-linux-gnu source_rows=7 discovered_functions=12 varargs_boundary_rows=2 vector_boundary_rows=2 x87_boundary_rows=2 packed_aggregate_boundary_rows=2 tail_call_boundary_rows=1 callconv_boundary_rows=1 stack_pressure_boundary_rows=0 safety_edge_boundary_rows=0 pointer_slice_boundary_rows=2 unexpected_accept_rows=0 wrong_diagnostic_rows=0 llvm_targetmachine_rows=0 lld_rows=0 local_fail=0
+summary uncurated-zig-air mode=ReleaseSafe corpus=frontier-boundaries target=x86_64-linux-gnu source_rows=7 discovered_functions=12 structured_functions=2 generic_codegen_functions=0 generic_cfg_functions=0 structural_matcher_functions=0 structured_air_v1_functions=2 structured_air_v2_functions=2 typed_air_type_functions=2 typed_air_operand_functions=2 legacy_air_text_lowering_functions=0 typed_v2_fallback_functions=2 generic_lowering_functions=2 shape_recognizer_functions=0 unsupported_functions=7 codegen_failures=0 case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source=- first_unsupported_function=- first_unsupported_opcode=- top_unsupported_construct=- top_unsupported_count=0 first_typed_v2_fallback_function=frontier_varargs_boundary.frontier_indirect_varargs_boundary first_typed_v2_fallback_opcode=call first_typed_v2_fallback_data_kind=call first_typed_v2_fallback_reason=lowering_validation top_typed_v2_fallback_reason=lowering_validation:call:call top_typed_v2_fallback_count=2 local_fail=0
+summary uncurated-zig-air-abi-boundaries mode=ReleaseSafe corpus=frontier-boundaries target=x86_64-linux-gnu source_rows=7 discovered_functions=12 varargs_boundary_rows=2 vector_boundary_rows=2 x87_boundary_rows=2 packed_aggregate_boundary_rows=2 tail_call_boundary_rows=1 callconv_boundary_rows=1 stack_pressure_boundary_rows=0 safety_edge_boundary_rows=0 pointer_slice_boundary_rows=2 unexpected_accept_rows=0 wrong_diagnostic_rows=0 llvm_targetmachine_rows=0 lld_rows=0 local_fail=0
+summary uncurated-zig-air mode=ReleaseSmall corpus=frontier-boundaries target=x86_64-linux-gnu source_rows=7 discovered_functions=12 structured_functions=2 generic_codegen_functions=0 generic_cfg_functions=0 structural_matcher_functions=0 structured_air_v1_functions=2 structured_air_v2_functions=2 typed_air_type_functions=2 typed_air_operand_functions=2 legacy_air_text_lowering_functions=0 typed_v2_fallback_functions=2 generic_lowering_functions=2 shape_recognizer_functions=0 unsupported_functions=7 codegen_failures=0 case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source=- first_unsupported_function=- first_unsupported_opcode=- top_unsupported_construct=- top_unsupported_count=0 first_typed_v2_fallback_function=frontier_varargs_boundary.frontier_indirect_varargs_boundary first_typed_v2_fallback_opcode=call first_typed_v2_fallback_data_kind=call first_typed_v2_fallback_reason=lowering_validation top_typed_v2_fallback_reason=lowering_validation:call:call top_typed_v2_fallback_count=2 local_fail=0
+summary uncurated-zig-air-abi-boundaries mode=ReleaseSmall corpus=frontier-boundaries target=x86_64-linux-gnu source_rows=7 discovered_functions=12 varargs_boundary_rows=2 vector_boundary_rows=2 x87_boundary_rows=2 packed_aggregate_boundary_rows=2 tail_call_boundary_rows=1 callconv_boundary_rows=1 stack_pressure_boundary_rows=0 safety_edge_boundary_rows=0 pointer_slice_boundary_rows=2 unexpected_accept_rows=0 wrong_diagnostic_rows=0 llvm_targetmachine_rows=0 lld_rows=0 local_fail=0
+```

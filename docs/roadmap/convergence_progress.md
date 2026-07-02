@@ -34,10 +34,15 @@ list and the visible record of progress. Evidence summaries under
 
   Closed by the docs adoption commit that introduced this file (docs-only
   cycle; evidence is the commit itself).
-- [ ] 2. Evidence tooling: `tools/summarize_gate_log.zig` emitting the
+- [x] 2. Evidence tooling: `tools/summarize_gate_log.zig` emitting the
   summary schema (command, z_llvm commit, ziglang pin, exit status,
   summary lines, first failure line, ratchet metadata); backfill summaries
   for currently cited logs that still exist under `tmp/`.
+
+  Closed by `docs/evidence/frontier_packed_call_arg_finish.summary`, which
+  validates the tool on the completed Cycle A frontier gate. Legacy gate-log
+  summaries for checklist-cited `tmp/` logs that still existed and contained
+  `summary ...` lines were backfilled under `docs/evidence/`.
 - [ ] 3. Ziglang pin: tracked pin file (`docs/evidence/ziglang_pin.txt`)
   plus stage4 emitter check against the pin; mismatch path validated via a
   temporary override or fixture pin, tracked pin untouched.

@@ -1243,6 +1243,9 @@ Layer: ABI planner and backend.
   common aligned packed-leaf store/construction subset without accepting Zig
   packed ABI payloads.
 - [x] Implement common aligned packed aggregate call arguments.
+
+  Tracked evidence:
+  `docs/evidence/frontier_packed_call_arg_finish.summary`.
 - [ ] Keep unaligned or target-sensitive forms fail-closed.
 - [ ] Prove one aligned packed aggregate executable row.
 - [ ] Refresh inventory and show the packed-aggregate bucket reduced or
