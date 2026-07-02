@@ -863,7 +863,18 @@ Layer: safety-edge CFG and runtime boundary.
   `native_link_failures=0`, `lld_rows=0`, and `local_fail=0`, so the
   child-process death path is executable-proven for this selected exact-shift
   safety edge.
-- [ ] Keep cold panic/runtime helper ownership explicit.
+- [x] Keep cold panic/runtime helper ownership explicit.
+  The accepted safety-runtime frontier keeps cold helper ownership explicit:
+  `frontier_frontier_safety_edges.c` provides local trap symbols for
+  `frontier_safety_edges.outOfBounds`,
+  `frontier_safety_edges.integerPartOutOfBounds`,
+  `frontier_safety_edges.unwrapNull`, `frontier_safety_edges.shlOverflow`, and
+  `debug.defaultPanic`. Generic CFG emits the hot path locally and lowers cold
+  noreturn blocks through `emitGenericCfgNoreturnCallBlock`; the executable
+  summary in `tmp/frontier_shl_exact.log` reports `runtime_boundary_rows=0`,
+  `native_link_failures=0`, `lld_rows=0`, and `local_fail=0` for all three
+  release modes. Broader runtime/compiler-rt/libc ownership remains outside
+  this safety-runtime frontier item.
 - [ ] Refresh ReleaseSafe inventory and show the safety-runtime bucket reduced
   or reclassified.
 
