@@ -1180,7 +1180,15 @@ Layer: ABI planner and backend.
   `tmp/frontier_vector_reduce.log`; the latest accepted frontier counter is
   still `source_rows=14`, `discovered_functions=753`,
   `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Otherwise prove object/native-link boundary diagnostics.
+- [x] Otherwise prove object/native-link boundary diagnostics.
+
+  The "otherwise" path is closed by the same boundary gate rather than a
+  separate accepted row: exported vector argument/return ABI and
+  vector-containing aggregate ABI remain source-backed `UnsupportedVectorAbi`
+  boundaries in `frontier_vector_boundary.zig`, while scalar-wrapper vector
+  operations are accepted and executable-proven. The latest boundary evidence
+  is `tmp/frontier_vector_element_boundaries.log`, with
+  `vector_boundary_rows=4`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
 - [ ] Refresh inventory and show the vector bucket reduced or reclassified.
 
 ### 10. Packed Aggregates
