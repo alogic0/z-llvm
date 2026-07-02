@@ -821,7 +821,17 @@ Layer: safety-edge CFG and runtime boundary.
   fail-closed future work. `tmp/frontier_shl_overflow.log` proves all three
   release modes at `source_rows=14`, `discovered_functions=738`,
   `object_emitted_functions=738`, `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower checked integer cast paths used by ReleaseSafe.
+- [x] Lower checked integer cast paths used by ReleaseSafe.
+  The accepted `frontier_int_from_float_checked` row is typed-v2/model-owned via
+  `typedCheckedIntFromFloatSummary`, lowers the `int_from_float` guard to
+  floating-point bound checks plus a cold `integerPartOutOfBounds` noreturn
+  call, and has both a stable hot return and ReleaseSafe child-process death
+  check in `frontier_frontier_safety_edges.c`. The current strict frontier proof
+  `tmp/frontier_shl_overflow.log` keeps that row green across ReleaseFast,
+  ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=738`, `object_emitted_functions=738`,
+  `executable_ok_rows=14`, and `local_fail=0`. Broader integer cast families
+  beyond the current checked int-from-float subset remain future work.
 - [ ] Lower checked shift/exact arithmetic paths used by ReleaseSafe.
 - [ ] Prove one non-trapping executable row.
 - [ ] Prove one trapping row with child-process death checks when practical.
