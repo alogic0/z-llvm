@@ -1226,7 +1226,15 @@ Layer: ABI planner and backend.
   from the INTEGER eightbyte and `double` leaves from the SSE stream through
   normal aggregate field-read lowering, with executable checks in
   `test/zig/harnesses/frontier_frontier_sysv_aggregate_classes.c`.
-- [ ] Implement common aligned packed aggregate stores.
+- [x] Implement common aligned packed aggregate stores.
+
+  Existing construction rows `frontier_packed_mixed_make` and
+  `frontier_packed_reverse_mixed_make` store adjacent `i32` leaves plus a
+  `double` leaf into the aggregate return path, packing the two integer fields
+  into one INTEGER eightbyte and returning the floating leaf through the SSE
+  stream. The C harness validates every returned field, so this covers the
+  common aligned packed-leaf store/construction subset without accepting Zig
+  packed ABI payloads.
 - [ ] Implement common aligned packed aggregate call arguments.
 - [ ] Keep unaligned or target-sensitive forms fail-closed.
 - [ ] Prove one aligned packed aggregate executable row.
