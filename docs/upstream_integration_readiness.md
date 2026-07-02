@@ -766,8 +766,8 @@ Source-backed ABI and pointer/slice boundary proof is tracked separately by
 `zig build distribution-air-release-frontier-boundaries`. It runs
 `test/zig/frontier_boundaries/*.zig` in ReleaseFast, ReleaseSafe, and
 ReleaseSmall and currently reports per mode: `source_rows=10`,
-`discovered_functions=17`, `varargs_boundary_rows=2`,
-`vector_boundary_rows=3`, `x87_boundary_rows=2`,
+`discovered_functions=18`, `varargs_boundary_rows=2`,
+`vector_boundary_rows=4`, `x87_boundary_rows=2`,
 `packed_aggregate_boundary_rows=2`, `tail_call_boundary_rows=1`,
 `callconv_boundary_rows=1`, `stack_pressure_boundary_rows=0`,
 `safety_edge_boundary_rows=0`,

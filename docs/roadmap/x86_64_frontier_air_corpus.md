@@ -374,9 +374,9 @@ Source-backed ABI and pointer/slice boundary proof is green for all three modes 
 
 ```text
 source_rows=10
-discovered_functions=17
+discovered_functions=18
 varargs_boundary_rows=2
-vector_boundary_rows=3
+vector_boundary_rows=4
 x87_boundary_rows=2
 packed_aggregate_boundary_rows=2
 tail_call_boundary_rows=1

@@ -1160,7 +1160,15 @@ Layer: ABI planner and backend.
   `tmp/frontier_vector_width_boundaries.log` reports all three release modes at
   `source_rows=10`, `discovered_functions=17`,
   `vector_boundary_rows=3`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
-- [ ] Add fail-closed diagnostics for unsupported element types.
+- [x] Add fail-closed diagnostics for unsupported element types.
+
+  Added `frontier_vector_unsupported_element`, a scalar C ABI wrapper that
+  constructs a `@Vector(4, f32)` with `@splat` and reads lane 2. This proves
+  float vector element shapes remain boundary-owned instead of falling into
+  selected integer vector lowering. Saved boundary evidence:
+  `tmp/frontier_vector_element_boundaries.log` reports all three release modes
+  at `source_rows=10`, `discovered_functions=18`,
+  `vector_boundary_rows=4`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
 - [ ] Prove one source-backed vector executable row if ABI-stable.
 - [ ] Otherwise prove object/native-link boundary diagnostics.
 - [ ] Refresh inventory and show the vector bucket reduced or reclassified.

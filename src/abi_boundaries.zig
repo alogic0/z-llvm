@@ -140,7 +140,7 @@ const SourceBoundary = struct {
 
 const source_boundaries = [_]SourceBoundary{
     .{ .source_fragment = "frontier_varargs_boundary.zig", .category = .varargs, .expected_rows = 2 },
-    .{ .source_fragment = "frontier_vector_boundary.zig", .category = .vector, .expected_rows = 3 },
+    .{ .source_fragment = "frontier_vector_boundary.zig", .category = .vector, .expected_rows = 4 },
     .{ .source_fragment = "frontier_x87_boundary.zig", .category = .x87, .expected_rows = 2, .source_failure_rows = 2 },
     .{ .source_fragment = "frontier_packed_aggregate_boundary.zig", .category = .packed_aggregate, .expected_rows = 2, .source_failure_rows = 2 },
     .{ .source_fragment = "frontier_tail_call_boundary.zig", .category = .tail_call, .expected_rows = 1 },
@@ -163,7 +163,7 @@ pub fn expectedFrontierBoundarySummary() ExpectedSummary {
     for (source_boundaries) |boundary| counts.add(boundary.category, boundary.expected_rows);
     return .{
         .source_rows = source_boundaries.len,
-        .discovered_functions = 17,
+        .discovered_functions = 18,
         .counts = counts,
     };
 }
@@ -314,17 +314,17 @@ test "frontier ABI boundary counts update by category" {
 test "frontier ABI boundary expected summary is registry-owned" {
     const expected = expectedFrontierBoundarySummary();
     try std.testing.expectEqual(@as(usize, 10), expected.source_rows);
-    try std.testing.expectEqual(@as(usize, 17), expected.discovered_functions);
+    try std.testing.expectEqual(@as(usize, 18), expected.discovered_functions);
     try std.testing.expectEqual(@as(usize, 2), expected.counts.varargs_rows);
-    try std.testing.expectEqual(@as(usize, 3), expected.counts.vector_rows);
+    try std.testing.expectEqual(@as(usize, 4), expected.counts.vector_rows);
     try std.testing.expectEqual(@as(usize, 1), expected.counts.tail_call_rows);
     try std.testing.expectEqual(@as(usize, 0), expected.counts.safety_edge_rows);
     try std.testing.expectEqual(@as(usize, 2), expected.counts.pointer_slice_rows);
     try std.testing.expectEqual(@as(usize, 1), expected.counts.tag_name_rows);
     try std.testing.expectEqual(@as(usize, 1), expected.counts.union_payload_rows);
     try std.testing.expectEqual(@as(usize, 2), expected.counts.optional_error_mix_rows);
-    try std.testing.expect(expected.matches(10, 17, expected.counts));
-    try std.testing.expect(!expected.matches(10, 16, expected.counts));
+    try std.testing.expect(expected.matches(10, 18, expected.counts));
+    try std.testing.expect(!expected.matches(10, 17, expected.counts));
 }
 
 test "frontier ABI boundary source row counts are explicit" {

@@ -16,3 +16,8 @@ export fn frontier_vector_unsupported_width(value: u8) u8 {
     const lanes: @Vector(16, u8) = @splat(value);
     return lanes[15];
 }
+
+export fn frontier_vector_unsupported_element(value: f32) f32 {
+    const lanes: @Vector(4, f32) = @splat(value);
+    return lanes[2];
+}
