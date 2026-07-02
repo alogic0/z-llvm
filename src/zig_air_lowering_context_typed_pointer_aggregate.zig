@@ -266,6 +266,7 @@ pub fn materializeSliceAggregateForLen(self: anytype, instruction_index: u32, sl
 
 pub fn lowerTypedPtrGep(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
+    if (try self.lowerTypedSyntheticVectorElemPtr(instruction)) return;
     const base = try self.resolveTypedOperand(instruction, 0);
     const index = try self.resolveTypedOperand(instruction, 1);
     const is_ptr_sub = std.mem.eql(u8, instruction.opcode, "ptr_sub");
@@ -327,6 +328,40 @@ pub fn lowerTypedPtrGep(self: anytype, instruction: air_export.TypedInstruction)
         .ty = result_type,
         .value = .{ .named = result_name },
     };
+}
+
+pub fn lowerTypedSyntheticVectorElemPtr(self: anytype, instruction: air_export.TypedInstruction) !bool {
+    if (!std.mem.eql(u8, instruction.opcode, "ptr_elem_ptr")) return false;
+    const base_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (base_index >= self.synthetic_vector_slots.len) return air_model.LowerError.UnsupportedAir;
+    const slot = self.synthetic_vector_slots[base_index] orelse return false;
+    const vector_ty = switch (slot.ty.ir_type) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+    };
+    const index = try self.resolveTypedOperand(instruction, 1);
+    const lane = switch (index.value) {
+        .int => |value| blk: {
+            if (value < 0 or value > std.math.maxInt(u32)) return air_model.LowerError.UnsupportedAir;
+            break :blk @as(u32, @intCast(value));
+        },
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return air_model.LowerError.UnsupportedAir,
+    };
+    if (lane >= vector_ty.len) return air_model.LowerError.UnsupportedAir;
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (result_type.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
+    if (result_type.pointer_child) |child| {
+        if (!child.eql(vector_ty.elem_ty.toType())) return air_model.LowerError.UnsupportedAir;
+    }
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .poison,
+    };
+    self.synthetic_vector_element_ptrs[instruction.index] = .{
+        .slot_index = base_index,
+        .lane_index = lane,
+    };
+    return true;
 }
 
 pub fn lowerTypedRuntimeNavPtr(self: anytype, instruction: air_export.TypedInstruction) !void {

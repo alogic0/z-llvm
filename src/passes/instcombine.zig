@@ -19,6 +19,10 @@ const InsertRecord = struct {
     insert: ir.InsertElementInst,
 };
 
+const ShuffleRecord = struct {
+    shuffle: ir.ShuffleVectorInst,
+};
+
 fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
@@ -28,6 +32,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         defer debug_aliases.deinit();
         var inserted_vectors = std.StringHashMap(InsertRecord).init(module.allocator);
         defer inserted_vectors.deinit();
+        var shuffled_vectors = std.StringHashMap(ShuffleRecord).init(module.allocator);
+        defer shuffled_vectors.deinit();
 
         for (function.blocks.items, 0..) |*block, block_index| {
             for (block.instructions.items, 0..) |*instruction, instruction_index| {
@@ -36,7 +42,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 
                 if (canonicalize(instruction)) changed = true;
 
-                if (try rewriteWithContext(module.allocator, function, instruction, inserted_vectors)) changed = true;
+                if (try rewriteWithContext(module.allocator, function, instruction, inserted_vectors, shuffled_vectors)) changed = true;
 
                 if (foldWithContext(instruction.*, inserted_vectors) orelse fold(instruction.*)) |replacement| {
                     instruction.removed = true;
@@ -54,6 +60,13 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                             .block_index = block_index,
                             .instruction_index = instruction_index,
                             .insert = instruction.kind.insertelement,
+                        });
+                    }
+                }
+                if (instruction.kind == .shufflevector) {
+                    if (instruction.result) |result| {
+                        try shuffled_vectors.put(result, .{
+                            .shuffle = instruction.kind.shufflevector,
                         });
                     }
                 }
@@ -227,9 +240,10 @@ fn rewriteWithContext(
     function: *ir.Function,
     instruction: *ir.Instruction,
     inserted_vectors: std.StringHashMap(InsertRecord),
+    shuffled_vectors: std.StringHashMap(ShuffleRecord),
 ) !bool {
     return switch (instruction.kind) {
-        .extractelement => |*extract| try rewriteExtractAfterInsert(allocator, function, extract, inserted_vectors),
+        .extractelement => |*extract| try rewriteExtractElement(allocator, function, extract, inserted_vectors, shuffled_vectors),
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
     };
 }
@@ -253,6 +267,71 @@ fn foldExtractAfterInsert(extract: ir.ExtractElementInst, inserted_vectors: std.
     };
     if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return null;
     return insert.value;
+}
+
+fn rewriteExtractElement(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    extract: *ir.ExtractElementInst,
+    inserted_vectors: std.StringHashMap(InsertRecord),
+    shuffled_vectors: std.StringHashMap(ShuffleRecord),
+) !bool {
+    var changed = false;
+    if (rewriteExtractAfterShuffle(extract, shuffled_vectors)) changed = true;
+    if (try rewriteExtractAfterInsert(allocator, function, extract, inserted_vectors)) changed = true;
+    return changed;
+}
+
+fn rewriteExtractAfterShuffle(
+    extract: *ir.ExtractElementInst,
+    shuffled_vectors: std.StringHashMap(ShuffleRecord),
+) bool {
+    if (extract.vector != .named) return false;
+    if (extract.index != .int) return false;
+    if (extract.index.int < 0) return false;
+    const record = shuffled_vectors.get(extract.vector.named) orelse return false;
+    const shuffle = record.shuffle;
+    const extract_vector_ty = switch (extract.vector_ty) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+    };
+    const mask_vector_ty = switch (shuffle.mask_ty) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+    };
+    const lhs_vector_ty = switch (shuffle.lhs_ty) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+    };
+    if (extract_vector_ty.len != mask_vector_ty.len) return false;
+    if (!extract_vector_ty.elem_ty.toType().eql(lhs_vector_ty.elem_ty.toType())) return false;
+    if (!shuffle.lhs_ty.eql(shuffle.rhs_ty)) return false;
+    if (shuffle.rhs != .poison and shuffle.rhs != .undef) return false;
+    if (extract.index.int > std.math.maxInt(usize)) return false;
+    const target_lane = shuffleMaskLane(shuffle.mask, @intCast(extract.index.int)) orelse return false;
+    if (target_lane >= lhs_vector_ty.len) return false;
+    extract.vector_ty = shuffle.lhs_ty;
+    extract.vector = shuffle.lhs;
+    extract.index_ty = .{ .int = 64 };
+    extract.index = .{ .int = target_lane };
+    return true;
+}
+
+fn shuffleMaskLane(mask: ir.Value, index: usize) ?i128 {
+    const text = switch (mask) {
+        .vector => |text| text,
+        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .constant_expr => return null,
+    };
+    const inner = std.mem.trim(u8, text, " \t\r\n<>");
+    var parts = std.mem.splitScalar(u8, inner, ',');
+    var current: usize = 0;
+    while (parts.next()) |raw_part| : (current += 1) {
+        if (current != index) continue;
+        const part = std.mem.trim(u8, raw_part, " \t\r\n");
+        if (!std.mem.startsWith(u8, part, "i32 ")) return null;
+        return std.fmt.parseInt(i128, std.mem.trim(u8, part["i32 ".len..], " \t\r\n"), 10) catch null;
+    }
+    return null;
 }
 
 fn rewriteExtractAfterInsert(

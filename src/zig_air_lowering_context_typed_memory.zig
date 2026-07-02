@@ -28,6 +28,17 @@ pub fn lowerTypedAlloca(self: anytype, instruction: air_export.TypedInstruction)
     }
     const pointer_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     const allocated_type = pointer_type.pointer_child orelse return air_model.LowerError.UnsupportedAir;
+    if (allocated_type == .vector) {
+        self.values[instruction.index] = .{
+            .ty = pointer_type,
+            .value = .poison,
+        };
+        self.synthetic_vector_slots[instruction.index] = .{
+            .ty = .{ .ir_type = allocated_type },
+            .value = .undef,
+        };
+        return;
+    }
     if (errorUnionPointerOperandText(instruction.result_type) and allocated_type.eql(.{ .int = 64 })) {
         self.values[instruction.index] = .{
             .ty = pointer_type,
@@ -51,16 +62,13 @@ pub fn lowerTypedLoad(self: anytype, instruction: air_export.TypedInstruction) !
     if (try self.lowerTypedLoadFromSyntheticPointerPayload(instruction)) return;
     if (try self.lowerTypedLoadFromSyntheticErrorUnionSlot(instruction)) return;
     if (try self.lowerTypedLoadFromSyntheticUnionTagSlot(instruction)) return;
+    if (try self.lowerTypedLoadFromSyntheticVectorSlot(instruction)) return;
+    if (try self.lowerTypedLoadFromSyntheticVectorElement(instruction)) return;
     if (try self.lowerTypedLoadFromSlicePtrPtr(instruction)) return;
     if (try self.lowerTypedLoadFromSliceLenPtr(instruction)) return;
     const pointer = try self.resolveTypedOperand(instruction, 0);
     if (pointer.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
-    const result_type = parseZigType(instruction.result_type) orelse blk: {
-        const typed_child = pointerLoadResultType(instruction.operands[0].type_text);
-        if (typed_child) |child| break :blk child;
-        const child = pointer.ty.pointer_child orelse return air_model.LowerError.UnsupportedAir;
-        break :blk air_model.ZigType{ .ir_type = child };
-    };
+    const result_type = try typedLoadResultType(instruction, pointer.ty);
     const result_name = try self.resultName(instruction.index);
     try self.block.instructions.append(self.allocator, .{
         .result = result_name,
@@ -73,6 +81,57 @@ pub fn lowerTypedLoad(self: anytype, instruction: air_export.TypedInstruction) !
     self.values[instruction.index] = .{
         .ty = result_type,
         .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedLoadFromSyntheticVectorSlot(self: anytype, instruction: air_export.TypedInstruction) !bool {
+    const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (pointer_index >= self.synthetic_vector_slots.len) return air_model.LowerError.UnsupportedAir;
+    const loaded = self.synthetic_vector_slots[pointer_index] orelse return false;
+    const pointer = try self.resolveTypedOperand(instruction, 0);
+    const result_type = try typedLoadResultType(instruction, pointer.ty);
+    if (!result_type.ir_type.eql(loaded.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    self.values[instruction.index] = loaded;
+    return true;
+}
+
+pub fn lowerTypedLoadFromSyntheticVectorElement(self: anytype, instruction: air_export.TypedInstruction) !bool {
+    const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (pointer_index >= self.synthetic_vector_element_ptrs.len) return air_model.LowerError.UnsupportedAir;
+    const element_ptr = self.synthetic_vector_element_ptrs[pointer_index] orelse return false;
+    if (element_ptr.slot_index >= self.synthetic_vector_slots.len) return air_model.LowerError.UnsupportedAir;
+    const vector = self.synthetic_vector_slots[element_ptr.slot_index] orelse return air_model.LowerError.UnsupportedAir;
+    const vector_ty = switch (vector.ty.ir_type) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+    };
+    if (element_ptr.lane_index >= vector_ty.len) return air_model.LowerError.UnsupportedAir;
+    const pointer = try self.resolveTypedOperand(instruction, 0);
+    const result_type = try typedLoadResultType(instruction, pointer.ty);
+    if (!result_type.ir_type.eql(vector_ty.elem_ty.toType())) return air_model.LowerError.UnsupportedAir;
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .extractelement = .{
+            .vector_ty = vector.ty.ir_type,
+            .vector = vector.value,
+            .index_ty = .{ .int = 64 },
+            .index = .{ .int = element_ptr.lane_index },
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+    return true;
+}
+
+fn typedLoadResultType(instruction: air_export.TypedInstruction, pointer_type: air_model.ZigType) air_model.LowerError!air_model.ZigType {
+    return parseZigType(instruction.result_type) orelse blk: {
+        const typed_child = pointerLoadResultType(instruction.operands[0].type_text);
+        if (typed_child) |child| break :blk child;
+        const child = pointer_type.pointer_child orelse return air_model.LowerError.UnsupportedAir;
+        break :blk air_model.ZigType{ .ir_type = child };
     };
 }
 
@@ -185,9 +244,11 @@ pub fn lowerTypedStore(self: anytype, instruction: air_export.TypedInstruction) 
     if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
     const pointer = try self.resolveTypedOperand(instruction, 0);
     if (pointer.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
+    if (try self.lowerTypedStoreToSyntheticVectorElement(instruction)) return;
     if (try self.lowerTypedStoreToSyntheticUnionField(instruction)) return;
     const value = try self.resolveTypedOperand(instruction, 1);
     if (try self.lowerTypedStoreToSyntheticErrorUnionSlot(instruction, value)) return;
+    if (try self.lowerTypedStoreToSyntheticVectorSlot(instruction, value)) return;
     try self.block.instructions.append(self.allocator, .{
         .result = null,
         .kind = .{ .store = .{
@@ -197,6 +258,54 @@ pub fn lowerTypedStore(self: anytype, instruction: air_export.TypedInstruction) 
             .attrs = .{ .is_volatile = pointer.ty.is_volatile_pointer },
         } },
     });
+}
+
+pub fn lowerTypedStoreToSyntheticVectorSlot(
+    self: anytype,
+    instruction: air_export.TypedInstruction,
+    value: anytype,
+) !bool {
+    const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (pointer_index >= self.synthetic_vector_slots.len) return air_model.LowerError.UnsupportedAir;
+    const slot = self.synthetic_vector_slots[pointer_index] orelse return false;
+    if (!value.ty.ir_type.eql(slot.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    self.synthetic_vector_slots[pointer_index] = value;
+    return true;
+}
+
+pub fn lowerTypedStoreToSyntheticVectorElement(
+    self: anytype,
+    instruction: air_export.TypedInstruction,
+) !bool {
+    const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (pointer_index >= self.synthetic_vector_element_ptrs.len) return air_model.LowerError.UnsupportedAir;
+    const element_ptr = self.synthetic_vector_element_ptrs[pointer_index] orelse return false;
+    if (element_ptr.slot_index >= self.synthetic_vector_slots.len) return air_model.LowerError.UnsupportedAir;
+    const vector = self.synthetic_vector_slots[element_ptr.slot_index] orelse return air_model.LowerError.UnsupportedAir;
+    const vector_ty = switch (vector.ty.ir_type) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+    };
+    if (element_ptr.lane_index >= vector_ty.len) return air_model.LowerError.UnsupportedAir;
+    const value = try self.resolveTypedOperand(instruction, 1);
+    if (!value.ty.ir_type.eql(vector_ty.elem_ty.toType())) return air_model.LowerError.UnsupportedAir;
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .insertelement = .{
+            .vector_ty = vector.ty.ir_type,
+            .vector = vector.value,
+            .value_ty = value.ty.ir_type,
+            .value = value.value,
+            .index_ty = .{ .int = 64 },
+            .index = .{ .int = element_ptr.lane_index },
+        } },
+    });
+    self.synthetic_vector_slots[element_ptr.slot_index] = .{
+        .ty = vector.ty,
+        .value = .{ .named = result_name },
+    };
+    return true;
 }
 
 pub fn lowerTypedStoreToSyntheticErrorUnionSlot(

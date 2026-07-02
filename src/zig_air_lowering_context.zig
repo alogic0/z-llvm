@@ -16,6 +16,7 @@ const typed_union_tag = @import("zig_air_lowering_context_typed_union_tag.zig");
 const typed_pointer_aggregate = @import("zig_air_lowering_context_typed_pointer_aggregate.zig");
 const typed_aggregate = @import("zig_air_lowering_context_typed_aggregate.zig");
 const typed_scalar = @import("zig_air_lowering_context_typed_scalar.zig");
+const typed_vector = @import("zig_air_lowering_context_typed_vector.zig");
 const typed_cfg = @import("zig_air_lowering_context_typed_cfg.zig");
 const typed_call = @import("zig_air_lowering_context_typed_call.zig");
 
@@ -79,6 +80,8 @@ pub const LoweringContext = struct {
     synthetic_error_union_slots: []?TypedValue,
     synthetic_union_tag_slots: []?TypedValue,
     synthetic_union_field_ptrs: []?air_model.SyntheticUnionFieldPointer,
+    synthetic_vector_slots: []?TypedValue,
+    synthetic_vector_element_ptrs: []?air_model.SyntheticVectorElementPointer,
     next_arg_index: usize = 0,
 
     // Typed lowering dispatch and domain-specific lowering operations.
@@ -144,10 +147,14 @@ pub const LoweringContext = struct {
     pub const lowerTypedLoadFromSyntheticPointerPayload = typed_memory.lowerTypedLoadFromSyntheticPointerPayload;
     pub const lowerTypedLoadFromSyntheticErrorUnionSlot = typed_memory.lowerTypedLoadFromSyntheticErrorUnionSlot;
     pub const lowerTypedLoadFromSyntheticUnionTagSlot = typed_memory.lowerTypedLoadFromSyntheticUnionTagSlot;
+    pub const lowerTypedLoadFromSyntheticVectorSlot = typed_memory.lowerTypedLoadFromSyntheticVectorSlot;
+    pub const lowerTypedLoadFromSyntheticVectorElement = typed_memory.lowerTypedLoadFromSyntheticVectorElement;
     pub const lowerTypedLoadFromSliceLenPtr = typed_memory.lowerTypedLoadFromSliceLenPtr;
     pub const lowerTypedLoadFromSlicePtrPtr = typed_memory.lowerTypedLoadFromSlicePtrPtr;
     pub const lowerTypedStore = typed_memory.lowerTypedStore;
     pub const lowerTypedStoreToSyntheticErrorUnionSlot = typed_memory.lowerTypedStoreToSyntheticErrorUnionSlot;
+    pub const lowerTypedStoreToSyntheticVectorSlot = typed_memory.lowerTypedStoreToSyntheticVectorSlot;
+    pub const lowerTypedStoreToSyntheticVectorElement = typed_memory.lowerTypedStoreToSyntheticVectorElement;
     pub const lowerTypedStoreToSyntheticUnionField = typed_memory.lowerTypedStoreToSyntheticUnionField;
 
     pub const lowerTypedOptionalSemanticInstruction = typed_optional.lowerTypedOptionalSemanticInstruction;
@@ -176,6 +183,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedArrayElemVal = typed_pointer_aggregate.lowerTypedArrayElemVal;
     pub const lowerTypedFieldPtr = typed_pointer_aggregate.lowerTypedFieldPtr;
     pub const lowerTypedSyntheticUnionFieldPtr = typed_pointer_aggregate.lowerTypedSyntheticUnionFieldPtr;
+    pub const lowerTypedSyntheticVectorElemPtr = typed_pointer_aggregate.lowerTypedSyntheticVectorElemPtr;
 
     pub const lowerTypedAggregateSemanticInstruction = typed_aggregate.lowerTypedAggregateSemanticInstruction;
     pub const lowerTypedAggregateInit = typed_aggregate.lowerTypedAggregateInit;
@@ -200,6 +208,9 @@ pub const LoweringContext = struct {
     pub const lowerTypedBitCount = typed_scalar.lowerTypedBitCount;
     pub const lowerTypedBitReverse = typed_scalar.lowerTypedBitReverse;
 
+    pub const lowerTypedVectorSemanticInstruction = typed_vector.lowerTypedVectorSemanticInstruction;
+    pub const lowerTypedShuffleOne = typed_vector.lowerTypedShuffleOne;
+
     pub const lowerTypedCall = typed_call.lowerTypedCall;
 
     pub fn lowerLegacySemanticInstruction(
@@ -210,7 +221,7 @@ pub const LoweringContext = struct {
             .scalar => try self.lowerLegacyScalarSemanticInstruction(instruction),
             .memory => try self.lowerLegacyMemorySemanticInstruction(instruction),
             .pointer_aggregate => try self.lowerLegacyPointerAggregateSemanticInstruction(instruction),
-            .optional, .error_union, .union_tag, .aggregate, .none => false,
+            .optional, .error_union, .union_tag, .aggregate, .vector, .none => false,
         };
         return lowered;
     }

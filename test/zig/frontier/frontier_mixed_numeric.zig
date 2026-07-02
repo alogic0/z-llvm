@@ -78,6 +78,12 @@ export fn frontier_shl_sat_u32(value: u32) u32 {
     return value <<| 1;
 }
 
+export fn frontier_shuffle_one_u8(a: u8, b: u8, c: u8, d: u8) u8 {
+    const vector: @Vector(4, u8) = .{ a, b, c, d };
+    const shuffled = @shuffle(u8, vector, undefined, @Vector(4, i32){ 3, 2, 1, 0 });
+    return shuffled[0];
+}
+
 export fn frontier_neg_f32(value: f32) f32 {
     return -value;
 }

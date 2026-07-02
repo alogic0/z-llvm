@@ -79,6 +79,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "f64")) return .{ .ir_type = .double };
     if (std.mem.eql(u8, trimmed, "f128")) return .{ .ir_type = .fp128 };
     if (std.mem.eql(u8, trimmed, "anyerror")) return .{ .ir_type = .{ .int = 16 } };
+    if (parseZigVectorType(trimmed)) |vector_ty| return vector_ty;
     if (std.mem.eql(u8, trimmed, "extern struct { a: i32, b: f64 }")) {
         return .{ .ir_type = .{ .aggregate = "{ i32, double }" } };
     }
@@ -115,6 +116,24 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         };
     }
     return null;
+}
+
+fn parseZigVectorType(trimmed: []const u8) ?ZigType {
+    const prefix = "@Vector(";
+    if (!std.mem.startsWith(u8, trimmed, prefix) or !std.mem.endsWith(u8, trimmed, ")")) return null;
+    const body = trimmed[prefix.len .. trimmed.len - 1];
+    const comma = std.mem.indexOfScalar(u8, body, ',') orelse return null;
+    const len = std.fmt.parseInt(u32, std.mem.trim(u8, body[0..comma], " "), 10) catch return null;
+    if (len == 0) return null;
+    const elem = parseZigType(std.mem.trim(u8, body[comma + 1 ..], " ")) orelse return null;
+    const elem_ty: ir.VectorElementType = switch (elem.ir_type) {
+        .int => |bits| .{ .int = bits },
+        .float => .float,
+        .double => .double,
+        .ptr => .ptr,
+        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => return null,
+    };
+    return .{ .ir_type = .{ .vector = .{ .len = len, .elem_ty = elem_ty } }, .signed = elem.signed };
 }
 
 pub fn parseAnonymousStructType(trimmed: []const u8) ?ZigType {

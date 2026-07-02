@@ -34,6 +34,7 @@ pub fn lowerTypedSemanticInstruction(self: anytype, instruction: air_export.Type
         .union_tag => try self.lowerTypedUnionTagSemanticInstruction(instruction),
         .pointer_aggregate => try self.lowerTypedPointerAggregateSemanticInstruction(instruction),
         .aggregate => try self.lowerTypedAggregateSemanticInstruction(instruction),
+        .vector => try self.lowerTypedVectorSemanticInstruction(instruction),
         .none => false,
     };
     if (!lowered) return air_model.LowerError.UnsupportedAir;

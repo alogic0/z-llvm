@@ -167,6 +167,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgShuffleOneU8Return(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
@@ -323,6 +327,85 @@ fn lowerGenericCfgByteSwapReturn(
     }
     try appendGenericCfgReturn(allocator, machine);
     return true;
+}
+
+fn lowerGenericCfgShuffleOneU8Return(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 8 }) or !ret.ty.eql(function.ret_ty)) return false;
+    if (block.instructions.items.len != 6) return false;
+    const extract_inst = block.instructions.items[5];
+    const extract_name = extract_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, extract_name)) return false;
+    const extract = switch (extract_inst.kind) {
+        .extractelement => |extract| extract,
+        else => return false,
+    };
+    if (!extract.vector_ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 8 } } })) return false;
+    if (!extract.index_ty.eql(.{ .int = 64 }) or !isInt(extract.index, 0)) return false;
+    const shuffle_name = switch (extract.vector) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const shuffle_inst = findInstruction(block, shuffle_name) orelse return false;
+    const shuffle = switch (shuffle_inst.kind) {
+        .shufflevector => |shuffle| shuffle,
+        else => return false,
+    };
+    if (!shuffle.lhs_ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 8 } } })) return false;
+    if (!shuffle.rhs_ty.eql(shuffle.lhs_ty)) return false;
+    if (shuffle.rhs != .poison and shuffle.rhs != .undef) return false;
+    if (!shuffle.mask_ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 32 } } })) return false;
+    const selected_lane = shuffleMaskLane(shuffle.mask, 0) orelse return false;
+    if (selected_lane < 0 or selected_lane > 3) return false;
+    const selected_value = vectorInsertedLaneValue(block, shuffle.lhs, @intCast(selected_lane)) orelse return false;
+    const selected_name = switch (selected_value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const reg = try paramReg(function, selected_name, .{ .int = 8 });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 0xff });
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn vectorInsertedLaneValue(block: ir.BasicBlock, vector: ir.Value, lane: u32) ?ir.Value {
+    const vector_name = switch (vector) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const instruction = findInstruction(block, vector_name) orelse return null;
+    const insert = switch (instruction.kind) {
+        .insertelement => |insert| insert,
+        else => return null,
+    };
+    if (!insert.vector_ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 8 } } })) return null;
+    if (!insert.value_ty.eql(.{ .int = 8 })) return null;
+    if (!insert.index_ty.eql(.{ .int = 64 }) or insert.index != .int) return null;
+    if (insert.index.int == lane) return insert.value;
+    return vectorInsertedLaneValue(block, insert.vector, lane);
+}
+
+fn shuffleMaskLane(mask: ir.Value, lane: usize) ?i128 {
+    const text = switch (mask) {
+        .vector => |text| text,
+        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .constant_expr => return null,
+    };
+    const inner = std.mem.trim(u8, text, " \t\r\n<>");
+    var parts = std.mem.splitScalar(u8, inner, ',');
+    var index: usize = 0;
+    while (parts.next()) |raw_part| : (index += 1) {
+        if (index != lane) continue;
+        const part = std.mem.trim(u8, raw_part, " \t\r\n");
+        if (!std.mem.startsWith(u8, part, "i32 ")) return null;
+        return std.fmt.parseInt(i128, std.mem.trim(u8, part["i32 ".len..], " \t\r\n"), 10) catch null;
+    }
+    return null;
 }
 
 fn lowerGenericCfgAbsReturn(

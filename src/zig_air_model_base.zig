@@ -40,6 +40,11 @@ pub const SyntheticUnionFieldPointer = struct {
     field_index: u32,
 };
 
+pub const SyntheticVectorElementPointer = struct {
+    slot_index: u32,
+    lane_index: u32,
+};
+
 pub const TypedBranchMergeResult = struct {
     value: ?TypedValue,
     predecessor_label: []const u8,

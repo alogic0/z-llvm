@@ -1094,12 +1094,31 @@ Layer: ABI planner and backend.
   supported subset is deliberately internal-only, not x86_64 SysV vector ABI:
   scalar C ABI wrappers may construct/use vectors inside Zig helpers, but
   exported vector arguments/returns remain boundary-owned. Initial lowering
-  should target power-of-two integer lanes used by real compiler-core rows,
-  starting with `@Vector(16, u8)` and the associated bool mask/count lanes for
+  should target power-of-two integer lanes used by real compiler-core rows. The
+  first proof below is deliberately narrower (`@Vector(4, u8)` lane selection)
+  so the typed-v2 contract and backend path are proven before moving to the
+  wider `@Vector(16, u8)` and bool-mask/count forms used by
   `countScalar`/`countTrues`. Wider integer vectors, float vectors, vector
   call/return ABI, and target-feature-specific SIMD instruction selection stay
   fail-closed until their own rows are proven.
-- [ ] Lower a narrow `shuffle_one` subset.
+- [x] Lower a narrow `shuffle_one` subset.
+  Added the narrow `zllvm-shuffle-one-v1` typed-v2 hook contract and z_llvm
+  model/lowering for element-mask `shuffle_one` records, with unsupported
+  non-`ty_pl` shuffle encodings left opaque instead of crashing the exporter.
+  The source-backed row
+  `frontier_mixed_numeric.frontier_shuffle_one_u8` constructs a
+  `@Vector(4, u8)`, shuffles it with an element-only mask, extracts the first
+  lane, and returns the selected scalar through the existing C ABI harness.
+  The x86_64 backend folds the supported
+  `insertelement`/`shufflevector`/`extractelement` single-block scalar-return
+  shape without accepting vector call/return ABI. Saved evidence:
+  `tmp/vector_shuffle_descriptor_lines.log` proves typed-v2 facts,
+  `tmp/vector_shuffle_safety_edges_probe.log` proves unrelated shuffle records
+  no longer crash export, `tmp/frontier_vector_shuffle.log` reports all three
+  release modes at `source_rows=14`, `discovered_functions=751`,
+  `generic_cfg_functions=751`, `object_emitted_functions=751`,
+  `executable_ok_rows=14`, and `local_fail=0`; boundary evidence remains green
+  in `tmp/frontier_vector_shuffle_boundaries.log`.
 - [ ] Lower `splat` for the selected vector subset.
 - [ ] Lower `reduce` for the selected vector subset.
 - [ ] Add fail-closed diagnostics for unsupported vector widths.

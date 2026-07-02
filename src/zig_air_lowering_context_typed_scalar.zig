@@ -163,6 +163,16 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
     const source = try self.resolveTypedOperand(instruction, 0);
     const target_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     if (source.ty.ir_type.eql(target_type.ir_type)) {
+        if (source.ty.ir_type == .ptr and instruction.index < self.synthetic_vector_slots.len) {
+            if (air_model.typedInstOperandIndex(instruction.operands[0])) |source_index| {
+                if (source_index < self.synthetic_vector_slots.len) {
+                    self.synthetic_vector_slots[instruction.index] = self.synthetic_vector_slots[source_index];
+                }
+                if (source_index < self.synthetic_vector_element_ptrs.len) {
+                    self.synthetic_vector_element_ptrs[instruction.index] = self.synthetic_vector_element_ptrs[source_index];
+                }
+            }
+        }
         if (source.ty.ir_type == .ptr and instruction.index < self.synthetic_union_tag_slots.len) {
             if (air_model.typedInstOperandIndex(instruction.operands[0])) |source_index| {
                 if (source_index < self.synthetic_union_tag_slots.len) {
@@ -179,6 +189,16 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
     if (air_capabilities.isBitcastOpcode(instruction.opcode) and
         source.ty.ir_type == .ptr and target_type.ir_type == .ptr)
     {
+        if (instruction.index < self.synthetic_vector_slots.len) {
+            if (air_model.typedInstOperandIndex(instruction.operands[0])) |source_index| {
+                if (source_index < self.synthetic_vector_slots.len) {
+                    self.synthetic_vector_slots[instruction.index] = self.synthetic_vector_slots[source_index];
+                }
+                if (source_index < self.synthetic_vector_element_ptrs.len) {
+                    self.synthetic_vector_element_ptrs[instruction.index] = self.synthetic_vector_element_ptrs[source_index];
+                }
+            }
+        }
         if (instruction.index < self.synthetic_union_tag_slots.len) {
             if (air_model.typedInstOperandIndex(instruction.operands[0])) |source_index| {
                 if (source_index < self.synthetic_union_tag_slots.len) {

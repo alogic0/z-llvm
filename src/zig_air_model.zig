@@ -9,12 +9,14 @@ const cfg_model = @import("zig_air_model_cfg.zig");
 const typed_operands = @import("zig_air_model_typed_operands.zig");
 const typed_recognizers = @import("zig_air_model_typed_recognizers.zig");
 const untyped_model = @import("zig_air_model_untyped.zig");
+const vector_model = @import("zig_air_model_vector.zig");
 
 pub const ZigType = model_base.ZigType;
 pub const FunctionType = model_base.FunctionType;
 pub const irCallingConvention = model_base.irCallingConvention;
 pub const TypedValue = model_base.TypedValue;
 pub const SyntheticUnionFieldPointer = model_base.SyntheticUnionFieldPointer;
+pub const SyntheticVectorElementPointer = model_base.SyntheticVectorElementPointer;
 pub const TypedBranchMergeResult = model_base.TypedBranchMergeResult;
 pub const LowerError = model_base.LowerError;
 pub const TypedFunctionView = model_base.TypedFunctionView;
@@ -141,6 +143,8 @@ pub const runtimePointerLoadStoreMainSummary = runtime_model.runtimePointerLoadS
 pub const selectedRuntimePointerLoadStoreMainShape = runtime_model.selectedRuntimePointerLoadStoreMainShape;
 pub const panicEdgeSummary = runtime_model.panicEdgeSummary;
 pub const selectedMixCAddMayPanicShape = runtime_model.selectedMixCAddMayPanicShape;
+pub const TypedShuffleOneSummary = vector_model.TypedShuffleOneSummary;
+pub const typedShuffleOneSummary = vector_model.typedShuffleOneSummary;
 
 pub const UntypedValueSource = untyped_model.UntypedValueSource;
 pub const UntypedStore = untyped_model.UntypedStore;

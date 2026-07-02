@@ -100,6 +100,7 @@ pub const SemanticDomain = enum {
     union_tag,
     pointer_aggregate,
     aggregate,
+    vector,
 
     pub fn name(self: SemanticDomain) []const u8 {
         return switch (self) {
@@ -111,6 +112,7 @@ pub const SemanticDomain = enum {
             .union_tag => "union-tag",
             .pointer_aggregate => "pointer-aggregate",
             .aggregate => "aggregate",
+            .vector => "vector",
         };
     }
 };
@@ -193,6 +195,11 @@ pub const AggregateSemanticOp = enum {
     none,
     init,
     field_val,
+};
+
+pub const VectorSemanticOp = enum {
+    none,
+    shuffle_one,
 };
 
 pub const CfgLoweringOp = enum {
@@ -340,6 +347,7 @@ fn semanticDomainFromOperationIds(opcode: []const u8) SemanticDomain {
     if (unionTagSemanticOpForOpcode(opcode) != .none) return .union_tag;
     if (pointerAggregateSemanticOpForOpcode(opcode) != .none) return .pointer_aggregate;
     if (aggregateSemanticOpForOpcode(opcode) != .none) return .aggregate;
+    if (vectorSemanticOpForOpcode(opcode) != .none) return .vector;
     return .none;
 }
 
@@ -421,6 +429,11 @@ pub fn pointerAggregateSemanticOpForOpcode(opcode: []const u8) PointerAggregateS
 pub fn aggregateSemanticOpForOpcode(opcode: []const u8) AggregateSemanticOp {
     if (std.mem.eql(u8, opcode, "aggregate_init")) return .init;
     if (std.mem.eql(u8, opcode, "struct_field_val")) return .field_val;
+    return .none;
+}
+
+pub fn vectorSemanticOpForOpcode(opcode: []const u8) VectorSemanticOp {
+    if (std.mem.eql(u8, opcode, "shuffle_one")) return .shuffle_one;
     return .none;
 }
 
@@ -1012,6 +1025,7 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(PointerAggregateSemanticOp.array_elem_val, pointerAggregateSemanticOpForOpcode("array_elem_val"));
     try std.testing.expectEqual(PointerAggregateSemanticOp.field_ptr, pointerAggregateSemanticOpForOpcode("struct_field_ptr"));
     try std.testing.expectEqual(SemanticDomain.aggregate, semanticDomainForOpcode("aggregate_init"));
+    try std.testing.expectEqual(SemanticDomain.vector, semanticDomainForOpcode("shuffle_one"));
     try std.testing.expectEqual(AggregateSemanticOp.init, aggregateSemanticOpForOpcode("aggregate_init"));
     try std.testing.expectEqual(AggregateSemanticOp.field_val, aggregateSemanticOpForOpcode("struct_field_val"));
     try std.testing.expect(isFieldPtrIndexOpcode("struct_field_ptr_index_0", 0));

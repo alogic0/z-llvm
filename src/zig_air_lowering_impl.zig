@@ -601,6 +601,12 @@ fn lowerFunction(
     const synthetic_union_field_ptrs = try allocator.alloc(?air_model.SyntheticUnionFieldPointer, air_function.instruction_count);
     defer allocator.free(synthetic_union_field_ptrs);
     @memset(synthetic_union_field_ptrs, null);
+    const synthetic_vector_slots = try allocator.alloc(?TypedValue, air_function.instruction_count);
+    defer allocator.free(synthetic_vector_slots);
+    @memset(synthetic_vector_slots, null);
+    const synthetic_vector_element_ptrs = try allocator.alloc(?air_model.SyntheticVectorElementPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_vector_element_ptrs);
+    @memset(synthetic_vector_element_ptrs, null);
 
     var context: LoweringContext = .{
         .allocator = allocator,
@@ -616,6 +622,8 @@ fn lowerFunction(
         .synthetic_error_union_slots = synthetic_error_union_slots,
         .synthetic_union_tag_slots = synthetic_union_tag_slots,
         .synthetic_union_field_ptrs = synthetic_union_field_ptrs,
+        .synthetic_vector_slots = synthetic_vector_slots,
+        .synthetic_vector_element_ptrs = synthetic_vector_element_ptrs,
     };
 
     for (air_function.instructions) |instruction| {
@@ -788,6 +796,12 @@ fn lowerFunctionTypedV2(
     const synthetic_union_field_ptrs = try allocator.alloc(?air_model.SyntheticUnionFieldPointer, air_function.instruction_count);
     defer allocator.free(synthetic_union_field_ptrs);
     @memset(synthetic_union_field_ptrs, null);
+    const synthetic_vector_slots = try allocator.alloc(?TypedValue, air_function.instruction_count);
+    defer allocator.free(synthetic_vector_slots);
+    @memset(synthetic_vector_slots, null);
+    const synthetic_vector_element_ptrs = try allocator.alloc(?air_model.SyntheticVectorElementPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_vector_element_ptrs);
+    @memset(synthetic_vector_element_ptrs, null);
     const typed_view = air_model.TypedFunctionView.init(air_function) orelse return error.UnsupportedAir;
 
     var context: LoweringContext = .{
@@ -806,6 +820,8 @@ fn lowerFunctionTypedV2(
         .synthetic_error_union_slots = synthetic_error_union_slots,
         .synthetic_union_tag_slots = synthetic_union_tag_slots,
         .synthetic_union_field_ptrs = synthetic_union_field_ptrs,
+        .synthetic_vector_slots = synthetic_vector_slots,
+        .synthetic_vector_element_ptrs = synthetic_vector_element_ptrs,
     };
 
     for (main_body.instructions) |instruction_index| {
