@@ -31,6 +31,8 @@ const appendSysVScalarCallArgs = x86_64_generic_cfg.appendSysVScalarCallArgs;
 const blockIndex = x86_64_generic_cfg.blockIndex;
 const lowerReturnTerminator = x86_64_generic_cfg.lowerReturnTerminator;
 const lowerReturnValueAfterCalls = x86_64_generic_cfg.lowerReturnValueAfterCalls;
+const emitGenericCfgI32CallIntoEax = x86_64_generic_cfg.emitGenericCfgI32CallIntoEax;
+const isUshlSatI32Callee = x86_64_generic_cfg.isUshlSatI32Callee;
 const paramReg = x86_64_generic_cfg.paramReg;
 const paramRegOrNull = x86_64_generic_cfg.paramRegOrNull;
 const paramValueReg = x86_64_generic_cfg.paramValueReg;
@@ -59,7 +61,12 @@ pub fn lowerStraightLineInstructions(
                     if (instruction.result != null) return error.VoidCallHasResult;
                     continue;
                 }
-                try lowerCall(allocator, machine, function, block, instruction_index, instruction.result, call);
+                if (call.ret_ty.eql(.{ .int = 32 }) and isUshlSatI32Callee(call.callee)) {
+                    if (instruction.result == null) return error.InstructionNeedsResult;
+                    try emitGenericCfgI32CallIntoEax(allocator, machine, function, block, instruction_index, call);
+                } else {
+                    try lowerCall(allocator, machine, function, block, instruction_index, instruction.result, call);
+                }
                 call_count += 1;
                 if (call.ret_ty == .void) {
                     if (instruction.result != null) return error.VoidCallHasResult;
@@ -94,6 +101,11 @@ pub fn lowerCall(
 ) !void {
     if (call.isDebugVariableLocation()) {
         if (result != null) return error.VoidCallHasResult;
+        return;
+    }
+    if (isUshlSatI32Callee(call.callee)) {
+        if (result == null) return error.InstructionNeedsResult;
+        try emitGenericCfgI32CallIntoEax(allocator, machine, function, block, instruction_index, call);
         return;
     }
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;

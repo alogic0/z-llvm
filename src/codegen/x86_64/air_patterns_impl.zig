@@ -352,6 +352,13 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (functionHasCall(function, "llvm.ushl.sat.i32")) {
+        if (try lowerGenericCfgSingleBlockScalar(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
+    }
+
     if (try lowerVolatileAbsoluteStore(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;

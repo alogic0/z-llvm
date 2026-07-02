@@ -49,6 +49,7 @@ const appendSysVScalarCallArgsWithBlock = cabi_call_lowering.appendSysVScalarCal
 const appendSysVCallTarget = shared.appendSysVCallTarget;
 const callIsFastcc = shared.callIsFastcc;
 const emitGenericCfgI32CallIntoEax = core_value_emit.emitGenericCfgI32CallIntoEax;
+const isUshlSatI32Callee = core_value_emit.isUshlSatI32Callee;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
 const emitGenericCfgI64ValueIntoRax = core_value_emit.emitGenericCfgI64ValueIntoRax;
 const emitGenericCfgIcmpCondition = cabi_call_lowering.emitGenericCfgIcmpCondition;
@@ -159,6 +160,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             return true;
         }
         if (try lowerGenericCfgBitReverseReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+        if (try lowerGenericCfgUshlSatReturn(allocator, machine, function, block, ret)) {
             machine.codegen_path = .generic_cfg;
             return true;
         }
@@ -405,6 +410,54 @@ fn lowerGenericCfgBitReverseReturn(
     ret: anytype,
 ) !bool {
     return lowerGenericCfgBitCountReturn(allocator, machine, function, block, ret, "llvm.bitreverse.i32", .bit_reverse_i32_edi_eax, false);
+}
+
+fn lowerGenericCfgUshlSatReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(function.ret_ty) or !ret.ty.eql(.{ .int = 32 })) return false;
+    var maybe_call_inst: ?ir.Instruction = null;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .call => {
+                if (maybe_call_inst != null) return false;
+                maybe_call_inst = instruction;
+            },
+            else => return false,
+        }
+    }
+    const call_inst = maybe_call_inst orelse return false;
+    const call_result_name = call_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, call_result_name, ret_name)) return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isUshlSatI32Callee(call.callee)) return false;
+    if (call.callee_value != null or call.inline_asm != null or !call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[1].ty.eql(.{ .int = 32 })) return false;
+    const source_name = switch (call.args.items[0].value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const amount_i128 = switch (call.args.items[1].value) {
+        .int => |value| value,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (amount_i128 < 0 or amount_i128 > 31) return false;
+    if ((try paramReg(function, source_name, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+    try machine.instructions.append(allocator, .{ .ushl_sat_i32_edi_imm_eax = @intCast(amount_i128) });
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
 }
 
 fn lowerGenericCfgZeroCountReturn(

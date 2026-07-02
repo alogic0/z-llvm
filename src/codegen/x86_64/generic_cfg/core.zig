@@ -3,6 +3,7 @@ const loop_phi = @import("core_loop_phi.zig");
 const diagnostics = @import("core_diagnostics.zig");
 const call_lowering = @import("core_call_lowering.zig");
 const memory_lowering = @import("core_memory_lowering.zig");
+const value_emit = @import("core_value_emit.zig");
 
 pub const appendAlignedDirectCallPreservingI32Param = call_lowering.appendAlignedDirectCallPreservingI32Param;
 pub const appendAlignedDirectCallPreservingI32Params = call_lowering.appendAlignedDirectCallPreservingI32Params;
@@ -69,6 +70,8 @@ pub const lowerReleaseSmallStrFromFloatSupportFunction = diagnostics.lowerReleas
 pub const lowerReturnTerminator = call_lowering.lowerReturnTerminator;
 pub const lowerReturnValue = call_lowering.lowerReturnValue;
 pub const lowerReturnValueAfterCalls = call_lowering.lowerReturnValueAfterCalls;
+pub const emitGenericCfgI32CallIntoEax = value_emit.emitGenericCfgI32CallIntoEax;
+pub const isUshlSatI32Callee = value_emit.isUshlSatI32Callee;
 pub const lowerRuntimeSliceSumPreoptHelper = diagnostics.lowerRuntimeSliceSumPreoptHelper;
 pub const lowerSliceSumLoop = diagnostics.lowerSliceSumLoop;
 pub const lowerUnreachableStub = diagnostics.lowerUnreachableStub;

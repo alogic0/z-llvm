@@ -399,6 +399,22 @@ pub fn emitGenericCfgI32CallIntoEax(
         try machine.instructions.append(allocator, .bit_reverse_i32_edi_eax);
         return;
     }
+    if (isUshlSatI32Callee(call.callee)) {
+        if (call.callee_value != null or call.inline_asm != null or !call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+        if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[1].ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+        const source_name = switch (call.args.items[0].value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        const amount_i128 = switch (call.args.items[1].value) {
+            .int => |value| value,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        if (amount_i128 < 0 or amount_i128 > 31) return error.UnsupportedCodegenValue;
+        if ((try paramReg(function, source_name, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .{ .ushl_sat_i32_edi_imm_eax = @intCast(amount_i128) });
+        return;
+    }
     if (genericCfgSupportsSminIntrinsicCall(function, call)) {
         const lhs_name = switch (call.args.items[0].value) {
             .named => |name| name,
@@ -450,6 +466,11 @@ pub fn emitGenericCfgI32CallIntoEax(
             try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
         }
     }
+}
+
+pub fn isUshlSatI32Callee(callee: []const u8) bool {
+    if (isCalleeName(callee, "llvm.ushl.sat.i32")) return true;
+    return std.mem.indexOf(u8, callee, "llvm.ushl.sat.i32") != null;
 }
 
 pub fn emitGenericCfgVoidCall(

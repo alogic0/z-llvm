@@ -1037,6 +1037,22 @@ Layer: semantic lowering and backend.
   and integer neg remains a source-shape discovery task because the tested
   `-value` integer row lowered to ordinary `sub(<i32, 0>, value)`, not AIR
   `neg`.
+- [x] Lower scalar unsigned `shl_sat`.
+  The refreshed ReleaseFast compiler-core evidence
+  `tmp/compiler_core_module_releasefast_after_scalar_neg.log` left
+  `scalar-transform:shl_sat:bin_op count=2` in
+  `Io.Threaded.Group.waitForCancelWithSignaling`. Added
+  `frontier_mixed_numeric.frontier_shl_sat_u32`, which lowers unsigned
+  `u32 <<| 1` from typed-v2 `shl_sat` operands into the local
+  `llvm.ushl.sat.i32` semantic call, then through x86_64 generic CFG as a
+  reusable local `ushl_sat_i32_edi_imm_eax` pseudo rather than an unresolved
+  intrinsic symbol. The C harness checks ordinary and saturating inputs.
+  Strict frontier evidence in `tmp/frontier_shl_sat.log` reports ReleaseFast,
+  ReleaseSafe, and ReleaseSmall at `source_rows=14`,
+  `discovered_functions=750`, `generic_cfg_functions=750`,
+  `object_emitted_functions=750`, `executable_ok_rows=14`, and `local_fail=0`.
+  Signed saturating shifts, dynamic shift counts, wider widths, and vector
+  saturating shifts remain future scalar-transform work.
 - [ ] Prove signed and unsigned width variants where compiler-core inventory
   shows both.
 - [x] Refresh inventory and show scalar-transform buckets reduced.

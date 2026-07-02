@@ -26,6 +26,13 @@ const target_transform_info = codegen_x86_64_common.target_transform_info;
 const instcombine = codegen_x86_64_common.instcombine;
 const zig_air_export = codegen_x86_64_common.zig_air_export;
 const zig_air_lowering = codegen_x86_64_common.zig_air_lowering;
+
+fn testFunctionByName(module: ir.Module, name: []const u8) !ir.Function {
+    for (module.functions.items) |function| {
+        if (std.mem.eql(u8, function.name, name)) return function;
+    }
+    return error.MissingTestFunction;
+}
 const dce = codegen_x86_64_common.dce;
 const dse = codegen_x86_64_common.dse;
 const early_cse = codegen_x86_64_common.early_cse;
@@ -332,6 +339,38 @@ test "x86_64 codegen routes smin intrinsic call through generic cfg path" {
     defer machine.deinit(std.testing.allocator);
     try std.testing.expect(machine.instructions.items.len > 0);
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes unsigned saturating shift-left intrinsic through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @llvm.ushl.sat.i32(i32, i32)
+        \\
+        \\define i32 @any_unsigned_shl_sat(i32 %a) {
+        \\entry:
+        \\  %r = call i32 @llvm.ushl.sat.i32(i32 %a, i32 1)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const selected_function = try testFunctionByName(module, "any_unsigned_shl_sat");
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        selected_function,
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(
+        codegen.x86_64.Instruction{ .ushl_sat_i32_edi_imm_eax = 1 },
+        machine.instructions.items[0],
+    );
 }
 
 test "x86_64 codegen routes signed-min select through generic cfg path" {

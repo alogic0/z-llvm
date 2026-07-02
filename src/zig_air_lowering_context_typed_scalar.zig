@@ -28,6 +28,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .min => try self.lowerTypedMin(instruction),
         .abs => try self.lowerTypedAbs(instruction),
         .neg => try self.lowerTypedNeg(instruction),
+        .shl_sat => try self.lowerTypedShlSat(instruction),
         .clz => try self.lowerTypedClz(instruction),
         .ctz => try self.lowerTypedCtz(instruction),
         .popcount => try self.lowerTypedPopcount(instruction),
@@ -379,6 +380,44 @@ pub fn lowerTypedNeg(self: anytype, instruction: air_export.TypedInstruction) !v
             .lhs = .{ .fp = "0.000000e+00" },
             .rhs = source.value,
         } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedShlSat(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
+    const lhs = try self.resolveTypedOperand(instruction, 0);
+    var rhs = try self.resolveTypedOperand(instruction, 1);
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (lhs.ty.signed or !lhs.ty.ir_type.eql(.{ .int = 32 }) or !result_type.ir_type.eql(lhs.ty.ir_type)) {
+        return air_model.LowerError.UnsupportedAir;
+    }
+    if (!rhs.ty.ir_type.eql(lhs.ty.ir_type)) {
+        rhs = switch (rhs.value) {
+            .int => .{
+                .ty = .{ .ir_type = lhs.ty.ir_type },
+                .value = rhs.value,
+            },
+            else => try self.extendShiftCount(instruction.index, lhs.ty, rhs),
+        };
+    }
+    if (!rhs.ty.ir_type.eql(lhs.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+
+    const result_name = try self.resultName(instruction.index);
+    var call: ir.CallInst = .{
+        .ret_ty = result_type.ir_type,
+        .callee = "llvm.ushl.sat.i32",
+        .args = .empty,
+    };
+    errdefer call.deinit(self.allocator);
+    try call.args.append(self.allocator, .{ .ty = lhs.ty.ir_type, .value = lhs.value });
+    try call.args.append(self.allocator, .{ .ty = rhs.ty.ir_type, .value = rhs.value });
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .call = call },
     });
     self.values[instruction.index] = .{
         .ty = result_type,

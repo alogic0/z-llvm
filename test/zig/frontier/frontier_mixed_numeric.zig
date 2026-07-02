@@ -74,6 +74,10 @@ export fn frontier_shr_exact_u32(value: u32) u32 {
     return @shrExact(value & 0xffff_fffe, 1);
 }
 
+export fn frontier_shl_sat_u32(value: u32) u32 {
+    return value <<| 1;
+}
+
 export fn frontier_neg_f32(value: f32) f32 {
     return -value;
 }

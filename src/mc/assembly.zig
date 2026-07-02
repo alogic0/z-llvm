@@ -1,3 +1,4 @@
+const std = @import("std");
 const x86_64 = @import("../codegen/x86_64.zig");
 
 pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
@@ -78,6 +79,14 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tandl $1431655765, %edx\n" ++
                     "\tshll $1, %edx\n" ++
                     "\torl %edx, %eax\n",
+            ),
+            .ushl_sat_i32_edi_imm_eax => |amount| try writer.print(
+                "\tmovl %edi, %eax\n" ++
+                    "\tshll ${}, %eax\n" ++
+                    "\tcmpl ${}, %edi\n" ++
+                    "\tmovl $-1, %edx\n" ++
+                    "\tcmoval %edx, %eax\n",
+                .{ amount, @as(u32, std.math.maxInt(u32)) >> amount },
             ),
             .bswap_eax => try writer.writeAll("\tbswapl %eax\n"),
             .bswap_rax => try writer.writeAll("\tbswapq %rax\n"),

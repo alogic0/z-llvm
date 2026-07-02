@@ -130,6 +130,7 @@ pub const ScalarSemanticOp = enum {
     min,
     abs,
     neg,
+    shl_sat,
     clz,
     ctz,
     popcount,
@@ -357,6 +358,7 @@ pub fn scalarSemanticOpForOpcode(opcode: []const u8) ScalarSemanticOp {
     if (std.mem.eql(u8, opcode, "min")) return .min;
     if (std.mem.eql(u8, opcode, "abs")) return .abs;
     if (std.mem.eql(u8, opcode, "neg")) return .neg;
+    if (std.mem.eql(u8, opcode, "shl_sat")) return .shl_sat;
     if (std.mem.eql(u8, opcode, "clz")) return .clz;
     if (std.mem.eql(u8, opcode, "ctz")) return .ctz;
     if (std.mem.eql(u8, opcode, "popcount")) return .popcount;
@@ -958,6 +960,7 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ScalarSemanticOp.min, scalarSemanticOpForOpcode("min"));
     try std.testing.expectEqual(ScalarSemanticOp.abs, scalarSemanticOpForOpcode("abs"));
     try std.testing.expectEqual(ScalarSemanticOp.neg, scalarSemanticOpForOpcode("neg"));
+    try std.testing.expectEqual(ScalarSemanticOp.shl_sat, scalarSemanticOpForOpcode("shl_sat"));
     try std.testing.expectEqual(ScalarSemanticOp.clz, scalarSemanticOpForOpcode("clz"));
     try std.testing.expectEqual(ScalarSemanticOp.ctz, scalarSemanticOpForOpcode("ctz"));
     try std.testing.expectEqual(ScalarSemanticOp.popcount, scalarSemanticOpForOpcode("popcount"));
