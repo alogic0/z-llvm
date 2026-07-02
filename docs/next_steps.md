@@ -37,7 +37,32 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None.
+Mid-cycle stop recorded 2026-07-02 by the docs/verification agent (the
+worker stopped without reporting).
+
+- Active convergence-progress item: pre-adoption family work (family 10,
+  packed aggregates) — checklist item "Implement common aligned packed
+  aggregate call arguments". Note: this cycle began before the convergence
+  plan adoption commit (f860ba86); after finishing it, goal selection must
+  switch to `docs/roadmap/convergence_progress.md` (next item: 2, evidence
+  tooling).
+- Modified files (uncommitted, intentional, keep):
+  `test/zig/frontier/frontier_sysv_aggregate_classes.zig` (adds
+  `helperPackedMixedHigh` + `frontier_packed_mixed_call_high`) and
+  `test/zig/harnesses/frontier_frontier_sysv_aggregate_classes.c` (extern +
+  check, exit code 28).
+- Exact failure: the new row is functionally green — ReleaseFast reports
+  `discovered_functions=755`, `executable_ok_rows=14`, `local_fail=0`,
+  `object_failures=0` — but the strict finish gate fails on the count:
+  `strict-finish-failure mode=ReleaseFast field=discovered_functions
+  expected=753 actual=755`. The strict finish expectations were not yet
+  bumped for the 2 added functions.
+- Saved log path: `tmp/frontier_packed_call_arg.log`.
+- Recommended next action: bump the strict finish count (`.functions = 753`
+  -> `755`, `src/uncurated_air_gate_helpers.zig:237`), re-run the
+  all-release-modes frontier gate, check off the family checklist item,
+  commit, then select the next goal from
+  `docs/roadmap/convergence_progress.md`.
 
 When the worker stops, record only:
 
