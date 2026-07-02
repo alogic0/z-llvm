@@ -1,5 +1,12 @@
 # x86_64 Compiler-Core Family Checklist
 
+> **Role change (2026-07-02):** this file is now the *tactic* list, not the
+> goal selector. Worker goals come from
+> [`convergence_progress.md`](convergence_progress.md) per
+> `docs/working-cycle.md`; open this checklist when a convergence goal (a
+> failing real row or a computed highest-blocking family) directs family
+> work, and keep checking family items off here as before.
+
 This checklist tracks recurring AIR/backend families for the x86_64 Zig
 compiler-core replacement path. It is not a per-function or per-instruction
 task list. Each item should be closed by a reusable semantic/lowering/backend

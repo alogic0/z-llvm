@@ -1,8 +1,17 @@
-# Project Finish Statement
+# Optimizer/IR-Layer Milestone Finish Statement
 
-This repository has reached the finish line defined by the current
-Zig-aligned effort to replace the LLVM library dependency used by Zig's
-distribution.
+> **Superseded as a project-level statement (2026-07-02).** This document
+> records the finish of an earlier, narrower milestone: the optimizer/IR
+> layer with bounded x86_64 smoke evidence. It is kept as a historical
+> record. Project-level scope, definition of done, and the active work
+> queue are now defined by
+> [`end_to_end_convergence_plan.md`](end_to_end_convergence_plan.md) and
+> tracked in [`convergence_progress.md`](convergence_progress.md). The
+> "Future Work Rule" below no longer governs worker cycles.
+
+This repository reached the finish line defined by the earlier
+Zig-aligned optimizer/IR-layer effort to replace the LLVM library dependency
+used by Zig's distribution.
 
 ## Finished Scope
 
@@ -68,9 +77,13 @@ tmp/zig_ir/optimizer_discovery_07_releasesmall
 - Target-complete vectorization and cost modeling.
 - Broad backend parity across targets and ABIs.
 
-## Future Work Rule
+## Future Work Rule (superseded)
 
-Do not continue by default. Future work should start only from
+Historical rule for the optimizer/IR-layer milestone; superseded by the
+convergence plan. Active worker goal selection is defined in
+`docs/working-cycle.md` and `docs/roadmap/convergence_progress.md`.
+
+Original text: Do not continue by default. Future work should start only from
 `docs/roadmap/future_optimizer_backlog.md` or from a new measured
 source-backed blocker. Any new cycle must name the LLVM upstream mapping,
 fixture evidence, local conservative boundary, and readiness-gate impact before

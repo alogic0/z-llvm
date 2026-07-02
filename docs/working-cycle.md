@@ -13,8 +13,8 @@ interrupts.
 
 One cycle means:
 
-1.  Choose one active family milestone and one concrete checklist item inside
-    that family.
+1.  Choose the next goal through the Goal Selection rules below (driven by
+    `docs/roadmap/convergence_progress.md`).
 2.  Implement only that checklist item.
 3.  Run focused validation.
 4.  Save important logs under `tmp/`.
@@ -41,32 +41,44 @@ Do not revert mid-cycle work unless explicitly asked.
 
 ## Goal Selection
 
+The strategy reference is
+`docs/roadmap/end_to_end_convergence_plan.md`; the live tracker is
+`docs/roadmap/convergence_progress.md`.
+
 At the start of every cycle:
 
-1.  Read
-    `docs/roadmap/x86_64_compiler_core_family_checklist.md`.
-2.  Read `docs/next_steps.md` for active slice notes and any current blocker.
-3.  Check the latest saved logs under `tmp/`.
-4.  Pick the highest-priority unchecked family that has actionable evidence.
-5.  Inside that family, pick exactly one unchecked checklist item for the
-    current cycle.
+1.  Read `docs/roadmap/convergence_progress.md`.
+2.  Read `docs/next_steps.md` for active blocker notes.
+3.  Check the latest tracked evidence summaries under `docs/evidence/` (and
+    saved logs under `tmp/` for the current cycle only).
+4.  Pick the cycle goal in this priority order:
+    1.  the first failing `distribution-real-rows` entry, when that gate
+        exists;
+    2.  the first failing real-program milestone gate
+        (`distribution-zig-integrated-exe`), when it exists;
+    3.  the first unchecked item in
+        `docs/roadmap/convergence_progress.md`, top to bottom.
 
-The family is the milestone. The checklist item is the cycle goal. Stay inside
-the same family and implement item by item until one of these happens:
+When the selected goal directs family work, use
+`docs/roadmap/x86_64_compiler_core_family_checklist.md` as the tactic list
+for that goal — the family checklist no longer drives goal selection on its
+own. Stay on the selected goal until one of these happens:
 
-- the family checklist is complete;
-- refreshed inventory shows a different family is now clearly higher value;
-- the next item requires an architectural-review stop;
+- the goal is complete;
+- the goal needs an architectural-review stop;
 - validation exposes an unexpected blocker.
 
-When a checklist item is completed, check it off in
-`docs/roadmap/x86_64_compiler_core_family_checklist.md` in the same commit as
-the implementation and evidence update.
+When a goal is completed, check it off in
+`docs/roadmap/convergence_progress.md` (and, for family items, in the family
+checklist) in the same commit as the implementation and evidence update.
+When ratchet counters move, update the Ratchet State table in
+`docs/roadmap/convergence_progress.md` in the same commit; never lower a
+counter without a ratchet-migration note in the cited evidence summary.
 
 Prefer goals in this order:
 
-1.  Complete the highest-priority actionable item in the active family
-    checklist.
+1.  The first failing real row or real-program gate, then the first
+    unchecked convergence-progress item.
 2.  Replace compatibility or temporary static tables with Zig-owned facts or
     provider contracts.
 3.  Remove nominal/name-specific admission.
