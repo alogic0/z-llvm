@@ -184,7 +184,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedScalarSemanticInstruction = typed_scalar.lowerTypedScalarSemanticInstruction;
     pub const lowerTypedArg = typed_scalar.lowerTypedArg;
     pub const lowerTypedBinary = typed_scalar.lowerTypedBinary;
-    pub const lowerTypedAddSubWithOverflow = typed_scalar.lowerTypedAddSubWithOverflow;
+    pub const lowerTypedArithmeticWithOverflow = typed_scalar.lowerTypedArithmeticWithOverflow;
     pub const lowerTypedCompare = typed_scalar.lowerTypedCompare;
     pub const lowerTypedCast = typed_scalar.lowerTypedCast;
     pub const lowerTypedByteSwap = typed_scalar.lowerTypedByteSwap;
@@ -216,7 +216,7 @@ pub const LoweringContext = struct {
             .binary => try self.lowerBinary(instruction),
             .compare => try self.lowerCompare(instruction),
             .cast => try self.lowerCast(instruction),
-            .add_with_overflow, .sub_with_overflow, .byte_swap, .max, .min, .abs, .none => return false,
+            .add_with_overflow, .sub_with_overflow, .mul_with_overflow, .byte_swap, .max, .min, .abs, .none => return false,
         }
         return true;
     }

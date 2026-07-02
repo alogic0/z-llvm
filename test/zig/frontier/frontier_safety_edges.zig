@@ -34,6 +34,12 @@ export fn frontier_explicit_usub_overflow(value: u32, delta: u32) u32 {
     return checked[0];
 }
 
+export fn frontier_explicit_smul_overflow(value: i32) i32 {
+    const checked = @mulWithOverflow(value, 6);
+    if (checked[1] != 0) @panic("frontier signed mul overflow");
+    return checked[0];
+}
+
 export fn frontier_bounds_guard(value: *const i32, len: usize, index: usize) i32 {
     _ = len;
     _ = index;

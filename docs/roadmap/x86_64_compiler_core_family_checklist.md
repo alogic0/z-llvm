@@ -798,7 +798,18 @@ Layer: safety-edge CFG and runtime boundary.
   exercise hot returns plus child-process death checks. `tmp/frontier_sub_overflow.log`
   proves all three release modes at `source_rows=14`, `discovered_functions=736`,
   `object_emitted_functions=736`, `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Lower or classify `mul_with_overflow`.
+- [x] Lower or classify `mul_with_overflow`.
+  Completed for the selected signed i32 constant-multiplier subset by routing
+  typed-v2 `mul_with_overflow` through the scalar overflow lowerer, emitting
+  `llvm.smul.with.overflow.i32`, and extending generic CFG checked-overflow
+  codegen to use the existing `imul eax, imm32` path plus `jo` overflow edge.
+  The accepted `frontier_explicit_smul_overflow` row proves the hot value and
+  child-process death path. `tmp/frontier_mul_overflow.log` proves all three
+  release modes at `source_rows=14`, `discovered_functions=737`,
+  `object_emitted_functions=737`, `executable_ok_rows=14`, and `local_fail=0`.
+  Unsigned multiply and register-register multiply remain future work until the
+  x86_64 machine instruction path is generalized beyond immediate signed
+  multiply.
 - [ ] Lower or classify `shl_with_overflow`.
 - [ ] Lower checked integer cast paths used by ReleaseSafe.
 - [ ] Lower checked shift/exact arithmetic paths used by ReleaseSafe.

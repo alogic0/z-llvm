@@ -19,7 +19,7 @@ const isShiftOpcode = air_capabilities.isShiftOpcode;
 pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_export.TypedInstruction) !bool {
     switch (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode)) {
         .arg => try self.lowerTypedArg(instruction),
-        .add_with_overflow, .sub_with_overflow => try self.lowerTypedAddSubWithOverflow(instruction),
+        .add_with_overflow, .sub_with_overflow, .mul_with_overflow => try self.lowerTypedArithmeticWithOverflow(instruction),
         .binary => try self.lowerTypedBinary(instruction),
         .compare => try self.lowerTypedCompare(instruction),
         .cast => try self.lowerTypedCast(instruction),
@@ -70,7 +70,7 @@ pub fn lowerTypedBinary(self: anytype, instruction: air_export.TypedInstruction)
     };
 }
 
-pub fn lowerTypedAddSubWithOverflow(self: anytype, instruction: air_export.TypedInstruction) !void {
+pub fn lowerTypedArithmeticWithOverflow(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
     const lhs = try self.resolveTypedOperand(instruction, 0);
     const rhs = try self.resolveTypedOperand(instruction, 1);
@@ -84,6 +84,8 @@ pub fn lowerTypedAddSubWithOverflow(self: anytype, instruction: air_export.Typed
         if (lhs.ty.signed) "llvm.sadd.with.overflow.i32" else "llvm.uadd.with.overflow.i32"
     else if (std.mem.eql(u8, instruction.opcode, "sub_with_overflow"))
         if (lhs.ty.signed) "llvm.ssub.with.overflow.i32" else "llvm.usub.with.overflow.i32"
+    else if (std.mem.eql(u8, instruction.opcode, "mul_with_overflow"))
+        if (lhs.ty.signed) "llvm.smul.with.overflow.i32" else "llvm.umul.with.overflow.i32"
     else
         return air_model.LowerError.UnsupportedAir;
     var call: ir.CallInst = .{
