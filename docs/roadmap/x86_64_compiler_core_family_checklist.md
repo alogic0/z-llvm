@@ -994,7 +994,16 @@ Layer: semantic lowering and backend.
   `generic_cfg_functions=746`, `object_emitted_functions=746`,
   `executable_ok_rows=14`, and `local_fail=0`. Wider widths, vector forms, and
   aggregate bit-reversal remain future scalar-transform work.
-- [ ] Lower `shl_exact`.
+- [x] Lower `shl_exact`.
+  This was completed by the earlier safety-runtime exact-shift cycle via the
+  accepted `frontier_safety_edges.frontier_checked_shl_exact` row. The row uses
+  the typed-v2 `bin_op` export for `shl_exact`, lowers the selected unsigned
+  `u32` `@shlExact(value, 1)` shape through generic CFG, proves the hot path in
+  all release modes, and proves the ReleaseSafe cold `shlOverflow` path with a
+  child-process death check. The latest strict frontier counter refresh remains
+  `tmp/frontier_bit_reverse_u32.log`; no counters changed for this checklist
+  cleanup. Dynamic exact shifts, signed exact-shift variants, and wider exact
+  shift families remain future scalar-transform work.
 - [ ] Lower `shr_exact`.
 - [ ] Lower integer `neg`.
 - [ ] Prove signed and unsigned width variants where compiler-core inventory
