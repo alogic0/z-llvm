@@ -1204,7 +1204,17 @@ Layer: ABI planner and backend.
 
 Layer: ABI planner and backend.
 
-- [ ] Separate aligned packed aggregates from unaligned/bitfield-like forms.
+- [x] Separate aligned packed aggregates from unaligned/bitfield-like forms.
+
+  Current ownership is split by use site rather than by accepting all packed
+  ABI payloads. Selected source-backed packed construction-return forms such as
+  `PackedMixed` and `PackedReverseMixed` are accepted only where their adjacent
+  scalar leaves can be proven and packed into normal SysV INTEGER/SSE return
+  registers. Packed C ABI argument/return payloads, packed `sret`/`byval`
+  payloads, and bitfield-like or target-sensitive unaligned layouts remain
+  `UnsupportedPackedAggregateAbi` boundaries. This keeps aligned scalar-leaf
+  construction separate from unaligned aggregate ABI ownership before adding
+  common packed load/store support.
 - [ ] Implement common aligned packed aggregate loads.
 - [ ] Implement common aligned packed aggregate stores.
 - [ ] Implement common aligned packed aggregate call arguments.
