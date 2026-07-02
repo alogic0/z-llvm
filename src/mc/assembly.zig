@@ -55,6 +55,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .abs_i64_rdi_rax => try writer.writeAll("\tmovq %rdi, %rax\n\tmovq %rdi, %rdx\n\tnegq %rdx\n\ttestq %rdi, %rdi\n\tcmovsq %rdx, %rax\n"),
             .clz_i32_edi_eax => try writer.writeAll("\tmovl $32, %eax\n\ttestl %edi, %edi\n\tje 1f\n\tbsrl %edi, %eax\n\txorl $31, %eax\n1:\n"),
             .ctz_i32_edi_eax => try writer.writeAll("\tmovl $32, %eax\n\ttestl %edi, %edi\n\tje 1f\n\tbsfl %edi, %eax\n1:\n"),
+            .popcount_i32_edi_eax => try writer.writeAll("\tpopcntl %edi, %eax\n"),
             .bswap_eax => try writer.writeAll("\tbswapl %eax\n"),
             .bswap_rax => try writer.writeAll("\tbswapq %rax\n"),
             .rol_ax_imm8 => |amount| try writer.print("\trolw ${}, %ax\n", .{amount}),

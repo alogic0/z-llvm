@@ -63,6 +63,7 @@ pub const Instruction = union(enum) {
     abs_i64_rdi_rax,
     clz_i32_edi_eax,
     ctz_i32_edi_eax,
+    popcount_i32_edi_eax,
     bswap_eax,
     bswap_rax,
     rol_ax_imm8: u8,

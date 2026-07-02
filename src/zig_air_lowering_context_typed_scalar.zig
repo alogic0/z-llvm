@@ -29,6 +29,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .abs => try self.lowerTypedAbs(instruction),
         .clz => try self.lowerTypedClz(instruction),
         .ctz => try self.lowerTypedCtz(instruction),
+        .popcount => try self.lowerTypedPopcount(instruction),
         .none => return false,
     }
     return true;
@@ -368,7 +369,15 @@ pub fn lowerTypedCtz(self: anytype, instruction: air_export.TypedInstruction) !v
     try self.lowerTypedZeroCount(instruction, "llvm.cttz.i32", "ctz");
 }
 
+pub fn lowerTypedPopcount(self: anytype, instruction: air_export.TypedInstruction) !void {
+    try self.lowerTypedBitCount(instruction, "llvm.ctpop.i32", "popcount", false);
+}
+
 pub fn lowerTypedZeroCount(self: anytype, instruction: air_export.TypedInstruction, callee: []const u8, label: []const u8) !void {
+    try self.lowerTypedBitCount(instruction, callee, label, true);
+}
+
+pub fn lowerTypedBitCount(self: anytype, instruction: air_export.TypedInstruction, callee: []const u8, label: []const u8, has_zero_is_poison_arg: bool) !void {
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     const source = try self.resolveTypedOperand(instruction, 0);
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
@@ -391,7 +400,9 @@ pub fn lowerTypedZeroCount(self: anytype, instruction: air_export.TypedInstructi
     };
     errdefer call.deinit(self.allocator);
     try call.args.append(self.allocator, .{ .ty = source.ty.ir_type, .value = source.value });
-    try call.args.append(self.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } });
+    if (has_zero_is_poison_arg) {
+        try call.args.append(self.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } });
+    }
     try self.block.instructions.append(self.allocator, .{
         .result = wide_result_name,
         .kind = .{ .call = call },

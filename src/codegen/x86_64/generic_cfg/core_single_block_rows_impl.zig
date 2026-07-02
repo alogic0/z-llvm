@@ -154,6 +154,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgPopcountReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
@@ -379,6 +383,16 @@ fn lowerGenericCfgCtzReturn(
     return lowerGenericCfgZeroCountReturn(allocator, machine, function, block, ret, "llvm.cttz.i32", .ctz_i32_edi_eax);
 }
 
+fn lowerGenericCfgPopcountReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    return lowerGenericCfgBitCountReturn(allocator, machine, function, block, ret, "llvm.ctpop.i32", .popcount_i32_edi_eax, false);
+}
+
 fn lowerGenericCfgZeroCountReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -387,6 +401,19 @@ fn lowerGenericCfgZeroCountReturn(
     ret: anytype,
     callee_name: []const u8,
     machine_instruction: Instruction,
+) !bool {
+    return lowerGenericCfgBitCountReturn(allocator, machine, function, block, ret, callee_name, machine_instruction, true);
+}
+
+fn lowerGenericCfgBitCountReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+    callee_name: []const u8,
+    machine_instruction: Instruction,
+    has_zero_is_poison_arg: bool,
 ) !bool {
     if (!ret.ty.eql(function.ret_ty) or !ret.ty.eql(.{ .int = 32 })) return false;
     if (block.instructions.items.len != 1 and block.instructions.items.len != 3) return false;
@@ -422,10 +449,14 @@ fn lowerGenericCfgZeroCountReturn(
         else => return false,
     };
     if (!isCalleeName(call.callee, callee_name)) return false;
-    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 2) return false;
+    const expected_arg_count: usize = if (has_zero_is_poison_arg) 2 else 1;
+    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != expected_arg_count) return false;
     if (!call.ret_ty.eql(.{ .int = 32 })) return false;
-    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[1].ty.eql(.{ .int = 1 })) return false;
-    if (!isInt(call.args.items[1].value, 0)) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 })) return false;
+    if (has_zero_is_poison_arg) {
+        if (!call.args.items[1].ty.eql(.{ .int = 1 })) return false;
+        if (!isInt(call.args.items[1].value, 0)) return false;
+    }
     const source_name = switch (call.args.items[0].value) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
