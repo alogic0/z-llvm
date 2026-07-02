@@ -1189,7 +1189,16 @@ Layer: ABI planner and backend.
   operations are accepted and executable-proven. The latest boundary evidence
   is `tmp/frontier_vector_element_boundaries.log`, with
   `vector_boundary_rows=4`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
-- [ ] Refresh inventory and show the vector bucket reduced or reclassified.
+- [x] Refresh inventory and show the vector bucket reduced or reclassified.
+
+  Refreshed ReleaseFast compiler-core-module inventory in
+  `tmp/compiler_core_module_releasefast_after_vector_family.log`. The vector
+  unknown-opcode bucket is now `unknown_opcode category=vector count=0`, so
+  `shuffle_one`, `splat`, and `reduce` are no longer opaque unknown-opcode
+  blockers in ReleaseFast. The broader `unsupported category=vector
+  count=16322` remains boundary-owned because exported vector ABI, float vector
+  elements, unsupported widths, and target-specific SIMD lowering are still
+  explicit vector boundaries.
 
 ### 10. Packed Aggregates
 
