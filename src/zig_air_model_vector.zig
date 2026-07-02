@@ -19,6 +19,35 @@ pub const TypedSplatSummary = struct {
     elem_bit_width: u32,
 };
 
+pub const TypedReduceSummary = struct {
+    instruction_index: u32,
+    operand_index: u32,
+    operation: []const u8,
+    vector_len: u32,
+    elem_bit_width: u32,
+};
+
+pub fn typedReduceSummary(instruction: air_export.TypedInstruction) ?TypedReduceSummary {
+    if (!std.mem.eql(u8, instruction.opcode, "reduce") and !std.mem.eql(u8, instruction.opcode, "reduce_optimized")) return null;
+    if (!std.mem.eql(u8, instruction.data_kind, "reduce")) return null;
+    if (instruction.operands.len != 1) return null;
+    const contract = core.detail(instruction, "reduce_contract") orelse return null;
+    if (!std.mem.eql(u8, contract, "zllvm-reduce-v1")) return null;
+    if (core.detail(instruction, "unsupported_non_vector") != null) return null;
+    const operation = core.detail(instruction, "reduce_operation") orelse return null;
+    const operand_index = core.typedInstOperandIndex(instruction.operands[0]) orelse return null;
+    const vector_len = parseU32Detail(instruction, "vector_len") orelse return null;
+    const elem_bit_width = parseU32Detail(instruction, "elem_bit_width") orelse return null;
+    if (vector_len == 0 or vector_len > 8) return null;
+    return .{
+        .instruction_index = instruction.index,
+        .operand_index = operand_index,
+        .operation = operation,
+        .vector_len = vector_len,
+        .elem_bit_width = elem_bit_width,
+    };
+}
+
 pub fn typedSplatSummary(instruction: air_export.TypedInstruction) ?TypedSplatSummary {
     if (!std.mem.eql(u8, instruction.opcode, "splat")) return null;
     if (!std.mem.eql(u8, instruction.data_kind, "ty_op")) return null;
@@ -93,6 +122,47 @@ test "typed splat summary accepts vector integer splat" {
     try std.testing.expectEqual(@as(u32, 11), summary.operand_index);
     try std.testing.expectEqual(@as(u32, 4), summary.vector_len);
     try std.testing.expectEqual(@as(u32, 8), summary.elem_bit_width);
+}
+
+test "typed reduce summary accepts vector add reduce" {
+    var operands = [_]air_export.TypedOperand{.{ .kind = "inst", .value = "21", .type_text = "@Vector(4, u32)" }};
+    var details = [_]air_export.TypedDetail{
+        .{ .key = "reduce_contract", .value = "zllvm-reduce-v1" },
+        .{ .key = "reduce_operation", .value = "Add" },
+        .{ .key = "vector_len", .value = "4" },
+        .{ .key = "elem_bit_width", .value = "32" },
+        .{ .key = "elem_type", .value = "int" },
+        .{ .key = "result_type", .value = "int" },
+    };
+    const summary = typedReduceSummary(.{
+        .index = 22,
+        .opcode = "reduce",
+        .result_type = "u32",
+        .data_kind = "reduce",
+        .operands = &operands,
+        .details = &details,
+    }) orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(@as(u32, 21), summary.operand_index);
+    try std.testing.expectEqualStrings("Add", summary.operation);
+    try std.testing.expectEqual(@as(u32, 4), summary.vector_len);
+    try std.testing.expectEqual(@as(u32, 32), summary.elem_bit_width);
+}
+
+test "typed reduce summary rejects non-vector operand" {
+    var operands = [_]air_export.TypedOperand{.{ .kind = "inst", .value = "21", .type_text = "u32" }};
+    var details = [_]air_export.TypedDetail{
+        .{ .key = "reduce_contract", .value = "zllvm-reduce-v1" },
+        .{ .key = "reduce_operation", .value = "Add" },
+        .{ .key = "unsupported_non_vector", .value = "1" },
+    };
+    try std.testing.expect(typedReduceSummary(.{
+        .index = 22,
+        .opcode = "reduce",
+        .result_type = "u32",
+        .data_kind = "reduce",
+        .operands = &operands,
+        .details = &details,
+    }) == null);
 }
 
 test "typed splat summary rejects unsupported non-vector result" {

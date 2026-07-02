@@ -14,11 +14,67 @@ pub fn lowerTypedVectorSemanticInstruction(
     instruction: air_export.TypedInstruction,
 ) !bool {
     switch (air_capabilities.vectorSemanticOpForOpcode(instruction.opcode)) {
+        .reduce => try self.lowerTypedReduce(instruction),
         .splat => try self.lowerTypedSplat(instruction),
         .shuffle_one => try self.lowerTypedShuffleOne(instruction),
         .none => return false,
     }
     return true;
+}
+
+pub fn lowerTypedReduce(self: anytype, instruction: air_export.TypedInstruction) !void {
+    const summary = air_model.typedReduceSummary(instruction) orelse return air_model.LowerError.UnsupportedAir;
+    if (!std.mem.eql(u8, summary.operation, "Add")) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const vector_ty = switch (source.ty.ir_type) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+    };
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!result_type.ir_type.eql(vector_ty.elem_ty.toType())) return air_model.LowerError.UnsupportedAir;
+    if (summary.vector_len != vector_ty.len) return air_model.LowerError.UnsupportedAir;
+    const elem_bits = switch (vector_ty.elem_ty) {
+        .int => |bits| bits,
+        .float, .double, .ptr => return air_model.LowerError.UnsupportedAir,
+    };
+    if (summary.elem_bit_width != elem_bits) return air_model.LowerError.UnsupportedAir;
+    if (vector_ty.len < 2 or vector_ty.len > 8) return air_model.LowerError.UnsupportedAir;
+
+    var accumulator_name: []const u8 = undefined;
+    for (0..vector_ty.len) |lane| {
+        const lane_name = try ownPrint(self.module, "air{}_reduce_lane{}", .{ instruction.index, lane });
+        try self.block.instructions.append(self.allocator, .{
+            .result = lane_name,
+            .kind = .{ .extractelement = .{
+                .vector_ty = source.ty.ir_type,
+                .vector = source.value,
+                .index_ty = .{ .int = 64 },
+                .index = .{ .int = @intCast(lane) },
+            } },
+        });
+        if (lane == 0) {
+            accumulator_name = lane_name;
+            continue;
+        }
+        const add_name = if (lane + 1 == vector_ty.len)
+            try self.resultName(instruction.index)
+        else
+            try ownPrint(self.module, "air{}_reduce_add{}", .{ instruction.index, lane });
+        try self.block.instructions.append(self.allocator, .{
+            .result = add_name,
+            .kind = .{ .binary = .{
+                .op = .add,
+                .ty = result_type.ir_type,
+                .lhs = .{ .named = accumulator_name },
+                .rhs = .{ .named = lane_name },
+            } },
+        });
+        accumulator_name = add_name;
+    }
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = accumulator_name },
+    };
 }
 
 pub fn lowerTypedSplat(self: anytype, instruction: air_export.TypedInstruction) !void {

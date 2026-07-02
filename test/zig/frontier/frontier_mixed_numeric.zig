@@ -89,6 +89,11 @@ export fn frontier_splat_u8(value: u8) u8 {
     return vector[3];
 }
 
+export fn frontier_reduce_add_u32(a: u32, b: u32, c: u32, d: u32) u32 {
+    const vector: @Vector(4, u32) = .{ a, b, c, d };
+    return @reduce(.Add, vector);
+}
+
 export fn frontier_neg_f32(value: f32) f32 {
     return -value;
 }

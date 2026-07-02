@@ -171,6 +171,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgVectorI32AddReduceReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (single_ret) |ret| {
@@ -410,6 +414,79 @@ fn shuffleMaskLane(mask: ir.Value, lane: usize) ?i128 {
         return std.fmt.parseInt(i128, std.mem.trim(u8, part["i32 ".len..], " \t\r\n"), 10) catch null;
     }
     return null;
+}
+
+fn lowerGenericCfgVectorI32AddReduceReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(function.ret_ty)) return false;
+    var regs: [8]ArgReg = undefined;
+    var count: usize = 0;
+    if (!collectVectorI32AddReduceParamRegs(function, block, ret.value orelse return error.InvalidRet, &regs, &count)) return false;
+    if (count < 2) return false;
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = regs[0] });
+    for (regs[1..count]) |reg| {
+        try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = reg } });
+    }
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn collectVectorI32AddReduceParamRegs(
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+    regs: *[8]ArgReg,
+    count: *usize,
+) bool {
+    if (count.* >= regs.len) return false;
+    const value_name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const instruction = findInstruction(block, value_name) orelse return false;
+    switch (instruction.kind) {
+        .binary => |binary| {
+            if (binary.op != .add or !binary.ty.eql(.{ .int = 32 })) return false;
+            return collectVectorI32AddReduceParamRegs(function, block, binary.lhs, regs, count) and
+                collectVectorI32AddReduceParamRegs(function, block, binary.rhs, regs, count);
+        },
+        .extractelement => |extract| {
+            if (!extract.vector_ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 32 } } })) return false;
+            if (!extract.index_ty.eql(.{ .int = 64 }) or extract.index != .int) return false;
+            if (extract.index.int < 0 or extract.index.int > 3) return false;
+            const selected_value = vectorInsertedLaneI32Value(block, extract.vector, @intCast(extract.index.int)) orelse return false;
+            const selected_name = switch (selected_value) {
+                .named => |name| name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+            };
+            regs[count.*] = paramReg(function, selected_name, .{ .int = 32 }) catch return false;
+            count.* += 1;
+            return true;
+        },
+        else => return false,
+    }
+}
+
+fn vectorInsertedLaneI32Value(block: ir.BasicBlock, vector: ir.Value, lane: u32) ?ir.Value {
+    const vector_name = switch (vector) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const instruction = findInstruction(block, vector_name) orelse return null;
+    const insert = switch (instruction.kind) {
+        .insertelement => |insert| insert,
+        else => return null,
+    };
+    if (!insert.vector_ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 32 } } })) return null;
+    if (!insert.value_ty.eql(.{ .int = 32 })) return null;
+    if (!insert.index_ty.eql(.{ .int = 64 }) or insert.index != .int) return null;
+    if (insert.index.int == lane) return insert.value;
+    return vectorInsertedLaneI32Value(block, insert.vector, lane);
 }
 
 fn lowerGenericCfgAbsReturn(

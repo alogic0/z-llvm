@@ -1135,7 +1135,21 @@ Layer: ABI planner and backend.
   `generic_cfg_functions=752`, `object_emitted_functions=752`,
   `executable_ok_rows=14`, and `local_fail=0`; boundary evidence remains green
   in `tmp/frontier_vector_splat_boundaries.log`.
-- [ ] Lower `reduce` for the selected vector subset.
+- [x] Lower `reduce` for the selected vector subset.
+
+  Added the narrow `zllvm-reduce-v1` typed-v2 hook contract and z_llvm vector
+  summary/lowering for integer `@reduce(.Add, vector)` records. The selected
+  proof is `frontier_mixed_numeric.frontier_reduce_add_u32`: it constructs a
+  `@Vector(4, u32)`, reduces it with `.Add`, and returns the scalar via the C
+  ABI harness. z_llvm scalarizes the reduce to lane extracts plus an integer
+  add chain, and the x86_64 backend validates that the add leaves are extracted
+  from an inserted vector before emitting GPR adds. Saved evidence:
+  `tmp/vector_reduce_descriptor_lines.log` proves typed-v2 facts,
+  `tmp/frontier_vector_reduce.log` reports all three release modes at
+  `source_rows=14`, `discovered_functions=753`,
+  `generic_cfg_functions=753`, `object_emitted_functions=753`,
+  `executable_ok_rows=14`, and `local_fail=0`; boundary evidence remains green
+  in `tmp/frontier_vector_reduce_boundaries.log`.
 - [ ] Add fail-closed diagnostics for unsupported vector widths.
 - [ ] Add fail-closed diagnostics for unsupported element types.
 - [ ] Prove one source-backed vector executable row if ABI-stable.

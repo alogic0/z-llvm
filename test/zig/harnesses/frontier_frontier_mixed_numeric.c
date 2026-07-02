@@ -20,6 +20,7 @@ extern unsigned int z_frontier_shr_exact_u32(unsigned int) __asm__("frontier_mix
 extern unsigned int z_frontier_shl_sat_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_shl_sat_u32");
 extern unsigned char z_frontier_shuffle_one_u8(unsigned char, unsigned char, unsigned char, unsigned char) __asm__("frontier_mixed_numeric.frontier_shuffle_one_u8");
 extern unsigned char z_frontier_splat_u8(unsigned char) __asm__("frontier_mixed_numeric.frontier_splat_u8");
+extern unsigned int z_frontier_reduce_add_u32(unsigned int, unsigned int, unsigned int, unsigned int) __asm__("frontier_mixed_numeric.frontier_reduce_add_u32");
 extern float z_frontier_neg_f32(float) __asm__("frontier_mixed_numeric.frontier_neg_f32");
 extern double z_frontier_neg_f64(double) __asm__("frontier_mixed_numeric.frontier_neg_f64");
 void z_frontier_mixed_numeric_shr_overflow(void) __asm__("frontier_mixed_numeric.shrOverflow");
@@ -73,9 +74,11 @@ int main(void) {
     if (z_frontier_shuffle_one_u8(9u, 8u, 7u, 6u) != 6u) return 46;
     if (z_frontier_splat_u8(0x5au) != 0x5au) return 47;
     if (z_frontier_splat_u8(0xc3u) != 0xc3u) return 48;
-    if (z_frontier_neg_f32(3.5f) != -3.5f) return 49;
-    if (z_frontier_neg_f32(-2.25f) != 2.25f) return 50;
-    if (z_frontier_neg_f64(7.75) != -7.75) return 51;
-    if (z_frontier_neg_f64(-0.5) != 0.5) return 52;
+    if (z_frontier_reduce_add_u32(1u, 2u, 3u, 4u) != 10u) return 49;
+    if (z_frontier_reduce_add_u32(0xffffffffu, 1u, 2u, 3u) != 5u) return 50;
+    if (z_frontier_neg_f32(3.5f) != -3.5f) return 51;
+    if (z_frontier_neg_f32(-2.25f) != 2.25f) return 52;
+    if (z_frontier_neg_f64(7.75) != -7.75) return 53;
+    if (z_frontier_neg_f64(-0.5) != 0.5) return 54;
     return 0;
 }
