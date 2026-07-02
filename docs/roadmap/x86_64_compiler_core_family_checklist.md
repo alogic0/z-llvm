@@ -1215,7 +1215,17 @@ Layer: ABI planner and backend.
   `UnsupportedPackedAggregateAbi` boundaries. This keeps aligned scalar-leaf
   construction separate from unaligned aggregate ABI ownership before adding
   common packed load/store support.
-- [ ] Implement common aligned packed aggregate loads.
+- [x] Implement common aligned packed aggregate loads.
+
+  Existing accepted rows in `frontier_sysv_aggregate_classes.zig` cover common
+  aligned packed-leaf loads: `frontier_packed_mixed_low_int`,
+  `frontier_packed_mixed_high_int`, `frontier_packed_mixed_float`,
+  `frontier_packed_reverse_mixed_float`,
+  `frontier_packed_reverse_mixed_low_int`, and
+  `frontier_packed_reverse_mixed_high_int`. These load adjacent `i32` lanes
+  from the INTEGER eightbyte and `double` leaves from the SSE stream through
+  normal aggregate field-read lowering, with executable checks in
+  `test/zig/harnesses/frontier_frontier_sysv_aggregate_classes.c`.
 - [ ] Implement common aligned packed aggregate stores.
 - [ ] Implement common aligned packed aggregate call arguments.
 - [ ] Keep unaligned or target-sensitive forms fail-closed.
