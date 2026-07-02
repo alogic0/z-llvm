@@ -916,7 +916,16 @@ Layer: semantic lowering and backend.
   `generic_cfg_functions=740`, `object_emitted_functions=740`,
   `executable_ok_rows=14`, and `local_fail=0`. Wider unsigned/signed integer
   max widths remain future scalar-transform work.
-- [ ] Broaden `min` beyond selected signed `i32`.
+- [x] Broaden `min` beyond selected signed `i32`.
+  Added `frontier_mixed_numeric.frontier_min_u32`, which lowers unsigned
+  `@min` as `icmp ult` plus `select` and emits an x86_64 unsigned-min
+  conditional-move return through the same generic CFG scalar path. The C
+  harness checks both `0xffffffff > 7` and `13 < 21`. Strict frontier evidence
+  in `tmp/frontier_min_u32.log` reports ReleaseFast, ReleaseSafe, and
+  ReleaseSmall at `source_rows=14`, `discovered_functions=741`,
+  `generic_cfg_functions=741`, `object_emitted_functions=741`,
+  `executable_ok_rows=14`, and `local_fail=0`. Wider unsigned/signed integer
+  min widths remain future scalar-transform work.
 - [ ] Broaden `abs` beyond selected signed `i32`, with non-integer facts
   fail-closed.
 - [ ] Lower `clz`.

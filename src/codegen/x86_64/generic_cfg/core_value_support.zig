@@ -81,7 +81,7 @@ pub fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, blo
         .binary => |binary| genericCfgSupportsSingleBlockBinary(function, block, binary),
         .icmp => |icmp| genericCfgSupportsSingleBlockIcmp(function, icmp) or
             genericCfgSupportsCallResultZeroIcmp(block, icmp) or
-            genericCfgSupportsSingleBlockUmaxIcmpUse(function, block, instruction.result, icmp),
+            genericCfgSupportsSingleBlockUnsignedMinMaxIcmpUse(function, block, instruction.result, icmp),
         .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
         .load => |load| genericCfgSupportsSingleBlockLoad(function, load),
         .store => |store| genericCfgSupportsSingleBlockStore(function, block, store),
@@ -205,6 +205,7 @@ pub fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.Basi
         else => return false,
     };
     if (genericCfgSupportsSminSelect(function, select, cond) or
+        genericCfgSupportsUminSelect(function, select, cond) or
         genericCfgSupportsSmaxSelect(function, select, cond) or
         genericCfgSupportsUmaxSelect(function, select, cond)) return true;
     if (!genericCfgSupportsSingleBlockIcmp(function, cond) and !genericCfgSupportsCallResultZeroIcmp(block, cond)) return false;
@@ -236,7 +237,7 @@ fn genericCfgSupportsCallResultZeroIcmp(block: ir.BasicBlock, icmp: ir.IcmpInst)
     return call.ret_ty.eql(.{ .int = 32 });
 }
 
-fn genericCfgSupportsSingleBlockUmaxIcmpUse(
+fn genericCfgSupportsSingleBlockUnsignedMinMaxIcmpUse(
     function: ir.Function,
     block: ir.BasicBlock,
     maybe_cond_name: ?[]const u8,
@@ -250,6 +251,7 @@ fn genericCfgSupportsSingleBlockUmaxIcmpUse(
             else => continue,
         };
         if (!isNamed(select.cond, cond_name)) continue;
+        if (genericCfgSupportsUminSelect(function, select, icmp)) return true;
         if (genericCfgSupportsUmaxSelect(function, select, icmp)) return true;
     }
     return false;
@@ -257,6 +259,21 @@ fn genericCfgSupportsSingleBlockUmaxIcmpUse(
 
 pub fn genericCfgSupportsSminSelect(function: ir.Function, select: ir.SelectInst, icmp: ir.IcmpInst) bool {
     if (icmp.predicate != .slt or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    const lhs = switch (icmp.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const rhs = switch (icmp.rhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!isNamed(select.true_value, lhs) or !isNamed(select.false_value, rhs)) return false;
+    return (paramRegOrNull(function, lhs, .{ .int = 32 }) catch null) != null and
+        (paramRegOrNull(function, rhs, .{ .int = 32 }) catch null) != null;
+}
+
+pub fn genericCfgSupportsUminSelect(function: ir.Function, select: ir.SelectInst, icmp: ir.IcmpInst) bool {
+    if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
     const lhs = switch (icmp.lhs) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,

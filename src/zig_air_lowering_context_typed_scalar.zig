@@ -281,14 +281,14 @@ pub fn lowerTypedMin(self: anytype, instruction: air_export.TypedInstruction) !v
     const rhs = try self.resolveTypedOperand(instruction, 1);
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     if (!lhs.ty.ir_type.eql(rhs.ty.ir_type) or !result_type.ir_type.eql(lhs.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
-    if (!lhs.ty.signed or !lhs.ty.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+    if (!lhs.ty.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
 
     const cmp_name = try ownPrint(self.module, "air{}_min_cmp", .{instruction.index});
     const result_name = try self.resultName(instruction.index);
     try self.block.instructions.append(self.allocator, .{
         .result = cmp_name,
         .kind = .{ .icmp = .{
-            .predicate = .slt,
+            .predicate = if (lhs.ty.signed) .slt else .ult,
             .operand_ty = lhs.ty.ir_type,
             .lhs = lhs.value,
             .rhs = rhs.value,
