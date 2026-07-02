@@ -102,10 +102,10 @@ longer make the global top 50.
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
 | error-union-try | 0 | 238174 | 231997 | - | - | ReleaseFast typed/model-owned bucket reclassified; ReleaseSafe/ReleaseSmall not refreshed | semantic lowering, CFG lowering |
 | pointer-address | 0 | 59226 | 49313 | - | - | ReleaseFast known/lowerable bucket reclassified; ReleaseSafe/ReleaseSmall not refreshed | typed AIR parser, address-form lowering |
-| aggregate-shape | 5940 | 64537 | 29881 | `../ziglang/src/main.zig` | `Build.Cache.Directory.join` | partially supported | aggregate semantic lowering, ABI planner |
-| vector | 26240 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
-| union-tag-shape | 14508 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported | semantic lowering, CFG lowering |
-| optional-shape | 6461 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `SemanticVersion.parse` | partially supported | semantic lowering, CFG lowering |
+| aggregate-shape | 0 | 64537 | 29881 | - | - | ReleaseFast known/lowerable bucket reclassified; ReleaseSafe/ReleaseSmall not refreshed | aggregate semantic lowering, ABI planner |
+| vector | 26246 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `Io.Writer.print__anon_39654` | unsupported boundary | ABI planner, backend |
+| union-tag-shape | 807 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `print_targets.cmdTargets` | partially supported; only `tag_name` remains unknown in ReleaseFast | semantic lowering, CFG lowering |
+| optional-shape | 0 | not refreshed | not refreshed | - | - | ReleaseFast optional-shape unknown bucket reclassified; normal optional opcodes remain counted | semantic lowering, CFG lowering |
 | scalar-transform | 225 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `mem.Alignment.fromByteUnits` | unsupported inventory family | semantic lowering, backend |
 | float-math | 87 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `math.pow.pow__anon_62528` | unsupported inventory family | backend, runtime boundary |
 | select-shape | 5 | not refreshed | not refreshed | `../ziglang/src/main.zig` | `simd.countTrues__anon_40840` | partially supported | semantic lowering, CFG lowering |
@@ -120,46 +120,36 @@ longer make the global top 50.
 
 | Rank | ReleaseFast | Count | ReleaseSafe | Count | ReleaseSmall | Count |
 | ---: | --- | ---: | --- | ---: | --- | ---: |
-| 1 | `vector:shuffle_one:opaque` | 26208 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
-| 2 | `union-tag-shape:get_union_tag:ty_op` | 6057 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
-| 3 | `aggregate-shape:array_to_slice:ty_op` | 5940 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
-| 4 | `union-tag-shape:union_init:opaque` | 4624 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
-| 5 | `union-tag-shape:set_union_tag:bin_op` | 3020 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
-| 6 | `union-tag-shape:tag_name:opaque` | 807 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
-| 7 | `scalar-transform:clz:opaque` | 51 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |
-| 8 | `scalar-transform:shr_exact:bin_op` | 49 | `safety-runtime:intcast_safe:ty_op` | 11185 | `aggregate-shape:slice:bin_ty_pl` | 10603 |
-| 9 | `scalar-transform:ctz:opaque` | 48 | `aggregate-shape:slice:bin_ty_pl` | 10942 | `other:wrap_optional:ty_op` | 6359 |
-| 10 | `safety-runtime:sub_with_overflow:bin_ty_pl` | 44 | `other:get_union_tag:opaque` | 10923 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6250 |
-| 11 | `safety-runtime:mul_with_overflow:bin_ty_pl` | 31 | - | - | - | - |
-| 12 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
-| 13 | `scalar-transform:neg:opaque` | 22 | - | - | - | - |
-| 14 | `vector:reduce:opaque` | 22 | - | - | - | - |
-| 15 | `scalar-transform:popcount:opaque` | 19 | - | - | - | - |
-| 16 | `float-math:round:opaque` | 10 | - | - | - | - |
-| 17 | `vector:splat:opaque` | 10 | - | - | - | - |
-| 18 | `scalar-transform:bit_reverse:opaque` | 9 | - | - | - | - |
-| 19 | `float-math:ceil:opaque` | 7 | - | - | - | - |
-| 20 | `float-math:exp:opaque` | 7 | - | - | - | - |
-| 21 | `float-math:log:opaque` | 7 | - | - | - | - |
-| 22 | `float-math:sqrt:opaque` | 7 | - | - | - | - |
-| 23 | `safety-runtime:shl_with_overflow:opaque` | 7 | - | - | - | - |
-| 24 | `float-math:floor:opaque` | 6 | - | - | - | - |
-| 25 | `float-math:log2:opaque` | 6 | - | - | - | - |
-| 26 | `float-math:mul_add:opaque` | 6 | - | - | - | - |
-| 27 | `float-math:trunc_float:opaque` | 6 | - | - | - | - |
-| 28 | `float-math:cos:opaque` | 5 | - | - | - | - |
-| 29 | `float-math:exp2:opaque` | 5 | - | - | - | - |
-| 30 | `float-math:log10:opaque` | 5 | - | - | - | - |
-| 31 | `safety-runtime:mul_with_overflow:bin_ty_pl` | 31 | - | - | - | - |
-| 32 | `scalar-transform:shl_exact:bin_op` | 25 | - | - | - | - |
-| 33 | `scalar-transform:neg:opaque` | 22 | - | - | - | - |
-| 34 | `vector:reduce:opaque` | 22 | - | - | - | - |
-| 35 | `scalar-transform:popcount:opaque` | 19 | - | - | - | - |
-| 36 | `float-math:round:opaque` | 10 | - | - | - | - |
-| 37 | `vector:splat:opaque` | 10 | - | - | - | - |
-| 38 | `scalar-transform:bit_reverse:opaque` | 9 | - | - | - | - |
-| 39 | `float-math:ceil:opaque` | 7 | - | - | - | - |
-| 40 | `float-math:exp:opaque` | 7 | - | - | - | - |
+| 1 | `vector:shuffle_one:opaque` | 26214 | `error-union-try:unwrap_errunion_err:ty_op` | 84913 | `error-union-try:unwrap_errunion_err:ty_op` | 82350 |
+| 2 | `union-tag-shape:tag_name:opaque` | 807 | `error-union-try:wrap_errunion_err:ty_op` | 77020 | `error-union-try:wrap_errunion_err:ty_op` | 75165 |
+| 3 | `scalar-transform:clz:opaque` | 51 | `error-union-try:try:pl_op` | 73993 | `error-union-try:try:pl_op` | 72265 |
+| 4 | `scalar-transform:shr_exact:bin_op` | 49 | `aggregate-shape:slice_len:ty_op` | 47605 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17069 |
+| 5 | `scalar-transform:ctz:opaque` | 48 | `pointer-address:ptr_add:bin_ty_pl` | 19156 | `pointer-address:ptr_add:bin_ty_pl` | 13966 |
+| 6 | `safety-runtime:sub_with_overflow:bin_ty_pl` | 44 | `pointer-address:ptr_slice_len_ptr:ty_op` | 17506 | `aggregate-shape:slice_len:ty_op` | 13459 |
+| 7 | `safety-runtime:mul_with_overflow:bin_ty_pl` | 31 | `pointer-address:slice_ptr:ty_op` | 14429 | `pointer-address:slice_ptr:ty_op` | 11615 |
+| 8 | `scalar-transform:shl_exact:bin_op` | 25 | `safety-runtime:intcast_safe:ty_op` | 11185 | `aggregate-shape:slice:bin_ty_pl` | 10603 |
+| 9 | `scalar-transform:neg:opaque` | 22 | `aggregate-shape:slice:bin_ty_pl` | 10942 | `other:wrap_optional:ty_op` | 6359 |
+| 10 | `vector:reduce:opaque` | 22 | `other:get_union_tag:opaque` | 10923 | `pointer-address:ptr_slice_ptr_ptr:ty_op` | 6250 |
+| 11 | `scalar-transform:popcount:opaque` | 19 | - | - | - | - |
+| 12 | `float-math:round:opaque` | 10 | - | - | - | - |
+| 13 | `vector:splat:opaque` | 10 | - | - | - | - |
+| 14 | `scalar-transform:bit_reverse:opaque` | 9 | - | - | - | - |
+| 15 | `float-math:ceil:opaque` | 7 | - | - | - | - |
+| 16 | `float-math:exp:opaque` | 7 | - | - | - | - |
+| 17 | `float-math:log:opaque` | 7 | - | - | - | - |
+| 18 | `float-math:sqrt:opaque` | 7 | - | - | - | - |
+| 19 | `safety-runtime:shl_with_overflow:opaque` | 7 | - | - | - | - |
+| 20 | `float-math:floor:opaque` | 6 | - | - | - | - |
+| 21 | `float-math:log2:opaque` | 6 | - | - | - | - |
+| 22 | `float-math:mul_add:opaque` | 6 | - | - | - | - |
+| 23 | `float-math:trunc_float:opaque` | 6 | - | - | - | - |
+| 24 | `float-math:cos:opaque` | 5 | - | - | - | - |
+| 25 | `float-math:exp2:opaque` | 5 | - | - | - | - |
+| 26 | `float-math:log10:opaque` | 5 | - | - | - | - |
+| 27 | `float-math:sin:opaque` | 5 | - | - | - | - |
+| 28 | `float-math:tan:opaque` | 5 | - | - | - | - |
+| 29 | `select-shape:select:pl_op` | 5 | - | - | - | - |
+| 30 | `scalar-transform:shl_sat:bin_op` | 2 | - | - | - | - |
 
 ## Top Opcode Categories
 
@@ -168,7 +158,7 @@ are body opcode counts, not necessarily the highest implementation gaps. Raw
 opcode rows now include `first_source` and `first_function`, so known/lowerable
 opcodes that are not in an unknown bucket can still be selected for the next
 source-backed reduction. The focused ReleaseFast selector refresh is
-`tmp/compiler_core_module_releasefast_opcode_first_sources.log`.
+`tmp/compiler_core_module_releasefast_after_optional_shape.log`.
 
 | Rank | ReleaseFast | Count | ReleaseSafe | Count | ReleaseSmall | Count |
 | ---: | --- | ---: | --- | ---: | --- | ---: |

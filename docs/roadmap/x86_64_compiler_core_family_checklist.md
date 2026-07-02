@@ -702,11 +702,11 @@ Layer: semantic lowering and CFG lowering.
   `typedWrapOptionalSummary`, which validates the typed-v2 operand/result
   relation before `src/zig_air_lowering_context_typed_optional.zig` materializes
   the optional value. This keeps accepted `wrap_optional` lowering model-owned
-  and fail-closed without source/function-name admission. ReleaseFast
-  compiler-core inventory still reports `wrap_optional count=6461`, first
-  source/function `../ziglang/src/main.zig / SemanticVersion.parse`; this item
-  closes the generic typed lowering ownership piece, not the full optional
-  branch/merge family.
+  and fail-closed without source/function-name admission. The refreshed
+  ReleaseFast compiler-core inventory still reports normal
+  `wrap_optional count=6461` opcode use, but the `optional-shape` unknown
+  bucket is now zero; this item owns generic typed lowering without claiming
+  nested optional/error-union mixes.
 - [x] Lower optional payload extraction.
   Completed in `src/zig_air_model_optional.zig` by adding
   `typedOptionalPayloadExtractionSummary`, which validates the optional operand
@@ -762,7 +762,14 @@ Layer: semantic lowering and CFG lowering.
   `optional_error_mix_boundary_rows=2`, `wrong_diagnostic_rows=0`, and
   `local_fail=0` in `tmp/frontier_optional_mix_boundary.log`; accepted frontier
   executable counters were not refreshed in this boundary-only cycle.
-- [ ] Refresh inventory and show the optional-shape bucket reduced.
+- [x] Refresh inventory and show the optional-shape bucket reduced.
+  Completed with
+  `tmp/compiler_core_module_releasefast_after_optional_shape.log`. ReleaseFast
+  compiler-core-module inventory moved `optional-shape` from `6461` unknown
+  rows in the stale baseline to `0`, with `wrap_optional`, `optional_payload`,
+  `optional_payload_ptr`, `is_non_null`, and `is_non_null_ptr` still visible as
+  normal opcode counts. ReleaseSafe and ReleaseSmall optional buckets were not
+  refreshed in this cycle.
 
 ### 7. Safety Runtime Paths
 
