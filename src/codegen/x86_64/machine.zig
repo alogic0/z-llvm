@@ -57,6 +57,7 @@ pub const Instruction = union(enum) {
     add_stack_disp32_rax: u32,
     add_eax_imm32: i32,
     shl_eax_imm5: u5,
+    shr_eax_imm5: u5,
     or_eax_imm32: i32,
     imul_eax_imm32: i32,
     and_eax_imm32: i32,

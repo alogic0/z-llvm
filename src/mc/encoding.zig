@@ -94,6 +94,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0xc1, 0xe0 });
                 try bytes.append(allocator, amount);
             },
+            .shr_eax_imm5 => |amount| {
+                try bytes.appendSlice(allocator, &.{ 0xc1, 0xe8 });
+                try bytes.append(allocator, amount);
+            },
             .or_eax_imm32 => |value| {
                 try bytes.append(allocator, 0x0d);
                 try appendI32(&bytes, allocator, value);
@@ -558,6 +562,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .add_stack_disp32_rax => 8,
         .add_eax_imm32 => 5,
         .shl_eax_imm5 => 3,
+        .shr_eax_imm5 => 3,
         .or_eax_imm32 => 5,
         .imul_eax_imm32 => 6,
         .and_eax_imm32 => 5,

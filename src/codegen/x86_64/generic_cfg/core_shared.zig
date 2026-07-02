@@ -57,6 +57,7 @@ pub const globalSymbolName = x86_64_match.globalSymbolName;
 pub const globalSymbolNameFromValue = x86_64_match.globalSymbolNameFromValue;
 pub const symbolName = x86_64_match.symbolName;
 pub const isInt = x86_64_match.isInt;
+pub const i32BitPattern = x86_64_match.i32BitPattern;
 pub const i32Value = x86_64_match.i32Value;
 pub const u8Value = x86_64_match.u8Value;
 pub const i64Value = x86_64_match.i64Value;

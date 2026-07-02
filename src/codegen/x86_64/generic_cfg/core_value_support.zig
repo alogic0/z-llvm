@@ -93,7 +93,7 @@ pub fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, blo
 
 pub fn genericCfgSupportsSingleBlockBinary(function: ir.Function, block: ir.BasicBlock, binary: ir.BinaryInst) bool {
     if (!binary.ty.eql(.{ .int = 32 })) return false;
-    if (binary.op == .shl) {
+    if (binary.op == .shl or binary.op == .lshr) {
         if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return false;
         const shift = singleBlockI32Constant(block, binary.rhs) orelse return false;
         return shift >= 0 and shift <= 31;

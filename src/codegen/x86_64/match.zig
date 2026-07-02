@@ -71,6 +71,12 @@ pub fn i32Value(value: i128) !i32 {
     return @intCast(value);
 }
 
+pub fn i32BitPattern(value: i128) !i32 {
+    if (value < std.math.minInt(i32) or value > std.math.maxInt(u32)) return error.UnsupportedCodegenValue;
+    if (value < 0) return @intCast(value);
+    return @bitCast(@as(u32, @intCast(value)));
+}
+
 pub fn u8Value(value: i128) !u8 {
     if (value < 0 or value > std.math.maxInt(u8)) return error.UnsupportedCodegenValue;
     return @intCast(value);

@@ -14,6 +14,7 @@ const appendIndirectCallRaxWithStackArgs = shared.appendIndirectCallRaxWithStack
 const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
 const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
 const callIsFastcc = shared.callIsFastcc;
+const i32BitPattern = shared.i32BitPattern;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
 const isCalleeName = shared.isCalleeName;
@@ -84,18 +85,30 @@ pub fn emitGenericCfgI32ValueIntoEax(
                         .int => |int| switch (binary.op) {
                             .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
                             .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -try i32Value(int) }),
+                            .@"and" => try machine.instructions.append(allocator, .{ .and_eax_imm32 = try i32BitPattern(int) }),
                             .shl => {
                                 const shift = try i32Value(int);
                                 if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
                                 if (shift != 0) try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
                             },
+                            .lshr => {
+                                const shift = try i32Value(int);
+                                if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
+                                if (shift != 0) try machine.instructions.append(allocator, .{ .shr_eax_imm5 = @intCast(shift) });
+                            },
                             else => return error.UnsupportedCodegenInstruction,
                         },
                         .named => |rhs_name| {
-                            if (binary.op == .shl) {
+                            if (binary.op == .shl or binary.op == .lshr) {
                                 const shift = singleBlockI32Constant(block, .{ .named = rhs_name }) orelse return error.UnsupportedCodegenValue;
                                 if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
-                                if (shift != 0) try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                                if (shift != 0) {
+                                    if (binary.op == .shl) {
+                                        try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                                    } else {
+                                        try machine.instructions.append(allocator, .{ .shr_eax_imm5 = @intCast(shift) });
+                                    }
+                                }
                                 return;
                             }
                             const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;

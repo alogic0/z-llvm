@@ -1459,6 +1459,106 @@ pub fn lowerGenericCfgTerminalBranchReturn(allocator: std.mem.Allocator, machine
     return true;
 }
 
+pub fn lowerGenericCfgCheckedLshrExactReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 3) return false;
+    const entry = function.blocks.items[0];
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return false;
+    const cond_name = switch (condbr.cond) {
+        .named => |name| name,
+        else => return false,
+    };
+
+    const cond_inst = findInstruction(entry, cond_name) orelse return false;
+    const cmp = switch (cond_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (cmp.predicate != .eq or !cmp.operand_ty.eql(.{ .int = 32 })) return false;
+
+    const source_name, const shl_name = blk: {
+        const lhs_name = switch (cmp.lhs) {
+            .named => |name| name,
+            else => return false,
+        };
+        const rhs_name = switch (cmp.rhs) {
+            .named => |name| name,
+            else => return false,
+        };
+        const lhs_inst = findInstruction(entry, lhs_name) orelse return false;
+        const rhs_inst = findInstruction(entry, rhs_name) orelse return false;
+        if (rhs_inst.kind == .binary) break :blk .{ lhs_name, rhs_name };
+        if (lhs_inst.kind == .binary) break :blk .{ rhs_name, lhs_name };
+        return false;
+    };
+
+    const shl_inst = findInstruction(entry, shl_name) orelse return false;
+    const shl = switch (shl_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (shl.op != .shl or !shl.ty.eql(.{ .int = 32 })) return false;
+    const lshr_name = switch (shl.lhs) {
+        .named => |name| name,
+        else => return false,
+    };
+
+    const lshr_inst = findInstruction(entry, lshr_name) orelse return false;
+    const lshr = switch (lshr_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (lshr.op != .lshr or !lshr.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(lshr.lhs, source_name)) return false;
+    const shift = multiBlockI32Constant(entry, lshr.rhs) orelse return false;
+    if (shift <= 0 or shift > 31) return false;
+
+    const inverse_shift = multiBlockI32Constant(entry, shl.rhs) orelse return false;
+    if (inverse_shift != shift) return false;
+
+    const cont_block = blockByName(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const panic_block = blockByName(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    const ret = switch (cont_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, lshr_name)) return false;
+    if (cont_block.instructions.items.len != 0) return false;
+
+    const shifted_out_mask: i128 = (@as(i128, 1) << @intCast(shift)) - 1;
+    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, entry, lshr.lhs);
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = try i32Value(shifted_out_mask) });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try appendGenericCfgConditionalBranch(allocator, machine, .jne, panic_block.name);
+    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, entry, .{ .named = lshr_name });
+    try appendGenericCfgReturn(allocator, machine);
+
+    try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
+    try emitGenericCfgNoreturnCallBlock(allocator, machine, function, panic_block);
+    return true;
+}
+
+fn multiBlockI32Constant(block: ir.BasicBlock, value: ir.Value) ?i64 {
+    return switch (value) {
+        .int => |int| i64Value(int) catch null,
+        .named => |name| blk: {
+            const instruction = findInstruction(block, name) orelse break :blk null;
+            break :blk switch (instruction.kind) {
+                .cast => |cast| if (cast.op == .zext and cast.to_ty.eql(.{ .int = 32 })) multiBlockI32Constant(block, cast.value) else null,
+                else => null,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+    };
+}
+
 pub const lowerGenericCfgErrorUnionPayloadBranchReturn = error_union_rows.lowerGenericCfgErrorUnionPayloadBranchReturn;
 
 pub fn lowerGenericCfgLinearTerminalBranchReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

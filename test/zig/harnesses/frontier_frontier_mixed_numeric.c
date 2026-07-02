@@ -16,6 +16,9 @@ extern unsigned int z_frontier_clz_u32(unsigned int) __asm__("frontier_mixed_num
 extern unsigned int z_frontier_ctz_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_ctz_u32");
 extern unsigned int z_frontier_popcount_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_popcount_u32");
 extern unsigned int z_frontier_bit_reverse_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_bit_reverse_u32");
+extern unsigned int z_frontier_shr_exact_u32(unsigned int) __asm__("frontier_mixed_numeric.frontier_shr_exact_u32");
+void z_frontier_mixed_numeric_shr_overflow(void) __asm__("frontier_mixed_numeric.shrOverflow");
+void z_frontier_mixed_numeric_shr_overflow(void) { __builtin_trap(); }
 int main(void) {
     if (z_frontier_mixed_float(1.5f, 2.25f) != 3.75f) return 1;
     if (z_frontier_double_roundtrip(9.0, 2.0) != 4.5) return 2;
@@ -55,5 +58,8 @@ int main(void) {
     if (z_frontier_bit_reverse_u32(0x89abcdefu) != 0xf7b3d591u) return 36;
     if (z_frontier_bit_reverse_u32(0u) != 0u) return 37;
     if (z_frontier_bit_reverse_u32(0xffffffffu) != 0xffffffffu) return 38;
+    if (z_frontier_shr_exact_u32(84u) != 42u) return 39;
+    if (z_frontier_shr_exact_u32(85u) != 42u) return 40;
+    if (z_frontier_shr_exact_u32(0x80000000u) != 0x40000000u) return 41;
     return 0;
 }

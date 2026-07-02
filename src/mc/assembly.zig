@@ -49,6 +49,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .add_stack_disp32_rax => |offset| try writer.print("\taddq {}(%rsp), %rax\n", .{offset}),
             .add_eax_imm32 => |value| try writer.print("\taddl ${}, %eax\n", .{value}),
             .shl_eax_imm5 => |amount| try writer.print("\tshll ${}, %eax\n", .{amount}),
+            .shr_eax_imm5 => |amount| try writer.print("\tshrl ${}, %eax\n", .{amount}),
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),
             .and_eax_imm32 => |value| try writer.print("\tandl ${}, %eax\n", .{value}),

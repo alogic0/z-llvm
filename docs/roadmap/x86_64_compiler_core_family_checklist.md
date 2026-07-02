@@ -1004,7 +1004,22 @@ Layer: semantic lowering and backend.
   `tmp/frontier_bit_reverse_u32.log`; no counters changed for this checklist
   cleanup. Dynamic exact shifts, signed exact-shift variants, and wider exact
   shift families remain future scalar-transform work.
-- [ ] Lower `shr_exact`.
+- [x] Lower `shr_exact`.
+  Added `frontier_mixed_numeric.frontier_shr_exact_u32`, which lowers scalar
+  `@shrExact((value & 0xffff_fffe), 1)` from the existing typed-v2 `bin_op`
+  export for `shr_exact`; no new Zig hook was required. The x86_64 generic CFG
+  path now emits immediate logical-right shifts for direct and named/zexted
+  constant shift counts, accepts unsigned 32-bit `and` masks as x86_64
+  immediate bit patterns, and owns the ReleaseSafe exactness guard shape
+  `source == shl(lshr(source))` with a cold `shrOverflow` noreturn edge. The C
+  harness checks odd/even inputs and the high-bit case, and supplies the
+  ReleaseSafe cold trap symbol. Strict frontier evidence in
+  `tmp/frontier_shr_exact_u32.log` reports ReleaseFast, ReleaseSafe, and
+  ReleaseSmall at `source_rows=14`, `discovered_functions=747`,
+  `generic_cfg_functions=747`, `object_emitted_functions=747`,
+  `executable_ok_rows=14`, and `local_fail=0`. Dynamic shift counts, signed
+  arithmetic-right exact forms, wider widths, and negative-path executable proof
+  for `shrOverflow` remain future scalar-transform/safety-edge work.
 - [ ] Lower integer `neg`.
 - [ ] Prove signed and unsigned width variants where compiler-core inventory
   shows both.

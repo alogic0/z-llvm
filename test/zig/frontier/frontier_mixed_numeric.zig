@@ -69,3 +69,7 @@ export fn frontier_popcount_u32(value: u32) u32 {
 export fn frontier_bit_reverse_u32(value: u32) u32 {
     return @bitReverse(value);
 }
+
+export fn frontier_shr_exact_u32(value: u32) u32 {
+    return @shrExact(value & 0xffff_fffe, 1);
+}

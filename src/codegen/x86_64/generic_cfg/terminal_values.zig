@@ -25,6 +25,7 @@ const emitGenericCfgIcmpCondition = cabi_call_lowering.emitGenericCfgIcmpConditi
 const findInstruction = cabi_call_lowering.findInstruction;
 const genericCfgSupportsSingleBlockI32Value = core_value_support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsSingleBlockIcmp = core_value_support.genericCfgSupportsSingleBlockIcmp;
+const i32BitPattern = shared.i32BitPattern;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
 const isInt = shared.isInt;
@@ -209,7 +210,7 @@ pub fn terminalBlockCanMaterializeI32Value(function: ir.Function, scope: Termina
             switch (instruction.kind) {
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 32 })) break :blk false;
-                    if (binary.op == .shl) {
+                    if (binary.op == .shl or binary.op == .lshr) {
                         const shift = terminalScopeI32Constant(scope, binary.rhs) orelse break :blk false;
                         if (shift < 0 or shift > 31) break :blk false;
                         break :blk terminalBlockCanMaterializeI32Value(function, scope, binary.lhs);
@@ -524,18 +525,31 @@ pub fn emitGenericCfgTerminalI32ValueIntoEaxInScope(
                         .int => |int| switch (binary.op) {
                             .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
                             .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -try i32Value(int) }),
-                            .shl => {
+                            .@"and" => try machine.instructions.append(allocator, .{ .and_eax_imm32 = try i32BitPattern(int) }),
+                            .shl, .lshr => {
                                 const shift = try i32Value(int);
                                 if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
-                                if (shift != 0) try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                                if (shift != 0) {
+                                    if (binary.op == .shl) {
+                                        try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                                    } else {
+                                        try machine.instructions.append(allocator, .{ .shr_eax_imm5 = @intCast(shift) });
+                                    }
+                                }
                             },
                             else => return error.UnsupportedCodegenInstruction,
                         },
                         .named => |rhs_name| {
-                            if (binary.op == .shl) {
+                            if (binary.op == .shl or binary.op == .lshr) {
                                 const shift = terminalScopeI32Constant(scope, .{ .named = rhs_name }) orelse return error.UnsupportedCodegenValue;
                                 if (shift < 0 or shift > 31) return error.UnsupportedCodegenValue;
-                                if (shift != 0) try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                                if (shift != 0) {
+                                    if (binary.op == .shl) {
+                                        try machine.instructions.append(allocator, .{ .shl_eax_imm5 = @intCast(shift) });
+                                    } else {
+                                        try machine.instructions.append(allocator, .{ .shr_eax_imm5 = @intCast(shift) });
+                                    }
+                                }
                                 return;
                             }
                             const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
