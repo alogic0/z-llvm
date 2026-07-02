@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
@@ -17,7 +19,7 @@ const isShiftOpcode = air_capabilities.isShiftOpcode;
 pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_export.TypedInstruction) !bool {
     switch (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode)) {
         .arg => try self.lowerTypedArg(instruction),
-        .add_with_overflow => try self.lowerTypedAddWithOverflow(instruction),
+        .add_with_overflow, .sub_with_overflow => try self.lowerTypedAddSubWithOverflow(instruction),
         .binary => try self.lowerTypedBinary(instruction),
         .compare => try self.lowerTypedCompare(instruction),
         .cast => try self.lowerTypedCast(instruction),
@@ -68,7 +70,7 @@ pub fn lowerTypedBinary(self: anytype, instruction: air_export.TypedInstruction)
     };
 }
 
-pub fn lowerTypedAddWithOverflow(self: anytype, instruction: air_export.TypedInstruction) !void {
+pub fn lowerTypedAddSubWithOverflow(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
     const lhs = try self.resolveTypedOperand(instruction, 0);
     const rhs = try self.resolveTypedOperand(instruction, 1);
@@ -78,9 +80,15 @@ pub fn lowerTypedAddWithOverflow(self: anytype, instruction: air_export.TypedIns
     if (!result_type.ir_type.eql(.{ .aggregate = "{ i32, i1 }" })) return air_model.LowerError.UnsupportedAir;
 
     const result_name = try self.resultName(instruction.index);
+    const callee = if (std.mem.eql(u8, instruction.opcode, "add_with_overflow"))
+        if (lhs.ty.signed) "llvm.sadd.with.overflow.i32" else "llvm.uadd.with.overflow.i32"
+    else if (std.mem.eql(u8, instruction.opcode, "sub_with_overflow"))
+        if (lhs.ty.signed) "llvm.ssub.with.overflow.i32" else "llvm.usub.with.overflow.i32"
+    else
+        return air_model.LowerError.UnsupportedAir;
     var call: ir.CallInst = .{
         .ret_ty = result_type.ir_type,
-        .callee = if (lhs.ty.signed) "llvm.sadd.with.overflow.i32" else "llvm.uadd.with.overflow.i32",
+        .callee = callee,
         .args = .empty,
     };
     errdefer call.deinit(self.allocator);

@@ -18,6 +18,7 @@ const std = shared.std;
 const ir = shared.ir;
 const MachineFunction = shared.MachineFunction;
 const ArgReg = shared.ArgReg;
+const MachineBinaryOp = shared.MachineBinaryOp;
 
 const appendAlignedDirectCall = shared.appendAlignedDirectCall;
 const appendDirectCallWithStackArgs = shared.appendDirectCallWithStackArgs;
@@ -888,8 +889,10 @@ pub fn lowerGenericCfgStackCheckedAddReturn(
     machine: *MachineFunction,
     function: ir.Function,
 ) !bool {
-    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
-    if (!function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len == 0) return false;
+    for (function.params.items) |param| {
+        if (!param.ty.eql(.{ .int = 32 })) return false;
+    }
     if (function.blocks.items.len != 3) return false;
 
     const entry = function.blocks.items[0];
@@ -938,12 +941,7 @@ fn genericCfgStackCheckedAdd(entry: ir.BasicBlock) !GenericCfgStackCheckedAdd {
     if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
     if (!call.ret_ty.eql(.{ .aggregate = "{ i32, i1 }" })) return error.UnsupportedCodegenType;
     if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[1].ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
-    const branch_kind: core_cfg_emit.GenericCfgBranchKind = if (isCalleeName(call.callee, "llvm.sadd.with.overflow.i32"))
-        .jo
-    else if (isCalleeName(call.callee, "llvm.uadd.with.overflow.i32"))
-        .jc
-    else
-        return error.UnsupportedCodegenInstruction;
+    const branch_kind = checkedOverflowBranchKind(call.callee) orelse return error.UnsupportedCodegenInstruction;
 
     const alloca = switch (entry.instructions.items[1].kind) {
         .alloca => |alloca| alloca,
@@ -1025,33 +1023,54 @@ fn emitGenericCfgCheckedAddIntoEax(
 ) !void {
     const lhs = call.args.items[0].value;
     const rhs = call.args.items[1].value;
+    if (isCheckedSubOverflowCallee(call.callee)) {
+        const lhs_reg = (paramValueReg(function, lhs, .{ .int = 32 }) catch null) orelse return error.UnsupportedCodegenValue;
+        try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
+        try emitGenericCfgCheckedOverflowOperand(allocator, machine, function, rhs, .sub);
+        return;
+    }
     if ((paramValueReg(function, lhs, .{ .int = 32 }) catch null)) |reg| {
         try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
-        try emitGenericCfgCheckedAddOperand(allocator, machine, function, rhs);
+        try emitGenericCfgCheckedOverflowOperand(allocator, machine, function, rhs, .add);
         return;
     }
     if ((paramValueReg(function, rhs, .{ .int = 32 }) catch null)) |reg| {
         try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
-        try emitGenericCfgCheckedAddOperand(allocator, machine, function, lhs);
+        try emitGenericCfgCheckedOverflowOperand(allocator, machine, function, lhs, .add);
         return;
     }
     return error.UnsupportedCodegenValue;
 }
 
-fn emitGenericCfgCheckedAddOperand(
+fn emitGenericCfgCheckedOverflowOperand(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     value: ir.Value,
+    op: MachineBinaryOp,
 ) !void {
     if ((paramValueReg(function, value, .{ .int = 32 }) catch null)) |reg| {
-        try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = reg } });
+        try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = reg } });
         return;
     }
+    if (op != .add) return error.UnsupportedCodegenValue;
     switch (value) {
         .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
+}
+
+fn checkedOverflowBranchKind(callee: []const u8) ?core_cfg_emit.GenericCfgBranchKind {
+    if (isCalleeName(callee, "llvm.sadd.with.overflow.i32")) return .jo;
+    if (isCalleeName(callee, "llvm.uadd.with.overflow.i32")) return .jc;
+    if (isCalleeName(callee, "llvm.ssub.with.overflow.i32")) return .jo;
+    if (isCalleeName(callee, "llvm.usub.with.overflow.i32")) return .jc;
+    return null;
+}
+
+fn isCheckedSubOverflowCallee(callee: []const u8) bool {
+    return isCalleeName(callee, "llvm.ssub.with.overflow.i32") or
+        isCalleeName(callee, "llvm.usub.with.overflow.i32");
 }
 
 pub fn genericCfgSupportsNegativeI32Guard(function: ir.Function, icmp: ir.IcmpInst) bool {

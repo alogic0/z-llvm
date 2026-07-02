@@ -22,6 +22,18 @@ export fn frontier_explicit_uadd_overflow(value: u32) u32 {
     return checked[0];
 }
 
+export fn frontier_explicit_ssub_overflow(value: i32, delta: i32) i32 {
+    const checked = @subWithOverflow(value, delta);
+    if (checked[1] != 0) @panic("frontier signed sub overflow");
+    return checked[0];
+}
+
+export fn frontier_explicit_usub_overflow(value: u32, delta: u32) u32 {
+    const checked = @subWithOverflow(value, delta);
+    if (checked[1] != 0) @panic("frontier unsigned sub overflow");
+    return checked[0];
+}
+
 export fn frontier_bounds_guard(value: *const i32, len: usize, index: usize) i32 {
     _ = len;
     _ = index;

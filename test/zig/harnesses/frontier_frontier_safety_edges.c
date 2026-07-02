@@ -5,6 +5,8 @@ extern int z_frontier_checked_add(int) __asm__("frontier_safety_edges.frontier_c
 extern unsigned z_frontier_checked_uadd(unsigned) __asm__("frontier_safety_edges.frontier_checked_uadd");
 extern int z_frontier_explicit_sadd_overflow(int) __asm__("frontier_safety_edges.frontier_explicit_sadd_overflow");
 extern unsigned z_frontier_explicit_uadd_overflow(unsigned) __asm__("frontier_safety_edges.frontier_explicit_uadd_overflow");
+extern int z_frontier_explicit_ssub_overflow(int, int) __asm__("frontier_safety_edges.frontier_explicit_ssub_overflow");
+extern unsigned z_frontier_explicit_usub_overflow(unsigned, unsigned) __asm__("frontier_safety_edges.frontier_explicit_usub_overflow");
 extern int z_frontier_bounds_guard(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_guard");
 extern int z_frontier_bounds_direct(const int *, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_direct");
 extern int z_frontier_bounds_panic(const int *, unsigned long, unsigned long) __asm__("frontier_safety_edges.frontier_bounds_panic");
@@ -46,6 +48,8 @@ static void death_panic_phi_right(void) { (void)z_frontier_panic_phi_len(0, 0, 1
 static void death_panic_loaded_ptr(void) { (void)z_frontier_panic_loaded_ptr(0, 19); }
 static void death_explicit_sadd_overflow(void) { (void)z_frontier_explicit_sadd_overflow(2147483640); }
 static void death_explicit_uadd_overflow(void) { (void)z_frontier_explicit_uadd_overflow(4294967290u); }
+static void death_explicit_ssub_overflow(void) { (void)z_frontier_explicit_ssub_overflow(-2147483647 - 1, 1); }
+static void death_explicit_usub_overflow(void) { (void)z_frontier_explicit_usub_overflow(0u, 1u); }
 #ifdef ZLLVM_HARNESS_MODE_ReleaseSafe
 static void death_bounds_panic(void) { int values[1] = { 7 }; (void)z_frontier_bounds_panic(values, 1, 2); }
 static void death_optional_unwrap(void) { int value = 41; (void)z_frontier_optional_unwrap(0, &value); }
@@ -58,6 +62,8 @@ int main(void) {
     if (z_frontier_checked_uadd(5u) != 24u) return 2;
     if (z_frontier_explicit_sadd_overflow(5) != 16) return 20;
     if (z_frontier_explicit_uadd_overflow(5u) != 24u) return 21;
+    if (z_frontier_explicit_ssub_overflow(31, 9) != 22) return 28;
+    if (z_frontier_explicit_usub_overflow(31u, 9u) != 22u) return 29;
     if (z_frontier_bounds_guard(&value, 1, 0) != 41) return 3;
     if (z_frontier_bounds_direct(values, 2) != 77) return 4;
     if (z_frontier_bounds_panic(values, 3, 2) != 77) return 22;
@@ -78,6 +84,8 @@ int main(void) {
     if (expect_death(death_panic_loaded_ptr) != 0) return 27;
     if (expect_death(death_explicit_sadd_overflow) != 0) return 15;
     if (expect_death(death_explicit_uadd_overflow) != 0) return 16;
+    if (expect_death(death_explicit_ssub_overflow) != 0) return 30;
+    if (expect_death(death_explicit_usub_overflow) != 0) return 31;
 #ifdef ZLLVM_HARNESS_MODE_ReleaseSafe
     if (expect_death(death_bounds_panic) != 0) return 17;
     if (expect_death(death_optional_unwrap) != 0) return 18;
@@ -85,4 +93,3 @@ int main(void) {
 #endif
     return 0;
 }
-

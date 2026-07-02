@@ -788,7 +788,16 @@ Layer: safety-edge CFG and runtime boundary.
   `executable_ok_rows=14`, and `local_fail=0`. The focused ReleaseFast
   compiler-core inventory still sees normal `add_with_overflow count=62`, but
   it is no longer in the top unknown safety-runtime bucket.
-- [ ] Lower or classify `sub_with_overflow`.
+- [x] Lower or classify `sub_with_overflow`.
+  Completed for signed/unsigned i32 operands by routing typed-v2
+  `sub_with_overflow` through the scalar overflow lowerer, emitting
+  `llvm.ssub.with.overflow.i32` or `llvm.usub.with.overflow.i32`, and extending
+  the generic CFG checked-overflow backend to preserve subtraction operand
+  order for multi-argument rows. The accepted frontier rows
+  `frontier_explicit_ssub_overflow` and `frontier_explicit_usub_overflow`
+  exercise hot returns plus child-process death checks. `tmp/frontier_sub_overflow.log`
+  proves all three release modes at `source_rows=14`, `discovered_functions=736`,
+  `object_emitted_functions=736`, `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower or classify `mul_with_overflow`.
 - [ ] Lower or classify `shl_with_overflow`.
 - [ ] Lower checked integer cast paths used by ReleaseSafe.
