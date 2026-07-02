@@ -1169,7 +1169,17 @@ Layer: ABI planner and backend.
   `tmp/frontier_vector_element_boundaries.log` reports all three release modes
   at `source_rows=10`, `discovered_functions=18`,
   `vector_boundary_rows=4`, `wrong_diagnostic_rows=0`, and `local_fail=0`.
-- [ ] Prove one source-backed vector executable row if ABI-stable.
+- [x] Prove one source-backed vector executable row if ABI-stable.
+
+  The ABI-stable vector proof is intentionally through scalar C ABI wrappers
+  that construct/use vectors inside real Zig code and return scalar checksums,
+  not through exported vector arguments or returns. Existing rows
+  `frontier_shuffle_one_u8`, `frontier_splat_u8`, and
+  `frontier_reduce_add_u32` are source-backed and executable-proven by
+  `tmp/frontier_vector_shuffle.log`, `tmp/frontier_vector_splat.log`, and
+  `tmp/frontier_vector_reduce.log`; the latest accepted frontier counter is
+  still `source_rows=14`, `discovered_functions=753`,
+  `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Otherwise prove object/native-link boundary diagnostics.
 - [ ] Refresh inventory and show the vector bucket reduced or reclassified.
 
