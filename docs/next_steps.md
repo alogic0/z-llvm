@@ -39,6 +39,26 @@ Stay on the selected goal until:
 
 None.
 
+Stop state recorded 2026-07-02 after convergence-progress item 5:
+
+- Active convergence-progress item: 6,
+  `distribution-real-rows --limit=1` gate exists and is wired into
+  `distribution-all`.
+- Current staged `real_*` counters: unopened (`real_functions_lowered=-`,
+  `real_objects_emitted=-`, `real_native_linked=-`, `real_executed=-`,
+  `real_programs_ok=-`).
+- Current candidate denominator:
+  `docs/evidence/real_candidates_releasefast_v1.tsv`,
+  hash
+  `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`,
+  selector `real-candidate-selector-v1`, Zig pin
+  `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
+- Current inventory counter:
+  `unsupported_functions (ReleaseFast, compiler-core-module)=55479`, cited
+  by `docs/evidence/real_candidates_releasefast_v1.summary`.
+- Recommended next action: implement item 6 using the ranked candidate file
+  as the denominator for the first `distribution-real-rows --limit=1` gate.
+
 When the worker stops, record only:
 
 - active convergence-progress item (and active family, when the goal was a

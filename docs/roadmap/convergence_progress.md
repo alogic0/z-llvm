@@ -62,11 +62,14 @@ list and the visible record of progress. Evidence summaries under
 
 ## Phase 1 — First Real Rows
 
-- [ ] 5. Candidate selector v1: inventory scanner emits the ranked
+- [x] 5. Candidate selector v1: inventory scanner emits the ranked
   real-candidate TSV/JSON (signature class, call_class, global_refs,
   runtime_refs, determinism, harnessable_reason/exclusion reason);
   conservative marks allowed, `proven_unharnessable` distinguished from
   `not_yet_analyzed`; first candidate file committed as evidence.
+
+  Closed by `docs/evidence/real_candidates_releasefast_v1.summary`, with
+  candidate rows in `docs/evidence/real_candidates_releasefast_v1.tsv`.
 - [ ] 6. `distribution-real-rows --limit=1` gate exists and is wired into
   `distribution-all`, reporting the staged `real_*` counters.
 - [ ] 7. First real compiler-core function green through its applicable
@@ -140,7 +143,7 @@ summaries.
 | real_native_linked | - | - | - | - |
 | real_executed | - | - | - | - |
 | real_programs_ok | - | - | - | - |
-| unsupported_functions (ReleaseFast, compiler-core-module) | 55852 | ReleaseFast | `tmp/compiler_core_module_releasefast_after_pointer_slice724.log` (pre-adoption, untracked) | pre-pin baseline |
+| unsupported_functions (ReleaseFast, compiler-core-module) | 55479 | ReleaseFast | `docs/evidence/real_candidates_releasefast_v1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 
 Fixture-frontier counters (`generic_cfg_functions=753`,
 `executable_ok_rows=14`) remain tracked by the family checklist and gate

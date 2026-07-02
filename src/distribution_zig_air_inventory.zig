@@ -11,6 +11,7 @@ const Options = struct {
     slice: InventorySlice = .all,
     mode: ?Mode = null,
     preserve_temp: bool = false,
+    real_candidates_tsv: ?[]const u8 = null,
 };
 
 const InventorySlice = enum {
@@ -125,6 +126,7 @@ const unsupported_category_count = @typeInfo(UnsupportedCategory).@"enum".fields
 const unknown_opcode_category_count = @typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".fields.len;
 const top_unknown_opcode_pair_limit = 50;
 const top_unknown_opcode_category_pair_limit = 10;
+const real_candidate_selector_version = "real-candidate-selector-v1";
 
 const AggregateSurfaceCategory = enum(u8) {
     opcode_shape,
@@ -268,6 +270,40 @@ const Counters = struct {
     }
 };
 
+const CounterSnapshot = struct {
+    calls: usize,
+    runtime_symbols: usize,
+    unsupported_categories: [unsupported_category_count]usize,
+};
+
+const CandidateRow = struct {
+    source: []const u8,
+    function: []const u8,
+    instruction_count: usize,
+    signature_class: []const u8,
+    call_class: []const u8,
+    global_refs: usize,
+    runtime_refs: usize,
+    determinism: []const u8,
+    harnessable_reason: []const u8,
+    sort_bucket: usize,
+
+    fn deinit(self: CandidateRow, allocator: std.mem.Allocator) void {
+        allocator.free(self.source);
+        allocator.free(self.function);
+        allocator.free(self.harnessable_reason);
+    }
+};
+
+const CandidateRows = struct {
+    rows: std.ArrayList(CandidateRow) = .empty,
+
+    fn deinit(self: *CandidateRows, allocator: std.mem.Allocator) void {
+        for (self.rows.items) |row| row.deinit(allocator);
+        self.rows.deinit(allocator);
+    }
+};
+
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
@@ -293,7 +329,7 @@ pub fn main(init: std.process.Init) !void {
             try runSlice(init, zig_emitter, mode, .compiler_core);
         }
         if (options.slice == .compiler_core_module or options.slice == .all) {
-            try runCompilerCoreModuleSlice(init, zig_emitter, mode, options.preserve_temp);
+            try runCompilerCoreModuleSlice(init, zig_emitter, mode, options.preserve_temp, options.real_candidates_tsv);
         }
     }
 }
@@ -314,6 +350,8 @@ fn parseOptions(args: std.process.Args) !Options {
             }
         } else if (std.mem.eql(u8, arg, "--preserve-temp")) {
             options.preserve_temp = true;
+        } else if (std.mem.startsWith(u8, arg, "--real-candidates-tsv=")) {
+            options.real_candidates_tsv = arg["--real-candidates-tsv=".len..];
         } else {
             return error.UnsupportedDistributionInventoryArgument;
         }
@@ -470,7 +508,13 @@ fn sliceAllowsBoundaries(slice: InventorySlice) bool {
     };
 }
 
-fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, mode: Mode, preserve_success_temp: bool) !void {
+fn runCompilerCoreModuleSlice(
+    init: std.process.Init,
+    zig_emitter: []const u8,
+    mode: Mode,
+    preserve_success_temp: bool,
+    real_candidates_tsv: ?[]const u8,
+) !void {
     const allocator = init.gpa;
     const io = init.io;
     const slice = InventorySlice.compiler_core_module;
@@ -576,8 +620,17 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
         .instruction_payload_scan = 1,
     };
     defer counters.deinit(allocator);
+    var candidate_rows: CandidateRows = .{};
+    defer candidate_rows.deinit(allocator);
     printCompilerCoreModuleProgress(slice, mode, descriptor_path, "descriptor-scan-start");
-    try scanLargeDescriptor(allocator, io, descriptor_path, &counters, "../ziglang/src/main.zig");
+    try scanLargeDescriptor(
+        allocator,
+        io,
+        descriptor_path,
+        &counters,
+        "../ziglang/src/main.zig",
+        if (real_candidates_tsv != null) &candidate_rows else null,
+    );
     std.debug.print(
         "inventory-progress slice={s} mode={s} phase=descriptor-scan-complete export_path={s} functions={} instructions_total={}\n",
         .{ slice.cliName(), mode.name(), descriptor_path, counters.functions, counters.instructions_total },
@@ -599,6 +652,9 @@ fn runCompilerCoreModuleSlice(init: std.process.Init, zig_emitter: []const u8, m
     }
     printCompilerCoreModuleProgress(slice, mode, descriptor_path, "summary-start");
     try printSummary(allocator, slice, mode, counters);
+    if (real_candidates_tsv) |path| {
+        try writeRealCandidatesTsv(allocator, io, path, slice, mode, &candidate_rows);
+    }
     if (preserve_success_temp) {
         preserve_temp = true;
         std.debug.print(
@@ -695,6 +751,7 @@ fn scanLargeDescriptor(
     descriptor_path: []const u8,
     counters: *Counters,
     source_path: []const u8,
+    candidates: ?*CandidateRows,
 ) !void {
     const file = try std.Io.Dir.cwd().openFile(io, descriptor_path, .{});
     defer file.close(io);
@@ -782,7 +839,10 @@ fn scanLargeDescriptor(
         if (isRuntimeSymbol(function_name)) counters.runtime_symbols += 1;
 
         var unsupported_in_function = false;
+        const before_candidate = snapshotCounters(counters);
+        const signature_class = classifySignature(function_name, type_text, instruction_count);
         try accountFunctionType(allocator, counters, source_path, function_name, type_text, &unsupported_in_function);
+        var candidate_global_refs: usize = 0;
 
         var line = try takeLine(reader);
         if (!std.mem.startsWith(u8, line, "air_bytes=")) return error.InvalidInventoryDescriptor;
@@ -801,6 +861,7 @@ fn scanLargeDescriptor(
             const typed_text = try readFramedSmallFromValueLine(allocator, reader, line, "structured_air_v2_bytes");
             defer allocator.free(typed_text);
             if (instruction_count > 0 and typed_text.len == 0) return error.ZigCompilerModuleInventoryMissingTypedBody;
+            candidate_global_refs = countGlobalRefs(typed_text);
             const scanned_instruction_count = try scanStructuredAirV2Text(allocator, counters, source_path, function_name, typed_text, &unsupported_in_function);
             if (instruction_count > 0 and scanned_instruction_count != instruction_count) {
                 return error.ZigCompilerModuleInventoryIncompleteTypedBody;
@@ -809,7 +870,140 @@ fn scanLargeDescriptor(
         }
         if (!std.mem.eql(u8, line, "function_end")) return error.InvalidInventoryDescriptor;
         if (unsupported_in_function) counters.unsupported_functions += 1;
+        if (candidates) |candidate_rows| {
+            try appendCandidateRow(
+                allocator,
+                candidate_rows,
+                source_path,
+                function_name,
+                instruction_count,
+                signature_class,
+                candidate_global_refs,
+                before_candidate,
+                snapshotCounters(counters),
+            );
+        }
     }
+}
+
+fn snapshotCounters(counters: *const Counters) CounterSnapshot {
+    var unsupported_categories: [unsupported_category_count]usize = undefined;
+    inline for (std.meta.fields(UnsupportedCategory)) |field| {
+        unsupported_categories[field.value] = counters.unsupported_categories[field.value].count;
+    }
+    return .{
+        .calls = counters.calls,
+        .runtime_symbols = counters.runtime_symbols,
+        .unsupported_categories = unsupported_categories,
+    };
+}
+
+fn classifySignature(function: []const u8, type_text: []const u8, instruction_count: usize) []const u8 {
+    if (instruction_count == 0 or isProbablyComptimeFunction(function)) return "not-callable";
+    const capability = air_capabilities.typeSurfaceCapability(type_text);
+    if (capability.varargs or
+        capability.vector or
+        capability.x87 or
+        capability.packed_or_unaligned_aggregate or
+        capability.aggregate_abi)
+    {
+        return "not-callable";
+    }
+    if (containsAny(type_text, &.{ "callconv(.c)", "callconv(.C)" })) return "C-ABI-stable";
+    if (contains(type_text, "callconv")) return "not-callable";
+    return "internal-callable";
+}
+
+fn appendCandidateRow(
+    allocator: std.mem.Allocator,
+    rows: *CandidateRows,
+    source: []const u8,
+    function: []const u8,
+    instruction_count: usize,
+    signature_class: []const u8,
+    global_refs: usize,
+    before: CounterSnapshot,
+    after: CounterSnapshot,
+) !void {
+    const call_count = after.calls - before.calls;
+    const runtime_refs = after.runtime_symbols - before.runtime_symbols;
+    const unsupported_category = firstUnsupportedCategory(before, after);
+    const call_class: []const u8 = if (call_count == 0) "leaf" else "external";
+    const reason = try candidateReason(allocator, unsupported_category, signature_class, call_count, global_refs, runtime_refs);
+    errdefer allocator.free(reason);
+    const source_copy = try allocator.dupe(u8, source);
+    errdefer allocator.free(source_copy);
+    const function_copy = try allocator.dupe(u8, function);
+    errdefer allocator.free(function_copy);
+    try rows.rows.append(allocator, .{
+        .source = source_copy,
+        .function = function_copy,
+        .instruction_count = instruction_count,
+        .signature_class = signature_class,
+        .call_class = call_class,
+        .global_refs = global_refs,
+        .runtime_refs = runtime_refs,
+        .determinism = "assumed_nondeterministic",
+        .harnessable_reason = reason,
+        .sort_bucket = candidateSortBucket(unsupported_category, signature_class, call_count, global_refs, runtime_refs),
+    });
+}
+
+fn firstUnsupportedCategory(before: CounterSnapshot, after: CounterSnapshot) ?UnsupportedCategory {
+    inline for (std.meta.fields(UnsupportedCategory)) |field| {
+        if (after.unsupported_categories[field.value] > before.unsupported_categories[field.value]) {
+            return @enumFromInt(field.value);
+        }
+    }
+    return null;
+}
+
+fn candidateReason(
+    allocator: std.mem.Allocator,
+    unsupported_category: ?UnsupportedCategory,
+    signature_class: []const u8,
+    call_count: usize,
+    global_refs: usize,
+    runtime_refs: usize,
+) ![]const u8 {
+    if (unsupported_category) |category| {
+        return std.fmt.allocPrint(allocator, "proven_unharnessable:unsupported-{s}", .{category.name()});
+    }
+    if (std.mem.eql(u8, signature_class, "not-callable")) {
+        return allocator.dupe(u8, "proven_unharnessable:signature");
+    }
+    if (runtime_refs > 0) return allocator.dupe(u8, "not_yet_analyzed:runtime_refs");
+    if (global_refs > 0) return allocator.dupe(u8, "not_yet_analyzed:global_refs");
+    if (call_count > 0) return allocator.dupe(u8, "not_yet_analyzed:callee_closure");
+    return allocator.dupe(u8, "harnessable:leaf_no_refs_supported");
+}
+
+fn candidateSortBucket(
+    unsupported_category: ?UnsupportedCategory,
+    signature_class: []const u8,
+    call_count: usize,
+    global_refs: usize,
+    runtime_refs: usize,
+) usize {
+    if (unsupported_category != null) return 500;
+    if (std.mem.eql(u8, signature_class, "not-callable")) return 400;
+    if (runtime_refs > 0) return 300;
+    if (global_refs > 0) return 200;
+    if (call_count > 0) return 100;
+    return 0;
+}
+
+fn countGlobalRefs(text: []const u8) usize {
+    var count: usize = 0;
+    var index: usize = 0;
+    while (std.mem.indexOfScalarPos(u8, text, index, '@')) |at| {
+        const next_index = at + 1;
+        if (next_index < text.len and (std.ascii.isAlphabetic(text[next_index]) or text[next_index] == '_')) {
+            count += 1;
+        }
+        index = next_index;
+    }
+    return count;
 }
 
 fn scanFramedText(
@@ -1535,6 +1729,70 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
         );
     }
     try writeAllStdout(output.written());
+}
+
+fn writeRealCandidatesTsv(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    slice: InventorySlice,
+    mode: Mode,
+    rows: *CandidateRows,
+) !void {
+    std.sort.heap(CandidateRow, rows.rows.items, {}, candidateRowLessThan);
+
+    var output: std.Io.Writer.Allocating = .init(allocator);
+    defer output.deinit();
+    const writer = &output.writer;
+
+    try writer.writeAll("rank\tsource\tfunction\tinstruction_count\tsignature_class\tcall_class\tglobal_refs\truntime_refs\tdeterminism\tharnessable_reason\n");
+    var harnessable_rows: usize = 0;
+    var not_yet_analyzed_rows: usize = 0;
+    var proven_unharnessable_rows: usize = 0;
+    for (rows.rows.items, 1..) |row, rank| {
+        if (std.mem.startsWith(u8, row.harnessable_reason, "harnessable:")) harnessable_rows += 1;
+        if (std.mem.startsWith(u8, row.harnessable_reason, "not_yet_analyzed:")) not_yet_analyzed_rows += 1;
+        if (std.mem.startsWith(u8, row.harnessable_reason, "proven_unharnessable:")) proven_unharnessable_rows += 1;
+        try writer.print(
+            "{}\t{s}\t{s}\t{}\t{s}\t{s}\t{}\t{}\t{s}\t{s}\n",
+            .{
+                rank,
+                row.source,
+                row.function,
+                row.instruction_count,
+                row.signature_class,
+                row.call_class,
+                row.global_refs,
+                row.runtime_refs,
+                row.determinism,
+                row.harnessable_reason,
+            },
+        );
+    }
+
+    var cwd = std.Io.Dir.cwd();
+    if (std.fs.path.dirname(path)) |dirname| try cwd.createDirPath(io, dirname);
+    try cwd.writeFile(io, .{ .sub_path = path, .data = output.written() });
+    std.debug.print(
+        "summary distribution-real-candidates selector_version={s} slice={s} mode={s} target={s} path={s} rows={} harnessable_rows={} not_yet_analyzed_rows={} proven_unharnessable_rows={} local_fail=0\n",
+        .{
+            real_candidate_selector_version,
+            slice.cliName(),
+            mode.name(),
+            target_triple,
+            path,
+            rows.rows.items.len,
+            harnessable_rows,
+            not_yet_analyzed_rows,
+            proven_unharnessable_rows,
+        },
+    );
+}
+
+fn candidateRowLessThan(_: void, lhs: CandidateRow, rhs: CandidateRow) bool {
+    if (lhs.sort_bucket != rhs.sort_bucket) return lhs.sort_bucket < rhs.sort_bucket;
+    if (lhs.instruction_count != rhs.instruction_count) return lhs.instruction_count < rhs.instruction_count;
+    return std.mem.lessThan(u8, lhs.function, rhs.function);
 }
 
 fn cloneEnvironment(
