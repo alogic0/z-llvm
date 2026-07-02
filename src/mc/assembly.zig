@@ -139,6 +139,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .addss_xmm1_xmm0 => try writer.writeAll("\taddss %xmm1, %xmm0\n"),
             .subss_xmm1_xmm0 => try writer.writeAll("\tsubss %xmm1, %xmm0\n"),
             .divsd_xmm1_xmm0 => try writer.writeAll("\tdivsd %xmm1, %xmm0\n"),
+            .xorps_xmm1_xmm0 => try writer.writeAll("\txorps %xmm1, %xmm0\n"),
             .movapd_xmm1_xmm0 => try writer.writeAll("\tmovapd %xmm1, %xmm0\n"),
             .movapd_xmm => |mov| try writer.print("\tmovapd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
             .unpcklps_xmm => |mov| try writer.print("\tunpcklps {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),

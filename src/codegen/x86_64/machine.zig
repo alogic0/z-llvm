@@ -136,6 +136,7 @@ pub const Instruction = union(enum) {
     addss_xmm1_xmm0,
     subss_xmm1_xmm0,
     divsd_xmm1_xmm0,
+    xorps_xmm1_xmm0,
     movapd_xmm1_xmm0,
     movapd_xmm: struct {
         dst: XmmReg,

@@ -81,6 +81,71 @@ pub fn lowerGenericCfgFpBinaryReturn(
     return true;
 }
 
+pub fn lowerGenericCfgFpNegReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty)) return false;
+    if (block.instructions.items.len != 1) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const result = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, result)) return false;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (binary.op != .fsub or !binary.ty.eql(function.ret_ty)) return false;
+    switch (binary.lhs) {
+        .fp => |value| if (!isFpZeroText(value)) return false,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    }
+    const source_name = switch (binary.rhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const fp_index = fpParamIndex(function, source_name, function.ret_ty) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi => null,
+        error.UnsupportedCodegenValue => return false,
+    };
+    if (fp_index) |index| {
+        switch (index) {
+            0 => {},
+            1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
+            else => return error.UnsupportedCodegenAbi,
+        }
+    } else {
+        const offset = scalarParamStackDisp8(function, source_name, function.ret_ty) catch |err| switch (err) {
+            error.UnsupportedCodegenAbi, error.UnsupportedCodegenValue => return false,
+            else => return err,
+        };
+        if (function.ret_ty.eql(.float)) {
+            try appendLoadStackDispXmm0F32(allocator, machine, offset);
+        } else {
+            try appendLoadStackDispXmm0(allocator, machine, offset);
+        }
+    }
+
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x80000000 });
+    } else {
+        try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = 0x8000000000000000 });
+    }
+    try machine.instructions.append(allocator, .xorps_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn isFpZeroText(value: []const u8) bool {
+    return std.mem.eql(u8, value, "0.000000e+00") or
+        std.mem.eql(u8, value, "0x0p+0") or
+        std.mem.eql(u8, value, "0");
+}
+
 pub fn lowerGenericCfgFpCastBinaryPipelineReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,

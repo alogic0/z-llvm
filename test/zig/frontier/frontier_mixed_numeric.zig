@@ -73,3 +73,11 @@ export fn frontier_bit_reverse_u32(value: u32) u32 {
 export fn frontier_shr_exact_u32(value: u32) u32 {
     return @shrExact(value & 0xffff_fffe, 1);
 }
+
+export fn frontier_neg_f32(value: f32) f32 {
+    return -value;
+}
+
+export fn frontier_neg_f64(value: f64) f64 {
+    return -value;
+}

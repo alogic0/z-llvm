@@ -27,6 +27,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .max => try self.lowerTypedMax(instruction),
         .min => try self.lowerTypedMin(instruction),
         .abs => try self.lowerTypedAbs(instruction),
+        .neg => try self.lowerTypedNeg(instruction),
         .clz => try self.lowerTypedClz(instruction),
         .ctz => try self.lowerTypedCtz(instruction),
         .popcount => try self.lowerTypedPopcount(instruction),
@@ -354,6 +355,29 @@ pub fn lowerTypedAbs(self: anytype, instruction: air_export.TypedInstruction) !v
             .ty = source.ty.ir_type,
             .true_value = .{ .named = neg_name },
             .false_value = source.value,
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
+}
+
+pub fn lowerTypedNeg(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (!result_type.ir_type.eql(source.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    if (!source.ty.ir_type.eql(.float) and !source.ty.ir_type.eql(.double)) return air_model.LowerError.UnsupportedAir;
+
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .binary = .{
+            .op = .fsub,
+            .ty = source.ty.ir_type,
+            .lhs = .{ .fp = "0.000000e+00" },
+            .rhs = source.value,
         } },
     });
     self.values[instruction.index] = .{

@@ -1020,7 +1020,23 @@ Layer: semantic lowering and backend.
   `executable_ok_rows=14`, and `local_fail=0`. Dynamic shift counts, signed
   arithmetic-right exact forms, wider widths, and negative-path executable proof
   for `shrOverflow` remain future scalar-transform/safety-edge work.
-- [ ] Lower integer `neg`.
+- [x] Lower scalar floating-point `neg`.
+  The refreshed compiler-core evidence for `scalar-transform:neg:opaque` points
+  at floating-point negation in `math.pow`/parse-float paths rather than an
+  integer AIR `neg` source shape. Added typed-v2 `zllvm-neg-v1` export for unary
+  `neg` operands in `../ziglang`, then lowered selected scalar `f32`/`f64`
+  `neg` through the typed scalar semantic path into generic CFG. The x86_64
+  backend now emits a reusable SSE sign-bit flip (`xorps` with a loaded sign
+  mask), and `frontier_mixed_numeric.frontier_neg_f32` /
+  `frontier_mixed_numeric.frontier_neg_f64` have C ABI executable checks for
+  positive and negative inputs. Strict frontier evidence in
+  `tmp/frontier_neg.log` reports ReleaseFast, ReleaseSafe, and ReleaseSmall at
+  `source_rows=14`, `discovered_functions=749`,
+  `generic_cfg_functions=749`, `object_emitted_functions=749`,
+  `executable_ok_rows=14`, and `local_fail=0`. `f128` neg remains unsupported,
+  and integer neg remains a source-shape discovery task because the tested
+  `-value` integer row lowered to ordinary `sub(<i32, 0>, value)`, not AIR
+  `neg`.
 - [ ] Prove signed and unsigned width variants where compiler-core inventory
   shows both.
 - [ ] Refresh inventory and show scalar-transform buckets reduced.

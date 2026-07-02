@@ -1053,6 +1053,10 @@ pub fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *Mach
         .ret => |ret| ret,
         else => return false,
     };
+    if (try fp_rows.lowerGenericCfgFpNegReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try fp_rows.lowerGenericCfgFpBinaryReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
