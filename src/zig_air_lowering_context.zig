@@ -192,6 +192,8 @@ pub const LoweringContext = struct {
     pub const lowerTypedMin = typed_scalar.lowerTypedMin;
     pub const lowerTypedAbs = typed_scalar.lowerTypedAbs;
     pub const lowerTypedClz = typed_scalar.lowerTypedClz;
+    pub const lowerTypedCtz = typed_scalar.lowerTypedCtz;
+    pub const lowerTypedZeroCount = typed_scalar.lowerTypedZeroCount;
 
     pub const lowerTypedCall = typed_call.lowerTypedCall;
 
@@ -217,7 +219,7 @@ pub const LoweringContext = struct {
             .binary => try self.lowerBinary(instruction),
             .compare => try self.lowerCompare(instruction),
             .cast => try self.lowerCast(instruction),
-            .add_with_overflow, .sub_with_overflow, .mul_with_overflow, .shl_with_overflow, .byte_swap, .max, .min, .abs, .clz, .none => return false,
+            .add_with_overflow, .sub_with_overflow, .mul_with_overflow, .shl_with_overflow, .byte_swap, .max, .min, .abs, .clz, .ctz, .none => return false,
         }
         return true;
     }

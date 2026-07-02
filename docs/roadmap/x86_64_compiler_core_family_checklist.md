@@ -952,7 +952,19 @@ Layer: semantic lowering and backend.
   `generic_cfg_functions=743`, `object_emitted_functions=743`,
   `executable_ok_rows=14`, and `local_fail=0`. Wider widths, vector forms, and
   `ctz`/`popcount`/`bit_reverse` remain separate scalar-transform items.
-- [ ] Lower `ctz`.
+- [x] Lower `ctz`.
+  Added `frontier_mixed_numeric.frontier_ctz_u32`, which lowers scalar
+  `@ctz(u32)` through the typed-v2 `zllvm-ctz-v1` `ty_op` contract and the
+  shared zero-count scalar lowering path. Like `clz`, the Zig result is `u6`
+  and the source row casts it back to `u32`; z_llvm preserves that with the
+  typed `llvm.cttz.i32` / `trunc` / `zext` chain. x86_64 emits a reusable
+  `ctz_i32_edi_eax` sequence that returns 32 for zero input. The C harness
+  checks high-bit, low-bit, zero, and mid-range values. Strict frontier
+  evidence in `tmp/frontier_ctz_u32.log` reports ReleaseFast, ReleaseSafe, and
+  ReleaseSmall at `source_rows=14`, `discovered_functions=744`,
+  `generic_cfg_functions=744`, `object_emitted_functions=744`,
+  `executable_ok_rows=14`, and `local_fail=0`. Wider widths, vector forms, and
+  `popcount`/`bit_reverse` remain separate scalar-transform items.
 - [ ] Lower `popcount`.
 - [ ] Lower `bit_reverse`.
 - [ ] Lower `shl_exact`.

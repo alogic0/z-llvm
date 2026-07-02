@@ -18,6 +18,7 @@ const std = shared.std;
 const ir = shared.ir;
 const target = shared.target;
 const MachineFunction = shared.MachineFunction;
+const Instruction = shared.x86_64_machine.Instruction;
 const FrameIndex = shared.FrameIndex;
 const ArgReg = shared.ArgReg;
 const XmmReg = shared.XmmReg;
@@ -146,6 +147,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             return true;
         }
         if (try lowerGenericCfgClzReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+        if (try lowerGenericCfgCtzReturn(allocator, machine, function, block, ret)) {
             machine.codegen_path = .generic_cfg;
             return true;
         }
@@ -361,6 +366,28 @@ fn lowerGenericCfgClzReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    return lowerGenericCfgZeroCountReturn(allocator, machine, function, block, ret, "llvm.ctlz.i32", .clz_i32_edi_eax);
+}
+
+fn lowerGenericCfgCtzReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    return lowerGenericCfgZeroCountReturn(allocator, machine, function, block, ret, "llvm.cttz.i32", .ctz_i32_edi_eax);
+}
+
+fn lowerGenericCfgZeroCountReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+    callee_name: []const u8,
+    machine_instruction: Instruction,
+) !bool {
     if (!ret.ty.eql(function.ret_ty) or !ret.ty.eql(.{ .int = 32 })) return false;
     if (block.instructions.items.len != 1 and block.instructions.items.len != 3) return false;
     const call_inst = block.instructions.items[0];
@@ -394,7 +421,7 @@ fn lowerGenericCfgClzReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!isCalleeName(call.callee, "llvm.ctlz.i32")) return false;
+    if (!isCalleeName(call.callee, callee_name)) return false;
     if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 2) return false;
     if (!call.ret_ty.eql(.{ .int = 32 })) return false;
     if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[1].ty.eql(.{ .int = 1 })) return false;
@@ -404,7 +431,7 @@ fn lowerGenericCfgClzReturn(
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
     if ((try paramReg(function, source_name, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
-    try machine.instructions.append(allocator, .clz_i32_edi_eax);
+    try machine.instructions.append(allocator, machine_instruction);
     try appendGenericCfgReturn(allocator, machine);
     return true;
 }

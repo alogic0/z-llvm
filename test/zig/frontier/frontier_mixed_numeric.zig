@@ -57,3 +57,7 @@ export fn frontier_abs_i64(value: i64) u64 {
 export fn frontier_clz_u32(value: u32) u32 {
     return @clz(value);
 }
+
+export fn frontier_ctz_u32(value: u32) u32 {
+    return @ctz(value);
+}

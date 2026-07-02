@@ -28,6 +28,7 @@ pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_expor
         .min => try self.lowerTypedMin(instruction),
         .abs => try self.lowerTypedAbs(instruction),
         .clz => try self.lowerTypedClz(instruction),
+        .ctz => try self.lowerTypedCtz(instruction),
         .none => return false,
     }
     return true;
@@ -360,6 +361,14 @@ pub fn lowerTypedAbs(self: anytype, instruction: air_export.TypedInstruction) !v
 }
 
 pub fn lowerTypedClz(self: anytype, instruction: air_export.TypedInstruction) !void {
+    try self.lowerTypedZeroCount(instruction, "llvm.ctlz.i32", "clz");
+}
+
+pub fn lowerTypedCtz(self: anytype, instruction: air_export.TypedInstruction) !void {
+    try self.lowerTypedZeroCount(instruction, "llvm.cttz.i32", "ctz");
+}
+
+pub fn lowerTypedZeroCount(self: anytype, instruction: air_export.TypedInstruction, callee: []const u8, label: []const u8) !void {
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     const source = try self.resolveTypedOperand(instruction, 0);
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
@@ -374,10 +383,10 @@ pub fn lowerTypedClz(self: anytype, instruction: air_export.TypedInstruction) !v
     const wide_result_name = if (result_type.ir_type.eql(.{ .int = 32 }))
         try self.resultName(instruction.index)
     else
-        try ownPrint(self.module, "air{}_clz_i32", .{instruction.index});
+        try ownPrint(self.module, "air{}_{s}_i32", .{ instruction.index, label });
     var call: ir.CallInst = .{
         .ret_ty = .{ .int = 32 },
-        .callee = "llvm.ctlz.i32",
+        .callee = callee,
         .args = .empty,
     };
     errdefer call.deinit(self.allocator);
