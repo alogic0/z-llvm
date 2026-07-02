@@ -875,8 +875,21 @@ Layer: safety-edge CFG and runtime boundary.
   `native_link_failures=0`, `lld_rows=0`, and `local_fail=0` for all three
   release modes. Broader runtime/compiler-rt/libc ownership remains outside
   this safety-runtime frontier item.
-- [ ] Refresh ReleaseSafe inventory and show the safety-runtime bucket reduced
+- [x] Refresh ReleaseSafe inventory and show the safety-runtime bucket reduced
   or reclassified.
+  Completed with
+  `tmp/compiler_core_module_releasesafe_after_safety_runtime.log`. The
+  ReleaseSafe compiler-core-module body scan covers `functions=62002` and
+  `instructions_total=6851837` with `instruction_payload_scan=1` and
+  `local_fail=0`. The remaining unknown safety-runtime category is now precise:
+  `top_unknown_opcode_pair rank=2 name=safety-runtime:intcast_safe:ty_op
+  count=11199 first_source=../ziglang/src/main.zig
+  first_function=os.linux.tls.initStatic`. Previously targeted overflow and
+  exact-shift forms are visible as normal opcode counts instead of opaque
+  safety-runtime blockers, including `add_with_overflow count=62`,
+  `sub_with_overflow count=44`, `mul_with_overflow count=31`,
+  `shl_with_overflow count=32`, and `shr_exact count=49`. The next safety work
+  is the high-count `intcast_safe:ty_op` family, not another overflow helper.
 
 ### 8. Scalar Transforms
 
