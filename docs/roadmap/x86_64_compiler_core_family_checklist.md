@@ -853,7 +853,16 @@ Layer: safety-edge CFG and runtime boundary.
   `executable_ok_rows=14` and `local_fail=0` for ReleaseFast, ReleaseSafe, and
   ReleaseSmall. This closes the non-trapping executable proof item without
   adding another row in this cycle.
-- [ ] Prove one trapping row with child-process death checks when practical.
+- [x] Prove one trapping row with child-process death checks when practical.
+  The ReleaseSafe harness now includes
+  `death_checked_shl_exact`, which calls `frontier_checked_shl_exact(0x80000000)`
+  in a child process and expects a trap through the generated
+  `frontier_safety_edges.shlOverflow` cold call. The strict frontier proof in
+  `tmp/frontier_shl_exact.log` includes the ReleaseSafe executable summary at
+  `native_link_accepted_rows=14`, `executable_ok_rows=14`,
+  `native_link_failures=0`, `lld_rows=0`, and `local_fail=0`, so the
+  child-process death path is executable-proven for this selected exact-shift
+  safety edge.
 - [ ] Keep cold panic/runtime helper ownership explicit.
 - [ ] Refresh ReleaseSafe inventory and show the safety-runtime bucket reduced
   or reclassified.
