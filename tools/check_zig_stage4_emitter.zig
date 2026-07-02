@@ -19,26 +19,33 @@ pub fn main(init: std.process.Init) !void {
         try common.validationError(io, "missing executable Zig emitter: {s}\n", .{zig_emitter});
     };
 
-    const head_argv = [_][]const u8{ "git", "-C", zig_source_dir, "rev-parse", "--short=9", "HEAD" };
-    const head_result = try common.runCapture(allocator, io, &head_argv, "git rev-parse Zig source HEAD");
-    defer common.freeRunResult(allocator, head_result);
-    const head_rev = std.mem.trim(u8, head_result.stdout, " \t\r\n");
+    const pin_file_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIGLANG_PIN_FILE");
+    defer if (pin_file_env) |value| allocator.free(value);
+    const pin_file = pin_file_env orelse "docs/evidence/ziglang_pin.txt";
+
+    const pin_contents = try std.Io.Dir.cwd().readFileAlloc(io, pin_file, allocator, .limited(4096));
+    defer allocator.free(pin_contents);
+    const pin = std.mem.trim(u8, pin_contents, " \t\r\n");
+    if (pin.len < 9) {
+        try common.validationError(io, "invalid Zig pin in {s}: expected at least 9 hex characters\n", .{pin_file});
+    }
+    const pinned_rev = pin[0..9];
 
     const version_argv = [_][]const u8{ zig_emitter, "version" };
     const version_result = try common.runCapture(allocator, io, &version_argv, "stage4 Zig version");
     defer common.freeRunResult(allocator, version_result);
     const version = std.mem.trim(u8, version_result.stdout, " \t\r\n");
 
-    if (std.mem.indexOf(u8, version, head_rev) == null) {
+    if (std.mem.indexOf(u8, version, pinned_rev) == null) {
         try common.validationError(
             io,
-            "stage4 Zig version does not match {s} HEAD\n  HEAD:    {s}\n  version: {s}\n",
-            .{ zig_source_dir, head_rev, version },
+            "stage4 Zig version does not match tracked Zig pin\n  pin_file: {s}\n  pin:      {s}\n  version:  {s}\n  fix:      rebuild stage4 per docs/build_steps.md or update the pin after selecting a new stage4 emitter\n",
+            .{ pin_file, pin, version },
         );
     }
 
     var stdout_buffer: [512]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-    try stdout_writer.interface.print("ok stage4 emitter {s} matches {s} HEAD {s}\n", .{ version, zig_source_dir, head_rev });
+    try stdout_writer.interface.print("ok stage4 emitter {s} matches tracked Zig pin {s} ({s})\n", .{ version, pinned_rev, pin_file });
     try stdout_writer.interface.flush();
 }

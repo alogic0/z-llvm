@@ -43,9 +43,12 @@ list and the visible record of progress. Evidence summaries under
   validates the tool on the completed Cycle A frontier gate. Legacy gate-log
   summaries for checklist-cited `tmp/` logs that still existed and contained
   `summary ...` lines were backfilled under `docs/evidence/`.
-- [ ] 3. Ziglang pin: tracked pin file (`docs/evidence/ziglang_pin.txt`)
+- [x] 3. Ziglang pin: tracked pin file (`docs/evidence/ziglang_pin.txt`)
   plus stage4 emitter check against the pin; mismatch path validated via a
   temporary override or fixture pin, tracked pin untouched.
+
+  Closed by `docs/evidence/ziglang_pin_stage4_check.summary`; the mismatch
+  path is recorded in `docs/evidence/ziglang_pin_stage4_mismatch.summary`.
 - [x] 4. Close the interrupted vector-family inventory refresh
   (ReleaseFast compiler-core-module) and check off the last vector item in
   the family checklist.

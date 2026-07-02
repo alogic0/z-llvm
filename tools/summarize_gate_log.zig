@@ -15,6 +15,7 @@ const usage =
     \\  --exit-status=N            Process exit status. If omitted, read process_exit_status=N from the log.
     \\  --z-llvm-commit=HASH       Override the current z_llvm commit hash.
     \\  --ziglang-pin=HASH         Override the current ../ziglang commit hash.
+    \\  --ziglang-pin-file=PATH    Tracked Zig pin file (default: docs/evidence/ziglang_pin.txt).
     \\  --zig-source-dir=PATH      Sibling Zig checkout for pin lookup (default: ../ziglang).
     \\  --candidate-file-hash=HASH Real-row denominator metadata (default: n/a).
     \\  --selector-version=TEXT    Real-row selector metadata (default: n/a).
@@ -32,6 +33,7 @@ const Options = struct {
     exit_status: ?[]const u8,
     z_llvm_commit: ?[]const u8,
     ziglang_pin: ?[]const u8,
+    ziglang_pin_file: []const u8,
     zig_source_dir: []const u8,
     candidate_file_hash: []const u8,
     selector_version: []const u8,
@@ -57,12 +59,7 @@ pub fn main(init: std.process.Init) !void {
     const z_llvm_commit = options.z_llvm_commit orelse try gitRev(allocator, io, &.{ "git", "rev-parse", "HEAD" }, "git rev-parse z_llvm HEAD");
     defer if (options.z_llvm_commit == null) allocator.free(z_llvm_commit);
 
-    const ziglang_pin = options.ziglang_pin orelse try gitRev(
-        allocator,
-        io,
-        &.{ "git", "-C", options.zig_source_dir, "rev-parse", "HEAD" },
-        "git rev-parse Zig source HEAD",
-    );
+    const ziglang_pin = options.ziglang_pin orelse try readZiglangPin(allocator, io, options);
     defer if (options.ziglang_pin == null) allocator.free(ziglang_pin);
 
     const parsed_exit_status = parseProcessExitStatus(log);
@@ -150,6 +147,7 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
     var exit_status: ?[]const u8 = null;
     var z_llvm_commit: ?[]const u8 = null;
     var ziglang_pin: ?[]const u8 = null;
+    var ziglang_pin_file: []const u8 = "docs/evidence/ziglang_pin.txt";
     var zig_source_dir: []const u8 = "../ziglang";
     var candidate_file_hash: []const u8 = "n/a";
     var selector_version: []const u8 = "n/a";
@@ -176,6 +174,8 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
             z_llvm_commit = arg["--z-llvm-commit=".len..];
         } else if (std.mem.startsWith(u8, arg, "--ziglang-pin=")) {
             ziglang_pin = arg["--ziglang-pin=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--ziglang-pin-file=")) {
+            ziglang_pin_file = arg["--ziglang-pin-file=".len..];
         } else if (std.mem.startsWith(u8, arg, "--zig-source-dir=")) {
             zig_source_dir = arg["--zig-source-dir=".len..];
         } else if (std.mem.startsWith(u8, arg, "--candidate-file-hash=")) {
@@ -200,6 +200,7 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
         .exit_status = exit_status,
         .z_llvm_commit = z_llvm_commit,
         .ziglang_pin = ziglang_pin,
+        .ziglang_pin_file = ziglang_pin_file,
         .zig_source_dir = zig_source_dir,
         .candidate_file_hash = candidate_file_hash,
         .selector_version = selector_version,
@@ -229,6 +230,20 @@ fn gitRev(
     const result = try common.runCapture(allocator, io, argv, label);
     defer common.freeRunResult(allocator, result);
     return try allocator.dupe(u8, std.mem.trim(u8, result.stdout, " \t\r\n"));
+}
+
+fn readZiglangPin(allocator: std.mem.Allocator, io: std.Io, options: Options) ![]const u8 {
+    const pin_contents = std.Io.Dir.cwd().readFileAlloc(io, options.ziglang_pin_file, allocator, .limited(4096)) catch |err| switch (err) {
+        error.FileNotFound => return gitRev(
+            allocator,
+            io,
+            &.{ "git", "-C", options.zig_source_dir, "rev-parse", "HEAD" },
+            "git rev-parse Zig source HEAD",
+        ),
+        else => return err,
+    };
+    defer allocator.free(pin_contents);
+    return try allocator.dupe(u8, std.mem.trim(u8, pin_contents, " \t\r\n"));
 }
 
 fn parseProcessExitStatus(log: []const u8) ?[]const u8 {
@@ -296,6 +311,7 @@ fn explicitFailureLine(line: []const u8) bool {
     return std.mem.indexOf(u8, line, "strict-finish-failure") != null or
         std.mem.indexOf(u8, line, "error:") != null or
         std.mem.indexOf(u8, line, "Error:") != null or
+        std.mem.indexOf(u8, line, "does not match") != null or
         std.mem.indexOf(u8, line, "failed") != null or
         std.mem.indexOf(u8, line, "failure") != null or
         std.mem.indexOf(u8, line, "panic:") != null;
