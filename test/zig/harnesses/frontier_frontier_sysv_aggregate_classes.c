@@ -98,6 +98,7 @@ extern int z_frontier_small_reverse_mixed_int(struct SmallReverseMixed) __asm__(
 extern int z_frontier_packed_mixed_low_int(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_low_int");
 extern int z_frontier_packed_mixed_high_int(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_high_int");
 extern double z_frontier_packed_mixed_float(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_float");
+extern int z_frontier_packed_mixed_call_high(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_call_high");
 extern struct PackedMixed z_frontier_packed_mixed_make(int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_make");
 extern double z_frontier_packed_reverse_mixed_float(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_float");
 extern int z_frontier_packed_reverse_mixed_low_int(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_low_int");
@@ -237,6 +238,7 @@ int main(void) {
     if (z_frontier_packed_mixed_low_int(packed_mixed) != 37) return 20;
     if (z_frontier_packed_mixed_high_int(packed_mixed) != 41) return 21;
     if (z_frontier_packed_mixed_float(packed_mixed) != 43.5) return 22;
+    if (z_frontier_packed_mixed_call_high(packed_mixed) != 41) return 28;
     struct PackedMixed made_packed_mixed = z_frontier_packed_mixed_make(61, 67, 71.5);
     if (made_packed_mixed.a != 61 || made_packed_mixed.b != 67 || made_packed_mixed.c != 71.5) return 26;
     struct PackedReverseMixed packed_reverse = { 47.5, 53, 59 };

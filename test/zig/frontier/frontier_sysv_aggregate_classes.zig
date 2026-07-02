@@ -89,6 +89,10 @@ const PackedReverseMixed = extern struct {
     c: i32,
 };
 
+noinline fn helperPackedMixedHigh(value: PackedMixed) i32 {
+    return value.b;
+}
+
 export fn frontier_mixed_int(value: Mixed) i64 {
     return value.a;
 }
@@ -809,6 +813,10 @@ export fn frontier_packed_mixed_high_int(value: PackedMixed) i32 {
 
 export fn frontier_packed_mixed_float(value: PackedMixed) f64 {
     return value.c;
+}
+
+export fn frontier_packed_mixed_call_high(value: PackedMixed) i32 {
+    return helperPackedMixedHigh(value);
 }
 
 export fn frontier_packed_mixed_make(a: i32, b: i32, c: f64) PackedMixed {

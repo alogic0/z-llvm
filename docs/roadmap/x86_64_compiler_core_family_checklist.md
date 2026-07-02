@@ -1242,7 +1242,7 @@ Layer: ABI planner and backend.
   stream. The C harness validates every returned field, so this covers the
   common aligned packed-leaf store/construction subset without accepting Zig
   packed ABI payloads.
-- [ ] Implement common aligned packed aggregate call arguments.
+- [x] Implement common aligned packed aggregate call arguments.
 - [ ] Keep unaligned or target-sensitive forms fail-closed.
 - [ ] Prove one aligned packed aggregate executable row.
 - [ ] Refresh inventory and show the packed-aggregate bucket reduced or
