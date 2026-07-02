@@ -1084,7 +1084,21 @@ Layer: semantic lowering and backend.
 
 Layer: ABI planner and backend.
 
-- [ ] Decide the supported first vector element types and widths.
+- [x] Decide the supported first vector element types and widths.
+  The focused ReleaseFast compiler-core-module inventory
+  `tmp/compiler_core_module_releasefast_after_shl_sat.log` makes vector forms
+  the top remaining unknown family: `vector:shuffle_one:opaque count=26214`
+  first appears in `Io.Writer.print__anon_39654`, with smaller
+  `vector:reduce:opaque count=22` from `std.simd.countTrues` and
+  `vector:splat:opaque count=10` from `std.mem.countScalar`. The first
+  supported subset is deliberately internal-only, not x86_64 SysV vector ABI:
+  scalar C ABI wrappers may construct/use vectors inside Zig helpers, but
+  exported vector arguments/returns remain boundary-owned. Initial lowering
+  should target power-of-two integer lanes used by real compiler-core rows,
+  starting with `@Vector(16, u8)` and the associated bool mask/count lanes for
+  `countScalar`/`countTrues`. Wider integer vectors, float vectors, vector
+  call/return ABI, and target-feature-specific SIMD instruction selection stay
+  fail-closed until their own rows are proven.
 - [ ] Lower a narrow `shuffle_one` subset.
 - [ ] Lower `splat` for the selected vector subset.
 - [ ] Lower `reduce` for the selected vector subset.
