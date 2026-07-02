@@ -143,6 +143,8 @@ pub const runtimePointerLoadStoreMainSummary = runtime_model.runtimePointerLoadS
 pub const selectedRuntimePointerLoadStoreMainShape = runtime_model.selectedRuntimePointerLoadStoreMainShape;
 pub const panicEdgeSummary = runtime_model.panicEdgeSummary;
 pub const selectedMixCAddMayPanicShape = runtime_model.selectedMixCAddMayPanicShape;
+pub const TypedSplatSummary = vector_model.TypedSplatSummary;
+pub const typedSplatSummary = vector_model.typedSplatSummary;
 pub const TypedShuffleOneSummary = vector_model.TypedShuffleOneSummary;
 pub const typedShuffleOneSummary = vector_model.typedShuffleOneSummary;
 

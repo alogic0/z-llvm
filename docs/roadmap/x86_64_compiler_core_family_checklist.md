@@ -1119,7 +1119,22 @@ Layer: ABI planner and backend.
   `generic_cfg_functions=751`, `object_emitted_functions=751`,
   `executable_ok_rows=14`, and `local_fail=0`; boundary evidence remains green
   in `tmp/frontier_vector_shuffle_boundaries.log`.
-- [ ] Lower `splat` for the selected vector subset.
+- [x] Lower `splat` for the selected vector subset.
+
+  Added the narrow `zllvm-splat-v1` typed-v2 hook contract and z_llvm vector
+  summary/lowering for integer vector splats. The selected proof is
+  `frontier_mixed_numeric.frontier_splat_u8`: it constructs a
+  `@Vector(4, u8)` with `@splat`, extracts lane 3, and returns the scalar via
+  the C ABI harness. z_llvm lowers `splat` to a reusable
+  `insertelement`-plus-zero-mask `shufflevector` form, and the x86_64 backend
+  now accepts arbitrary extracted lanes for the existing scalarized vector
+  return data-flow pattern. Saved evidence:
+  `tmp/vector_splat_descriptor_lines.log` proves typed-v2 facts,
+  `tmp/frontier_vector_splat.log` reports all three release modes at
+  `source_rows=14`, `discovered_functions=752`,
+  `generic_cfg_functions=752`, `object_emitted_functions=752`,
+  `executable_ok_rows=14`, and `local_fail=0`; boundary evidence remains green
+  in `tmp/frontier_vector_splat_boundaries.log`.
 - [ ] Lower `reduce` for the selected vector subset.
 - [ ] Add fail-closed diagnostics for unsupported vector widths.
 - [ ] Add fail-closed diagnostics for unsupported element types.

@@ -84,6 +84,11 @@ export fn frontier_shuffle_one_u8(a: u8, b: u8, c: u8, d: u8) u8 {
     return shuffled[0];
 }
 
+export fn frontier_splat_u8(value: u8) u8 {
+    const vector: @Vector(4, u8) = @splat(value);
+    return vector[3];
+}
+
 export fn frontier_neg_f32(value: f32) f32 {
     return -value;
 }

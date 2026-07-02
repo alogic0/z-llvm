@@ -199,6 +199,7 @@ pub const AggregateSemanticOp = enum {
 
 pub const VectorSemanticOp = enum {
     none,
+    splat,
     shuffle_one,
 };
 
@@ -433,6 +434,7 @@ pub fn aggregateSemanticOpForOpcode(opcode: []const u8) AggregateSemanticOp {
 }
 
 pub fn vectorSemanticOpForOpcode(opcode: []const u8) VectorSemanticOp {
+    if (std.mem.eql(u8, opcode, "splat")) return .splat;
     if (std.mem.eql(u8, opcode, "shuffle_one")) return .shuffle_one;
     return .none;
 }

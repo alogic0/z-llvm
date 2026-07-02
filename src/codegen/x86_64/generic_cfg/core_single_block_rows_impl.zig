@@ -337,8 +337,11 @@ fn lowerGenericCfgShuffleOneU8Return(
     ret: anytype,
 ) !bool {
     if (!function.ret_ty.eql(.{ .int = 8 }) or !ret.ty.eql(function.ret_ty)) return false;
-    if (block.instructions.items.len != 6) return false;
-    const extract_inst = block.instructions.items[5];
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const extract_inst = findInstruction(block, ret_name) orelse return false;
     const extract_name = extract_inst.result orelse return false;
     if (!isNamed(ret.value orelse return error.InvalidRet, extract_name)) return false;
     const extract = switch (extract_inst.kind) {
@@ -346,7 +349,8 @@ fn lowerGenericCfgShuffleOneU8Return(
         else => return false,
     };
     if (!extract.vector_ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 8 } } })) return false;
-    if (!extract.index_ty.eql(.{ .int = 64 }) or !isInt(extract.index, 0)) return false;
+    if (!extract.index_ty.eql(.{ .int = 64 }) or extract.index != .int) return false;
+    if (extract.index.int < 0 or extract.index.int > 3) return false;
     const shuffle_name = switch (extract.vector) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
@@ -360,7 +364,7 @@ fn lowerGenericCfgShuffleOneU8Return(
     if (!shuffle.rhs_ty.eql(shuffle.lhs_ty)) return false;
     if (shuffle.rhs != .poison and shuffle.rhs != .undef) return false;
     if (!shuffle.mask_ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 32 } } })) return false;
-    const selected_lane = shuffleMaskLane(shuffle.mask, 0) orelse return false;
+    const selected_lane = shuffleMaskLane(shuffle.mask, @intCast(extract.index.int)) orelse return false;
     if (selected_lane < 0 or selected_lane > 3) return false;
     const selected_value = vectorInsertedLaneValue(block, shuffle.lhs, @intCast(selected_lane)) orelse return false;
     const selected_name = switch (selected_value) {

@@ -12,6 +12,32 @@ pub const TypedShuffleOneSummary = struct {
     mask_len: usize,
 };
 
+pub const TypedSplatSummary = struct {
+    instruction_index: u32,
+    operand_index: u32,
+    vector_len: u32,
+    elem_bit_width: u32,
+};
+
+pub fn typedSplatSummary(instruction: air_export.TypedInstruction) ?TypedSplatSummary {
+    if (!std.mem.eql(u8, instruction.opcode, "splat")) return null;
+    if (!std.mem.eql(u8, instruction.data_kind, "ty_op")) return null;
+    if (instruction.operands.len != 1) return null;
+    const contract = core.detail(instruction, "splat_contract") orelse return null;
+    if (!std.mem.eql(u8, contract, "zllvm-splat-v1")) return null;
+    if (core.detail(instruction, "unsupported_non_vector") != null) return null;
+    const operand_index = core.typedInstOperandIndex(instruction.operands[0]) orelse return null;
+    const vector_len = parseU32Detail(instruction, "vector_len") orelse return null;
+    const elem_bit_width = parseU32Detail(instruction, "elem_bit_width") orelse return null;
+    if (vector_len == 0 or vector_len > 8) return null;
+    return .{
+        .instruction_index = instruction.index,
+        .operand_index = operand_index,
+        .vector_len = vector_len,
+        .elem_bit_width = elem_bit_width,
+    };
+}
+
 pub fn typedShuffleOneSummary(instruction: air_export.TypedInstruction) ?TypedShuffleOneSummary {
     if (!std.mem.eql(u8, instruction.opcode, "shuffle_one")) return null;
     if (!std.mem.eql(u8, instruction.data_kind, "shuffle_one")) return null;
@@ -45,6 +71,44 @@ pub fn typedShuffleOneSummary(instruction: air_export.TypedInstruction) ?TypedSh
 fn parseU32Detail(instruction: air_export.TypedInstruction, key: []const u8) ?u32 {
     const text = core.detail(instruction, key) orelse return null;
     return std.fmt.parseInt(u32, text, 10) catch null;
+}
+
+test "typed splat summary accepts vector integer splat" {
+    var operands = [_]air_export.TypedOperand{.{ .kind = "inst", .value = "11", .type_text = "u8" }};
+    var details = [_]air_export.TypedDetail{
+        .{ .key = "splat_contract", .value = "zllvm-splat-v1" },
+        .{ .key = "vector_len", .value = "4" },
+        .{ .key = "elem_bit_width", .value = "8" },
+        .{ .key = "elem_type", .value = "int" },
+        .{ .key = "operand_type", .value = "int" },
+    };
+    const summary = typedSplatSummary(.{
+        .index = 12,
+        .opcode = "splat",
+        .result_type = "@Vector(4, u8)",
+        .data_kind = "ty_op",
+        .operands = &operands,
+        .details = &details,
+    }) orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(@as(u32, 11), summary.operand_index);
+    try std.testing.expectEqual(@as(u32, 4), summary.vector_len);
+    try std.testing.expectEqual(@as(u32, 8), summary.elem_bit_width);
+}
+
+test "typed splat summary rejects unsupported non-vector result" {
+    var operands = [_]air_export.TypedOperand{.{ .kind = "inst", .value = "11", .type_text = "u8" }};
+    var details = [_]air_export.TypedDetail{
+        .{ .key = "splat_contract", .value = "zllvm-splat-v1" },
+        .{ .key = "unsupported_non_vector", .value = "1" },
+    };
+    try std.testing.expect(typedSplatSummary(.{
+        .index = 12,
+        .opcode = "splat",
+        .result_type = "u8",
+        .data_kind = "ty_op",
+        .operands = &operands,
+        .details = &details,
+    }) == null);
 }
 
 test "typed shuffle_one summary accepts element mask" {

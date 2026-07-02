@@ -209,6 +209,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedBitReverse = typed_scalar.lowerTypedBitReverse;
 
     pub const lowerTypedVectorSemanticInstruction = typed_vector.lowerTypedVectorSemanticInstruction;
+    pub const lowerTypedSplat = typed_vector.lowerTypedSplat;
     pub const lowerTypedShuffleOne = typed_vector.lowerTypedShuffleOne;
 
     pub const lowerTypedCall = typed_call.lowerTypedCall;

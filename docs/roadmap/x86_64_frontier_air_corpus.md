@@ -189,6 +189,14 @@ generic scalar transform path to x86_64 `rolw`/`bswapl`/`bswapq` instructions,
 so the accepted rows do not leave `llvm.bswap.*` as linker-visible symbols.
 Vector byte swaps, aggregate `byteSwapAllFields`, `u8` identity policy, and
 odd-width integer byte swaps remain future/boundary work.
+The vector frontier now includes selected `@shuffle` and `@splat` scalarized
+rows for `@Vector(4, u8)`. Zig exports `shuffle_one` through
+`zllvm-shuffle-one-v1` and `splat` through `zllvm-splat-v1`; z_llvm lowers both
+to typed vector IR and the x86_64 backend folds the supported
+`insertelement`/`shufflevector`/`extractelement` data-flow pattern to a scalar
+return. This is not a general vector ABI claim: exported vector
+arguments/returns, float vectors, wider SIMD instruction selection, and vector
+reductions remain future/boundary work.
 The same source now includes signed `i32` `@max` and `@min` rows. Zig exports
 AIR `max` and `min` as typed `bin_op` records, z_llvm lowers the operands to
 signed compare/select forms, and the x86_64 generic CFG backend emits the
@@ -312,20 +320,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=14
-discovered_functions=751
-structured_functions=751
-generic_codegen_functions=751
-generic_cfg_functions=751
+discovered_functions=752
+structured_functions=752
+generic_codegen_functions=752
+generic_cfg_functions=752
 structural_matcher_functions=0
-structured_air_v2_functions=751
-typed_air_operand_functions=751
+structured_air_v2_functions=752
+typed_air_operand_functions=752
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=751
+generic_lowering_functions=752
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=751
+object_emitted_functions=752
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0

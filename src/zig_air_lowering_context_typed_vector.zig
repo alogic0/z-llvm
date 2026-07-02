@@ -14,10 +14,59 @@ pub fn lowerTypedVectorSemanticInstruction(
     instruction: air_export.TypedInstruction,
 ) !bool {
     switch (air_capabilities.vectorSemanticOpForOpcode(instruction.opcode)) {
+        .splat => try self.lowerTypedSplat(instruction),
         .shuffle_one => try self.lowerTypedShuffleOne(instruction),
         .none => return false,
     }
     return true;
+}
+
+pub fn lowerTypedSplat(self: anytype, instruction: air_export.TypedInstruction) !void {
+    const summary = air_model.typedSplatSummary(instruction) orelse return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    const vector_ty = switch (result_type.ir_type) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+    };
+    if (summary.vector_len != vector_ty.len) return air_model.LowerError.UnsupportedAir;
+    const elem_bits = switch (vector_ty.elem_ty) {
+        .int => |bits| bits,
+        .float, .double, .ptr => return air_model.LowerError.UnsupportedAir,
+    };
+    if (summary.elem_bit_width != elem_bits) return air_model.LowerError.UnsupportedAir;
+    if (!source.ty.ir_type.eql(vector_ty.elem_ty.toType())) return air_model.LowerError.UnsupportedAir;
+
+    const seed_name = try ownPrint(self.module, "air{}_splat_seed", .{instruction.index});
+    try self.block.instructions.append(self.allocator, .{
+        .result = seed_name,
+        .kind = .{ .insertelement = .{
+            .vector_ty = result_type.ir_type,
+            .vector = .undef,
+            .value_ty = source.ty.ir_type,
+            .value = source.value,
+            .index_ty = .{ .int = 64 },
+            .index = .{ .int = 0 },
+        } },
+    });
+
+    const mask_text = try splatMaskText(self.module, vector_ty.len);
+    const result_name = try self.resultName(instruction.index);
+    try self.block.instructions.append(self.allocator, .{
+        .result = result_name,
+        .kind = .{ .shufflevector = .{
+            .lhs_ty = result_type.ir_type,
+            .lhs = .{ .named = seed_name },
+            .rhs_ty = result_type.ir_type,
+            .rhs = .poison,
+            .mask_ty = .{ .vector = .{ .len = vector_ty.len, .elem_ty = .{ .int = 32 } } },
+            .mask = .{ .vector = mask_text },
+        } },
+    });
+    self.values[instruction.index] = .{
+        .ty = result_type,
+        .value = .{ .named = result_name },
+    };
 }
 
 pub fn lowerTypedShuffleOne(self: anytype, instruction: air_export.TypedInstruction) !void {
@@ -54,6 +103,18 @@ pub fn lowerTypedShuffleOne(self: anytype, instruction: air_export.TypedInstruct
         .ty = result_type,
         .value = .{ .named = result_name },
     };
+}
+
+fn splatMaskText(module: *ir.Module, vector_len: u32) ![]const u8 {
+    var buffer: std.ArrayList(u8) = .empty;
+    defer buffer.deinit(module.allocator);
+    try buffer.append(module.allocator, '<');
+    for (0..vector_len) |index| {
+        if (index != 0) try buffer.appendSlice(module.allocator, ", ");
+        try buffer.appendSlice(module.allocator, "i32 0");
+    }
+    try buffer.append(module.allocator, '>');
+    return ownPrint(module, "{s}", .{buffer.items});
 }
 
 fn shuffleMaskText(module: *ir.Module, summary: air_model.TypedShuffleOneSummary) ![]const u8 {
