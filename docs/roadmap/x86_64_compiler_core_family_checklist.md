@@ -906,7 +906,16 @@ Layer: semantic lowering and backend.
   `tmp/compiler_core_module_releasefast_after_abs_hook_fix.log` is stale from
   before the byte-swap ownership cycle. Vector byte-swap and aggregate
   `@byteSwapAllFields` remain outside this scalar item.
-- [ ] Broaden `max` beyond selected signed `i32`.
+- [x] Broaden `max` beyond selected signed `i32`.
+  Added `frontier_mixed_numeric.frontier_max_u32`, which lowers `@max` on
+  unsigned `u32` through typed-v2 scalar lowering as `icmp ult` plus `select`,
+  then through generic CFG into an x86_64 unsigned conditional-move return.
+  The C harness checks both `0xffffffff > 7` and `13 < 21`. Strict frontier
+  evidence in `tmp/frontier_max_u32.log` reports ReleaseFast, ReleaseSafe, and
+  ReleaseSmall at `source_rows=14`, `discovered_functions=740`,
+  `generic_cfg_functions=740`, `object_emitted_functions=740`,
+  `executable_ok_rows=14`, and `local_fail=0`. Wider unsigned/signed integer
+  max widths remain future scalar-transform work.
 - [ ] Broaden `min` beyond selected signed `i32`.
 - [ ] Broaden `abs` beyond selected signed `i32`, with non-integer facts
   fail-closed.
