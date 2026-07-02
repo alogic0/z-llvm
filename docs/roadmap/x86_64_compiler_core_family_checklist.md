@@ -845,7 +845,14 @@ Layer: safety-edge CFG and runtime boundary.
   fail-closed future work. `tmp/frontier_shl_exact.log` proves all three release
   modes at `source_rows=14`, `discovered_functions=739`,
   `object_emitted_functions=739`, `executable_ok_rows=14`, and `local_fail=0`.
-- [ ] Prove one non-trapping executable row.
+- [x] Prove one non-trapping executable row.
+  The current safety-runtime frontier includes multiple stable hot-path checks
+  in `test/zig/harnesses/frontier_frontier_safety_edges.c`. The newest
+  checked-exact-shift proof calls `frontier_checked_shl_exact(21)` and expects
+  `42`, while the strict frontier gate in `tmp/frontier_shl_exact.log` reports
+  `executable_ok_rows=14` and `local_fail=0` for ReleaseFast, ReleaseSafe, and
+  ReleaseSmall. This closes the non-trapping executable proof item without
+  adding another row in this cycle.
 - [ ] Prove one trapping row with child-process death checks when practical.
 - [ ] Keep cold panic/runtime helper ownership explicit.
 - [ ] Refresh ReleaseSafe inventory and show the safety-runtime bucket reduced
