@@ -586,7 +586,8 @@ pub fn genericCfgSupportsCall(function: ir.Function, call: ir.CallInst) bool {
         isCalleeName(call.callee, "llvm.uadd.with.overflow.i32") or
         isCalleeName(call.callee, "llvm.ssub.with.overflow.i32") or
         isCalleeName(call.callee, "llvm.usub.with.overflow.i32") or
-        isCalleeName(call.callee, "llvm.smul.with.overflow.i32"))
+        isCalleeName(call.callee, "llvm.smul.with.overflow.i32") or
+        isCalleeName(call.callee, "llvm.ushl.with.overflow.i32"))
     {
         if (!call.ret_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or call.args.items.len != 2) return false;
         return genericCfgSupportsI32Value(function, call.args.items[0].value) and

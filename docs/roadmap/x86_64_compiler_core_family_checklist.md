@@ -810,7 +810,17 @@ Layer: safety-edge CFG and runtime boundary.
   Unsigned multiply and register-register multiply remain future work until the
   x86_64 machine instruction path is generalized beyond immediate signed
   multiply.
-- [ ] Lower or classify `shl_with_overflow`.
+- [x] Lower or classify `shl_with_overflow`.
+  Completed for the selected unsigned i32 constant-shift-by-one subset by
+  exporting typed-v2 `shl_with_overflow` operands from Zig, routing it through
+  the scalar overflow lowerer as `llvm.ushl.with.overflow.i32`, and extending
+  generic CFG checked-overflow codegen to emit `shl $1, %eax` plus a carry-flag
+  cold panic edge. The accepted `frontier_explicit_ushl_overflow` row proves the
+  hot value and child-process death path through the C harness. General dynamic
+  shift counts, signed shift overflow, and wider integer shifts remain
+  fail-closed future work. `tmp/frontier_shl_overflow.log` proves all three
+  release modes at `source_rows=14`, `discovered_functions=738`,
+  `object_emitted_functions=738`, `executable_ok_rows=14`, and `local_fail=0`.
 - [ ] Lower checked integer cast paths used by ReleaseSafe.
 - [ ] Lower checked shift/exact arithmetic paths used by ReleaseSafe.
 - [ ] Prove one non-trapping executable row.

@@ -43,6 +43,7 @@ const globalSymbolName = shared.globalSymbolName;
 const globalSymbolNameFromValue = shared.globalSymbolNameFromValue;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
+const u5Value = shared.u5Value;
 const isCalleeName = shared.isCalleeName;
 const isInt = shared.isInt;
 const isNamed = shared.isNamed;
@@ -1036,6 +1037,12 @@ fn emitGenericCfgCheckedAddIntoEax(
         }
         return error.UnsupportedCodegenValue;
     }
+    if (isCheckedShlOverflowCallee(call.callee)) {
+        const lhs_reg = (paramValueReg(function, lhs, .{ .int = 32 }) catch null) orelse return error.UnsupportedCodegenValue;
+        try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
+        try emitGenericCfgCheckedShlOperand(allocator, machine, rhs);
+        return;
+    }
     if (isCheckedSubOverflowCallee(call.callee)) {
         const lhs_reg = (paramValueReg(function, lhs, .{ .int = 32 }) catch null) orelse return error.UnsupportedCodegenValue;
         try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
@@ -1084,12 +1091,26 @@ fn emitGenericCfgCheckedMulOperand(
     }
 }
 
+fn emitGenericCfgCheckedShlOperand(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    value: ir.Value,
+) !void {
+    const amount = switch (value) {
+        .int => |int| try u5Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (amount != 1) return error.UnsupportedCodegenValue;
+    try machine.instructions.append(allocator, .{ .shl_eax_imm5 = amount });
+}
+
 fn checkedOverflowBranchKind(callee: []const u8) ?core_cfg_emit.GenericCfgBranchKind {
     if (isCalleeName(callee, "llvm.sadd.with.overflow.i32")) return .jo;
     if (isCalleeName(callee, "llvm.uadd.with.overflow.i32")) return .jc;
     if (isCalleeName(callee, "llvm.ssub.with.overflow.i32")) return .jo;
     if (isCalleeName(callee, "llvm.usub.with.overflow.i32")) return .jc;
     if (isCalleeName(callee, "llvm.smul.with.overflow.i32")) return .jo;
+    if (isCalleeName(callee, "llvm.ushl.with.overflow.i32")) return .jc;
     return null;
 }
 
@@ -1100,6 +1121,10 @@ fn isCheckedSubOverflowCallee(callee: []const u8) bool {
 
 fn isCheckedMulOverflowCallee(callee: []const u8) bool {
     return isCalleeName(callee, "llvm.smul.with.overflow.i32");
+}
+
+fn isCheckedShlOverflowCallee(callee: []const u8) bool {
+    return isCalleeName(callee, "llvm.ushl.with.overflow.i32");
 }
 
 pub fn genericCfgSupportsNegativeI32Guard(function: ir.Function, icmp: ir.IcmpInst) bool {

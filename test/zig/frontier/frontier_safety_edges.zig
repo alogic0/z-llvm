@@ -40,6 +40,12 @@ export fn frontier_explicit_smul_overflow(value: i32) i32 {
     return checked[0];
 }
 
+export fn frontier_explicit_ushl_overflow(value: u32) u32 {
+    const checked = @shlWithOverflow(value, 1);
+    if (checked[1] != 0) @panic("frontier unsigned shift overflow");
+    return checked[0];
+}
+
 export fn frontier_bounds_guard(value: *const i32, len: usize, index: usize) i32 {
     _ = len;
     _ = index;
