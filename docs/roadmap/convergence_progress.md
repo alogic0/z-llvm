@@ -21,6 +21,11 @@ list and the visible record of progress. Evidence summaries under
    cited evidence summary.
 5. On stopping mid-phase, record the first failing real row and current
    counter values in `docs/next_steps.md`.
+6. Granularity sections (append/update in the same commit as the work):
+   append one Progress Log line per completed cycle; update the Discovered
+   State table when report-mode green counts change; keep the Cluster Board
+   current from item 9a onward. Ratchet State stays strict-evidence only —
+   report-mode progress belongs in Discovered State, never in Ratchet State.
 
 ## Adoption Cycles (Phase 0)
 
@@ -208,6 +213,52 @@ list and the visible record of progress. Evidence summaries under
   behavior test suite for x86_64-linux in all release modes.
 - [ ] 23. Milestone 5c: fixed point — the z_llvm-built compiler rebuilds
   itself with functionally identical results.
+
+## Discovered State (report mode)
+
+Latest report-mode green counts per mode at the current discovery limit —
+progress that is real but not yet strict-enforced. Update when a fix cycle
+changes the counts; cite the discovery/fix evidence summary.
+
+| Mode | Limit | Lowered | Objects | Linked | Evidence |
+| --- | ---: | ---: | ---: | ---: | --- |
+| ReleaseFast | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_limit25_after_assertUnlocked_object.summary` |
+| ReleaseSafe | 25 | 25 | 25 | 24 | `docs/evidence/real_rows_limit25_after_assertUnlocked_object.summary` |
+| ReleaseSmall | 25 | pending rank-1 `air-export` recheck (item 9) | | | `docs/next_steps.md` stop state |
+
+## Cluster Board (item 9a)
+
+Filled from each wide discovery run; one row per failure cluster. A cluster
+closes when its member rows are report-green; "rows unlocked" records the
+count that turned green when the fix landed.
+
+| Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
+| --- | ---: | --- | ---: | --- |
+| (first `--limit=200` discovery pending) | | | | |
+
+## Progress Log
+
+One line per completed cycle, append-only, newest last. This is the
+"what we achieved" record; details live in the cited commits/summaries.
+
+- 2026-07-02 `f860ba86` Convergence plan adopted; docs selector switched.
+- 2026-07-02 `258fc996` Packed-aggregate call-arg row finished (frontier 755).
+- 2026-07-02 `40ec8bc3` Evidence tooling; ~60 gate summaries backfilled.
+- 2026-07-02 `4e6fec67` Ziglang pin + stage4 check (mismatch path proven).
+- 2026-07-02 `6489fffc` Candidate selector v1: 61,386 real functions ranked.
+- 2026-07-02 `9d591215` Real-rows gate; first real function
+  (`math.raiseInvalid`) lowered/emitted/linked, all modes.
+- 2026-07-02 `841ee26f` Strict enforcement on in `distribution-all` (limit 1).
+- 2026-07-03 `d8f0982a`+`80cef1b7`+`36bcc91e` Rows 2-10 green via named-enum,
+  unused-opaque-param, and const-i1 generalizations; strict ratchet to 10.
+- 2026-07-03 `bf0b6aa5` AIR export cache: ~9 min -> ~15 s per mode, identical
+  summaries proven.
+- 2026-07-03 `a2bac7c6` Limit-25 discovery: 20/25 green, 5 failures mapped.
+- 2026-07-03 `686015c7`..`eb34afdb` Eight fix cycles: null-ptr returns,
+  atomic enum/monotonic stores, union tag-only signatures, sub-byte GPR
+  returns, comptime void rows, single-field aggregate layout inference,
+  aggregate param field loads. ReleaseFast 25/25; ReleaseSafe 24/25 linked.
+  Recognizer count still 1.
 
 ## Ratchet State
 
