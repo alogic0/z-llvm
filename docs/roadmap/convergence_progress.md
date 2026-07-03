@@ -114,17 +114,33 @@ list and the visible record of progress. Evidence summaries under
   run and records `comparison_summary_lines_match=true` plus fresh and
   cached timings for ReleaseFast, ReleaseSafe, and ReleaseSmall.
 - [ ] 9. Ratchet to `--limit=25`, green. Start the syscall-hello track
-  (item 11) in parallel from here. Fix-cycle rules carry over from item 8
-  unchanged: rank-order fixes, one fix per commit, no source/function-name
-  admission, `distribution-all` green before every commit, no weakening
-  captured rows or golden files without behavioral verification,
-  recognizer three-strikes escalation per the item 15 note (count stands
-  at 1), and `real_executed=0` remains correct until a selector version
-  lifts determinism marks via a ratchet-migration note. Once the hello
-  track opens, every stop report must state the position of both tracks.
+  (item 11) after the strict close (single-worker mode: the tracks run
+  sequentially, but every stop report still states both). Fix-cycle rules
+  carry over from item 8 unchanged: one fix per commit, no
+  source/function-name admission, `distribution-all` green before every
+  commit, no weakening captured rows or golden files without behavioral
+  verification, recognizer three-strikes escalation per the item 15 note
+  (count stands at 1), and `real_executed=0` remains correct until a
+  selector version lifts determinism marks via a ratchet-migration note.
+  Finish the two open item-9 issues (ReleaseSafe native-link for
+  `debug.SafetyLock.assertUnlocked`; ReleaseSmall rank-1 `air-export`
+  recheck — reproduce it once with the cache bypassed to rule the cache
+  in or out) and close the strict `--limit=25` ratchet.
+- [ ] 9a. Cluster discovery (fix-selection method change, effective after
+  item 9 closes): run one report-mode discovery at `--limit=200` in
+  ReleaseFast, group the failing rows by `first_failing_stage` plus
+  failure diagnostic, and record the clusters (size, representative rows,
+  suspected shared cause) in a tracked discovery summary. From then on,
+  each fix cycle targets the **largest remaining cluster**, not the first
+  failing rank; validate a cluster fix against several member rows, not
+  one. The strict ratchet keeps prefix semantics: `--strict --limit=N`
+  covers ranks 1..N, so the enforced limit advances to the longest green
+  prefix after each cluster lands, while report-mode counters record total
+  green rows beyond the prefix. Re-cluster from a fresh discovery whenever
+  the current cluster list is exhausted or stale.
 - [ ] 10. Phase 1 exit: 100 real functions green through applicable
   stages, all three release modes, sustained (ratchets enforced by
-  `distribution-all`).
+  `distribution-all`), reached by cluster-order fixing per item 9a.
 
 ## Phase 2 — First Real Program
 
