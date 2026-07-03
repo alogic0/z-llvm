@@ -734,10 +734,20 @@ pub const LoweringContext = struct {
             }
             if (try self.resolveStringLiteralPointer(literal)) |string_pointer| return string_pointer;
             if (try self.resolveStringLiteralSlice(instruction, operand_index, literal)) |string_slice| return string_slice;
-            return parseConstant(literal) orelse error.UnsupportedAir;
+            if (parseConstant(literal)) |constant| return constant;
+            if (resolveTypedNumericConstOperand(operand)) |constant| return constant;
+            return error.UnsupportedAir;
         }
         if (air_model.isTypedNoneOperand(operand)) return error.UnsupportedAir;
         return error.UnsupportedAir;
+    }
+
+    fn resolveTypedNumericConstOperand(operand: air_export.TypedOperand) ?TypedValue {
+        if (!air_model.isTypedConstOperand(operand)) return null;
+        const ty = parseZigType(operand.type_text) orelse return null;
+        if (ty.ir_type != .int) return null;
+        const value = std.fmt.parseInt(i128, operand.value, 10) catch return null;
+        return .{ .ty = ty, .value = .{ .int = value } };
     }
 
     fn resolveStringLiteralPointer(self: *LoweringContext, literal: []const u8) !?TypedValue {

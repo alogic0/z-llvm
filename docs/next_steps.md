@@ -39,20 +39,22 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-03 after the sixth item 9 real-row fix:
+Stop state recorded 2026-07-03 after the seventh item 9 real-row fix:
 
 - Active convergence-progress item: 9. This opens two active tracks:
   `distribution-real-rows --limit=25` ratchet work and the syscall-hello
   real-program track from item 11.
 - Real-row track status: ReleaseFast `--limit=25` report mode is green for
   all 25 ranked rows through typed lowering, x86_64 object emission, and
-  native link. The last fixed row was
-  `../ziglang/src/main.zig/debug.ConfigurableTrace(2,4,false).dump`.
+  native link. The all-mode strict close exposed a ReleaseSafe-only failure
+  in `../ziglang/src/main.zig/debug.SafetyLock.assertUnlocked`; that row now
+  clears typed lowering and fails at object emission.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
-- First failing stage: none in ReleaseFast report mode.
+- First failing stage: `object-emission` for
+  `../ziglang/src/main.zig/debug.SafetyLock.assertUnlocked` in ReleaseSafe.
 - Current staged `real_*` counters: `real_functions_lowered=25`,
-  `real_objects_emitted=25`, `real_native_linked=25`, `real_executed=0`,
+  `real_objects_emitted=24`, `real_native_linked=24`, `real_executed=0`,
   `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_releasefast_v1.tsv`,
@@ -62,13 +64,15 @@ Stop state recorded 2026-07-03 after the sixth item 9 real-row fix:
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=10`.
-- Saved log path: `tmp/real_rows_limit25_after_dump_typed.log`.
+- Saved log path: `tmp/real_rows_limit25_after_assertUnlocked_typed.log`.
 - Tracked evidence summary:
-  `docs/evidence/real_rows_limit25_after_dump_typed.summary`.
-- Recommended next action: run strict `distribution-real-rows --limit=25` in
-  all three release modes, raise the wired strict limit in
-  `distribution-all`, update the Ratchet State table and item 9 closure
-  evidence, then start the syscall-hello track from item 11.
+  `docs/evidence/real_rows_limit25_after_assertUnlocked_typed.summary`.
+- Recommended next action: debug the ReleaseSafe object-emission failure for
+  `debug.SafetyLock.assertUnlocked`, then rerun the all-mode strict
+  `distribution-real-rows --limit=25` close. ReleaseSmall also reported an
+  `air-export` failure at rank 1 during the failed strict close and must be
+  rechecked after the ReleaseSafe object fix. Keep the syscall-hello track
+  open in every stop report.
 
 When the worker stops, record only:
 

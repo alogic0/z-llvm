@@ -107,8 +107,6 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
         return .{ .ir_type = .{ .int = bits }, .signed = trimmed[0] == 'i' };
     }
-    if (parseNamedEnumType(trimmed)) |enum_ty| return enum_ty;
-    if (parseZigArrayType(trimmed)) |array_ty| return array_ty;
     if (isPointerType(trimmed)) {
         const child_text = pointerChildText(trimmed) orelse return null;
         const child = parseZigType(child_text);
@@ -118,6 +116,8 @@ pub fn parseZigType(text: []const u8) ?ZigType {
             .is_volatile_pointer = std.mem.indexOf(u8, trimmed, "volatile") != null,
         };
     }
+    if (parseNamedEnumType(trimmed)) |enum_ty| return enum_ty;
+    if (parseZigArrayType(trimmed)) |array_ty| return array_ty;
     return null;
 }
 
@@ -327,6 +327,10 @@ test "parse exported named enum type surfaces as C ABI scalars" {
     const parsed_type = parseZigType("os.linux.SIG__enum_1334") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_type.ir_type);
     try std.testing.expect(parsed_type.signed);
+
+    const parsed_ptr = parseZigType("*const os.linux.SIG__enum_1334") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type.ptr, parsed_ptr.ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_ptr.pointer_child.?);
 
     const parsed_fn = try parseFunctionType(std.testing.allocator, "fn (os.linux.SIG__enum_1334) callconv(.c) void");
     defer parsed_fn.deinit(std.testing.allocator);

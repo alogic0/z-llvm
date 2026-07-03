@@ -1,5 +1,6 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
+const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const target_mod = @import("target.zig");
@@ -247,6 +248,15 @@ pub fn lowerCompatible(
     const matched_root_functions = rootFunctionCount(air_module.functions, root_stem);
     for (air_module.functions) |air_function| {
         if (matched_root_functions != 0 and !isRootSourceFunction(root_stem, air_function.name)) continue;
+        var scoped_aggregate_facts = try scopedAggregateLayoutFactsForFunction(allocator, air_function);
+        defer scoped_aggregate_facts.deinit(allocator);
+        const previous_aggregate_facts = exported_aggregate_layout_facts.active_provider;
+        if (scoped_aggregate_facts.active) {
+            exported_aggregate_layout_facts.setActiveProvider(scoped_aggregate_facts.provider);
+        }
+        defer if (scoped_aggregate_facts.active) {
+            exported_aggregate_layout_facts.setActiveProvider(previous_aggregate_facts);
+        };
         if (firstUnsupported(allocator, air_function)) |diagnostic| {
             try unsupported.append(allocator, diagnostic);
             continue;
@@ -489,6 +499,84 @@ pub fn firstUnsupported(
         return .{ .function = function.name, .opcode = instruction.opcode, .reason = .opcode };
     }
     return null;
+}
+
+const ScopedAggregateLayoutFacts = struct {
+    provider: exported_aggregate_layout_facts.Provider = .{},
+    owned_start: usize = 0,
+    active: bool = false,
+
+    fn deinit(self: ScopedAggregateLayoutFacts, allocator: std.mem.Allocator) void {
+        if (!self.active) return;
+        for (self.provider.facts[self.owned_start..]) |fact| {
+            allocator.free(fact.nominal_type_name);
+            allocator.free(fact.aggregate_text);
+        }
+        allocator.free(self.provider.facts);
+    }
+};
+
+fn scopedAggregateLayoutFactsForFunction(
+    allocator: std.mem.Allocator,
+    function: air_export.Function,
+) !ScopedAggregateLayoutFacts {
+    const structured_air_v2 = function.structured_air_v2 orelse return .{};
+    var facts: std.ArrayList(exported_aggregate_layout_facts.Fact) = .empty;
+    try facts.appendSlice(allocator, exported_aggregate_layout_facts.active_provider.facts);
+    const owned_start = facts.items.len;
+    errdefer {
+        for (facts.items[owned_start..]) |fact| {
+            allocator.free(fact.nominal_type_name);
+            allocator.free(fact.aggregate_text);
+        }
+        facts.deinit(allocator);
+    }
+
+    for (structured_air_v2.instructions) |instruction| {
+        if (!air_model.isTypedFieldPtrDataKind(instruction.data_kind)) continue;
+        const field_index = air_model.fieldIndex(instruction) orelse continue;
+        if (field_index != 0) continue;
+        if (instruction.operands.len != 1) continue;
+        const source_child = pointerChildText(instruction.operands[0].type_text) orelse continue;
+        if (!isOpaqueNominalTypeSurface(source_child)) continue;
+        if (exported_aggregate_layout_facts.active_provider.lookup(source_child) != null) continue;
+        const field_child = pointerChildText(instruction.result_type) orelse continue;
+        const field_type = parseZigType(field_child) orelse continue;
+        const field_text = irTypeTextForAggregateFact(allocator, field_type.ir_type) catch continue;
+        defer allocator.free(field_text);
+        const aggregate_text = try ownPrintText(allocator, "{{ {s} }}", .{field_text});
+        errdefer allocator.free(aggregate_text);
+        const nominal_type_name = try allocator.dupe(u8, source_child);
+        errdefer allocator.free(nominal_type_name);
+        try facts.append(allocator, .{
+            .nominal_type_name = nominal_type_name,
+            .aggregate_text = aggregate_text,
+            .evidence = .{ .construction = false, .store = true, .load = true },
+        });
+    }
+    if (facts.items.len == owned_start) {
+        facts.deinit(allocator);
+        return .{};
+    }
+    return .{
+        .provider = .{ .facts = try facts.toOwnedSlice(allocator) },
+        .owned_start = owned_start,
+        .active = true,
+    };
+}
+
+fn irTypeTextForAggregateFact(allocator: std.mem.Allocator, ty: ir.Type) ![]const u8 {
+    return switch (ty) {
+        .int => |bits| try ownPrintText(allocator, "i{}", .{bits}),
+        .float => try allocator.dupe(u8, "float"),
+        .double => try allocator.dupe(u8, "double"),
+        .ptr => try allocator.dupe(u8, "ptr"),
+        else => error.UnsupportedAir,
+    };
+}
+
+fn ownPrintText(allocator: std.mem.Allocator, comptime format: []const u8, args: anytype) ![]const u8 {
+    return try std.fmt.allocPrint(allocator, format, args);
 }
 
 fn parseFunctionTypeForLowering(
