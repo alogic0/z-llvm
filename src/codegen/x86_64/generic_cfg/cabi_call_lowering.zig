@@ -64,6 +64,7 @@ const genericCfgSupportsSminSelect = core_value_support.genericCfgSupportsSminSe
 const genericCfgSupportsUminSelect = core_value_support.genericCfgSupportsUminSelect;
 const genericCfgSupportsSmaxSelect = core_value_support.genericCfgSupportsSmaxSelect;
 const genericCfgSupportsUmaxSelect = core_value_support.genericCfgSupportsUmaxSelect;
+const genericCfgSupportsSingleBlockIcmp = core_value_support.genericCfgSupportsSingleBlockIcmp;
 const genericCfgSupportsSingleBlockI32Value = core_value_support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsI64Value = core_value_support.genericCfgSupportsI64Value;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
@@ -360,6 +361,9 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
                                 else
                                     .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
                             }
+                        } else if (arg.ty.eql(.{ .int = 1 })) {
+                            const block = maybe_block orelse return error.UnsupportedCodegenAbi;
+                            try emitGenericCfgI1ValueIntoArgReg(allocator, machine, function, block, arg.value, dst);
                         } else if (arg.ty.eql(.{ .int = 1 }) or arg.ty.eql(.{ .int = 8 }) or arg.ty.eql(.{ .int = 16 }) or arg.ty.eql(.{ .int = 32 })) {
                             try appendLoadStackDispArg32(allocator, machine, dst, @as(usize, try scalarParamStackDisp8(function, name, arg.ty)) + incoming_stack_adjust);
                         } else if (arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr) {
@@ -419,6 +423,59 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
         .stack_arg_count = stack_arg_count,
         .cleanup_bytes = incoming_stack_adjust,
     };
+}
+
+fn emitGenericCfgI1ValueIntoArgReg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+    dst: ArgReg,
+) !void {
+    switch (value) {
+        .int => |int| {
+            if (int != 0 and int != 1) return error.UnsupportedCodegenValue;
+            try appendMoveImmToArgReg(allocator, machine, dst, @intCast(int));
+        },
+        .named => |name| {
+            if (paramRegOrNull(function, name, .{ .int = 1 }) catch |err| switch (err) {
+                error.UnsupportedCodegenAbi => null,
+                else => return err,
+            }) |src| {
+                if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                return;
+            }
+            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
+            const icmp = switch (instruction.kind) {
+                .icmp => |icmp| icmp,
+                else => return error.UnsupportedCodegenInstruction,
+            };
+            const label_suffix = machine.instructions.items.len;
+            const true_label = try ownedMachineLabel(allocator, machine, "generic_cfg_i1_arg_{}_true", .{label_suffix});
+            const end_label = try ownedMachineLabel(allocator, machine, "generic_cfg_i1_arg_{}_end", .{label_suffix});
+            const branch_kind = try emitGenericCfgIcmpConditionWithBlock(allocator, machine, function, block, icmp);
+            try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+            try appendMoveImmToArgReg(allocator, machine, dst, 0);
+            try machine.instructions.append(allocator, .{ .jmp = end_label });
+            try appendGenericCfgBlockLabel(allocator, machine, true_label);
+            try appendMoveImmToArgReg(allocator, machine, dst, 1);
+            try appendGenericCfgBlockLabel(allocator, machine, end_label);
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn ownedMachineLabel(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    comptime fmt: []const u8,
+    args: anytype,
+) ![]const u8 {
+    const label = try std.fmt.allocPrint(allocator, fmt, args);
+    errdefer allocator.free(label);
+    try machine.owned_labels.append(allocator, label);
+    return label;
 }
 
 const max_gpr_parallel_copies = 6;
@@ -1367,7 +1424,10 @@ pub fn lowerGenericCfgSelectReturnValue(
         if (try lowerGenericCfgUminSelectReturn(allocator, machine, function, select, cond)) return;
         if (try lowerGenericCfgSmaxSelectReturn(allocator, machine, function, select, cond)) return;
         if (try lowerGenericCfgUmaxSelectReturn(allocator, machine, function, select, cond)) return;
-        const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, cond);
+        const branch_kind = if (genericCfgSupportsSingleBlockIcmp(function, null, cond))
+            try emitGenericCfgIcmpCondition(allocator, machine, function, cond)
+        else
+            try emitGenericCfgIcmpConditionWithBlock(allocator, machine, function, block, cond);
         try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
     }
     try lowerGenericCfgI32ValueIntoEax(allocator, machine, function, block, select.false_value, depth +| 1);
@@ -1591,6 +1651,16 @@ pub fn emitGenericCfgIcmpCondition(
     function: ir.Function,
     icmp: ir.IcmpInst,
 ) !GenericCfgBranchKind {
+    return try emitGenericCfgIcmpConditionWithBlock(allocator, machine, function, null, icmp);
+}
+
+pub fn emitGenericCfgIcmpConditionWithBlock(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    maybe_block: ?ir.BasicBlock,
+    icmp: ir.IcmpInst,
+) !GenericCfgBranchKind {
     const branch_kind: GenericCfgBranchKind = switch (icmp.predicate) {
         .eq => .je,
         .ne => .jne,
@@ -1656,12 +1726,31 @@ pub fn emitGenericCfgIcmpCondition(
     if (!icmp.operand_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
 
     if (icmp.predicate == .slt and isInt(icmp.rhs, 0)) {
+        if (maybe_block) |block| {
+            if (genericCfgSupportsSingleBlockI32Value(function, block, icmp.lhs)) {
+                try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, icmp.lhs);
+                try appendGenericCfgCompareLocalImm(allocator, machine, .eax, 0);
+                return .js;
+            }
+        }
         const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });
         try appendGenericCfgCompareParamZero(allocator, machine, lhs_reg);
         return .js;
     }
 
     if (icmp.predicate == .slt) {
+        if (maybe_block) |block| {
+            if (genericCfgSupportsSingleBlockI32Value(function, block, icmp.lhs)) {
+                const rhs_imm = switch (icmp.rhs) {
+                    .int => |int| try i32Value(int),
+                    .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                };
+                if (rhs_imm == std.math.minInt(i32)) return error.UnsupportedCodegenValue;
+                try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, icmp.lhs);
+                try appendGenericCfgCompareLocalImm(allocator, machine, .eax, rhs_imm - 1);
+                return .jle;
+            }
+        }
         const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });
         const rhs_imm = switch (icmp.rhs) {
             .int => |int| try i32Value(int),
@@ -1674,6 +1763,13 @@ pub fn emitGenericCfgIcmpCondition(
     }
 
     if (isInt(icmp.rhs, 0)) {
+        if (maybe_block) |block| {
+            if (genericCfgSupportsSingleBlockI32Value(function, block, icmp.lhs)) {
+                try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, icmp.lhs);
+                try appendGenericCfgCompareLocalImm(allocator, machine, .eax, 0);
+                return branch_kind;
+            }
+        }
         const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });
         try appendGenericCfgCompareParamZero(allocator, machine, lhs_reg);
         return branch_kind;
@@ -1682,6 +1778,18 @@ pub fn emitGenericCfgIcmpCondition(
         const rhs_reg = try paramValueReg(function, icmp.rhs, .{ .int = 32 });
         try appendGenericCfgCompareParamZero(allocator, machine, rhs_reg);
         return branch_kind;
+    }
+
+    if (maybe_block) |block| {
+        if (genericCfgSupportsSingleBlockI32Value(function, block, icmp.lhs)) {
+            const rhs_imm = switch (icmp.rhs) {
+                .int => |int| try i32Value(int),
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, icmp.lhs);
+            try appendGenericCfgCompareLocalImm(allocator, machine, .eax, rhs_imm);
+            return branch_kind;
+        }
     }
 
     const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });

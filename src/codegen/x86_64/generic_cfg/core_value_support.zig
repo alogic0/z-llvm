@@ -2,6 +2,7 @@ const shared = @import("core_shared.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_tls_global_lowering = @import("cabi_tls_global_lowering.zig");
 const sysv_abi = @import("../sysv_abi.zig");
+const type_layout = @import("../../../zig_air_type_layout.zig");
 
 const std = shared.std;
 const ir = shared.ir;
@@ -45,6 +46,12 @@ pub const GenericCfgAddress = union(enum) {
     tls: []const u8,
 };
 
+pub const GenericCfgLocalAggregateField = struct {
+    param_name: []const u8,
+    aggregate_ty: ir.Type,
+    offset: u64,
+};
+
 pub fn genericCfgI32Address(function: ir.Function, ptr: ir.Value) ?GenericCfgAddress {
     const name = switch (ptr) {
         .named => |name| name,
@@ -79,15 +86,16 @@ pub fn genericCfgSupportsSingleBlockScalar(function: ir.Function) bool {
 pub fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, block: ir.BasicBlock, instruction: ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |binary| genericCfgSupportsSingleBlockBinary(function, block, binary),
-        .icmp => |icmp| genericCfgSupportsSingleBlockIcmp(function, icmp) or
+        .icmp => |icmp| genericCfgSupportsSingleBlockIcmp(function, block, icmp) or
             genericCfgSupportsCallResultZeroIcmp(block, icmp) or
             genericCfgSupportsSingleBlockUnsignedMinMaxIcmpUse(function, block, instruction.result, icmp),
         .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
-        .load => |load| genericCfgSupportsSingleBlockLoad(function, load),
+        .load => |load| genericCfgSupportsSingleBlockLoad(function, block, load),
         .store => |store| genericCfgSupportsSingleBlockStore(function, block, store),
         .call => |call| genericCfgSupportsSingleBlockCall(function, block, instruction.result, call),
         .cast => |cast| genericCfgSupportsSingleBlockI32Cast(block, cast),
-        .phi, .fcmp, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
+        .alloca => |alloca| genericCfgSupportsLocalAggregateAlloca(function, block, instruction.result, alloca),
+        .phi, .fcmp, .freeze, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
     };
 }
 
@@ -144,7 +152,7 @@ pub fn genericCfgSupportsLowerableI32OperandPair(function: ir.Function, lhs: ir.
     }
 }
 
-pub fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
+pub fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, maybe_block: ?ir.BasicBlock, icmp: ir.IcmpInst) bool {
     switch (icmp.predicate) {
         .eq, .ne, .slt => {},
         .ugt, .uge, .ult, .ule, .sgt, .sge, .sle => return false,
@@ -159,12 +167,12 @@ pub fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, icmp: ir.IcmpIns
             genericCfgSupportsI16ParamOrConst(function, icmp.rhs);
     }
     if (!icmp.operand_ty.eql(.{ .int = 32 })) return false;
-    return genericCfgSupportsI32ParamOrConst(function, icmp.lhs) and
-        genericCfgSupportsI32ParamOrConst(function, icmp.rhs);
+    return genericCfgSupportsSingleBlockI32CmpOperand(function, maybe_block, icmp.lhs) and
+        genericCfgSupportsSingleBlockI32CmpOperand(function, maybe_block, icmp.rhs);
 }
 
 pub fn genericCfgSupportsBranchIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
-    if (genericCfgSupportsSingleBlockIcmp(function, icmp)) return true;
+    if (genericCfgSupportsSingleBlockIcmp(function, null, icmp)) return true;
     return genericCfgSupportsPointerNullIcmp(function, icmp);
 }
 
@@ -208,7 +216,7 @@ pub fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.Basi
         genericCfgSupportsUminSelect(function, select, cond) or
         genericCfgSupportsSmaxSelect(function, select, cond) or
         genericCfgSupportsUmaxSelect(function, select, cond)) return true;
-    if (!genericCfgSupportsSingleBlockIcmp(function, cond) and !genericCfgSupportsCallResultZeroIcmp(block, cond)) return false;
+    if (!genericCfgSupportsSingleBlockIcmp(function, block, cond) and !genericCfgSupportsCallResultZeroIcmp(block, cond)) return false;
     return genericCfgSupportsSingleBlockI32Value(function, block, select.true_value) and
         genericCfgSupportsSingleBlockI32Value(function, block, select.false_value);
 }
@@ -331,7 +339,7 @@ pub fn genericCfgSupportsSingleBlockI32Value(function: ir.Function, maybe_block:
             return switch (instruction.kind) {
                 .binary => |binary| genericCfgSupportsSingleBlockBinary(function, block, binary),
                 .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
-                .load => |load| genericCfgSupportsSingleBlockLoad(function, load),
+                .load => |load| genericCfgSupportsSingleBlockLoad(function, block, load),
                 .call => |call| genericCfgSupportsSingleBlockCall(function, block, instruction.result, call),
                 .cast => |cast| genericCfgSupportsSingleBlockI32Cast(block, cast),
                 .icmp, .phi, .fcmp, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
@@ -368,12 +376,14 @@ fn singleBlockI32Constant(block: ir.BasicBlock, value: ir.Value) ?i64 {
     };
 }
 
-pub fn genericCfgSupportsSingleBlockLoad(function: ir.Function, load: ir.LoadInst) bool {
+pub fn genericCfgSupportsSingleBlockLoad(function: ir.Function, block: ir.BasicBlock, load: ir.LoadInst) bool {
     if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
-    return genericCfgI32Address(function, load.ptr) != null;
+    return genericCfgI32Address(function, load.ptr) != null or
+        genericCfgLocalAggregateFieldLoad(function, block, load) != null;
 }
 
 pub fn genericCfgSupportsSingleBlockStore(function: ir.Function, block: ir.BasicBlock, store: ir.StoreInst) bool {
+    if (genericCfgSupportsLocalAggregateParamStore(function, block, store)) return true;
     if (!store.ty.eql(.{ .int = 32 }) or !genericCfgSupportsSingleBlockI32StoreAttrs(store.attrs)) return false;
     if (genericCfgI32Address(function, store.ptr) == null) return false;
     return genericCfgSupportsSingleBlockI32Value(function, block, store.value);
@@ -432,6 +442,11 @@ fn genericCfgSupportsScalarCallArg(
                 genericCfgSupportsI32Param(function, name),
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         };
+    }
+    if (arg.ty.eql(.{ .int = 1 })) {
+        defer gpr_index.* += 1;
+        if (gpr_index.* >= 6) return false;
+        return genericCfgSupportsSingleBlockI1Value(function, block, arg.value);
     }
     if (arg.ty.eql(.{ .int = 64 })) {
         defer gpr_index.* += 1;
@@ -530,12 +545,109 @@ pub fn genericCfgSupportsI1Param(function: ir.Function, name: []const u8) bool {
     return false;
 }
 
+fn genericCfgSupportsSingleBlockI1Value(function: ir.Function, block: ir.BasicBlock, value: ir.Value) bool {
+    return switch (value) {
+        .int => |int| int == 0 or int == 1,
+        .named => |name| {
+            if (genericCfgSupportsI1Param(function, name)) return true;
+            const instruction = findInstruction(block, name) orelse return false;
+            return switch (instruction.kind) {
+                .icmp => |icmp| genericCfgSupportsSingleBlockIcmp(function, block, icmp),
+                else => false,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsSingleBlockI32CmpOperand(function: ir.Function, maybe_block: ?ir.BasicBlock, value: ir.Value) bool {
+    return switch (value) {
+        .int => true,
+        .named => |name| {
+            if (genericCfgSupportsI32Param(function, name)) return true;
+            const block = maybe_block orelse return false;
+            return genericCfgSupportsSingleBlockI32Value(function, block, value);
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
 pub fn genericCfgSupportsI32ParamOrConst(function: ir.Function, value: ir.Value) bool {
     return switch (value) {
         .int => true,
         .named => |name| genericCfgSupportsI32Param(function, name),
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn genericCfgSupportsLocalAggregateAlloca(function: ir.Function, block: ir.BasicBlock, result: ?[]const u8, alloca: ir.AllocaInst) bool {
+    const slot_name = result orelse return false;
+    if (alloca.allocated_ty_addrspace != null or !type_layout.isAggregateType(alloca.allocated_ty)) return false;
+    return genericCfgLocalAggregateParamSlot(function, block, slot_name, alloca.allocated_ty) != null;
+}
+
+pub fn genericCfgSupportsLocalAggregateParamStore(function: ir.Function, block: ir.BasicBlock, store: ir.StoreInst) bool {
+    if (store.ty_addrspace != null or store.ptr_addrspace != null or store.attrs.isBarrier()) return false;
+    const slot_name = switch (store.ptr) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const alloca_instruction = findInstruction(block, slot_name) orelse return false;
+    const alloca = switch (alloca_instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    return alloca.allocated_ty.eql(store.ty) and
+        genericCfgLocalAggregateParamSlot(function, block, slot_name, store.ty) != null;
+}
+
+fn genericCfgLocalAggregateParamSlot(
+    function: ir.Function,
+    block: ir.BasicBlock,
+    slot_name: []const u8,
+    aggregate_ty: ir.Type,
+) ?[]const u8 {
+    if (!type_layout.isAggregateType(aggregate_ty)) return null;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const store = switch (instruction.kind) {
+            .store => |store| store,
+            else => continue,
+        };
+        if (!store.ty.eql(aggregate_ty) or store.ty_addrspace != null or store.ptr_addrspace != null or
+            store.attrs.isBarrier() or !isNamed(store.ptr, slot_name)) continue;
+        const param_name = switch (store.value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+        };
+        for (function.params.items) |param| {
+            if (std.mem.eql(u8, param.name, param_name) and param.ty.eql(aggregate_ty)) return param_name;
+        }
+        return null;
+    }
+    return null;
+}
+
+pub fn genericCfgLocalAggregateFieldLoad(
+    function: ir.Function,
+    block: ir.BasicBlock,
+    load: ir.LoadInst,
+) ?GenericCfgLocalAggregateField {
+    if (!load.ty.eql(.{ .int = 32 }) or load.ty_addrspace != null or load.ptr_addrspace != null or
+        load.attrs.isBarrier()) return null;
+    const slot_name = switch (load.ptr) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const alloca_instruction = findInstruction(block, slot_name) orelse return null;
+    const alloca = switch (alloca_instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return null,
+    };
+    if (alloca.allocated_ty_addrspace != null or !type_layout.isAggregateType(alloca.allocated_ty)) return null;
+    const param_name = genericCfgLocalAggregateParamSlot(function, block, slot_name, alloca.allocated_ty) orelse return null;
+    _ = cabi_abi_helpers.sysvIntegerAggregateFieldLocation(function, param_name, alloca.allocated_ty, 0, load.ty) catch return null;
+    return .{ .param_name = param_name, .aggregate_ty = alloca.allocated_ty, .offset = 0 };
 }
 
 pub fn genericCfgSupportsI8ParamOrConst(function: ir.Function, value: ir.Value) bool {

@@ -70,6 +70,7 @@ const genericCfgSupportsSingleBlockScalar = core_value_support.genericCfgSupport
 const genericCfgSupportsSingleBlockScalarInstruction = core_value_support.genericCfgSupportsSingleBlockScalarInstruction;
 const genericCfgSupportsSingleBlockI32Value = core_value_support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsSingleBlockStore = core_value_support.genericCfgSupportsSingleBlockStore;
+const genericCfgSupportsLocalAggregateParamStore = core_value_support.genericCfgSupportsLocalAggregateParamStore;
 const globalSymbolName = shared.globalSymbolName;
 const i32Value = shared.i32Value;
 const i64Value = shared.i64Value;
@@ -2893,25 +2894,28 @@ fn lowerGenericCfgSingleBlockVoidEffects(
         if (instruction.removed) return false;
         if (!genericCfgSupportsSingleBlockScalarInstruction(function, block, instruction)) return false;
         switch (instruction.kind) {
-            .store => saw_effect = true,
+            .store => |store| {
+                if (!genericCfgSupportsLocalAggregateParamStore(function, block, store)) saw_effect = true;
+            },
             .call => |call| {
                 if (instruction.result != null or call.ret_ty != .void) return false;
                 saw_effect = true;
             },
-            .load, .binary, .icmp, .select => {},
-            .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return false,
+            .load, .binary, .icmp, .select, .alloca => {},
+            .phi, .fcmp, .cast, .freeze, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return false,
         }
     }
     if (!saw_effect) return false;
     for (block.instructions.items, 0..) |instruction, instruction_index| {
         switch (instruction.kind) {
             .store => |store| {
+                if (genericCfgSupportsLocalAggregateParamStore(function, block, store)) continue;
                 try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
                 try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
             },
             .call => |call| try emitGenericCfgVoidCall(allocator, machine, function, block, instruction_index, call),
-            .load, .binary, .icmp, .select => {},
-            .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => unreachable,
+            .load, .binary, .icmp, .select, .alloca => {},
+            .phi, .fcmp, .cast, .freeze, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => unreachable,
         }
     }
     try appendGenericCfgReturn(allocator, machine);

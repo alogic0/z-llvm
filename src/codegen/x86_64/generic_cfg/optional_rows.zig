@@ -272,7 +272,7 @@ pub fn lowerGenericCfgGuardedOptionalPointerBranchReturn(
     try machine.instructions.append(allocator, .ud2);
 
     try appendGenericCfgBlockLabel(allocator, machine, cont_block.name);
-    try core_value_emit.emitGenericCfgLoadI32IntoEax(allocator, machine, function, load.ptr);
+    try core_value_emit.emitGenericCfgLoadI32IntoEax(allocator, machine, function, null, load.ptr);
     try appendGenericCfgPhiBinaryImmediate(allocator, machine, phi_binary);
     try appendGenericCfgReturn(allocator, machine);
     return true;
@@ -556,7 +556,7 @@ fn emitCheckedOptionalPointerReturnBlock(
             .load => |load| load,
             else => return error.UnsupportedCodegenInstruction,
         };
-        try core_value_emit.emitGenericCfgLoadI32IntoEax(allocator, machine, function, load.ptr);
+        try core_value_emit.emitGenericCfgLoadI32IntoEax(allocator, machine, function, null, load.ptr);
     } else {
         const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
             .ret => |ret| ret,

@@ -591,6 +591,37 @@ test "x86_64 codegen routes aggregate pair first-field unpack through generic cf
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes local aggregate parameter field compare call through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc void @assert(i1)
+        \\
+        \\define internal fastcc void @aggregate_field_assert({ i32 } %arg0) {
+        \\entry:
+        \\  %slot = alloca { i32 }
+        \\  store { i32 } %arg0, ptr %slot
+        \\  %field = load i32, ptr %slot
+        \\  %cmp = icmp eq i32 %field, 9296
+        \\  call fastcc void @assert(i1 %cmp)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes boolean branch-mix select through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

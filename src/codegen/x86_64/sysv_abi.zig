@@ -672,7 +672,7 @@ fn isAggregateType(ty: ir.Type) bool {
 }
 
 fn isGprScalarType(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty == .ptr;
+    return isScalarGprAbiType(ty);
 }
 
 fn isScalarGprAbiType(ty: ir.Type) bool {

@@ -60,6 +60,7 @@ const validateDefaultCallConv = shared.validateDefaultCallConv;
 pub const GenericCfgLoopSumPlan = core_loop_rows.GenericCfgLoopSumPlan;
 const genericCfgSupportsBranchIcmp = core_value_support.genericCfgSupportsBranchIcmp;
 const genericCfgSupportsPointerNullIcmp = core_value_support.genericCfgSupportsPointerNullIcmp;
+const genericCfgSupportsSingleBlockIcmp = core_value_support.genericCfgSupportsSingleBlockIcmp;
 const genericCfgSupportsI32Value = core_value_support.genericCfgSupportsI32Value;
 
 pub const lowerGenericCfgLoopTryReturn = error_union_rows.lowerGenericCfgLoopTryReturn;
@@ -1452,11 +1453,25 @@ pub fn lowerGenericCfgTerminalBranchReturn(allocator: std.mem.Allocator, machine
         return true;
     }
 
+    if (!genericCfgSupportsTerminalBranchCondition(function, entry, condbr.cond)) return false;
     try emitGenericCfgTerminalConditionTrueBranch(allocator, machine, function, entry, entry, condbr.cond, then_block.name);
     try emitGenericCfgTerminalReturnBlock(allocator, machine, function, entry, else_block);
     try appendGenericCfgBlockLabel(allocator, machine, then_block.name);
     try emitGenericCfgTerminalReturnBlock(allocator, machine, function, entry, then_block);
     return true;
+}
+
+fn genericCfgSupportsTerminalBranchCondition(function: ir.Function, block: ir.BasicBlock, cond: ir.Value) bool {
+    const cond_name = switch (cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const cond_inst = findInstruction(block, cond_name) orelse return false;
+    const icmp = switch (cond_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    return genericCfgSupportsSingleBlockIcmp(function, null, icmp);
 }
 
 pub fn lowerGenericCfgCheckedLshrExactReturn(

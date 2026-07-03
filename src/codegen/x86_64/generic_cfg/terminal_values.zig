@@ -380,7 +380,7 @@ fn terminalBlockCanMaterializeU16Value(function: ir.Function, scope: TerminalVal
 }
 
 fn terminalBlockCanBranchOnIcmp(function: ir.Function, scope: TerminalValueScope, icmp: ir.IcmpInst) bool {
-    if (genericCfgSupportsSingleBlockIcmp(function, icmp)) return true;
+    if (genericCfgSupportsSingleBlockIcmp(function, null, icmp)) return true;
     if (!icmp.operand_ty.eql(.{ .int = 16 })) return false;
     switch (icmp.predicate) {
         .eq, .ne, .slt => {},
@@ -457,6 +457,7 @@ pub fn emitGenericCfgConditionTrueBranch(
         .icmp => |icmp| icmp,
         else => return error.UnsupportedCodegenInstruction,
     };
+    if (!genericCfgSupportsSingleBlockIcmp(function, null, icmp)) return error.UnsupportedCodegenValue;
     const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
     try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
 }

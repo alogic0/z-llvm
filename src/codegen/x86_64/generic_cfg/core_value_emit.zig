@@ -39,6 +39,7 @@ const sysvScalarCallNeedsStackArgs = cabi_call_lowering.sysvScalarCallNeedsStack
 
 const genericCfgSupportsSingleBlockI32Value = support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsSminIntrinsicCall = support.genericCfgSupportsSminIntrinsicCall;
+const genericCfgLocalAggregateFieldLoad = support.genericCfgLocalAggregateFieldLoad;
 
 pub fn emitGenericCfgBranchSideEffects(
     allocator: std.mem.Allocator,
@@ -76,7 +77,7 @@ pub fn emitGenericCfgI32ValueIntoEax(
             switch (instruction.kind) {
                 .load => |load| {
                     if (!load.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
-                    try emitGenericCfgLoadI32IntoEax(allocator, machine, function, load.ptr);
+                    try emitGenericCfgLoadI32IntoEax(allocator, machine, function, block, load.ptr);
                 },
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
@@ -359,12 +360,67 @@ pub fn emitGenericCfgLoadI32IntoEax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
+    maybe_block: ?ir.BasicBlock,
     ptr: ir.Value,
 ) !void {
+    if (maybe_block) |block| {
+        const ptr_name = switch (ptr) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+        };
+        if (ptr_name) |name| {
+            const instruction = findInstruction(block, name) orelse null;
+            if (instruction) |alloca_instruction| switch (alloca_instruction.kind) {
+                .alloca => {
+                    const synthetic_load: ir.LoadInst = .{
+                        .ty = .{ .int = 32 },
+                        .ptr = ptr,
+                    };
+                    if (genericCfgLocalAggregateFieldLoad(function, block, synthetic_load)) |field| {
+                        try emitSysVIntegerAggregateFieldLoadIntoEax(allocator, machine, function, field);
+                        return;
+                    }
+                },
+                else => {},
+            };
+        }
+    }
     switch (genericCfgI32Address(function, ptr) orelse return error.UnsupportedCodegenValue) {
         .param => |name| try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = try paramReg(function, name, .ptr) }),
         .global => |symbol| try machine.instructions.append(allocator, .{ .load_global_i32_eax = symbol }),
         .tls => |symbol| try machine.instructions.append(allocator, .{ .load_tls_i32_eax = symbol }),
+    }
+}
+
+fn emitSysVIntegerAggregateFieldLoadIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    field: support.GenericCfgLocalAggregateField,
+) !void {
+    const location = try cabi_abi_helpers.sysvIntegerAggregateFieldLocation(
+        function,
+        field.param_name,
+        field.aggregate_ty,
+        field.offset,
+        .{ .int = 32 },
+    );
+    switch (location) {
+        .gpr => |gpr| switch (gpr.offset_in_eightbyte) {
+            0 => try machine.instructions.append(allocator, .{ .mov_arg_eax = gpr.reg }),
+            4 => {
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = gpr.reg });
+                try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 32 });
+            },
+            else => return error.UnsupportedCodegenAbi,
+        },
+        .stack => |offset| {
+            if (offset <= std.math.maxInt(i8)) {
+                try machine.instructions.append(allocator, .{ .load_stack_disp8_eax = @intCast(offset) });
+            } else {
+                try machine.instructions.append(allocator, .{ .load_stack_disp32_eax = offset });
+            }
+        },
     }
 }
 
