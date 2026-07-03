@@ -2149,6 +2149,10 @@ pub fn lowerGenericCfgSingleBlockPtr(allocator: std.mem.Allocator, machine: *Mac
         .ret => |ret| ret,
         else => return false,
     };
+    if (try lowerGenericCfgPtrNullReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgGprParamReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -2162,6 +2166,21 @@ pub fn lowerGenericCfgSingleBlockPtr(allocator: std.mem.Allocator, machine: *Mac
         return true;
     }
     return false;
+}
+
+fn lowerGenericCfgPtrNullReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.ptr) or !ret.ty.eql(.ptr)) return false;
+    if (block.instructions.items.len != 0) return false;
+    if ((ret.value orelse return error.InvalidRet) != .null_value) return false;
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 });
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
 }
 
 pub fn lowerGenericCfgSingleBlockEffectBarrier(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
