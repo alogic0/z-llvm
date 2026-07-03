@@ -41,8 +41,9 @@ None.
 
 Stop state recorded 2026-07-02 after closing convergence-progress item 8:
 
-- Active convergence-progress item: 9. This opens two active tracks:
-  `distribution-real-rows --limit=25` and the syscall-hello track (item 11).
+- Active convergence-progress item: 8a (AIR export cache), inserted by the
+  docs agent after this stop state was written — do 8a before opening
+  item 9's two tracks.
 - First failing real row: none discovered for item 9 yet.
 - First failing stage: none discovered for item 9 yet.
 - Current staged `real_*` counters: `real_functions_lowered=10`,
@@ -59,9 +60,10 @@ Stop state recorded 2026-07-02 after closing convergence-progress item 8:
   `docs/evidence/real_rows_strict_limit10.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=10`.
-- Recommended next action: perform a fresh goal-selection pass, then start
-  item 9 discovery with `distribution-real-rows --limit=25` while also
-  opening the syscall-hello track.
+- Recommended next action: implement tracker item 8a (gate-run AIR export
+  cache; spec in `docs/roadmap/convergence_progress.md`), then start item 9
+  discovery with `distribution-real-rows --limit=25` while also opening the
+  syscall-hello track.
 
 When the worker stops, record only:
 

@@ -95,8 +95,28 @@ list and the visible record of progress. Evidence summaries under
   object emission, and native link; `real_executed` and `real_programs_ok`
   remain 0 because the v1 candidates are still marked
   `assumed_nondeterministic`.
+- [ ] 8a. Gate-run AIR export cache (infrastructure, do before item 9):
+  cache the exported real-module AIR keyed on ziglang pin
+  (`docs/evidence/ziglang_pin.txt`), exporter-relevant z_llvm state, mode,
+  and slice; `distribution-real-rows` reuses cache hits instead of
+  re-exporting the compiler module every run. Fail closed: any key
+  mismatch or missing/corrupt entry means full re-export, never a stale
+  read. The cache lives under `tmp/` (speedup, not evidence). Validate by
+  proving a cached run and a fresh-export run produce identical gate
+  summary lines; record both timings in
+  `docs/evidence/real_rows_export_cache.summary`. Rationale: at
+  `--limit=10` each fix cycle spent hours re-exporting; at 25 and 100 the
+  export dominates wall-clock entirely. While iterating on fixes, run
+  single-mode (ReleaseFast) gates; all three modes at cycle close only.
 - [ ] 9. Ratchet to `--limit=25`, green. Start the syscall-hello track
-  (item 11) in parallel from here.
+  (item 11) in parallel from here. Fix-cycle rules carry over from item 8
+  unchanged: rank-order fixes, one fix per commit, no source/function-name
+  admission, `distribution-all` green before every commit, no weakening
+  captured rows or golden files without behavioral verification,
+  recognizer three-strikes escalation per the item 15 note (count stands
+  at 1), and `real_executed=0` remains correct until a selector version
+  lifts determinism marks via a ratchet-migration note. Once the hello
+  track opens, every stop report must state the position of both tracks.
 - [ ] 10. Phase 1 exit: 100 real functions green through applicable
   stages, all three release modes, sustained (ratchets enforced by
   `distribution-all`).
