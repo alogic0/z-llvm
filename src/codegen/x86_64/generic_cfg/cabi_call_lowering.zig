@@ -2231,7 +2231,11 @@ pub fn lowerSelectedI64ConstReturn(
 }
 
 fn isSysVGprReturnType(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 64 }) or ty.eql(.ptr);
+    return switch (ty) {
+        .int => |bits| bits >= 1 and bits <= 64,
+        .ptr => true,
+        else => false,
+    };
 }
 
 pub fn lowerGenericCfgGprParamReturn(

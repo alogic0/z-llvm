@@ -223,9 +223,7 @@ pub fn advanceParamCursors(
     sse_index: *usize,
     stack_eightbytes: *usize,
 ) !void {
-    if (ty.eql(.{ .int = 1 }) or ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or
-        ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr))
-    {
+    if (isScalarGprAbiType(ty)) {
         if (gpr_index.* < 6) gpr_index.* += 1 else stack_eightbytes.* += 1;
         return;
     }
@@ -431,7 +429,7 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
 pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
     try rejectUnsupportedAbiType(ret_ty);
     if (ret_ty == .void) return .{};
-    if (ret_ty.eql(.{ .int = 1 }) or ret_ty.eql(.{ .int = 8 }) or ret_ty.eql(.{ .int = 16 }) or ret_ty.eql(.{ .int = 32 }) or ret_ty.eql(.{ .int = 64 }) or ret_ty == .ptr) {
+    if (isScalarGprAbiType(ret_ty)) {
         return .{ .gpr_returns = 1 };
     }
     if (ret_ty == .float or ret_ty == .double) {
@@ -675,6 +673,14 @@ fn isAggregateType(ty: ir.Type) bool {
 
 fn isGprScalarType(ty: ir.Type) bool {
     return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty == .ptr;
+}
+
+fn isScalarGprAbiType(ty: ir.Type) bool {
+    return switch (ty) {
+        .int => |bits| bits >= 1 and bits <= 64,
+        .ptr => true,
+        else => false,
+    };
 }
 
 fn i32Value(value: i128) !i32 {

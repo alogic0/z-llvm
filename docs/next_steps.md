@@ -39,7 +39,7 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-03 after the fourth item 9 real-row fix:
+Stop state recorded 2026-07-03 after the fifth item 9 real-row fix:
 
 - Active convergence-progress item: 9. This opens two active tracks:
   `distribution-real-rows --limit=25` ratchet work and the syscall-hello
@@ -50,13 +50,13 @@ Stop state recorded 2026-07-03 after the fourth item 9 real-row fix:
   `../ziglang/src/main.zig/Io.Event.reset` through object emission and native
   link. It also clears
   `../ziglang/src/main.zig/compress.flate.Container.Metadata.container`
-  through typed lowering. The first failing row remains
-  `../ziglang/src/main.zig/compress.flate.Container.Metadata.container`.
+  through object emission and native link. The first failing row advanced to
+  `../ziglang/src/main.zig/debug.ConfigurableTrace(2,4,false).dump`.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
-- First failing stage: `object-emission`.
+- First failing stage: `typed-lowering`.
 - Current staged `real_*` counters: `real_functions_lowered=24`,
-  `real_objects_emitted=23`, `real_native_linked=23`, `real_executed=0`,
+  `real_objects_emitted=24`, `real_native_linked=24`, `real_executed=0`,
   `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_releasefast_v1.tsv`,
@@ -66,12 +66,12 @@ Stop state recorded 2026-07-03 after the fourth item 9 real-row fix:
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=10`.
-- Saved log path: `tmp/real_rows_limit25_after_container_typed.log`.
+- Saved log path: `tmp/real_rows_limit25_after_container_object.log`.
 - Tracked evidence summary:
-  `docs/evidence/real_rows_limit25_after_container_typed.summary`.
-- Recommended next action: debug `compress.flate.Container.Metadata.container`
-  object emission with `ZLLVM_DEBUG_DUMP_IR_SOURCE=container zig build distribution-real-rows -- --mode=ReleaseFast --limit=25`,
-  fix the `object-emission` failure through the normal ownership chain, and
+  `docs/evidence/real_rows_limit25_after_container_object.summary`.
+- Recommended next action: debug `debug.ConfigurableTrace(2,4,false).dump`
+  typed lowering with `ZLLVM_DEBUG_DUMP_IR_SOURCE=dump zig build distribution-real-rows -- --mode=ReleaseFast --limit=25`,
+  fix the `typed-lowering` failure through the normal ownership chain, and
   keep the syscall-hello track open in the stop report.
 
 When the worker stops, record only:

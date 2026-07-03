@@ -69,8 +69,11 @@ pub fn scalarParamStackDisp8(function: ir.Function, name: []const u8, ty: ir.Typ
 }
 
 pub fn isSysVIntegerParamType(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 1 }) or ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or
-        ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr);
+    return switch (ty) {
+        .int => |bits| bits >= 1 and bits <= 64,
+        .ptr => true,
+        else => false,
+    };
 }
 
 pub fn fpParamIndex(function: ir.Function, name: []const u8, ty: ir.Type) !usize {
