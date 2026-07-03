@@ -29,9 +29,14 @@ pub fn lowerTypedCall(self: anytype, instruction: air_export.TypedInstruction) !
     } else null;
 
     const is_default_panic = call_details.callee_name != null and std.mem.eql(u8, call_details.callee_name.?, "defaultPanic");
+    const is_debug_assert = if (call_details.callee) |direct|
+        !direct.external and call_details.callee_name != null and std.mem.eql(u8, call_details.callee_name.?, "assert") and
+            call_type.return_type.ir_type == .void and call_type.params.len == 1 and call_type.params[0].ir_type.eql(.{ .int = 1 })
+    else
+        false;
     var call: ir.CallInst = .{
         .ret_ty = call_type.return_type.ir_type,
-        .callee = if (is_default_panic) "debug.defaultPanic" else callee,
+        .callee = if (is_default_panic) "debug.defaultPanic" else if (is_debug_assert) "debug.assert" else callee,
         .callee_value = callee_value,
         .calling_conv = irCallingConvention(call_type),
         .tail_kind = air_capabilities.callTailKindForOpcode(instruction.opcode),

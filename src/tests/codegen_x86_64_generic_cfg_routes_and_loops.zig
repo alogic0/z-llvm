@@ -622,6 +622,41 @@ test "x86_64 codegen routes local aggregate parameter field compare call through
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 generic cfg lowers debug assert as local trap boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc void @debug.assert(i1)
+        \\
+        \\define internal fastcc void @assert_user(i1 %ok) {
+        \\entry:
+        \\  call fastcc void @debug.assert(i1 %ok)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    var saw_trap = false;
+    for (machine.instructions.items) |instruction| {
+        switch (instruction) {
+            .direct_call => |call| try std.testing.expect(!std.mem.eql(u8, call.symbol, "debug.assert")),
+            .ud2 => saw_trap = true,
+            else => {},
+        }
+    }
+    try std.testing.expect(saw_trap);
+}
+
 test "x86_64 codegen routes boolean branch-mix select through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

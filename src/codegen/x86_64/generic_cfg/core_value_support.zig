@@ -793,6 +793,11 @@ pub fn genericCfgSupportsCall(function: ir.Function, call: ir.CallInst) bool {
     if (std.mem.eql(u8, call.callee, "llvm.assume")) {
         return call.ret_ty == .void and call.args.items.len == 1 and genericCfgSupportsI1Value(function, call.args.items[0].value);
     }
+    if (std.mem.eql(u8, call.callee, "debug.assert")) {
+        return call.ret_ty == .void and call.args.items.len == 1 and
+            call.args.items[0].ty.eql(.{ .int = 1 }) and
+            genericCfgSupportsI1Value(function, call.args.items[0].value);
+    }
     if (isCalleeName(call.callee, "llvm.sadd.with.overflow.i32") or
         isCalleeName(call.callee, "llvm.uadd.with.overflow.i32") or
         isCalleeName(call.callee, "llvm.ssub.with.overflow.i32") or

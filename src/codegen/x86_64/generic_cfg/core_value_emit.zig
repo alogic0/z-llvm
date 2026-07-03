@@ -12,6 +12,7 @@ const MachineFunction = shared.MachineFunction;
 const appendDirectCallWithStackArgs = shared.appendDirectCallWithStackArgs;
 const appendIndirectCallRaxWithStackArgs = shared.appendIndirectCallRaxWithStackArgs;
 const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
+const appendGenericCfgCompareParamZero = core_cfg_emit.appendGenericCfgCompareParamZero;
 const appendGenericCfgConditionalBranch = core_cfg_emit.appendGenericCfgConditionalBranch;
 const callIsFastcc = shared.callIsFastcc;
 const i32BitPattern = shared.i32BitPattern;
@@ -541,6 +542,10 @@ pub fn emitGenericCfgVoidCall(
     if (call.isDebugVariableLocation()) return;
     if (call.ret_ty != .void or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
+    if (std.mem.eql(u8, call.callee, "debug.assert")) {
+        try emitGenericCfgDebugAssert(allocator, machine, function, block, call);
+        return;
+    }
     const live_params = try liveParamsAfter(function, block, instruction_index);
     if (live_params.count == 0) {
         if (call.callee_value) |callee_value| {
@@ -574,4 +579,55 @@ pub fn emitGenericCfgVoidCall(
     } else {
         try appendAlignedCallPreservingI32Params(allocator, machine, function, call, live_params, .{ .direct = call.callee });
     }
+}
+
+fn emitGenericCfgDebugAssert(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    call: ir.CallInst,
+) !void {
+    if (call.callee_value != null or call.args.items.len != 1 or
+        !call.args.items[0].ty.eql(.{ .int = 1 })) return error.UnsupportedCodegenInstruction;
+    switch (call.args.items[0].value) {
+        .int => |int| {
+            if (int == 1) return;
+            if (int != 0) return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .ud2);
+            return;
+        },
+        else => {},
+    }
+    const ok_label = try ownedMachineLabel(
+        allocator,
+        machine,
+        "generic_cfg_debug_assert_{}_ok",
+        .{machine.instructions.items.len},
+    );
+    switch (call.args.items[0].value) {
+        .int => unreachable,
+        .named => |name| {
+            if (findInstruction(block, name)) |instruction| {
+                const icmp = switch (instruction.kind) {
+                    .icmp => |icmp| icmp,
+                    else => return error.UnsupportedCodegenInstruction,
+                };
+                const branch_kind = try cabi_call_lowering.emitGenericCfgIcmpConditionWithBlock(
+                    allocator,
+                    machine,
+                    function,
+                    block,
+                    icmp,
+                );
+                try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, ok_label);
+            } else {
+                try appendGenericCfgCompareParamZero(allocator, machine, try paramReg(function, name, .{ .int = 1 }));
+                try appendGenericCfgConditionalBranch(allocator, machine, .jne, ok_label);
+            }
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+    try machine.instructions.append(allocator, .ud2);
+    try appendGenericCfgBlockLabel(allocator, machine, ok_label);
 }

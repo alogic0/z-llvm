@@ -223,8 +223,8 @@ changes the counts; cite the discovery/fix evidence summary.
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
 | ReleaseFast | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_limit25_after_assertUnlocked_object.summary` |
-| ReleaseSafe | 25 | 25 | 25 | 24 | `docs/evidence/real_rows_limit25_after_assertUnlocked_object.summary` |
-| ReleaseSmall | 25 | pending rank-1 `air-export` recheck (item 9) | | | `docs/next_steps.md` stop state |
+| ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_limit25_after_assert_runtime.summary` |
+| ReleaseSmall | 25 | 0 | 0 | 0 | `docs/evidence/real_rows_limit25_releasesmall_fresh_recheck.summary` |
 
 ## Cluster Board (item 9a)
 
@@ -259,6 +259,10 @@ One line per completed cycle, append-only, newest last. This is the
   returns, comptime void rows, single-field aggregate layout inference,
   aggregate param field loads. ReleaseFast 25/25; ReleaseSafe 24/25 linked.
   Recognizer count still 1.
+- 2026-07-03 (this commit) ReleaseSafe limit-25 native-link fixed for
+  `debug.SafetyLock.assertUnlocked` by model-owned `debug.assert` lowering;
+  ReleaseSmall cache-bypassed recheck still fails at AIR export. Recognizer
+  count still 1.
 
 ## Ratchet State
 

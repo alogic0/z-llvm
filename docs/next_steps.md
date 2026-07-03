@@ -39,23 +39,23 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-03 after the eighth item 9 real-row fix:
+Stop state recorded 2026-07-03 after the ninth item 9 real-row fix:
 
 - Active convergence-progress item: 9. This opens two active tracks:
   `distribution-real-rows --limit=25` ratchet work and the syscall-hello
   real-program track from item 11.
 - Real-row track status: ReleaseFast `--limit=25` report mode is green for
   all 25 ranked rows through typed lowering, x86_64 object emission, and
-  native link. ReleaseSafe `--limit=25` report mode now lowers and emits
-  objects for all 25 ranked rows; the first remaining ReleaseSafe failure is
-  native-link for `../ziglang/src/main.zig/debug.SafetyLock.assertUnlocked`.
+  native link. ReleaseSafe `--limit=25` report mode is now also green
+  through native link. ReleaseSmall was rechecked with the cache bypassed and
+  still fails before typed lowering during AIR export.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
-- First failing stage: `native-link` for
-  `../ziglang/src/main.zig/debug.SafetyLock.assertUnlocked` in ReleaseSafe.
-- Current staged `real_*` counters: `real_functions_lowered=25`,
-  `real_objects_emitted=25`, `real_native_linked=24`, `real_executed=0`,
-  `real_programs_ok=0`.
+- First failing stage: `air-export` for
+  `../ziglang/src/main.zig/math.raiseInvalid` in ReleaseSmall.
+- Current staged `real_*` counters for the first failing mode:
+  `real_functions_lowered=0`, `real_objects_emitted=0`,
+  `real_native_linked=0`, `real_executed=0`, `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_releasefast_v1.tsv`,
   hash
@@ -64,15 +64,16 @@ Stop state recorded 2026-07-03 after the eighth item 9 real-row fix:
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=10`.
-- Saved log path: `tmp/real_rows_limit25_after_assertUnlocked_object.log`.
-- Tracked evidence summary:
-  `docs/evidence/real_rows_limit25_after_assertUnlocked_object.summary`.
-- Recommended next action: debug the ReleaseSafe native-link failure for
-  `debug.SafetyLock.assertUnlocked`, then rerun the all-mode strict
-  `distribution-real-rows --limit=25` close. ReleaseSmall also reported an
-  `air-export` failure at rank 1 during the failed strict close and must be
-  rechecked after the ReleaseSafe native-link fix. Keep the syscall-hello
-  track open in every stop report.
+- Saved log paths: `tmp/real_rows_limit25_after_assert_runtime.log` and
+  `tmp/real_rows_limit25_releasesmall_fresh_recheck.log`.
+- Tracked evidence summaries:
+  `docs/evidence/real_rows_limit25_after_assert_runtime.summary` and
+  `docs/evidence/real_rows_limit25_releasesmall_fresh_recheck.summary`.
+- Recommended next action: debug the ReleaseSmall AIR export failure. The
+  summary reports rank 1 (`math.raiseInvalid`) because descriptor validation
+  fails before per-row lowering; confirm the missing or corrupt descriptor
+  entry before changing lowering or codegen. Keep the syscall-hello track
+  open in every stop report.
 
 When the worker stops, record only:
 
