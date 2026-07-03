@@ -19,10 +19,7 @@ pub fn typedUnionInitSummary(instruction: air_export.TypedInstruction) ?TypedUni
     const bit_width_text = core.detail(instruction, "bit_width") orelse return null;
     const field_index = std.fmt.parseInt(u32, field_index_text, 10) catch return null;
     const bit_width = std.fmt.parseInt(u16, bit_width_text, 10) catch return null;
-    switch (bit_width) {
-        8, 16, 32, 64 => {},
-        else => return null,
-    }
+    if (!supportedUnionTagBitWidth(bit_width)) return null;
     return .{
         .payload_index = payload_index,
         .field_index = field_index,
@@ -38,10 +35,7 @@ pub fn typedUnionTagSetSummary(instruction: air_export.TypedInstruction) ?TypedU
     const bit_width_text = core.detail(instruction, "bit_width") orelse return null;
     const tag_index = std.fmt.parseInt(u32, tag_index_text, 10) catch return null;
     const bit_width = std.fmt.parseInt(u16, bit_width_text, 10) catch return null;
-    switch (bit_width) {
-        8, 16, 32, 64 => {},
-        else => return null,
-    }
+    if (!supportedUnionTagBitWidth(bit_width)) return null;
     return .{
         .pointer_index = pointer_index,
         .tag_index = tag_index,
@@ -55,14 +49,15 @@ pub fn typedUnionTagGetSummary(instruction: air_export.TypedInstruction) ?TypedU
     const operand_index = core.typedInstOperandIndex(instruction.operands[0]) orelse return null;
     const bit_width_text = core.detail(instruction, "bit_width") orelse return null;
     const bit_width = std.fmt.parseInt(u16, bit_width_text, 10) catch return null;
-    switch (bit_width) {
-        8, 16, 32, 64 => {},
-        else => return null,
-    }
+    if (!supportedUnionTagBitWidth(bit_width)) return null;
     return .{
         .operand_index = operand_index,
         .bit_width = bit_width,
     };
+}
+
+fn supportedUnionTagBitWidth(bit_width: u16) bool {
+    return bit_width >= 1 and bit_width <= 64;
 }
 
 test "typed AIR model recognizes union init summary" {
@@ -146,7 +141,7 @@ test "typed AIR model recognizes get union tag summary" {
     try std.testing.expectEqual(@as(u32, 7), summary.operand_index);
     try std.testing.expectEqual(@as(u16, 8), summary.bit_width);
 
-    details[0].value = "24";
+    details[0].value = "0";
     try std.testing.expect(typedUnionTagGetSummary(.{
         .index = 9,
         .opcode = "get_union_tag",

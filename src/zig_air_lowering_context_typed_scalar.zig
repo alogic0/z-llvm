@@ -45,7 +45,8 @@ pub fn lowerTypedArg(self: anytype, instruction: air_export.TypedInstruction) !v
     if (param_index >= self.function_type.params.len) return air_model.LowerError.UnsupportedAir;
     const parsed_type = parseZigType(instruction.result_type) orelse
         (self.unusedOpaqueNominalArgType(instruction.index, instruction.result_type, param_index) orelse
-            return air_model.LowerError.UnsupportedAir);
+            (self.unionTagOnlyOpaqueNominalArgType(instruction.index, instruction.result_type, param_index) orelse
+                return air_model.LowerError.UnsupportedAir));
     if (!parsed_type.ir_type.eql(self.function_type.params[param_index].ir_type)) return air_model.LowerError.UnsupportedAir;
     self.values[instruction.index] = .{
         .ty = parsed_type,

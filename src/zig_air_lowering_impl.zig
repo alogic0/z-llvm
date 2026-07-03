@@ -495,7 +495,10 @@ fn parseFunctionTypeForLowering(
     air_function: air_export.Function,
 ) !FunctionType {
     return parseFunctionType(allocator, air_function.type_text) catch |err| switch (err) {
-        error.UnsupportedAir => parseFunctionTypeWithUnusedOpaqueParams(allocator, air_function),
+        error.UnsupportedAir => parseFunctionTypeWithUnusedOpaqueParams(allocator, air_function) catch |fallback_err| switch (fallback_err) {
+            error.UnsupportedAir => parseFunctionTypeWithUnionTagOnlyOpaqueSignature(allocator, air_function),
+            else => return fallback_err,
+        },
         else => return err,
     };
 }
@@ -536,6 +539,81 @@ fn parseFunctionTypeWithUnusedOpaqueParams(
         .c_calling_convention = c_calling_convention,
         .non_default_calling_convention = non_default_calling_convention,
     };
+}
+
+fn parseFunctionTypeWithUnionTagOnlyOpaqueSignature(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+) !FunctionType {
+    const bit_width = unionTagOnlyReturnBitWidth(air_function) orelse return error.UnsupportedAir;
+    const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, air_function.type_text, " "));
+    if (!std.mem.startsWith(u8, trimmed, "fn (")) return error.UnsupportedAir;
+    const params_end = findMatching(trimmed, 3, '(', ')') orelse return error.UnsupportedAir;
+    const params_text = trimmed[4..params_end];
+    var fields = splitTopLevel(params_text, ',');
+    const param_text = std.mem.trim(u8, fields.next() orelse return error.UnsupportedAir, " ");
+    if (param_text.len == 0 or fields.next() != null or !isOpaqueNominalTypeSurface(param_text)) {
+        return error.UnsupportedAir;
+    }
+    const return_text = functionReturnTypeText(air_function.type_text) orelse return error.UnsupportedAir;
+    if (!isOpaqueNominalTypeSurface(return_text)) return error.UnsupportedAir;
+
+    var params = try allocator.alloc(ZigType, 1);
+    errdefer allocator.free(params);
+    params[0] = .{ .ir_type = .{ .int = bit_width } };
+    return .{
+        .params = params,
+        .return_type = .{ .ir_type = .{ .int = bit_width } },
+        .c_calling_convention = false,
+        .non_default_calling_convention = false,
+    };
+}
+
+fn unionTagOnlyReturnBitWidth(air_function: air_export.Function) ?u16 {
+    const structured_air = air_function.structured_air orelse return null;
+    const structured_air_v2 = air_function.structured_air_v2 orelse return null;
+    const main_body = structured_air.body(.main, null) orelse return null;
+    if (main_body.instructions.len != air_function.main_body_count) return null;
+
+    var arg_index: ?u32 = null;
+    var get_tag_index: ?u32 = null;
+    var bit_width: ?u16 = null;
+    var ret_seen = false;
+    var semantic_count: usize = 0;
+
+    for (main_body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return null;
+        if (std.mem.eql(u8, instruction.opcode, "dbg_stmt")) continue;
+        semantic_count += 1;
+        if (std.mem.eql(u8, instruction.opcode, "arg")) {
+            if (arg_index != null or instruction.operands.len != 0) return null;
+            arg_index = instruction.index;
+        } else if (std.mem.eql(u8, instruction.opcode, "get_union_tag")) {
+            if (get_tag_index != null) return null;
+            const arg = arg_index orelse return null;
+            const summary = air_model.typedUnionTagGetSummary(instruction) orelse return null;
+            if (summary.operand_index != arg) return null;
+            get_tag_index = instruction.index;
+            bit_width = summary.bit_width;
+        } else if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) {
+            if (ret_seen or instruction.operands.len != 1) return null;
+            const get_tag = get_tag_index orelse return null;
+            if (air_model.typedInstOperandIndex(instruction.operands[0]) != get_tag) return null;
+            ret_seen = true;
+        } else {
+            return null;
+        }
+    }
+
+    if (semantic_count != 3 or !ret_seen) return null;
+    return bit_width;
+}
+
+fn typedInstructionByIndex(structured_air_v2: air_export.StructuredAirV2, index: u32) ?air_export.TypedInstruction {
+    for (structured_air_v2.instructions) |instruction| {
+        if (instruction.index == index) return instruction;
+    }
+    return null;
 }
 
 fn functionParamValueUsed(function: air_export.Function, param_index: usize) bool {
@@ -1033,4 +1111,67 @@ test "lowering parser rejects used opaque nominal parameters" {
         error.UnsupportedAir,
         parseFunctionTypeForLowering(std.testing.allocator, air_function),
     );
+}
+
+test "lowering parser admits union tag-only opaque nominal signatures" {
+    var main_body_instructions = [_]u32{ 0, 1, 2, 3 };
+    var bodies = [_]air_export.StructuredBody{.{
+        .kind = .main,
+        .owner = null,
+        .instructions = main_body_instructions[0..],
+    }};
+    var structured_instructions = [_]air_export.StructuredInstruction{
+        .{ .index = 0, .opcode = "arg", .type_text = "pkg.Payload" },
+        .{ .index = 1, .opcode = "dbg_stmt", .type_text = "void" },
+        .{ .index = 2, .opcode = "get_union_tag", .type_text = "pkg.Tag" },
+        .{ .index = 3, .opcode = "ret_safe", .type_text = "noreturn" },
+    };
+    var get_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "pkg.Payload" },
+    };
+    var get_details = [_]air_export.TypedDetail{
+        .{ .key = "union_tag_contract", .value = "zllvm-union-tag-facts-v1" },
+        .{ .key = "bit_width", .value = "2" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "2", .type_text = "pkg.Tag" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "pkg.Payload", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 2, .opcode = "get_union_tag", .result_type = "pkg.Tag", .data_kind = "ty_op", .operands = get_operands[0..], .details = get_details[0..] },
+        .{ .index = 3, .opcode = "ret_safe", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..] },
+    };
+    var legacy_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 2, .unused = false, .opcode = "arg", .payload = "pkg.Payload, 0", .category = .argument },
+        .{ .index = 1, .indent = 2, .unused = true, .opcode = "dbg_stmt", .payload = "2:13", .category = .debug },
+        .{ .index = 2, .indent = 2, .unused = false, .opcode = "get_union_tag", .payload = "pkg.Tag, %0!", .category = .other },
+        .{ .index = 3, .indent = 2, .unused = true, .opcode = "ret_safe", .payload = "%2!", .category = .return_op },
+    };
+    const air_function: air_export.Function = .{
+        .name = "pkg.container",
+        .type_text = "fn (pkg.Payload) pkg.Tag",
+        .instruction_count = 4,
+        .main_body_count = 4,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = .{
+            .instructions = structured_instructions[0..],
+            .bodies = bodies[0..],
+            .branches = &.{},
+            .cond_branches = &.{},
+            .repeats = &.{},
+        },
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = legacy_instructions[0..],
+    };
+
+    const function_type = try parseFunctionTypeForLowering(std.testing.allocator, air_function);
+    defer function_type.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 2 }, function_type.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 2 }, function_type.return_type.ir_type);
 }

@@ -303,6 +303,41 @@ pub const LoweringContext = struct {
         return .{ .ir_type = .ptr };
     }
 
+    pub fn unionTagOnlyOpaqueNominalArgType(
+        self: *LoweringContext,
+        instruction_index: u32,
+        type_text: []const u8,
+        param_index: usize,
+    ) ?ZigType {
+        if (!isOpaqueNominalTypeSurface(type_text)) return null;
+        if (param_index >= self.function_type.params.len) return null;
+        const param_ty = self.function_type.params[param_index].ir_type;
+        if (param_ty != .int) return null;
+        const bit_width = self.unionTagOnlyArgBitWidth(instruction_index) orelse return null;
+        if (param_ty.int != bit_width) return null;
+        return .{ .ir_type = .{ .int = bit_width } };
+    }
+
+    fn unionTagOnlyArgBitWidth(self: *LoweringContext, instruction_index: u32) ?u16 {
+        const structured_air_v2 = self.structured_air_v2 orelse return null;
+        var bit_width: ?u16 = null;
+        for (structured_air_v2.instructions) |instruction| {
+            for (instruction.operands) |operand| {
+                const operand_index = air_model.typedInstOperandIndex(operand) orelse continue;
+                if (operand_index != instruction_index) continue;
+                if (!std.mem.eql(u8, instruction.opcode, "get_union_tag")) return null;
+                const summary = air_model.typedUnionTagGetSummary(instruction) orelse return null;
+                if (summary.operand_index != instruction_index) return null;
+                if (bit_width) |existing| {
+                    if (existing != summary.bit_width) return null;
+                } else {
+                    bit_width = summary.bit_width;
+                }
+            }
+        }
+        return bit_width;
+    }
+
     pub fn instructionValueUsed(self: *LoweringContext, instruction_index: u32) bool {
         for (self.air_function.instructions) |instruction| {
             if (instruction.index != instruction_index) continue;
