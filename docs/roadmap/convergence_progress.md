@@ -88,6 +88,13 @@ list and the visible record of progress. Evidence summaries under
   not move; enforcement did, by wiring `distribution-all` to
   `distribution-real-rows --strict --limit=1`.
 - [ ] 8. Ratchet to `--limit=10`, green in all three release modes.
+
+  In progress: `docs/evidence/real_rows_limit10_after_enum.summary`
+  records the named-enum type-surface fix, advancing report-mode counters
+  to `5/5/5/0/0` across ReleaseFast, ReleaseSafe, and ReleaseSmall. The
+  next failing real row is
+  `../ziglang/src/main.zig/link.MachO.CodeSignature.Requirements.size` at
+  `typed-lowering`.
 - [ ] 9. Ratchet to `--limit=25`, green. Start the syscall-hello track
   (item 11) in parallel from here.
 - [ ] 10. Phase 1 exit: 100 real functions green through applicable
@@ -159,11 +166,11 @@ summaries.
 
 | Counter | Value | Modes | Evidence | Denominator (candidate hash / selector / pin) |
 | --- | ---: | --- | --- | --- |
-| real_functions_lowered | 1 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_objects_emitted | 1 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_native_linked | 1 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_programs_ok | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_functions_lowered | 5 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit10_after_enum.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_objects_emitted | 5 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit10_after_enum.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_native_linked | 5 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit10_after_enum.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit10_after_enum.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_programs_ok | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_limit10_after_enum.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 | unsupported_functions (ReleaseFast, compiler-core-module) | 55479 | ReleaseFast | `docs/evidence/real_candidates_releasefast_v1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 
 Fixture-frontier counters (`generic_cfg_functions=753`,

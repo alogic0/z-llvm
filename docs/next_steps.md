@@ -39,14 +39,15 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-02 after convergence-progress item 7:
+Stop state recorded 2026-07-02 during convergence-progress item 8:
 
 - Active convergence-progress item: 8, ratchet `distribution-real-rows` to
   `--limit=10` green in all three release modes.
-- First failing real row: `-`.
-- First failing stage: `-`.
-- Current staged `real_*` counters: `real_functions_lowered=1`,
-  `real_objects_emitted=1`, `real_native_linked=1`, `real_executed=0`,
+- First failing real row:
+  `../ziglang/src/main.zig/link.MachO.CodeSignature.Requirements.size`.
+- First failing stage: `typed-lowering`.
+- Current staged `real_*` counters: `real_functions_lowered=5`,
+  `real_objects_emitted=5`, `real_native_linked=5`, `real_executed=0`,
   `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_releasefast_v1.tsv`,
@@ -54,14 +55,16 @@ Stop state recorded 2026-07-02 after convergence-progress item 7:
   `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`,
   selector `real-candidate-selector-v1`, Zig pin
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
-- Saved log path: `tmp/real_rows_strict_limit1.log`.
+- Saved log path: `tmp/real_rows_limit10_after_enum.log`.
 - Tracked evidence summary:
-  `docs/evidence/real_rows_strict_limit1.summary`.
+  `docs/evidence/real_rows_limit10_after_enum.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=1`.
-- Recommended next action: start item 8 discovery with
-  `zig build distribution-real-rows -- --limit=10`, then fix the first
-  reported `first_failing_real_row` and `first_failing_stage` in rank order.
+- Recommended next action: debug
+  `link.MachO.CodeSignature.Requirements.size` with
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=Requirements.size` on
+  `zig build distribution-real-rows -- --limit=10`, then fix the
+  typed-lowering gap.
 
 When the worker stops, record only:
 

@@ -105,6 +105,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
         return .{ .ir_type = .{ .int = bits }, .signed = trimmed[0] == 'i' };
     }
+    if (parseNamedEnumType(trimmed)) |enum_ty| return enum_ty;
     if (parseZigArrayType(trimmed)) |array_ty| return array_ty;
     if (isPointerType(trimmed)) {
         const child_text = pointerChildText(trimmed) orelse return null;
@@ -116,6 +117,11 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         };
     }
     return null;
+}
+
+fn parseNamedEnumType(trimmed: []const u8) ?ZigType {
+    if (std.mem.indexOf(u8, trimmed, "__enum_") == null) return null;
+    return .{ .ir_type = .{ .int = 32 }, .signed = true };
 }
 
 fn parseZigVectorType(trimmed: []const u8) ?ZigType {
@@ -297,6 +303,19 @@ test "parse frontier BigN array-backed byval types generically" {
 
     const parsed = parseZigType("frontier_sysv_sret_byval.Big256") orelse return error.TestExpectedEqual;
     try std.testing.expectEqualStrings("{ [256 x i64] }", parsed.ir_type.aggregate);
+}
+
+test "parse exported named enum type surfaces as C ABI scalars" {
+    const parsed_type = parseZigType("os.linux.SIG__enum_1334") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_type.ir_type);
+    try std.testing.expect(parsed_type.signed);
+
+    const parsed_fn = try parseFunctionType(std.testing.allocator, "fn (os.linux.SIG__enum_1334) callconv(.c) void");
+    defer parsed_fn.deinit(std.testing.allocator);
+    try std.testing.expect(parsed_fn.c_calling_convention);
+    try std.testing.expectEqual(@as(usize, 1), parsed_fn.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_fn.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type.void, parsed_fn.return_type.ir_type);
 }
 
 test "parse array length from typed AIR array and pointer forms" {
