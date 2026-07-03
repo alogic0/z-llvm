@@ -5,8 +5,8 @@ const codegen = @import("codegen.zig");
 const mc = @import("mc.zig");
 const helpers = @import("uncurated_air_gate_helpers.zig");
 
-const selector_version = "real-candidate-selector-v1";
-const default_candidate_path = "docs/evidence/real_candidates_releasefast_v1.tsv";
+const selector_version = "real-candidate-selector-v2";
+const default_candidate_path = "docs/evidence/real_candidates_release_v2.tsv";
 const ziglang_pin_path = "docs/evidence/ziglang_pin.txt";
 const export_cache_dir = "tmp/real_rows_air_export_cache";
 const target_triple = "x86_64-unknown-linux-gnu";

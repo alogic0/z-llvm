@@ -118,7 +118,7 @@ list and the visible record of progress. Evidence summaries under
   a fresh strict `--limit=10` export run with a cached strict `--limit=10`
   run and records `comparison_summary_lines_match=true` plus fresh and
   cached timings for ReleaseFast, ReleaseSafe, and ReleaseSmall.
-- [ ] 9. Ratchet to `--limit=25`, green. Start the syscall-hello track
+- [x] 9. Ratchet to `--limit=25`, green. Start the syscall-hello track
   (item 11) after the strict close (single-worker mode: the tracks run
   sequentially, but every stop report still states both). Fix-cycle rules
   carry over from item 8 unchanged: one fix per commit, no
@@ -131,6 +131,18 @@ list and the visible record of progress. Evidence summaries under
   `debug.SafetyLock.assertUnlocked`; ReleaseSmall rank-1 `air-export`
   recheck — reproduce it once with the cache bypassed to rule the cache
   in or out) and close the strict `--limit=25` ratchet.
+
+  Closed by `docs/evidence/real_rows_strict_limit25_v2.summary`, which
+  confirms selector-v2 ranks 1-25 stay strict-green in ReleaseFast,
+  ReleaseSafe, and ReleaseSmall with counters `25/25/25/0/0`.
+  `docs/evidence/real_candidates_release_v2.summary` records the denominator
+  migration from v1 hash
+  `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`
+  to v2 hash
+  `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`,
+  filtering v1 rows to functions present in all three release-mode AIR
+  exports whose leaf claims hold in all three modes. The syscall-hello track
+  is now open per item 11; no implementation work has started there.
 - [ ] 9a. Cluster discovery (fix-selection method change, effective after
   item 9 closes): run one report-mode discovery at `--limit=200` in
   ReleaseFast, group the failing rows by `first_failing_stage` plus
@@ -222,9 +234,9 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_limit25_after_assertUnlocked_object.summary` |
-| ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_limit25_after_assert_runtime.summary` |
-| ReleaseSmall | 25 | 0 | 0 | 0 | `docs/evidence/real_rows_limit25_releasesmall_fresh_recheck.summary` |
+| ReleaseFast | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
+| ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
+| ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
 ## Cluster Board (item 9a)
 
@@ -263,6 +275,10 @@ One line per completed cycle, append-only, newest last. This is the
   `debug.SafetyLock.assertUnlocked` by model-owned `debug.assert` lowering;
   ReleaseSmall cache-bypassed recheck still fails at AIR export. Recognizer
   count still 1.
+- 2026-07-03 (this commit) Selector-v2 denominator migration filters v1 rows
+  to all-mode-present, all-mode-leaf real functions; strict limit-25 is green
+  in all release modes and `distribution-all` now enforces
+  `distribution-real-rows --strict --limit=25`. Recognizer count still 1.
 
 ## Ratchet State
 
@@ -272,11 +288,11 @@ summaries.
 
 | Counter | Value | Modes | Evidence | Denominator (candidate hash / selector / pin) |
 | --- | ---: | --- | --- | --- |
-| real_functions_lowered | 10 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit10.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_objects_emitted | 10 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit10.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_native_linked | 10 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit10.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit10.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_programs_ok | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit10.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_functions_lowered | 25 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_objects_emitted | 25 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_native_linked | 25 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_programs_ok | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 | unsupported_functions (ReleaseFast, compiler-core-module) | 55479 | ReleaseFast | `docs/evidence/real_candidates_releasefast_v1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 
 Fixture-frontier counters (`generic_cfg_functions=753`,

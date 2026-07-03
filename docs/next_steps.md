@@ -39,41 +39,35 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-03 after the ninth item 9 real-row fix:
+Stop state recorded 2026-07-03 after item 9 strict close:
 
-- Active convergence-progress item: 9. This opens two active tracks:
-  `distribution-real-rows --limit=25` ratchet work and the syscall-hello
-  real-program track from item 11.
-- Real-row track status: ReleaseFast `--limit=25` report mode is green for
-  all 25 ranked rows through typed lowering, x86_64 object emission, and
-  native link. ReleaseSafe `--limit=25` report mode is now also green
-  through native link. ReleaseSmall was rechecked with the cache bypassed and
-  still fails before typed lowering during AIR export.
+- Active convergence-progress items: 9a on the real-row track and 11 on the
+  syscall-hello real-program track. Single-worker mode still applies, but
+  every stop report must state both tracks.
+- Real-row track status: selector-v2 `distribution-real-rows --strict
+  --limit=25` is green in ReleaseFast, ReleaseSafe, and ReleaseSmall through
+  typed lowering, x86_64 object emission, and native link.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
-- First failing stage: `air-export` for
-  `../ziglang/src/main.zig/math.raiseInvalid` in ReleaseSmall.
-- Current staged `real_*` counters for the first failing mode:
-  `real_functions_lowered=0`, `real_objects_emitted=0`,
-  `real_native_linked=0`, `real_executed=0`, `real_programs_ok=0`.
+- First failing real row/stage: none for the enforced limit-25 prefix.
+- Current staged `real_*` counters:
+  `real_functions_lowered=25`, `real_objects_emitted=25`,
+  `real_native_linked=25`, `real_executed=0`, `real_programs_ok=0`.
 - Current candidate denominator:
-  `docs/evidence/real_candidates_releasefast_v1.tsv`,
+  `docs/evidence/real_candidates_release_v2.tsv`,
   hash
-  `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`,
-  selector `real-candidate-selector-v1`, Zig pin
-  `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
+  `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`,
+  selector `real-candidate-selector-v2`, Zig pin
+  `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`. The migration from selector-v1
+  is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
-  `distribution-real-rows --strict --limit=10`.
-- Saved log paths: `tmp/real_rows_limit25_after_assert_runtime.log` and
-  `tmp/real_rows_limit25_releasesmall_fresh_recheck.log`.
-- Tracked evidence summaries:
-  `docs/evidence/real_rows_limit25_after_assert_runtime.summary` and
-  `docs/evidence/real_rows_limit25_releasesmall_fresh_recheck.summary`.
-- Recommended next action: debug the ReleaseSmall AIR export failure. The
-  summary reports rank 1 (`math.raiseInvalid`) because descriptor validation
-  fails before per-row lowering; confirm the missing or corrupt descriptor
-  entry before changing lowering or codegen. Keep the syscall-hello track
-  open in every stop report.
+  `distribution-real-rows --strict --limit=25`.
+- Saved log path: `tmp/real_rows_strict_limit25_v2.log`.
+- Tracked evidence summary:
+  `docs/evidence/real_rows_strict_limit25_v2.summary`.
+- Recommended next action: run the item 9a wide report-mode discovery
+  (`--limit=200`, ReleaseFast), populate the Cluster Board from the resulting
+  clusters, and keep the syscall-hello item 11 track open in the stop report.
 
 When the worker stops, record only:
 
