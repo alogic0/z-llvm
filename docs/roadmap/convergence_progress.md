@@ -156,6 +156,16 @@ list and the visible record of progress. Evidence summaries under
   If real-row fix cycles keep producing recognizer reorders or pre-pass
   special cases, pull this item forward instead of continuing
   recognizer-by-recognizer.
+
+  Design option to evaluate before implementing: upstream Zig's self-hosted
+  x86_64 backend (`../ziglang/src/codegen/x86_64/` — `CodeGen.zig`,
+  `Emit.zig`, `encoder.zig` + `encodings.zon`, `abi.zig`) is MIT-licensed,
+  written in Zig, and already solves instruction encoding tables, selection
+  scaffolding, and register handling. Adapting its encoder/encoding tables
+  and lowering machinery may be far cheaper than building selection from
+  scratch; z_llvm's differentiation stays in the optimizing release path,
+  not in encoder tables. Assess reuse vs. rewrite at this item's
+  architectural review.
 - [ ] 16. ABI-level differential harness: same real function compiled by
   stock LLVM Zig and z_llvm behind a shared input-generating C harness;
   outputs, exit codes, and ReleaseSafe panic behavior compared; runs on
