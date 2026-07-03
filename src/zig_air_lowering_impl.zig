@@ -59,6 +59,7 @@ const TypedValue = air_model.TypedValue;
 const LowerError = air_model.LowerError;
 const TypedBranchMergeResult = air_model.TypedBranchMergeResult;
 const parseFunctionType = air_types.parseFunctionType;
+const stripFunctionTypeQualifiers = air_types.stripFunctionTypeQualifiers;
 const functionReturnTypeText = air_types.functionReturnTypeText;
 const parseZigType = air_types.parseZigType;
 const pointerLoadResultType = air_types.pointerLoadResultType;
@@ -306,7 +307,7 @@ pub fn firstUnsupported(
     function: air_export.Function,
 ) ?Diagnostic {
     const typed_view = air_model.TypedFunctionView.init(function);
-    const function_type = parseFunctionType(allocator, function.type_text) catch {
+    const function_type = parseFunctionTypeForLowering(allocator, function) catch {
         return .{ .function = function.name, .opcode = "function-type", .reason = .function_type };
     };
     defer function_type.deinit(allocator);
@@ -488,6 +489,85 @@ pub fn firstUnsupported(
     return null;
 }
 
+fn parseFunctionTypeForLowering(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+) !FunctionType {
+    return parseFunctionType(allocator, air_function.type_text) catch |err| switch (err) {
+        error.UnsupportedAir => parseFunctionTypeWithUnusedOpaqueParams(allocator, air_function),
+        else => return err,
+    };
+}
+
+fn parseFunctionTypeWithUnusedOpaqueParams(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+) !FunctionType {
+    const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, air_function.type_text, " "));
+    if (!std.mem.startsWith(u8, trimmed, "fn (")) return error.UnsupportedAir;
+    const params_end = findMatching(trimmed, 3, '(', ')') orelse return error.UnsupportedAir;
+    const params_text = trimmed[4..params_end];
+    const suffix = std.mem.trim(u8, trimmed[params_end + 1 ..], " ");
+    const c_calling_convention = std.mem.startsWith(u8, suffix, "callconv(.c)");
+    const non_default_calling_convention = std.mem.startsWith(u8, suffix, "callconv(") and !c_calling_convention;
+    const return_text = functionReturnTypeText(air_function.type_text) orelse return error.UnsupportedAir;
+    const return_type = parseZigType(return_text) orelse return error.UnsupportedAir;
+
+    var params: std.ArrayList(ZigType) = .empty;
+    errdefer params.deinit(allocator);
+    var fields = splitTopLevel(params_text, ',');
+    var param_index: usize = 0;
+    while (fields.next()) |field| {
+        const param_text = std.mem.trim(u8, field, " ");
+        if (param_text.len == 0) continue;
+        const param_type = parseZigType(param_text) orelse blk: {
+            if (!functionParamMaterialized(air_function, param_index) and isOpaqueNominalParamSurface(param_text)) {
+                break :blk ZigType{ .ir_type = .ptr };
+            }
+            return error.UnsupportedAir;
+        };
+        try params.append(allocator, param_type);
+        param_index += 1;
+    }
+    return .{
+        .params = try params.toOwnedSlice(allocator),
+        .return_type = return_type,
+        .c_calling_convention = c_calling_convention,
+        .non_default_calling_convention = non_default_calling_convention,
+    };
+}
+
+fn functionParamMaterialized(function: air_export.Function, param_index: usize) bool {
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "arg")) continue;
+        const arg_index = legacyArgParamIndex(instruction.payload) orelse return true;
+        if (arg_index == param_index) return true;
+    }
+    if (function.structured_air_v2) |structured_air_v2| {
+        for (structured_air_v2.instructions) |instruction| {
+            if (std.mem.eql(u8, instruction.opcode, "arg")) return true;
+        }
+    }
+    return false;
+}
+
+fn legacyArgParamIndex(payload: []const u8) ?usize {
+    var fields = splitTopLevel(payload, ',');
+    _ = fields.next() orelse return null;
+    const index_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+    if (fields.next() != null) return null;
+    return std.fmt.parseInt(usize, index_text, 10) catch null;
+}
+
+fn isOpaqueNominalParamSurface(text: []const u8) bool {
+    if (text.len == 0 or std.mem.indexOfScalar(u8, text, '.') == null) return false;
+    for (text) |char| switch (char) {
+        'a'...'z', 'A'...'Z', '0'...'9', '_', '.' => {},
+        else => return false,
+    };
+    return true;
+}
+
 fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
     _ = function.structured_air orelse return .{
         .function = function.name,
@@ -565,7 +645,7 @@ fn lowerFunction(
     if (errorSwitchShape(air_function)) return lowerErrorSwitch(allocator, air_function);
     if (mixCAddMayPanicShape(air_function)) return lowerMixCAddMayPanic(allocator, module, air_function);
 
-    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    const function_type = try parseFunctionTypeForLowering(allocator, air_function);
     defer function_type.deinit(allocator);
 
     var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
@@ -665,7 +745,7 @@ fn lowerFunctionTypedV2(
     const structured_air_v2 = air_function.structured_air_v2 orelse return error.UnsupportedAir;
     const main_body = structured_air.body(.main, null) orelse return error.UnsupportedAir;
 
-    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    const function_type = try parseFunctionTypeForLowering(allocator, air_function);
     defer function_type.deinit(allocator);
     if (try lowerTypedV2OptionalPayload(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
@@ -848,4 +928,64 @@ fn setTypedV2Fallback(
         .data_kind = data_kind,
         .reason = reason,
     };
+}
+
+test "lowering parser admits unused opaque nominal parameters only" {
+    var ret_inst = [_]air_export.Instruction{.{
+        .index = 0,
+        .indent = 2,
+        .unused = true,
+        .opcode = "ret",
+        .payload = "<u32, 12>",
+        .category = .control_flow,
+    }};
+    const air_function: air_export.Function = .{
+        .name = "pkg.f",
+        .type_text = "fn (pkg.Opaque) u32",
+        .instruction_count = 1,
+        .main_body_count = 1,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = ret_inst[0..],
+    };
+
+    const function_type = try parseFunctionTypeForLowering(std.testing.allocator, air_function);
+    defer function_type.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
+    try std.testing.expectEqual(ir.Type.ptr, function_type.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, function_type.return_type.ir_type);
+}
+
+test "lowering parser rejects materialized opaque nominal parameters" {
+    var arg_inst = [_]air_export.Instruction{.{
+        .index = 0,
+        .indent = 2,
+        .unused = true,
+        .opcode = "arg",
+        .payload = "pkg.Opaque, 0",
+        .category = .other,
+    }};
+    const air_function: air_export.Function = .{
+        .name = "pkg.f",
+        .type_text = "fn (pkg.Opaque) u32",
+        .instruction_count = 1,
+        .main_body_count = 1,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = arg_inst[0..],
+    };
+
+    try std.testing.expectError(
+        error.UnsupportedAir,
+        parseFunctionTypeForLowering(std.testing.allocator, air_function),
+    );
 }

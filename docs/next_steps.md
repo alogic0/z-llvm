@@ -44,10 +44,10 @@ Stop state recorded 2026-07-02 during convergence-progress item 8:
 - Active convergence-progress item: 8, ratchet `distribution-real-rows` to
   `--limit=10` green in all three release modes.
 - First failing real row:
-  `../ziglang/src/main.zig/link.MachO.CodeSignature.Requirements.size`.
+  `../ziglang/src/main.zig/aro.Preprocessor.Macro.Builtin.isVarArgs`.
 - First failing stage: `typed-lowering`.
-- Current staged `real_*` counters: `real_functions_lowered=5`,
-  `real_objects_emitted=5`, `real_native_linked=5`, `real_executed=0`,
+- Current staged `real_*` counters: `real_functions_lowered=9`,
+  `real_objects_emitted=9`, `real_native_linked=9`, `real_executed=0`,
   `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_releasefast_v1.tsv`,
@@ -55,14 +55,14 @@ Stop state recorded 2026-07-02 during convergence-progress item 8:
   `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`,
   selector `real-candidate-selector-v1`, Zig pin
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
-- Saved log path: `tmp/real_rows_limit10_after_enum.log`.
+- Saved log path: `tmp/real_rows_limit10_after_unused_param.log`.
 - Tracked evidence summary:
-  `docs/evidence/real_rows_limit10_after_enum.summary`.
+  `docs/evidence/real_rows_limit10_after_unused_param.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=1`.
 - Recommended next action: debug
-  `link.MachO.CodeSignature.Requirements.size` with
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=Requirements.size` on
+  `aro.Preprocessor.Macro.Builtin.isVarArgs` with
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=isVarArgs` on
   `zig build distribution-real-rows -- --limit=10`, then fix the
   typed-lowering gap.
 
