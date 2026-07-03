@@ -28,6 +28,7 @@ const TypedBranchMergeResult = air_model.TypedBranchMergeResult;
 const parseFunctionType = air_types.parseFunctionType;
 const functionReturnTypeText = air_types.functionReturnTypeText;
 const parseZigType = air_types.parseZigType;
+const isOpaqueNominalTypeSurface = air_types.isOpaqueNominalTypeSurface;
 const pointerLoadResultType = air_types.pointerLoadResultType;
 const isErrorUnionTypeText = air_types.isErrorUnionTypeText;
 const errorUnionPayloadType = air_types.errorUnionPayloadType;
@@ -275,8 +276,10 @@ pub const LoweringContext = struct {
         const param_index = std.fmt.parseInt(usize, std.mem.trim(u8, index_text, " "), 10) catch
             return error.UnsupportedAir;
         if (param_index >= self.function_type.params.len) return error.UnsupportedAir;
-        const parsed_type = parseZigType(std.mem.trim(u8, type_text, " ")) orelse
-            return error.UnsupportedAir;
+        const trimmed_type = std.mem.trim(u8, type_text, " ");
+        const parsed_type = parseZigType(trimmed_type) orelse
+            (self.unusedOpaqueNominalArgType(instruction.index, trimmed_type, param_index) orelse
+                return error.UnsupportedAir);
         if (!parsed_type.ir_type.eql(self.function_type.params[param_index].ir_type)) {
             return error.UnsupportedAir;
         }
@@ -284,6 +287,36 @@ pub const LoweringContext = struct {
             .ty = parsed_type,
             .value = .{ .named = self.blockParamName(param_index) },
         };
+    }
+
+    pub fn unusedOpaqueNominalArgType(
+        self: *LoweringContext,
+        instruction_index: u32,
+        type_text: []const u8,
+        param_index: usize,
+    ) ?ZigType {
+        if (!isOpaqueNominalTypeSurface(type_text)) return null;
+        if (param_index >= self.function_type.params.len) return null;
+        if (!self.function_type.params[param_index].ir_type.eql(ir.Type.ptr)) return null;
+        if (self.instructionValueUsed(instruction_index)) return null;
+        return .{ .ir_type = .ptr };
+    }
+
+    pub fn instructionValueUsed(self: *LoweringContext, instruction_index: u32) bool {
+        for (self.air_function.instructions) |instruction| {
+            if (instruction.index != instruction_index) continue;
+            if (!instruction.unused) return true;
+            break;
+        }
+        if (self.structured_air_v2) |structured_air_v2| {
+            for (structured_air_v2.instructions) |instruction| {
+                for (instruction.operands) |operand| {
+                    const index = air_model.typedInstOperandIndex(operand) orelse continue;
+                    if (index == instruction_index) return true;
+                }
+            }
+        }
+        return false;
     }
 
     fn lowerBinary(self: *LoweringContext, instruction: air_export.Instruction) !void {

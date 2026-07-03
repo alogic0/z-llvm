@@ -1260,9 +1260,9 @@ pub fn lowerSelectedI1ConstReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main.runner_futex_wait")) return false;
+    _ = function;
     if (!ret.ty.eql(.{ .int = 1 })) return false;
-    if (function.params.items.len != 2 or block.instructions.items.len != 0) return false;
+    if (hasLiveInstructions(block)) return false;
     const value = switch (ret.value orelse return error.InvalidRet) {
         .int => |int| int,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -1272,6 +1272,27 @@ pub fn lowerSelectedI1ConstReturn(
     try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(value) });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+test "x86_64 lowers i1 constant return with unused pointer parameter" {
+    const allocator = std.testing.allocator;
+    var function = ir.Function.init("real.const_i1_unused_ptr", .{ .int = 1 });
+    defer function.deinit(allocator);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } } };
+    try function.blocks.append(allocator, block);
+
+    var machine = try lowerFunction(allocator, "x86_64-unknown-linux-gnu", function);
+    defer machine.deinit(allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(i32, 0), switch (machine.instructions.items[0]) {
+        .mov_imm_eax => |value| value,
+        else => return error.TestExpectedEqual,
+    });
+    try std.testing.expectEqual(.ret, machine.instructions.items[1]);
 }
 
 pub fn lowerSelectedStringSliceReturn(

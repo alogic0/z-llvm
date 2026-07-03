@@ -39,15 +39,14 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-02 during convergence-progress item 8:
+Stop state recorded 2026-07-02 after closing convergence-progress item 8:
 
-- Active convergence-progress item: 8, ratchet `distribution-real-rows` to
-  `--limit=10` green in all three release modes.
-- First failing real row:
-  `../ziglang/src/main.zig/aro.Preprocessor.Macro.Builtin.isVarArgs`.
-- First failing stage: `typed-lowering`.
-- Current staged `real_*` counters: `real_functions_lowered=9`,
-  `real_objects_emitted=9`, `real_native_linked=9`, `real_executed=0`,
+- Active convergence-progress item: 9. This opens two active tracks:
+  `distribution-real-rows --limit=25` and the syscall-hello track (item 11).
+- First failing real row: none discovered for item 9 yet.
+- First failing stage: none discovered for item 9 yet.
+- Current staged `real_*` counters: `real_functions_lowered=10`,
+  `real_objects_emitted=10`, `real_native_linked=10`, `real_executed=0`,
   `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_releasefast_v1.tsv`,
@@ -55,16 +54,14 @@ Stop state recorded 2026-07-02 during convergence-progress item 8:
   `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`,
   selector `real-candidate-selector-v1`, Zig pin
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
-- Saved log path: `tmp/real_rows_limit10_after_unused_param.log`.
+- Saved log path: `tmp/real_rows_strict_limit10.log`.
 - Tracked evidence summary:
-  `docs/evidence/real_rows_limit10_after_unused_param.summary`.
+  `docs/evidence/real_rows_strict_limit10.summary`.
 - Enforcement state: `distribution-all` runs
-  `distribution-real-rows --strict --limit=1`.
-- Recommended next action: debug
-  `aro.Preprocessor.Macro.Builtin.isVarArgs` with
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=isVarArgs` on
-  `zig build distribution-real-rows -- --limit=10`, then fix the
-  typed-lowering gap.
+  `distribution-real-rows --strict --limit=10`.
+- Recommended next action: perform a fresh goal-selection pass, then start
+  item 9 discovery with `distribution-real-rows --limit=25` while also
+  opening the syscall-hello track.
 
 When the worker stops, record only:
 

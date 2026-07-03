@@ -124,6 +124,15 @@ fn parseNamedEnumType(trimmed: []const u8) ?ZigType {
     return .{ .ir_type = .{ .int = 32 }, .signed = true };
 }
 
+pub fn isOpaqueNominalTypeSurface(text: []const u8) bool {
+    if (text.len == 0 or std.mem.indexOfScalar(u8, text, '.') == null) return false;
+    for (text) |char| switch (char) {
+        'a'...'z', 'A'...'Z', '0'...'9', '_', '.' => {},
+        else => return false,
+    };
+    return true;
+}
+
 fn parseZigVectorType(trimmed: []const u8) ?ZigType {
     const prefix = "@Vector(";
     if (!std.mem.startsWith(u8, trimmed, prefix) or !std.mem.endsWith(u8, trimmed, ")")) return null;

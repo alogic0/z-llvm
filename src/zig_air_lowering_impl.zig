@@ -62,6 +62,7 @@ const parseFunctionType = air_types.parseFunctionType;
 const stripFunctionTypeQualifiers = air_types.stripFunctionTypeQualifiers;
 const functionReturnTypeText = air_types.functionReturnTypeText;
 const parseZigType = air_types.parseZigType;
+const isOpaqueNominalTypeSurface = air_types.isOpaqueNominalTypeSurface;
 const pointerLoadResultType = air_types.pointerLoadResultType;
 const isErrorUnionTypeText = air_types.isErrorUnionTypeText;
 const errorUnionPayloadType = air_types.errorUnionPayloadType;
@@ -521,7 +522,7 @@ fn parseFunctionTypeWithUnusedOpaqueParams(
         const param_text = std.mem.trim(u8, field, " ");
         if (param_text.len == 0) continue;
         const param_type = parseZigType(param_text) orelse blk: {
-            if (!functionParamMaterialized(air_function, param_index) and isOpaqueNominalParamSurface(param_text)) {
+            if (!functionParamValueUsed(air_function, param_index) and isOpaqueNominalTypeSurface(param_text)) {
                 break :blk ZigType{ .ir_type = .ptr };
             }
             return error.UnsupportedAir;
@@ -537,15 +538,20 @@ fn parseFunctionTypeWithUnusedOpaqueParams(
     };
 }
 
-fn functionParamMaterialized(function: air_export.Function, param_index: usize) bool {
+fn functionParamValueUsed(function: air_export.Function, param_index: usize) bool {
     for (function.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, "arg")) continue;
         const arg_index = legacyArgParamIndex(instruction.payload) orelse return true;
-        if (arg_index == param_index) return true;
+        if (arg_index == param_index and legacyInstructionValueUsed(function, instruction)) return true;
     }
     if (function.structured_air_v2) |structured_air_v2| {
+        var arg_index: usize = 0;
         for (structured_air_v2.instructions) |instruction| {
-            if (std.mem.eql(u8, instruction.opcode, "arg")) return true;
+            if (!std.mem.eql(u8, instruction.opcode, "arg")) continue;
+            if (arg_index == param_index and typedInstructionValueUsed(structured_air_v2, instruction.index)) {
+                return true;
+            }
+            arg_index += 1;
         }
     }
     return false;
@@ -559,13 +565,22 @@ fn legacyArgParamIndex(payload: []const u8) ?usize {
     return std.fmt.parseInt(usize, index_text, 10) catch null;
 }
 
-fn isOpaqueNominalParamSurface(text: []const u8) bool {
-    if (text.len == 0 or std.mem.indexOfScalar(u8, text, '.') == null) return false;
-    for (text) |char| switch (char) {
-        'a'...'z', 'A'...'Z', '0'...'9', '_', '.' => {},
-        else => return false,
-    };
-    return true;
+fn legacyInstructionValueUsed(function: air_export.Function, instruction: air_export.Instruction) bool {
+    if (!instruction.unused) return true;
+    if (function.structured_air_v2) |structured_air_v2| {
+        if (typedInstructionValueUsed(structured_air_v2, instruction.index)) return true;
+    }
+    return false;
+}
+
+fn typedInstructionValueUsed(structured_air_v2: air_export.StructuredAirV2, instruction_index: u32) bool {
+    for (structured_air_v2.instructions) |instruction| {
+        for (instruction.operands) |operand| {
+            const index = air_model.typedInstOperandIndex(operand) orelse continue;
+            if (index == instruction_index) return true;
+        }
+    }
+    return false;
 }
 
 fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
@@ -930,7 +945,7 @@ fn setTypedV2Fallback(
     };
 }
 
-test "lowering parser admits unused opaque nominal parameters only" {
+test "lowering parser admits unused opaque nominal parameters" {
     var ret_inst = [_]air_export.Instruction{.{
         .index = 0,
         .indent = 2,
@@ -961,11 +976,41 @@ test "lowering parser admits unused opaque nominal parameters only" {
     try std.testing.expectEqual(ir.Type{ .int = 32 }, function_type.return_type.ir_type);
 }
 
-test "lowering parser rejects materialized opaque nominal parameters" {
+test "lowering parser admits materialized opaque nominal parameters when their values are unused" {
     var arg_inst = [_]air_export.Instruction{.{
         .index = 0,
         .indent = 2,
         .unused = true,
+        .opcode = "arg",
+        .payload = "pkg.Opaque, 0",
+        .category = .other,
+    }};
+    const air_function: air_export.Function = .{
+        .name = "pkg.f",
+        .type_text = "fn (pkg.Opaque) u32",
+        .instruction_count = 1,
+        .main_body_count = 1,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = null,
+        .instructions = arg_inst[0..],
+    };
+
+    const function_type = try parseFunctionTypeForLowering(std.testing.allocator, air_function);
+    defer function_type.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
+    try std.testing.expectEqual(ir.Type.ptr, function_type.params[0].ir_type);
+}
+
+test "lowering parser rejects used opaque nominal parameters" {
+    var arg_inst = [_]air_export.Instruction{.{
+        .index = 0,
+        .indent = 2,
+        .unused = false,
         .opcode = "arg",
         .payload = "pkg.Opaque, 0",
         .category = .other,
