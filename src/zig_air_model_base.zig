@@ -187,6 +187,14 @@ pub const TypedFunctionView = struct {
         return false;
     }
 
+    pub fn orphanStructuredBlockInstruction(self: TypedFunctionView, instruction_index: u32) bool {
+        const typed_instruction = self.instruction(instruction_index) orelse return false;
+        if (!air_capabilities.isBlockOpcode(typed_instruction.opcode)) return false;
+        const main_body = self.body(.main, null) orelse return false;
+        if (self.containsInstruction(main_body, instruction_index)) return false;
+        return self.body(.block, instruction_index) == null;
+    }
+
     pub fn returnBody(self: TypedFunctionView, structured_body: air_export.StructuredBody) bool {
         const return_index = self.singleSemanticInstruction(structured_body) orelse return false;
         const return_instruction = self.instruction(return_index) orelse return false;

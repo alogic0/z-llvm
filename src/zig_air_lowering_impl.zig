@@ -468,6 +468,7 @@ pub fn firstUnsupported(
         if (isIgnoredOpcode(instruction.opcode) or isStraightLineOpcode(instruction.opcode)) continue;
         if (air_capabilities.isBlockOpcode(instruction.opcode)) {
             if (isSimpleSelectBlock(function, instruction.index)) continue;
+            if (typed_view != null and typed_view.?.orphanStructuredBlockInstruction(instruction.index)) continue;
             if (typed_view != null and typed_view.?.voidGuardBlockByIndex(instruction.index)) continue;
             if (typed_view != null and typed_view.?.errorUnionVoidReturnContinueBlockByIndex(instruction.index)) continue;
             if (typed_view != null and typed_view.?.genericCfgBlock(instruction.index)) continue;
@@ -1174,4 +1175,75 @@ test "lowering parser admits union tag-only opaque nominal signatures" {
     try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
     try std.testing.expectEqual(ir.Type{ .int = 2 }, function_type.params[0].ir_type);
     try std.testing.expectEqual(ir.Type{ .int = 2 }, function_type.return_type.ir_type);
+}
+
+test "first unsupported ignores orphan structured block outside main body" {
+    var main_body_instructions = [_]u32{ 0, 2, 3 };
+    var bodies = [_]air_export.StructuredBody{.{
+        .kind = .main,
+        .owner = null,
+        .instructions = main_body_instructions[0..],
+    }};
+    var structured_instructions = [_]air_export.StructuredInstruction{
+        .{ .index = 0, .opcode = "dbg_stmt", .type_text = "void" },
+        .{ .index = 1, .opcode = "block", .type_text = "block-result" },
+        .{ .index = 2, .opcode = "dbg_stmt", .type_text = "void" },
+        .{ .index = 3, .opcode = "ret", .type_text = "noreturn" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "const", .value = "3", .type_text = "void" },
+    };
+    var ret_details = [_]air_export.TypedDetail{
+        .{ .key = "operand0_text", .value = "@.void_value" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 1, .opcode = "block", .result_type = "block-result", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 2, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 3, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..], .details = ret_details[0..] },
+    };
+    var legacy_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 2, .unused = true, .opcode = "dbg_stmt", .payload = "2:17", .category = .debug },
+        .{ .index = 1, .indent = 2, .unused = true, .opcode = "block", .payload = "", .category = .control_flow },
+        .{ .index = 2, .indent = 2, .unused = true, .opcode = "dbg_stmt", .payload = "2:27", .category = .debug },
+        .{ .index = 3, .indent = 2, .unused = true, .opcode = "ret", .payload = "@.void_value", .category = .return_op },
+    };
+    const air_function: air_export.Function = .{
+        .name = "debug.ConfigurableTrace(2,4,false).dump",
+        .type_text = "fn (debug.ConfigurableTrace(2,4,false)) void",
+        .instruction_count = 4,
+        .main_body_count = 3,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = .{
+            .instructions = structured_instructions[0..],
+            .bodies = bodies[0..],
+            .branches = &.{},
+            .cond_branches = &.{},
+            .repeats = &.{},
+        },
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = legacy_instructions[0..],
+    };
+
+    try std.testing.expectEqual(@as(?Diagnostic, null), firstUnsupported(std.testing.allocator, air_function));
+
+    var air_functions = [_]air_export.Function{air_function};
+    const air_module: air_export.Module = .{
+        .allocator = std.testing.allocator,
+        .storage = "",
+        .producer = "test",
+        .root_source = "main.zig",
+        .wrapper = "main.zig",
+        .mode = "ReleaseFast",
+        .target = "x86_64-unknown-linux-gnu",
+        .globals = &.{},
+        .functions = air_functions[0..],
+    };
+    var result = try lowerCompatible(std.testing.allocator, air_module);
+    defer result.deinit();
+    try std.testing.expectEqual(@as(usize, 1), result.accepted_functions);
+    try std.testing.expectEqual(@as(usize, 0), result.unsupported.len);
 }

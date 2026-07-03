@@ -128,11 +128,18 @@ fn parseNamedEnumType(trimmed: []const u8) ?ZigType {
 
 pub fn isOpaqueNominalTypeSurface(text: []const u8) bool {
     if (text.len == 0 or std.mem.indexOfScalar(u8, text, '.') == null) return false;
+    var paren_depth: usize = 0;
     for (text) |char| switch (char) {
         'a'...'z', 'A'...'Z', '0'...'9', '_', '.' => {},
+        '(' => paren_depth += 1,
+        ')' => {
+            if (paren_depth == 0) return false;
+            paren_depth -= 1;
+        },
+        ',', ' ' => if (paren_depth == 0) return false,
         else => return false,
     };
-    return true;
+    return paren_depth == 0;
 }
 
 fn parseZigVectorType(trimmed: []const u8) ?ZigType {
@@ -338,6 +345,12 @@ test "parse fact-owned named enum type surfaces" {
     try std.testing.expectEqual(@as(usize, 1), parsed_fn.params.len);
     try std.testing.expectEqual(ir.Type.ptr, parsed_fn.params[0].ir_type);
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_fn.params[0].pointer_child.?);
+}
+
+test "opaque nominal type surface accepts comptime argument instantiations" {
+    try std.testing.expect(isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2,4,false)"));
+    try std.testing.expect(!isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2 + 4)"));
+    try std.testing.expect(!isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2,4,false"));
 }
 
 test "parse array length from typed AIR array and pointer forms" {
