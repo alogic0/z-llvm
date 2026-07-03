@@ -39,19 +39,20 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-03 after the first item 9 real-row fix:
+Stop state recorded 2026-07-03 after the second item 9 real-row fix:
 
 - Active convergence-progress item: 9. This opens two active tracks:
   `distribution-real-rows --limit=25` ratchet work and the syscall-hello
   real-program track from item 11.
 - Real-row track status: ReleaseFast `--limit=25` report mode now clears
   `../ziglang/src/main.zig/codegen.aarch64.legalizeFeatures` through object
-  emission and native link. The first failing row advanced to
-  `../ziglang/src/main.zig/Io.Event.reset`.
+  emission and native link, and clears
+  `../ziglang/src/main.zig/Io.Event.reset` through typed lowering. The first
+  failing row remains `../ziglang/src/main.zig/Io.Event.reset`.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
-- First failing stage: `typed-lowering`.
-- Current staged `real_*` counters: `real_functions_lowered=22`,
+- First failing stage: `object-emission`.
+- Current staged `real_*` counters: `real_functions_lowered=23`,
   `real_objects_emitted=22`, `real_native_linked=22`, `real_executed=0`,
   `real_programs_ok=0`.
 - Current candidate denominator:
@@ -62,12 +63,12 @@ Stop state recorded 2026-07-03 after the first item 9 real-row fix:
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=10`.
-- Saved log path: `tmp/real_rows_limit25_after_legalizeFeatures.log`.
+- Saved log path: `tmp/real_rows_limit25_after_Io_Event_reset.log`.
 - Tracked evidence summary:
-  `docs/evidence/real_rows_limit25_after_legalizeFeatures.summary`.
-- Recommended next action: debug `Io.Event.reset` with
+  `docs/evidence/real_rows_limit25_after_Io_Event_reset.summary`.
+- Recommended next action: debug `Io.Event.reset` object emission with
   `ZLLVM_DEBUG_DUMP_IR_SOURCE=reset zig build distribution-real-rows -- --mode=ReleaseFast --limit=25`,
-  fix the `typed-lowering` failure through the normal ownership chain, and
+  fix the `object-emission` failure through the normal ownership chain, and
   keep the syscall-hello track open in the stop report.
 
 When the worker stops, record only:

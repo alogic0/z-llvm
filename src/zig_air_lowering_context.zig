@@ -153,6 +153,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedLoadFromSliceLenPtr = typed_memory.lowerTypedLoadFromSliceLenPtr;
     pub const lowerTypedLoadFromSlicePtrPtr = typed_memory.lowerTypedLoadFromSlicePtrPtr;
     pub const lowerTypedStore = typed_memory.lowerTypedStore;
+    pub const lowerTypedAtomicStoreMonotonic = typed_memory.lowerTypedAtomicStoreMonotonic;
     pub const lowerTypedStoreToSyntheticErrorUnionSlot = typed_memory.lowerTypedStoreToSyntheticErrorUnionSlot;
     pub const lowerTypedStoreToSyntheticVectorSlot = typed_memory.lowerTypedStoreToSyntheticVectorSlot;
     pub const lowerTypedStoreToSyntheticVectorElement = typed_memory.lowerTypedStoreToSyntheticVectorElement;

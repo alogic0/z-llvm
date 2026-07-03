@@ -1,6 +1,7 @@
 const std = @import("std");
 const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
+const enum_facts = @import("zig_air_enum_facts.zig");
 const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const ir = @import("ir.zig");
 const type_layout = @import("zig_air_type_layout.zig");
@@ -92,6 +93,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .int = 16 } };
     }
     if (parseAnonymousStructType(trimmed)) |struct_ty| return struct_ty;
+    if (enum_facts.lookup(trimmed)) |fact| return .{ .ir_type = fact.backing_type, .signed = fact.signed };
     if (trimmed.len > 1 and trimmed[0] == '?') {
         const child = parseZigType(trimmed[1..]) orelse return null;
         if (child.ir_type == .int and (child.ir_type.int == 32 or child.ir_type.int == 64)) return child;
@@ -325,6 +327,17 @@ test "parse exported named enum type surfaces as C ABI scalars" {
     try std.testing.expectEqual(@as(usize, 1), parsed_fn.params.len);
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_fn.params[0].ir_type);
     try std.testing.expectEqual(ir.Type.void, parsed_fn.return_type.ir_type);
+}
+
+test "parse fact-owned named enum type surfaces" {
+    const parsed_type = parseZigType("Io.Event") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_type.ir_type);
+
+    const parsed_fn = try parseFunctionType(std.testing.allocator, "fn (*Io.Event) void");
+    defer parsed_fn.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 1), parsed_fn.params.len);
+    try std.testing.expectEqual(ir.Type.ptr, parsed_fn.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_fn.params[0].pointer_child.?);
 }
 
 test "parse array length from typed AIR array and pointer forms" {

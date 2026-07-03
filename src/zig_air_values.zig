@@ -1,5 +1,6 @@
 const std = @import("std");
 const air_model = @import("zig_air_model.zig");
+const enum_facts = @import("zig_air_enum_facts.zig");
 const air_semantics = @import("zig_air_semantics.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
@@ -22,6 +23,10 @@ pub fn parseConstant(text: []const u8) ?TypedValue {
         if (std.mem.eql(u8, value_text, "null")) return .{
             .ty = ty,
             .value = if (ty.ir_type == .ptr) .null_value else .{ .int = 0 },
+        };
+        if (enum_facts.enumeratorValue(type_text, value_text)) |code| return .{
+            .ty = ty,
+            .value = .{ .int = code },
         };
         if (errorSetConstantCode(type_text, value_text)) |code| return .{
             .ty = ty,
@@ -185,6 +190,9 @@ test "parse static AIR constants" {
     try std.testing.expectEqual(@as(i128, 42), parsed.value.int);
     const error_union_void = parseConstant("<error{Bad}!void, {}>") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(@as(i128, 0), error_union_void.value.int);
+    const enum_literal = parseConstant("<Io.Event, .unset>") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, enum_literal.ty.ir_type);
+    try std.testing.expectEqual(@as(i128, 0), enum_literal.value.int);
 }
 
 test "parse symbol pointers" {

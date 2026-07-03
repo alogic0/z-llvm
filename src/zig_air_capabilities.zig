@@ -379,7 +379,12 @@ pub fn scalarSemanticOpForOpcode(opcode: []const u8) ScalarSemanticOp {
 pub fn memorySemanticOpForOpcode(opcode: []const u8) MemorySemanticOp {
     if (std.mem.eql(u8, opcode, "alloc")) return .alloc;
     if (std.mem.eql(u8, opcode, "load")) return .load;
-    if (std.mem.eql(u8, opcode, "store") or std.mem.eql(u8, opcode, "store_safe")) return .store;
+    if (std.mem.eql(u8, opcode, "store") or
+        std.mem.eql(u8, opcode, "store_safe") or
+        std.mem.eql(u8, opcode, "atomic_store_monotonic"))
+    {
+        return .store;
+    }
     return .none;
 }
 
@@ -987,6 +992,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(MemorySemanticOp.load, memorySemanticOpForOpcode("load"));
     try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("store"));
     try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("store_safe"));
+    try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("atomic_store_monotonic"));
+    try std.testing.expect(typedV2CanLower(opcodeCapability("atomic_store_monotonic")));
     try std.testing.expectEqual(SemanticDomain.optional, semanticDomainForOpcode("optional_payload"));
     try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null"));
     try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null_ptr"));
