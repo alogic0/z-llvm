@@ -39,16 +39,19 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-03 after closing convergence-progress item 8a:
+Stop state recorded 2026-07-03 after opening convergence-progress item 9:
 
 - Active convergence-progress item: 9. This opens two active tracks:
   `distribution-real-rows --limit=25` discovery and the syscall-hello
   real-program track from item 11.
-- First failing real row: none discovered for item 9 yet; run the
-  ReleaseFast `--limit=25` discovery next.
-- First failing stage: none discovered for item 9 yet.
-- Current staged `real_*` counters: `real_functions_lowered=10`,
-  `real_objects_emitted=10`, `real_native_linked=10`, `real_executed=0`,
+- Real-row track status: ReleaseFast `--limit=25` report-mode discovery
+  found first failing row
+  `../ziglang/src/main.zig/codegen.aarch64.legalizeFeatures`.
+- Syscall-hello track status: opened by item 9; no implementation work
+  started yet.
+- First failing stage: `object-emission`.
+- Current staged `real_*` counters: `real_functions_lowered=22`,
+  `real_objects_emitted=20`, `real_native_linked=20`, `real_executed=0`,
   `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_releasefast_v1.tsv`,
@@ -56,15 +59,16 @@ Stop state recorded 2026-07-03 after closing convergence-progress item 8a:
   `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`,
   selector `real-candidate-selector-v1`, Zig pin
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
-- Saved log path: `tmp/real_rows_strict_limit10.log`.
+- Saved log path: `tmp/real_rows_limit25_releasefast_discovery.log`.
 - Tracked evidence summary:
-  `docs/evidence/real_rows_export_cache.summary`.
+  `docs/evidence/real_rows_limit25_releasefast_discovery.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=10`.
-- Recommended next action: fresh goal-selection pass for item 9, then run
-  `distribution-real-rows --mode=ReleaseFast --limit=25` in report mode to
-  find the first failing real row while opening the item 11 syscall-hello
-  track.
+- Recommended next action: debug
+  `codegen.aarch64.legalizeFeatures` with
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=legalizeFeatures zig build distribution-real-rows -- --mode=ReleaseFast --limit=25`,
+  fix the `object-emission` failure through the normal ownership chain, and
+  keep the syscall-hello track open in the stop report.
 
 When the worker stops, record only:
 
