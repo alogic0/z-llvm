@@ -374,9 +374,18 @@ pub fn genericCfgSupportsSingleBlockLoad(function: ir.Function, load: ir.LoadIns
 }
 
 pub fn genericCfgSupportsSingleBlockStore(function: ir.Function, block: ir.BasicBlock, store: ir.StoreInst) bool {
-    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
+    if (!store.ty.eql(.{ .int = 32 }) or !genericCfgSupportsSingleBlockI32StoreAttrs(store.attrs)) return false;
     if (genericCfgI32Address(function, store.ptr) == null) return false;
     return genericCfgSupportsSingleBlockI32Value(function, block, store.value);
+}
+
+fn genericCfgSupportsSingleBlockI32StoreAttrs(attrs: ir.MemoryAttrs) bool {
+    if (attrs.is_volatile or attrs.syncscope != null) return false;
+    if (attrs.@"align") |alignment| {
+        if (alignment < 4) return false;
+    }
+    if (attrs.atomic_ordering) |ordering| return std.mem.eql(u8, ordering, "monotonic");
+    return true;
 }
 
 pub fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock, result: ?[]const u8, call: ir.CallInst) bool {
