@@ -39,10 +39,10 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-02 after convergence-progress item 6:
+Stop state recorded 2026-07-02 after convergence-progress item 7:
 
-- Active convergence-progress item: 7, first real compiler-core function
-  green through its applicable stages in all three release modes.
+- Active convergence-progress item: 8, ratchet `distribution-real-rows` to
+  `--limit=10` green in all three release modes.
 - First failing real row: `-`.
 - First failing stage: `-`.
 - Current staged `real_*` counters: `real_functions_lowered=1`,
@@ -54,12 +54,14 @@ Stop state recorded 2026-07-02 after convergence-progress item 6:
   `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`,
   selector `real-candidate-selector-v1`, Zig pin
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
-- Saved log path: `tmp/real_rows_limit1.log`.
-- Tracked evidence summary: `docs/evidence/real_rows_limit1.summary`.
-- Recommended next action: validate and close item 7 with
-  `zig build distribution-real-rows -- --strict --limit=1`; if it stays
-  green in all three modes, switch strict mode on in `distribution-all` and
-  proceed to item 8 (`--limit=10`).
+- Saved log path: `tmp/real_rows_strict_limit1.log`.
+- Tracked evidence summary:
+  `docs/evidence/real_rows_strict_limit1.summary`.
+- Enforcement state: `distribution-all` runs
+  `distribution-real-rows --strict --limit=1`.
+- Recommended next action: start item 8 discovery with
+  `zig build distribution-real-rows -- --limit=10`, then fix the first
+  reported `first_failing_real_row` and `first_failing_stage` in rank order.
 
 When the worker stops, record only:
 

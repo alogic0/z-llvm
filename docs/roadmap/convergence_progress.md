@@ -78,9 +78,15 @@ list and the visible record of progress. Evidence summaries under
   x86_64 object emission, and native link in ReleaseFast, ReleaseSafe, and
   ReleaseSmall. Execution is skipped for this row because the candidate is
   marked `assumed_nondeterministic`.
-- [ ] 7. First real compiler-core function green through its applicable
+- [x] 7. First real compiler-core function green through its applicable
   stages in all three release modes (expect multiple fix cycles; each fix
   cycle is its own commit, this box closes on the first green run).
+
+  Closed by `docs/evidence/real_rows_strict_limit1.summary`, which confirms
+  the rank-1 real row stays strict-green in ReleaseFast, ReleaseSafe, and
+  ReleaseSmall with counters unchanged at `1/1/1/0/0`. The ratchet value did
+  not move; enforcement did, by wiring `distribution-all` to
+  `distribution-real-rows --strict --limit=1`.
 - [ ] 8. Ratchet to `--limit=10`, green in all three release modes.
 - [ ] 9. Ratchet to `--limit=25`, green. Start the syscall-hello track
   (item 11) in parallel from here.
