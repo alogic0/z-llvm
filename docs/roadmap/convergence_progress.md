@@ -95,7 +95,7 @@ list and the visible record of progress. Evidence summaries under
   object emission, and native link; `real_executed` and `real_programs_ok`
   remain 0 because the v1 candidates are still marked
   `assumed_nondeterministic`.
-- [ ] 8a. Gate-run AIR export cache (infrastructure, do before item 9):
+- [x] 8a. Gate-run AIR export cache (infrastructure, do before item 9):
   cache the exported real-module AIR keyed on ziglang pin
   (`docs/evidence/ziglang_pin.txt`), exporter-relevant z_llvm state, mode,
   and slice; `distribution-real-rows` reuses cache hits instead of
@@ -108,6 +108,11 @@ list and the visible record of progress. Evidence summaries under
   `--limit=10` each fix cycle spent hours re-exporting; at 25 and 100 the
   export dominates wall-clock entirely. While iterating on fixes, run
   single-mode (ReleaseFast) gates; all three modes at cycle close only.
+
+  Closed by `docs/evidence/real_rows_export_cache.summary`, which compares
+  a fresh strict `--limit=10` export run with a cached strict `--limit=10`
+  run and records `comparison_summary_lines_match=true` plus fresh and
+  cached timings for ReleaseFast, ReleaseSafe, and ReleaseSmall.
 - [ ] 9. Ratchet to `--limit=25`, green. Start the syscall-hello track
   (item 11) in parallel from here. Fix-cycle rules carry over from item 8
   unchanged: rank-order fixes, one fix per commit, no source/function-name

@@ -7,6 +7,8 @@ const helpers = @import("uncurated_air_gate_helpers.zig");
 
 const selector_version = "real-candidate-selector-v1";
 const default_candidate_path = "docs/evidence/real_candidates_releasefast_v1.tsv";
+const ziglang_pin_path = "docs/evidence/ziglang_pin.txt";
+const export_cache_dir = "tmp/real_rows_air_export_cache";
 const target_triple = "x86_64-unknown-linux-gnu";
 const Mode = helpers.Mode;
 
@@ -37,6 +39,8 @@ const Options = struct {
     limit: usize = 1,
     strict: bool = false,
     candidate_path: []const u8 = default_candidate_path,
+    mode: ?Mode = null,
+    fresh_export: bool = false,
 };
 
 const Candidate = struct {
@@ -91,7 +95,10 @@ pub fn main(init: std.process.Init) !void {
     const modes = [_]Mode{ .ReleaseFast, .ReleaseSafe, .ReleaseSmall };
     var any_failure = false;
     for (modes) |mode| {
-        var counters = try runMode(allocator, io, init, mode, options, candidates.items, &candidate_hash);
+        if (options.mode) |selected| {
+            if (mode != selected) continue;
+        }
+        var counters = try runMode(allocator, io, init, &stdout_writer.interface, mode, options, candidates.items, &candidate_hash);
         defer {
             if (counters.first_failing_real_row) |value| allocator.free(value);
             if (counters.first_failing_stage) |value| allocator.free(value);
@@ -113,8 +120,12 @@ fn parseOptions(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--strict")) {
             options.strict = true;
+        } else if (std.mem.eql(u8, arg, "--fresh-export")) {
+            options.fresh_export = true;
         } else if (std.mem.startsWith(u8, arg, "--limit=")) {
             options.limit = try std.fmt.parseUnsigned(usize, arg["--limit=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--mode=")) {
+            options.mode = try parseMode(io, arg["--mode=".len..]);
         } else if (std.mem.startsWith(u8, arg, "--candidate-file=")) {
             options.candidate_path = arg["--candidate-file=".len..];
         } else {
@@ -123,6 +134,13 @@ fn parseOptions(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init
     }
     if (options.limit == 0) try validationError(io, "--limit must be greater than zero\n", .{});
     return options;
+}
+
+fn parseMode(io: std.Io, text: []const u8) !Mode {
+    if (std.mem.eql(u8, text, "ReleaseFast")) return .ReleaseFast;
+    if (std.mem.eql(u8, text, "ReleaseSafe")) return .ReleaseSafe;
+    if (std.mem.eql(u8, text, "ReleaseSmall")) return .ReleaseSmall;
+    try validationError(io, "unsupported --mode={s}; expected ReleaseFast, ReleaseSafe, or ReleaseSmall\n", .{text});
 }
 
 fn parseCandidates(allocator: std.mem.Allocator, contents: []const u8, limit: usize) !std.ArrayList(Candidate) {
@@ -178,6 +196,7 @@ fn runMode(
     allocator: std.mem.Allocator,
     io: std.Io,
     init: std.process.Init,
+    stdout: *std.Io.Writer,
     mode: Mode,
     options: Options,
     candidates: []const Candidate,
@@ -198,6 +217,74 @@ fn runMode(
     const zig_emitter = try readStage4Emitter(allocator, io, init);
     defer allocator.free(zig_emitter);
 
+    const descriptor = try loadOrExportDescriptor(
+        allocator,
+        io,
+        init,
+        stdout,
+        mode,
+        options,
+        candidates,
+        candidate_hash,
+        descriptor_path,
+        zig_cache_path,
+        zig_emitter,
+    ) orelse {
+        for (candidates) |candidate| try setFirstFailure(allocator, &counters, candidate, "air-export");
+        return counters;
+    };
+    defer allocator.free(descriptor);
+    for (candidates) |candidate| {
+        try runCandidate(allocator, io, init, mode, temp, descriptor, candidate, candidate_hash, &counters, zig_emitter);
+    }
+    return counters;
+}
+
+fn loadOrExportDescriptor(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    init: std.process.Init,
+    stdout: *std.Io.Writer,
+    mode: Mode,
+    options: Options,
+    candidates: []const Candidate,
+    candidate_hash: *const [64]u8,
+    descriptor_path: []const u8,
+    zig_cache_path: []const u8,
+    zig_emitter: []const u8,
+) !?[]u8 {
+    const ziglang_pin = try readZiglangPin(allocator, io);
+    defer allocator.free(ziglang_pin);
+    const stage4_version = try readStage4Version(allocator, io, zig_emitter);
+    defer allocator.free(stage4_version);
+    const z_llvm_export_state = try exporterRelevantStateHash(allocator, io);
+    const slice_hash = candidateSliceHash(candidates);
+    const cache_key_text = try std.fmt.allocPrint(
+        allocator,
+        "schema=1\nziglang_pin={s}\nstage4_version={s}\nz_llvm_export_state={s}\nmode={s}\nselector_version={s}\ncandidate_file_hash={s}\nlimit={}\nslice_hash={s}\n",
+        .{
+            ziglang_pin,
+            stage4_version,
+            &z_llvm_export_state,
+            mode.name(),
+            selector_version,
+            candidate_hash,
+            options.limit,
+            &slice_hash,
+        },
+    );
+    defer allocator.free(cache_key_text);
+    const cache_key = sha256Hex(cache_key_text);
+
+    if (!options.fresh_export) {
+        const cache_start = std.Io.Timestamp.now(io, .awake);
+        if (try loadCachedDescriptor(allocator, io, &cache_key, cache_key_text, mode, candidates)) |descriptor| {
+            try printCacheEvent(stdout, mode, "hit", elapsedMs(io, cache_start), &cache_key, descriptor.len);
+            return descriptor;
+        }
+    }
+
+    const export_start = std.Io.Timestamp.now(io, .awake);
     var env_map = try helpers.cloneEnvironment(allocator, init.environ_map);
     defer env_map.deinit();
     try env_map.put("ZLLVM_AIR_EXPORT_PATH", descriptor_path);
@@ -225,17 +312,245 @@ fn runMode(
         allocator.free(build_result.stdout);
         allocator.free(build_result.stderr);
     }
+    const duration_ms = elapsedMs(io, export_start);
     if (!helpers.termOk(build_result.term)) {
-        for (candidates) |candidate| try setFirstFailure(allocator, &counters, candidate, "air-export");
-        return counters;
+        try printCacheEvent(stdout, mode, "export-failed", duration_ms, &cache_key, 0);
+        return null;
     }
 
     const descriptor = try std.Io.Dir.cwd().readFileAlloc(io, descriptor_path, allocator, .limited(2 * 1024 * 1024 * 1024));
-    defer allocator.free(descriptor);
-    for (candidates) |candidate| {
-        try runCandidate(allocator, io, init, mode, temp, descriptor, candidate, candidate_hash, &counters, zig_emitter);
+    errdefer allocator.free(descriptor);
+    if (!try descriptorLooksValid(allocator, descriptor, mode, candidates)) {
+        try printCacheEvent(stdout, mode, "export-invalid", duration_ms, &cache_key, descriptor.len);
+        return null;
     }
-    return counters;
+    try storeCachedDescriptor(allocator, io, &cache_key, cache_key_text, descriptor);
+    try printCacheEvent(stdout, mode, if (options.fresh_export) "fresh-export" else "miss-export", duration_ms, &cache_key, descriptor.len);
+    return descriptor;
+}
+
+fn loadCachedDescriptor(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    cache_key: *const [64]u8,
+    cache_key_text: []const u8,
+    mode: Mode,
+    candidates: []const Candidate,
+) !?[]u8 {
+    const meta_path = try cachePath(allocator, cache_key, ".meta");
+    defer allocator.free(meta_path);
+    const descriptor_path = try cachePath(allocator, cache_key, ".air");
+    defer allocator.free(descriptor_path);
+
+    const meta = std.Io.Dir.cwd().readFileAlloc(io, meta_path, allocator, .limited(64 * 1024)) catch return null;
+    defer allocator.free(meta);
+    if (!metadataMatches(meta, cache_key, cache_key_text)) return null;
+
+    const descriptor = std.Io.Dir.cwd().readFileAlloc(io, descriptor_path, allocator, .limited(2 * 1024 * 1024 * 1024)) catch return null;
+    errdefer allocator.free(descriptor);
+    const expected_hash = metadataValue(meta, "descriptor_sha256") orelse return null;
+    const actual_hash = sha256Hex(descriptor);
+    if (!std.mem.eql(u8, expected_hash, &actual_hash)) return null;
+    if (!try descriptorLooksValid(allocator, descriptor, mode, candidates)) return null;
+    return descriptor;
+}
+
+fn storeCachedDescriptor(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    cache_key: *const [64]u8,
+    cache_key_text: []const u8,
+    descriptor: []const u8,
+) !void {
+    var cwd = std.Io.Dir.cwd();
+    try cwd.createDirPath(io, export_cache_dir);
+    const descriptor_path = try cachePath(allocator, cache_key, ".air");
+    defer allocator.free(descriptor_path);
+    const meta_path = try cachePath(allocator, cache_key, ".meta");
+    defer allocator.free(meta_path);
+
+    const descriptor_hash = sha256Hex(descriptor);
+    const meta = try std.fmt.allocPrint(
+        allocator,
+        "schema=1\ncache_key={s}\ndescriptor_sha256={s}\nkey_begin\n{s}key_end\n",
+        .{ cache_key, &descriptor_hash, cache_key_text },
+    );
+    defer allocator.free(meta);
+    try cwd.writeFile(io, .{ .sub_path = descriptor_path, .data = descriptor });
+    try cwd.writeFile(io, .{ .sub_path = meta_path, .data = meta });
+}
+
+fn metadataMatches(meta: []const u8, cache_key: *const [64]u8, cache_key_text: []const u8) bool {
+    const schema = metadataValue(meta, "schema") orelse return false;
+    if (!std.mem.eql(u8, schema, "1")) return false;
+    const stored_key = metadataValue(meta, "cache_key") orelse return false;
+    if (!std.mem.eql(u8, stored_key, cache_key)) return false;
+    const key_begin = std.mem.indexOf(u8, meta, "key_begin\n") orelse return false;
+    const key_start = key_begin + "key_begin\n".len;
+    const key_end = std.mem.indexOfPos(u8, meta, key_start, "key_end\n") orelse return false;
+    return std.mem.eql(u8, meta[key_start..key_end], cache_key_text);
+}
+
+fn metadataValue(meta: []const u8, key: []const u8) ?[]const u8 {
+    var line_iter = std.mem.splitScalar(u8, meta, '\n');
+    while (line_iter.next()) |raw_line| {
+        const line = std.mem.trimEnd(u8, raw_line, "\r");
+        if (line.len <= key.len or line[key.len] != '=') continue;
+        if (std.mem.eql(u8, line[0..key.len], key)) return line[key.len + 1 ..];
+    }
+    return null;
+}
+
+fn cachePath(allocator: std.mem.Allocator, cache_key: *const [64]u8, suffix: []const u8) ![]const u8 {
+    return std.fmt.allocPrint(allocator, "{s}/{s}{s}", .{ export_cache_dir, cache_key, suffix });
+}
+
+fn descriptorLooksValid(
+    allocator: std.mem.Allocator,
+    descriptor: []const u8,
+    mode: Mode,
+    candidates: []const Candidate,
+) !bool {
+    if (!descriptorHeaderLineEquals(descriptor, "mode", mode.name())) return false;
+    if (std.mem.indexOf(u8, descriptor, "\nfunction_count=") == null) return false;
+    return try descriptorContainsAllFunctions(allocator, descriptor, candidates);
+}
+
+fn descriptorHeaderLineEquals(descriptor: []const u8, key: []const u8, expected: []const u8) bool {
+    var line_start: usize = 0;
+    while (line_start < descriptor.len) {
+        const line_end = std.mem.indexOfScalarPos(u8, descriptor, line_start, '\n') orelse descriptor.len;
+        const line = std.mem.trimEnd(u8, descriptor[line_start..line_end], "\r");
+        if (std.mem.startsWith(u8, line, "function_count=")) return false;
+        if (line.len > key.len and std.mem.eql(u8, line[0..key.len], key) and line[key.len] == '=') {
+            return std.mem.eql(u8, line[key.len + 1 ..], expected);
+        }
+        if (line_end == descriptor.len) break;
+        line_start = line_end + 1;
+    }
+    return false;
+}
+
+fn descriptorContainsAllFunctions(
+    allocator: std.mem.Allocator,
+    descriptor: []const u8,
+    candidates: []const Candidate,
+) !bool {
+    if (candidates.len == 0) return true;
+    const found = try allocator.alloc(bool, candidates.len);
+    defer allocator.free(found);
+    @memset(found, false);
+    var found_count: usize = 0;
+    var search_start: usize = 0;
+    while (std.mem.indexOfPos(u8, descriptor, search_start, "function_begin\n")) |frame_start| {
+        const name_line_start = frame_start + "function_begin\n".len;
+        const name_line_end = std.mem.indexOfScalarPos(u8, descriptor, name_line_start, '\n') orelse return false;
+        const name_len = parseValueLine(usize, descriptor[name_line_start..name_line_end], "name_bytes") catch return false;
+        const name_start = name_line_end + 1;
+        const name_end = name_start + name_len;
+        if (name_end >= descriptor.len) return false;
+        const name = descriptor[name_start..name_end];
+        const frame_marker_start = std.mem.indexOfPos(u8, descriptor, name_end, "\nfunction_end\n") orelse return false;
+        const frame_end = frame_marker_start + "\nfunction_end\n".len;
+        for (candidates, 0..) |candidate, index| {
+            if (!found[index] and std.mem.eql(u8, name, candidate.function)) {
+                found[index] = true;
+                found_count += 1;
+                if (found_count == candidates.len) return true;
+                break;
+            }
+        }
+        search_start = frame_end;
+    }
+    return found_count == candidates.len;
+}
+
+fn readZiglangPin(allocator: std.mem.Allocator, io: std.Io) ![]const u8 {
+    const pin_contents = try std.Io.Dir.cwd().readFileAlloc(io, ziglang_pin_path, allocator, .limited(4096));
+    defer allocator.free(pin_contents);
+    return try allocator.dupe(u8, std.mem.trim(u8, pin_contents, " \t\r\n"));
+}
+
+fn readStage4Version(allocator: std.mem.Allocator, io: std.Io, zig_emitter: []const u8) ![]const u8 {
+    const argv = [_][]const u8{ zig_emitter, "version" };
+    const result = try std.process.run(allocator, io, .{
+        .argv = &argv,
+        .stdout_limit = .limited(1024 * 1024),
+        .stderr_limit = .limited(1024 * 1024),
+    });
+    defer {
+        allocator.free(result.stdout);
+        allocator.free(result.stderr);
+    }
+    if (!helpers.termOk(result.term)) return error.Stage4VersionFailed;
+    return try allocator.dupe(u8, std.mem.trim(u8, result.stdout, " \t\r\n"));
+}
+
+fn exporterRelevantStateHash(allocator: std.mem.Allocator, io: std.Io) ![64]u8 {
+    const files = [_][]const u8{
+        "src/distribution_real_rows_gate.zig",
+        "src/zig_air_export.zig",
+        "docs/evidence/ziglang_pin.txt",
+    };
+    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    for (files) |path| {
+        hasher.update(path);
+        hasher.update("\n");
+        const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(32 * 1024 * 1024));
+        defer allocator.free(contents);
+        hasher.update(contents);
+        hasher.update("\n");
+    }
+    var digest: [32]u8 = undefined;
+    hasher.final(&digest);
+    return std.fmt.bytesToHex(digest, .lower);
+}
+
+fn candidateSliceHash(candidates: []const Candidate) [64]u8 {
+    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    for (candidates) |candidate| {
+        hashNumber(&hasher, candidate.rank);
+        hasher.update("\t");
+        hasher.update(candidate.source);
+        hasher.update("\t");
+        hasher.update(candidate.function);
+        hasher.update("\n");
+    }
+    var digest: [32]u8 = undefined;
+    hasher.final(&digest);
+    return std.fmt.bytesToHex(digest, .lower);
+}
+
+fn hashNumber(hasher: *std.crypto.hash.sha2.Sha256, value: usize) void {
+    var buffer: [32]u8 = undefined;
+    const text = std.fmt.bufPrint(&buffer, "{}", .{value}) catch unreachable;
+    hasher.update(text);
+}
+
+fn sha256Hex(contents: []const u8) [64]u8 {
+    var digest: [32]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(contents, &digest, .{});
+    return std.fmt.bytesToHex(digest, .lower);
+}
+
+fn elapsedMs(io: std.Io, start: std.Io.Timestamp) i96 {
+    const end = std.Io.Timestamp.now(io, .awake);
+    return @divTrunc(start.durationTo(end).nanoseconds, std.time.ns_per_ms);
+}
+
+fn printCacheEvent(
+    writer: *std.Io.Writer,
+    mode: Mode,
+    status: []const u8,
+    duration_ms: i96,
+    cache_key: *const [64]u8,
+    descriptor_bytes: usize,
+) !void {
+    try writer.print(
+        "air-export-cache mode={s} status={s} duration_ms={} cache_key={s} descriptor_bytes={}\n",
+        .{ mode.name(), status, duration_ms, cache_key, descriptor_bytes },
+    );
+    try writer.flush();
 }
 
 fn runCandidate(

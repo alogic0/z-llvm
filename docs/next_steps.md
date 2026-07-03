@@ -39,12 +39,13 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-02 after closing convergence-progress item 8:
+Stop state recorded 2026-07-03 after closing convergence-progress item 8a:
 
-- Active convergence-progress item: 8a (AIR export cache), inserted by the
-  docs agent after this stop state was written — do 8a before opening
-  item 9's two tracks.
-- First failing real row: none discovered for item 9 yet.
+- Active convergence-progress item: 9. This opens two active tracks:
+  `distribution-real-rows --limit=25` discovery and the syscall-hello
+  real-program track from item 11.
+- First failing real row: none discovered for item 9 yet; run the
+  ReleaseFast `--limit=25` discovery next.
 - First failing stage: none discovered for item 9 yet.
 - Current staged `real_*` counters: `real_functions_lowered=10`,
   `real_objects_emitted=10`, `real_native_linked=10`, `real_executed=0`,
@@ -57,13 +58,13 @@ Stop state recorded 2026-07-02 after closing convergence-progress item 8:
   `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`.
 - Saved log path: `tmp/real_rows_strict_limit10.log`.
 - Tracked evidence summary:
-  `docs/evidence/real_rows_strict_limit10.summary`.
+  `docs/evidence/real_rows_export_cache.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=10`.
-- Recommended next action: implement tracker item 8a (gate-run AIR export
-  cache; spec in `docs/roadmap/convergence_progress.md`), then start item 9
-  discovery with `distribution-real-rows --limit=25` while also opening the
-  syscall-hello track.
+- Recommended next action: fresh goal-selection pass for item 9, then run
+  `distribution-real-rows --mode=ReleaseFast --limit=25` in report mode to
+  find the first failing real row while opening the item 11 syscall-hello
+  track.
 
 When the worker stops, record only:
 

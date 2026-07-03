@@ -21,6 +21,7 @@ const usage =
     \\  --selector-version=TEXT    Real-row selector metadata (default: n/a).
     \\  --mode=TEXT                Real-row mode metadata (default: n/a).
     \\  --limit=TEXT               Real-row limit metadata (default: n/a).
+    \\  --compare-summary-log=PATH Compare `summary ...` lines against another log.
     \\  --ratchet-migration-note=TEXT
     \\                             Ratchet migration note (default: n/a).
     \\
@@ -39,6 +40,7 @@ const Options = struct {
     selector_version: []const u8,
     mode: []const u8,
     limit: []const u8,
+    compare_summary_log_path: ?[]const u8,
     ratchet_migration_note: []const u8,
 };
 
@@ -68,12 +70,25 @@ pub fn main(init: std.process.Init) !void {
 
     var summary_lines: std.ArrayList([]const u8) = .empty;
     defer summary_lines.deinit(allocator);
-    var line_iter = std.mem.splitScalar(u8, log, '\n');
-    while (line_iter.next()) |raw_line| {
-        const line = std.mem.trim(u8, raw_line, "\r");
-        if (std.mem.startsWith(u8, line, "summary ")) {
-            try summary_lines.append(allocator, line);
-        }
+    try collectLinesByPrefix(allocator, log, "summary ", &summary_lines);
+
+    var metadata_lines: std.ArrayList([]const u8) = .empty;
+    defer metadata_lines.deinit(allocator);
+    try collectLinesByPrefix(allocator, log, "air-export-cache ", &metadata_lines);
+
+    var compare_log: ?[]u8 = null;
+    defer if (compare_log) |contents| allocator.free(contents);
+    var compare_summary_lines: std.ArrayList([]const u8) = .empty;
+    defer compare_summary_lines.deinit(allocator);
+    var compare_metadata_lines: std.ArrayList([]const u8) = .empty;
+    defer compare_metadata_lines.deinit(allocator);
+    var compare_summary_lines_match: []const u8 = "n/a";
+    if (options.compare_summary_log_path) |path| {
+        const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(128 * 1024 * 1024));
+        compare_log = contents;
+        try collectLinesByPrefix(allocator, contents, "summary ", &compare_summary_lines);
+        try collectLinesByPrefix(allocator, contents, "air-export-cache ", &compare_metadata_lines);
+        compare_summary_lines_match = if (summaryLinesEqual(summary_lines.items, compare_summary_lines.items)) "true" else "false";
     }
 
     var output: std.ArrayList(u8) = .empty;
@@ -95,6 +110,8 @@ pub fn main(init: std.process.Init) !void {
         \\selector_version: `{s}`
         \\mode: `{s}`
         \\limit: `{s}`
+        \\comparison_log_path: `{s}`
+        \\comparison_summary_lines_match: `{s}`
         \\ratchet_migration_note: `{s}`
         \\
         \\## Summary Lines
@@ -112,6 +129,8 @@ pub fn main(init: std.process.Init) !void {
         options.selector_version,
         options.mode,
         options.limit,
+        options.compare_summary_log_path orelse "n/a",
+        compare_summary_lines_match,
         options.ratchet_migration_note,
     });
     for (summary_lines.items) |line| {
@@ -121,6 +140,25 @@ pub fn main(init: std.process.Init) !void {
         \\```
         \\
     );
+    if (metadata_lines.items.len != 0 or compare_metadata_lines.items.len != 0) {
+        try output.appendSlice(allocator,
+            \\
+            \\## Gate Metadata Lines
+            \\
+            \\```text
+            \\
+        );
+        for (compare_metadata_lines.items) |line| {
+            try appendFmt(allocator, &output, "compare {s}\n", .{line});
+        }
+        for (metadata_lines.items) |line| {
+            try appendFmt(allocator, &output, "primary {s}\n", .{line});
+        }
+        try output.appendSlice(allocator,
+            \\```
+            \\
+        );
+    }
 
     var cwd = std.Io.Dir.cwd();
     try cwd.createDirPath(io, "docs/evidence");
@@ -153,6 +191,7 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
     var selector_version: []const u8 = "n/a";
     var mode: []const u8 = "n/a";
     var limit: []const u8 = "n/a";
+    var compare_summary_log_path: ?[]const u8 = null;
     var ratchet_migration_note: []const u8 = "n/a";
 
     while (args.next()) |arg| {
@@ -186,6 +225,8 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
             mode = arg["--mode=".len..];
         } else if (std.mem.startsWith(u8, arg, "--limit=")) {
             limit = arg["--limit=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--compare-summary-log=")) {
+            compare_summary_log_path = arg["--compare-summary-log=".len..];
         } else if (std.mem.startsWith(u8, arg, "--ratchet-migration-note=")) {
             ratchet_migration_note = arg["--ratchet-migration-note=".len..];
         } else {
@@ -206,8 +247,32 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
         .selector_version = selector_version,
         .mode = mode,
         .limit = limit,
+        .compare_summary_log_path = compare_summary_log_path,
         .ratchet_migration_note = ratchet_migration_note,
     };
+}
+
+fn collectLinesByPrefix(
+    allocator: std.mem.Allocator,
+    log: []const u8,
+    prefix: []const u8,
+    out: *std.ArrayList([]const u8),
+) !void {
+    var line_iter = std.mem.splitScalar(u8, log, '\n');
+    while (line_iter.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, "\r");
+        if (std.mem.startsWith(u8, line, prefix)) {
+            try out.append(allocator, line);
+        }
+    }
+}
+
+fn summaryLinesEqual(primary: []const []const u8, compare: []const []const u8) bool {
+    if (primary.len != compare.len) return false;
+    for (primary, compare) |lhs, rhs| {
+        if (!std.mem.eql(u8, lhs, rhs)) return false;
+    }
+    return true;
 }
 
 fn appendFmt(
