@@ -37,7 +37,39 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None.
+Hook-contract / architectural review needed for item 10:
+
+- Active convergence-progress items: item 10 on the real-row track and item
+  11 on the syscall-hello real-program track. Single-worker mode still
+  applies, and both tracks remain open.
+- Blocked checklist item: item 10 cluster fixing, first failing real row rank
+  190 `../ziglang/src/main.zig/Build.Cache.Path.fmtEscapeString`.
+- Exact failure: `distribution-real-rows --mode=ReleaseFast --limit=200`
+  reports `typed-lowering unsupported:function_type:function-type` for
+  `Build.Cache.Path.fmtEscapeString`.
+- Missing hook fact: the debug AIR dump shows no
+  `zllvm-aggregate-layout-facts-v1` fact for `Build.Cache.Path` or for
+  `fmt.Alt(Build.Cache.Path,(function 'formatEscapeString'))`. The function
+  stores a `Build.Cache.Path` field into that `fmt.Alt` return aggregate, but
+  the current aggregate-layout exporter omits the fact because
+  `Build.Cache.Path` contains `?[]const u8`, which the current layout writer
+  does not emit. z_llvm cannot infer the ABI layout from the descriptor without
+  source-name admission or guessing.
+- Current report-mode discovery state: ReleaseFast `--limit=200` is
+  `real_functions_lowered=199`, `real_objects_emitted=199`,
+  `real_native_linked=199`, `real_executed=0`, `real_programs_ok=0`.
+- Strict ratchet state remains `real_functions_lowered=25`,
+  `real_objects_emitted=25`, `real_native_linked=25`, `real_executed=0`,
+  `real_programs_ok=0`; `distribution-all` still enforces
+  `distribution-real-rows --strict --limit=25`.
+- Saved log path: `tmp/real_rows_releasefast_limit200_fmtescape_debug.log`.
+  Latest tracked evidence before this blocker:
+  `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.summary`.
+- Recommended next action: decide whether to allow a narrow aggregate-layout
+  hook-contract change in `../ziglang` for optional payload/slice layout facts,
+  then rebuild/check stage4 and update pin/evidence as required. Do not unblock
+  this row by adding a local source-name static fact for `Build.Cache.Path` or
+  by treating the unknown aggregate as a pointer.
 
 Stop state recorded 2026-07-03 during item 10 cluster fixing:
 
