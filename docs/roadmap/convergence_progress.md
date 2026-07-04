@@ -239,7 +239,7 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 200 | 188 | 186 | 186 | `docs/evidence/real_rows_releasefast_limit200_after_shuffle_mask.summary` |
+| ReleaseFast | 200 | 198 | 196 | 196 | `docs/evidence/real_rows_releasefast_limit200_after_opaque_intcast.summary` |
 | ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 | ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
@@ -251,9 +251,9 @@ count that turned green when the fix landed.
 
 | Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
 | --- | ---: | --- | ---: | --- |
-| `object-emission x86_64-lower:UnsupportedCodegenInstruction` | 2 | Open | 144 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission unlocked rank 36 `ascii.isAscii`; i64 terminal shifts with model-owned extended shift-count constants unlocked ranks 39-43 `bit_set.*.maskIndex`; narrow enum `zext` emission unlocked rank 59 `Air.VectorCmp.encodeOp`; nominal enum bool less-than returns unlocked ranks 61-62 `codegen.*.bits.FrameIndex.isNamed`, ranks 66-182 `hash_map.*.Metadata.*`, and rank 184 `os.linux.W.IFEXITED`; sub-byte unsigned greater-than-zero bool returns unlocked rank 183 `link.Diags.Flags.anySet`. Representative rows now: ranks 186-187 `unicode.utf16Is*Surrogate`; evidence `docs/evidence/real_rows_releasefast_limit200_after_shuffle_mask.summary` |
-| `typed-lowering unsupported:function_type:function-type` | 11 | Open | 146 | Opaque nominal type-surface parsing now accepts pointer sigils inside balanced generic argument lists, so existing typed-bitcast inference unlocked ranks 63-65 `hash_map.*.Metadata.*`; preserving module aggregate-layout facts in real-row slices plus direct `aggregate_init` register-aggregate lowering unlocked rank 185 `sort.block.Range.init`; fact-owned `Air.ShuffleTwoMask` u32 nominal enum parsing unlocked rank 189 `Air.ShuffleTwoMask.aElem`. Representative rows now: ranks 190-200 `InternPool.*`/related optional-index helpers; evidence `docs/evidence/real_rows_releasefast_limit200_after_shuffle_mask.summary` |
-| `typed-lowering unsupported:instruction_type:lowering` | 1 | Open | 0 | Representative row: rank 188 `Air.Liveness.fmtInstSet`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
+| `object-emission x86_64-lower:UnsupportedCodegenInstruction` | 2 | Open | 144 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission unlocked rank 36 `ascii.isAscii`; i64 terminal shifts with model-owned extended shift-count constants unlocked ranks 39-43 `bit_set.*.maskIndex`; narrow enum `zext` emission unlocked rank 59 `Air.VectorCmp.encodeOp`; nominal enum bool less-than returns unlocked ranks 61-62 `codegen.*.bits.FrameIndex.isNamed`, ranks 66-182 `hash_map.*.Metadata.*`, and rank 184 `os.linux.W.IFEXITED`; sub-byte unsigned greater-than-zero bool returns unlocked rank 183 `link.Diags.Flags.anySet`. Representative rows now: ranks 186-187 `unicode.utf16Is*Surrogate`; evidence `docs/evidence/real_rows_releasefast_limit200_after_opaque_intcast.summary` |
+| `typed-lowering unsupported:function_type:function-type` | 1 | Open | 156 | Opaque nominal type-surface parsing now accepts pointer sigils inside balanced generic argument lists, so existing typed-bitcast inference unlocked ranks 63-65 `hash_map.*.Metadata.*`; preserving module aggregate-layout facts in real-row slices plus direct `aggregate_init` register-aggregate lowering unlocked rank 185 `sort.block.Range.init`; fact-owned `Air.ShuffleTwoMask` u32 nominal enum parsing unlocked rank 189 `Air.ShuffleTwoMask.aElem`; opaque nominal `bitcast` + `intcast` scalar inference unlocked ranks 191-200 `InternPool.*`/related optional-index wrappers. Representative row now: rank 190 `Build.Cache.Path.fmtEscapeString`; evidence `docs/evidence/real_rows_releasefast_limit200_after_opaque_intcast.summary` |
+| `typed-lowering unsupported:instruction_type:lowering` | 1 | Open | 0 | Representative row: rank 188 `Air.Liveness.fmtInstSet`; evidence `docs/evidence/real_rows_releasefast_limit200_after_opaque_intcast.summary` |
 
 ## Progress Log
 
@@ -347,6 +347,11 @@ One line per completed cycle, append-only, newest last. This is the
   `--limit=200` to `188/186/186/0/0` and made rank 189
   `Air.ShuffleTwoMask.aElem` typed/object/link green. Recognizer count still
   1 (no recognizer reorder or pre-pass).
+- 2026-07-04 (this commit) Item 10 cluster fix: model-owned opaque nominal
+  `bitcast` + `intcast` scalar inference moved ReleaseFast report-mode
+  `--limit=200` to `198/196/196/0/0` and made ranks 191-200
+  `InternPool.*`/related optional-index wrappers typed/object/link green.
+  Recognizer count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 

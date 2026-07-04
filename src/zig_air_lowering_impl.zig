@@ -706,15 +706,16 @@ fn inferredOpaqueBitcastType(structured_air_v2: air_export.StructuredAirV2, text
     if (!isOpaqueNominalTypeSurface(text)) return error.UnsupportedAir;
     var inferred: ?ZigType = null;
     for (structured_air_v2.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, "bitcast")) continue;
-        if (std.mem.eql(u8, instruction.result_type, text)) {
-            const operand_type = singleOperandType(instruction) orelse continue;
-            const concrete = parseScalarBitcastType(operand_type) orelse continue;
-            try mergeInferredOpaqueBitcastType(&inferred, concrete);
-        }
-        if (std.mem.eql(u8, singleOperandType(instruction) orelse "", text)) {
-            const concrete = parseScalarBitcastType(instruction.result_type) orelse continue;
-            try mergeInferredOpaqueBitcastType(&inferred, concrete);
+        if (std.mem.eql(u8, instruction.opcode, "bitcast") or std.mem.eql(u8, instruction.opcode, "intcast")) {
+            if (std.mem.eql(u8, instruction.result_type, text)) {
+                const operand_type = singleOperandType(instruction) orelse continue;
+                const concrete = parseScalarBitcastType(operand_type) orelse continue;
+                try mergeInferredOpaqueBitcastType(&inferred, concrete);
+            }
+            if (std.mem.eql(u8, singleOperandType(instruction) orelse "", text)) {
+                const concrete = parseScalarBitcastType(instruction.result_type) orelse continue;
+                try mergeInferredOpaqueBitcastType(&inferred, concrete);
+            }
         }
     }
     return inferred orelse error.UnsupportedAir;
@@ -1409,6 +1410,115 @@ test "lowering parser infers opaque nominal return from typed bitcast" {
     try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
     try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.params[0].ir_type);
     try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.return_type.ir_type);
+}
+
+test "lowering parser infers opaque nominal return from typed intcast" {
+    var bitcast_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "pkg.Source" },
+    };
+    var intcast_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "u6" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "2", .type_text = "pkg.Target" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "pkg.Source", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "bitcast", .result_type = "u6", .data_kind = "ty_op", .operands = bitcast_operands[0..] },
+        .{ .index = 2, .opcode = "intcast", .result_type = "pkg.Target", .data_kind = "ty_op", .operands = intcast_operands[0..] },
+        .{ .index = 3, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..] },
+    };
+    var legacy_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 2, .unused = false, .opcode = "arg", .payload = "pkg.Source, 0", .category = .argument },
+        .{ .index = 1, .indent = 2, .unused = false, .opcode = "bitcast", .payload = "u6, %0!", .category = .cast },
+        .{ .index = 2, .indent = 2, .unused = false, .opcode = "intcast", .payload = "pkg.Target, %1!", .category = .cast },
+        .{ .index = 3, .indent = 2, .unused = true, .opcode = "ret", .payload = "%2!", .category = .return_op },
+    };
+    const air_function: air_export.Function = .{
+        .name = "pkg.convert",
+        .type_text = "fn (pkg.Source) pkg.Target",
+        .instruction_count = 4,
+        .main_body_count = 4,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = legacy_instructions[0..],
+    };
+
+    const function_type = try parseFunctionTypeForLowering(std.testing.allocator, air_function);
+    defer function_type.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 6 }, function_type.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 6 }, function_type.return_type.ir_type);
+}
+
+test "lowering accepts opaque nominal bitcast intcast return wrapper" {
+    var bitcast_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "pkg.Source" },
+    };
+    var intcast_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "2", .type_text = "u6" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "4", .type_text = "pkg.Target" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "pkg.Source", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 2, .opcode = "bitcast", .result_type = "u6", .data_kind = "ty_op", .operands = bitcast_operands[0..] },
+        .{ .index = 3, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 4, .opcode = "intcast", .result_type = "pkg.Target", .data_kind = "ty_op", .operands = intcast_operands[0..] },
+        .{ .index = 5, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 6, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..] },
+    };
+    var main_body_instructions = [_]u32{ 0, 1, 2, 3, 4, 5, 6 };
+    var bodies = [_]air_export.StructuredBody{.{
+        .kind = .main,
+        .owner = null,
+        .instructions = main_body_instructions[0..],
+    }};
+    var functions = [_]air_export.Function{.{
+        .name = "pkg.convert",
+        .type_text = "fn (pkg.Source) pkg.Target",
+        .instruction_count = 7,
+        .main_body_count = 7,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = .{
+            .instructions = &.{},
+            .bodies = bodies[0..],
+            .branches = &.{},
+            .cond_branches = &.{},
+            .repeats = &.{},
+        },
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = &.{},
+    }};
+    const air_module: air_export.Module = .{
+        .allocator = std.testing.allocator,
+        .storage = "",
+        .producer = "test",
+        .root_source = "module.zig",
+        .wrapper = "compiler-core-module",
+        .mode = "ReleaseFast",
+        .target = "x86_64-linux-gnu",
+        .globals = &.{},
+        .aggregate_layout_facts = null,
+        .functions = functions[0..],
+    };
+
+    var result = try lowerCompatible(std.testing.allocator, air_module);
+    defer result.deinit();
+    try std.testing.expectEqual(@as(usize, 1), result.accepted_functions);
+    try std.testing.expectEqual(@as(usize, 0), result.unsupported.len);
+    try std.testing.expectEqual(@as(usize, 1), result.module.functions.items.len);
+    try std.testing.expect(result.module.functions.items[0].ret_ty.eql(.{ .int = 6 }));
 }
 
 test "lowering parser rejects conflicting opaque bitcast inference" {

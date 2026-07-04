@@ -167,7 +167,7 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     const source = try self.resolveTypedOperand(instruction, 0);
     const target_type = parseZigType(instruction.result_type) orelse
-        (opaqueBitcastResultType(instruction, source.ty) orelse return air_model.LowerError.UnsupportedAir);
+        (opaqueCastResultType(instruction, source.ty) orelse return air_model.LowerError.UnsupportedAir);
     if (source.ty.ir_type.eql(target_type.ir_type)) {
         if (source.ty.ir_type == .ptr and instruction.index < self.synthetic_vector_slots.len) {
             if (air_model.typedInstOperandIndex(instruction.operands[0])) |source_index| {
@@ -235,8 +235,8 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
     };
 }
 
-fn opaqueBitcastResultType(instruction: air_export.TypedInstruction, source_type: air_model.ZigType) ?air_model.ZigType {
-    if (!air_capabilities.isBitcastOpcode(instruction.opcode)) return null;
+fn opaqueCastResultType(instruction: air_export.TypedInstruction, source_type: air_model.ZigType) ?air_model.ZigType {
+    if (!air_capabilities.isBitcastOpcode(instruction.opcode) and !std.mem.eql(u8, instruction.opcode, "intcast")) return null;
     if (!isOpaqueNominalTypeSurface(instruction.result_type)) return null;
     return switch (source_type.ir_type) {
         .int, .ptr, .float, .double => source_type,
