@@ -318,6 +318,36 @@ pub const LoweringContext = struct {
         return .{ .ir_type = .{ .int = bit_width } };
     }
 
+    pub fn opaqueBitcastNominalArgType(
+        self: *LoweringContext,
+        instruction_index: u32,
+        type_text: []const u8,
+        param_index: usize,
+    ) ?ZigType {
+        if (!isOpaqueNominalTypeSurface(type_text)) return null;
+        if (param_index >= self.function_type.params.len) return null;
+        const param_ty = self.function_type.params[param_index];
+        if (!isScalarBitcastIrType(param_ty.ir_type)) return null;
+        const structured_air_v2 = self.structured_air_v2 orelse return null;
+        var matched = false;
+        for (structured_air_v2.instructions) |instruction| {
+            if (!air_capabilities.isBitcastOpcode(instruction.opcode) or instruction.operands.len != 1) continue;
+            const operand_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse continue;
+            if (operand_index != instruction_index) continue;
+            const result_type = parseZigType(instruction.result_type) orelse continue;
+            if (!result_type.ir_type.eql(param_ty.ir_type) or result_type.signed != param_ty.signed) return null;
+            matched = true;
+        }
+        return if (matched) param_ty else null;
+    }
+
+    fn isScalarBitcastIrType(ty: ir.Type) bool {
+        return switch (ty) {
+            .int, .ptr, .float, .double => true,
+            .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+        };
+    }
+
     fn unionTagOnlyArgBitWidth(self: *LoweringContext, instruction_index: u32) ?u16 {
         const structured_air_v2 = self.structured_air_v2 orelse return null;
         var bit_width: ?u16 = null;

@@ -585,7 +585,10 @@ fn parseFunctionTypeForLowering(
 ) !FunctionType {
     return parseFunctionType(allocator, air_function.type_text) catch |err| switch (err) {
         error.UnsupportedAir => parseFunctionTypeWithUnusedOpaqueParams(allocator, air_function) catch |fallback_err| switch (fallback_err) {
-            error.UnsupportedAir => parseFunctionTypeWithUnionTagOnlyOpaqueSignature(allocator, air_function),
+            error.UnsupportedAir => parseFunctionTypeWithUnionTagOnlyOpaqueSignature(allocator, air_function) catch |tag_err| switch (tag_err) {
+                error.UnsupportedAir => parseFunctionTypeWithOpaqueBitcasts(allocator, air_function),
+                else => return tag_err,
+            },
             else => return fallback_err,
         },
         else => return err,
@@ -656,6 +659,79 @@ fn parseFunctionTypeWithUnionTagOnlyOpaqueSignature(
         .c_calling_convention = false,
         .non_default_calling_convention = false,
     };
+}
+
+fn parseFunctionTypeWithOpaqueBitcasts(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+) !FunctionType {
+    const structured_air_v2 = air_function.structured_air_v2 orelse return error.UnsupportedAir;
+    const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, air_function.type_text, " "));
+    if (!std.mem.startsWith(u8, trimmed, "fn (")) return error.UnsupportedAir;
+    const params_end = findMatching(trimmed, 3, '(', ')') orelse return error.UnsupportedAir;
+    const params_text = trimmed[4..params_end];
+    const suffix = std.mem.trim(u8, trimmed[params_end + 1 ..], " ");
+    const c_calling_convention = std.mem.startsWith(u8, suffix, "callconv(.c)");
+    const non_default_calling_convention = std.mem.startsWith(u8, suffix, "callconv(") and !c_calling_convention;
+    const return_text = functionReturnTypeText(air_function.type_text) orelse return error.UnsupportedAir;
+    const return_type = parseZigType(return_text) orelse try inferredOpaqueBitcastType(structured_air_v2, return_text);
+
+    var params: std.ArrayList(ZigType) = .empty;
+    errdefer params.deinit(allocator);
+    var fields = splitTopLevel(params_text, ',');
+    while (fields.next()) |field| {
+        const param_text = std.mem.trim(u8, field, " ");
+        if (param_text.len == 0) continue;
+        const param_type = parseZigType(param_text) orelse try inferredOpaqueBitcastType(structured_air_v2, param_text);
+        try params.append(allocator, param_type);
+    }
+    return .{
+        .params = try params.toOwnedSlice(allocator),
+        .return_type = return_type,
+        .c_calling_convention = c_calling_convention,
+        .non_default_calling_convention = non_default_calling_convention,
+    };
+}
+
+fn inferredOpaqueBitcastType(structured_air_v2: air_export.StructuredAirV2, text: []const u8) !ZigType {
+    if (!isOpaqueNominalTypeSurface(text)) return error.UnsupportedAir;
+    var inferred: ?ZigType = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "bitcast")) continue;
+        if (std.mem.eql(u8, instruction.result_type, text)) {
+            const operand_type = singleOperandType(instruction) orelse continue;
+            const concrete = parseScalarBitcastType(operand_type) orelse continue;
+            try mergeInferredOpaqueBitcastType(&inferred, concrete);
+        }
+        if (std.mem.eql(u8, singleOperandType(instruction) orelse "", text)) {
+            const concrete = parseScalarBitcastType(instruction.result_type) orelse continue;
+            try mergeInferredOpaqueBitcastType(&inferred, concrete);
+        }
+    }
+    return inferred orelse error.UnsupportedAir;
+}
+
+fn singleOperandType(instruction: air_export.TypedInstruction) ?[]const u8 {
+    if (instruction.operands.len != 1) return null;
+    return instruction.operands[0].type_text;
+}
+
+fn parseScalarBitcastType(text: []const u8) ?ZigType {
+    const parsed = parseZigType(text) orelse return null;
+    return switch (parsed.ir_type) {
+        .int, .ptr, .float, .double => parsed,
+        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => null,
+    };
+}
+
+fn mergeInferredOpaqueBitcastType(inferred: *?ZigType, concrete: ZigType) !void {
+    if (inferred.*) |existing| {
+        if (!existing.ir_type.eql(concrete.ir_type) or existing.signed != concrete.signed) {
+            return error.UnsupportedAir;
+        }
+        return;
+    }
+    inferred.* = concrete;
 }
 
 fn unionTagOnlyReturnBitWidth(air_function: air_export.Function) ?u16 {
@@ -1194,6 +1270,124 @@ test "lowering parser rejects used opaque nominal parameters" {
         .structured_air_v2_text = null,
         .structured_air_v2 = null,
         .instructions = arg_inst[0..],
+    };
+
+    try std.testing.expectError(
+        error.UnsupportedAir,
+        parseFunctionTypeForLowering(std.testing.allocator, air_function),
+    );
+}
+
+test "lowering parser infers opaque nominal parameter from typed bitcast" {
+    var bitcast_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "pkg.Packed" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "u64" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "pkg.Packed", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "bitcast", .result_type = "u64", .data_kind = "ty_op", .operands = bitcast_operands[0..] },
+        .{ .index = 2, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..] },
+    };
+    var legacy_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 2, .unused = false, .opcode = "arg", .payload = "pkg.Packed, 0", .category = .argument },
+        .{ .index = 1, .indent = 2, .unused = false, .opcode = "bitcast", .payload = "u64, %0!", .category = .cast },
+        .{ .index = 2, .indent = 2, .unused = true, .opcode = "ret", .payload = "%1!", .category = .return_op },
+    };
+    const air_function: air_export.Function = .{
+        .name = "pkg.get",
+        .type_text = "fn (pkg.Packed) u64",
+        .instruction_count = 3,
+        .main_body_count = 3,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = legacy_instructions[0..],
+    };
+
+    const function_type = try parseFunctionTypeForLowering(std.testing.allocator, air_function);
+    defer function_type.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.return_type.ir_type);
+}
+
+test "lowering parser infers opaque nominal return from typed bitcast" {
+    var bitcast_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "u64" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "pkg.Packed" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "u64", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "bitcast", .result_type = "pkg.Packed", .data_kind = "ty_op", .operands = bitcast_operands[0..] },
+        .{ .index = 2, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..] },
+    };
+    var legacy_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 2, .unused = false, .opcode = "arg", .payload = "u64, 0", .category = .argument },
+        .{ .index = 1, .indent = 2, .unused = false, .opcode = "bitcast", .payload = "pkg.Packed, %0!", .category = .cast },
+        .{ .index = 2, .indent = 2, .unused = true, .opcode = "ret", .payload = "%1!", .category = .return_op },
+    };
+    const air_function: air_export.Function = .{
+        .name = "pkg.init",
+        .type_text = "fn (u64) pkg.Packed",
+        .instruction_count = 3,
+        .main_body_count = 3,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = legacy_instructions[0..],
+    };
+
+    const function_type = try parseFunctionTypeForLowering(std.testing.allocator, air_function);
+    defer function_type.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.return_type.ir_type);
+}
+
+test "lowering parser rejects conflicting opaque bitcast inference" {
+    var wide_operand = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "pkg.Packed" },
+    };
+    var narrow_operand = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "pkg.Packed" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "pkg.Packed", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "bitcast", .result_type = "u64", .data_kind = "ty_op", .operands = wide_operand[0..] },
+        .{ .index = 2, .opcode = "bitcast", .result_type = "u32", .data_kind = "ty_op", .operands = narrow_operand[0..] },
+    };
+    var legacy_instructions = [_]air_export.Instruction{.{
+        .index = 0,
+        .indent = 2,
+        .unused = false,
+        .opcode = "arg",
+        .payload = "pkg.Packed, 0",
+        .category = .argument,
+    }};
+    const air_function: air_export.Function = .{
+        .name = "pkg.bad",
+        .type_text = "fn (pkg.Packed) u64",
+        .instruction_count = 3,
+        .main_body_count = 3,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = legacy_instructions[0..],
     };
 
     try std.testing.expectError(

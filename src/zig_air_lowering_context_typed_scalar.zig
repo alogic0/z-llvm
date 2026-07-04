@@ -8,6 +8,7 @@ const air_types = @import("zig_air_types.zig");
 const ir = @import("ir.zig");
 
 const parseZigType = air_types.parseZigType;
+const isOpaqueNominalTypeSurface = air_types.isOpaqueNominalTypeSurface;
 const ownPrint = air_model.ownPrint;
 const binaryOp = air_semantics.binaryOp;
 const isFpType = air_semantics.isFpType;
@@ -44,9 +45,10 @@ pub fn lowerTypedArg(self: anytype, instruction: air_export.TypedInstruction) !v
     self.next_arg_index += 1;
     if (param_index >= self.function_type.params.len) return air_model.LowerError.UnsupportedAir;
     const parsed_type = parseZigType(instruction.result_type) orelse
-        (self.unusedOpaqueNominalArgType(instruction.index, instruction.result_type, param_index) orelse
-            (self.unionTagOnlyOpaqueNominalArgType(instruction.index, instruction.result_type, param_index) orelse
-                return air_model.LowerError.UnsupportedAir));
+        (self.opaqueBitcastNominalArgType(instruction.index, instruction.result_type, param_index) orelse
+            (self.unusedOpaqueNominalArgType(instruction.index, instruction.result_type, param_index) orelse
+                (self.unionTagOnlyOpaqueNominalArgType(instruction.index, instruction.result_type, param_index) orelse
+                    return air_model.LowerError.UnsupportedAir)));
     if (!parsed_type.ir_type.eql(self.function_type.params[param_index].ir_type)) return air_model.LowerError.UnsupportedAir;
     self.values[instruction.index] = .{
         .ty = parsed_type,
@@ -164,7 +166,8 @@ pub fn lowerTypedCompare(self: anytype, instruction: air_export.TypedInstruction
 pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     const source = try self.resolveTypedOperand(instruction, 0);
-    const target_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    const target_type = parseZigType(instruction.result_type) orelse
+        (opaqueBitcastResultType(instruction, source.ty) orelse return air_model.LowerError.UnsupportedAir);
     if (source.ty.ir_type.eql(target_type.ir_type)) {
         if (source.ty.ir_type == .ptr and instruction.index < self.synthetic_vector_slots.len) {
             if (air_model.typedInstOperandIndex(instruction.operands[0])) |source_index| {
@@ -229,6 +232,15 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
     self.values[instruction.index] = .{
         .ty = target_type,
         .value = .{ .named = result_name },
+    };
+}
+
+fn opaqueBitcastResultType(instruction: air_export.TypedInstruction, source_type: air_model.ZigType) ?air_model.ZigType {
+    if (!air_capabilities.isBitcastOpcode(instruction.opcode)) return null;
+    if (!isOpaqueNominalTypeSurface(instruction.result_type)) return null;
+    return switch (source_type.ir_type) {
+        .int, .ptr, .float, .double => source_type,
+        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => null,
     };
 }
 

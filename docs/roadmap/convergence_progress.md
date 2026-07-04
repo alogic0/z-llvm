@@ -239,7 +239,7 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 200 | 42 | 33 | 33 | `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
+| ReleaseFast | 200 | 179 | 49 | 49 | `docs/evidence/real_rows_releasefast_limit200_after_opaque_bitcast.summary` |
 | ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 | ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
@@ -251,8 +251,8 @@ count that turned green when the fix landed.
 
 | Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
 | --- | ---: | --- | ---: | --- |
-| `typed-lowering unsupported:function_type:function-type` | 157 | Open | 0 | Representative rows: rank 28 `InternPool.PackedU64.get`, rank 29 `InternPool.PackedU64.init`, rank 32 `Io.Limit.limited`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
-| `object-emission UnsupportedCodegenInstruction` | 9 | Open | 0 | Representative rows: rank 36 `ascii.isAscii`, ranks 39-43 `bit_set.*.maskIndex`, rank 184 `os.linux.W.IFEXITED`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
+| `object-emission UnsupportedCodegenInstruction` | 130 | Open | 16 | Opaque-bitcast typed lowering moved 137 rows past typed lowering; 16 of those also emitted/linked. Representative rows: rank 36 `ascii.isAscii`, ranks 39-43 `bit_set.*.maskIndex`, ranks 66-182 `hash_map.*.Metadata.*`; evidence `docs/evidence/real_rows_releasefast_limit200_after_opaque_bitcast.summary` |
+| `typed-lowering unsupported:function_type:function-type` | 20 | Open | 137 | Representative rows now: rank 32 `Io.Limit.limited`, rank 33 `Io.Limit.nonzero`, rank 51 `http.Reader.RemainingChunkLen.init`; evidence `docs/evidence/real_rows_releasefast_limit200_after_opaque_bitcast.summary` |
 | `typed-lowering unsupported:instruction_type:lowering` | 1 | Open | 0 | Representative row: rank 188 `Air.Liveness.fmtInstSet`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
 
 ## Progress Log
@@ -290,6 +290,11 @@ One line per completed cycle, append-only, newest last. This is the
   report-mode `--limit=200` reached `42/33/33/0/0`; 167 failing rows grouped
   into three clusters, led by 157 typed-lowering function-type failures.
   Recognizer count still 1.
+- 2026-07-03 (this commit) Item 10 cluster fix: model-owned opaque nominal
+  bitcast inference moved ReleaseFast report-mode `--limit=200` to
+  `179/49/49/0/0`, unlocking 137 typed-lowering rows from the former
+  function-type cluster. The largest open cluster is now object emission
+  `UnsupportedCodegenInstruction`. Recognizer count still 1.
 
 ## Ratchet State
 
