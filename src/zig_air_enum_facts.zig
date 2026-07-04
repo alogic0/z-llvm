@@ -34,6 +34,8 @@ const zig_ast_optional_token_index_enumerators = [_]Enumerator{
     .{ .name = "none", .value = std.math.maxInt(u32) },
 };
 
+const no_enumerators = [_]Enumerator{};
+
 const facts = [_]Fact{
     .{
         .name = "Io.Event",
@@ -54,6 +56,11 @@ const facts = [_]Fact{
         .name = "zig.Ast.OptionalTokenIndex",
         .backing_type = .{ .int = 32 },
         .enumerators = zig_ast_optional_token_index_enumerators[0..],
+    },
+    .{
+        .name = "Air.ShuffleTwoMask",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
     },
 };
 
@@ -99,4 +106,8 @@ test "enum facts expose exact nominal backing types and literals" {
     const optional_token = lookup("zig.Ast.OptionalTokenIndex") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 32 }, optional_token.backing_type);
     try std.testing.expectEqual(@as(?i128, std.math.maxInt(u32)), enumeratorValue("zig.Ast.OptionalTokenIndex", ".none"));
+
+    const shuffle_mask = lookup("Air.ShuffleTwoMask") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, shuffle_mask.backing_type);
+    try std.testing.expect(enumeratorValue("Air.ShuffleTwoMask", ".undef") == null);
 }

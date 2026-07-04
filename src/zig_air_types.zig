@@ -350,12 +350,20 @@ test "parse fact-owned named enum type surfaces" {
     try std.testing.expectEqual(ir.Type{ .int = 64 }, parsed_chunk_len.ir_type);
     const parsed_optional_token = parseZigType("zig.Ast.OptionalTokenIndex") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_optional_token.ir_type);
+    const parsed_shuffle_mask = parseZigType("Air.ShuffleTwoMask") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_shuffle_mask.ir_type);
 
     const parsed_fn = try parseFunctionType(std.testing.allocator, "fn (*Io.Event) void");
     defer parsed_fn.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 1), parsed_fn.params.len);
     try std.testing.expectEqual(ir.Type.ptr, parsed_fn.params[0].ir_type);
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_fn.params[0].pointer_child.?);
+
+    const parsed_shuffle_fn = try parseFunctionType(std.testing.allocator, "fn (u32) Air.ShuffleTwoMask");
+    defer parsed_shuffle_fn.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 1), parsed_shuffle_fn.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_shuffle_fn.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_shuffle_fn.return_type.ir_type);
 }
 
 test "opaque nominal type surface accepts comptime argument instantiations" {
