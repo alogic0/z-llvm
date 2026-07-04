@@ -699,6 +699,8 @@ fn appendHeader(allocator: std.mem.Allocator, out: *std.ArrayList(u8), descripto
     try appendLineByKey(allocator, out, descriptor, "target");
     try out.appendSlice(allocator, "function_count=1\n");
     try out.appendSlice(allocator, "global_count=0\n");
+    _ = try appendOptionalFramedByKey(allocator, out, descriptor, "aggregate_layout_facts_bytes");
+    _ = try appendOptionalFramedByKey(allocator, out, descriptor, "error_union_call_facts_bytes");
 }
 
 fn appendLineByKey(
@@ -726,6 +728,30 @@ fn appendLineByKey(
         line_start = line_end + 1;
     }
     return error.InvalidAirHeader;
+}
+
+fn appendOptionalFramedByKey(
+    allocator: std.mem.Allocator,
+    out: *std.ArrayList(u8),
+    descriptor: []const u8,
+    key: []const u8,
+) !bool {
+    var line_start: usize = 0;
+    while (line_start < descriptor.len) {
+        const line_end = std.mem.indexOfScalarPos(u8, descriptor, line_start, '\n') orelse descriptor.len;
+        const line = descriptor[line_start..line_end];
+        if (std.mem.startsWith(u8, line, "function_begin")) return false;
+        if (std.mem.startsWith(u8, line, key) and line.len > key.len and line[key.len] == '=') {
+            const len = try parseValueLine(usize, line, key);
+            const value_start = line_end + 1;
+            const value_end = value_start + len;
+            if (value_end >= descriptor.len or descriptor[value_end] != '\n') return error.InvalidAirHeader;
+            try out.appendSlice(allocator, descriptor[line_start .. value_end + 1]);
+            return true;
+        }
+        line_start = line_end + 1;
+    }
+    return false;
 }
 
 fn parseValueLine(comptime T: type, line: []const u8, key: []const u8) !T {

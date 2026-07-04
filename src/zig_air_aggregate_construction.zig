@@ -1,5 +1,6 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
+const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const air_model = @import("zig_air_model.zig");
 const air_types = @import("zig_air_types.zig");
 const sysv_abi = @import("codegen/x86_64/sysv_abi.zig");
@@ -41,6 +42,15 @@ pub fn registerAggregateLeafPaths(
 ) bool {
     if (function_type.return_type.ir_type != .aggregate) return false;
     if (function_type.params.len == 0 or function_type.params.len > leaf_paths.len) return false;
+    if (registerAggregateLeafPathsFromStores(function_type, structured_air_v2, leaf_paths)) return true;
+    return registerAggregateLeafPathsFromAggregateInit(function_type, structured_air_v2, leaf_paths);
+}
+
+fn registerAggregateLeafPathsFromStores(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+    leaf_paths: *[8][]const u8,
+) bool {
     const inferred_summary = inferRegisterAggregateConstructionLayout(function_type, structured_air_v2) orelse return false;
     if (!isSysVRegisterAggregateCandidate(inferred_summary.ty)) return false;
     const layout = x86_64SysVDataLayout() orelse return false;
@@ -78,6 +88,48 @@ pub fn registerAggregateLeafPaths(
         store_index += 1;
     }
     return store_index == function_type.params.len;
+}
+
+fn registerAggregateLeafPathsFromAggregateInit(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+    leaf_paths: *[8][]const u8,
+) bool {
+    if (!isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "aggregate_init") != 1) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret") != 1) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 0) return false;
+    if (air_model.typedStoreOpcodeCount(structured_air_v2) != 0) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 0) return false;
+
+    const aggregate_init = air_model.singleInstructionByOpcode(structured_air_v2, "aggregate_init") orelse return false;
+    if (aggregate_init.operands.len != function_type.params.len) return false;
+    const init_type = parseZigType(aggregate_init.result_type) orelse return false;
+    if (!init_type.ir_type.eql(function_type.return_type.ir_type)) return false;
+
+    const ret = air_model.singleInstructionByOpcode(structured_air_v2, "ret") orelse return false;
+    if (ret.operands.len != 1) return false;
+    if (!std.mem.eql(u8, ret.operands[0].kind, "inst")) return false;
+    const ret_inst_index = std.fmt.parseInt(u32, ret.operands[0].value, 10) catch return false;
+    if (ret_inst_index != aggregate_init.index) return false;
+
+    const layout = x86_64SysVDataLayout() orelse return false;
+    const plan = type_layout.aggregateLayoutPlan(layout, function_type.return_type.ir_type) catch return false;
+    if (plan.field_count != function_type.params.len) return false;
+    const leaves = plan.leafSlice();
+    if (leaves.len != function_type.params.len) return false;
+
+    for (aggregate_init.operands, function_type.params, leaves, 0..) |operand, param, leaf, index| {
+        if (!std.mem.eql(u8, operand.kind, "inst")) return false;
+        const arg_inst_index = std.fmt.parseInt(u32, operand.value, 10) catch return false;
+        if (arg_inst_index != index) return false;
+        const operand_type = parseZigType(operand.type_text) orelse return false;
+        if (!operand_type.ir_type.eql(param.ir_type)) return false;
+        if (!leaf.ty.eql(param.ir_type)) return false;
+        leaf_paths[index] = air_model.aggregateIndexPathText(&.{index}) orelse return false;
+    }
+    return true;
 }
 
 pub fn inferRegisterAggregateConstructionLayout(
@@ -267,6 +319,45 @@ test "aggregate construction infers simple register aggregate layout from typed 
         .non_default_calling_convention = false,
     };
     try std.testing.expect(registerAggregateRecords(unknown_nominal_function_type, structured_air_v2));
+}
+
+test "aggregate construction accepts direct aggregate_init return" {
+    const facts = [_]exported_aggregate_layout_facts.Fact{
+        .{ .nominal_type_name = "sort.block.Range", .aggregate_text = "{ i64, i64 }" },
+    };
+    const previous_provider = exported_aggregate_layout_facts.active_provider;
+    exported_aggregate_layout_facts.setActiveProvider(.{ .facts = facts[0..] });
+    defer exported_aggregate_layout_facts.setActiveProvider(previous_provider);
+
+    var params = [_]air_model.ZigType{
+        .{ .ir_type = .{ .int = 64 } },
+        .{ .ir_type = .{ .int = 64 } },
+    };
+    const function_type = FunctionType{
+        .params = params[0..],
+        .return_type = .{ .ir_type = .{ .aggregate = "{ i64, i64 }" } },
+        .c_calling_convention = false,
+        .non_default_calling_convention = false,
+    };
+    const init_ops = [_]air_export.TypedOperand{
+        testInstOperand("0", "usize"),
+        testInstOperand("1", "usize"),
+    };
+    const ret_ops = [_]air_export.TypedOperand{testInstOperand("3", "sort.block.Range")};
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "usize", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "arg", .result_type = "usize", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 2, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 3, .opcode = "aggregate_init", .result_type = "sort.block.Range", .data_kind = "aggregate_init", .operands = @constCast(&init_ops) },
+        .{ .index = 4, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 5, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = @constCast(&ret_ops) },
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = instructions[0..] };
+    var leaf_paths: [8][]const u8 = undefined;
+    try std.testing.expect(registerAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths));
+    try std.testing.expectEqualStrings("0", leaf_paths[0]);
+    try std.testing.expectEqualStrings("1", leaf_paths[1]);
+    try std.testing.expect(registerAggregateRecords(function_type, structured_air_v2));
 }
 
 test "aggregate construction infers array leaf layout from typed AIR element stores" {

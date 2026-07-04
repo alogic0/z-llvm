@@ -190,6 +190,15 @@ pub fn lowerCompatible(
     allocator: std.mem.Allocator,
     air_module: air_export.Module,
 ) !Result {
+    const previous_module_aggregate_facts = exported_aggregate_layout_facts.active_provider;
+    const use_module_aggregate_facts = previous_module_aggregate_facts.facts.len == 0 and air_module.aggregate_layout_facts != null;
+    if (use_module_aggregate_facts) {
+        exported_aggregate_layout_facts.setActiveProvider(air_module.aggregate_layout_facts.?);
+    }
+    defer if (use_module_aggregate_facts) {
+        exported_aggregate_layout_facts.setActiveProvider(previous_module_aggregate_facts);
+    };
+
     var module: ir.Module = .{
         .allocator = allocator,
         .source = try allocator.dupe(u8, ""),
@@ -1503,6 +1512,70 @@ test "lowering parser admits union tag-only opaque nominal signatures" {
     try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
     try std.testing.expectEqual(ir.Type{ .int = 2 }, function_type.params[0].ir_type);
     try std.testing.expectEqual(ir.Type{ .int = 2 }, function_type.return_type.ir_type);
+}
+
+test "lowering installs module aggregate facts for direct aggregate init returns" {
+    const facts = [_]exported_aggregate_layout_facts.Fact{
+        .{ .nominal_type_name = "sort.block.Range", .aggregate_text = "{ i64, i64 }" },
+    };
+    var init_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "usize" },
+        .{ .kind = "inst", .value = "1", .type_text = "usize" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "3", .type_text = "sort.block.Range" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "usize", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "arg", .result_type = "usize", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 2, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 3, .opcode = "aggregate_init", .result_type = "sort.block.Range", .data_kind = "aggregate_init", .operands = init_operands[0..] },
+        .{ .index = 4, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 5, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..] },
+    };
+    var main_body_instructions = [_]u32{ 0, 1, 2, 3, 4, 5 };
+    var bodies = [_]air_export.StructuredBody{.{
+        .kind = .main,
+        .owner = null,
+        .instructions = main_body_instructions[0..],
+    }};
+    var functions = [_]air_export.Function{.{
+        .name = "sort.block.Range.init",
+        .type_text = "fn (usize, usize) sort.block.Range",
+        .instruction_count = 6,
+        .main_body_count = 6,
+        .has_liveness = false,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = .{
+            .instructions = &.{},
+            .bodies = bodies[0..],
+            .branches = &.{},
+            .cond_branches = &.{},
+            .repeats = &.{},
+        },
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = &.{},
+    }};
+    const air_module: air_export.Module = .{
+        .allocator = std.testing.allocator,
+        .storage = "",
+        .producer = "test",
+        .root_source = "module.zig",
+        .wrapper = "compiler-core-module",
+        .mode = "ReleaseFast",
+        .target = "x86_64-linux-gnu",
+        .globals = &.{},
+        .aggregate_layout_facts = .{ .facts = facts[0..] },
+        .functions = functions[0..],
+    };
+
+    var result = try lowerCompatible(std.testing.allocator, air_module);
+    defer result.deinit();
+    try std.testing.expectEqual(@as(usize, 1), result.accepted_functions);
+    try std.testing.expectEqual(@as(usize, 0), result.unsupported.len);
+    try std.testing.expectEqual(@as(usize, 1), result.module.functions.items.len);
 }
 
 test "first unsupported ignores orphan structured block outside main body" {
