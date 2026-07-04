@@ -264,14 +264,25 @@ pub fn emitGenericCfgIntBitsValueIntoEax(
                 return;
             }
             const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
-            const cast = switch (instruction.kind) {
-                .cast => |cast| cast,
+            switch (instruction.kind) {
+                .cast => |cast| {
+                    if (cast.op != .bitcast or !cast.to_ty.eql(.{ .int = bits }) or !cast.from_ty.eql(.{ .int = bits })) {
+                        return error.UnsupportedCodegenInstruction;
+                    }
+                    try emitGenericCfgIntBitsValueIntoEax(allocator, machine, function, block, cast.value, bits);
+                },
+                .binary => |binary| {
+                    if (!binary.ty.eql(.{ .int = bits }) or binary.op != .@"and") return error.UnsupportedCodegenInstruction;
+                    const rhs = switch (binary.rhs) {
+                        .int => |int| int,
+                        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                    };
+                    if (!intFitsUnsignedBits(rhs, bits)) return error.UnsupportedCodegenValue;
+                    try emitGenericCfgIntBitsValueIntoEax(allocator, machine, function, block, binary.lhs, bits);
+                    try machine.instructions.append(allocator, .{ .and_eax_imm32 = @intCast(rhs) });
+                },
                 else => return error.UnsupportedCodegenInstruction,
-            };
-            if (cast.op != .bitcast or !cast.to_ty.eql(.{ .int = bits }) or !cast.from_ty.eql(.{ .int = bits })) {
-                return error.UnsupportedCodegenInstruction;
             }
-            try emitGenericCfgIntBitsValueIntoEax(allocator, machine, function, block, cast.value, bits);
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }

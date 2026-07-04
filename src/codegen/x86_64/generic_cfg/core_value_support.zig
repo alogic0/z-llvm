@@ -101,6 +101,17 @@ pub fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, blo
 }
 
 pub fn genericCfgSupportsSingleBlockBinary(function: ir.Function, block: ir.BasicBlock, binary: ir.BinaryInst) bool {
+    switch (binary.ty) {
+        .int => |bits| if (bits > 0 and bits < 32) {
+            if (binary.op != .@"and") return false;
+            if (!genericCfgSupportsSingleBlockIntBitsValue(function, block, binary.lhs, bits)) return false;
+            return switch (binary.rhs) {
+                .int => |int| intFitsUnsignedBits(int, bits),
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+            };
+        },
+        else => {},
+    }
     if (!binary.ty.eql(.{ .int = 32 })) return false;
     if (binary.op == .shl or binary.op == .lshr) {
         if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return false;
@@ -166,8 +177,12 @@ pub fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, maybe_block: ?ir
     }
     if (icmp.operand_ty.eql(.{ .int = 16 })) {
         if (icmp.predicate == .ult) return false;
-        return genericCfgSupportsI16ParamOrConst(function, icmp.lhs) and
-            genericCfgSupportsI16ParamOrConst(function, icmp.rhs);
+        if (icmp.predicate == .slt) {
+            return genericCfgSupportsI16ParamOrConst(function, icmp.lhs) and
+                genericCfgSupportsI16ParamOrConst(function, icmp.rhs);
+        }
+        return genericCfgSupportsSingleBlockI16CmpOperand(function, maybe_block, icmp.lhs) and
+            genericCfgSupportsSingleBlockI16CmpOperand(function, maybe_block, icmp.rhs);
     }
     if (icmp.operand_ty.eql(.{ .int = 64 })) {
         if (icmp.predicate != .eq and icmp.predicate != .ne) return false;
@@ -434,7 +449,7 @@ fn singleBlockI32CastConstant(block: ir.BasicBlock, cast: ir.CastInst) ?i64 {
     return singleBlockI32Constant(block, cast.value);
 }
 
-fn genericCfgSupportsSingleBlockIntBitsValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value, bits: u16) bool {
+pub fn genericCfgSupportsSingleBlockIntBitsValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value, bits: u16) bool {
     if (bits == 0 or bits > 32) return false;
     if (bits == 32) return genericCfgSupportsSingleBlockI32Value(function, block, value);
     return switch (value) {
@@ -442,15 +457,36 @@ fn genericCfgSupportsSingleBlockIntBitsValue(function: ir.Function, block: ir.Ba
         .named => |name| {
             if ((paramRegOrNull(function, name, .{ .int = bits }) catch null) != null) return true;
             const instruction = findInstruction(block, name) orelse return false;
-            const cast = switch (instruction.kind) {
-                .cast => |cast| cast,
+            return switch (instruction.kind) {
+                .cast => |cast| {
+                    if (cast.op != .bitcast or !cast.to_ty.eql(.{ .int = bits }) or !cast.from_ty.eql(.{ .int = bits })) return false;
+                    return genericCfgSupportsSingleBlockIntBitsValue(function, block, cast.value, bits);
+                },
+                .binary => |binary| {
+                    if (!binary.ty.eql(.{ .int = bits }) or binary.op != .@"and") return false;
+                    if (!genericCfgSupportsSingleBlockIntBitsValue(function, block, binary.lhs, bits)) return false;
+                    return switch (binary.rhs) {
+                        .int => |int| intFitsUnsignedBits(int, bits),
+                        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+                    };
+                },
                 else => return false,
             };
-            if (cast.op != .bitcast or !cast.to_ty.eql(.{ .int = bits }) or !cast.from_ty.eql(.{ .int = bits })) return false;
-            return genericCfgSupportsSingleBlockIntBitsValue(function, block, cast.value, bits);
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn genericCfgSupportsSingleBlockI16CmpOperand(function: ir.Function, maybe_block: ?ir.BasicBlock, value: ir.Value) bool {
+    switch (value) {
+        .int => |int| return intFitsUnsignedBits(int, 16),
+        .named => |name| {
+            if ((paramRegOrNull(function, name, .{ .int = 16 }) catch null) != null) return true;
+            const block = maybe_block orelse return false;
+            return genericCfgSupportsSingleBlockIntBitsValue(function, block, value, 16);
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    }
 }
 
 fn intFitsUnsignedBits(value: i128, bits: u16) bool {

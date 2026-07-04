@@ -66,6 +66,7 @@ const genericCfgSupportsSmaxSelect = core_value_support.genericCfgSupportsSmaxSe
 const genericCfgSupportsUmaxSelect = core_value_support.genericCfgSupportsUmaxSelect;
 const genericCfgSupportsSingleBlockIcmp = core_value_support.genericCfgSupportsSingleBlockIcmp;
 const genericCfgSupportsSingleBlockI32Value = core_value_support.genericCfgSupportsSingleBlockI32Value;
+const genericCfgSupportsSingleBlockIntBitsValue = core_value_support.genericCfgSupportsSingleBlockIntBitsValue;
 const genericCfgSupportsI64Value = core_value_support.genericCfgSupportsI64Value;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
 const emitGenericCfgIntBitsValueIntoEax = core_value_emit.emitGenericCfgIntBitsValueIntoEax;
@@ -1711,6 +1712,19 @@ pub fn emitGenericCfgIcmpConditionWithBlock(
             };
             try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = lhs_reg, .imm = rhs_imm } });
             return .jle;
+        }
+        if (icmp.predicate == .eq or icmp.predicate == .ne) {
+            if (maybe_block) |block| {
+                if (genericCfgSupportsSingleBlockIntBitsValue(function, block, icmp.lhs, 16)) {
+                    const rhs_imm = switch (icmp.rhs) {
+                        .int => |int| try u16Value(int),
+                        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                    };
+                    try emitGenericCfgIntBitsValueIntoEax(allocator, machine, function, block, icmp.lhs, 16);
+                    try appendGenericCfgCompareLocalImm(allocator, machine, .eax, @intCast(rhs_imm));
+                    return branch_kind;
+                }
+            }
         }
         if (icmp.lhs == .int and icmp.rhs != .int) {
             const rhs_reg = try paramValueReg(function, icmp.rhs, .{ .int = 16 });
