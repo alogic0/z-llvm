@@ -243,7 +243,7 @@ pub fn emitGenericCfgBoolValueIntoEax(
     }
 }
 
-fn emitGenericCfgIntBitsValueIntoEax(
+pub fn emitGenericCfgIntBitsValueIntoEax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,

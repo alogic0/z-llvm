@@ -154,6 +154,7 @@ pub fn genericCfgSupportsLowerableI32OperandPair(function: ir.Function, lhs: ir.
 }
 
 pub fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, maybe_block: ?ir.BasicBlock, icmp: ir.IcmpInst) bool {
+    if (genericCfgSupportsSingleBlockUnsignedGtZeroIcmp(function, maybe_block, icmp)) return true;
     switch (icmp.predicate) {
         .eq, .ne, .slt, .ult => {},
         .ugt, .uge, .ule, .sgt, .sge, .sle => return false,
@@ -176,6 +177,17 @@ pub fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, maybe_block: ?ir
     if (!icmp.operand_ty.eql(.{ .int = 32 })) return false;
     return genericCfgSupportsSingleBlockI32CmpOperand(function, maybe_block, icmp.lhs) and
         genericCfgSupportsSingleBlockI32CmpOperand(function, maybe_block, icmp.rhs);
+}
+
+fn genericCfgSupportsSingleBlockUnsignedGtZeroIcmp(function: ir.Function, maybe_block: ?ir.BasicBlock, icmp: ir.IcmpInst) bool {
+    if (icmp.predicate != .ugt or !isInt(icmp.rhs, 0)) return false;
+    const bits = switch (icmp.operand_ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (bits == 0 or bits > 32) return false;
+    const block = maybe_block orelse return false;
+    return genericCfgSupportsSingleBlockIntBitsValue(function, block, icmp.lhs, bits);
 }
 
 pub fn genericCfgSupportsBranchIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {

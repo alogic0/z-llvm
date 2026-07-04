@@ -68,6 +68,7 @@ const genericCfgSupportsSingleBlockIcmp = core_value_support.genericCfgSupportsS
 const genericCfgSupportsSingleBlockI32Value = core_value_support.genericCfgSupportsSingleBlockI32Value;
 const genericCfgSupportsI64Value = core_value_support.genericCfgSupportsI64Value;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
+const emitGenericCfgIntBitsValueIntoEax = core_value_emit.emitGenericCfgIntBitsValueIntoEax;
 const emitGenericCfgI64ValueIntoRax = core_value_emit.emitGenericCfgI64ValueIntoRax;
 const GenericCfgBranchKind = core_cfg_emit.GenericCfgBranchKind;
 const appendGenericCfgBlockLabel = core_cfg_emit.appendGenericCfgBlockLabel;
@@ -1661,6 +1662,10 @@ pub fn emitGenericCfgIcmpConditionWithBlock(
     maybe_block: ?ir.BasicBlock,
     icmp: ir.IcmpInst,
 ) !GenericCfgBranchKind {
+    if (try emitGenericCfgUnsignedGtZeroCondition(allocator, machine, function, maybe_block, icmp)) |branch_kind| {
+        return branch_kind;
+    }
+
     const branch_kind: GenericCfgBranchKind = switch (icmp.predicate) {
         .eq => .je,
         .ne => .jne,
@@ -1829,6 +1834,34 @@ pub fn emitGenericCfgIcmpConditionWithBlock(
     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
     try appendGenericCfgCompareLocalImm(allocator, machine, .eax, rhs_imm);
     return branch_kind;
+}
+
+fn emitGenericCfgUnsignedGtZeroCondition(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    maybe_block: ?ir.BasicBlock,
+    icmp: ir.IcmpInst,
+) !?GenericCfgBranchKind {
+    if (icmp.predicate != .ugt or !isInt(icmp.rhs, 0)) return null;
+    const bits = switch (icmp.operand_ty) {
+        .int => |bits| bits,
+        else => return null,
+    };
+    if (bits == 0 or bits > 32) return error.UnsupportedCodegenType;
+    const block = maybe_block orelse return error.UnsupportedCodegenInstruction;
+    try emitGenericCfgIntBitsValueIntoEax(allocator, machine, function, block, icmp.lhs, bits);
+    if (try unsignedIntBitsMaskI32(bits)) |mask| try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
+    try appendGenericCfgCompareLocalImm(allocator, machine, .eax, 0);
+    return .jne;
+}
+
+fn unsignedIntBitsMaskI32(bits: u16) !?i32 {
+    if (bits == 0 or bits > 32) return error.UnsupportedCodegenType;
+    if (bits == 32) return null;
+    const shift: u5 = @intCast(bits);
+    const mask = (@as(u32, 1) << shift) - 1;
+    return @intCast(mask);
 }
 
 fn u16Value(value: i128) !u16 {
