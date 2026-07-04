@@ -1688,6 +1688,73 @@ test "lowering installs module aggregate facts for direct aggregate init returns
     try std.testing.expectEqual(@as(usize, 1), result.module.functions.items.len);
 }
 
+test "lowering constructs pointer register aggregate from ret pointer store" {
+    const facts = [_]exported_aggregate_layout_facts.Fact{
+        .{ .nominal_type_name = "Air.Liveness.FmtInstSet", .aggregate_text = "{ ptr }" },
+    };
+    var field_details = [_]air_export.TypedDetail{.{ .key = "field_index", .value = "0" }};
+    var field_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "2", .type_text = "*Air.Liveness.FmtInstSet" },
+    };
+    var store_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "3", .type_text = "**const hash_map.HashMapUnmanaged(Air.Inst.Index,void,hash_map.AutoContext(Air.Inst.Index),80)" },
+        .{ .kind = "inst", .value = "0", .type_text = "*const hash_map.HashMapUnmanaged(Air.Inst.Index,void,hash_map.AutoContext(Air.Inst.Index),80)" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "*const hash_map.HashMapUnmanaged(Air.Inst.Index,void,hash_map.AutoContext(Air.Inst.Index),80)", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 2, .opcode = "ret_ptr", .result_type = "*Air.Liveness.FmtInstSet", .data_kind = "ret_ptr", .operands = &.{} },
+        .{ .index = 3, .opcode = "struct_field_ptr_index_0", .result_type = "**const hash_map.HashMapUnmanaged(Air.Inst.Index,void,hash_map.AutoContext(Air.Inst.Index),80)", .data_kind = "field_ptr", .operands = field_operands[0..], .details = field_details[0..] },
+        .{ .index = 4, .opcode = "store", .result_type = "void", .data_kind = "store", .operands = store_operands[0..] },
+        .{ .index = 5, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 6, .opcode = "ret_load", .result_type = "noreturn", .data_kind = "ret_load", .operands = &.{} },
+    };
+    var main_body_instructions = [_]u32{ 0, 1, 2, 3, 4, 5, 6 };
+    var bodies = [_]air_export.StructuredBody{.{
+        .kind = .main,
+        .owner = null,
+        .instructions = main_body_instructions[0..],
+    }};
+    var functions = [_]air_export.Function{.{
+        .name = "Air.Liveness.fmtInstSet",
+        .type_text = "fn (*const hash_map.HashMapUnmanaged(Air.Inst.Index,void,hash_map.AutoContext(Air.Inst.Index),80)) Air.Liveness.FmtInstSet",
+        .instruction_count = 7,
+        .main_body_count = 7,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = .{
+            .instructions = &.{},
+            .bodies = bodies[0..],
+            .branches = &.{},
+            .cond_branches = &.{},
+            .repeats = &.{},
+        },
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = &.{},
+    }};
+    const air_module: air_export.Module = .{
+        .allocator = std.testing.allocator,
+        .storage = "",
+        .producer = "test",
+        .root_source = "main.zig",
+        .wrapper = "compiler-core-module",
+        .mode = "ReleaseFast",
+        .target = "x86_64-linux-gnu",
+        .globals = &.{},
+        .aggregate_layout_facts = .{ .facts = facts[0..] },
+        .functions = functions[0..],
+    };
+
+    var result = try lowerCompatible(std.testing.allocator, air_module);
+    defer result.deinit();
+    try std.testing.expectEqual(@as(usize, 1), result.accepted_functions);
+    try std.testing.expectEqual(@as(usize, 0), result.unsupported.len);
+    try std.testing.expectEqual(@as(usize, 1), result.module.functions.items.len);
+    try std.testing.expect(result.module.functions.items[0].ret_ty.eql(.{ .aggregate = "{ ptr }" }));
+}
+
 test "first unsupported ignores orphan structured block outside main body" {
     var main_body_instructions = [_]u32{ 0, 2, 3 };
     var bodies = [_]air_export.StructuredBody{.{

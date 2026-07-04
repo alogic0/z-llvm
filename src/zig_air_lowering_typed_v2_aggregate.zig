@@ -34,7 +34,8 @@ fn lowerRegisterAggregateMake(
     if (!typedV2RegisterAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths)) return error.UnsupportedAir;
     for (function_type.params) |param| {
         if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and
-            !param.ir_type.eql(.float) and !param.ir_type.eql(.double)) return error.UnsupportedAir;
+            !param.ir_type.eql(.float) and !param.ir_type.eql(.double) and
+            !param.ir_type.eql(.ptr)) return error.UnsupportedAir;
     }
     var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
     errdefer function.deinit(allocator);
@@ -48,8 +49,7 @@ fn lowerRegisterAggregateMake(
     errdefer block.deinit(allocator);
     const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "result", "result" };
     var aggregate_value: ir.Value = .undef;
-    for (function_type.params, 0..) |param, index| {
-        _ = param;
+    for (function_type.params, 0..) |_, index| {
         try block.instructions.append(allocator, .{
             .result = result_names[index],
             .kind = .{ .insertvalue = .{

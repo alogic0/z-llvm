@@ -430,7 +430,7 @@ pub fn lowerRegisterAggregateReturn(
         const leaf_class = classification.eightbytes[leaf_eightbyte] orelse return false;
         switch (leaf_class) {
             .integer => {
-                if (leaf.ty.eql(.{ .int = 64 })) {
+                if (leaf.ty.eql(.{ .int = 64 }) or leaf.ty.eql(.ptr)) {
                     const src = try paramValueReg(function, leaf.value, leaf.ty);
                     switch (gpr_return_index) {
                         0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
