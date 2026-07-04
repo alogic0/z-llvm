@@ -51,14 +51,16 @@ Stop state recorded 2026-07-04 during item 10 cluster fixing:
   `real_native_linked=200`, `real_executed=0`, `real_programs_ok=0`.
   The hook-contract blocker for `Build.Cache.Path.fmtEscapeString` was closed
   by patched Zig commit `bdee02bc`, which additively emits optional
-  payload/slice aggregate-layout facts under the v1 contract.
+  payload/slice aggregate-layout facts under the v1 contract. ReleaseSafe
+  report-mode `distribution-real-rows --mode=ReleaseSafe --limit=100` is now
+  also green after model-owned `intcast_safe` lowering, with counters
+  `real_functions_lowered=100`, `real_objects_emitted=100`,
+  `real_native_linked=100`, `real_executed=0`, `real_programs_ok=0`.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
-- First failing real row/stage beyond the enforced prefix:
-  ReleaseSafe `../ziglang/src/main.zig/Io.Limit.limited` at `typed-lowering`,
-  diagnostic `unsupported:opcode:intcast_safe`. The same ReleaseSafe cluster
-  also appears at ranks 51 `http.Reader.RemainingChunkLen.init` and 58
-  `zig.Ast.OptionalTokenIndex.fromToken`.
+- First failing real row/stage beyond the enforced prefix: none known after
+  the ReleaseSafe `intcast_safe` fix; strict `--limit=100` all-mode proof has
+  not yet been rerun after that fix.
 - Strict ratchet `real_*` counters:
   `real_functions_lowered=25`, `real_objects_emitted=25`,
   `real_native_linked=25`, `real_executed=0`, `real_programs_ok=0`.
@@ -73,16 +75,19 @@ Stop state recorded 2026-07-04 during item 10 cluster fixing:
   `distribution-real-rows --strict --limit=25`.
 - Saved log paths: `tmp/check_stage4_optional_layout_pin_amended.log`,
   `tmp/real_rows_releasefast_limit200_after_sret_field_backend.log`, and
-  `tmp/real_rows_strict_limit100_after_optional_layout.log`.
+  `tmp/real_rows_strict_limit100_after_optional_layout.log`,
+  `tmp/real_rows_releasesafe_limit100_after_intcast_safe.log`.
 - Tracked evidence summaries:
   `docs/evidence/ziglang_pin_stage4_optional_layout.summary`,
   `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary`,
+  `docs/evidence/real_rows_releasesafe_limit100_after_intcast_safe.summary`,
   and
   `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`.
-- Recommended next action: fix the ReleaseSafe `intcast_safe` typed-lowering
-  cluster starting from rank 32 `Io.Limit.limited`, then rerun strict
-  `--limit=100` in all three release modes. Keep the syscall-hello item 11
-  track open in the stop report.
+- Recommended next action: rerun strict `distribution-real-rows --strict
+  --limit=100` in all three release modes. If green, raise the item 10
+  ratchet, wire `distribution-all` to strict limit 100, write the strict
+  evidence summary, check off item 10, and then move to item 11. Keep the
+  syscall-hello item 11 track open in the stop report.
 
 When the worker stops, record only:
 

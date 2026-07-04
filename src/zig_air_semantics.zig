@@ -50,7 +50,7 @@ pub fn castOp(opcode: []const u8, from: ZigType, to: ZigType) ?ir.CastOp {
     if (std.mem.eql(u8, opcode, "int_from_float")) return if (to.signed) .fptosi else .fptoui;
     if (std.mem.eql(u8, opcode, "fpext")) return .fpext;
     if (std.mem.eql(u8, opcode, "fptrunc")) return .fptrunc;
-    if (!std.mem.eql(u8, opcode, "intcast")) return null;
+    if (!std.mem.eql(u8, opcode, "intcast") and !std.mem.eql(u8, opcode, "intcast_safe")) return null;
     const from_bits = intBits(from.ir_type) orelse return null;
     const to_bits = intBits(to.ir_type) orelse return null;
     if (to_bits < from_bits) return .trunc;
@@ -67,4 +67,14 @@ pub fn intBits(ty: ir.Type) ?u16 {
         .int => |bits| bits,
         else => null,
     };
+}
+
+test "safe intcast shares integer cast semantics" {
+    const unsigned64: ZigType = .{ .ir_type = .{ .int = 64 } };
+    const unsigned32: ZigType = .{ .ir_type = .{ .int = 32 } };
+    const signed32: ZigType = .{ .ir_type = .{ .int = 32 }, .signed = true };
+    try std.testing.expectEqual(ir.CastOp.trunc, castOp("intcast_safe", unsigned64, unsigned32).?);
+    try std.testing.expectEqual(ir.CastOp.zext, castOp("intcast_safe", unsigned32, unsigned64).?);
+    try std.testing.expectEqual(ir.CastOp.sext, castOp("intcast_safe", signed32, unsigned64).?);
+    try std.testing.expectEqual(ir.CastOp.bitcast, castOp("intcast_safe", unsigned64, unsigned64).?);
 }

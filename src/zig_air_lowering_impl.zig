@@ -708,7 +708,10 @@ fn inferredOpaqueBitcastType(structured_air_v2: air_export.StructuredAirV2, text
     if (!isOpaqueNominalTypeSurface(text)) return error.UnsupportedAir;
     var inferred: ?ZigType = null;
     for (structured_air_v2.instructions) |instruction| {
-        if (std.mem.eql(u8, instruction.opcode, "bitcast") or std.mem.eql(u8, instruction.opcode, "intcast")) {
+        if (std.mem.eql(u8, instruction.opcode, "bitcast") or
+            std.mem.eql(u8, instruction.opcode, "intcast") or
+            std.mem.eql(u8, instruction.opcode, "intcast_safe"))
+        {
             if (std.mem.eql(u8, instruction.result_type, text)) {
                 const operand_type = singleOperandType(instruction) orelse continue;
                 const concrete = parseScalarBitcastType(operand_type) orelse continue;
@@ -1456,6 +1459,45 @@ test "lowering parser infers opaque nominal return from typed intcast" {
     try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
     try std.testing.expectEqual(ir.Type{ .int = 6 }, function_type.params[0].ir_type);
     try std.testing.expectEqual(ir.Type{ .int = 6 }, function_type.return_type.ir_type);
+}
+
+test "lowering parser infers opaque nominal return from typed safe intcast" {
+    var intcast_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = "usize" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "pkg.Target" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "usize", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "intcast_safe", .result_type = "pkg.Target", .data_kind = "ty_op", .operands = intcast_operands[0..] },
+        .{ .index = 2, .opcode = "ret_safe", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..] },
+    };
+    var legacy_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 2, .unused = false, .opcode = "arg", .payload = "usize, 0", .category = .argument },
+        .{ .index = 1, .indent = 2, .unused = false, .opcode = "intcast_safe", .payload = "pkg.Target, %0!", .category = .cast },
+        .{ .index = 2, .indent = 2, .unused = true, .opcode = "ret_safe", .payload = "%1!", .category = .return_op },
+    };
+    const air_function: air_export.Function = .{
+        .name = "pkg.convertSafe",
+        .type_text = "fn (usize) pkg.Target",
+        .instruction_count = 3,
+        .main_body_count = 3,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = legacy_instructions[0..],
+    };
+
+    const function_type = try parseFunctionTypeForLowering(std.testing.allocator, air_function);
+    defer function_type.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.return_type.ir_type);
 }
 
 test "lowering accepts opaque nominal bitcast intcast return wrapper" {

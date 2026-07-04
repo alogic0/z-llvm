@@ -594,6 +594,7 @@ pub fn isCmpLtOpcode(opcode: []const u8) bool {
 pub fn isCastOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "trunc") or
         std.mem.eql(u8, opcode, "intcast") or
+        std.mem.eql(u8, opcode, "intcast_safe") or
         isBitcastOpcode(opcode) or
         std.mem.eql(u8, opcode, "ptrtoint") or
         std.mem.eql(u8, opcode, "inttoptr") or
@@ -977,6 +978,7 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ScalarSemanticOp.binary, scalarSemanticOpForOpcode("add"));
     try std.testing.expectEqual(ScalarSemanticOp.compare, scalarSemanticOpForOpcode("cmp_eq"));
     try std.testing.expectEqual(ScalarSemanticOp.cast, scalarSemanticOpForOpcode("intcast"));
+    try std.testing.expectEqual(ScalarSemanticOp.cast, scalarSemanticOpForOpcode("intcast_safe"));
     try std.testing.expectEqual(ScalarSemanticOp.byte_swap, scalarSemanticOpForOpcode("byte_swap"));
     try std.testing.expectEqual(ScalarSemanticOp.max, scalarSemanticOpForOpcode("max"));
     try std.testing.expectEqual(ScalarSemanticOp.min, scalarSemanticOpForOpcode("min"));

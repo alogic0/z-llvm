@@ -240,7 +240,7 @@ changes the counts; cite the discovery/fix evidence summary.
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
 | ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
-| ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
+| ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_releasesafe_limit100_after_intcast_safe.summary` |
 | ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
 ## Cluster Board (item 9a)
@@ -374,6 +374,13 @@ One line per completed cycle, append-only, newest last. This is the
   ReleaseSafe-only typed-lowering cluster, `unsupported:opcode:intcast_safe`
   at ranks 32, 51, and 58; no ratchet move yet. Recognizer count still 1 (no
   recognizer reorder or pre-pass).
+- 2026-07-04 (this commit) Item 10 cluster fix: typed scalar lowering now
+  admits `intcast_safe` through the same model-owned integer cast semantics as
+  `intcast`, moving ReleaseSafe report-mode `--limit=100` to
+  `100/100/100/0/0` and making ranks 32 `Io.Limit.limited`, 51
+  `http.Reader.RemainingChunkLen.init`, and 58
+  `zig.Ast.OptionalTokenIndex.fromToken` typed/object/link green. Recognizer
+  count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 

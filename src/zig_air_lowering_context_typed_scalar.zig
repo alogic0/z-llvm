@@ -236,7 +236,9 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
 }
 
 fn opaqueCastResultType(instruction: air_export.TypedInstruction, source_type: air_model.ZigType) ?air_model.ZigType {
-    if (!air_capabilities.isBitcastOpcode(instruction.opcode) and !std.mem.eql(u8, instruction.opcode, "intcast")) return null;
+    if (!air_capabilities.isBitcastOpcode(instruction.opcode) and
+        !std.mem.eql(u8, instruction.opcode, "intcast") and
+        !std.mem.eql(u8, instruction.opcode, "intcast_safe")) return null;
     if (!isOpaqueNominalTypeSurface(instruction.result_type)) return null;
     return switch (source_type.ir_type) {
         .int, .ptr, .float, .double => source_type,
