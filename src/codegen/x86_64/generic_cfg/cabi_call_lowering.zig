@@ -1724,6 +1724,34 @@ pub fn emitGenericCfgIcmpConditionWithBlock(
         return branch_kind;
     }
 
+    if (icmp.operand_ty.eql(.{ .int = 64 })) {
+        if (icmp.predicate != .eq and icmp.predicate != .ne) return error.UnsupportedCodegenInstruction;
+        if (icmp.lhs == .int and icmp.rhs != .int) {
+            const rhs_reg = try paramValueReg(function, icmp.rhs, .{ .int = 64 });
+            const lhs_imm = try i64Value(switch (icmp.lhs) {
+                .int => |int| int,
+                else => unreachable,
+            });
+            if (lhs_imm == 0) {
+                try machine.instructions.append(allocator, .{ .test_arg64 = rhs_reg });
+            } else {
+                try machine.instructions.append(allocator, .{ .cmp_arg64_imm64 = .{ .reg = rhs_reg, .imm = lhs_imm } });
+            }
+            return branch_kind;
+        }
+        const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 64 });
+        const rhs_imm = switch (icmp.rhs) {
+            .int => |int| try i64Value(int),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        if (rhs_imm == 0) {
+            try machine.instructions.append(allocator, .{ .test_arg64 = lhs_reg });
+        } else {
+            try machine.instructions.append(allocator, .{ .cmp_arg64_imm64 = .{ .reg = lhs_reg, .imm = rhs_imm } });
+        }
+        return branch_kind;
+    }
+
     if (!icmp.operand_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
 
     if (icmp.predicate == .slt and isInt(icmp.rhs, 0)) {

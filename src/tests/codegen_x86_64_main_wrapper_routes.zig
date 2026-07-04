@@ -547,3 +547,27 @@ test "x86_64 codegen routes nominal enum bool less-than return through generic c
     }
     try std.testing.expect(saw_unsigned_branch);
 }
+
+test "x86_64 codegen routes i64 equality bool returns through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal fastcc i1 @Io.Limit.nonzero(i64 %limit) {
+        \\entry:
+        \\  %nonzero = icmp ne i64 %limit, 0
+        \\  ret i1 %nonzero
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .test_arg64 = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_imm_eax = 0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_imm_eax = 1 });
+    try expectMachineInstruction(machine.instructions.items, .ret);
+}

@@ -193,6 +193,12 @@ test "parse static AIR constants" {
     const enum_literal = parseConstant("<Io.Event, .unset>") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 32 }, enum_literal.ty.ir_type);
     try std.testing.expectEqual(@as(i128, 0), enum_literal.value.int);
+    const limit_literal = parseConstant("<Io.Limit, .nothing>") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, limit_literal.ty.ir_type);
+    try std.testing.expectEqual(@as(i128, 0), limit_literal.value.int);
+    const chunk_len_literal = parseConstant("<http.Reader.RemainingChunkLen, .rn>") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, chunk_len_literal.ty.ir_type);
+    try std.testing.expectEqual(@as(i128, 2), chunk_len_literal.value.int);
 }
 
 test "parse symbol pointers" {

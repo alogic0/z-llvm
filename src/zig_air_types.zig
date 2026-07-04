@@ -343,6 +343,10 @@ test "parse exported named enum type surfaces as C ABI scalars" {
 test "parse fact-owned named enum type surfaces" {
     const parsed_type = parseZigType("Io.Event") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_type.ir_type);
+    const parsed_limit = parseZigType("Io.Limit") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, parsed_limit.ir_type);
+    const parsed_chunk_len = parseZigType("http.Reader.RemainingChunkLen") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, parsed_chunk_len.ir_type);
 
     const parsed_fn = try parseFunctionType(std.testing.allocator, "fn (*Io.Event) void");
     defer parsed_fn.deinit(std.testing.allocator);

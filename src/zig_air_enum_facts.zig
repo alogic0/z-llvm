@@ -19,11 +19,32 @@ const io_event_enumerators = [_]Enumerator{
     .{ .name = "is_set", .value = 2 },
 };
 
+const io_limit_enumerators = [_]Enumerator{
+    .{ .name = "nothing", .value = 0 },
+    .{ .name = "unlimited", .value = std.math.maxInt(u64) },
+};
+
+const http_reader_remaining_chunk_len_enumerators = [_]Enumerator{
+    .{ .name = "head", .value = 0 },
+    .{ .name = "n", .value = 1 },
+    .{ .name = "rn", .value = 2 },
+};
+
 const facts = [_]Fact{
     .{
         .name = "Io.Event",
         .backing_type = .{ .int = 32 },
         .enumerators = io_event_enumerators[0..],
+    },
+    .{
+        .name = "Io.Limit",
+        .backing_type = .{ .int = 64 },
+        .enumerators = io_limit_enumerators[0..],
+    },
+    .{
+        .name = "http.Reader.RemainingChunkLen",
+        .backing_type = .{ .int = 64 },
+        .enumerators = http_reader_remaining_chunk_len_enumerators[0..],
     },
 };
 
@@ -57,4 +78,12 @@ test "enum facts expose exact nominal backing types and literals" {
     try std.testing.expectEqual(@as(?i128, 0), enumeratorValue("Io.Event", ".unset"));
     try std.testing.expectEqual(@as(?i128, 2), enumeratorValue("Io.Event", ".is_set"));
     try std.testing.expect(enumeratorValue("Event", ".unset") == null);
+
+    const limit = lookup("Io.Limit") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, limit.backing_type);
+    try std.testing.expectEqual(@as(?i128, 0), enumeratorValue("Io.Limit", ".nothing"));
+
+    const chunk_len = lookup("http.Reader.RemainingChunkLen") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, chunk_len.backing_type);
+    try std.testing.expectEqual(@as(?i128, 2), enumeratorValue("http.Reader.RemainingChunkLen", ".rn"));
 }
