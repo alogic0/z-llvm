@@ -30,6 +30,10 @@ const http_reader_remaining_chunk_len_enumerators = [_]Enumerator{
     .{ .name = "rn", .value = 2 },
 };
 
+const zig_ast_optional_token_index_enumerators = [_]Enumerator{
+    .{ .name = "none", .value = std.math.maxInt(u32) },
+};
+
 const facts = [_]Fact{
     .{
         .name = "Io.Event",
@@ -45,6 +49,11 @@ const facts = [_]Fact{
         .name = "http.Reader.RemainingChunkLen",
         .backing_type = .{ .int = 64 },
         .enumerators = http_reader_remaining_chunk_len_enumerators[0..],
+    },
+    .{
+        .name = "zig.Ast.OptionalTokenIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_ast_optional_token_index_enumerators[0..],
     },
 };
 
@@ -86,4 +95,8 @@ test "enum facts expose exact nominal backing types and literals" {
     const chunk_len = lookup("http.Reader.RemainingChunkLen") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 64 }, chunk_len.backing_type);
     try std.testing.expectEqual(@as(?i128, 2), enumeratorValue("http.Reader.RemainingChunkLen", ".rn"));
+
+    const optional_token = lookup("zig.Ast.OptionalTokenIndex") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, optional_token.backing_type);
+    try std.testing.expectEqual(@as(?i128, std.math.maxInt(u32)), enumeratorValue("zig.Ast.OptionalTokenIndex", ".none"));
 }

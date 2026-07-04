@@ -199,6 +199,9 @@ test "parse static AIR constants" {
     const chunk_len_literal = parseConstant("<http.Reader.RemainingChunkLen, .rn>") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 64 }, chunk_len_literal.ty.ir_type);
     try std.testing.expectEqual(@as(i128, 2), chunk_len_literal.value.int);
+    const optional_token_literal = parseConstant("<zig.Ast.OptionalTokenIndex, .none>") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, optional_token_literal.ty.ir_type);
+    try std.testing.expectEqual(@as(i128, std.math.maxInt(u32)), optional_token_literal.value.int);
 }
 
 test "parse symbol pointers" {

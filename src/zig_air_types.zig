@@ -347,6 +347,8 @@ test "parse fact-owned named enum type surfaces" {
     try std.testing.expectEqual(ir.Type{ .int = 64 }, parsed_limit.ir_type);
     const parsed_chunk_len = parseZigType("http.Reader.RemainingChunkLen") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 64 }, parsed_chunk_len.ir_type);
+    const parsed_optional_token = parseZigType("zig.Ast.OptionalTokenIndex") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_optional_token.ir_type);
 
     const parsed_fn = try parseFunctionType(std.testing.allocator, "fn (*Io.Event) void");
     defer parsed_fn.deinit(std.testing.allocator);
