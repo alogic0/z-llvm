@@ -109,6 +109,7 @@ pub const Instruction = union(enum) {
     shift_mix_i32_edi_esi_eax,
     replace_low_i8_dil_sil_al,
     read_flag_i8_dil_al,
+    ult_i8_dil_imm8_al: u8,
     store_imm8_abs: struct {
         address: u32,
         value: u8,

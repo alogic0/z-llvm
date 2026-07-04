@@ -1387,6 +1387,10 @@ pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machin
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgPackedU8LtImmReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     return false;
 }
 
@@ -3389,6 +3393,37 @@ pub fn lowerGenericCfgPackedReadFlagReturn(
     if (!isNamed(icmp.lhs, function.params.items[0].name) or !isInt(icmp.rhs, 0)) return false;
 
     try machine.instructions.append(allocator, .read_flag_i8_dil_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGenericCfgPackedU8LtImmReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 1 }) or !ret.ty.eql(.{ .int = 1 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    if (block.instructions.items.len != 1) return false;
+    const icmp_inst = block.instructions.items[0];
+    if (icmp_inst.removed) return false;
+    const icmp_result = icmp_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, icmp_result)) return false;
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(icmp.lhs, function.params.items[0].name)) return false;
+    const imm = switch (icmp.rhs) {
+        .int => |int| try i64Value(int),
+        else => return false,
+    };
+    if (imm < 0 or imm > std.math.maxInt(u8)) return false;
+
+    try machine.instructions.append(allocator, .{ .ult_i8_dil_imm8_al = @intCast(imm) });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

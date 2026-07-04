@@ -47,12 +47,12 @@ Stop state recorded 2026-07-03 during item 10 cluster fixing:
 - Real-row track status: selector-v2 `distribution-real-rows --strict
   --limit=25` is green in ReleaseFast, ReleaseSafe, and ReleaseSmall through
   typed lowering, x86_64 object emission, and native link. After the
-  opaque-bitcast fix, ReleaseFast report-mode discovery at `--limit=200`
-  reached `real_functions_lowered=179`, `real_objects_emitted=49`,
-  `real_native_linked=49`, `real_executed=0`, `real_programs_ok=0`.
+  i8 unsigned-compare fix, ReleaseFast report-mode discovery at `--limit=200`
+  reached `real_functions_lowered=179`, `real_objects_emitted=50`,
+  `real_native_linked=50`, `real_executed=0`, `real_programs_ok=0`.
 - Largest open cluster: `object-emission UnsupportedCodegenInstruction`,
-  130 rows; representative first row rank 36
-  `../ziglang/src/main.zig/ascii.isAscii`.
+  129 rows; representative first row rank 39
+  `../ziglang/src/main.zig/bit_set.Array(usize,100).maskIndex`.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
 - First failing real row/stage beyond the enforced prefix:
@@ -73,14 +73,14 @@ Stop state recorded 2026-07-03 during item 10 cluster fixing:
   `distribution-real-rows --strict --limit=25`.
 - Saved log paths: `tmp/real_rows_strict_limit25_v2.log`,
   `tmp/real_rows_releasefast_limit200_discovery.log`, and
-  `tmp/real_rows_releasefast_limit200_after_opaque_bitcast.log`.
+  `tmp/real_rows_releasefast_limit200_after_i8_ult.log`.
 - Tracked evidence summaries:
   `docs/evidence/real_rows_strict_limit25_v2.summary`,
   `docs/evidence/real_rows_releasefast_limit200_discovery.summary`, and
-  `docs/evidence/real_rows_releasefast_limit200_after_opaque_bitcast.summary`.
+  `docs/evidence/real_rows_releasefast_limit200_after_i8_ult.summary`.
 - Recommended next action: continue item 10 on the largest remaining cluster,
-  `object-emission UnsupportedCodegenInstruction`, using rank 36
-  `ascii.isAscii` as the first representative. Keep the syscall-hello item
+  `object-emission UnsupportedCodegenInstruction`, using rank 39
+  `bit_set.Array(usize,100).maskIndex` as the first representative. Keep the syscall-hello item
   11 track open in the stop report.
 
 When the worker stops, record only:

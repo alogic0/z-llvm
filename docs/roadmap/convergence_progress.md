@@ -239,7 +239,7 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 200 | 179 | 49 | 49 | `docs/evidence/real_rows_releasefast_limit200_after_opaque_bitcast.summary` |
+| ReleaseFast | 200 | 179 | 50 | 50 | `docs/evidence/real_rows_releasefast_limit200_after_i8_ult.summary` |
 | ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 | ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
@@ -251,7 +251,7 @@ count that turned green when the fix landed.
 
 | Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
 | --- | ---: | --- | ---: | --- |
-| `object-emission UnsupportedCodegenInstruction` | 130 | Open | 16 | Opaque-bitcast typed lowering moved 137 rows past typed lowering; 16 of those also emitted/linked. Representative rows: rank 36 `ascii.isAscii`, ranks 39-43 `bit_set.*.maskIndex`, ranks 66-182 `hash_map.*.Metadata.*`; evidence `docs/evidence/real_rows_releasefast_limit200_after_opaque_bitcast.summary` |
+| `object-emission UnsupportedCodegenInstruction` | 129 | Open | 17 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission then unlocked rank 36 `ascii.isAscii`. Representative rows now: ranks 39-43 `bit_set.*.maskIndex`, rank 59 `Air.VectorCmp.encodeOp`, ranks 66-182 `hash_map.*.Metadata.*`; evidence `docs/evidence/real_rows_releasefast_limit200_after_i8_ult.summary` |
 | `typed-lowering unsupported:function_type:function-type` | 20 | Open | 137 | Representative rows now: rank 32 `Io.Limit.limited`, rank 33 `Io.Limit.nonzero`, rank 51 `http.Reader.RemainingChunkLen.init`; evidence `docs/evidence/real_rows_releasefast_limit200_after_opaque_bitcast.summary` |
 | `typed-lowering unsupported:instruction_type:lowering` | 1 | Open | 0 | Representative row: rank 188 `Air.Liveness.fmtInstSet`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
 
@@ -295,6 +295,10 @@ One line per completed cycle, append-only, newest last. This is the
   `179/49/49/0/0`, unlocking 137 typed-lowering rows from the former
   function-type cluster. The largest open cluster is now object emission
   `UnsupportedCodegenInstruction`. Recognizer count still 1.
+- 2026-07-03 (this commit) Item 10 cluster fix: generic CFG x86_64 emission
+  for unsigned `i8 < imm8` boolean returns moved ReleaseFast report-mode
+  `--limit=200` to `179/50/50/0/0`, making rank 36 `ascii.isAscii`
+  object/link green. Recognizer count still 1.
 
 ## Ratchet State
 
