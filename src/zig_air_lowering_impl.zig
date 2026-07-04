@@ -1317,6 +1317,52 @@ test "lowering parser infers opaque nominal parameter from typed bitcast" {
     try std.testing.expectEqual(ir.Type{ .int = 64 }, function_type.return_type.ir_type);
 }
 
+test "lowering parser infers opaque generic pointer nominal parameter from typed bitcast" {
+    const metadata_type = "hash_map.HashMapUnmanaged(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata";
+    var bitcast_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "0", .type_text = metadata_type },
+    };
+    var cmp_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "1", .type_text = "u8" },
+        .{ .kind = "const", .value = "0", .type_text = "u8" },
+    };
+    var ret_operands = [_]air_export.TypedOperand{
+        .{ .kind = "inst", .value = "2", .type_text = "bool" },
+    };
+    var typed_instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = metadata_type, .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "bitcast", .result_type = "u8", .data_kind = "ty_op", .operands = bitcast_operands[0..] },
+        .{ .index = 2, .opcode = "cmp_eq", .result_type = "bool", .data_kind = "bin_op", .operands = cmp_operands[0..] },
+        .{ .index = 3, .opcode = "ret", .result_type = "noreturn", .data_kind = "un_op", .operands = ret_operands[0..] },
+    };
+    var legacy_instructions = [_]air_export.Instruction{
+        .{ .index = 0, .indent = 2, .unused = false, .opcode = "arg", .payload = metadata_type ++ ", 0", .category = .argument },
+        .{ .index = 1, .indent = 2, .unused = false, .opcode = "bitcast", .payload = "u8, %0!", .category = .cast },
+        .{ .index = 2, .indent = 2, .unused = false, .opcode = "cmp_eq", .payload = "%1!, @.zero_u8", .category = .other },
+        .{ .index = 3, .indent = 2, .unused = true, .opcode = "ret", .payload = "%2!", .category = .return_op },
+    };
+    const air_function: air_export.Function = .{
+        .name = "pkg.isFree",
+        .type_text = "fn (" ++ metadata_type ++ ") bool",
+        .instruction_count = 4,
+        .main_body_count = 4,
+        .has_liveness = true,
+        .air_text = "",
+        .structured_air_text = null,
+        .structured_air = null,
+        .structured_air_v2_text = null,
+        .structured_air_v2 = .{ .instructions = typed_instructions[0..] },
+        .instructions = legacy_instructions[0..],
+    };
+
+    const function_type = try parseFunctionTypeForLowering(std.testing.allocator, air_function);
+    defer function_type.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), function_type.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 8 }, function_type.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 1 }, function_type.return_type.ir_type);
+}
+
 test "lowering parser infers opaque nominal return from typed bitcast" {
     var bitcast_operands = [_]air_export.TypedOperand{
         .{ .kind = "inst", .value = "0", .type_text = "u64" },

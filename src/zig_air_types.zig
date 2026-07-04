@@ -131,6 +131,7 @@ pub fn isOpaqueNominalTypeSurface(text: []const u8) bool {
     var paren_depth: usize = 0;
     for (text) |char| switch (char) {
         'a'...'z', 'A'...'Z', '0'...'9', '_', '.' => {},
+        '*' => if (paren_depth == 0) return false,
         '(' => paren_depth += 1,
         ')' => {
             if (paren_depth == 0) return false;
@@ -359,8 +360,10 @@ test "parse fact-owned named enum type surfaces" {
 
 test "opaque nominal type surface accepts comptime argument instantiations" {
     try std.testing.expect(isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2,4,false)"));
+    try std.testing.expect(isOpaqueNominalTypeSurface("hash_map.HashMapUnmanaged(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata"));
     try std.testing.expect(!isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2 + 4)"));
     try std.testing.expect(!isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2,4,false"));
+    try std.testing.expect(!isOpaqueNominalTypeSurface("*pkg.Metadata"));
 }
 
 test "parse array length from typed AIR array and pointer forms" {

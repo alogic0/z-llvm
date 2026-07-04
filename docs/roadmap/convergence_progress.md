@@ -239,7 +239,7 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 200 | 183 | 180 | 180 | `docs/evidence/real_rows_releasefast_limit200_after_optional_token.summary` |
+| ReleaseFast | 200 | 186 | 183 | 183 | `docs/evidence/real_rows_releasefast_limit200_after_metadata_surface.summary` |
 | ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 | ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
@@ -252,7 +252,7 @@ count that turned green when the fix landed.
 | Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
 | --- | ---: | --- | ---: | --- |
 | `object-emission x86_64-lower:UnsupportedCodegenInstruction` | 3 | Open | 143 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission unlocked rank 36 `ascii.isAscii`; i64 terminal shifts with model-owned extended shift-count constants unlocked ranks 39-43 `bit_set.*.maskIndex`; narrow enum `zext` emission unlocked rank 59 `Air.VectorCmp.encodeOp`; nominal enum bool less-than returns unlocked ranks 61-62 `codegen.*.bits.FrameIndex.isNamed`, ranks 66-182 `hash_map.*.Metadata.*`, and rank 184 `os.linux.W.IFEXITED`. Representative rows now: rank 183 `link.Diags.Flags.anySet`, ranks 186-187 `unicode.utf16Is*Surrogate`; evidence `docs/evidence/real_rows_releasefast_limit200_after_frameindex_bool.summary` |
-| `typed-lowering unsupported:function_type:function-type` | 16 | Open | 141 | Fact-owned `zig.Ast.OptionalTokenIndex` u32 nominal enum surface unlocked rank 58 `zig.Ast.OptionalTokenIndex.fromToken`. Representative rows now: ranks 63-65 `hash_map.*.Metadata.*`, rank 185 `sort.block.Range.init`, and ranks 189-200 `InternPool.*`/related optional-index helpers; evidence `docs/evidence/real_rows_releasefast_limit200_after_optional_token.summary` |
+| `typed-lowering unsupported:function_type:function-type` | 13 | Open | 144 | Opaque nominal type-surface parsing now accepts pointer sigils inside balanced generic argument lists, so existing typed-bitcast inference unlocked ranks 63-65 `hash_map.*.Metadata.*`. Representative rows now: rank 185 `sort.block.Range.init` and ranks 189-200 `InternPool.*`/related optional-index helpers; evidence `docs/evidence/real_rows_releasefast_limit200_after_metadata_surface.summary` |
 | `typed-lowering unsupported:instruction_type:lowering` | 1 | Open | 0 | Representative row: rank 188 `Air.Liveness.fmtInstSet`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
 
 ## Progress Log
@@ -325,6 +325,11 @@ One line per completed cycle, append-only, newest last. This is the
   report-mode `--limit=200` to `183/180/180/0/0`, making rank 58
   `zig.Ast.OptionalTokenIndex.fromToken` typed/object/link green. Recognizer
   count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-03 (this commit) Item 10 cluster fix: opaque nominal type-surface
+  parsing now accepts pointer sigils inside balanced generic argument lists,
+  moving ReleaseFast report-mode `--limit=200` to `186/183/183/0/0` and
+  making ranks 63-65 `hash_map.*.Metadata.*` typed/object/link green.
+  Recognizer count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 
