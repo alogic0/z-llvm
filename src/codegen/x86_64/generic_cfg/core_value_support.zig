@@ -93,7 +93,7 @@ pub fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, blo
         .load => |load| genericCfgSupportsSingleBlockLoad(function, block, load),
         .store => |store| genericCfgSupportsSingleBlockStore(function, block, store),
         .call => |call| genericCfgSupportsSingleBlockCall(function, block, instruction.result, call),
-        .cast => |cast| genericCfgSupportsSingleBlockI32Cast(block, cast),
+        .cast => |cast| genericCfgSupportsSingleBlockCast(function, block, cast),
         .alloca => |alloca| genericCfgSupportsLocalAggregateAlloca(function, block, instruction.result, alloca),
         .phi, .fcmp, .freeze, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
     };
@@ -126,7 +126,7 @@ pub fn genericCfgSupportsSingleBlockBinary(function: ir.Function, block: ir.Basi
                         genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs) and
                         genericCfgSupportsSingleBlockI32Value(function, block, binary.rhs);
                 },
-                .cast => |cast| return binary.op == .add and genericCfgSupportsSingleBlockI32Cast(block, cast),
+                .cast => |cast| return binary.op == .add and genericCfgSupportsSingleBlockI32Cast(function, block, cast),
                 else => return false,
             }
         },
@@ -341,7 +341,7 @@ pub fn genericCfgSupportsSingleBlockI32Value(function: ir.Function, maybe_block:
                 .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
                 .load => |load| genericCfgSupportsSingleBlockLoad(function, block, load),
                 .call => |call| genericCfgSupportsSingleBlockCall(function, block, instruction.result, call),
-                .cast => |cast| genericCfgSupportsSingleBlockI32Cast(block, cast),
+                .cast => |cast| genericCfgSupportsSingleBlockI32Cast(function, block, cast),
                 .icmp, .phi, .fcmp, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
             };
         },
@@ -349,17 +349,35 @@ pub fn genericCfgSupportsSingleBlockI32Value(function: ir.Function, maybe_block:
     };
 }
 
-fn genericCfgSupportsSingleBlockI32Cast(block: ir.BasicBlock, cast: ir.CastInst) bool {
-    switch (cast.op) {
-        .zext, .sext, .bitcast => {},
+fn genericCfgSupportsSingleBlockCast(function: ir.Function, block: ir.BasicBlock, cast: ir.CastInst) bool {
+    if (genericCfgSupportsSingleBlockI32Cast(function, block, cast)) return true;
+    if (cast.op != .bitcast) return false;
+    const bits = switch (cast.to_ty) {
+        .int => |bits| bits,
         else => return false,
-    }
+    };
+    if (!cast.from_ty.eql(.{ .int = bits })) return false;
+    return genericCfgSupportsSingleBlockIntBitsValue(function, block, cast.value, bits);
+}
+
+fn genericCfgSupportsSingleBlockI32Cast(function: ir.Function, block: ir.BasicBlock, cast: ir.CastInst) bool {
     if (!cast.to_ty.eql(.{ .int = 32 })) return false;
-    switch (cast.from_ty) {
-        .int => |bits| if (bits > 32) return false,
+    switch (cast.op) {
+        .zext => {
+            const bits = switch (cast.from_ty) {
+                .int => |bits| bits,
+                else => return false,
+            };
+            if (bits > 32) return false;
+            return genericCfgSupportsSingleBlockIntBitsValue(function, block, cast.value, bits);
+        },
+        .bitcast => {
+            if (!cast.from_ty.eql(.{ .int = 32 })) return false;
+            return genericCfgSupportsSingleBlockI32Value(function, block, cast.value);
+        },
+        .sext => return singleBlockI32CastConstant(block, cast) != null,
         else => return false,
     }
-    return singleBlockI32Constant(block, cast.value) != null;
 }
 
 fn singleBlockI32Constant(block: ir.BasicBlock, value: ir.Value) ?i64 {
@@ -368,12 +386,51 @@ fn singleBlockI32Constant(block: ir.BasicBlock, value: ir.Value) ?i64 {
         .named => |name| blk: {
             const instruction = findInstruction(block, name) orelse break :blk null;
             break :blk switch (instruction.kind) {
-                .cast => |cast| if (genericCfgSupportsSingleBlockI32Cast(block, cast)) singleBlockI32Constant(block, cast.value) else null,
+                .cast => |cast| singleBlockI32CastConstant(block, cast),
                 else => null,
             };
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
     };
+}
+
+fn singleBlockI32CastConstant(block: ir.BasicBlock, cast: ir.CastInst) ?i64 {
+    switch (cast.op) {
+        .zext, .sext, .bitcast => {},
+        else => return null,
+    }
+    if (!cast.to_ty.eql(.{ .int = 32 })) return null;
+    switch (cast.from_ty) {
+        .int => |bits| if (bits > 32) return null,
+        else => return null,
+    }
+    return singleBlockI32Constant(block, cast.value);
+}
+
+fn genericCfgSupportsSingleBlockIntBitsValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value, bits: u16) bool {
+    if (bits == 0 or bits > 32) return false;
+    if (bits == 32) return genericCfgSupportsSingleBlockI32Value(function, block, value);
+    return switch (value) {
+        .int => |int| intFitsUnsignedBits(int, bits),
+        .named => |name| {
+            if ((paramRegOrNull(function, name, .{ .int = bits }) catch null) != null) return true;
+            const instruction = findInstruction(block, name) orelse return false;
+            const cast = switch (instruction.kind) {
+                .cast => |cast| cast,
+                else => return false,
+            };
+            if (cast.op != .bitcast or !cast.to_ty.eql(.{ .int = bits }) or !cast.from_ty.eql(.{ .int = bits })) return false;
+            return genericCfgSupportsSingleBlockIntBitsValue(function, block, cast.value, bits);
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn intFitsUnsignedBits(value: i128, bits: u16) bool {
+    if (bits == 0 or bits > 32 or value < 0) return false;
+    if (bits == 32) return value <= std.math.maxInt(u32);
+    const shift: u5 = @intCast(bits);
+    return value < (@as(i128, 1) << shift);
 }
 
 pub fn genericCfgSupportsSingleBlockLoad(function: ir.Function, block: ir.BasicBlock, load: ir.LoadInst) bool {

@@ -154,13 +154,84 @@ pub fn emitGenericCfgI32ValueIntoEax(
                 .call => |call| try emitGenericCfgI32CallIntoEax(allocator, machine, function, block, instruction_index, call),
                 .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select, 0),
                 .cast => |cast| {
-                    if (singleBlockI32CastConstant(block, cast) == null) return error.UnsupportedCodegenInstruction;
+                    switch (cast.op) {
+                        .zext => {
+                            if (!cast.to_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+                            const bits = switch (cast.from_ty) {
+                                .int => |bits| bits,
+                                else => return error.UnsupportedCodegenType,
+                            };
+                            if (bits > 32) return error.UnsupportedCodegenType;
+                            try emitGenericCfgIntBitsValueIntoEax(allocator, machine, function, block, cast.value, bits);
+                            if (try zextMaskI32(bits)) |mask| try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
+                        },
+                        .bitcast => {
+                            if (!cast.to_ty.eql(.{ .int = 32 }) or !cast.from_ty.eql(.{ .int = 32 })) {
+                                return error.UnsupportedCodegenInstruction;
+                            }
+                            try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, cast.value);
+                        },
+                        .sext => {
+                            const constant = singleBlockI32CastConstant(block, cast) orelse return error.UnsupportedCodegenInstruction;
+                            try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(constant) });
+                        },
+                        else => return error.UnsupportedCodegenInstruction,
+                    }
                 },
                 .phi, .icmp, .fcmp, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
             }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
+}
+
+fn emitGenericCfgIntBitsValueIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+    bits: u16,
+) anyerror!void {
+    if (bits == 0 or bits > 32) return error.UnsupportedCodegenType;
+    if (bits == 32) return emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
+    switch (value) {
+        .int => |int| {
+            if (!intFitsUnsignedBits(int, bits)) return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .{ .mov_imm_eax = @intCast(int) });
+        },
+        .named => |name| {
+            if (try registerParamRegOrNull(function, name, .{ .int = bits })) |reg| {
+                try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+                return;
+            }
+            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
+            const cast = switch (instruction.kind) {
+                .cast => |cast| cast,
+                else => return error.UnsupportedCodegenInstruction,
+            };
+            if (cast.op != .bitcast or !cast.to_ty.eql(.{ .int = bits }) or !cast.from_ty.eql(.{ .int = bits })) {
+                return error.UnsupportedCodegenInstruction;
+            }
+            try emitGenericCfgIntBitsValueIntoEax(allocator, machine, function, block, cast.value, bits);
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn intFitsUnsignedBits(value: i128, bits: u16) bool {
+    if (bits == 0 or bits > 32 or value < 0) return false;
+    if (bits == 32) return value <= std.math.maxInt(u32);
+    const shift: u5 = @intCast(bits);
+    return value < (@as(i128, 1) << shift);
+}
+
+fn zextMaskI32(bits: u16) !?i32 {
+    if (bits == 0 or bits > 32) return error.UnsupportedCodegenType;
+    if (bits == 32) return null;
+    const shift: u5 = @intCast(bits);
+    const mask = (@as(u32, 1) << shift) - 1;
+    return @intCast(mask);
 }
 
 fn singleBlockI32Constant(block: ir.BasicBlock, value: ir.Value) ?i64 {

@@ -220,8 +220,26 @@ pub fn terminalBlockCanMaterializeI32Value(function: ir.Function, scope: Termina
                         terminalBlockCanMaterializeI32Value(function, scope, binary.rhs);
                 },
                 .cast => |cast| {
-                    if (cast.op != .trunc or !cast.from_ty.eql(.{ .int = 64 }) or !cast.to_ty.eql(.{ .int = 32 })) break :blk false;
-                    break :blk terminalBlockCanMaterializeI64Value(function, scope, cast.value);
+                    if (!cast.to_ty.eql(.{ .int = 32 })) break :blk false;
+                    switch (cast.op) {
+                        .trunc => {
+                            if (!cast.from_ty.eql(.{ .int = 64 })) break :blk false;
+                            break :blk terminalBlockCanMaterializeI64Value(function, scope, cast.value);
+                        },
+                        .zext => {
+                            const bits = switch (cast.from_ty) {
+                                .int => |bits| bits,
+                                else => break :blk false,
+                            };
+                            if (bits > 32) break :blk false;
+                            break :blk terminalBlockCanMaterializeIntBitsValue(function, scope, cast.value, bits);
+                        },
+                        .bitcast => {
+                            if (!cast.from_ty.eql(.{ .int = 32 })) break :blk false;
+                            break :blk terminalBlockCanMaterializeI32Value(function, scope, cast.value);
+                        },
+                        else => break :blk false,
+                    }
                 },
                 else => break :blk false,
             }
@@ -397,6 +415,25 @@ fn terminalBlockCanBranchOnIcmp(function: ir.Function, scope: TerminalValueScope
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
     return rhs >= 0 and rhs <= std.math.maxInt(u16);
+}
+
+fn terminalBlockCanMaterializeIntBitsValue(function: ir.Function, scope: TerminalValueScope, value: ir.Value, bits: u16) bool {
+    if (bits == 0 or bits > 32) return false;
+    if (bits == 32) return terminalBlockCanMaterializeI32Value(function, scope, value);
+    return switch (value) {
+        .int => |int| intFitsUnsignedBits(int, bits),
+        .named => |name| blk: {
+            if ((paramRegOrNull(function, name, .{ .int = bits }) catch null) != null) break :blk true;
+            const instruction = terminalScopeInstruction(scope, name) orelse break :blk false;
+            const cast = switch (instruction.kind) {
+                .cast => |cast| cast,
+                else => break :blk false,
+            };
+            if (cast.op != .bitcast or !cast.to_ty.eql(.{ .int = bits }) or !cast.from_ty.eql(.{ .int = bits })) break :blk false;
+            break :blk terminalBlockCanMaterializeIntBitsValue(function, scope, cast.value, bits);
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
 }
 
 fn terminalI16ValueReg(function: ir.Function, scope: TerminalValueScope, value: ir.Value) ?ArgReg {
@@ -578,16 +615,84 @@ pub fn emitGenericCfgTerminalI32ValueIntoEaxInScope(
                     }
                 },
                 .cast => |cast| {
-                    if (cast.op != .trunc or !cast.from_ty.eql(.{ .int = 64 }) or !cast.to_ty.eql(.{ .int = 32 })) {
+                    if (!cast.to_ty.eql(.{ .int = 32 })) {
                         return error.UnsupportedCodegenInstruction;
                     }
-                    try emitGenericCfgTerminalI64ValueIntoRaxInScope(allocator, machine, function, scope, cast.value);
+                    switch (cast.op) {
+                        .trunc => {
+                            if (!cast.from_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+                            try emitGenericCfgTerminalI64ValueIntoRaxInScope(allocator, machine, function, scope, cast.value);
+                        },
+                        .zext => {
+                            const bits = switch (cast.from_ty) {
+                                .int => |bits| bits,
+                                else => return error.UnsupportedCodegenType,
+                            };
+                            if (bits > 32) return error.UnsupportedCodegenType;
+                            try emitGenericCfgTerminalIntBitsValueIntoEax(allocator, machine, function, scope, cast.value, bits);
+                            if (try zextMaskI32(bits)) |mask| try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
+                        },
+                        .bitcast => {
+                            if (!cast.from_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+                            try emitGenericCfgTerminalI32ValueIntoEaxInScope(allocator, machine, function, scope, cast.value);
+                        },
+                        else => return error.UnsupportedCodegenInstruction,
+                    }
                 },
                 else => try emitGenericCfgI32ValueIntoEax(allocator, machine, function, scope.block, value),
             }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
+}
+
+fn emitGenericCfgTerminalIntBitsValueIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    scope: TerminalValueScope,
+    value: ir.Value,
+    bits: u16,
+) anyerror!void {
+    if (bits == 0 or bits > 32) return error.UnsupportedCodegenType;
+    if (bits == 32) return emitGenericCfgTerminalI32ValueIntoEaxInScope(allocator, machine, function, scope, value);
+    switch (value) {
+        .int => |int| {
+            if (!intFitsUnsignedBits(int, bits)) return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .{ .mov_imm_eax = @intCast(int) });
+        },
+        .named => |name| {
+            if ((paramRegOrNull(function, name, .{ .int = bits }) catch null)) |reg| {
+                try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+                return;
+            }
+            const instruction = terminalScopeInstruction(scope, name) orelse return error.UnsupportedCodegenValue;
+            const cast = switch (instruction.kind) {
+                .cast => |cast| cast,
+                else => return error.UnsupportedCodegenInstruction,
+            };
+            if (cast.op != .bitcast or !cast.to_ty.eql(.{ .int = bits }) or !cast.from_ty.eql(.{ .int = bits })) {
+                return error.UnsupportedCodegenInstruction;
+            }
+            try emitGenericCfgTerminalIntBitsValueIntoEax(allocator, machine, function, scope, cast.value, bits);
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn intFitsUnsignedBits(value: i128, bits: u16) bool {
+    if (bits == 0 or bits > 32 or value < 0) return false;
+    if (bits == 32) return value <= std.math.maxInt(u32);
+    const shift: u5 = @intCast(bits);
+    return value < (@as(i128, 1) << shift);
+}
+
+fn zextMaskI32(bits: u16) !?i32 {
+    if (bits == 0 or bits > 32) return error.UnsupportedCodegenType;
+    if (bits == 32) return null;
+    const shift: u5 = @intCast(bits);
+    const mask = (@as(u32, 1) << shift) - 1;
+    return @intCast(mask);
 }
 
 fn terminalScopeI32Constant(scope: TerminalValueScope, value: ir.Value) ?i64 {

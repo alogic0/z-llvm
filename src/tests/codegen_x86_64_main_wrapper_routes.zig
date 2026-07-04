@@ -493,3 +493,27 @@ test "x86_64 codegen routes i64 logical shift with extended shift count through 
     try expectMachineInstruction(machine.instructions.items, .{ .shr_rax_imm6 = 6 });
     try expectMachineInstruction(machine.instructions.items, .ret);
 }
+
+test "x86_64 codegen routes narrow enum encoding return through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal fastcc i32 @Air.VectorCmp.encodeOp(i3 %op) {
+        \\entry:
+        \\  %bits = bitcast i3 %op to i3
+        \\  %wide = zext i3 %bits to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_eax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .and_eax_imm32 = 7 });
+    try expectMachineInstruction(machine.instructions.items, .ret);
+}
