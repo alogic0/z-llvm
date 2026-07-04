@@ -52,6 +52,7 @@ const emitGenericCfgI32CallIntoEax = core_value_emit.emitGenericCfgI32CallIntoEa
 const isUshlSatI32Callee = core_value_emit.isUshlSatI32Callee;
 const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
 const emitGenericCfgI64ValueIntoRax = core_value_emit.emitGenericCfgI64ValueIntoRax;
+const emitGenericCfgBoolValueIntoEax = core_value_emit.emitGenericCfgBoolValueIntoEax;
 const emitGenericCfgIcmpCondition = cabi_call_lowering.emitGenericCfgIcmpCondition;
 const emitGenericCfgStoreEax = core_value_emit.emitGenericCfgStoreEax;
 const emitGenericCfgVoidCall = core_value_emit.emitGenericCfgVoidCall;
@@ -181,65 +182,67 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             return true;
         }
     }
-    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
-    if (single_ret) |ret| {
-        if (try lowerGenericCfgPointerLoadStoreReturn(allocator, machine, function, block, ret)) {
+    if (!function.ret_ty.eql(.{ .int = 32 }) and !function.ret_ty.eql(.{ .int = 1 })) return false;
+    if (function.ret_ty.eql(.{ .int = 32 })) {
+        if (single_ret) |ret| {
+            if (try lowerGenericCfgPointerLoadStoreReturn(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+        }
+        if (try lowerGenericCfgPointerSelectLoadReturn(allocator, machine, function, block)) {
             machine.codegen_path = .generic_cfg;
             return true;
         }
-        if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) {
+        if (try lowerGenericCfgStructFieldLoadReturn(allocator, machine, function, block)) {
             machine.codegen_path = .generic_cfg;
             return true;
         }
-    }
-    if (try lowerGenericCfgPointerSelectLoadReturn(allocator, machine, function, block)) {
-        machine.codegen_path = .generic_cfg;
-        return true;
-    }
-    if (try lowerGenericCfgStructFieldLoadReturn(allocator, machine, function, block)) {
-        machine.codegen_path = .generic_cfg;
-        return true;
-    }
-    if (single_ret) |ret| {
-        if (lowerStructSumReturn(allocator, machine, function, block, ret) catch false) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (lowerRuntimeStructSumPreoptHelper(allocator, machine, function, block, ret) catch false) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (lowerRuntimeArraySumPreoptHelper(allocator, machine, function, block, ret) catch false) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (try lowerScalarFpCastReturn(allocator, machine, function, block, ret)) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (try lowerGenericCfgByteTableLookupReturn(allocator, machine, function, block, ret)) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (try lowerIntegerShiftMixReturn(allocator, machine, function, block, ret)) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (try lowerMulConstReturn(allocator, machine, function, block, ret)) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (try lowerGenericCfgCallResultAcrossVoidCall(allocator, machine, function, block, ret)) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (try lowerGenericCfgTwoI32CallResultsAcrossVoidCall(allocator, machine, function, block, ret)) {
-            machine.codegen_path = .generic_cfg;
-            return true;
-        }
-        if (try lowerGenericCfgI32CallResultAcrossI32Call(allocator, machine, function, block, ret)) {
-            machine.codegen_path = .generic_cfg;
-            return true;
+        if (single_ret) |ret| {
+            if (lowerStructSumReturn(allocator, machine, function, block, ret) catch false) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (lowerRuntimeStructSumPreoptHelper(allocator, machine, function, block, ret) catch false) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (lowerRuntimeArraySumPreoptHelper(allocator, machine, function, block, ret) catch false) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (try lowerScalarFpCastReturn(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (try lowerGenericCfgByteTableLookupReturn(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (try lowerIntegerShiftMixReturn(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (try lowerMulConstReturn(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (try lowerGenericCfgCallResultAcrossVoidCall(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (try lowerGenericCfgTwoI32CallResultsAcrossVoidCall(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
+            if (try lowerGenericCfgI32CallResultAcrossI32Call(allocator, machine, function, block, ret)) {
+                machine.codegen_path = .generic_cfg;
+                return true;
+            }
         }
     }
     if (!genericCfgSupportsSingleBlockScalar(function)) return false;
@@ -262,7 +265,9 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
         }
     }
     const ret_value = ret.value orelse return error.InvalidRet;
-    if (last_eax_value == null or !last_eax_value.?.eql(ret_value)) {
+    if (function.ret_ty.eql(.{ .int = 1 })) {
+        try emitGenericCfgBoolValueIntoEax(allocator, machine, function, block, ret_value);
+    } else if (last_eax_value == null or !last_eax_value.?.eql(ret_value)) {
         try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, ret_value);
     }
     try appendGenericCfgReturn(allocator, machine);

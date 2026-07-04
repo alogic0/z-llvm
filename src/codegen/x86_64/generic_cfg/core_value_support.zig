@@ -15,6 +15,7 @@ const isNamed = shared.isNamed;
 const i64Value = shared.i64Value;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
 
+const bitcastScalarParamRegOrNull = cabi_abi_helpers.bitcastScalarParamRegOrNull;
 const blockIndex = cabi_abi_helpers.blockIndex;
 const paramRegOrNull = cabi_abi_helpers.paramRegOrNull;
 const knownLocalExecTlsSymbol = cabi_tls_global_lowering.knownLocalExecTlsSymbol;
@@ -68,7 +69,7 @@ pub fn genericCfgI32Address(function: ir.Function, ptr: ir.Value) ?GenericCfgAdd
 }
 
 pub fn genericCfgSupportsSingleBlockScalar(function: ir.Function) bool {
-    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) and !function.ret_ty.eql(.{ .int = 1 })) return false;
     if (function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
     for (block.instructions.items) |instruction| {
@@ -79,7 +80,7 @@ pub fn genericCfgSupportsSingleBlockScalar(function: ir.Function) bool {
         .ret => |ret| ret,
         else => return false,
     };
-    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (!ret.ty.eql(function.ret_ty)) return false;
     return genericCfgSupportsSingleBlockScalarReturnValue(function, block, ret.value orelse return false);
 }
 
@@ -154,15 +155,16 @@ pub fn genericCfgSupportsLowerableI32OperandPair(function: ir.Function, lhs: ir.
 
 pub fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, maybe_block: ?ir.BasicBlock, icmp: ir.IcmpInst) bool {
     switch (icmp.predicate) {
-        .eq, .ne, .slt => {},
-        .ugt, .uge, .ult, .ule, .sgt, .sge, .sle => return false,
+        .eq, .ne, .slt, .ult => {},
+        .ugt, .uge, .ule, .sgt, .sge, .sle => return false,
     }
     if (icmp.operand_ty.eql(.{ .int = 8 })) {
-        if (icmp.predicate == .slt) return false;
+        if (icmp.predicate == .slt or icmp.predicate == .ult) return false;
         return genericCfgSupportsI8ParamOrConst(function, icmp.lhs) and
             genericCfgSupportsI8ParamOrConst(function, icmp.rhs);
     }
     if (icmp.operand_ty.eql(.{ .int = 16 })) {
+        if (icmp.predicate == .ult) return false;
         return genericCfgSupportsI16ParamOrConst(function, icmp.lhs) and
             genericCfgSupportsI16ParamOrConst(function, icmp.rhs);
     }
@@ -326,7 +328,9 @@ pub fn genericCfgSupportsUmaxSelect(function: ir.Function, select: ir.SelectInst
 }
 
 pub fn genericCfgSupportsSingleBlockScalarReturnValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value) bool {
-    return genericCfgSupportsSingleBlockI32Value(function, block, value);
+    if (function.ret_ty.eql(.{ .int = 32 })) return genericCfgSupportsSingleBlockI32Value(function, block, value);
+    if (function.ret_ty.eql(.{ .int = 1 })) return genericCfgSupportsSingleBlockI1Value(function, block, value);
+    return false;
 }
 
 pub fn genericCfgSupportsSingleBlockI32Value(function: ir.Function, maybe_block: ?ir.BasicBlock, value: ir.Value) bool {
@@ -372,7 +376,13 @@ fn genericCfgSupportsSingleBlockI32Cast(function: ir.Function, block: ir.BasicBl
             return genericCfgSupportsSingleBlockIntBitsValue(function, block, cast.value, bits);
         },
         .bitcast => {
-            if (!cast.from_ty.eql(.{ .int = 32 })) return false;
+            if (!cast.from_ty.eql(.{ .int = 32 })) {
+                const name = switch (cast.value) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                return (bitcastScalarParamRegOrNull(function, name, cast.from_ty, cast.to_ty) catch null) != null;
+            }
             return genericCfgSupportsSingleBlockI32Value(function, block, cast.value);
         },
         .sext => return singleBlockI32CastConstant(block, cast) != null,

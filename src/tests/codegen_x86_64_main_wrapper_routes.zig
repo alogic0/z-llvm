@@ -517,3 +517,33 @@ test "x86_64 codegen routes narrow enum encoding return through generic cfg path
     try expectMachineInstruction(machine.instructions.items, .{ .and_eax_imm32 = 7 });
     try expectMachineInstruction(machine.instructions.items, .ret);
 }
+
+test "x86_64 codegen routes nominal enum bool less-than return through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal fastcc i1 @codegen.x86_64.bits.FrameIndex.isNamed(%codegen.x86_64.bits.FrameIndex %fi) {
+        \\entry:
+        \\  %bits = bitcast %codegen.x86_64.bits.FrameIndex %fi to i32
+        \\  %named = icmp ult i32 %bits, 5
+        \\  ret i1 %named
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_eax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .cmp_eax_imm32 = 5 });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_imm_eax = 0 });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_imm_eax = 1 });
+    try expectMachineInstruction(machine.instructions.items, .ret);
+    var saw_unsigned_branch = false;
+    for (machine.instructions.items) |instruction| {
+        if (std.meta.activeTag(instruction) == .jc) saw_unsigned_branch = true;
+    }
+    try std.testing.expect(saw_unsigned_branch);
+}

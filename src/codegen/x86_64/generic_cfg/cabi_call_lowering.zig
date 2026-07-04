@@ -1668,7 +1668,8 @@ pub fn emitGenericCfgIcmpConditionWithBlock(
             .js
         else
             .jle,
-        .ugt, .uge, .ult, .ule, .sgt, .sge, .sle => return error.UnsupportedCodegenInstruction,
+        .ult => .jc,
+        .ugt, .uge, .ule, .sgt, .sge, .sle => return error.UnsupportedCodegenInstruction,
     };
 
     if (icmp.operand_ty.eql(.ptr)) {

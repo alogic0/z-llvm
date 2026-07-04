@@ -23,6 +23,7 @@ const isNamed = shared.isNamed;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
 
 const paramReg = cabi_abi_helpers.paramReg;
+const bitcastScalarParamRegOrNull = cabi_abi_helpers.bitcastScalarParamRegOrNull;
 const registerParamRegOrNull = cabi_abi_helpers.registerParamRegOrNull;
 const scalarParamStackDisp8 = cabi_abi_helpers.scalarParamStackDisp8;
 const stackParamDisp8OrNull = cabi_abi_helpers.stackParamDisp8OrNull;
@@ -166,8 +167,16 @@ pub fn emitGenericCfgI32ValueIntoEax(
                             if (try zextMaskI32(bits)) |mask| try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
                         },
                         .bitcast => {
-                            if (!cast.to_ty.eql(.{ .int = 32 }) or !cast.from_ty.eql(.{ .int = 32 })) {
-                                return error.UnsupportedCodegenInstruction;
+                            if (!cast.to_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
+                            if (!cast.from_ty.eql(.{ .int = 32 })) {
+                                const source_name = switch (cast.value) {
+                                    .named => |source_name| source_name,
+                                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                                };
+                                const reg = try bitcastScalarParamRegOrNull(function, source_name, cast.from_ty, cast.to_ty) orelse
+                                    return error.UnsupportedCodegenValue;
+                                try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+                                return;
                             }
                             try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, cast.value);
                         },
@@ -180,6 +189,55 @@ pub fn emitGenericCfgI32ValueIntoEax(
                 },
                 .phi, .icmp, .fcmp, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
             }
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+pub fn emitGenericCfgBoolValueIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+) !void {
+    switch (value) {
+        .int => |int| switch (int) {
+            0, 1 => try machine.instructions.append(allocator, .{ .mov_imm_eax = @intCast(int) }),
+            else => return error.UnsupportedCodegenValue,
+        },
+        .named => |name| {
+            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
+            const icmp = switch (instruction.kind) {
+                .icmp => |icmp| icmp,
+                else => return error.UnsupportedCodegenInstruction,
+            };
+            const label_suffix = machine.instructions.items.len;
+            const true_label = try ownedMachineLabel(
+                allocator,
+                machine,
+                "generic_cfg_bool_return_{}_true",
+                .{label_suffix},
+            );
+            const end_label = try ownedMachineLabel(
+                allocator,
+                machine,
+                "generic_cfg_bool_return_{}_generic_cfg_select_end",
+                .{label_suffix},
+            );
+            const branch_kind = try cabi_call_lowering.emitGenericCfgIcmpConditionWithBlock(
+                allocator,
+                machine,
+                function,
+                block,
+                icmp,
+            );
+            try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+            try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+            try machine.instructions.append(allocator, .{ .jmp = end_label });
+            try appendGenericCfgBlockLabel(allocator, machine, true_label);
+            try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+            try appendGenericCfgBlockLabel(allocator, machine, end_label);
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }

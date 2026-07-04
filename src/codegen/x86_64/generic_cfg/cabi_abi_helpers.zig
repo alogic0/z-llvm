@@ -119,6 +119,36 @@ pub fn registerParamRegOrNull(function: ir.Function, name: []const u8, ty: ir.Ty
     };
 }
 
+pub fn bitcastScalarParamRegOrNull(function: ir.Function, name: []const u8, from_ty: ir.Type, to_ty: ir.Type) !?ArgReg {
+    const to_bits = switch (to_ty) {
+        .int => |bits| bits,
+        else => return error.UnsupportedCodegenType,
+    };
+    if (to_bits == 0 or to_bits > 64) return error.UnsupportedCodegenType;
+
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) {
+            if (!param.ty.eql(from_ty)) return error.UnsupportedCodegenValue;
+            if (gpr_index >= 6) return error.UnsupportedCodegenAbi;
+            return try ArgReg.fromIndex(gpr_index);
+        }
+        if (isSysVIntegerParamType(param.ty)) {
+            if (gpr_index < 6) {
+                gpr_index += 1;
+            }
+        } else if (param.ty.eql(.float) or param.ty.eql(.double)) {
+            if (sse_index < 8) {
+                sse_index += 1;
+            }
+        } else {
+            return error.UnsupportedCodegenAbi;
+        }
+    }
+    return null;
+}
+
 pub fn blockIndex(function: ir.Function, name: []const u8) ?usize {
     for (function.blocks.items, 0..) |block, index| {
         if (std.mem.eql(u8, block.name, name)) return index;
