@@ -240,7 +240,12 @@ pub fn terminalBlockCanMaterializeI64Value(function: ir.Function, scope: Termina
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 64 })) break :blk false;
                     switch (binary.op) {
-                        .add, .@"and", .lshr, .shl => {},
+                        .lshr, .shl => {
+                            const shift = terminalScopeI64Constant(scope, binary.rhs) orelse break :blk false;
+                            if (shift < 0 or shift > 63) break :blk false;
+                            break :blk terminalBlockCanMaterializeI64Value(function, scope, binary.lhs);
+                        },
+                        .add, .@"and" => {},
                         else => break :blk false,
                     }
                     if (binary.rhs != .int) break :blk false;
@@ -610,6 +615,31 @@ fn terminalScopeI32Constant(scope: TerminalValueScope, value: ir.Value) ?i64 {
     }
 }
 
+fn terminalScopeI64Constant(scope: TerminalValueScope, value: ir.Value) ?i64 {
+    switch (value) {
+        .int => |int| return i64Value(int) catch null,
+        .named => |name| {
+            const instruction = terminalScopeInstruction(scope, name) orelse return null;
+            return switch (instruction.kind) {
+                .cast => |cast| blk: {
+                    switch (cast.op) {
+                        .zext, .sext, .bitcast => {},
+                        else => break :blk null,
+                    }
+                    if (!cast.to_ty.eql(.{ .int = 64 })) break :blk null;
+                    switch (cast.from_ty) {
+                        .int => |bits| if (bits > 64) break :blk null,
+                        else => break :blk null,
+                    }
+                    break :blk terminalScopeI64Constant(scope, cast.value);
+                },
+                else => null,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    }
+}
+
 pub fn emitGenericCfgTerminalI64ValueIntoRax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -639,9 +669,12 @@ pub fn emitGenericCfgTerminalI64ValueIntoRaxInScope(
             switch (scoped_instruction.instruction.kind) {
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
-                    const rhs = switch (binary.rhs) {
-                        .int => |int| try i64Value(int),
-                        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                    const rhs = switch (binary.op) {
+                        .lshr, .shl => terminalScopeI64Constant(scope, binary.rhs) orelse return error.UnsupportedCodegenValue,
+                        else => switch (binary.rhs) {
+                            .int => |int| try i64Value(int),
+                            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                        },
                     };
                     try emitGenericCfgTerminalI64ValueIntoRaxInScope(allocator, machine, function, scope, binary.lhs);
                     switch (binary.op) {

@@ -239,7 +239,7 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 200 | 179 | 50 | 50 | `docs/evidence/real_rows_releasefast_limit200_after_i8_ult.summary` |
+| ReleaseFast | 200 | 179 | 55 | 55 | `docs/evidence/real_rows_releasefast_limit200_after_usize_shift_count.summary` |
 | ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 | ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
@@ -251,7 +251,7 @@ count that turned green when the fix landed.
 
 | Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
 | --- | ---: | --- | ---: | --- |
-| `object-emission UnsupportedCodegenInstruction` | 129 | Open | 17 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission then unlocked rank 36 `ascii.isAscii`. Representative rows now: ranks 39-43 `bit_set.*.maskIndex`, rank 59 `Air.VectorCmp.encodeOp`, ranks 66-182 `hash_map.*.Metadata.*`; evidence `docs/evidence/real_rows_releasefast_limit200_after_i8_ult.summary` |
+| `object-emission x86_64-lower:UnsupportedCodegenInstruction` | 124 | Open | 22 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission unlocked rank 36 `ascii.isAscii`; i64 terminal shifts with model-owned extended shift-count constants unlocked ranks 39-43 `bit_set.*.maskIndex`. Representative rows now: rank 59 `Air.VectorCmp.encodeOp`, ranks 61-62 `codegen.*.bits.FrameIndex.isNamed`, ranks 66-182 `hash_map.*.Metadata.*`, rank 183 `link.Diags.Flags.anySet`, rank 184 `os.linux.W.IFEXITED`, ranks 186-187 `unicode.utf16Is*Surrogate`; evidence `docs/evidence/real_rows_releasefast_limit200_after_usize_shift_count.summary` |
 | `typed-lowering unsupported:function_type:function-type` | 20 | Open | 137 | Representative rows now: rank 32 `Io.Limit.limited`, rank 33 `Io.Limit.nonzero`, rank 51 `http.Reader.RemainingChunkLen.init`; evidence `docs/evidence/real_rows_releasefast_limit200_after_opaque_bitcast.summary` |
 | `typed-lowering unsupported:instruction_type:lowering` | 1 | Open | 0 | Representative row: rank 188 `Air.Liveness.fmtInstSet`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
 
@@ -299,6 +299,11 @@ One line per completed cycle, append-only, newest last. This is the
   for unsigned `i8 < imm8` boolean returns moved ReleaseFast report-mode
   `--limit=200` to `179/50/50/0/0`, making rank 36 `ascii.isAscii`
   object/link green. Recognizer count still 1.
+- 2026-07-03 (this commit) Item 10 cluster fix: generic CFG terminal i64
+  shifts now accept model-owned extended shift-count constants, moving
+  ReleaseFast report-mode `--limit=200` to `179/55/55/0/0` and making ranks
+  39-43 `bit_set.*.maskIndex` object/link green. Recognizer count still 1
+  (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 

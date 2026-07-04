@@ -446,3 +446,50 @@ test "x86_64 codegen routes i64 constant return through generic cfg path" {
     defer machine.deinit(std.testing.allocator);
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
+
+test "x86_64 codegen routes i64 logical shift return through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal fastcc i64 @i64_arithmetic.index_mask(i64 %index) {
+        \\entry:
+        \\  %word = lshr i64 %index, 6
+        \\  ret i64 %word
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .shr_rax_imm6 = 6 });
+    try expectMachineInstruction(machine.instructions.items, .ret);
+}
+
+test "x86_64 codegen routes i64 logical shift with extended shift count through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal fastcc i64 @i64_arithmetic.index_mask_extended(i64 %index) {
+        \\entry:
+        \\  %shift = zext i6 6 to i64
+        \\  %word = lshr i64 %index, %shift
+        \\  ret i64 %word
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rdi });
+    try expectMachineInstruction(machine.instructions.items, .{ .shr_rax_imm6 = 6 });
+    try expectMachineInstruction(machine.instructions.items, .ret);
+}

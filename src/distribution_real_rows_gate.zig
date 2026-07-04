@@ -612,7 +612,9 @@ fn runCandidate(
         target_triple,
         lowered.module.functions.items[0],
     ) catch |err| {
-        try recordFailure(allocator, stdout, counters, mode, candidate, "object-emission", @errorName(err));
+        const diagnostic = try std.fmt.allocPrint(allocator, "x86_64-lower:{s}", .{@errorName(err)});
+        defer allocator.free(diagnostic);
+        try recordFailure(allocator, stdout, counters, mode, candidate, "object-emission", diagnostic);
         return;
     };
     defer machine.deinit(allocator);
@@ -623,7 +625,9 @@ fn runCandidate(
         lowered.module.aliases.items,
         lowered.module.globals.items,
     ) catch |err| {
-        try recordFailure(allocator, stdout, counters, mode, candidate, "object-emission", @errorName(err));
+        const diagnostic = try std.fmt.allocPrint(allocator, "elf-object:{s}", .{@errorName(err)});
+        defer allocator.free(diagnostic);
+        try recordFailure(allocator, stdout, counters, mode, candidate, "object-emission", diagnostic);
         return;
     };
     defer allocator.free(object);
