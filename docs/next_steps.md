@@ -39,11 +39,11 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-04 during item 10 cluster fixing:
+Stop state recorded 2026-07-04 after item 10 close:
 
-- Active convergence-progress items: item 10 on the real-row track and item
-  11 on the syscall-hello real-program track. Single-worker mode still
-  applies, but every stop report must state both tracks.
+- Active convergence-progress item: item 11 on the syscall-hello
+  real-program track. The real-row track closed item 10 at strict
+  `--limit=100`, but every stop report still states both tracks.
 - Real-row track status: selector-v2 ReleaseFast report-mode
   `distribution-real-rows --mode=ReleaseFast --limit=200` is green through
   typed lowering, x86_64 object emission, and native link with counters
@@ -56,14 +56,16 @@ Stop state recorded 2026-07-04 during item 10 cluster fixing:
   also green after model-owned `intcast_safe` lowering, with counters
   `real_functions_lowered=100`, `real_objects_emitted=100`,
   `real_native_linked=100`, `real_executed=0`, `real_programs_ok=0`.
+  Strict `distribution-real-rows --strict --limit=100` is green in
+  ReleaseFast, ReleaseSafe, and ReleaseSmall, and `distribution-all` now
+  enforces that strict limit.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
 - First failing real row/stage beyond the enforced prefix: none known after
-  the ReleaseSafe `intcast_safe` fix; strict `--limit=100` all-mode proof has
-  not yet been rerun after that fix.
+  the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
-  `real_functions_lowered=25`, `real_objects_emitted=25`,
-  `real_native_linked=25`, `real_executed=0`, `real_programs_ok=0`.
+  `real_functions_lowered=100`, `real_objects_emitted=100`,
+  `real_native_linked=100`, `real_executed=0`, `real_programs_ok=0`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_release_v2.tsv`,
   hash
@@ -72,22 +74,22 @@ Stop state recorded 2026-07-04 during item 10 cluster fixing:
   `bdee02bc0c7f227c0f11bc9a449df673fe803540`. The migration from selector-v1
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
-  `distribution-real-rows --strict --limit=25`.
+  `distribution-real-rows --strict --limit=100`.
 - Saved log paths: `tmp/check_stage4_optional_layout_pin_amended.log`,
   `tmp/real_rows_releasefast_limit200_after_sret_field_backend.log`, and
   `tmp/real_rows_strict_limit100_after_optional_layout.log`,
-  `tmp/real_rows_releasesafe_limit100_after_intcast_safe.log`.
+  `tmp/real_rows_releasesafe_limit100_after_intcast_safe.log`,
+  `tmp/real_rows_strict_limit100_after_intcast_safe.log`.
 - Tracked evidence summaries:
   `docs/evidence/ziglang_pin_stage4_optional_layout.summary`,
   `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary`,
   `docs/evidence/real_rows_releasesafe_limit100_after_intcast_safe.summary`,
-  and
+  `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary`, and
   `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`.
-- Recommended next action: rerun strict `distribution-real-rows --strict
-  --limit=100` in all three release modes. If green, raise the item 10
-  ratchet, wire `distribution-all` to strict limit 100, write the strict
-  evidence summary, check off item 10, and then move to item 11. Keep the
-  syscall-hello item 11 track open in the stop report.
+- Recommended next action: start item 11, the syscall-hello track: export
+  `_start`, no std, direct write/exit syscalls, x86_64-linux-gnu, patched Zig
+  plus z_llvm codegen, native linker, no LLD. Expect the minimal inline-asm
+  syscall form first; keep general inline asm fail-closed.
 
 When the worker stops, record only:
 

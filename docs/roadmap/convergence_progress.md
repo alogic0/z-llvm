@@ -160,9 +160,18 @@ list and the visible record of progress. Evidence summaries under
   which records ReleaseFast report-mode `--limit=200` counts at
   `42/33/33/0/0` and groups the 167 failing rows into three clusters.
   Follow-on real-row fix cycles target the largest remaining open cluster.
-- [ ] 10. Phase 1 exit: 100 real functions green through applicable
+- [x] 10. Phase 1 exit: 100 real functions green through applicable
   stages, all three release modes, sustained (ratchets enforced by
   `distribution-all`), reached by cluster-order fixing per item 9a.
+
+  Closed by
+  `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary`, which
+  records strict `--limit=100` green in ReleaseFast, ReleaseSafe, and
+  ReleaseSmall with counters `100/100/100/0/0`. `distribution-all` now
+  enforces `distribution-real-rows --strict --limit=100`. The denominator is
+  selector-v2 hash
+  `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d` under
+  patched Zig pin `bdee02bc0c7f227c0f11bc9a449df673fe803540`.
 
 ## Phase 2 — First Real Program
 
@@ -240,8 +249,8 @@ changes the counts; cite the discovery/fix evidence summary.
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
 | ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
-| ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_releasesafe_limit100_after_intcast_safe.summary` |
-| ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
+| ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
+| ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
 
 ## Cluster Board (item 9a)
 
@@ -381,6 +390,12 @@ One line per completed cycle, append-only, newest last. This is the
   `http.Reader.RemainingChunkLen.init`, and 58
   `zig.Ast.OptionalTokenIndex.fromToken` typed/object/link green. Recognizer
   count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-04 (this commit) Item 10 strict close: strict
+  `distribution-real-rows --limit=100` is green in ReleaseFast, ReleaseSafe,
+  and ReleaseSmall with `100/100/100/0/0`; `distribution-all` now enforces
+  `distribution-real-rows --strict --limit=100`. The strict ratchet moved
+  from 25 to 100 under selector-v2 and Zig pin `bdee02bc`. Recognizer count
+  still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 
@@ -390,11 +405,11 @@ summaries.
 
 | Counter | Value | Modes | Evidence | Denominator (candidate hash / selector / pin) |
 | --- | ---: | --- | --- | --- |
-| real_functions_lowered | 25 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_objects_emitted | 25 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_native_linked | 25 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
-| real_programs_ok | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit25_v2.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+| real_functions_lowered | 100 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
+| real_objects_emitted | 100 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
+| real_native_linked | 100 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
+| real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
+| real_programs_ok | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
 | unsupported_functions (ReleaseFast, compiler-core-module) | 55479 | ReleaseFast | `docs/evidence/real_candidates_releasefast_v1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 
 Fixture-frontier counters (`generic_cfg_functions=753`,
