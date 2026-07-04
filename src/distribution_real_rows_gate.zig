@@ -235,7 +235,7 @@ fn runMode(
     };
     defer allocator.free(descriptor);
     for (candidates) |candidate| {
-        try runCandidate(allocator, io, init, mode, temp, descriptor, candidate, candidate_hash, &counters, zig_emitter);
+        try runCandidate(allocator, io, init, stdout, mode, temp, descriptor, candidate, candidate_hash, &counters, zig_emitter);
     }
     return counters;
 }
@@ -557,6 +557,7 @@ fn runCandidate(
     allocator: std.mem.Allocator,
     io: std.Io,
     init: std.process.Init,
+    stdout: *std.Io.Writer,
     mode: Mode,
     temp: TempDir,
     descriptor: []const u8,
@@ -565,8 +566,8 @@ fn runCandidate(
     counters: *Counters,
     zig_emitter: []const u8,
 ) !void {
-    const filtered = extractFunctionDescriptor(allocator, descriptor, candidate.function) catch {
-        try setFirstFailure(allocator, counters, candidate, "air-extract");
+    const filtered = extractFunctionDescriptor(allocator, descriptor, candidate.function) catch |err| {
+        try recordFailure(allocator, stdout, counters, mode, candidate, "air-extract", @errorName(err));
         return;
     };
     defer allocator.free(filtered);
@@ -581,19 +582,27 @@ fn runCandidate(
         try stderr_writer.interface.flush();
     }
 
-    var parsed = air_export.parse(allocator, filtered) catch {
-        try setFirstFailure(allocator, counters, candidate, "typed-lowering");
+    var parsed = air_export.parse(allocator, filtered) catch |err| {
+        try recordFailure(allocator, stdout, counters, mode, candidate, "typed-lowering", @errorName(err));
         return;
     };
     defer parsed.deinit();
 
-    var lowered = air_lowering.lowerCompatible(allocator, parsed) catch {
-        try setFirstFailure(allocator, counters, candidate, "typed-lowering");
+    var lowered = air_lowering.lowerCompatible(allocator, parsed) catch |err| {
+        try recordFailure(allocator, stdout, counters, mode, candidate, "typed-lowering", @errorName(err));
         return;
     };
     defer lowered.deinit();
     if (lowered.accepted_functions != 1 or lowered.unsupported.len != 0 or lowered.module.functions.items.len != 1) {
-        try setFirstFailure(allocator, counters, candidate, "typed-lowering");
+        const diagnostic = if (lowered.unsupported.len != 0)
+            try std.fmt.allocPrint(allocator, "unsupported:{s}:{s}", .{
+                @tagName(lowered.unsupported[0].reason),
+                lowered.unsupported[0].opcode,
+            })
+        else
+            try allocator.dupe(u8, "unexpected-lowering-result");
+        defer allocator.free(diagnostic);
+        try recordFailure(allocator, stdout, counters, mode, candidate, "typed-lowering", diagnostic);
         return;
     }
     counters.real_functions_lowered += 1;
@@ -602,8 +611,8 @@ fn runCandidate(
         allocator,
         target_triple,
         lowered.module.functions.items[0],
-    ) catch {
-        try setFirstFailure(allocator, counters, candidate, "object-emission");
+    ) catch |err| {
+        try recordFailure(allocator, stdout, counters, mode, candidate, "object-emission", @errorName(err));
         return;
     };
     defer machine.deinit(allocator);
@@ -613,8 +622,8 @@ fn runCandidate(
         &machines,
         lowered.module.aliases.items,
         lowered.module.globals.items,
-    ) catch {
-        try setFirstFailure(allocator, counters, candidate, "object-emission");
+    ) catch |err| {
+        try recordFailure(allocator, stdout, counters, mode, candidate, "object-emission", @errorName(err));
         return;
     };
     defer allocator.free(object);
@@ -631,7 +640,7 @@ fn runCandidate(
         allocator.free(link_result.stderr);
     }
     if (!helpers.termOk(link_result.term)) {
-        try setFirstFailure(allocator, counters, candidate, "native-link");
+        try recordFailure(allocator, stdout, counters, mode, candidate, "native-link", "native-link-nonzero");
         return;
     }
     counters.real_native_linked += 1;
@@ -646,7 +655,7 @@ fn runCandidate(
     if (helpers.termOk(run_result.term)) {
         counters.real_programs_ok += 1;
     } else {
-        try setFirstFailure(allocator, counters, candidate, "execute");
+        try recordFailure(allocator, stdout, counters, mode, candidate, "execute", "execute-nonzero");
     }
 }
 
@@ -724,6 +733,23 @@ fn setFirstFailure(allocator: std.mem.Allocator, counters: *Counters, candidate:
     if (counters.first_failing_real_row != null) return;
     counters.first_failing_real_row = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ candidate.source, candidate.function });
     counters.first_failing_stage = try allocator.dupe(u8, stage);
+}
+
+fn recordFailure(
+    allocator: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    counters: *Counters,
+    mode: Mode,
+    candidate: Candidate,
+    stage: []const u8,
+    diagnostic: []const u8,
+) !void {
+    try setFirstFailure(allocator, counters, candidate, stage);
+    try writer.print(
+        "real-row-failure mode={s} rank={} source={s} function={s} stage={s} diagnostic={s}\n",
+        .{ mode.name(), candidate.rank, candidate.source, candidate.function, stage, diagnostic },
+    );
+    try writer.flush();
 }
 
 fn executionQualified(candidate: Candidate) bool {

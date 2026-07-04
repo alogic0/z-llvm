@@ -39,18 +39,25 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-03 after item 9 strict close:
+Stop state recorded 2026-07-03 after item 9a cluster discovery:
 
-- Active convergence-progress items: 9a on the real-row track and 11 on the
-  syscall-hello real-program track. Single-worker mode still applies, but
-  every stop report must state both tracks.
+- Active convergence-progress items: item 10 on the real-row track and item
+  11 on the syscall-hello real-program track. Single-worker mode still
+  applies, but every stop report must state both tracks.
 - Real-row track status: selector-v2 `distribution-real-rows --strict
   --limit=25` is green in ReleaseFast, ReleaseSafe, and ReleaseSmall through
-  typed lowering, x86_64 object emission, and native link.
+  typed lowering, x86_64 object emission, and native link. ReleaseFast
+  report-mode discovery at `--limit=200` reached
+  `real_functions_lowered=42`, `real_objects_emitted=33`,
+  `real_native_linked=33`, `real_executed=0`, `real_programs_ok=0`.
+- Largest open cluster: `typed-lowering
+  unsupported:function_type:function-type`, 157 rows; representative first
+  row rank 28 `../ziglang/src/main.zig/InternPool.PackedU64.get`.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
-- First failing real row/stage: none for the enforced limit-25 prefix.
-- Current staged `real_*` counters:
+- First failing real row/stage beyond the enforced prefix:
+  `../ziglang/src/main.zig/InternPool.PackedU64.get` at `typed-lowering`.
+- Strict ratchet `real_*` counters:
   `real_functions_lowered=25`, `real_objects_emitted=25`,
   `real_native_linked=25`, `real_executed=0`, `real_programs_ok=0`.
 - Current candidate denominator:
@@ -62,12 +69,15 @@ Stop state recorded 2026-07-03 after item 9 strict close:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=25`.
-- Saved log path: `tmp/real_rows_strict_limit25_v2.log`.
-- Tracked evidence summary:
-  `docs/evidence/real_rows_strict_limit25_v2.summary`.
-- Recommended next action: run the item 9a wide report-mode discovery
-  (`--limit=200`, ReleaseFast), populate the Cluster Board from the resulting
-  clusters, and keep the syscall-hello item 11 track open in the stop report.
+- Saved log paths: `tmp/real_rows_strict_limit25_v2.log` and
+  `tmp/real_rows_releasefast_limit200_discovery.log`.
+- Tracked evidence summaries:
+  `docs/evidence/real_rows_strict_limit25_v2.summary` and
+  `docs/evidence/real_rows_releasefast_limit200_discovery.summary`.
+- Recommended next action: start the item 10 real-row cluster-fix cycle on the
+  largest cluster (`typed-lowering unsupported:function_type:function-type`),
+  using rank 28 `InternPool.PackedU64.get` as the first representative. Keep
+  the syscall-hello item 11 track open in the stop report.
 
 When the worker stops, record only:
 

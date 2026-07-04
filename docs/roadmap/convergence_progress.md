@@ -143,7 +143,7 @@ list and the visible record of progress. Evidence summaries under
   filtering v1 rows to functions present in all three release-mode AIR
   exports whose leaf claims hold in all three modes. The syscall-hello track
   is now open per item 11; no implementation work has started there.
-- [ ] 9a. Cluster discovery (fix-selection method change, effective after
+- [x] 9a. Cluster discovery (fix-selection method change, effective after
   item 9 closes): run one report-mode discovery at `--limit=200` in
   ReleaseFast, group the failing rows by `first_failing_stage` plus
   failure diagnostic, and record the clusters (size, representative rows,
@@ -155,6 +155,11 @@ list and the visible record of progress. Evidence summaries under
   prefix after each cluster lands, while report-mode counters record total
   green rows beyond the prefix. Re-cluster from a fresh discovery whenever
   the current cluster list is exhausted or stale.
+
+  Closed by `docs/evidence/real_rows_releasefast_limit200_discovery.summary`,
+  which records ReleaseFast report-mode `--limit=200` counts at
+  `42/33/33/0/0` and groups the 167 failing rows into three clusters.
+  Follow-on real-row fix cycles target the largest remaining open cluster.
 - [ ] 10. Phase 1 exit: 100 real functions green through applicable
   stages, all three release modes, sustained (ratchets enforced by
   `distribution-all`), reached by cluster-order fixing per item 9a.
@@ -234,7 +239,7 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
+| ReleaseFast | 200 | 42 | 33 | 33 | `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
 | ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 | ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
@@ -246,7 +251,9 @@ count that turned green when the fix landed.
 
 | Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
 | --- | ---: | --- | ---: | --- |
-| (first `--limit=200` discovery pending) | | | | |
+| `typed-lowering unsupported:function_type:function-type` | 157 | Open | 0 | Representative rows: rank 28 `InternPool.PackedU64.get`, rank 29 `InternPool.PackedU64.init`, rank 32 `Io.Limit.limited`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
+| `object-emission UnsupportedCodegenInstruction` | 9 | Open | 0 | Representative rows: rank 36 `ascii.isAscii`, ranks 39-43 `bit_set.*.maskIndex`, rank 184 `os.linux.W.IFEXITED`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
+| `typed-lowering unsupported:instruction_type:lowering` | 1 | Open | 0 | Representative row: rank 188 `Air.Liveness.fmtInstSet`; evidence `docs/evidence/real_rows_releasefast_limit200_discovery.summary` |
 
 ## Progress Log
 
@@ -279,6 +286,10 @@ One line per completed cycle, append-only, newest last. This is the
   to all-mode-present, all-mode-leaf real functions; strict limit-25 is green
   in all release modes and `distribution-all` now enforces
   `distribution-real-rows --strict --limit=25`. Recognizer count still 1.
+- 2026-07-03 (this commit) Item 9a cluster discovery: ReleaseFast
+  report-mode `--limit=200` reached `42/33/33/0/0`; 167 failing rows grouped
+  into three clusters, led by 157 typed-lowering function-type failures.
+  Recognizer count still 1.
 
 ## Ratchet State
 
