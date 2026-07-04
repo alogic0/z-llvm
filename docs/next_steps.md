@@ -37,60 +37,28 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-Hook-contract / architectural review needed for item 10:
+None.
 
-- Active convergence-progress items: item 10 on the real-row track and item
-  11 on the syscall-hello real-program track. Single-worker mode still
-  applies, and both tracks remain open.
-- Blocked checklist item: item 10 cluster fixing, first failing real row rank
-  190 `../ziglang/src/main.zig/Build.Cache.Path.fmtEscapeString`.
-- Exact failure: `distribution-real-rows --mode=ReleaseFast --limit=200`
-  reports `typed-lowering unsupported:function_type:function-type` for
-  `Build.Cache.Path.fmtEscapeString`.
-- Missing hook fact: the debug AIR dump shows no
-  `zllvm-aggregate-layout-facts-v1` fact for `Build.Cache.Path` or for
-  `fmt.Alt(Build.Cache.Path,(function 'formatEscapeString'))`. The function
-  stores a `Build.Cache.Path` field into that `fmt.Alt` return aggregate, but
-  the current aggregate-layout exporter omits the fact because
-  `Build.Cache.Path` contains `?[]const u8`, which the current layout writer
-  does not emit. z_llvm cannot infer the ABI layout from the descriptor without
-  source-name admission or guessing.
-- Current report-mode discovery state: ReleaseFast `--limit=200` is
-  `real_functions_lowered=199`, `real_objects_emitted=199`,
-  `real_native_linked=199`, `real_executed=0`, `real_programs_ok=0`.
-- Strict ratchet state remains `real_functions_lowered=25`,
-  `real_objects_emitted=25`, `real_native_linked=25`, `real_executed=0`,
-  `real_programs_ok=0`; `distribution-all` still enforces
-  `distribution-real-rows --strict --limit=25`.
-- Saved log path: `tmp/real_rows_releasefast_limit200_fmtescape_debug.log`.
-  Latest tracked evidence before this blocker:
-  `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.summary`.
-- Recommended next action: decide whether to allow a narrow aggregate-layout
-  hook-contract change in `../ziglang` for optional payload/slice layout facts,
-  then rebuild/check stage4 and update pin/evidence as required. Do not unblock
-  this row by adding a local source-name static fact for `Build.Cache.Path` or
-  by treating the unknown aggregate as a pointer.
-
-Stop state recorded 2026-07-03 during item 10 cluster fixing:
+Stop state recorded 2026-07-04 during item 10 cluster fixing:
 
 - Active convergence-progress items: item 10 on the real-row track and item
   11 on the syscall-hello real-program track. Single-worker mode still
   applies, but every stop report must state both tracks.
-- Real-row track status: selector-v2 `distribution-real-rows --strict
-  --limit=25` is green in ReleaseFast, ReleaseSafe, and ReleaseSmall through
-  typed lowering, x86_64 object emission, and native link. After the
-  i8 unsigned-compare fix, ReleaseFast report-mode discovery at `--limit=200`
-  reached `real_functions_lowered=179`, `real_objects_emitted=50`,
-  `real_native_linked=50`, `real_executed=0`, `real_programs_ok=0`.
-- Largest open cluster: `object-emission UnsupportedCodegenInstruction`,
-  129 rows; representative first row rank 39
-  `../ziglang/src/main.zig/bit_set.Array(usize,100).maskIndex`.
+- Real-row track status: selector-v2 ReleaseFast report-mode
+  `distribution-real-rows --mode=ReleaseFast --limit=200` is green through
+  typed lowering, x86_64 object emission, and native link with counters
+  `real_functions_lowered=200`, `real_objects_emitted=200`,
+  `real_native_linked=200`, `real_executed=0`, `real_programs_ok=0`.
+  The hook-contract blocker for `Build.Cache.Path.fmtEscapeString` was closed
+  by patched Zig commit `bdee02bc`, which additively emits optional
+  payload/slice aggregate-layout facts under the v1 contract.
 - Syscall-hello track status: opened by item 9; no implementation work
   started yet.
 - First failing real row/stage beyond the enforced prefix:
-  `../ziglang/src/main.zig/Io.Limit.limited` at `typed-lowering`; cluster
-  priority still points next to the larger object-emission cluster per item
-  9a.
+  ReleaseSafe `../ziglang/src/main.zig/Io.Limit.limited` at `typed-lowering`,
+  diagnostic `unsupported:opcode:intcast_safe`. The same ReleaseSafe cluster
+  also appears at ranks 51 `http.Reader.RemainingChunkLen.init` and 58
+  `zig.Ast.OptionalTokenIndex.fromToken`.
 - Strict ratchet `real_*` counters:
   `real_functions_lowered=25`, `real_objects_emitted=25`,
   `real_native_linked=25`, `real_executed=0`, `real_programs_ok=0`.
@@ -99,21 +67,22 @@ Stop state recorded 2026-07-03 during item 10 cluster fixing:
   hash
   `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`,
   selector `real-candidate-selector-v2`, Zig pin
-  `141bfce0883017ff7ebe03e3af3db07fff0c5dc3`. The migration from selector-v1
+  `bdee02bc0c7f227c0f11bc9a449df673fe803540`. The migration from selector-v1
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=25`.
-- Saved log paths: `tmp/real_rows_strict_limit25_v2.log`,
-  `tmp/real_rows_releasefast_limit200_discovery.log`, and
-  `tmp/real_rows_releasefast_limit200_after_i8_ult.log`.
+- Saved log paths: `tmp/check_stage4_optional_layout_pin_amended.log`,
+  `tmp/real_rows_releasefast_limit200_after_sret_field_backend.log`, and
+  `tmp/real_rows_strict_limit100_after_optional_layout.log`.
 - Tracked evidence summaries:
-  `docs/evidence/real_rows_strict_limit25_v2.summary`,
-  `docs/evidence/real_rows_releasefast_limit200_discovery.summary`, and
-  `docs/evidence/real_rows_releasefast_limit200_after_i8_ult.summary`.
-- Recommended next action: continue item 10 on the largest remaining cluster,
-  `object-emission UnsupportedCodegenInstruction`, using rank 39
-  `bit_set.Array(usize,100).maskIndex` as the first representative. Keep the syscall-hello item
-  11 track open in the stop report.
+  `docs/evidence/ziglang_pin_stage4_optional_layout.summary`,
+  `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary`,
+  and
+  `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`.
+- Recommended next action: fix the ReleaseSafe `intcast_safe` typed-lowering
+  cluster starting from rank 32 `Io.Limit.limited`, then rerun strict
+  `--limit=100` in all three release modes. Keep the syscall-hello item 11
+  track open in the stop report.
 
 When the worker stops, record only:
 

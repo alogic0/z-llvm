@@ -40,6 +40,11 @@ pub fn isAggregateIrType(ty: ir.Type) bool {
 
 pub const AggregateCopyLeaf = type_layout.AggregateLeaf;
 
+pub const AggregateFieldWrapper = struct {
+    field_offset: u64,
+    param_ty: ir.Type,
+};
+
 pub fn collectAggregateCopyLeaves(allocator: std.mem.Allocator, aggregate_ty: ir.Type) ![]AggregateCopyLeaf {
     const plan = aggregateCopyLayoutPlan(aggregate_ty) orelse return error.UnsupportedAir;
     if (plan.leaf_count < 3) return error.UnsupportedAir;
@@ -137,6 +142,71 @@ pub fn validateSretAggregateCopyRecords(
     if (arg_count != 1) return false;
     const returned = singleReturnedInst(structured_air_v2) orelse return false;
     return returned == arg_indices[0];
+}
+
+pub fn sretAggregateFieldWrapper(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?AggregateFieldWrapper {
+    if (function_type.return_type.ir_type != .aggregate or function_type.params.len != 1) return null;
+    const param_ty = function_type.params[0].ir_type;
+    if (!isAggregateIrType(param_ty)) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return null;
+    if (air_model.typedStoreOpcodeCount(structured_air_v2) != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return null;
+    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return null;
+    const store = typedSingleStoreInstruction(structured_air_v2) orelse return null;
+    if (store.operands.len != 2) return null;
+    if (!std.mem.eql(u8, store.operands[1].kind, "inst")) return null;
+    const arg_inst_index = std.fmt.parseInt(u32, store.operands[1].value, 10) catch return null;
+    if (arg_inst_index != 0) return null;
+    const operand_type = parseZigType(store.operands[1].type_text) orelse return null;
+    if (!operand_type.ir_type.eql(param_ty)) return null;
+    const ptr_inst_index = std.fmt.parseInt(u32, store.operands[0].value, 10) catch return null;
+    var path: [4]usize = undefined;
+    const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return null;
+    const layout = x86_64SysVDataLayout() orelse return null;
+    const field = aggregateFieldAtPath(layout, function_type.return_type.ir_type, path[0..path_len]) orelse return null;
+    const normalized_field_ty = type_layout.normalizeAggregateTypeChecked(field.ty) catch return null;
+    const normalized_param_ty = type_layout.normalizeAggregateTypeChecked(param_ty) catch return null;
+    if (!normalized_field_ty.eql(normalized_param_ty)) return null;
+    _ = aggregateCopyLayoutPlan(normalized_param_ty) orelse return null;
+    return .{
+        .field_offset = field.offset,
+        .param_ty = normalized_param_ty,
+    };
+}
+
+fn typedSingleStoreInstruction(structured_air_v2: air_export.StructuredAirV2) ?air_export.TypedInstruction {
+    var found: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
+        if (found != null) return null;
+        found = instruction;
+    }
+    return found;
+}
+
+fn aggregateFieldAtPath(
+    layout: target_mod.DataLayout,
+    aggregate_ty: ir.Type,
+    path: []const usize,
+) ?struct { offset: u64, ty: ir.Type } {
+    if (path.len == 0) return null;
+    var current_ty = type_layout.normalizeAggregateTypeChecked(aggregate_ty) catch return null;
+    var offset: u64 = 0;
+    for (path, 0..) |field_index, position| {
+        const field_ty = type_layout.fieldType(current_ty, field_index) orelse return null;
+        offset += type_layout.fieldByteOffset(layout, current_ty, field_index) orelse return null;
+        if (position == path.len - 1) return .{
+            .offset = offset,
+            .ty = field_ty,
+        };
+        current_ty = type_layout.normalizeAggregateTypeChecked(field_ty) catch return null;
+        if (!isAggregateIrType(current_ty)) return null;
+    }
+    return null;
 }
 
 pub fn validateSretAggregateCallWrapperRecords(
@@ -321,6 +391,35 @@ test "aggregate copy validates returned aggregate argument" {
         .{ .index = 1, .opcode = "ret", .result_type = "noreturn", .data_kind = "ret", .operands = @constCast(&wrong_ret_ops) },
     };
     try std.testing.expect(!validateSretAggregateCopyRecords(function_type, .{ .instructions = wrong_instructions[0..] }));
+}
+
+test "aggregate copy validates sret aggregate field wrapper" {
+    const big3 = "struct { i64, i64, i64 }";
+    var params = [_]ZigType{.{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } }};
+    const function_type = FunctionType{
+        .params = params[0..],
+        .return_type = .{ .ir_type = .{ .aggregate = "{ { i64, i64, i64 } }" } },
+        .c_calling_convention = true,
+        .non_default_calling_convention = false,
+    };
+    const field0_details = [_]air_export.TypedDetail{.{ .key = "field_index", .value = "0" }};
+    const field_ops = [_]air_export.TypedOperand{testInstOperand("1", "*Outer")};
+    const store_ops = [_]air_export.TypedOperand{ testInstOperand("2", "*struct { i64, i64, i64 }"), testInstOperand("0", big3) };
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = big3, .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "ret_ptr", .result_type = "*Outer", .data_kind = "ret_ptr", .operands = &.{} },
+        .{ .index = 2, .opcode = "struct_field_ptr_index_0", .result_type = "*struct { i64, i64, i64 }", .data_kind = "field_ptr", .operands = @constCast(&field_ops), .details = @constCast(&field0_details) },
+        .{ .index = 3, .opcode = "store", .result_type = "void", .data_kind = "bin_op", .operands = @constCast(&store_ops) },
+        .{ .index = 4, .opcode = "ret_load", .result_type = "noreturn", .data_kind = "ret_load", .operands = &.{} },
+    };
+    const wrapper = sretAggregateFieldWrapper(function_type, .{ .instructions = instructions[0..] }).?;
+    try std.testing.expectEqual(@as(u64, 0), wrapper.field_offset);
+    try std.testing.expect(wrapper.param_ty.eql(.{ .aggregate = "{ i64, i64, i64 }" }));
+
+    const wrong_store_ops = [_]air_export.TypedOperand{ testInstOperand("2", "*Big3"), testInstOperand("0", "i64") };
+    var wrong_instructions = instructions;
+    wrong_instructions[3].operands = @constCast(&wrong_store_ops);
+    try std.testing.expect(sretAggregateFieldWrapper(function_type, .{ .instructions = wrong_instructions[0..] }) == null);
 }
 
 test "aggregate copy validates call wrapper aggregate data flow" {

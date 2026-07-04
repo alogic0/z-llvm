@@ -239,7 +239,7 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 200 | 199 | 199 | 199 | `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.summary` |
+| ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
 | ReleaseSafe | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 | ReleaseSmall | 25 | 25 | 25 | 25 | `docs/evidence/real_rows_strict_limit25_v2.summary` |
 
@@ -252,7 +252,7 @@ count that turned green when the fix landed.
 | Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
 | --- | ---: | --- | ---: | --- |
 | `object-emission x86_64-lower:UnsupportedCodegenInstruction` | 0 | Closed | 146 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission unlocked rank 36 `ascii.isAscii`; i64 terminal shifts with model-owned extended shift-count constants unlocked ranks 39-43 `bit_set.*.maskIndex`; narrow enum `zext` emission unlocked rank 59 `Air.VectorCmp.encodeOp`; nominal enum bool less-than returns unlocked ranks 61-62 `codegen.*.bits.FrameIndex.isNamed`, ranks 66-182 `hash_map.*.Metadata.*`, and rank 184 `os.linux.W.IFEXITED`; sub-byte unsigned greater-than-zero bool returns unlocked rank 183 `link.Diags.Flags.anySet`; model-owned `i16` masked equality bool returns unlocked ranks 186-187 `unicode.utf16Is*Surrogate`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_i16_masked_cmp.summary` |
-| `typed-lowering unsupported:function_type:function-type` | 1 | Open | 156 | Opaque nominal type-surface parsing now accepts pointer sigils inside balanced generic argument lists, so existing typed-bitcast inference unlocked ranks 63-65 `hash_map.*.Metadata.*`; preserving module aggregate-layout facts in real-row slices plus direct `aggregate_init` register-aggregate lowering unlocked rank 185 `sort.block.Range.init`; fact-owned `Air.ShuffleTwoMask` u32 nominal enum parsing unlocked rank 189 `Air.ShuffleTwoMask.aElem`; opaque nominal `bitcast` + `intcast` scalar inference unlocked ranks 191-200 `InternPool.*`/related optional-index wrappers. Representative row now: rank 190 `Build.Cache.Path.fmtEscapeString`; evidence `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.summary` |
+| `typed-lowering unsupported:function_type:function-type` | 0 | Closed | 157 | Opaque nominal type-surface parsing now accepts pointer sigils inside balanced generic argument lists, so existing typed-bitcast inference unlocked ranks 63-65 `hash_map.*.Metadata.*`; preserving module aggregate-layout facts in real-row slices plus direct `aggregate_init` register-aggregate lowering unlocked rank 185 `sort.block.Range.init`; fact-owned `Air.ShuffleTwoMask` u32 nominal enum parsing unlocked rank 189 `Air.ShuffleTwoMask.aElem`; opaque nominal `bitcast` + `intcast` scalar inference unlocked ranks 191-200 `InternPool.*`/related optional-index wrappers; hook-contract v1 aggregate-layout facts for optional payload/slice fields plus fact-owned sret aggregate field-wrapper lowering/emission unlocked rank 190 `Build.Cache.Path.fmtEscapeString`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
 | `typed-lowering unsupported:instruction_type:lowering` | 0 | Closed | 1 | Fact-owned pointer register-aggregate construction from `ret_ptr` field-store/`ret_load` plus x86_64 pointer aggregate return emission unlocked rank 188 `Air.Liveness.fmtInstSet`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.summary` |
 
 ## Progress Log
@@ -363,6 +363,17 @@ One line per completed cycle, append-only, newest last. This is the
   report-mode `--limit=200` to `199/199/199/0/0` and making rank 188
   `Air.Liveness.fmtInstSet` typed/object/link green. Recognizer count still 1
   (no recognizer reorder or pre-pass).
+- 2026-07-04 (this commit) Item 10 hook-contract cycle: patched Zig commit
+  `bdee02bc` keeps the `zllvm-aggregate-layout-facts-v1` schema and
+  additively emits optional payload/slice aggregate layout facts, including
+  `?[]const u8` layouts needed by `Build.Cache.Path`; z_llvm consumes those
+  model-owned facts with sret aggregate field-wrapper lowering and generic CFG
+  field-offset copy emission, moving ReleaseFast report-mode `--limit=200` to
+  `200/200/200/0/0` and making rank 190 `Build.Cache.Path.fmtEscapeString`
+  typed/object/link green. Strict `--limit=100` then exposed the next
+  ReleaseSafe-only typed-lowering cluster, `unsupported:opcode:intcast_safe`
+  at ranks 32, 51, and 58; no ratchet move yet. Recognizer count still 1 (no
+  recognizer reorder or pre-pass).
 
 ## Ratchet State
 

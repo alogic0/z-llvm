@@ -3159,14 +3159,15 @@ pub fn lowerGenericCfgSretCopy(
     if (function.params.items.len != 2) return false;
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
     const byval_ty = byvalAggregateType(function.params.items[1].attrs) orelse return false;
-    if (!byval_ty.eql(aggregate_ty)) return false;
     if (!isSupportedAggregateCopyLeafAggregate(aggregate_ty)) return false;
+    if (!isSupportedAggregateCopyLeafAggregate(byval_ty)) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;
     const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
     if (sret_reg != .rdi) return error.UnsupportedCodegenAbi;
     if (block.instructions.items.len < 12 or block.instructions.items.len % 4 != 0) return false;
 
     const copy_count = block.instructions.items.len / 4;
+    var dst_base_offset: ?u64 = null;
     var copy_index: usize = 0;
     while (copy_index < copy_count) : (copy_index += 1) {
         const src_gep_inst = block.instructions.items[copy_index * 4];
@@ -3177,9 +3178,15 @@ pub fn lowerGenericCfgSretCopy(
         const src_gep_name = src_gep_inst.result orelse return false;
         const load_name = load_inst.result orelse return false;
         const dst_gep_name = dst_gep_inst.result orelse return false;
-        const src_offset = aggregateCopyGepOffset(src_gep_inst, aggregate_ty, function.params.items[1].name) orelse return false;
+        const src_offset = aggregateCopyGepOffset(src_gep_inst, byval_ty, function.params.items[1].name) orelse return false;
         const dst_offset = aggregateCopyGepOffset(dst_gep_inst, aggregate_ty, function.params.items[0].name) orelse return false;
-        if (src_offset != dst_offset) return false;
+        if (dst_offset < src_offset) return false;
+        const current_dst_base = dst_offset - src_offset;
+        if (dst_base_offset) |base| {
+            if (base != current_dst_base) return false;
+        } else {
+            dst_base_offset = current_dst_base;
+        }
 
         const load = switch (load_inst.kind) {
             .load => |load| load,
@@ -3193,24 +3200,24 @@ pub fn lowerGenericCfgSretCopy(
         if (!store.ty.eql(load.ty) or store.attrs.isBarrier() or !isNamed(store.ptr, dst_gep_name) or
             !isNamed(store.value, load_name)) return false;
 
-        const offset = try aggregateByteOffset(aggregate_ty, src_offset, load.ty);
+        const offset = try aggregateByteOffset(aggregate_ty, dst_offset, load.ty);
         if (load.ty.eql(.float)) {
-            try appendLoadStackDispXmm0F32(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendLoadStackDispXmm0F32(allocator, machine, try stackAggregateByteDisp(byval_ty, src_offset, load.ty));
             try appendStoreXmm0F32ArgPtrDisp(allocator, machine, sret_reg, offset);
         } else if (load.ty.eql(.double)) {
-            try appendLoadStackDispXmm0(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendLoadStackDispXmm0(allocator, machine, try stackAggregateByteDisp(byval_ty, src_offset, load.ty));
             try appendStoreXmm0ArgPtrDisp(allocator, machine, sret_reg, offset);
         } else if (load.ty.eql(.{ .int = 64 }) or load.ty.eql(.ptr)) {
-            try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(byval_ty, src_offset, load.ty));
             try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, offset);
         } else if (load.ty.eql(.{ .int = 32 })) {
-            try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendLoadStackDispRax(allocator, machine, try stackAggregateByteDisp(byval_ty, src_offset, load.ty));
             try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
         } else if (load.ty.eql(.{ .int = 16 })) {
-            try appendLoadStackDispU16Eax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendLoadStackDispU16Eax(allocator, machine, try stackAggregateByteDisp(byval_ty, src_offset, load.ty));
             try appendStoreAxArgPtrDisp(allocator, machine, sret_reg, offset);
         } else if (load.ty.eql(.{ .int = 8 })) {
-            try appendLoadStackDispU8Eax(allocator, machine, try stackAggregateByteDisp(aggregate_ty, src_offset, load.ty));
+            try appendLoadStackDispU8Eax(allocator, machine, try stackAggregateByteDisp(byval_ty, src_offset, load.ty));
             try appendStoreAlArgPtrDisp(allocator, machine, sret_reg, offset);
         } else {
             return error.UnsupportedCodegenType;

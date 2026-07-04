@@ -12,6 +12,7 @@ const collectAggregateCopyLeaves = air_aggregate_copy.collectAggregateCopyLeaves
 const validateSretAggregateMakeRecords = air_aggregate_copy.validateSretAggregateMakeRecords;
 const validateSretAggregateCopyRecords = air_aggregate_copy.validateSretAggregateCopyRecords;
 const validateSretAggregateCallWrapperRecords = air_aggregate_copy.validateSretAggregateCallWrapperRecords;
+const sretAggregateFieldWrapper = air_aggregate_copy.sretAggregateFieldWrapper;
 const isSysVRegisterAggregateCandidate = air_aggregate_construction.isSysVRegisterAggregateCandidate;
 const typedDetail = air_model.detail;
 const typedCallee = air_model.callee;
@@ -306,6 +307,9 @@ pub fn lowerTypedV2SretIntegerAggregateAbi(
     if (typedV2SretIntegerAggregateCopyRecords(function_type, structured_air_v2)) {
         return try lowerSretIntegerAggregateCopy(allocator, module, air_function, function_type.return_type.ir_type);
     }
+    if (typedV2SretIntegerAggregateFieldWrapperRecords(function_type, structured_air_v2)) |wrapper| {
+        return try lowerSretIntegerAggregateFieldWrapper(allocator, module, air_function, function_type.return_type.ir_type, wrapper);
+    }
     if (!typedV2SretIntegerAggregateRecords(function_type, structured_air_v2)) return null;
     return try lowerSretIntegerAggregateMake(allocator, module, air_function, function_type.return_type.ir_type);
 }
@@ -324,6 +328,14 @@ pub fn typedV2SretIntegerAggregateCopyRecords(
 ) bool {
     if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     return validateSretAggregateCopyRecords(function_type, structured_air_v2);
+}
+
+pub fn typedV2SretIntegerAggregateFieldWrapperRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?air_aggregate_copy.AggregateFieldWrapper {
+    if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return null;
+    return sretAggregateFieldWrapper(function_type, structured_air_v2);
 }
 
 pub fn typedV2SretIntegerAggregateCallWrapperRecords(
@@ -411,6 +423,58 @@ pub fn lowerSretIntegerAggregateCopy(
         var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
         errdefer dst_gep.deinit(allocator);
         try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(leaf.offset) } });
+        try block.instructions.append(allocator, .{ .result = dst_result, .kind = .{ .gep = dst_gep } });
+
+        try block.instructions.append(allocator, .{
+            .result = null,
+            .kind = .{ .store = .{
+                .ty = leaf.ty,
+                .value = .{ .named = load_result },
+                .ptr = .{ .named = dst_result },
+            } },
+        });
+    }
+    block.terminator = .{ .ret = .{ .ty = .void } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+pub fn lowerSretIntegerAggregateFieldWrapper(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    aggregate_ty: ir.Type,
+    wrapper: air_aggregate_copy.AggregateFieldWrapper,
+) !ir.Function {
+    var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+    errdefer function.deinit(allocator);
+    function.linkage = .default;
+    function.calling_conv = null;
+    const leaves = try collectAggregateCopyLeaves(allocator, wrapper.param_ty);
+    defer allocator.free(leaves);
+    try function.params.append(allocator, .{ .ty = .ptr, .attrs = try sretAttrsForAggregate(module, aggregate_ty), .name = "sret" });
+    try function.params.append(allocator, .{ .ty = .ptr, .attrs = try byvalAttrsForAggregate(module, wrapper.param_ty), .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    for (leaves, 0..) |leaf, leaf_index| {
+        const src_result = try ownPrint(module, "src_leaf{}", .{leaf_index});
+        const load_result = try ownPrint(module, "load{}", .{leaf_index});
+        const dst_result = try ownPrint(module, "dst_leaf{}", .{leaf_index});
+
+        var src_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "arg0" }, .indices = .empty };
+        errdefer src_gep.deinit(allocator);
+        try src_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(leaf.offset) } });
+        try block.instructions.append(allocator, .{ .result = src_result, .kind = .{ .gep = src_gep } });
+
+        try block.instructions.append(allocator, .{ .result = load_result, .kind = .{ .load = .{
+            .ty = leaf.ty,
+            .ptr = .{ .named = src_result },
+        } } });
+
+        var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+        errdefer dst_gep.deinit(allocator);
+        try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(wrapper.field_offset + leaf.offset) } });
         try block.instructions.append(allocator, .{ .result = dst_result, .kind = .{ .gep = dst_gep } });
 
         try block.instructions.append(allocator, .{

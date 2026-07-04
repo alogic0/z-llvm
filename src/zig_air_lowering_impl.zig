@@ -111,6 +111,7 @@ const ensureBase64LookupGlobal = typed_v2_fallbacks.ensureBase64LookupGlobal;
 const typedV2RegisterAggregateRecords = typed_v2.typedV2RegisterAggregateRecords;
 const typedV2SretIntegerAggregateRecords = typed_v2.typedV2SretIntegerAggregateRecords;
 const typedV2SretIntegerAggregateCopyRecords = typed_v2.typedV2SretIntegerAggregateCopyRecords;
+const typedV2SretIntegerAggregateFieldWrapperRecords = typed_v2.typedV2SretIntegerAggregateFieldWrapperRecords;
 const typedV2SretIntegerAggregateCallWrapperRecords = typed_v2.typedV2SretIntegerAggregateCallWrapperRecords;
 const typedV2ErrorUnionPayloadRecords = typed_v2.typedV2ErrorUnionPayloadRecords;
 const typedV2MaybeErrorRecords = typed_v2.typedV2MaybeErrorRecords;
@@ -346,6 +347,7 @@ pub fn firstUnsupported(
         if (function.structured_air_v2) |structured_air_v2|
             typedV2SretIntegerAggregateRecords(function_type, structured_air_v2) or
                 typedV2SretIntegerAggregateCopyRecords(function_type, structured_air_v2) or
+                typedV2SretIntegerAggregateFieldWrapperRecords(function_type, structured_air_v2) != null or
                 typedV2SretIntegerAggregateCallWrapperRecords(function_type, structured_air_v2)
         else
             false;
