@@ -211,6 +211,45 @@ test "x86_64 codegen lowers slice length extracted from typed AIR slice stack" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers byte scan length loop without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal i64 @any_byte_scan_len(ptr %ptr) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %index = phi i64 [ 0, %entry ], [ %next, %loop ]
+        \\  %byte.ptr = getelementptr inbounds [1 x i8], ptr %ptr, i64 %index
+        \\  %byte = load i8, ptr %byte.ptr, align 1
+        \\  %is.zero = icmp eq i8 %byte, 0
+        \\  %next = add nuw i64 %index, 1
+        \\  br i1 %is.zero, label %exit, label %loop
+        \\exit:
+        \\  ret i64 %index
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } });
+    try expectMachineInstruction(machine.instructions.items, .load_rcx_ptr_u8_eax);
+    try expectMachineInstruction(machine.instructions.items, .test_eax_eax);
+    try expectMachineInstruction(machine.instructions.items, .sub_r8_rcx);
+    try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rcx });
+}
+
 test "x86_64 codegen routes checked guard cfg through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

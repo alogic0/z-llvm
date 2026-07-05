@@ -89,6 +89,10 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.Ma
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try loop_rows.lowerByteScanLenLoop(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try multi_block_rows.lowerGenericCfgTerminalBranchReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;

@@ -276,6 +276,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt verifier:UnsupportedType vector floating binary ops` | 0 | Closed | 16 | Item 12 std-hello Debug discovery now verifies fixed-vector floating binary operations for modeled `half`, `float`, `double`, and `fp128` element types, preserving fail-closed lowering; the next open cluster is verifier `UnsupportedFloatingPointLiteral` on vector floating literal lanes. Evidence `tmp/std_debug_hello_debug_build_after_vector_fp_binary.log` |
 | `real-program object-emission compiler_rt verifier:UnsupportedFloatingPointLiteral vector fneg splat` | 0 | Closed | 2 | Item 12 std-hello Debug discovery now lowers vector `fneg` through a model-owned vector negative-zero splat instead of a scalar FP literal, resolving the two vector `fneg <2 x double>` rows; the next open cluster is verifier `UnsupportedInlineAsm` on non-sideeffect compiler_rt inline asm. Evidence `tmp/std_debug_hello_debug_build_after_vector_fneg_splat.log` |
 | `real-program object-emission compiler_rt verifier:UnsupportedInlineAsm pure register outputs` | 0 | Closed | 3 | Item 12 std-hello Debug discovery now admits pure non-sideeffect inline asm when the modeled constraints have no memory effects, while keeping memory-effecting asm without `sideeffect` rejected; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.strlen`. Evidence `tmp/std_debug_hello_debug_build_after_pure_inline_asm.log` |
+| `real-program object-emission compiler_rt cfg:byte scan len loop` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned byte-scan length loop shape used by `compiler_rt.strlen` through generic CFG without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.bcmp`. Evidence `tmp/std_debug_hello_debug_build_after_byte_scan_len.log` |
 
 ## Progress Log
 
@@ -475,6 +476,13 @@ One line per completed cycle, append-only, newest last. This is the
   `UnsupportedCodegenControlFlow` in `compiler_rt.strlen`; strict real-row
   enforcement remains at 100. Recognizer count still 1 (no recognizer reorder
   or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned byte-scan length loop shape used by compiler_rt
+  `strlen` without function-name admission, moving Debug std-hello from
+  object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.strlen` to
+  the same stage/diagnostic in `compiler_rt.bcmp`; strict real-row enforcement
+  remains at 100. Recognizer count still 1 (no recognizer reorder or
+  pre-pass).
 
 ## Ratchet State
 

@@ -951,6 +951,98 @@ pub fn lowerSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction
     return true;
 }
 
+pub fn lowerByteScanLenLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesByteScanLenLoop(function)) return false;
+    const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    if (ptr_reg != .rdi) return error.UnsupportedCodegenAbi;
+
+    const loop_label = "byte_scan_len_loop";
+    const done_label = "byte_scan_len_done";
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .r8, .src = ptr_reg } });
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = ptr_reg } });
+    try machine.instructions.append(allocator, .{ .label = loop_label });
+    try machine.instructions.append(allocator, .load_rcx_ptr_u8_eax);
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try machine.instructions.append(allocator, .{ .je = done_label });
+    try machine.instructions.append(allocator, .inc_rcx);
+    try machine.instructions.append(allocator, .{ .jmp = loop_label });
+    try machine.instructions.append(allocator, .{ .label = done_label });
+    try machine.instructions.append(allocator, .sub_r8_rcx);
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = .rcx });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn matchesByteScanLenLoop(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 1 or function.params.items[0].ty != .ptr) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const exit = function.blocks.items[2];
+    if (entry.instructions.items.len != 0 or loop.instructions.items.len != 5 or exit.instructions.items.len != 0) return false;
+
+    const entry_br = switch (entry.terminator orelse return false) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, entry_br.target, loop.name)) return false;
+
+    const phi_name = loop.instructions.items[0].result orelse return false;
+    const gep_name = loop.instructions.items[1].result orelse return false;
+    const load_name = loop.instructions.items[2].result orelse return false;
+    const icmp_name = loop.instructions.items[3].result orelse return false;
+    const next_name = loop.instructions.items[4].result orelse return false;
+
+    const phi = switch (loop.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 64 })) return false;
+    if (!phiHasIncomingInt(phi, 0, entry.name) or !phiHasIncoming(phi, next_name, loop.name)) return false;
+
+    const gep = switch (loop.instructions.items[1].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" }) or !isNamed(gep.ptr, function.params.items[0].name)) return false;
+    if (gep.indices.items.len != 1) return false;
+    const gep_index = gep.indices.items[0];
+    if (!gep_index.ty.eql(.{ .int = 64 }) or !isNamed(gep_index.value, phi_name)) return false;
+
+    const load = switch (loop.instructions.items[2].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
+
+    const icmp = switch (loop.instructions.items[3].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 8 }) or !isNamed(icmp.lhs, load_name) or !isInt(icmp.rhs, 0)) return false;
+
+    const next = switch (loop.instructions.items[4].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (next.op != .add or !next.ty.eql(.{ .int = 64 }) or !isNamed(next.lhs, phi_name) or !isInt(next.rhs, 1)) return false;
+
+    const condbr = switch (loop.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_name)) return false;
+    if (!std.mem.eql(u8, condbr.then_target, exit.name) or !std.mem.eql(u8, condbr.else_target, loop.name)) return false;
+
+    const ret = switch (exit.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(.{ .int = 64 }) and isNamed(ret.value orelse return false, phi_name);
+}
+
 pub fn lowerGenericCfgConditionalSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 3) return false;
