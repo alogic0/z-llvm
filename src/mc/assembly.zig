@@ -97,6 +97,20 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .or_rdx_rax => try writer.writeAll("\torq %rdx, %rax\n"),
             .neg_rax => try writer.writeAll("\tnegq %rax\n"),
             .neg_i128_rdi_rsi_rdx_rax => try writer.writeAll("\tmovq %rdi, %rax\n\tmovq %rsi, %rdx\n\tnegq %rax\n\tadcq $0, %rdx\n\tnegq %rdx\n"),
+            .ffs_i128_rdi_rsi_eax => try writer.writeAll(
+                "\txorl %eax, %eax\n" ++
+                    "\ttestq %rdi, %rdi\n" ++
+                    "\tjne 1f\n" ++
+                    "\ttestq %rsi, %rsi\n" ++
+                    "\tje 2f\n" ++
+                    "\tbsfq %rsi, %rax\n" ++
+                    "\taddl $65, %eax\n" ++
+                    "\tjmp 2f\n" ++
+                    "1:\n" ++
+                    "\tbsfq %rdi, %rax\n" ++
+                    "\taddl $1, %eax\n" ++
+                    "2:\n",
+            ),
             .shl_rcx_imm6 => |amount| try writer.print("\tshlq ${}, %rcx\n", .{amount}),
             .shl_r8_imm6 => |amount| try writer.print("\tshlq ${}, %r8\n", .{amount}),
             .or_rcx_rax => try writer.writeAll("\torq %rcx, %rax\n"),
