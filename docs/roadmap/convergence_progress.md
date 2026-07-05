@@ -273,6 +273,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt parser:InvalidFunctionHeader half` | 0 | Closed | 55 | Item 12 std-hello Debug discovery now models LLVM `half` as a first-class scalar type with parser, verifier, layout, and fail-closed lowering support; the next open cluster is `UnsupportedType` while parsing `<4 x half>` vector elements in compiler_rt complex half multiplication. Evidence `tmp/std_debug_hello_debug_build_after_half_type.log` |
 | `real-program object-emission compiler_rt parser:UnsupportedType vector floating elements` | 0 | Closed | 2 | Item 12 std-hello Debug discovery now models LLVM vector element types `half` and `fp128` with parser, verifier, layout, cost, and fail-closed lowering support, unlocking compiler_rt `mulhc3` and `multc3`; the next open cluster is verifier `InvalidDebugMetadata` on a `!DILocalVariable` without `name`. Evidence `tmp/std_debug_hello_debug_build_after_vector_fp_elements.log` |
 | `real-program object-emission compiler_rt verifier:InvalidDebugMetadata unnamed DILocalVariable arg` | 0 | Closed | 2 | Item 12 std-hello Debug discovery now accepts LLVM `!DILocalVariable(arg: ...)` records without a `name` field while still requiring `scope` and `type`; the next open cluster is verifier `UnsupportedType` on vector floating binary operations. Evidence `tmp/std_debug_hello_debug_build_after_unnamed_dilocalvariable.log` |
+| `real-program object-emission compiler_rt verifier:UnsupportedType vector floating binary ops` | 0 | Closed | 16 | Item 12 std-hello Debug discovery now verifies fixed-vector floating binary operations for modeled `half`, `float`, `double`, and `fp128` element types, preserving fail-closed lowering; the next open cluster is verifier `UnsupportedFloatingPointLiteral` on vector floating literal lanes. Evidence `tmp/std_debug_hello_debug_build_after_vector_fp_binary.log` |
 
 ## Progress Log
 
@@ -453,6 +454,12 @@ One line per completed cycle, append-only, newest last. This is the
   Debug std-hello from `InvalidDebugMetadata` to verifier `UnsupportedType` on
   vector floating binary operations; strict real-row enforcement remains at
   100. Recognizer count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: fixed-vector
+  floating binary operations now verify for modeled floating element types, and
+  Debug std-hello moves from vector binary `UnsupportedType` to verifier
+  `UnsupportedFloatingPointLiteral` on vector floating literal lanes; strict
+  real-row enforcement remains at 100. Recognizer count still 1 (no recognizer
+  reorder or pre-pass).
 
 ## Ratchet State
 

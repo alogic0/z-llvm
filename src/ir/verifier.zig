@@ -1751,7 +1751,10 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
             .half, .float, .double, .x86_fp80, .fp128 => {},
-            .vector => return error.UnsupportedType,
+            .vector => |vector| switch (vector.elem_ty) {
+                .half, .float, .double, .fp128 => {},
+                .int, .ptr => return error.TypeMismatch,
+            },
             .void, .int, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => switch (binary.ty) {
@@ -1770,7 +1773,11 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
     switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
             .half, .float, .double, .x86_fp80, .fp128 => {},
-            .void, .int, .metadata, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
+            .vector => |vector| switch (vector.elem_ty) {
+                .half, .float, .double, .fp128 => {},
+                .int, .ptr => return error.InvalidInstructionFlag,
+            },
+            .void, .int, .metadata, .ptr, .aggregate => return error.InvalidInstructionFlag,
         },
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
     }

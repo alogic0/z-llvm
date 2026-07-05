@@ -525,7 +525,7 @@ test "parser preserves fast-math flags without enabling FP folds" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
-test "parser keeps unsupported FP surface closed" {
+test "parser keeps unsupported FP surface closed except modeled vector FP binary ops" {
     const invalid_fast_mix_input =
         \\define float @invalid_fast_mix(float %a, float %b) {
         \\entry:
@@ -553,7 +553,7 @@ test "parser keeps unsupported FP surface closed" {
     const vector_fp_binary_input =
         \\define <2 x float> @vector_fadd(<2 x float> %a, <2 x float> %b) {
         \\entry:
-        \\  %r = fadd <2 x float> %a, %b
+        \\  %r = fadd nnan <2 x float> %a, %b
         \\  ret <2 x float> %r
         \\}
         \\
@@ -577,7 +577,7 @@ test "parser keeps unsupported FP surface closed" {
 
     var vector_fp_binary = try ir.Module.parse(std.testing.allocator, vector_fp_binary_input);
     defer vector_fp_binary.deinit();
-    try std.testing.expectError(error.UnsupportedType, vector_fp_binary.verify());
+    try vector_fp_binary.verify();
 
     var constrained = try ir.Module.parse(std.testing.allocator, constrained_input);
     defer constrained.deinit();
