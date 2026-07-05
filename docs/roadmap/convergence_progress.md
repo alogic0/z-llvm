@@ -187,6 +187,16 @@ list and the visible record of progress. Evidence summaries under
   ReleaseSafe, and ReleaseSmall; each binary prints `hello\n` and exits 0.
 - [ ] 12. Milestone 2a', std hello: same program via `std.debug.print`
   with default `_start`; separate acceptance, all modes.
+
+  Method annotation (2026-07-05): after the per-width ctz cycles, remaining
+  compiler_rt builtin families are fixed width-parametrically where the IR
+  shape matches. One model-owned family lowering should cover i32, i64, and
+  i128 (and float formats where applicable), deleting/subsuming existing
+  per-width special cases in the same commit. Each parametric family closure
+  records partial item-14 credit, with `distribution-all` and the real-program
+  boundary gate as proof. If a soft-float f80/f128 arithmetic family needs
+  more than one new generic-CFG shape, stop for item-15 architectural review
+  instead of stacking shapes.
 - [ ] 12a. tmp hygiene (small infrastructure cycle; may be taken between
   item-12 cluster cycles when a short cycle fits): a Zig tool
   `tools/clean_tmp.zig`, wired as `zig build clean-tmp`, that (a) deletes
@@ -315,6 +325,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt int:i128 ctz ladder` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned i128 ctz zero/low/high-bit ladder shape through a SysV `rsi:rdi` backend op without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ctzdi2`. Evidence `tmp/std_debug_hello_debug_build_after_ctzti2.log` |
 | `real-program object-emission compiler_rt int:i64 ctz ladder` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned i64 ctz zero/low/high-bit ladder shape through a SysV `rdi` backend op without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ctzsi2`. Evidence `tmp/std_debug_hello_debug_build_after_ctzdi2.log` |
 | `real-program object-emission compiler_rt int:i32 ctz ladder` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned i32 ctz zero/low/high-bit ladder shape through the existing SysV `edi` backend op without function-name admission; the next open cluster is object-emission `UnsupportedCodegenInstruction` in `compiler_rt.count0bits.__clzti2`. Evidence `tmp/std_debug_hello_debug_build_after_ctzsi2.log` |
+| `real-program object-emission compiler_rt int:clz ladder width-parametric` | 0 | Closed | 2 | Item 12 std-hello Debug discovery now lowers the model-owned clz ladder family width-parametrically for i32/i64/i128; it subsumes the former i32-only ladder recognizer, adds SysV `rdi`/`rsi:rdi` backend ops for i64/i128, and moves Debug std-hello from object-emission `UnsupportedCodegenInstruction` in `compiler_rt.count0bits.__clzti2` to object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__memmove_chk` without function-name admission. Partial item-14 credit recorded for deleting the per-width i32 special-case entry point. Evidence `tmp/std_debug_hello_debug_build_after_clz_family.log` |
 
 ## Progress Log
 
@@ -644,6 +655,16 @@ One line per completed cycle, append-only, newest last. This is the
   `UnsupportedCodegenInstruction` in `compiler_rt.count0bits.__clzti2`; strict
   real-row enforcement remains at 100. Recognizer count still 1 (no recognizer
   reorder or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello method change + discovery fix:
+  remaining compiler_rt builtin families now use width-parametric lowering
+  where the model-owned shape matches. The clz ladder family covers
+  i32/i64/i128, subsumes the previous i32-only ladder entry point, adds i64
+  and i128 SysV backend ops, and moves Debug std-hello from object-emission
+  `UnsupportedCodegenInstruction` in `compiler_rt.count0bits.__clzti2` to
+  object-emission `UnsupportedCodegenControlFlow` in
+  `compiler_rt.ssp.__memmove_chk`; partial item-14 credit recorded for the
+  per-width subsumption. Strict real-row enforcement remains at 100.
+  Recognizer count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 
