@@ -216,7 +216,7 @@ fn canonicalizeStrictSelfFcmp(fcmp: *ir.FcmpInst) bool {
     if (!fcmp.lhs.eql(fcmp.rhs)) return false;
     if (fcmp.fp_flags.any()) return false;
     const zero = switch (fcmp.operand_ty) {
-        .float, .double => ir.Value{ .fp = "0.000000e+00" },
+        .half, .float, .double => ir.Value{ .fp = "0.000000e+00" },
         .void, .int, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
     };
     fcmp.predicate = .ord;
@@ -263,7 +263,7 @@ fn foldExtractAfterInsert(extract: ir.ExtractElementInst, inserted_vectors: std.
     if (!extract.vector_ty.eql(insert.vector_ty)) return null;
     const vector_ty = switch (extract.vector_ty) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return null,
     };
     if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return null;
     return insert.value;
@@ -293,15 +293,15 @@ fn rewriteExtractAfterShuffle(
     const shuffle = record.shuffle;
     const extract_vector_ty = switch (extract.vector_ty) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
     };
     const mask_vector_ty = switch (shuffle.mask_ty) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
     };
     const lhs_vector_ty = switch (shuffle.lhs_ty) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
     };
     if (extract_vector_ty.len != mask_vector_ty.len) return false;
     if (!extract_vector_ty.elem_ty.toType().eql(lhs_vector_ty.elem_ty.toType())) return false;
@@ -348,7 +348,7 @@ fn rewriteExtractAfterInsert(
     if (!extract.vector_ty.eql(insert.vector_ty)) return false;
     const vector_ty = switch (extract.vector_ty) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
     };
     if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return false;
 

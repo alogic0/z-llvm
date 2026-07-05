@@ -34,7 +34,7 @@ pub fn supportedAggregateCopyLeaf(ty: ir.Type) bool {
 pub fn isAggregateIrType(ty: ir.Type) bool {
     return switch (ty) {
         .aggregate => true,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
     };
 }
 

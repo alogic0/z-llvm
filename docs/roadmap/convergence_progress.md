@@ -270,6 +270,7 @@ count that turned green when the fix landed.
 | `typed-lowering unsupported:instruction_type:lowering` | 0 | Closed | 1 | Fact-owned pointer register-aggregate construction from `ret_ptr` field-store/`ret_load` plus x86_64 pointer aggregate return emission unlocked rank 188 `Air.Liveness.fmtInstSet`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.summary` |
 | `real-program object-emission compiler_rt parser:UnsupportedGlobalVariable weak_odr hidden alias` | 0 | Closed | 479 | Item 12 std-hello Debug discovery moved past compiler_rt `weak_odr hidden alias` declarations by parsing alias visibility as model IR and preserving ELF symbol visibility; the next open cluster is `UnsupportedInstruction` on `fneg x86_fp80`. Evidence `tmp/std_debug_hello_debug_build_after_alias_visibility.log` |
 | `real-program object-emission compiler_rt parser:UnsupportedInstruction fneg` | 0 | Closed | 76 | Item 12 std-hello Debug discovery now parses LLVM `fneg` as a model-owned `fsub` from negative zero, preserving fast-math flags; the next open cluster is `InvalidFunctionHeader` on `define internal half @compiler_rt.__neghf2(...)`. Evidence `tmp/std_debug_hello_debug_build_after_fneg_parse.log` |
+| `real-program object-emission compiler_rt parser:InvalidFunctionHeader half` | 0 | Closed | 55 | Item 12 std-hello Debug discovery now models LLVM `half` as a first-class scalar type with parser, verifier, layout, and fail-closed lowering support; the next open cluster is `UnsupportedType` while parsing `<4 x half>` vector elements in compiler_rt complex half multiplication. Evidence `tmp/std_debug_hello_debug_build_after_half_type.log` |
 
 ## Progress Log
 
@@ -430,6 +431,13 @@ One line per completed cycle, append-only, newest last. This is the
   `InvalidFunctionHeader` on `define internal half
   @compiler_rt.__neghf2(...)`; strict real-row enforcement remains at 100.
   Recognizer count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: LLVM `half`
+  is now a model-owned scalar type across parsing, verification, layout, and
+  fail-closed lowering/type helpers, moving Debug std-hello from
+  `InvalidFunctionHeader` on compiler_rt `__neghf2` to `UnsupportedType` while
+  parsing the first `<4 x half>` vector instruction in compiler_rt complex half
+  multiplication; strict real-row enforcement remains at 100. Recognizer count
+  still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 

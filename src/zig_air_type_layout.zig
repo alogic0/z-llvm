@@ -247,14 +247,14 @@ fn x86_64SysVDataLayout() !target.DataLayout {
 pub fn normalizeAggregateType(ty: ir.Type) ir.Type {
     return switch (ty) {
         .aggregate => |text| parseNamedAggregateType(text) orelse ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => ty,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => ty,
     };
 }
 
 pub fn normalizeAggregateTypeChecked(ty: ir.Type) error{AggregateLayoutMismatch}!ir.Type {
     return switch (ty) {
         .aggregate => |text| if (try aggregateLayoutSummaryChecked(text)) |summary| summary.ty else ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => ty,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => ty,
     };
 }
 
@@ -402,7 +402,7 @@ pub fn aggregateLayoutPlan(layout: target.DataLayout, aggregate_ty: ir.Type) !Ag
 pub fn isAggregateType(ty: ir.Type) bool {
     return switch (ty) {
         .aggregate => true,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
     };
 }
 

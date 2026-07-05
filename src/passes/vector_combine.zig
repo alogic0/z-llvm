@@ -57,7 +57,7 @@ fn foldExtractAfterInsert(
     if (!extract.vector_ty.eql(insert.vector_ty)) return false;
     const vector_ty = switch (extract.vector_ty) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
     };
     if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return false;
 

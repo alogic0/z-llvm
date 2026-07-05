@@ -265,7 +265,7 @@ pub fn appendFpMulXmm1Xmm0(allocator: std.mem.Allocator, machine: *MachineFuncti
 pub fn genericCfgSupportsUnusedScalarParam(ty: ir.Type) bool {
     return switch (ty) {
         .int, .ptr, .float, .double => true,
-        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+        .void, .half, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
     };
 }
 

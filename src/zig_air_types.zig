@@ -156,7 +156,7 @@ fn parseZigVectorType(trimmed: []const u8) ?ZigType {
         .float => .float,
         .double => .double,
         .ptr => .ptr,
-        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => return null,
+        .void, .half, .x86_fp80, .fp128, .metadata, .aggregate, .vector => return null,
     };
     return .{ .ir_type = .{ .vector = .{ .len = len, .elem_ty = elem_ty } }, .signed = elem.signed };
 }
@@ -189,6 +189,7 @@ fn appendIrTypeText(aggregate: *std.ArrayList(u8), ty: ir.Type) !void {
             const text = try std.fmt.allocPrint(std.heap.page_allocator, "i{}", .{bits});
             try aggregate.appendSlice(std.heap.page_allocator, text);
         },
+        .half => try aggregate.appendSlice(std.heap.page_allocator, "half"),
         .float => try aggregate.appendSlice(std.heap.page_allocator, "float"),
         .double => try aggregate.appendSlice(std.heap.page_allocator, "double"),
         .x86_fp80 => try aggregate.appendSlice(std.heap.page_allocator, "x86_fp80"),

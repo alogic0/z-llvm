@@ -726,7 +726,7 @@ pub fn boundaryForIrType(ty: ir.Type) ?TypeBoundary {
             }
             return null;
         },
-        .void, .int, .float, .double, .metadata, .ptr => null,
+        .void, .int, .half, .float, .double, .metadata, .ptr => null,
     };
 }
 

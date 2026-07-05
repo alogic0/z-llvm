@@ -682,6 +682,47 @@ test "parser lowers fneg to fsub negative zero" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "parser accepts half typed function headers and fneg" {
+    const input =
+        \\define internal half @negate_half(half %0) unnamed_addr align 1 {
+        \\entry:
+        \\  %1 = fneg half %0
+        \\  ret half %1
+        \\}
+        \\
+    ;
+    const expected =
+        \\define internal half @negate_half(half %0) unnamed_addr align 1 {
+        \\entry:
+        \\  %1 = fsub half -0.000000e+00, %0
+        \\  ret half %1
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    try std.testing.expect(function.ret_ty.eql(.half));
+    try std.testing.expect(function.params.items[0].ty.eql(.half));
+
+    const instruction = function.blocks.items[0].instructions.items[0];
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expectEqual(ir.BinaryOp.fsub, binary.op);
+    try std.testing.expect(binary.ty.eql(.half));
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser preserves scalar floating point global initializers" {
     const input =
         \\@gf = private unnamed_addr global float 1.250000e+00, align 4

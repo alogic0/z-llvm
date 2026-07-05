@@ -1053,7 +1053,7 @@ fn aggregateFieldIndexAtOffset(aggregate_ty: ir.Type, expected_offset: u64, expe
 fn isScalarElementGepType(ty: ir.Type) bool {
     return switch (ty) {
         .int, .float, .double, .ptr => true,
-        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+        .void, .half, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
     };
 }
 

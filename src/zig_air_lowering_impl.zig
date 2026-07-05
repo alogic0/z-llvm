@@ -735,7 +735,7 @@ fn parseScalarBitcastType(text: []const u8) ?ZigType {
     const parsed = parseZigType(text) orelse return null;
     return switch (parsed.ir_type) {
         .int, .ptr, .float, .double => parsed,
-        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => null,
+        .void, .half, .x86_fp80, .fp128, .metadata, .aggregate, .vector => null,
     };
 }
 

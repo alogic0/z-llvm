@@ -337,7 +337,7 @@ pub fn lowerTypedSyntheticVectorElemPtr(self: anytype, instruction: air_export.T
     const slot = self.synthetic_vector_slots[base_index] orelse return false;
     const vector_ty = switch (slot.ty.ir_type) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
     };
     const index = try self.resolveTypedOperand(instruction, 1);
     const lane = switch (index.value) {

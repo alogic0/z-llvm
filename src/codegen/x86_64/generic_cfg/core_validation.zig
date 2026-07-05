@@ -29,7 +29,7 @@ pub fn typeIsI128(ty: ir.Type) bool {
             .int => |bits| bits == 128,
             .float, .double, .ptr => false,
         },
-        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => false,
+        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => false,
     };
 }
 

@@ -148,7 +148,7 @@ pub fn materializedGlobalInitializer(ty: ir.Type, initializer_text: ?[]const u8)
     return switch (ty) {
         .int => .{ .scalar = .{ .int = 0 } },
         .ptr => .{ .scalar = .null_value },
-        .float, .double, .x86_fp80, .fp128 => .{ .scalar = .{ .fp = "0.0" } },
+        .half, .float, .double, .x86_fp80, .fp128 => .{ .scalar = .{ .fp = "0.0" } },
         .void, .metadata, .aggregate, .vector => .none,
     };
 }

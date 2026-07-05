@@ -297,7 +297,7 @@ const ParsedArrayType = struct {
 pub fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -2229,7 +2229,7 @@ pub fn aggregateElementType(aggregate_ty: core.Type, index: usize) !core.Type {
 
     const text = switch (aggregate_ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.TypeMismatch,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.TypeMismatch,
     };
 
     const body = if (std.mem.startsWith(u8, text, "{") and std.mem.endsWith(u8, text, "}"))
@@ -2548,6 +2548,7 @@ pub fn parseType(text: []const u8) !core.Type {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (std.mem.eql(u8, trimmed, "void")) return .void;
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
+    if (std.mem.eql(u8, trimmed, "half")) return .half;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
     if (std.mem.eql(u8, trimmed, "x86_fp80")) return .x86_fp80;

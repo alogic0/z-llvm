@@ -121,7 +121,7 @@ fn classifyAggregateInto(
             const size = try layout.typeStoreSizeBytes(ty);
             try mergeAggregateClass(classification, base_offset, size, .integer);
         },
-        .float, .double, .vector => {
+        .half, .float, .double, .vector => {
             const size = scalarOrVectorSizeBytes(ty) orelse {
                 classification.kind = .memory;
                 return;
@@ -168,6 +168,7 @@ fn mergeEightbyte(existing: ?AggregateEightbyteClass, incoming: AggregateEightby
 
 fn scalarOrVectorSizeBytes(ty: ir.Type) ?u64 {
     return switch (ty) {
+        .half => 2,
         .float => 4,
         .double => 8,
         .vector => |vector| vector.len * (switch (vector.elem_ty) {
@@ -667,7 +668,7 @@ fn paramCursorForWithInitial(function: ir.Function, name: []const u8, ty: ir.Typ
 fn isAggregateType(ty: ir.Type) bool {
     return switch (ty) {
         .aggregate => true,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
     };
 }
 

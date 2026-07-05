@@ -513,6 +513,7 @@ fn mergeWriteSize(current: ?usize, next: ?usize) ?usize {
 fn typeStoreSize(ty: ir.Type) ?usize {
     return switch (ty) {
         .int => |bits| if (bits % 8 == 0) @as(usize, bits / 8) else null,
+        .half => 2,
         .float => 4,
         .double => 8,
         .ptr => 8,

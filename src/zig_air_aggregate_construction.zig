@@ -253,6 +253,7 @@ fn appendIrTypeText(aggregate_text: *std.ArrayList(u8), ty: ir.Type) !void {
             const text = try std.fmt.allocPrint(std.heap.page_allocator, "i{}", .{bits});
             try aggregate_text.appendSlice(std.heap.page_allocator, text);
         },
+        .half => try aggregate_text.appendSlice(std.heap.page_allocator, "half"),
         .float => try aggregate_text.appendSlice(std.heap.page_allocator, "float"),
         .double => try aggregate_text.appendSlice(std.heap.page_allocator, "double"),
         .x86_fp80 => try aggregate_text.appendSlice(std.heap.page_allocator, "x86_fp80"),

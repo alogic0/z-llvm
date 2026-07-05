@@ -81,7 +81,7 @@ pub fn findCandidate(function: ir.Function) ?Candidate {
 fn isAcceptedScalarElement(ty: ir.Type) bool {
     return switch (ty) {
         .int, .float, .double => true,
-        .void, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+        .void, .half, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
     };
 }
 

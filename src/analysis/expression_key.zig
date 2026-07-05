@@ -264,14 +264,15 @@ const HashState = struct {
                 state.addTag(2);
                 state.addInt(bits);
             },
-            .float => state.addTag(3),
-            .double => state.addTag(4),
-            .x86_fp80 => state.addTag(5),
-            .fp128 => state.addTag(6),
-            .metadata => state.addTag(7),
-            .ptr => state.addTag(8),
+            .half => state.addTag(3),
+            .float => state.addTag(4),
+            .double => state.addTag(5),
+            .x86_fp80 => state.addTag(6),
+            .fp128 => state.addTag(7),
+            .metadata => state.addTag(8),
+            .ptr => state.addTag(9),
             .aggregate => |text| {
-                state.addTag(9);
+                state.addTag(10);
                 state.addBytes(text);
             },
             .vector => |vector| {

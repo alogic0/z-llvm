@@ -2646,7 +2646,7 @@ pub fn lowerGenericCfgSingleBlockIntCallCheckMainReturn(
     if (!genericCfgSupportsConstantWrapperCall(function, call)) return false;
     switch (call.ret_ty) {
         .int => {},
-        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
+        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
     }
 
     const icmp = switch (icmp_inst.kind) {
@@ -2760,7 +2760,7 @@ pub fn genericCfgSupportsConstantWrapperCallArg(arg: ir.CallArg) bool {
             .null_value => true,
             .int, .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => false,
         },
-        .float, .double => switch (arg.value) {
+        .half, .float, .double => switch (arg.value) {
             .fp => true,
             .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         },

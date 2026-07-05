@@ -802,7 +802,7 @@ pub const DirectBuilder = struct {
                 if (std.fmt.parseInt(i128, trimmed, 10)) |value| return .{ .scalar = .{ .int = value } } else |_| {}
             },
             .ptr => return .{ .scalar = parseValueRef(trimmed) },
-            .float, .double, .x86_fp80, .fp128 => return .{ .scalar = .{ .fp = trimmed } },
+            .half, .float, .double, .x86_fp80, .fp128 => return .{ .scalar = .{ .fp = trimmed } },
             .aggregate => {
                 if (std.mem.eql(u8, trimmed, "zeroinitializer")) return .{ .scalar = .zero_initializer };
                 if (std.mem.eql(u8, trimmed, "undef")) return .{ .scalar = .undef };
@@ -934,7 +934,7 @@ const ParsedArrayType = struct {
 fn parseArrayType(ty: ir.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     const trimmed = std.mem.trim(u8, text, " \t");
     if (!std.mem.startsWith(u8, trimmed, "[") or !std.mem.endsWith(u8, trimmed, "]")) return null;
@@ -1072,7 +1072,7 @@ pub fn parseGlobalInitializer(ty: ir.Type, text: []const u8) ir.GlobalInitialize
             if (std.fmt.parseInt(i128, trimmed, 10)) |value| return .{ .scalar = .{ .int = value } } else |_| {}
         },
         .ptr => return .{ .scalar = parseValueRef(trimmed) },
-        .float, .double, .x86_fp80, .fp128 => return .{ .scalar = .{ .fp = trimmed } },
+        .half, .float, .double, .x86_fp80, .fp128 => return .{ .scalar = .{ .fp = trimmed } },
         .aggregate => {
             if (std.mem.eql(u8, trimmed, "zeroinitializer")) return .{ .scalar = .zero_initializer };
             if (std.mem.eql(u8, trimmed, "undef")) return .{ .scalar = .undef };

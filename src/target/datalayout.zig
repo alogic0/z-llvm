@@ -45,6 +45,7 @@ pub const DataLayout = struct {
         return switch (ty) {
             .void => 0,
             .int => |bits| byteWidth(bits) orelse error.UnsupportedDataLayoutQuery,
+            .half => 2,
             .float => 4,
             .double => 8,
             .x86_fp80 => 10,
@@ -59,6 +60,7 @@ pub const DataLayout = struct {
         return switch (ty) {
             .void => 8,
             .int => |bits| try layout.integerAbiAlignmentBits(bits),
+            .half => 16,
             .float => 32,
             .double => 64,
             .x86_fp80 => 128,
@@ -73,6 +75,7 @@ pub const DataLayout = struct {
         return switch (ty) {
             .void => 8,
             .int => |bits| try layout.integerPreferredAlignmentBits(bits),
+            .half => 16,
             .float => 32,
             .double => 64,
             .x86_fp80 => 128,
@@ -86,7 +89,7 @@ pub const DataLayout = struct {
     pub fn aggregateFieldOffsetBytes(layout: DataLayout, ty: ir.Type, field_index: usize) anyerror!i128 {
         const text = switch (ty) {
             .aggregate => |text| text,
-            .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedDataLayoutQuery,
+            .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedDataLayoutQuery,
         };
         if (arrayInfo(text)) |array| {
             const stride = try layout.arrayElementStrideBytes(array.element_ty);
@@ -108,7 +111,7 @@ pub const DataLayout = struct {
     fn aggregateSizeBytes(layout: DataLayout, ty: ir.Type) anyerror!u64 {
         const text = switch (ty) {
             .aggregate => |text| text,
-            .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedDataLayoutQuery,
+            .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedDataLayoutQuery,
         };
         if (arrayInfo(text)) |array| return array.count * try layout.arrayElementStrideBytes(array.element_ty);
 
@@ -128,7 +131,7 @@ pub const DataLayout = struct {
     fn aggregateAlignmentBits(layout: DataLayout, ty: ir.Type, kind: AlignmentKind) anyerror!u16 {
         const text = switch (ty) {
             .aggregate => |text| text,
-            .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedDataLayoutQuery,
+            .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedDataLayoutQuery,
         };
         if (arrayInfo(text)) |array| return switch (kind) {
             .abi => try layout.typeAbiAlignmentBits(array.element_ty),

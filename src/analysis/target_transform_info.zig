@@ -77,14 +77,14 @@ pub const TargetTransformInfo = struct {
                 .free()
             else
                 .of(vector.len),
-            .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => .free(),
+            .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => .free(),
         };
     }
 
     fn typeOperationCost(tti: TargetTransformInfo, ty: ir.Type) Cost {
         return switch (ty) {
             .int => |bits| .of(if (bits <= 64) 1 else ceilDiv(bits, 64)),
-            .float, .double, .ptr => .of(1),
+            .half, .float, .double, .ptr => .of(1),
             .vector => |vector| vectorOperationCost(tti, vector),
             .void, .metadata, .aggregate, .x86_fp80, .fp128 => .of(4),
         };

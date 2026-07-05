@@ -690,7 +690,7 @@ fn i32Value(value: i128) !i32 {
 fn parseByteArrayType(ty: ir.Type) ?usize {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (text.len < "[1 x i8]".len or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -703,7 +703,7 @@ fn parseByteArrayType(ty: ir.Type) ?usize {
 fn parseI32ArrayType(ty: ir.Type) ?usize {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (text.len < "[1 x i32]".len or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");

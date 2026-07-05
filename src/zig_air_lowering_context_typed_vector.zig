@@ -28,7 +28,7 @@ pub fn lowerTypedReduce(self: anytype, instruction: air_export.TypedInstruction)
     const source = try self.resolveTypedOperand(instruction, 0);
     const vector_ty = switch (source.ty.ir_type) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
     };
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     if (!result_type.ir_type.eql(vector_ty.elem_ty.toType())) return air_model.LowerError.UnsupportedAir;
@@ -83,7 +83,7 @@ pub fn lowerTypedSplat(self: anytype, instruction: air_export.TypedInstruction) 
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     const vector_ty = switch (result_type.ir_type) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
     };
     if (summary.vector_len != vector_ty.len) return air_model.LowerError.UnsupportedAir;
     const elem_bits = switch (vector_ty.elem_ty) {
@@ -130,7 +130,7 @@ pub fn lowerTypedShuffleOne(self: anytype, instruction: air_export.TypedInstruct
     const source = try self.resolveTypedOperand(instruction, 0);
     const vector_ty = switch (source.ty.ir_type) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
     };
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     if (!result_type.ir_type.eql(source.ty.ir_type)) return air_model.LowerError.UnsupportedAir;

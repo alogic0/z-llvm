@@ -1751,7 +1751,7 @@ pub fn plainFieldPointerChild(ty: ir.Type) bool {
         .int => |bits| bits == 1 or bits % 8 == 0,
         .float, .double, .ptr => true,
         .aggregate => true,
-        .void, .x86_fp80, .fp128, .metadata, .vector => false,
+        .void, .half, .x86_fp80, .fp128, .metadata, .vector => false,
     };
 }
 
@@ -1759,7 +1759,7 @@ pub fn supportedTypedGepElementType(ty: ir.Type) bool {
     return switch (ty) {
         .int => |bits| bits == 8 or bits == 16 or bits == 32 or bits == 64,
         .float, .double => true,
-        .void, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+        .void, .half, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
     };
 }
 

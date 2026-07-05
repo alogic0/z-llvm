@@ -561,7 +561,7 @@ pub fn byvalAttrsForAggregate(module: *ir.Module, aggregate_ty: ir.Type) ![]cons
 pub fn aggregateAbiAttrsForAggregate(module: *ir.Module, attr_name: []const u8, aggregate_ty: ir.Type) ![]const u8 {
     return switch (aggregate_ty) {
         .aggregate => |text| try ownPrint(module, "{s}({s})", .{ attr_name, text }),
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => error.UnsupportedAir,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => error.UnsupportedAir,
     };
 }
 pub fn lowerTypedV2PackedBits(

@@ -95,7 +95,7 @@ fn isSupportedExpectScalar(call: ir.CallInst) bool {
 fn isExpectIntrinsicName(name: []const u8, ret_ty: ir.Type) bool {
     const bits = switch (ret_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
+        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
     };
     if (!std.mem.startsWith(u8, name, "llvm.expect.i")) return false;
     const suffix = name["llvm.expect.i".len..];

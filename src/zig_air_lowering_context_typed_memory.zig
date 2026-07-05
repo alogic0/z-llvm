@@ -105,7 +105,7 @@ pub fn lowerTypedLoadFromSyntheticVectorElement(self: anytype, instruction: air_
     const vector = self.synthetic_vector_slots[element_ptr.slot_index] orelse return air_model.LowerError.UnsupportedAir;
     const vector_ty = switch (vector.ty.ir_type) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
     };
     if (element_ptr.lane_index >= vector_ty.len) return air_model.LowerError.UnsupportedAir;
     const pointer = try self.resolveTypedOperand(instruction, 0);
@@ -332,7 +332,7 @@ pub fn lowerTypedStoreToSyntheticVectorElement(
     const vector = self.synthetic_vector_slots[element_ptr.slot_index] orelse return air_model.LowerError.UnsupportedAir;
     const vector_ty = switch (vector.ty.ir_type) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return air_model.LowerError.UnsupportedAir,
     };
     if (element_ptr.lane_index >= vector_ty.len) return air_model.LowerError.UnsupportedAir;
     const value = try self.resolveTypedOperand(instruction, 1);

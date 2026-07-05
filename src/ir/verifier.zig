@@ -420,7 +420,7 @@ pub fn verify(module: core.Module) !void {
                     .constant_expr => |text| try verifyConstantExprValue(global.ty, text),
                     .int, .fp, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
                 },
-                .float, .double, .x86_fp80, .fp128 => switch (value) {
+                .half, .float, .double, .x86_fp80, .fp128 => switch (value) {
                     .fp => |text| {
                         _ = fp_semantics.classify(global.ty, text) catch return error.UnsupportedFloatingPointLiteral;
                     },
@@ -455,7 +455,7 @@ pub fn verify(module: core.Module) !void {
                 if (text.len == 0) return error.UnsupportedGlobalVariable;
                 switch (global.ty) {
                     .aggregate => {},
-                    .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedGlobalVariable,
+                    .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedGlobalVariable,
                 }
             },
         }
@@ -543,12 +543,12 @@ pub fn verify(module: core.Module) !void {
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         if (fcmp.fp_flags.any()) {
                             switch (fcmp.operand_ty) {
-                                .float, .double, .x86_fp80, .fp128 => {},
+                                .half, .float, .double, .x86_fp80, .fp128 => {},
                                 .void, .int, .metadata, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
                             }
                         }
                         switch (fcmp.operand_ty) {
-                            .float, .double, .x86_fp80, .fp128 => {},
+                            .half, .float, .double, .x86_fp80, .fp128 => {},
                             .vector => |vector| switch (vector.elem_ty) {
                                 .float, .double => {},
                                 .int, .ptr => return error.TypeMismatch,
@@ -1475,7 +1475,7 @@ const ParsedArrayType = struct {
 fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -1489,6 +1489,7 @@ fn parseType(text: []const u8) !core.Type {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (std.mem.eql(u8, trimmed, "void")) return .void;
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
+    if (std.mem.eql(u8, trimmed, "half")) return .half;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
     if (std.mem.eql(u8, trimmed, "x86_fp80")) return .x86_fp80;
@@ -1646,7 +1647,7 @@ fn verifyLiteralValueForType(ty: core.Type, text: []const u8) !void {
             }
             _ = try std.fmt.parseInt(i128, text, 10);
         },
-        .float, .double, .x86_fp80, .fp128 => {
+        .half, .float, .double, .x86_fp80, .fp128 => {
             _ = fp_semantics.classify(ty, text) catch return error.UnsupportedFloatingPointLiteral;
         },
         .ptr => {
@@ -1747,7 +1748,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     }
     switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
-            .float, .double, .x86_fp80, .fp128 => {},
+            .half, .float, .double, .x86_fp80, .fp128 => {},
             .vector => return error.UnsupportedType,
             .void, .int, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
@@ -1757,7 +1758,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
                 .int => {},
                 .float, .double, .ptr => return error.TypeMismatch,
             },
-            .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return error.TypeMismatch,
+            .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
     }
 }
@@ -1766,7 +1767,7 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
     if (!binary.fp_flags.any()) return;
     switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
-            .float, .double, .x86_fp80, .fp128 => {},
+            .half, .float, .double, .x86_fp80, .fp128 => {},
             .void, .int, .metadata, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
         },
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
@@ -1861,11 +1862,11 @@ fn verifyCast(cast: core.CastInst) !void {
 
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
+        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
     };
     const to_bits = switch (cast.to_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
+        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
     };
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
@@ -1910,6 +1911,7 @@ fn verifyCastFlags(cast: core.CastInst) !void {
 
 fn floatBits(ty: core.Type) ?u16 {
     return switch (ty) {
+        .half => 16,
         .float => 32,
         .double => 64,
         .x86_fp80 => 80,
@@ -1921,6 +1923,7 @@ fn floatBits(ty: core.Type) ?u16 {
 fn bitcastBits(ty: core.Type) ?u64 {
     return switch (ty) {
         .int => |bits| bits,
+        .half => 16,
         .float => 32,
         .double => 64,
         .x86_fp80 => 80,
@@ -2083,6 +2086,7 @@ fn verifyAtomicRmwOperationType(op: []const u8, ty: core.Type) !void {
 fn verifyAtomicMemoryAccessType(ty: core.Type) !void {
     switch (ty) {
         .int => |bits| try verifyAtomicMemoryAccessBits(bits),
+        .half => try verifyAtomicMemoryAccessBits(16),
         .float => try verifyAtomicMemoryAccessBits(32),
         .double => try verifyAtomicMemoryAccessBits(64),
         .fp128 => try verifyAtomicMemoryAccessBits(128),
@@ -2118,12 +2122,12 @@ fn isIntegerOrFloatingOrPointer(ty: core.Type) bool {
 }
 
 fn isFloatingScalar(ty: core.Type) bool {
-    return ty == .float or ty == .double or ty == .x86_fp80 or ty == .fp128;
+    return ty == .half or ty == .float or ty == .double or ty == .x86_fp80 or ty == .fp128;
 }
 
 fn isFloatingOrFloatingVector(ty: core.Type) bool {
     return switch (ty) {
-        .float, .double, .x86_fp80, .fp128 => true,
+        .half, .float, .double, .x86_fp80, .fp128 => true,
         .vector => |vector| vector.elem_ty == .float or vector.elem_ty == .double,
         .void, .int, .metadata, .ptr, .aggregate => false,
     };

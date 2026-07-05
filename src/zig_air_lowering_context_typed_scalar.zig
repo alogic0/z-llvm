@@ -242,7 +242,7 @@ fn opaqueCastResultType(instruction: air_export.TypedInstruction, source_type: a
     if (!isOpaqueNominalTypeSurface(instruction.result_type)) return null;
     return switch (source_type.ir_type) {
         .int, .ptr, .float, .double => source_type,
-        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => null,
+        .void, .half, .x86_fp80, .fp128, .metadata, .aggregate, .vector => null,
     };
 }
 

@@ -77,7 +77,7 @@ pub fn lowerReleaseSmallStrFromFloatSupportFunction(allocator: std.mem.Allocator
             try machine.instructions.append(allocator, .{ .mov_imm_rdx = 0 });
         },
         .ptr => try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 }),
-        .float, .double, .x86_fp80, .fp128, .metadata, .vector => return false,
+        .half, .float, .double, .x86_fp80, .fp128, .metadata, .vector => return false,
     }
     try machine.instructions.append(allocator, .ret);
     return true;

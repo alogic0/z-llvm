@@ -1373,7 +1373,7 @@ pub fn aggregateFieldIndexAtOffset(aggregate_ty: ir.Type, expected_offset: u64, 
 pub fn isScalarElementGepType(ty: ir.Type) bool {
     return switch (ty) {
         .int, .float, .double, .ptr => true,
-        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+        .void, .half, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
     };
 }
 
@@ -2358,7 +2358,7 @@ fn isPairAggregateAllocaForSretCall(ty: ir.Type, call: ir.CallInst) bool {
     if (call.args.items.len == 0) return false;
     const text = switch (ty) {
         .aggregate => |aggregate_text| aggregate_text,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return false,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return false,
     };
     const attrs = call.args.items[0].attrs orelse return false;
     const marker = "sret(";

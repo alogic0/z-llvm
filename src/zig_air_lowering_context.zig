@@ -344,7 +344,7 @@ pub const LoweringContext = struct {
     fn isScalarBitcastIrType(ty: ir.Type) bool {
         return switch (ty) {
             .int, .ptr, .float, .double => true,
-            .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+            .void, .half, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
         };
     }
 

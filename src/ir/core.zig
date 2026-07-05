@@ -3,6 +3,7 @@ const std = @import("std");
 pub const Type = union(enum) {
     void,
     int: u16,
+    half,
     float,
     double,
     x86_fp80,
@@ -17,8 +18,9 @@ pub const Type = union(enum) {
             .void => b == .void,
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
-                .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+                .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
             },
+            .half => b == .half,
             .float => b == .float,
             .double => b == .double,
             .x86_fp80 => b == .x86_fp80,
@@ -27,11 +29,11 @@ pub const Type = union(enum) {
             .ptr => b == .ptr,
             .aggregate => |text| switch (b) {
                 .aggregate => |other_text| std.mem.eql(u8, text, other_text),
-                .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+                .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
             },
             .vector => |vector| switch (b) {
                 .vector => |other_vector| vector.eql(other_vector),
-                .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => false,
+                .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => false,
             },
         };
     }
@@ -44,6 +46,7 @@ pub const Type = union(enum) {
         switch (ty) {
             .void => try writer.writeAll("void"),
             .int => |bits| try writer.print("i{}", .{bits}),
+            .half => try writer.writeAll("half"),
             .float => try writer.writeAll("float"),
             .double => try writer.writeAll("double"),
             .x86_fp80 => try writer.writeAll("x86_fp80"),

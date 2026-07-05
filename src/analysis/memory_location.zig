@@ -188,6 +188,7 @@ fn gepOffsetInternal(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
 pub fn typeSize(ty: ir.Type) ?u64 {
     return switch (ty) {
         .int => |bits| if (bits % 8 == 0) bits / 8 else null,
+        .half => 2,
         .float => 4,
         .double => 8,
         .x86_fp80 => 10,
@@ -209,7 +210,7 @@ fn typeSizeMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
 pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (arrayInfo(text)) |array| {
         if (field_index >= array.count) return null;
@@ -227,7 +228,7 @@ pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
 pub fn aggregateFieldOffset(ty: ir.Type, field_index: usize) ?i128 {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (arrayInfo(text)) |array| {
         if (field_index >= array.count) return null;
@@ -259,7 +260,7 @@ fn aggregateFieldOffsetMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type, 
 fn aggregateSize(ty: ir.Type) ?u64 {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (arrayInfo(text)) |array| return array.count * (typeSize(array.element_ty) orelse return null);
     var fields = aggregateFields(text) orelse return null;
