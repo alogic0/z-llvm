@@ -88,7 +88,8 @@ pub fn lowerGenericCfgFpNegReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty)) return false;
+    if ((!function.ret_ty.eql(.half) and !function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or
+        !ret.ty.eql(function.ret_ty)) return false;
     if (block.instructions.items.len != 1) return false;
     const instruction = block.instructions.items[0];
     if (instruction.removed) return false;
@@ -119,6 +120,7 @@ pub fn lowerGenericCfgFpNegReturn(
             else => return error.UnsupportedCodegenAbi,
         }
     } else {
+        if (function.ret_ty.eql(.half)) return false;
         const offset = scalarParamStackDisp8(function, source_name, function.ret_ty) catch |err| switch (err) {
             error.UnsupportedCodegenAbi, error.UnsupportedCodegenValue => return false,
             else => return err,
@@ -130,7 +132,9 @@ pub fn lowerGenericCfgFpNegReturn(
         }
     }
 
-    if (function.ret_ty.eql(.float)) {
+    if (function.ret_ty.eql(.half)) {
+        try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x8000 });
+    } else if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x80000000 });
     } else {
         try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = 0x8000000000000000 });

@@ -82,7 +82,7 @@ pub fn fpParamIndex(function: ir.Function, name: []const u8, ty: ir.Type) !usize
     var sse_index: usize = 0;
     var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {
-        const param_is_fp = param.ty.eql(.float) or param.ty.eql(.double);
+        const param_is_fp = param.ty.eql(.half) or param.ty.eql(.float) or param.ty.eql(.double);
         if (std.mem.eql(u8, param.name, name)) {
             if (!param.ty.eql(ty) or !param_is_fp) return error.UnsupportedCodegenValue;
             if (sse_index >= 8) return error.UnsupportedCodegenAbi;
