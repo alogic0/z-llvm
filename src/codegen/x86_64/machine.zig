@@ -103,6 +103,7 @@ pub const Instruction = union(enum) {
     and_edi_imm8: u8,
     load_rax_rdi_u8_eax,
     bcmp_rdi_rsi_rdx_eax,
+    memcmp_rdi_rsi_rdx_eax,
     smin_i32_edi_esi_eax,
     umin_i32_edi_esi_eax,
     smax_i32_edi_esi_eax,

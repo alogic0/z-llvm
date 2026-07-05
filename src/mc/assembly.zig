@@ -141,6 +141,25 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tmovl $1, %eax\n" ++
                     "4:\n",
             ),
+            .memcmp_rdi_rsi_rdx_eax => try writer.writeAll(
+                "\ttestq %rdx, %rdx\n" ++
+                    "\tje 2f\n" ++
+                    "\txorl %ecx, %ecx\n" ++
+                    "1:\n" ++
+                    "\tmovzbl (%rdi,%rcx), %eax\n" ++
+                    "\tmovzbl (%rsi,%rcx), %r8d\n" ++
+                    "\tcmpb %r8b, %al\n" ++
+                    "\tjne 3f\n" ++
+                    "\tincq %rcx\n" ++
+                    "\tcmpq %rcx, %rdx\n" ++
+                    "\tjne 1b\n" ++
+                    "2:\n" ++
+                    "\txorl %eax, %eax\n" ++
+                    "\tjmp 4f\n" ++
+                    "3:\n" ++
+                    "\tsubl %r8d, %eax\n" ++
+                    "4:\n",
+            ),
             .smin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovgl %esi, %eax\n"),
             .umin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmoval %esi, %eax\n"),
             .smax_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovll %esi, %eax\n"),
