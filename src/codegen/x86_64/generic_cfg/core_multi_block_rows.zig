@@ -249,6 +249,119 @@ pub fn lowerGenericCfgI128FfsReturn(
     return true;
 }
 
+pub fn lowerGenericCfgI64FfsReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len != 3) return false;
+    const param_name = function.params.items[0].name;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const zero_cmp = try validateI64IcmpNamedImm(entry.instructions.items[0], .eq, param_name, 0);
+    const entry_branch = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_branch.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_branch.cond, zero_cmp)) return false;
+
+    const zero_block = blockByName(function, entry_branch.then_target) orelse return false;
+    const ladder_block = blockByName(function, entry_branch.else_target) orelse return false;
+    if (zero_block.instructions.items.len != 1 or ladder_block.instructions.items.len != 37) return false;
+    for (ladder_block.instructions.items) |instruction| {
+        if (instruction.removed) return false;
+    }
+
+    const phi_instruction = zero_block.instructions.items[0];
+    const phi_name = phi_instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const phi = switch (phi_instruction.kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 32 })) return false;
+    const ret = switch (zero_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, phi_name)) return false;
+    const ladder_br = switch (ladder_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, ladder_br.target, zero_block.name)) return false;
+
+    var cursor: usize = 0;
+    const low32 = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", param_name, 4294967295);
+    cursor += 1;
+    const low32_is_zero = try validateI64IcmpNamedImm(ladder_block.instructions.items[cursor], .eq, low32, 0);
+    cursor += 1;
+    const high32 = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .lshr, param_name, 32);
+    cursor += 1;
+    var count = try validateI64Select(ladder_block.instructions.items[cursor], low32_is_zero, .{ .int = 33 }, .{ .int = 1 });
+    cursor += 1;
+    var value = try validateI64Select(ladder_block.instructions.items[cursor], low32_is_zero, .{ .named = high32 }, .{ .named = param_name });
+    cursor += 1;
+
+    const or_stages = [_]struct { mask: i128, shift: i128, bit: i128 }{
+        .{ .mask = 65535, .shift = 16, .bit = 16 },
+        .{ .mask = 255, .shift = 8, .bit = 8 },
+        .{ .mask = 15, .shift = 4, .bit = 4 },
+    };
+    for (or_stages) |stage| {
+        const masked = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", value, stage.mask);
+        cursor += 1;
+        const masked_is_zero = try validateI64IcmpNamedImm(ladder_block.instructions.items[cursor], .eq, masked, 0);
+        cursor += 1;
+        const next_count = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .@"or", count, stage.bit);
+        cursor += 1;
+        const shifted = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .lshr, value, stage.shift);
+        cursor += 1;
+        count = try validateI64Select(ladder_block.instructions.items[cursor], masked_is_zero, .{ .named = next_count }, .{ .named = count });
+        cursor += 1;
+        value = try validateI64Select(ladder_block.instructions.items[cursor], masked_is_zero, .{ .named = shifted }, .{ .named = value });
+        cursor += 1;
+    }
+
+    const masked = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", value, 3);
+    cursor += 1;
+    const masked_is_zero = try validateI64IcmpNamedImm(ladder_block.instructions.items[cursor], .eq, masked, 0);
+    cursor += 1;
+    const next_count = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .add, count, 2);
+    cursor += 1;
+    const shifted = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .lshr, value, 2);
+    cursor += 1;
+    count = try validateI64Select(ladder_block.instructions.items[cursor], masked_is_zero, .{ .named = next_count }, .{ .named = count });
+    cursor += 1;
+    value = try validateI64Select(ladder_block.instructions.items[cursor], masked_is_zero, .{ .named = shifted }, .{ .named = value });
+    cursor += 1;
+
+    const low_bit = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", value, 1);
+    cursor += 1;
+    const shift_delta = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .xor, low_bit, 1);
+    cursor += 1;
+    const final_count = try validateI64BinaryEitherNamed(ladder_block.instructions.items[cursor], .add, shift_delta, count);
+    cursor += 1;
+    const final_value = try validateI64BinaryNamed(ladder_block.instructions.items[cursor], .lshr, value, shift_delta);
+    cursor += 1;
+    const final_bit = try validateI64BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", final_value, 1);
+    cursor += 1;
+    const zero_based = try validateI64BinaryNamed(ladder_block.instructions.items[cursor], .sub, final_count, final_bit);
+    cursor += 1;
+    const zero_based_i32 = try validateI64TruncToI32(ladder_block.instructions.items[cursor], zero_based);
+    cursor += 1;
+    const one_based_i32 = try validateI32BinaryNamedImm(ladder_block.instructions.items[cursor], .add, zero_based_i32, 1);
+    cursor += 1;
+    if (cursor != ladder_block.instructions.items.len) return false;
+    if (!phiHasIncoming(phi, one_based_i32, ladder_block.name) or !phiHasIncomingInt(phi, 0, entry.name)) return false;
+
+    try machine.instructions.append(allocator, .ffs_i64_rdi_eax);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
 fn validateI128BinaryNamedImm(instruction: ir.Instruction, op: ir.BinaryOp, lhs_name: []const u8, rhs_value: i128) ![]const u8 {
     const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
     const binary = switch (instruction.kind) {
@@ -259,6 +372,16 @@ fn validateI128BinaryNamedImm(instruction: ir.Instruction, op: ir.BinaryOp, lhs_
     return result_name;
 }
 
+fn validateI64BinaryNamedImm(instruction: ir.Instruction, op: ir.BinaryOp, lhs_name: []const u8, rhs_value: i128) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != op or !binary.ty.eql(.{ .int = 64 }) or !isNamed(binary.lhs, lhs_name) or !isInt(binary.rhs, rhs_value)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
 fn validateI128BinaryNamed(instruction: ir.Instruction, op: ir.BinaryOp, lhs_name: []const u8, rhs_name: []const u8) ![]const u8 {
     const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
     const binary = switch (instruction.kind) {
@@ -266,6 +389,16 @@ fn validateI128BinaryNamed(instruction: ir.Instruction, op: ir.BinaryOp, lhs_nam
         else => return error.UnsupportedCodegenInstruction,
     };
     if (binary.op != op or !binary.ty.eql(.{ .int = 128 }) or !isNamed(binary.lhs, lhs_name) or !isNamed(binary.rhs, rhs_name)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI64BinaryNamed(instruction: ir.Instruction, op: ir.BinaryOp, lhs_name: []const u8, rhs_name: []const u8) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != op or !binary.ty.eql(.{ .int = 64 }) or !isNamed(binary.lhs, lhs_name) or !isNamed(binary.rhs, rhs_name)) return error.UnsupportedCodegenInstruction;
     return result_name;
 }
 
@@ -282,6 +415,19 @@ fn validateI128BinaryEitherNamed(instruction: ir.Instruction, op: ir.BinaryOp, a
     return result_name;
 }
 
+fn validateI64BinaryEitherNamed(instruction: ir.Instruction, op: ir.BinaryOp, a_name: []const u8, b_name: []const u8) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != op or !binary.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+    const direct = isNamed(binary.lhs, a_name) and isNamed(binary.rhs, b_name);
+    const reversed = isNamed(binary.lhs, b_name) and isNamed(binary.rhs, a_name);
+    if (!direct and !reversed) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
 fn validateI32BinaryNamedImm(instruction: ir.Instruction, op: ir.BinaryOp, lhs_name: []const u8, rhs_value: i128) ![]const u8 {
     const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
     const binary = switch (instruction.kind) {
@@ -289,6 +435,16 @@ fn validateI32BinaryNamedImm(instruction: ir.Instruction, op: ir.BinaryOp, lhs_n
         else => return error.UnsupportedCodegenInstruction,
     };
     if (binary.op != op or !binary.ty.eql(.{ .int = 32 }) or !isNamed(binary.lhs, lhs_name) or !isInt(binary.rhs, rhs_value)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI64IcmpNamedImm(instruction: ir.Instruction, predicate: ir.IcmpPredicate, lhs_name: []const u8, rhs_value: i128) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (icmp.predicate != predicate or !icmp.operand_ty.eql(.{ .int = 64 }) or !isNamed(icmp.lhs, lhs_name) or !isInt(icmp.rhs, rhs_value)) return error.UnsupportedCodegenInstruction;
     return result_name;
 }
 
@@ -302,6 +458,16 @@ fn validateI128IcmpNamedImm(instruction: ir.Instruction, predicate: ir.IcmpPredi
     return result_name;
 }
 
+fn validateI64Select(instruction: ir.Instruction, cond_name: []const u8, true_value: ir.Value, false_value: ir.Value) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const select = switch (instruction.kind) {
+        .select => |select| select,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 64 }) or !isNamed(select.cond, cond_name) or !select.true_value.eql(true_value) or !select.false_value.eql(false_value)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
 fn validateI128Select(instruction: ir.Instruction, cond_name: []const u8, true_value: ir.Value, false_value: ir.Value) ![]const u8 {
     const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
     const select = switch (instruction.kind) {
@@ -309,6 +475,16 @@ fn validateI128Select(instruction: ir.Instruction, cond_name: []const u8, true_v
         else => return error.UnsupportedCodegenInstruction,
     };
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 128 }) or !isNamed(select.cond, cond_name) or !select.true_value.eql(true_value) or !select.false_value.eql(false_value)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI64TruncToI32(instruction: ir.Instruction, value_name: []const u8) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (cast.op != .trunc or !cast.from_ty.eql(.{ .int = 64 }) or !cast.to_ty.eql(.{ .int = 32 }) or !isNamed(cast.value, value_name)) return error.UnsupportedCodegenInstruction;
     return result_name;
 }
 

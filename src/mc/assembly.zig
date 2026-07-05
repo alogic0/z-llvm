@@ -111,6 +111,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\taddl $1, %eax\n" ++
                     "2:\n",
             ),
+            .ffs_i64_rdi_eax => try writer.writeAll("\txorl %eax, %eax\n\ttestq %rdi, %rdi\n\tje 1f\n\tbsfq %rdi, %rax\n\taddl $1, %eax\n1:\n"),
             .shl_rcx_imm6 => |amount| try writer.print("\tshlq ${}, %rcx\n", .{amount}),
             .shl_r8_imm6 => |amount| try writer.print("\tshlq ${}, %r8\n", .{amount}),
             .or_rcx_rax => try writer.writeAll("\torq %rcx, %rax\n"),
