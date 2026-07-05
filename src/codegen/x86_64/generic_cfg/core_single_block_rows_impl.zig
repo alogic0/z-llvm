@@ -149,6 +149,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgI32ClzLadderReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
         if (try lowerGenericCfgClzReturn(allocator, machine, function, block, ret)) {
             machine.codegen_path = .generic_cfg;
             return true;
@@ -615,6 +619,141 @@ fn lowerGenericCfgClzReturn(
     ret: anytype,
 ) !bool {
     return lowerGenericCfgZeroCountReturn(allocator, machine, function, block, ret, "llvm.ctlz.i32", .clz_i32_edi_eax);
+}
+
+fn lowerGenericCfgI32ClzLadderReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 25) return false;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) return false;
+    }
+
+    const param_name = function.params.items[0].name;
+    var cursor: usize = 0;
+
+    const hi16_name = try validateI32LshrNamedImm(block.instructions.items[cursor], param_name, 16);
+    cursor += 1;
+    const hi16_is_zero = try validateI32IcmpNamedImm(block.instructions.items[cursor], .eq, hi16_name, 0);
+    cursor += 1;
+    var count_name = try validateI32Select(block.instructions.items[cursor], hi16_is_zero, .{ .int = 32 }, .{ .int = 16 });
+    cursor += 1;
+    var value_name = try validateI32Select(block.instructions.items[cursor], hi16_is_zero, .{ .named = param_name }, .{ .named = hi16_name });
+    cursor += 1;
+
+    const shifts = [_]struct { shift: i128, delta: i128 }{
+        .{ .shift = 8, .delta = -8 },
+        .{ .shift = 4, .delta = -4 },
+        .{ .shift = 2, .delta = -2 },
+    };
+    for (shifts) |stage| {
+        const shifted_name = try validateI32LshrNamedImm(block.instructions.items[cursor], value_name, stage.shift);
+        cursor += 1;
+        const shifted_is_zero = try validateI32IcmpNamedImm(block.instructions.items[cursor], .eq, shifted_name, 0);
+        cursor += 1;
+        const decremented_count = try validateI32AddNamedImm(block.instructions.items[cursor], count_name, stage.delta);
+        cursor += 1;
+        count_name = try validateI32Select(block.instructions.items[cursor], shifted_is_zero, .{ .named = count_name }, .{ .named = decremented_count });
+        cursor += 1;
+        value_name = try validateI32Select(block.instructions.items[cursor], shifted_is_zero, .{ .named = value_name }, .{ .named = shifted_name });
+        cursor += 1;
+    }
+
+    const shifted_one_name = try validateI32LshrNamedImm(block.instructions.items[cursor], value_name, 1);
+    cursor += 1;
+    const shifted_one_nonzero = try validateI32IcmpNamedImm(block.instructions.items[cursor], .ne, shifted_one_name, 0);
+    cursor += 1;
+    const nonzero_i32 = try validateI1SextToI32(block.instructions.items[cursor], shifted_one_nonzero);
+    cursor += 1;
+    const incremented_count = try validateI32AddNamed(block.instructions.items[cursor], count_name, nonzero_i32);
+    cursor += 1;
+    const final_value = try validateI32Select(block.instructions.items[cursor], shifted_one_nonzero, .{ .named = shifted_one_name }, .{ .named = value_name });
+    cursor += 1;
+    const result_name = try validateI32SubNamed(block.instructions.items[cursor], incremented_count, final_value);
+    cursor += 1;
+    if (cursor != block.instructions.items.len) return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, result_name)) return false;
+    if ((try paramReg(function, param_name, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .clz_i32_edi_eax);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn validateI32LshrNamedImm(instruction: ir.Instruction, lhs_name: []const u8, rhs_value: i128) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != .lshr or !binary.ty.eql(.{ .int = 32 }) or !isNamed(binary.lhs, lhs_name) or !isInt(binary.rhs, rhs_value)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI32AddNamedImm(instruction: ir.Instruction, lhs_name: []const u8, rhs_value: i128) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != .add or !binary.ty.eql(.{ .int = 32 }) or !isNamed(binary.lhs, lhs_name) or !isInt(binary.rhs, rhs_value)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI32AddNamed(instruction: ir.Instruction, lhs_name: []const u8, rhs_name: []const u8) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != .add or !binary.ty.eql(.{ .int = 32 }) or !isNamed(binary.lhs, lhs_name) or !isNamed(binary.rhs, rhs_name)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI32SubNamed(instruction: ir.Instruction, lhs_name: []const u8, rhs_name: []const u8) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != .sub or !binary.ty.eql(.{ .int = 32 }) or !isNamed(binary.lhs, lhs_name) or !isNamed(binary.rhs, rhs_name)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI32IcmpNamedImm(instruction: ir.Instruction, predicate: ir.IcmpPredicate, lhs_name: []const u8, rhs_value: i128) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (icmp.predicate != predicate or !icmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(icmp.lhs, lhs_name) or !isInt(icmp.rhs, rhs_value)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI32Select(instruction: ir.Instruction, cond_name: []const u8, true_value: ir.Value, false_value: ir.Value) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const select = switch (instruction.kind) {
+        .select => |select| select,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 }) or !isNamed(select.cond, cond_name) or !select.true_value.eql(true_value) or !select.false_value.eql(false_value)) return error.UnsupportedCodegenInstruction;
+    return result_name;
+}
+
+fn validateI1SextToI32(instruction: ir.Instruction, value_name: []const u8) ![]const u8 {
+    const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (cast.op != .sext or !cast.from_ty.eql(.{ .int = 1 }) or !cast.to_ty.eql(.{ .int = 32 }) or !isNamed(cast.value, value_name)) return error.UnsupportedCodegenInstruction;
+    return result_name;
 }
 
 fn lowerGenericCfgCtzReturn(

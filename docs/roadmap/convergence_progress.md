@@ -308,6 +308,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt fp:half fneg` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned half `fsub -0.0, param` shape by toggling the low-half sign bit in the SysV XMM return value without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negti2`. Evidence `tmp/std_debug_hello_debug_build_after_half_fneg.log` |
 | `real-program object-emission compiler_rt int:i128 neg` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned `sub i128 0, param` shape through the SysV `rdx:rax` return pair without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negdi2`. Evidence `tmp/std_debug_hello_debug_build_after_i128_neg.log` |
 | `real-program object-emission compiler_rt int:i64 neg` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned `sub i64 0, param` shape through a generic GPR `negq` return path without function-name admission; the next open cluster is object-emission `UnsupportedCodegenInstruction` in `compiler_rt.count0bits.clzsi2_generic`. Evidence `tmp/std_debug_hello_debug_build_after_i64_neg.log` |
+| `real-program object-emission compiler_rt int:i32 clz ladder` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned branchless i32 clz ladder shape to the existing `clz_i32_edi_eax` backend op without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ffsti2`. Evidence `tmp/std_debug_hello_debug_build_after_clzsi2_ladder.log` |
 
 ## Progress Log
 
@@ -581,6 +582,14 @@ One line per completed cycle, append-only, newest last. This is the
   `UnsupportedCodegenInstruction` in `compiler_rt.count0bits.clzsi2_generic`;
   strict real-row enforcement remains at 100. Recognizer count still 1 (no
   recognizer reorder or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: the generic CFG
+  lowering now recognizes the model-owned branchless i32 clz ladder emitted for
+  compiler-rt and maps it to the existing `clz_i32_edi_eax` backend op, moving
+  Debug std-hello from object-emission `UnsupportedCodegenInstruction` in
+  `compiler_rt.count0bits.clzsi2_generic` to object-emission
+  `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ffsti2`; strict
+  real-row enforcement remains at 100. Recognizer count still 1 (no recognizer
+  reorder or pre-pass).
 
 ## Ratchet State
 
