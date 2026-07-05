@@ -105,6 +105,7 @@ pub const Instruction = union(enum) {
     bcmp_rdi_rsi_rdx_eax,
     memcmp_rdi_rsi_rdx_eax,
     guarded_memset_rdi_sil_rdx_rcx_rax,
+    memset_rdi_sil_rdx_rax,
     smin_i32_edi_esi_eax,
     umin_i32_edi_esi_eax,
     smax_i32_edi_esi_eax,

@@ -301,6 +301,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt cfg:byte compare equal loop` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned two-pointer byte equality loop shape used by `compiler_rt.bcmp` through generic CFG without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.memcmp`. Evidence `tmp/std_debug_hello_debug_build_after_byte_compare_equal.log` |
 | `real-program object-emission compiler_rt cfg:byte compare diff loop` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned two-pointer byte difference loop shape used by `compiler_rt.memcmp` through generic CFG without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.__memset`. Evidence `tmp/std_debug_hello_debug_build_after_byte_compare_diff.log` |
 | `real-program object-emission compiler_rt cfg:guarded byte memset loop` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned guarded byte-store loop shape used by `compiler_rt.__memset` through generic CFG without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.memset`. Evidence `tmp/std_debug_hello_debug_build_after_guarded_byte_memset.log` |
+| `real-program object-emission compiler_rt cfg:byte memset loop` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned byte-store loop shape used by `compiler_rt.memset` through generic CFG without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negxf2`. Evidence `tmp/std_debug_hello_debug_build_after_byte_memset.log` |
 
 ## Progress Log
 
@@ -526,6 +527,13 @@ One line per completed cycle, append-only, newest last. This is the
   `__memset` without function-name admission, moving Debug std-hello from
   object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.__memset` to
   the same stage/diagnostic in `compiler_rt.memset`; strict real-row
+  enforcement remains at 100. Recognizer count still 1 (no recognizer reorder
+  or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned byte-store loop shape used by `compiler_rt.memset`
+  without function-name admission, moving Debug std-hello from object-emission
+  `UnsupportedCodegenControlFlow` in `compiler_rt.memset` to object-emission
+  `UnsupportedCodegenType` in `compiler_rt.__negxf2`; strict real-row
   enforcement remains at 100. Recognizer count still 1 (no recognizer reorder
   or pre-pass).
 

@@ -1010,6 +1010,18 @@ pub fn lowerGuardedByteMemsetLoop(allocator: std.mem.Allocator, machine: *Machin
     return true;
 }
 
+pub fn lowerByteMemsetLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesByteMemsetLoop(function)) return false;
+    const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const byte_reg = try paramReg(function, function.params.items[1].name, .{ .int = 8 });
+    const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    if (ptr_reg != .rdi or byte_reg != .rsi or len_reg != .rdx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .memset_rdi_sil_rdx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn matchesByteScanLenLoop(function: ir.Function) bool {
     if (!function.ret_ty.eql(.{ .int = 64 })) return false;
     if (function.params.items.len != 1 or function.params.items[0].ty != .ptr) return false;
@@ -1364,6 +1376,40 @@ fn matchesGuardedByteMemsetLoop(function: ir.Function) bool {
     return functionHasPointerAdvancingStoreLoop(function, function.params.items[0].name, function.params.items[2].name);
 }
 
+fn matchesByteMemsetLoop(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.ptr)) return false;
+    if (function.params.items.len != 3 or function.params.items[0].ty != .ptr or
+        !function.params.items[1].ty.eql(.{ .int = 8 }) or
+        !function.params.items[2].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len != 6) return false;
+    if (!functionHasNoCalls(function)) return false;
+    if (!allStoresWriteMemsetByte(function, function.params.items[1].name)) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const len_zero_name = entry.instructions.items[0].result orelse return false;
+    const len_zero = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (len_zero.predicate != .eq or !len_zero.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(len_zero.lhs, function.params.items[2].name) or !isInt(len_zero.rhs, 0)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, len_zero_name)) return false;
+
+    const ret_block = blockByName(function, entry_br.then_target) orelse return false;
+    const ret = switch (ret_block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.ptr) or !isNamed(ret.value orelse return false, function.params.items[0].name)) return false;
+
+    return functionHasPointerAdvancingStoreLoop(function, function.params.items[0].name, function.params.items[2].name);
+}
+
 fn allCallsAreMemsetGuardCalls(function: ir.Function) bool {
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
@@ -1373,6 +1419,19 @@ fn allCallsAreMemsetGuardCalls(function: ir.Function) bool {
                 else => continue,
             };
             if (!std.mem.eql(u8, call.callee, "llvm.assume") and !std.mem.eql(u8, call.callee, "llvm.trap")) return false;
+        }
+    }
+    return true;
+}
+
+fn functionHasNoCalls(function: ir.Function) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .call => return false,
+                else => {},
+            }
         }
     }
     return true;

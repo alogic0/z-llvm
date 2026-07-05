@@ -176,6 +176,18 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tjne 2b\n" ++
                     "3:\n",
             ),
+            .memset_rdi_sil_rdx_rax => try writer.writeAll(
+                "\tmovq %rdi, %rax\n" ++
+                    "\ttestq %rdx, %rdx\n" ++
+                    "\tje 2f\n" ++
+                    "\txorl %ecx, %ecx\n" ++
+                    "1:\n" ++
+                    "\tmovb %sil, (%rdi,%rcx)\n" ++
+                    "\tincq %rcx\n" ++
+                    "\tcmpq %rcx, %rdx\n" ++
+                    "\tjne 1b\n" ++
+                    "2:\n",
+            ),
             .smin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovgl %esi, %eax\n"),
             .umin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmoval %esi, %eax\n"),
             .smax_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovll %esi, %eax\n"),
