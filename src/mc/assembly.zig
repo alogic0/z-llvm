@@ -110,6 +110,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tbsfq %rdi, %rax\n" ++
                     "2:\n",
             ),
+            .ctz_i64_rdi_eax => try writer.writeAll("\tmovl $64, %eax\n\ttestq %rdi, %rdi\n\tje 1f\n\tbsfq %rdi, %rax\n1:\n"),
             .ffs_i128_rdi_rsi_eax => try writer.writeAll(
                 "\txorl %eax, %eax\n" ++
                     "\ttestq %rdi, %rdi\n" ++
