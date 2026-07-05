@@ -1242,7 +1242,14 @@ pub fn lowerStraightLineReturn(
             try lowerReturnValue(allocator, machine, function, block, ret.value orelse return error.InvalidRet);
             try machine.instructions.append(allocator, .ret);
         },
-        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
+        .@"unreachable" => {
+            if (hasLiveInstructions(block)) {
+                try air_patterns_cfg.lowerStraightLineUnreachable(allocator, machine, function, block);
+                return;
+            }
+            try machine.instructions.append(allocator, .ud2);
+        },
+        .br, .condbr, .@"switch", .indirectbr => return error.UnsupportedCodegenControlFlow,
     }
 }
 

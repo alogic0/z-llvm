@@ -83,6 +83,7 @@ pub fn build(b: *std.Build) void {
     addToolStepWithArgs(b, "distribution-native-link-object-inspection", "Inspect z_llvm ELF objects before Zig native linker handoff", "tools/run_native_link_object_inspection.zig");
     addToolStep(b, "distribution-zig-source-native-link", "Run selected Zig source to z_llvm object to native-link executable gate", "tools/run_distribution_zig_source_native_link.zig");
     addToolStep(b, "distribution-zig-integrated-object", "Run patched Zig integrated z_llvm object-emission gate", "tools/run_distribution_zig_integrated_object.zig");
+    addToolStepWithArgs(b, "distribution-zig-integrated-exe", "Run patched Zig integrated z_llvm executable syscall gate", "tools/run_distribution_zig_integrated_exe.zig");
     addToolStepWithFixedAndUserArgs(b, "distribution-zig-integrated-preopt", "Run patched Zig integrated preopt z_llvm optimizer/object-emission gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--pipeline=preopt"});
     addToolStepWithFixedAndUserArgs(b, "distribution-zig-ir-writer-tiny-scalar", "Run the first selected Zig-owned textual IR writer gate", "tools/run_distribution_zig_integrated_object.zig", &.{ "--ir-writer", "--case=releasefast_tiny_scalar" });
     addToolStepWithFixedAndUserArgs(b, "distribution-zig-ir-writer", "Run selected Zig-owned textual IR writer integration gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--ir-writer"});

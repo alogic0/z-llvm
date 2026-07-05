@@ -39,10 +39,10 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-04 after item 10 close:
+Stop state recorded 2026-07-04 after item 11 close:
 
-- Active convergence-progress item: item 11 on the syscall-hello
-  real-program track. The real-row track closed item 10 at strict
+- Active convergence-progress item: item 12 on the std-hello real-program
+  track. The real-row track closed item 10 at strict
   `--limit=100`, but every stop report still states both tracks.
 - Real-row track status: selector-v2 ReleaseFast report-mode
   `distribution-real-rows --mode=ReleaseFast --limit=200` is green through
@@ -59,8 +59,14 @@ Stop state recorded 2026-07-04 after item 10 close:
   Strict `distribution-real-rows --strict --limit=100` is green in
   ReleaseFast, ReleaseSafe, and ReleaseSmall, and `distribution-all` now
   enforces that strict limit.
-- Syscall-hello track status: opened by item 9; no implementation work
-  started yet.
+- Real-program track status: item 11 syscall hello is closed by
+  `docs/evidence/zig_integrated_exe_syscall_hello.summary`. Patched Zig plus
+  z_llvm object emission and Zig native `build-exe -fno-lld` build a no-std
+  `_start` executable in ReleaseFast, ReleaseSafe, and ReleaseSmall; each run
+  prints `hello\n` and exits 0. The minimal inline-asm `syscall` support is
+  intentionally limited to fixed register integer inputs, return register,
+  and explicit clobbers. Item 12 (std hello via `std.debug.print` with the
+  default `_start`) is next.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -79,17 +85,20 @@ Stop state recorded 2026-07-04 after item 10 close:
   `tmp/real_rows_releasefast_limit200_after_sret_field_backend.log`, and
   `tmp/real_rows_strict_limit100_after_optional_layout.log`,
   `tmp/real_rows_releasesafe_limit100_after_intcast_safe.log`,
-  `tmp/real_rows_strict_limit100_after_intcast_safe.log`.
+  `tmp/real_rows_strict_limit100_after_intcast_safe.log`,
+  `tmp/zig_integrated_exe.log`.
 - Tracked evidence summaries:
   `docs/evidence/ziglang_pin_stage4_optional_layout.summary`,
   `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary`,
   `docs/evidence/real_rows_releasesafe_limit100_after_intcast_safe.summary`,
   `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary`, and
-  `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`.
-- Recommended next action: start item 11, the syscall-hello track: export
-  `_start`, no std, direct write/exit syscalls, x86_64-linux-gnu, patched Zig
-  plus z_llvm codegen, native linker, no LLD. Expect the minimal inline-asm
-  syscall form first; keep general inline asm fail-closed.
+  `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`,
+  `docs/evidence/zig_integrated_exe_syscall_hello.summary`.
+- Recommended next action: start item 12, the std-hello track: build the same
+  hello program through `std.debug.print` with the default `_start`, all
+  release modes, patched Zig plus z_llvm codegen, Zig native linker, no LLD.
+  Keep any new runtime or linker boundary explicit rather than weakening the
+  syscall-hello boundary.
 
 When the worker stops, record only:
 

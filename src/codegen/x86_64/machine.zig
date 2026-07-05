@@ -420,6 +420,7 @@ pub const Instruction = union(enum) {
     jae: []const u8,
     jle: []const u8,
     jmp: []const u8,
+    syscall,
     ud2,
     ret,
 };

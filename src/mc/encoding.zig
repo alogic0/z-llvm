@@ -455,6 +455,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .test_arg64 => |reg| try encodeTest64(&bytes, allocator, reg),
             .base64_raw_args_to_decode4_regs => try bytes.appendSlice(allocator, base64RawArgsToDecode4RegsBytes()),
             .base64_decode4_from_table_rax => try bytes.appendSlice(allocator, base64Decode4FromTableRaxBytes()),
+            .syscall => try bytes.appendSlice(allocator, &.{ 0x0f, 0x05 }),
             .ud2 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x0b }),
             .je => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
@@ -742,6 +743,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .test_arg64 => 3,
         .base64_raw_args_to_decode4_regs => @intCast(base64RawArgsToDecode4RegsBytes().len),
         .base64_decode4_from_table_rax => @intCast(base64Decode4FromTableRaxBytes().len),
+        .syscall => 2,
         .ud2 => 2,
         .je, .jne, .jo, .jc, .jp, .js, .jae, .jle => 6,
         .jmp => 5,

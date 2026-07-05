@@ -175,11 +175,16 @@ list and the visible record of progress. Evidence summaries under
 
 ## Phase 2 — First Real Program
 
-- [ ] 11. Milestone 2a, syscall hello: `export _start`, no std, direct
+- [x] 11. Milestone 2a, syscall hello: `export _start`, no std, direct
   `write`/`exit` syscalls, target `x86_64-linux-gnu`, patched Zig with
   z_llvm codegen, Zig native linker, no LLD; gate
   (`distribution-zig-integrated-exe`) runs the binary and checks stdout and
   exit code. Includes the budgeted minimal inline-asm `syscall` form.
+
+  Closed by `docs/evidence/zig_integrated_exe_syscall_hello.summary`, which
+  confirms patched Zig plus z_llvm object emission and Zig native
+  `build-exe -fno-lld` produce a no-std `_start` executable in ReleaseFast,
+  ReleaseSafe, and ReleaseSmall; each binary prints `hello\n` and exits 0.
 - [ ] 12. Milestone 2a', std hello: same program via `std.debug.print`
   with default `_start`; separate acceptance, all modes.
 - [ ] 13. Milestone 2b, one real std test file (e.g. a `std.mem` subset)
@@ -396,6 +401,13 @@ One line per completed cycle, append-only, newest last. This is the
   `distribution-real-rows --strict --limit=100`. The strict ratchet moved
   from 25 to 100 under selector-v2 and Zig pin `bdee02bc`. Recognizer count
   still 1 (no recognizer reorder or pre-pass).
+- 2026-07-04 (this commit) Item 11 syscall-hello milestone: patched Zig plus
+  z_llvm object emission and Zig native `build-exe -fno-lld` now build and
+  run the no-std `_start` program in ReleaseFast, ReleaseSafe, and
+  ReleaseSmall; the gate verifies `hello\n` on stdout and exit code 0. The
+  budgeted minimal inline-asm `syscall` form is supported only for fixed
+  register integer inputs, return register, and explicit clobbers. Recognizer
+  count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 

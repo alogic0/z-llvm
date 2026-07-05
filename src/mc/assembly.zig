@@ -363,6 +363,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                 \\    retq
                 \\
             ),
+            .syscall => try writer.writeAll("\tsyscall\n"),
             .ud2 => try writer.writeAll("\tud2\n"),
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),
             .jne => |label| try writer.print("\tjne .L{s}_{s}\n", .{ function.name, label }),

@@ -17,6 +17,7 @@ const SelectedI32Value = union(enum) {
 
 const i32Value = x86_64_match.i32Value;
 const i64Value = x86_64_match.i64Value;
+const globalSymbolNameFromValue = x86_64_match.globalSymbolNameFromValue;
 const isNamed = x86_64_match.isNamed;
 const isInt = x86_64_match.isInt;
 const isFpText = x86_64_match.isFpText;
@@ -61,7 +62,9 @@ pub fn lowerStraightLineInstructions(
                     if (instruction.result != null) return error.VoidCallHasResult;
                     continue;
                 }
-                if (call.ret_ty.eql(.{ .int = 32 }) and isUshlSatI32Callee(call.callee)) {
+                if (call.inline_asm != null) {
+                    try lowerInlineAsmCall(allocator, machine, instruction.result, call);
+                } else if (call.ret_ty.eql(.{ .int = 32 }) and isUshlSatI32Callee(call.callee)) {
                     if (instruction.result == null) return error.InstructionNeedsResult;
                     try emitGenericCfgI32CallIntoEax(allocator, machine, function, block, instruction_index, call);
                 } else {
@@ -88,6 +91,23 @@ pub fn lowerStraightLineInstructions(
     if (!ret.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
     try lowerReturnValueAfterCalls(allocator, machine, function, block, ret.value orelse return error.InvalidRet, last_eax_value, call_count);
     try machine.instructions.append(allocator, .ret);
+}
+
+pub fn lowerStraightLineUnreachable(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !void {
+    _ = function;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .call => |call| try lowerInlineAsmCall(allocator, machine, instruction.result, call),
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
+        }
+    }
+    try machine.instructions.append(allocator, .ud2);
 }
 
 pub fn lowerCall(
@@ -186,6 +206,69 @@ pub fn lowerCall(
 
     if (call.ret_ty == .void and result != null) return error.VoidCallHasResult;
     if (call.ret_ty != .void and result == null) return error.InstructionNeedsResult;
+}
+
+fn lowerInlineAsmCall(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    result: ?[]const u8,
+    call: ir.CallInst,
+) !void {
+    const inline_asm = call.inline_asm orelse return error.UnsupportedCodegenInstruction;
+    if (result == null) return error.InstructionNeedsResult;
+    if (!call.ret_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+    if (!inline_asm.sideeffect or !std.mem.eql(u8, inline_asm.template, "syscall")) return error.UnsupportedCodegenInstruction;
+    if (call.callee_value != null or call.calling_conv != null or call.ret_attrs != null or call.operand_bundle != null) return error.UnsupportedCodegenInstruction;
+
+    if (std.mem.eql(u8, inline_asm.constraints, "={rax},{rax},{rdi},{rsi},{rdx},~{memory},~{rcx},~{r11},~{dirflag},~{fpsr},~{flags}")) {
+        if (call.args.items.len != 4) return error.UnsupportedCodegenInstruction;
+        try emitSyscallArg(allocator, machine, .rax, call.args.items[0]);
+        try emitSyscallArg(allocator, machine, .rdi, call.args.items[1]);
+        try emitSyscallArg(allocator, machine, .rsi, call.args.items[2]);
+        try emitSyscallArg(allocator, machine, .rdx, call.args.items[3]);
+        try machine.instructions.append(allocator, .syscall);
+        return;
+    }
+    if (std.mem.eql(u8, inline_asm.constraints, "={rax},{rax},{rdi},~{memory},~{rcx},~{r11},~{dirflag},~{fpsr},~{flags}")) {
+        if (call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+        try emitSyscallArg(allocator, machine, .rax, call.args.items[0]);
+        try emitSyscallArg(allocator, machine, .rdi, call.args.items[1]);
+        try machine.instructions.append(allocator, .syscall);
+        return;
+    }
+    return error.UnsupportedCodegenInstruction;
+}
+
+const SyscallReg = enum { rax, rdi, rsi, rdx };
+
+fn emitSyscallArg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: SyscallReg,
+    arg: ir.CallArg,
+) !void {
+    if (!arg.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+    switch (arg.value) {
+        .int => |value| {
+            const imm = try i64Value(value);
+            try machine.instructions.append(allocator, switch (reg) {
+                .rax => .{ .mov_imm_rax = imm },
+                .rdi => .{ .mov_imm_rdi = imm },
+                .rsi => .{ .mov_imm_rsi = imm },
+                .rdx => .{ .mov_imm_rdx = imm },
+            });
+        },
+        .constant_expr => {
+            const symbol = try globalSymbolNameFromValue(arg.value);
+            try machine.instructions.append(allocator, switch (reg) {
+                .rax => .{ .lea_global_rax = symbol },
+                .rdi => .{ .lea_global_rdi = symbol },
+                .rsi => .{ .lea_global_rsi = symbol },
+                .rdx => .{ .lea_global_rdx = symbol },
+            });
+        },
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    }
 }
 
 fn callHasArgAttrs(call: ir.CallInst) bool {
