@@ -408,6 +408,11 @@ One line per completed cycle, append-only, newest last. This is the
   budgeted minimal inline-asm `syscall` form is supported only for fixed
   register integer inputs, return register, and explicit clobbers. Recognizer
   count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-04 (this commit) Docs-only ratchet bookkeeping: `real_programs_ok`
+  is raised from 0 to 1 for the syscall-hello executable milestone, enforced
+  by `distribution-zig-integrated-exe` and evidenced by
+  `docs/evidence/zig_integrated_exe_syscall_hello.summary`. Real-row strict
+  counters stay at `100/100/100/0`; recognizer count still 1.
 
 ## Ratchet State
 
@@ -421,7 +426,7 @@ summaries.
 | real_objects_emitted | 100 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
 | real_native_linked | 100 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
 | real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
-| real_programs_ok | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
+| real_programs_ok | 1 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/zig_integrated_exe_syscall_hello.summary` | enforcement=`distribution-zig-integrated-exe`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
 | unsupported_functions (ReleaseFast, compiler-core-module) | 55479 | ReleaseFast | `docs/evidence/real_candidates_releasefast_v1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
 
 Fixture-frontier counters (`generic_cfg_functions=753`,
