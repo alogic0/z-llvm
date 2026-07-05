@@ -27,7 +27,7 @@ pub fn typeIsI128(ty: ir.Type) bool {
         .int => |bits| bits == 128,
         .vector => |vector| switch (vector.elem_ty) {
             .int => |bits| bits == 128,
-            .float, .double, .ptr => false,
+            .half, .float, .double, .fp128, .ptr => false,
         },
         .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => false,
     };

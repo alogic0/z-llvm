@@ -61,18 +61,22 @@ pub const Type = union(enum) {
 
 pub const VectorElementType = union(enum) {
     int: u16,
+    half,
     float,
     double,
+    fp128,
     ptr,
 
     pub fn eql(a: VectorElementType, b: VectorElementType) bool {
         return switch (a) {
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
-                .float, .double, .ptr => false,
+                .half, .float, .double, .fp128, .ptr => false,
             },
+            .half => b == .half,
             .float => b == .float,
             .double => b == .double,
+            .fp128 => b == .fp128,
             .ptr => b == .ptr,
         };
     }
@@ -80,8 +84,10 @@ pub const VectorElementType = union(enum) {
     pub fn toType(elem_ty: VectorElementType) Type {
         return switch (elem_ty) {
             .int => |bits| .{ .int = bits },
+            .half => .half,
             .float => .float,
             .double => .double,
+            .fp128 => .fp128,
             .ptr => .ptr,
         };
     }
@@ -89,8 +95,10 @@ pub const VectorElementType = union(enum) {
     pub fn format(elem_ty: VectorElementType, writer: anytype) !void {
         switch (elem_ty) {
             .int => |bits| try writer.print("i{}", .{bits}),
+            .half => try writer.writeAll("half"),
             .float => try writer.writeAll("float"),
             .double => try writer.writeAll("double"),
+            .fp128 => try writer.writeAll("fp128"),
             .ptr => try writer.writeAll("ptr"),
         }
     }

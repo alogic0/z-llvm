@@ -173,8 +173,10 @@ fn scalarOrVectorSizeBytes(ty: ir.Type) ?u64 {
         .double => 8,
         .vector => |vector| vector.len * (switch (vector.elem_ty) {
             .int => |bits| if (bits % 8 == 0) bits / 8 else return null,
+            .half => 2,
             .float => 4,
             .double => 8,
+            .fp128 => 16,
             .ptr => 8,
         }),
         .void, .int, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => null,

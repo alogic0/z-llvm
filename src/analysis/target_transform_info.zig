@@ -105,8 +105,10 @@ pub const TargetTransformInfo = struct {
 fn vectorTotalBits(vector: ir.VectorType) ?u32 {
     const elem_bits = switch (vector.elem_ty) {
         .int => |bits| bits,
+        .half => 16,
         .float => 32,
         .double, .ptr => 64,
+        .fp128 => 128,
     };
     return @as(u32, vector.len) * @as(u32, elem_bits);
 }

@@ -283,9 +283,11 @@ const HashState = struct {
                         state.addTag(1);
                         state.addInt(bits);
                     },
-                    .float => state.addTag(2),
-                    .double => state.addTag(3),
-                    .ptr => state.addTag(4),
+                    .half => state.addTag(2),
+                    .float => state.addTag(3),
+                    .double => state.addTag(4),
+                    .fp128 => state.addTag(5),
+                    .ptr => state.addTag(6),
                 }
             },
         }

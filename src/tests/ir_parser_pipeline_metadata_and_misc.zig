@@ -681,6 +681,42 @@ test "parser preserves fixed vector signatures and rejects unsupported vector bo
     defer extract_module.deinit();
     try extract_module.verify();
 
+    const half_insert_extract =
+        \\define half @half_lane(half %a) {
+        \\entry:
+        \\  %v = insertelement <4 x half> poison, half %a, i64 0
+        \\  %r = extractelement <4 x half> %v, i64 0
+        \\  ret half %r
+        \\}
+        \\
+    ;
+    var half_module = try ir.Module.parse(std.testing.allocator, half_insert_extract);
+    defer half_module.deinit();
+    try half_module.verify();
+
+    var half_printed: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer half_printed.deinit();
+    try half_module.print(&half_printed.writer);
+    try std.testing.expectEqualStrings(half_insert_extract, half_printed.writer.buffered());
+
+    const fp128_insert_extract =
+        \\define fp128 @fp128_lane(fp128 %a) {
+        \\entry:
+        \\  %v = insertelement <4 x fp128> poison, fp128 %a, i64 0
+        \\  %r = extractelement <4 x fp128> %v, i64 0
+        \\  ret fp128 %r
+        \\}
+        \\
+    ;
+    var fp128_module = try ir.Module.parse(std.testing.allocator, fp128_insert_extract);
+    defer fp128_module.deinit();
+    try fp128_module.verify();
+
+    var fp128_printed: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer fp128_printed.deinit();
+    try fp128_module.print(&fp128_printed.writer);
+    try std.testing.expectEqualStrings(fp128_insert_extract, fp128_printed.writer.buffered());
+
     const vector_constant =
         \\define <2 x i32> @vector_constant() {
         \\entry:

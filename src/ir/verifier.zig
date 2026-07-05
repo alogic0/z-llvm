@@ -550,7 +550,7 @@ pub fn verify(module: core.Module) !void {
                         switch (fcmp.operand_ty) {
                             .half, .float, .double, .x86_fp80, .fp128 => {},
                             .vector => |vector| switch (vector.elem_ty) {
-                                .float, .double => {},
+                                .half, .float, .double, .fp128 => {},
                                 .int, .ptr => return error.TypeMismatch,
                             },
                             .void, .int, .metadata, .ptr, .aggregate => return error.TypeMismatch,
@@ -1516,8 +1516,10 @@ fn parseVectorType(text: []const u8) !core.VectorType {
 
 fn parseVectorElementType(text: []const u8) !core.VectorElementType {
     if (std.mem.eql(u8, text, "ptr")) return .ptr;
+    if (std.mem.eql(u8, text, "half")) return .half;
     if (std.mem.eql(u8, text, "float")) return .float;
     if (std.mem.eql(u8, text, "double")) return .double;
+    if (std.mem.eql(u8, text, "fp128")) return .fp128;
     if (text.len < 2 or text[0] != 'i') return error.UnsupportedType;
     const bits = try std.fmt.parseInt(u16, text[1..], 10);
     if (bits == 0) return error.UnsupportedType;
@@ -1560,7 +1562,7 @@ fn verifySelectConditionType(cond_ty: core.Type, value_ty: core.Type) !void {
     if (cond_ty.vector.len != value_ty.vector.len) return error.SelectConditionTypeMismatch;
     switch (cond_ty.vector.elem_ty) {
         .int => |bits| if (bits == 1) return,
-        .float, .double, .ptr => {},
+        .half, .float, .double, .fp128, .ptr => {},
     }
     return error.SelectConditionTypeMismatch;
 }
@@ -1583,7 +1585,7 @@ fn verifyShuffleMask(vector_ty: core.Type, mask_ty: core.Type, mask: core.Value)
     if (vector_ty != .vector or mask_ty != .vector) return error.TypeMismatch;
     switch (mask_ty.vector.elem_ty) {
         .int => {},
-        .float, .double, .ptr => return error.TypeMismatch,
+        .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
     }
     switch (mask) {
         .vector => |text| try verifyShuffleMaskLiteral(vector_ty.vector.len * 2, mask_ty, text),
@@ -1756,7 +1758,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
             .int => {},
             .vector => |vector| switch (vector.elem_ty) {
                 .int => {},
-                .float, .double, .ptr => return error.TypeMismatch,
+                .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
             },
             .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
@@ -1844,11 +1846,11 @@ fn verifyCast(cast: core.CastInst) !void {
                 if (from_vector.len != to_vector.len) return error.TypeMismatch;
                 const from_bits = switch (from_vector.elem_ty) {
                     .int => |bits| bits,
-                    .float, .double, .ptr => return error.TypeMismatch,
+                    .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
                 };
                 const to_bits = switch (to_vector.elem_ty) {
                     .int => |bits| bits,
-                    .float, .double, .ptr => return error.TypeMismatch,
+                    .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
                 };
                 switch (cast.op) {
                     .trunc => if (from_bits <= to_bits) return error.InvalidCast,
@@ -1886,12 +1888,12 @@ fn verifyVectorFloatToIntCast(cast: core.CastInst) !void {
     };
     if (from_vector.len != to_vector.len) return error.TypeMismatch;
     switch (from_vector.elem_ty) {
-        .float, .double => {},
+        .half, .float, .double, .fp128 => {},
         .int, .ptr => return error.TypeMismatch,
     }
     switch (to_vector.elem_ty) {
         .int => {},
-        .float, .double, .ptr => return error.TypeMismatch,
+        .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
     }
 }
 
@@ -1930,8 +1932,10 @@ fn bitcastBits(ty: core.Type) ?u64 {
         .fp128 => 128,
         .vector => |vector| vector.len * (switch (vector.elem_ty) {
             .int => |bits| @as(u64, bits),
+            .half => 16,
             .float => 32,
             .double => 64,
+            .fp128 => 128,
             .ptr => return null,
         }),
         .void, .metadata, .ptr, .aggregate => null,
@@ -2095,8 +2099,10 @@ fn verifyAtomicMemoryAccessType(ty: core.Type) !void {
             if (vector.elem_ty == .ptr) return;
             const elem_bits: u64 = switch (vector.elem_ty) {
                 .int => |bits| bits,
+                .half => 16,
                 .float => 32,
                 .double => 64,
+                .fp128 => 128,
                 .ptr => unreachable,
             };
             try verifyAtomicMemoryAccessBits(@as(u64, vector.len) * elem_bits);
@@ -2128,7 +2134,7 @@ fn isFloatingScalar(ty: core.Type) bool {
 fn isFloatingOrFloatingVector(ty: core.Type) bool {
     return switch (ty) {
         .half, .float, .double, .x86_fp80, .fp128 => true,
-        .vector => |vector| vector.elem_ty == .float or vector.elem_ty == .double,
+        .vector => |vector| vector.elem_ty == .half or vector.elem_ty == .float or vector.elem_ty == .double or vector.elem_ty == .fp128,
         .void, .int, .metadata, .ptr, .aggregate => false,
     };
 }
