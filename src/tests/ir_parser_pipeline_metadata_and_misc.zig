@@ -259,6 +259,33 @@ test "verifier preserves unknown metadata nodes with valid references" {
     try module.verify();
 }
 
+test "verifier accepts unnamed debug local variable arguments" {
+    const input =
+        \\define i32 @unnamed_arg(i32 %0) !dbg !1 {
+        \\entry:
+        \\  call void @llvm.dbg.value(metadata i32 %0, metadata !6, metadata !DIExpression()), !dbg !7
+        \\  ret i32 %0, !dbg !7
+        \\}
+        \\
+        \\declare void @llvm.dbg.value(metadata, metadata, metadata)
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2)
+        \\!1 = distinct !DISubprogram(name: "unnamed_arg", scope: !2, file: !2, line: 1, type: !3, scopeLine: 1)
+        \\!2 = !DIFile(filename: "unnamed_arg.zig", directory: ".")
+        \\!3 = !DISubroutineType(types: !4)
+        \\!4 = !{!5, !5}
+        \\!5 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_signed)
+        \\!6 = !DILocalVariable(arg: 1, scope: !1, file: !2, line: 1, type: !5)
+        \\!7 = !DILocation(line: 1, column: 1, scope: !1)
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+}
+
 test "verifier rejects dangling debug metadata references" {
     const input =
         \\define i32 @bad_debug_metadata(i32 %a) !dbg !4 {

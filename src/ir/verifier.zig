@@ -827,7 +827,7 @@ fn verifyKnownMetadataNode(body: []const u8, ids: std.AutoHashMap(u32, []const u
         try verifyFieldTargetAnyDebugNode(body, "scope", ids);
         try verifyFieldTargetKind(body, "file", ids, "!DIFile(");
     } else if (knownNodeBody(body, "!DILocalVariable(")) {
-        if (!hasMetadataField(body, "name") or !hasMetadataField(body, "scope") or !hasMetadataField(body, "type")) return error.InvalidDebugMetadata;
+        if ((!hasMetadataField(body, "name") and !hasMetadataField(body, "arg")) or !hasMetadataField(body, "scope") or !hasMetadataField(body, "type")) return error.InvalidDebugMetadata;
         try verifyFieldTargetAnyDebugNode(body, "scope", ids);
         try verifyFieldTargetAnyDebugNode(body, "type", ids);
     } else if (knownNodeBody(body, "!DIExpression(")) {
