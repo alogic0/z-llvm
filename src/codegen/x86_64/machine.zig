@@ -140,6 +140,7 @@ pub const Instruction = union(enum) {
         imm: u16,
     },
     cmp_rdi_imm64: i64,
+    cmp_rdx_rcx,
     cmp_rdx_rdi,
     cmp_rax_rdx,
     test_eax_eax,

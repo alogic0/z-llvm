@@ -10,7 +10,10 @@ const isNamed = shared.isNamed;
 const isInt = shared.isInt;
 const isCalleeName = shared.isCalleeName;
 const paramReg = cabi_abi_helpers.paramReg;
+const appendDirectCall = shared.appendDirectCall;
 const appendPanicCall = shared.appendPanicCall;
+const appendStackFrame = shared.appendStackFrame;
+const appendStackFrameEnd = shared.appendStackFrameEnd;
 const phiHasIncoming = call_lowering.phiHasIncoming;
 const phiHasIncomingInt = call_lowering.phiHasIncomingInt;
 
@@ -1010,6 +1013,28 @@ pub fn lowerGuardedByteMemsetLoop(allocator: std.mem.Allocator, machine: *Machin
     return true;
 }
 
+pub fn lowerGuardedMemmoveCall(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    const callee = matchesGuardedMemmoveCall(function) orelse return false;
+    const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const src_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    const guard_reg = try paramReg(function, function.params.items[3].name, .{ .int = 64 });
+    if (dst_reg != .rdi or src_reg != .rsi or len_reg != .rdx or guard_reg != .rcx) return error.UnsupportedCodegenAbi;
+
+    const ok_label = "guarded_memmove_ok";
+    try machine.instructions.append(allocator, .cmp_rdx_rcx);
+    try machine.instructions.append(allocator, .{ .jae = ok_label });
+    try machine.instructions.append(allocator, .ud2);
+    try machine.instructions.append(allocator, .{ .label = ok_label });
+    try appendStackFrame(allocator, machine, 8);
+    try machine.instructions.append(allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rdi } });
+    try appendDirectCall(allocator, machine, callee, .ptr);
+    try machine.instructions.append(allocator, .{ .reload_rsp_rax = .slot0 });
+    try appendStackFrameEnd(allocator, machine, 8);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 pub fn lowerByteMemsetLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesByteMemsetLoop(function)) return false;
     const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -1020,6 +1045,64 @@ pub fn lowerByteMemsetLoop(allocator: std.mem.Allocator, machine: *MachineFuncti
     try machine.instructions.append(allocator, .memset_rdi_sil_rdx_rax);
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn matchesGuardedMemmoveCall(function: ir.Function) ?[]const u8 {
+    if (!function.ret_ty.eql(.ptr)) return null;
+    if (function.params.items.len != 4 or function.params.items[0].ty != .ptr or
+        function.params.items[1].ty != .ptr or !function.params.items[2].ty.eql(.{ .int = 64 }) or
+        !function.params.items[3].ty.eql(.{ .int = 64 })) return null;
+    if (function.blocks.items.len != 3) return null;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return null;
+    const guard_cmp_name = entry.instructions.items[0].result orelse return null;
+    const guard_cmp = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (guard_cmp.predicate != .ult or !guard_cmp.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(guard_cmp.lhs, function.params.items[3].name) or !isNamed(guard_cmp.rhs, function.params.items[2].name)) return null;
+    const entry_br = switch (entry.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, guard_cmp_name)) return null;
+
+    const trap_block = blockByName(function, entry_br.then_target) orelse return null;
+    const call_block = blockByName(function, entry_br.else_target) orelse return null;
+    if (!matchesTrapBlock(trap_block)) return null;
+    if (call_block.instructions.items.len != 1) return null;
+
+    const call = switch (call_block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (call.callee_value != null or call.inline_asm != null or !call.ret_ty.eql(.ptr) or call.args.items.len != 3) return null;
+    if (!call.args.items[0].ty.eql(.ptr) or !isNamed(call.args.items[0].value, function.params.items[0].name)) return null;
+    if (!call.args.items[1].ty.eql(.ptr) or !isNamed(call.args.items[1].value, function.params.items[1].name)) return null;
+    if (!call.args.items[2].ty.eql(.{ .int = 64 }) or !isNamed(call.args.items[2].value, function.params.items[2].name)) return null;
+
+    const ret = switch (call_block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.ptr) or !isNamed(ret.value orelse return null, function.params.items[0].name)) return null;
+    return call.callee;
+}
+
+fn matchesTrapBlock(block: ir.BasicBlock) bool {
+    if (block.instructions.items.len != 1) return false;
+    if (block.instructions.items[0].result != null) return false;
+    const call = switch (block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(call.callee, "llvm.trap") or call.callee_value != null or call.inline_asm != null or call.ret_ty != .void or call.args.items.len != 0) return false;
+    return switch (block.terminator orelse return false) {
+        .@"unreachable" => true,
+        else => false,
+    };
 }
 
 fn matchesByteScanLenLoop(function: ir.Function) bool {

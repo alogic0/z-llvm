@@ -39,34 +39,27 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-04 after item 11 close:
+Stop state recorded 2026-07-05 after item 12 guarded-memmove cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
   `--limit=100`, but every stop report still states both tracks.
-- Real-row track status: selector-v2 ReleaseFast report-mode
-  `distribution-real-rows --mode=ReleaseFast --limit=200` is green through
-  typed lowering, x86_64 object emission, and native link with counters
-  `real_functions_lowered=200`, `real_objects_emitted=200`,
+- Real-row track status: strict `distribution-real-rows --strict --limit=100`
+  is green in ReleaseFast, ReleaseSafe, and ReleaseSmall, and
+  `distribution-all` enforces that strict limit. Selector-v2 ReleaseFast
+  report-mode `distribution-real-rows --mode=ReleaseFast --limit=200` remains
+  green through typed lowering, x86_64 object emission, and native link with
+  counters `real_functions_lowered=200`, `real_objects_emitted=200`,
   `real_native_linked=200`, `real_executed=0`, `real_programs_ok=0`.
-  The hook-contract blocker for `Build.Cache.Path.fmtEscapeString` was closed
-  by patched Zig commit `bdee02bc`, which additively emits optional
-  payload/slice aggregate-layout facts under the v1 contract. ReleaseSafe
-  report-mode `distribution-real-rows --mode=ReleaseSafe --limit=100` is now
-  also green after model-owned `intcast_safe` lowering, with counters
-  `real_functions_lowered=100`, `real_objects_emitted=100`,
-  `real_native_linked=100`, `real_executed=0`, `real_programs_ok=0`.
-  Strict `distribution-real-rows --strict --limit=100` is green in
-  ReleaseFast, ReleaseSafe, and ReleaseSmall, and `distribution-all` now
-  enforces that strict limit.
 - Real-program track status: item 11 syscall hello is closed by
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`. Patched Zig plus
   z_llvm object emission and Zig native `build-exe -fno-lld` build a no-std
   `_start` executable in ReleaseFast, ReleaseSafe, and ReleaseSmall; each run
-  prints `hello\n` and exits 0. The minimal inline-asm `syscall` support is
-  intentionally limited to fixed register integer inputs, return register,
-  and explicit clobbers. Item 12 (std hello via `std.debug.print` with the
-  default `_start`) is next.
+  prints `hello\n` and exits 0. Item 12 std hello remains open. The latest
+  Debug std-hello cycle lowered the model-owned guarded trap/direct-call
+  wrapper shape in `compiler_rt.ssp.__memmove_chk` without name admission;
+  the focused build now fails at `compiler_rt.ssp.__memcpy_chk` with
+  `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -81,12 +74,8 @@ Stop state recorded 2026-07-04 after item 11 close:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/check_stage4_optional_layout_pin_amended.log`,
-  `tmp/real_rows_releasefast_limit200_after_sret_field_backend.log`, and
-  `tmp/real_rows_strict_limit100_after_optional_layout.log`,
-  `tmp/real_rows_releasesafe_limit100_after_intcast_safe.log`,
-  `tmp/real_rows_strict_limit100_after_intcast_safe.log`,
-  `tmp/zig_integrated_exe.log`.
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_memmove_chk.log`
+  and `tmp/distribution_all_after_memmove_chk.log`.
 - Tracked evidence summaries:
   `docs/evidence/ziglang_pin_stage4_optional_layout.summary`,
   `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary`,
@@ -94,11 +83,14 @@ Stop state recorded 2026-07-04 after item 11 close:
   `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary`, and
   `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`,
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`.
-- Recommended next action: start item 12, the std-hello track: build the same
-  hello program through `std.debug.print` with the default `_start`, all
-  release modes, patched Zig plus z_llvm codegen, Zig native linker, no LLD.
-  Keep any new runtime or linker boundary explicit rather than weakening the
-  syscall-hello boundary.
+- Recommended next action: continue item 12 by fixing
+  `compiler_rt.ssp.__memcpy_chk`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__memcpy_chk` on the focused Debug std-hello
+  build. The outer guard/trap matches the previous wrapper, but the copy body
+  is inlined; keep the lowering model-owned and fail-closed. For remaining
+  compiler_rt builtin families, use width-parametric lowerings where the
+  model-owned shapes match, recording partial item-14 credit when a
+  parametric family subsumes per-width special cases.
 
 When the worker stops, record only:
 
