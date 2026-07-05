@@ -249,6 +249,123 @@ pub fn lowerGenericCfgI128FfsReturn(
     return true;
 }
 
+pub fn lowerGenericCfgI128CtzReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 128 })) return false;
+    if (function.blocks.items.len != 3) return false;
+    const param_name = function.params.items[0].name;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const zero_cmp = try validateI128IcmpNamedImm(entry.instructions.items[0], .eq, param_name, 0);
+    const entry_branch = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_branch.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_branch.cond, zero_cmp)) return false;
+
+    const zero_block = blockByName(function, entry_branch.then_target) orelse return false;
+    const ladder_block = blockByName(function, entry_branch.else_target) orelse return false;
+    if (zero_block.instructions.items.len != 1 or ladder_block.instructions.items.len != 42) return false;
+    for (ladder_block.instructions.items) |instruction| {
+        if (instruction.removed) return false;
+    }
+
+    const phi_instruction = zero_block.instructions.items[0];
+    const phi_name = phi_instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const phi = switch (phi_instruction.kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 32 })) return false;
+    const ret = switch (zero_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, phi_name)) return false;
+    const ladder_br = switch (ladder_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, ladder_br.target, zero_block.name)) return false;
+
+    var cursor: usize = 0;
+    const low64 = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", param_name, 18446744073709551615);
+    cursor += 1;
+    const low64_is_zero = try validateI128IcmpNamedImm(ladder_block.instructions.items[cursor], .eq, low64, 0);
+    cursor += 1;
+    const high64 = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .lshr, param_name, 64);
+    cursor += 1;
+    var count = try validateI128Select(ladder_block.instructions.items[cursor], low64_is_zero, .{ .int = 65 }, .{ .int = 1 });
+    cursor += 1;
+    var value = try validateI128Select(ladder_block.instructions.items[cursor], low64_is_zero, .{ .named = high64 }, .{ .named = param_name });
+    cursor += 1;
+
+    const or_stages = [_]struct { mask: i128, shift: i128, bit: i128 }{
+        .{ .mask = 4294967295, .shift = 32, .bit = 32 },
+        .{ .mask = 65535, .shift = 16, .bit = 16 },
+        .{ .mask = 255, .shift = 8, .bit = 8 },
+    };
+    for (or_stages) |stage| {
+        const masked = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", value, stage.mask);
+        cursor += 1;
+        const masked_is_zero = try validateI128IcmpNamedImm(ladder_block.instructions.items[cursor], .eq, masked, 0);
+        cursor += 1;
+        const next_count = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .@"or", count, stage.bit);
+        cursor += 1;
+        const shifted = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .lshr, value, stage.shift);
+        cursor += 1;
+        count = try validateI128Select(ladder_block.instructions.items[cursor], masked_is_zero, .{ .named = next_count }, .{ .named = count });
+        cursor += 1;
+        value = try validateI128Select(ladder_block.instructions.items[cursor], masked_is_zero, .{ .named = shifted }, .{ .named = value });
+        cursor += 1;
+    }
+
+    const add_stages = [_]struct { mask: i128, shift: i128, increment: i128 }{
+        .{ .mask = 15, .shift = 4, .increment = 4 },
+        .{ .mask = 3, .shift = 2, .increment = 2 },
+    };
+    for (add_stages) |stage| {
+        const masked = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", value, stage.mask);
+        cursor += 1;
+        const masked_is_zero = try validateI128IcmpNamedImm(ladder_block.instructions.items[cursor], .eq, masked, 0);
+        cursor += 1;
+        const next_count = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .add, count, stage.increment);
+        cursor += 1;
+        const shifted = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .lshr, value, stage.shift);
+        cursor += 1;
+        count = try validateI128Select(ladder_block.instructions.items[cursor], masked_is_zero, .{ .named = next_count }, .{ .named = count });
+        cursor += 1;
+        value = try validateI128Select(ladder_block.instructions.items[cursor], masked_is_zero, .{ .named = shifted }, .{ .named = value });
+        cursor += 1;
+    }
+
+    const low_bit = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", value, 1);
+    cursor += 1;
+    const shift_delta = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .xor, low_bit, 1);
+    cursor += 1;
+    const final_count = try validateI128BinaryEitherNamed(ladder_block.instructions.items[cursor], .add, shift_delta, count);
+    cursor += 1;
+    const final_value = try validateI128BinaryNamed(ladder_block.instructions.items[cursor], .lshr, value, shift_delta);
+    cursor += 1;
+    const final_bit = try validateI128BinaryNamedImm(ladder_block.instructions.items[cursor], .@"and", final_value, 1);
+    cursor += 1;
+    const zero_based = try validateI128BinaryNamed(ladder_block.instructions.items[cursor], .sub, final_count, final_bit);
+    cursor += 1;
+    const zero_based_i32 = try validateI128TruncToI32(ladder_block.instructions.items[cursor], zero_based);
+    cursor += 1;
+    if (cursor != ladder_block.instructions.items.len) return false;
+    if (!phiHasIncoming(phi, zero_based_i32, ladder_block.name) or !phiHasIncomingInt(phi, 128, entry.name)) return false;
+
+    try machine.instructions.append(allocator, .ctz_i128_rdi_rsi_eax);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
 pub fn lowerGenericCfgI64FfsReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,

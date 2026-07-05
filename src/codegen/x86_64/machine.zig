@@ -76,6 +76,7 @@ pub const Instruction = union(enum) {
     or_rdx_rax,
     neg_rax,
     neg_i128_rdi_rsi_rdx_rax,
+    ctz_i128_rdi_rsi_eax,
     ffs_i128_rdi_rsi_eax,
     ffs_i64_rdi_eax,
     ffs_i32_edi_eax,

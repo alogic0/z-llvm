@@ -312,6 +312,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt int:i128 ffs ladder` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned i128 ffs zero/low/high-bit ladder shape through a SysV `rsi:rdi` backend op without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ffsdi2`. Evidence `tmp/std_debug_hello_debug_build_after_ffsti2.log` |
 | `real-program object-emission compiler_rt int:i64 ffs ladder` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned i64 ffs zero/low/high-bit ladder shape through a SysV `rdi` backend op without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ffssi2`. Evidence `tmp/std_debug_hello_debug_build_after_ffsdi2.log` |
 | `real-program object-emission compiler_rt int:i32 ffs ladder` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned i32 ffs zero/low/high-bit ladder shape through a SysV `edi` backend op without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ctzti2`. Evidence `tmp/std_debug_hello_debug_build_after_ffssi2.log` |
+| `real-program object-emission compiler_rt int:i128 ctz ladder` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned i128 ctz zero/low/high-bit ladder shape through a SysV `rsi:rdi` backend op without function-name admission; the next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ctzdi2`. Evidence `tmp/std_debug_hello_debug_build_after_ctzti2.log` |
 
 ## Progress Log
 
@@ -615,6 +616,14 @@ One line per completed cycle, append-only, newest last. This is the
   object-emission `UnsupportedCodegenControlFlow` in
   `compiler_rt.count0bits.__ffssi2` to object-emission
   `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ctzti2`; strict
+  real-row enforcement remains at 100. Recognizer count still 1 (no recognizer
+  reorder or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: the generic CFG
+  lowering now recognizes the model-owned i128 ctz zero/low/high-bit ladder and
+  lowers it through a SysV `rsi:rdi` backend op, moving Debug std-hello from
+  object-emission `UnsupportedCodegenControlFlow` in
+  `compiler_rt.count0bits.__ctzti2` to object-emission
+  `UnsupportedCodegenControlFlow` in `compiler_rt.count0bits.__ctzdi2`; strict
   real-row enforcement remains at 100. Recognizer count still 1 (no recognizer
   reorder or pre-pass).
 
