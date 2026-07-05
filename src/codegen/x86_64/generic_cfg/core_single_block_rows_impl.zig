@@ -181,6 +181,10 @@ pub fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerGenericCfgI64NegParamReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
         if (!ret.ty.eql(.{ .int = 32 }) and try lowerGenericCfgGprParamReturn(allocator, machine, function, block, ret)) {
             machine.codegen_path = .generic_cfg;
             return true;
@@ -472,6 +476,33 @@ fn lowerGenericCfgI128NegParamReturn(
     if (!isInt(binary.lhs, 0) or !isNamed(binary.rhs, function.params.items[0].name)) return false;
 
     try machine.instructions.append(allocator, .neg_i128_rdi_rsi_rdx_rax);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn lowerGenericCfgI64NegParamReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or !ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 64 })) return false;
+    if (block.instructions.items.len != 1) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const result_name = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, result_name)) return false;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (binary.op != .sub or !binary.ty.eql(function.ret_ty)) return false;
+    if (!isInt(binary.lhs, 0) or !isNamed(binary.rhs, function.params.items[0].name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = try paramReg(function, function.params.items[0].name, .{ .int = 64 }) });
+    try machine.instructions.append(allocator, .neg_rax);
     try appendGenericCfgReturn(allocator, machine);
     return true;
 }

@@ -74,6 +74,7 @@ pub const Instruction = union(enum) {
     shl_rax_imm6: u6,
     shl_rdx_imm6: u6,
     or_rdx_rax,
+    neg_rax,
     neg_i128_rdi_rsi_rdx_rax,
     shl_rcx_imm6: u6,
     shl_r8_imm6: u6,
