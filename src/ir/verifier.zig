@@ -979,7 +979,7 @@ fn verifyCall(lookup: ModuleLookup, ctx: VerifyContext, call: core.CallInst, blo
     try verifyCallOperandBundle(call.operand_bundle);
 
     if (call.inline_asm) |inline_asm| {
-        if (!inline_asm.sideeffect) return error.UnsupportedInlineAsm;
+        if (!inline_asm.sideeffect and (inline_asm.has_memory_clobber or inline_asm.may_load or inline_asm.may_store)) return error.UnsupportedInlineAsm;
         for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
         return;
     }

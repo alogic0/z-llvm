@@ -781,6 +781,19 @@ test "parser rejects unsupported inline asm forms explicitly" {
     var module = try ir.Module.parse(std.testing.allocator, missing_sideeffect);
     defer module.deinit();
     try std.testing.expectError(error.UnsupportedInlineAsm, module.verify());
+
+    const pure_register_output =
+        \\define { i64, i64 } @inline_asm_divq(i64 %hi, i64 %lo, i64 %divisor) {
+        \\entry:
+        \\  %r = call { i64, i64 } asm "divq ${2}", "={rax},={rdx},r,{rax},{rdx},~{dirflag},~{fpsr},~{flags}"(i64 %hi, i64 %lo, i64 %divisor)
+        \\  ret { i64, i64 } %r
+        \\}
+        \\
+    ;
+
+    var pure_module = try ir.Module.parse(std.testing.allocator, pure_register_output);
+    defer pure_module.deinit();
+    try pure_module.verify();
 }
 
 test "parser normalizes getelementptr instructions" {
