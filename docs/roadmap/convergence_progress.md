@@ -187,6 +187,27 @@ list and the visible record of progress. Evidence summaries under
   ReleaseSafe, and ReleaseSmall; each binary prints `hello\n` and exits 0.
 - [ ] 12. Milestone 2a', std hello: same program via `std.debug.print`
   with default `_start`; separate acceptance, all modes.
+- [ ] 12a. tmp hygiene (small infrastructure cycle; may be taken between
+  item-12 cluster cycles when a short cycle fits): a Zig tool
+  `tools/clean_tmp.zig`, wired as `zig build clean-tmp`, that (a) deletes
+  export-cache `.meta`/`.air` pairs whose recorded `ziglang_pin` differs
+  from the current `docs/evidence/ziglang_pin.txt` (provably unreachable
+  under the fail-closed key), (b) deletes per-run scratch directories
+  matching the known patterns (`distribution_real_rows_*`,
+  `distribution_zig_air_inventory_*`, `uncurated_zig_air_*`,
+  `zig_integrated_object_*`, `handoff_validation_*`, and similar) older
+  than a threshold (default 2 hours, flag-adjustable), and (c) never
+  touches current-pin cache entries, `*.log`, or `*.txt` files. Dry-run is
+  the default; `--delete` is required to act; print per-item sizes and a
+  bytes-reclaimed summary; refuse to run if the cache layout is not the
+  expected `.meta`/`.air` pair shape. Additionally, make the export cache
+  self-pruning: on a pin-mismatch key miss inside the real-rows gate,
+  delete entries whose meta cites a pin other than the current one, so
+  each pin bump reclaims the previous generation (~1.4 GB per entry)
+  automatically. Validate with a dry-run/delete pair on a fixture cache
+  dir and record the evidence summary. Context: a manual cleanup on
+  2026-07-04 reclaimed ~61 GB, most of it old-pin cache generations; every
+  hook-contract pin bump recreates the problem.
 - [ ] 13. Milestone 2b, one real std test file (e.g. a `std.mem` subset)
   builds, links natively, runs, exits 0 in Debug + all three release modes.
 
