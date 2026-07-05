@@ -142,6 +142,7 @@ pub fn lowerGenericCfgFpNegReturn(
 
 fn isFpZeroText(value: []const u8) bool {
     return std.mem.eql(u8, value, "0.000000e+00") or
+        std.mem.eql(u8, value, "-0.000000e+00") or
         std.mem.eql(u8, value, "0x0p+0") or
         std.mem.eql(u8, value, "0");
 }

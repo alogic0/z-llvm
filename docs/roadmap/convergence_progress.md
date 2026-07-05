@@ -304,6 +304,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt cfg:byte memset loop` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned byte-store loop shape used by `compiler_rt.memset` through generic CFG without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negxf2`. Evidence `tmp/std_debug_hello_debug_build_after_byte_memset.log` |
 | `real-program object-emission compiler_rt fp:x86_fp80 fneg` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned x86_fp80 `fsub -0.0, param` shape through the SysV long-double stack argument and x87 return convention without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negtf2`. Evidence `tmp/std_debug_hello_debug_build_after_x86_fp80_fneg.log` |
 | `real-program object-emission compiler_rt fp:fp128 fneg` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned fp128 `fsub -0.0, param` shape by toggling the high-lane sign bit in the SysV XMM return value without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negdf2`. Evidence `tmp/std_debug_hello_debug_build_after_fp128_fneg.log` |
+| `real-program object-emission compiler_rt fp:f32/f64 fneg negative-zero spelling` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lets the generic CFG float/double negation matcher accept the parser-normalized `fsub -0.0, param` spelling, moving the same model-owned sign-bit toggle path through `compiler_rt.__negdf2` without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__neghf2`. Evidence `tmp/std_debug_hello_debug_build_after_fp_neg_zero.log` |
 
 ## Progress Log
 
@@ -551,6 +552,12 @@ One line per completed cycle, append-only, newest last. This is the
   object-emission `UnsupportedCodegenType` in `compiler_rt.__negtf2` to the
   same stage/diagnostic in `compiler_rt.__negdf2`; strict real-row enforcement
   remains at 100. Recognizer count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: the generic CFG
+  float/double negation matcher now accepts the parser-normalized negative-zero
+  spelling, moving Debug std-hello from object-emission `UnsupportedCodegenType`
+  in `compiler_rt.__negdf2` to the same stage/diagnostic in
+  `compiler_rt.__neghf2`; strict real-row enforcement remains at 100.
+  Recognizer count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 
