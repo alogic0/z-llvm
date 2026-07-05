@@ -410,6 +410,7 @@ pub const Global = struct {
 pub const GlobalAlias = struct {
     name: []const u8,
     linkage: FunctionLinkage = .default,
+    visibility: FunctionVisibility = .default,
     aliased_ty: []const u8,
     target_ty: Type,
     target: []const u8,

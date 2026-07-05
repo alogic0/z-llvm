@@ -92,6 +92,13 @@ pub fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
 
     const linkage = core.FunctionLinkage.parse(token) orelse .default;
     if (linkage != .default) token = parts.next() orelse return error.InvalidGlobalAlias;
+
+    var visibility: core.FunctionVisibility = .default;
+    if (core.FunctionVisibility.parse(token)) |parsed_visibility| {
+        visibility = parsed_visibility;
+        token = parts.next() orelse return error.InvalidGlobalAlias;
+    }
+
     if (!std.mem.eql(u8, token, "alias")) return error.NotGlobalAlias;
 
     const alias_token_offset = @intFromPtr(token.ptr) - @intFromPtr(rest.ptr) + token.len;
@@ -110,6 +117,7 @@ pub fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
     return .{
         .name = name_text[1..],
         .linkage = linkage,
+        .visibility = visibility,
         .aliased_ty = aliased_ty,
         .target_ty = target_ty,
         .target = target_name[1..],

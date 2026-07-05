@@ -257,7 +257,7 @@ changes the counts; cite the discovery/fix evidence summary.
 | ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
 | ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
 
-## Cluster Board (item 9a)
+## Cluster Board (item 9a onward)
 
 Filled from each wide discovery run; one row per failure cluster. A cluster
 closes when its member rows are report-green; "rows unlocked" records the
@@ -268,6 +268,7 @@ count that turned green when the fix landed.
 | `object-emission x86_64-lower:UnsupportedCodegenInstruction` | 0 | Closed | 146 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission unlocked rank 36 `ascii.isAscii`; i64 terminal shifts with model-owned extended shift-count constants unlocked ranks 39-43 `bit_set.*.maskIndex`; narrow enum `zext` emission unlocked rank 59 `Air.VectorCmp.encodeOp`; nominal enum bool less-than returns unlocked ranks 61-62 `codegen.*.bits.FrameIndex.isNamed`, ranks 66-182 `hash_map.*.Metadata.*`, and rank 184 `os.linux.W.IFEXITED`; sub-byte unsigned greater-than-zero bool returns unlocked rank 183 `link.Diags.Flags.anySet`; model-owned `i16` masked equality bool returns unlocked ranks 186-187 `unicode.utf16Is*Surrogate`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_i16_masked_cmp.summary` |
 | `typed-lowering unsupported:function_type:function-type` | 0 | Closed | 157 | Opaque nominal type-surface parsing now accepts pointer sigils inside balanced generic argument lists, so existing typed-bitcast inference unlocked ranks 63-65 `hash_map.*.Metadata.*`; preserving module aggregate-layout facts in real-row slices plus direct `aggregate_init` register-aggregate lowering unlocked rank 185 `sort.block.Range.init`; fact-owned `Air.ShuffleTwoMask` u32 nominal enum parsing unlocked rank 189 `Air.ShuffleTwoMask.aElem`; opaque nominal `bitcast` + `intcast` scalar inference unlocked ranks 191-200 `InternPool.*`/related optional-index wrappers; hook-contract v1 aggregate-layout facts for optional payload/slice fields plus fact-owned sret aggregate field-wrapper lowering/emission unlocked rank 190 `Build.Cache.Path.fmtEscapeString`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
 | `typed-lowering unsupported:instruction_type:lowering` | 0 | Closed | 1 | Fact-owned pointer register-aggregate construction from `ret_ptr` field-store/`ret_load` plus x86_64 pointer aggregate return emission unlocked rank 188 `Air.Liveness.fmtInstSet`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.summary` |
+| `real-program object-emission compiler_rt parser:UnsupportedGlobalVariable weak_odr hidden alias` | 0 | Closed | 479 | Item 12 std-hello Debug discovery moved past compiler_rt `weak_odr hidden alias` declarations by parsing alias visibility as model IR and preserving ELF symbol visibility; the next open cluster is `UnsupportedInstruction` on `fneg x86_fp80`. Evidence `tmp/std_debug_hello_debug_build_after_alias_visibility.log` |
 
 ## Progress Log
 
@@ -413,6 +414,14 @@ One line per completed cycle, append-only, newest last. This is the
   by `distribution-zig-integrated-exe` and evidenced by
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`. Real-row strict
   counters stay at `100/100/100/0`; recognizer count still 1.
+- 2026-07-04 (this commit) Item 12 std-hello discovery fix: compiler_rt
+  `weak_odr hidden alias` declarations now parse as model-owned global
+  aliases with preserved hidden/protected visibility through IR printing and
+  ELF symbol emission. Debug std-hello moved from
+  `UnsupportedGlobalVariable` to the next compiler_rt parser cluster,
+  `UnsupportedInstruction` on `fneg x86_fp80`; strict real-row enforcement
+  remains at 100. Recognizer count still 1 (no recognizer reorder or
+  pre-pass).
 
 ## Ratchet State
 

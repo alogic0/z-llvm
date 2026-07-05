@@ -21,6 +21,7 @@ const Symbol = struct {
     size: u64,
     section_index: u16,
     info: u8,
+    other: u8 = 0,
 };
 
 const Relocation = struct {
@@ -436,6 +437,7 @@ fn appendLocalFunctionAliases(
             .size = target_symbol.size,
             .section_index = target_symbol.section_index,
             .info = target_symbol.info,
+            .other = symbolOtherForVisibility(alias.visibility),
         });
         try symbol_indices.put(alias.name, @intCast(symbols.items.len));
     }
@@ -598,10 +600,19 @@ fn writeSymbolTable(buffer: []u8, symbols: []const Symbol, name_offsets: []const
         const entry = buffer[(index + 1) * 24 ..][0..24];
         writeU32(entry, 0, name_offsets[index]);
         entry[4] = symbol.info;
+        entry[5] = symbol.other;
         writeU16(entry, 6, symbol.section_index);
         writeU64(entry, 8, symbol.value);
         writeU64(entry, 16, symbol.size);
     }
+}
+
+fn symbolOtherForVisibility(visibility: ir.FunctionVisibility) u8 {
+    return switch (visibility) {
+        .default => 0,
+        .hidden => 2,
+        .protected => 3,
+    };
 }
 
 fn writeSectionHeader(header: []u8, section: Section) void {

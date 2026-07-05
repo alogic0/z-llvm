@@ -45,6 +45,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
     for (module.aliases.items) |alias| {
         try writer.print("@{s} = ", .{alias.name});
         try alias.linkage.format(writer);
+        try alias.visibility.format(writer);
         try writer.print("alias {s}, ", .{alias.aliased_ty});
         try alias.target_ty.format(writer);
         try writer.print(" @{s}\n", .{alias.target});

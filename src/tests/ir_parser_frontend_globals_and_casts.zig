@@ -615,6 +615,34 @@ test "parser preserves scalar global variables" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves hidden global aliases" {
+    const input =
+        \\@memmove = weak_odr hidden alias ptr (ptr, ptr, i64), ptr @compiler_rt.memmove.memmoveFast
+        \\
+        \\define internal ptr @compiler_rt.memmove.memmoveFast(ptr %dest, ptr %src, i64 %len) {
+        \\entry:
+        \\  ret ptr %dest
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 1), module.aliases.items.len);
+    try std.testing.expectEqual(ir.FunctionLinkage.weak_odr, module.aliases.items[0].linkage);
+    try std.testing.expectEqual(ir.FunctionVisibility.hidden, module.aliases.items[0].visibility);
+    try std.testing.expectEqualStrings("ptr (ptr, ptr, i64)", module.aliases.items[0].aliased_ty);
+    try std.testing.expectEqualStrings("compiler_rt.memmove.memmoveFast", module.aliases.items[0].target);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves scalar floating point global initializers" {
     const input =
         \\@gf = private unnamed_addr global float 1.250000e+00, align 4
