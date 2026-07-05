@@ -306,6 +306,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt fp:fp128 fneg` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned fp128 `fsub -0.0, param` shape by toggling the high-lane sign bit in the SysV XMM return value without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negdf2`. Evidence `tmp/std_debug_hello_debug_build_after_fp128_fneg.log` |
 | `real-program object-emission compiler_rt fp:f32/f64 fneg negative-zero spelling` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lets the generic CFG float/double negation matcher accept the parser-normalized `fsub -0.0, param` spelling, moving the same model-owned sign-bit toggle path through `compiler_rt.__negdf2` without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__neghf2`. Evidence `tmp/std_debug_hello_debug_build_after_fp_neg_zero.log` |
 | `real-program object-emission compiler_rt fp:half fneg` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned half `fsub -0.0, param` shape by toggling the low-half sign bit in the SysV XMM return value without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negti2`. Evidence `tmp/std_debug_hello_debug_build_after_half_fneg.log` |
+| `real-program object-emission compiler_rt int:i128 neg` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned `sub i128 0, param` shape through the SysV `rdx:rax` return pair without function-name admission; the next open cluster is object-emission `UnsupportedCodegenType` in `compiler_rt.__negdi2`. Evidence `tmp/std_debug_hello_debug_build_after_i128_neg.log` |
 
 ## Progress Log
 
@@ -565,6 +566,13 @@ One line per completed cycle, append-only, newest last. This is the
   object-emission `UnsupportedCodegenType` in `compiler_rt.__neghf2` to the
   same stage/diagnostic in `compiler_rt.__negti2`; strict real-row enforcement
   remains at 100. Recognizer count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: the generic CFG
+  lowering now recognizes the model-owned `sub i128 0, param` shape and returns
+  the two's-complement negated value in SysV `rdx:rax`, moving Debug std-hello
+  from object-emission `UnsupportedCodegenType` in `compiler_rt.__negti2` to
+  the same stage/diagnostic in `compiler_rt.__negdi2`; strict real-row
+  enforcement remains at 100. Recognizer count still 1 (no recognizer reorder
+  or pre-pass).
 
 ## Ratchet State
 

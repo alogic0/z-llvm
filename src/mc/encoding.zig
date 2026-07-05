@@ -142,6 +142,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, amount);
             },
             .or_rdx_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x09, 0xd0 }),
+            .neg_i128_rdi_rsi_rdx_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0xf8, 0x48, 0x89, 0xf2, 0x48, 0xf7, 0xd8, 0x48, 0x83, 0xd2, 0x00, 0x48, 0xf7, 0xda }),
             .shl_rcx_imm6 => |amount| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xc1, 0xe1 });
                 try bytes.append(allocator, amount);
@@ -641,6 +642,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .shl_rax_imm6 => 4,
         .shl_rdx_imm6 => 4,
         .or_rdx_rax => 3,
+        .neg_i128_rdi_rsi_rdx_rax => 16,
         .shl_rcx_imm6 => 4,
         .shl_r8_imm6 => 4,
         .or_rcx_rax => 3,
