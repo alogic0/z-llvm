@@ -860,6 +860,13 @@ pub fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !cor
         };
     }
 
+    if (std.mem.eql(u8, op_text, "fneg")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .binary = try parseFnegInst(std.mem.trim(u8, rhs_text[op_text.len..], " \t")) },
+        };
+    }
+
     if (std.mem.eql(u8, op_text, "select")) {
         const select = try parseSelect(rhs_text);
         return .{
@@ -884,6 +891,25 @@ pub fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !cor
     return .{
         .result = result_text[1..],
         .kind = .{ .binary = binary },
+    };
+}
+
+pub fn parseFnegInst(text: []const u8) !core.BinaryInst {
+    var rest = std.mem.trim(u8, text, " \t");
+    var fp_flags: core.FastMathFlags = .{};
+    while (firstToken(rest)) |token| {
+        if (!isFastMathFlagToken(token)) break;
+        try setFastMathFlag(&fp_flags, token);
+        rest = trimFirstToken(rest);
+    }
+
+    const typed = try parseLeadingType(rest);
+    return .{
+        .op = .fsub,
+        .fp_flags = fp_flags,
+        .ty = typed.ty,
+        .lhs = .{ .fp = "-0.000000e+00" },
+        .rhs = try parseValue(typed.after),
     };
 }
 

@@ -643,6 +643,45 @@ test "parser preserves hidden global aliases" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser lowers fneg to fsub negative zero" {
+    const input =
+        \\define internal x86_fp80 @negate_long_double(x86_fp80 %0) {
+        \\entry:
+        \\  %1 = fneg x86_fp80 %0
+        \\  ret x86_fp80 %1
+        \\}
+        \\
+    ;
+    const expected =
+        \\define internal x86_fp80 @negate_long_double(x86_fp80 %0) {
+        \\entry:
+        \\  %1 = fsub x86_fp80 -0.000000e+00, %0
+        \\  ret x86_fp80 %1
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const instruction = module.functions.items[0].blocks.items[0].instructions.items[0];
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expectEqual(ir.BinaryOp.fsub, binary.op);
+    try std.testing.expect(binary.ty.eql(.x86_fp80));
+    try std.testing.expectEqualStrings("-0.000000e+00", binary.lhs.fp);
+    try std.testing.expectEqualStrings("0", binary.rhs.named);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser preserves scalar floating point global initializers" {
     const input =
         \\@gf = private unnamed_addr global float 1.250000e+00, align 4
