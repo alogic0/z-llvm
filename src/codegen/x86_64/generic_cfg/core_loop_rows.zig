@@ -973,6 +973,18 @@ pub fn lowerByteScanLenLoop(allocator: std.mem.Allocator, machine: *MachineFunct
     return true;
 }
 
+pub fn lowerByteCompareEqualLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesByteCompareEqualLoop(function)) return false;
+    const lhs_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const rhs_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    if (lhs_reg != .rdi or rhs_reg != .rsi or len_reg != .rdx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .bcmp_rdi_rsi_rdx_eax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn matchesByteScanLenLoop(function: ir.Function) bool {
     if (!function.ret_ty.eql(.{ .int = 64 })) return false;
     if (function.params.items.len != 1 or function.params.items[0].ty != .ptr) return false;
@@ -1041,6 +1053,134 @@ fn matchesByteScanLenLoop(function: ir.Function) bool {
         else => return false,
     };
     return ret.ty.eql(.{ .int = 64 }) and isNamed(ret.value orelse return false, phi_name);
+}
+
+fn matchesByteCompareEqualLoop(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 3 or function.params.items[0].ty != .ptr or
+        function.params.items[1].ty != .ptr or !function.params.items[2].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len != 4) return false;
+
+    const entry = function.blocks.items[0];
+    const common_ret = function.blocks.items[1];
+    const loop = function.blocks.items[2];
+    const then = function.blocks.items[3];
+    if (entry.instructions.items.len != 1 or common_ret.instructions.items.len != 1 or
+        loop.instructions.items.len != 2 or then.instructions.items.len != 6) return false;
+
+    const entry_cmp_name = entry.instructions.items[0].result orelse return false;
+    const entry_cmp = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (entry_cmp.predicate != .eq or !entry_cmp.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(entry_cmp.lhs, function.params.items[2].name) or !isInt(entry_cmp.rhs, 0)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, entry_cmp_name) or
+        !std.mem.eql(u8, entry_br.then_target, common_ret.name) or !std.mem.eql(u8, entry_br.else_target, then.name)) return false;
+
+    const ret_phi_name = common_ret.instructions.items[0].result orelse return false;
+    const ret_phi = switch (common_ret.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!ret_phi.ty.eql(.{ .int = 32 })) return false;
+    if (!phiHasIncomingInt(ret_phi, 0, entry.name) or !phiHasIncomingInt(ret_phi, 0, loop.name) or
+        !phiHasIncomingInt(ret_phi, 1, then.name)) return false;
+    const ret = switch (common_ret.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return false, ret_phi_name)) return false;
+
+    const next_index_name = loop.instructions.items[0].result orelse return false;
+    const loop_cmp_name = loop.instructions.items[1].result orelse return false;
+    const index_name = then.instructions.items[0].result orelse return false;
+    const lhs_gep_name = then.instructions.items[1].result orelse return false;
+    const lhs_load_name = then.instructions.items[2].result orelse return false;
+    const rhs_gep_name = then.instructions.items[3].result orelse return false;
+    const rhs_load_name = then.instructions.items[4].result orelse return false;
+
+    const next_index = switch (loop.instructions.items[0].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (next_index.op != .add or !next_index.ty.eql(.{ .int = 64 }) or !isNamed(next_index.lhs, index_name) or !isInt(next_index.rhs, 1)) return false;
+    const loop_cmp = switch (loop.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (loop_cmp.predicate != .eq or !loop_cmp.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(loop_cmp.lhs, next_index_name) or !isNamed(loop_cmp.rhs, function.params.items[2].name)) return false;
+    const loop_br = switch (loop.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!loop_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(loop_br.cond, loop_cmp_name) or
+        !std.mem.eql(u8, loop_br.then_target, common_ret.name) or !std.mem.eql(u8, loop_br.else_target, then.name)) return false;
+
+    const index_phi = switch (then.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!index_phi.ty.eql(.{ .int = 64 }) or !phiHasIncomingInt(index_phi, 0, entry.name) or
+        !phiHasIncoming(index_phi, next_index_name, loop.name)) return false;
+    const lhs_gep = switch (then.instructions.items[1].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!byteCompareGep(lhs_gep, function.params.items[0].name, index_name)) return false;
+    const lhs_load = switch (then.instructions.items[2].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!lhs_load.ty.eql(.{ .int = 8 }) or lhs_load.attrs.isBarrier() or !isNamed(lhs_load.ptr, lhs_gep_name)) return false;
+    const rhs_gep = switch (then.instructions.items[3].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!byteCompareGep(rhs_gep, function.params.items[1].name, index_name)) return false;
+    const rhs_load = switch (then.instructions.items[4].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!rhs_load.ty.eql(.{ .int = 8 }) or rhs_load.attrs.isBarrier() or !isNamed(rhs_load.ptr, rhs_gep_name)) return false;
+
+    const then_br = switch (then.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    const value_cmp = switch (then_br.cond) {
+        .named => |name| findIcmpEqI8(then, name) orelse return false,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!isNamed(value_cmp.lhs, lhs_load_name) or !isNamed(value_cmp.rhs, rhs_load_name)) return false;
+    return then_br.cond_ty.eql(.{ .int = 1 }) and
+        std.mem.eql(u8, then_br.then_target, loop.name) and
+        std.mem.eql(u8, then_br.else_target, common_ret.name);
+}
+
+fn byteCompareGep(gep: ir.GepInst, ptr_param_name: []const u8, index_name: []const u8) bool {
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" }) or !isNamed(gep.ptr, ptr_param_name)) return false;
+    if (gep.indices.items.len != 1) return false;
+    const index = gep.indices.items[0];
+    return index.ty.eql(.{ .int = 64 }) and isNamed(index.value, index_name);
+}
+
+fn findIcmpEqI8(block: ir.BasicBlock, name: []const u8) ?ir.IcmpInst {
+    for (block.instructions.items) |instruction| {
+        if (!std.mem.eql(u8, instruction.result orelse continue, name)) continue;
+        const icmp = switch (instruction.kind) {
+            .icmp => |icmp| icmp,
+            else => return null,
+        };
+        if (icmp.predicate == .eq and icmp.operand_ty.eql(.{ .int = 8 })) return icmp;
+        return null;
+    }
+    return null;
 }
 
 pub fn lowerGenericCfgConditionalSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

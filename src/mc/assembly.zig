@@ -123,6 +123,24 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .movzx_dil_edi => try writer.writeAll("\tmovzbl %dil, %edi\n"),
             .and_edi_imm8 => |value| try writer.print("\tandl ${}, %edi\n", .{value}),
             .load_rax_rdi_u8_eax => try writer.writeAll("\tmovzbl (%rax,%rdi), %eax\n"),
+            .bcmp_rdi_rsi_rdx_eax => try writer.writeAll(
+                "\ttestq %rdx, %rdx\n" ++
+                    "\tje 2f\n" ++
+                    "\txorl %ecx, %ecx\n" ++
+                    "1:\n" ++
+                    "\tmovzbl (%rdi,%rcx), %eax\n" ++
+                    "\tcmpb (%rsi,%rcx), %al\n" ++
+                    "\tjne 3f\n" ++
+                    "\tincq %rcx\n" ++
+                    "\tcmpq %rcx, %rdx\n" ++
+                    "\tjne 1b\n" ++
+                    "2:\n" ++
+                    "\txorl %eax, %eax\n" ++
+                    "\tjmp 4f\n" ++
+                    "3:\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "4:\n",
+            ),
             .smin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovgl %esi, %eax\n"),
             .umin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmoval %esi, %eax\n"),
             .smax_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovll %esi, %eax\n"),

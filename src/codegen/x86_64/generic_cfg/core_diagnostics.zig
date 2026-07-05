@@ -65,6 +65,7 @@ pub const lowerMulConstReturn = misc_rows.lowerMulConstReturn;
 pub const lowerReleaseSmallStrFromFloatHelp = release_small_rows.lowerReleaseSmallStrFromFloatHelp;
 pub const lowerReleaseSmallStrFromFloatSupportFunction = release_small_rows.lowerReleaseSmallStrFromFloatSupportFunction;
 pub const lowerRuntimeSliceSumPreoptHelper = loop_rows.lowerRuntimeSliceSumPreoptHelper;
+pub const lowerByteCompareEqualLoop = loop_rows.lowerByteCompareEqualLoop;
 pub const lowerByteScanLenLoop = loop_rows.lowerByteScanLenLoop;
 pub const lowerSliceSumLoop = loop_rows.lowerSliceSumLoop;
 pub const lowerUnreachableStub = misc_rows.lowerUnreachableStub;

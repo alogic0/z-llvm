@@ -250,6 +250,49 @@ test "x86_64 generic cfg lowers byte scan length loop without name admission" {
     try expectMachineInstruction(machine.instructions.items, .{ .mov_arg_rax = .rcx });
 }
 
+test "x86_64 generic cfg lowers byte compare equal loop without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal range(i32 0, 2) i32 @any_byte_compare_equal(ptr %lhs, ptr %rhs, i64 %len) {
+        \\entry:
+        \\  %is.empty = icmp eq i64 %len, 0
+        \\  br i1 %is.empty, label %done, label %body
+        \\done:
+        \\  %result = phi i32 [ 0, %entry ], [ 1, %body ], [ 0, %next ]
+        \\  ret i32 %result
+        \\next:
+        \\  %index.next = add nuw i64 %index, 1
+        \\  %is.done = icmp eq i64 %index.next, %len
+        \\  br i1 %is.done, label %done, label %body
+        \\body:
+        \\  %index = phi i64 [ 0, %entry ], [ %index.next, %next ]
+        \\  %lhs.ptr = getelementptr inbounds [1 x i8], ptr %lhs, i64 %index
+        \\  %lhs.byte = load i8, ptr %lhs.ptr, align 1
+        \\  %rhs.ptr = getelementptr inbounds [1 x i8], ptr %rhs, i64 %index
+        \\  %rhs.byte = load i8, ptr %rhs.ptr, align 1
+        \\  %is.equal = icmp eq i8 %lhs.byte, %rhs.byte
+        \\  br i1 %is.equal, label %next, label %done
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.bcmp_rdi_rsi_rdx_eax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 codegen routes checked guard cfg through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
