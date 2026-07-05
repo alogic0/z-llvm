@@ -76,6 +76,16 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.Ma
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (multi_block_rows.lowerGenericCfgI32FfsReturn(allocator, machine, function) catch |err| switch (err) {
+        error.UnsupportedCodegenInstruction,
+        error.BlockWithoutTerminator,
+        error.InvalidRet,
+        => false,
+        else => return err,
+    }) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try multi_block_rows.lowerGenericCfgBranchMergeReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
