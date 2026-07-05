@@ -1162,6 +1162,7 @@ pub fn lowerStraightLineReturn(
             if (try lowerFloatAddReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatSubMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatSubReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerX86Fp80NegReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeDoubleDivMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerDoubleDivReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatRemMainReturn(allocator, machine, function, block, ret)) return;
@@ -1689,6 +1690,36 @@ pub fn lowerFloatSubReturn(
 ) !bool {
     if (!try matchesFpBinaryReturn(function, block, ret, .float, .fsub)) return false;
     try machine.instructions.append(allocator, .subss_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerX86Fp80NegReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (function.params.items.len != 1) return false;
+    if (!function.ret_ty.eql(.x86_fp80) or !ret.ty.eql(.x86_fp80)) return false;
+    if (!function.params.items[0].ty.eql(.x86_fp80)) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const fsub_inst = block.instructions.items[0];
+    if (fsub_inst.removed) return false;
+    const fsub_result = fsub_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, fsub_result)) return false;
+
+    const fsub = switch (fsub_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (fsub.op != .fsub or !fsub.ty.eql(.x86_fp80)) return false;
+    if (!isFpText(fsub.lhs, "-0.000000e+00")) return false;
+    if (!isNamed(fsub.rhs, function.params.items[0].name)) return false;
+
+    try machine.instructions.append(allocator, .fneg_x86_fp80_stack8_st0);
     try machine.instructions.append(allocator, .ret);
     return true;
 }

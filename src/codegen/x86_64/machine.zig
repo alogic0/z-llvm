@@ -182,6 +182,7 @@ pub const Instruction = union(enum) {
     ucomiss_xmm1_xmm0,
     ucomiss_xmm0_xmm1,
     oltss_xmm0_xmm1_al,
+    fneg_x86_fp80_stack8_st0,
     sub_rsp_8,
     add_rsp_8,
     push_imm32: i32,
