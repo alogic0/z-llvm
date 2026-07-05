@@ -339,6 +339,87 @@ test "x86_64 generic cfg lowers byte compare diff loop without name admission" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers guarded byte memset loop without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.assume(i1)
+        \\declare void @llvm.trap()
+        \\
+        \\define internal ptr @any_guarded_byte_memset(ptr %dst, i8 %byte, i64 %len, i64 %guard) {
+        \\entry:
+        \\  %bad = icmp ult i64 %guard, %len
+        \\  br i1 %bad, label %trap, label %check
+        \\trap:
+        \\  call void @llvm.assume(i1 true)
+        \\  call void @llvm.trap()
+        \\  unreachable
+        \\check:
+        \\  %empty = icmp eq i64 %len, 0
+        \\  br i1 %empty, label %done, label %preheader
+        \\preheader:
+        \\  %tail = and i64 %len, 7
+        \\  %no.tail = icmp eq i64 %tail, 0
+        \\  br i1 %no.tail, label %loopexit, label %prologue
+        \\prologue:
+        \\  %remaining.prol = phi i64 [ %remaining.next, %prologue ], [ %len, %preheader ]
+        \\  %ptr.prol = phi ptr [ %ptr.next, %prologue ], [ %dst, %preheader ]
+        \\  %iter = phi i64 [ %iter.next, %prologue ], [ 0, %preheader ]
+        \\  store i8 %byte, ptr %ptr.prol, align 1
+        \\  %remaining.next = add i64 %remaining.prol, -1
+        \\  %ptr.next = getelementptr inbounds nuw i8, ptr %ptr.prol, i64 1
+        \\  %iter.next = add i64 %iter, 1
+        \\  %iter.done = icmp eq i64 %iter.next, %tail
+        \\  br i1 %iter.done, label %loopexit, label %prologue
+        \\loopexit:
+        \\  %remaining.unr = phi i64 [ %len, %preheader ], [ %remaining.next, %prologue ]
+        \\  %ptr.unr = phi ptr [ %dst, %preheader ], [ %ptr.next, %prologue ]
+        \\  %small = icmp ult i64 %len, 8
+        \\  br i1 %small, label %done, label %loop
+        \\loop:
+        \\  %remaining = phi i64 [ %remaining.after, %loop ], [ %remaining.unr, %loopexit ]
+        \\  %ptr = phi ptr [ %ptr.after, %loop ], [ %ptr.unr, %loopexit ]
+        \\  store i8 %byte, ptr %ptr, align 1
+        \\  %p1 = getelementptr inbounds nuw i8, ptr %ptr, i64 1
+        \\  store i8 %byte, ptr %p1, align 1
+        \\  %p2 = getelementptr inbounds nuw i8, ptr %ptr, i64 2
+        \\  store i8 %byte, ptr %p2, align 1
+        \\  %p3 = getelementptr inbounds nuw i8, ptr %ptr, i64 3
+        \\  store i8 %byte, ptr %p3, align 1
+        \\  %p4 = getelementptr inbounds nuw i8, ptr %ptr, i64 4
+        \\  store i8 %byte, ptr %p4, align 1
+        \\  %p5 = getelementptr inbounds nuw i8, ptr %ptr, i64 5
+        \\  store i8 %byte, ptr %p5, align 1
+        \\  %p6 = getelementptr inbounds nuw i8, ptr %ptr, i64 6
+        \\  store i8 %byte, ptr %p6, align 1
+        \\  %p7 = getelementptr inbounds nuw i8, ptr %ptr, i64 7
+        \\  store i8 %byte, ptr %p7, align 1
+        \\  %remaining.after = add i64 %remaining, -8
+        \\  %done.loop = icmp eq i64 %remaining.after, 0
+        \\  %ptr.after = getelementptr inbounds nuw i8, ptr %ptr, i64 8
+        \\  br i1 %done.loop, label %done, label %loop
+        \\done:
+        \\  ret ptr %dst
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.guarded_memset_rdi_sil_rdx_rcx_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 codegen routes checked guard cfg through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

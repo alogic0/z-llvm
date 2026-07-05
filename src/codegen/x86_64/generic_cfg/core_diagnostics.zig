@@ -68,6 +68,7 @@ pub const lowerRuntimeSliceSumPreoptHelper = loop_rows.lowerRuntimeSliceSumPreop
 pub const lowerByteCompareEqualLoop = loop_rows.lowerByteCompareEqualLoop;
 pub const lowerByteCompareDiffLoop = loop_rows.lowerByteCompareDiffLoop;
 pub const lowerByteScanLenLoop = loop_rows.lowerByteScanLenLoop;
+pub const lowerGuardedByteMemsetLoop = loop_rows.lowerGuardedByteMemsetLoop;
 pub const lowerSliceSumLoop = loop_rows.lowerSliceSumLoop;
 pub const lowerUnreachableStub = misc_rows.lowerUnreachableStub;
 pub const lowerVolatileAbsoluteStore = misc_rows.lowerVolatileAbsoluteStore;

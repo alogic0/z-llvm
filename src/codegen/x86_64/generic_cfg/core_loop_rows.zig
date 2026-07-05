@@ -997,6 +997,19 @@ pub fn lowerByteCompareDiffLoop(allocator: std.mem.Allocator, machine: *MachineF
     return true;
 }
 
+pub fn lowerGuardedByteMemsetLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesGuardedByteMemsetLoop(function)) return false;
+    const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const byte_reg = try paramReg(function, function.params.items[1].name, .{ .int = 8 });
+    const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    const guard_reg = try paramReg(function, function.params.items[3].name, .{ .int = 64 });
+    if (ptr_reg != .rdi or byte_reg != .rsi or len_reg != .rdx or guard_reg != .rcx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .guarded_memset_rdi_sil_rdx_rcx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn matchesByteScanLenLoop(function: ir.Function) bool {
     if (!function.ret_ty.eql(.{ .int = 64 })) return false;
     if (function.params.items.len != 1 or function.params.items[0].ty != .ptr) return false;
@@ -1294,6 +1307,167 @@ fn matchesByteCompareDiffLoop(function: ir.Function) bool {
     return then_br.cond_ty.eql(.{ .int = 1 }) and isNamed(then_br.cond, value_cmp_name) and
         std.mem.eql(u8, then_br.then_target, loop.name) and
         std.mem.eql(u8, then_br.else_target, common_ret.name);
+}
+
+fn matchesGuardedByteMemsetLoop(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.ptr)) return false;
+    if (function.params.items.len != 4 or function.params.items[0].ty != .ptr or
+        !function.params.items[1].ty.eql(.{ .int = 8 }) or
+        !function.params.items[2].ty.eql(.{ .int = 64 }) or
+        !function.params.items[3].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len != 8) return false;
+    if (!allCallsAreMemsetGuardCalls(function)) return false;
+    if (!allStoresWriteMemsetByte(function, function.params.items[1].name)) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const guard_name = entry.instructions.items[0].result orelse return false;
+    const guard = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (guard.predicate != .ult or !guard.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(guard.lhs, function.params.items[3].name) or !isNamed(guard.rhs, function.params.items[2].name)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, guard_name)) return false;
+
+    const trap_block = blockByName(function, entry_br.then_target) orelse return false;
+    const normal_block = blockByName(function, entry_br.else_target) orelse return false;
+    if (!blockHasTrapThenUnreachable(trap_block)) return false;
+
+    const len_zero_name = if (normal_block.instructions.items.len == 1)
+        normal_block.instructions.items[0].result orelse return false
+    else
+        return false;
+    const len_zero = switch (normal_block.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (len_zero.predicate != .eq or !len_zero.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(len_zero.lhs, function.params.items[2].name) or !isInt(len_zero.rhs, 0)) return false;
+    const normal_br = switch (normal_block.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!normal_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(normal_br.cond, len_zero_name)) return false;
+
+    const ret_block = blockByName(function, normal_br.then_target) orelse return false;
+    const ret = switch (ret_block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.ptr) or !isNamed(ret.value orelse return false, function.params.items[0].name)) return false;
+
+    return functionHasPointerAdvancingStoreLoop(function, function.params.items[0].name, function.params.items[2].name);
+}
+
+fn allCallsAreMemsetGuardCalls(function: ir.Function) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const call = switch (instruction.kind) {
+                .call => |call| call,
+                else => continue,
+            };
+            if (!std.mem.eql(u8, call.callee, "llvm.assume") and !std.mem.eql(u8, call.callee, "llvm.trap")) return false;
+        }
+    }
+    return true;
+}
+
+fn allStoresWriteMemsetByte(function: ir.Function, byte_param_name: []const u8) bool {
+    var store_count: usize = 0;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const store = switch (instruction.kind) {
+                .store => |store| store,
+                else => continue,
+            };
+            if (!store.ty.eql(.{ .int = 8 }) or !isNamed(store.value, byte_param_name) or store.attrs.isBarrier()) return false;
+            store_count += 1;
+        }
+    }
+    return store_count >= 2;
+}
+
+fn blockHasTrapThenUnreachable(block: ir.BasicBlock) bool {
+    var has_trap = false;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const call = switch (instruction.kind) {
+            .call => |call| call,
+            else => continue,
+        };
+        if (std.mem.eql(u8, call.callee, "llvm.trap") and call.ret_ty == .void and call.args.items.len == 0) has_trap = true;
+    }
+    return has_trap and switch (block.terminator orelse return false) {
+        .@"unreachable" => true,
+        else => false,
+    };
+}
+
+fn functionHasPointerAdvancingStoreLoop(function: ir.Function, ptr_param_name: []const u8, len_param_name: []const u8) bool {
+    for (function.blocks.items) |block| {
+        const terminator = block.terminator orelse continue;
+        const condbr = switch (terminator) {
+            .condbr => |condbr| condbr,
+            else => continue,
+        };
+        if (!std.mem.eql(u8, condbr.else_target, block.name)) continue;
+        if (!blockHasGepFromPointer(block, ptr_param_name) and !blockHasGepFromBlockPointerPhi(block)) continue;
+        if (!blockHasI64EqToLen(block, len_param_name)) continue;
+        return true;
+    }
+    return false;
+}
+
+fn blockHasGepFromPointer(block: ir.BasicBlock, ptr_param_name: []const u8) bool {
+    for (block.instructions.items) |instruction| {
+        const gep = switch (instruction.kind) {
+            .gep => |gep| gep,
+            else => continue,
+        };
+        if (gep.source_ty.eql(.{ .int = 8 }) and isNamed(gep.ptr, ptr_param_name)) return true;
+    }
+    return false;
+}
+
+fn blockHasGepFromBlockPointerPhi(block: ir.BasicBlock) bool {
+    for (block.instructions.items) |instruction| {
+        const gep = switch (instruction.kind) {
+            .gep => |gep| gep,
+            else => continue,
+        };
+        if (!gep.source_ty.eql(.{ .int = 8 })) continue;
+        for (block.instructions.items) |candidate| {
+            if (!std.mem.eql(u8, candidate.result orelse continue, switch (gep.ptr) {
+                .named => |name| name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => continue,
+            })) continue;
+            const phi = switch (candidate.kind) {
+                .phi => |phi| phi,
+                else => continue,
+            };
+            if (phi.ty.eql(.ptr)) return true;
+        }
+    }
+    return false;
+}
+
+fn blockHasI64EqToLen(block: ir.BasicBlock, len_param_name: []const u8) bool {
+    for (block.instructions.items) |instruction| {
+        const icmp = switch (instruction.kind) {
+            .icmp => |icmp| icmp,
+            else => continue,
+        };
+        if (icmp.predicate == .eq and icmp.operand_ty.eql(.{ .int = 64 }) and
+            (isNamed(icmp.lhs, len_param_name) or isNamed(icmp.rhs, len_param_name) or isInt(icmp.lhs, 0) or isInt(icmp.rhs, 0))) return true;
+    }
+    return false;
 }
 
 fn byteCompareGep(gep: ir.GepInst, ptr_param_name: []const u8, index_name: []const u8) bool {
