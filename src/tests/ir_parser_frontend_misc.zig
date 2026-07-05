@@ -579,6 +579,18 @@ test "parser keeps unsupported FP surface closed except modeled vector FP binary
     defer vector_fp_binary.deinit();
     try vector_fp_binary.verify();
 
+    const vector_fp_literal_input =
+        \\define <2 x double> @vector_fsub_literal(<2 x double> %a) {
+        \\entry:
+        \\  %r = fsub <2 x double> <double 0x3F147E88A03792A6, double poison>, %a
+        \\  ret <2 x double> %r
+        \\}
+        \\
+    ;
+    var vector_fp_literal = try ir.Module.parse(std.testing.allocator, vector_fp_literal_input);
+    defer vector_fp_literal.deinit();
+    try vector_fp_literal.verify();
+
     var constrained = try ir.Module.parse(std.testing.allocator, constrained_input);
     defer constrained.deinit();
     try std.testing.expectError(error.UnknownFunction, constrained.verify());

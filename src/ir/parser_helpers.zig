@@ -908,8 +908,21 @@ pub fn parseFnegInst(text: []const u8) !core.BinaryInst {
         .op = .fsub,
         .fp_flags = fp_flags,
         .ty = typed.ty,
-        .lhs = .{ .fp = "-0.000000e+00" },
+        .lhs = negativeZeroForFneg(typed.ty),
         .rhs = try parseValue(typed.after),
+    };
+}
+
+fn negativeZeroForFneg(ty: core.Type) core.Value {
+    return switch (ty) {
+        .vector => |vector| switch (vector.elem_ty) {
+            .half => .{ .vector = "splat (half -0.000000e+00)" },
+            .float => .{ .vector = "splat (float -0.000000e+00)" },
+            .double => .{ .vector = "splat (double -0.000000e+00)" },
+            .fp128 => .{ .vector = "splat (fp128 -0.000000e+00)" },
+            .int, .ptr => .{ .fp = "-0.000000e+00" },
+        },
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => .{ .fp = "-0.000000e+00" },
     };
 }
 

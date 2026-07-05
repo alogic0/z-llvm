@@ -723,6 +723,48 @@ test "parser accepts half typed function headers and fneg" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "parser lowers vector fneg to fsub negative zero splat" {
+    const input =
+        \\define internal <2 x double> @negate_vector(<2 x double> %0) {
+        \\entry:
+        \\  %1 = fneg <2 x double> %0
+        \\  ret <2 x double> %1
+        \\}
+        \\
+    ;
+    const expected =
+        \\define internal <2 x double> @negate_vector(<2 x double> %0) {
+        \\entry:
+        \\  %1 = fsub <2 x double> splat (double -0.000000e+00), %0
+        \\  ret <2 x double> %1
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const instruction = module.functions.items[0].blocks.items[0].instructions.items[0];
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expectEqual(ir.BinaryOp.fsub, binary.op);
+    try std.testing.expect(binary.ty.eql(.{ .vector = .{
+        .len = 2,
+        .elem_ty = .double,
+    } }));
+    try std.testing.expectEqualStrings("splat (double -0.000000e+00)", binary.lhs.vector);
+    try std.testing.expectEqualStrings("0", binary.rhs.named);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser preserves scalar floating point global initializers" {
     const input =
         \\@gf = private unnamed_addr global float 1.250000e+00, align 4
