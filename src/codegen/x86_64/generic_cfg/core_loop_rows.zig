@@ -1048,6 +1048,30 @@ pub fn lowerGuardedMemcpyBody(allocator: std.mem.Allocator, machine: *MachineFun
     return true;
 }
 
+pub fn lowerMemmoveBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesMemmoveBody(function)) return false;
+    const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const src_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    if (dst_reg != .rdi or src_reg != .rsi or len_reg != .rdx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .memmove_rdi_rsi_rdx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerMemcpyBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesMemcpyBody(function)) return false;
+    const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const src_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    if (dst_reg != .rdi or src_reg != .rsi or len_reg != .rdx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .memcpy_rdi_rsi_rdx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 pub fn lowerGuardedStrncatBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesGuardedStrncatBody(function)) return false;
     const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -1234,6 +1258,124 @@ fn matchesGuardedMemcpyBody(function: ir.Function) bool {
     }
 
     return saw_body_entry and saw_load and saw_store and saw_ret;
+}
+
+fn matchesMemmoveBody(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.ptr)) return false;
+    if (function.params.items.len != 3 or function.params.items[0].ty != .ptr or
+        function.params.items[1].ty != .ptr or !function.params.items[2].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len < 4) return false;
+
+    var saw_overlap_split = false;
+    var saw_src_load = false;
+    var saw_dst_store = false;
+    var saw_temp_alloca = false;
+    var saw_temp_copy = false;
+    var saw_ret = false;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .alloca => |alloca| {
+                    if (alloca.allocated_ty.eql(.{ .aggregate = "[16 x i8]" })) saw_temp_alloca = true;
+                },
+                .binary, .phi, .gep, .cast => {},
+                .icmp => |icmp| {
+                    if (icmp.predicate == .ult and icmp.operand_ty.eql(.ptr) and
+                        isNamed(icmp.lhs, function.params.items[1].name) and
+                        isNamed(icmp.rhs, function.params.items[0].name)) saw_overlap_split = true;
+                },
+                .load => |load| {
+                    if (load.attrs.isBarrier()) return false;
+                    if (valueDerivedFromMemmovePointer(function, load.ptr, function.params.items[1].name, 0)) {
+                        saw_src_load = true;
+                    } else if (!valueDerivedFromAlloca(function, load.ptr, 0)) {
+                        return false;
+                    }
+                },
+                .store => |store| {
+                    if (store.attrs.isBarrier()) return false;
+                    if (valueDerivedFromMemmovePointer(function, store.ptr, function.params.items[0].name, 0)) {
+                        if (!valueIsLoadFromPointer(function, store.value, function.params.items[1].name)) return false;
+                        saw_dst_store = true;
+                    } else if (!valueDerivedFromAlloca(function, store.ptr, 0)) {
+                        return false;
+                    }
+                },
+                .call => |call| {
+                    if (isMemcpyInline16BetweenMemmoveStorage(function, call)) {
+                        saw_temp_copy = true;
+                    } else if (!isMemcpyBodyMetadataCall(call)) {
+                        return false;
+                    }
+                },
+                .freeze, .fcmp, .select, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+            }
+        }
+
+        switch (block.terminator orelse return false) {
+            .br, .condbr => {},
+            .ret => |ret| {
+                if (!ret.ty.eql(.ptr) or !isNamed(ret.value orelse return false, function.params.items[0].name)) return false;
+                saw_ret = true;
+            },
+            .@"unreachable", .@"switch", .indirectbr => return false,
+        }
+    }
+
+    return saw_overlap_split and saw_src_load and saw_dst_store and saw_temp_alloca and saw_temp_copy and saw_ret;
+}
+
+fn matchesMemcpyBody(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.ptr)) return false;
+    if (function.params.items.len != 3 or function.params.items[0].ty != .ptr or
+        function.params.items[1].ty != .ptr or !function.params.items[2].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len < 4) return false;
+
+    var saw_len_split = false;
+    var saw_src_load = false;
+    var saw_dst_store = false;
+    var saw_ret = false;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .binary, .phi, .gep, .cast => {},
+                .icmp => |icmp| {
+                    if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 }) and
+                        isNamed(icmp.lhs, function.params.items[2].name) and icmp.rhs.eql(.{ .int = 16 })) saw_len_split = true;
+                },
+                .load => |load| {
+                    if (load.attrs.isBarrier()) return false;
+                    if (!valueDerivedFromPointer(function, load.ptr, function.params.items[1].name, 0)) return false;
+                    saw_src_load = true;
+                },
+                .store => |store| {
+                    if (store.attrs.isBarrier()) return false;
+                    if (!valueDerivedFromPointer(function, store.ptr, function.params.items[0].name, 0)) return false;
+                    if (!valueIsLoadFromPointer(function, store.value, function.params.items[1].name)) return false;
+                    saw_dst_store = true;
+                },
+                .call => |call| {
+                    if (!isMemcpyBodyMetadataCall(call)) return false;
+                },
+                .alloca, .freeze, .fcmp, .select, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+            }
+        }
+
+        switch (block.terminator orelse return false) {
+            .br, .condbr => {},
+            .ret => |ret| {
+                if (!ret.ty.eql(.ptr) or !isNamed(ret.value orelse return false, function.params.items[0].name)) return false;
+                saw_ret = true;
+            },
+            .@"unreachable", .@"switch", .indirectbr => return false,
+        }
+    }
+
+    return saw_len_split and saw_src_load and saw_dst_store and saw_ret;
 }
 
 fn matchesGuardedStrncatBody(function: ir.Function) bool {
@@ -1600,6 +1742,71 @@ fn valueDerivedFromPointer(function: ir.Function, value: ir.Value, root_name: []
     };
 }
 
+fn valueDerivedFromMemmovePointer(function: ir.Function, value: ir.Value, root_name: []const u8, depth: u8) bool {
+    if (valueDerivedFromPointer(function, value, root_name, depth)) return true;
+    if (depth > 16) return false;
+    const name = switch (value) {
+        .named => |name| name,
+        else => return false,
+    };
+    const instruction = instructionByResult(function, name) orelse return false;
+    return switch (instruction.kind) {
+        .gep => |gep| valueDerivedFromMemmovePointer(function, gep.ptr, root_name, depth + 1),
+        .cast => |cast| cast.op == .inttoptr and cast.to_ty.eql(.ptr) and
+            intValueDerivedFromPointer(function, cast.value, root_name, depth + 1),
+        else => false,
+    };
+}
+
+fn intValueDerivedFromPointer(function: ir.Function, value: ir.Value, root_name: []const u8, depth: u8) bool {
+    if (depth > 16) return false;
+    const name = switch (value) {
+        .named => |name| name,
+        .int => return false,
+        else => return false,
+    };
+    const instruction = instructionByResult(function, name) orelse return false;
+    return switch (instruction.kind) {
+        .cast => |cast| cast.op == .ptrtoint and cast.from_ty.eql(.ptr) and
+            valueDerivedFromPointer(function, cast.value, root_name, depth + 1),
+        .binary => |binary| switch (binary.op) {
+            .add, .sub, .@"and", .@"or", .xor, .shl, .lshr, .ashr => intValueDerivedFromPointer(function, binary.lhs, root_name, depth + 1) or
+                intValueDerivedFromPointer(function, binary.rhs, root_name, depth + 1),
+            else => false,
+        },
+        .phi => |phi| blk: {
+            if (phi.incoming.items.len == 0 or !phi.ty.eql(.{ .int = 64 })) break :blk false;
+            for (phi.incoming.items) |incoming| {
+                if (!intValueDerivedFromPointer(function, incoming.value, root_name, depth + 1)) break :blk false;
+            }
+            break :blk true;
+        },
+        else => false,
+    };
+}
+
+fn valueDerivedFromAlloca(function: ir.Function, value: ir.Value, depth: u8) bool {
+    if (depth > 16) return false;
+    const name = switch (value) {
+        .named => |name| name,
+        else => return false,
+    };
+    const instruction = instructionByResult(function, name) orelse return false;
+    return switch (instruction.kind) {
+        .alloca => true,
+        .gep => |gep| valueDerivedFromAlloca(function, gep.ptr, depth + 1),
+        .cast => |cast| cast.to_ty.eql(.ptr) and valueDerivedFromAlloca(function, cast.value, depth + 1),
+        .phi => |phi| blk: {
+            if (phi.incoming.items.len == 0 or !phi.ty.eql(.ptr)) break :blk false;
+            for (phi.incoming.items) |incoming| {
+                if (!valueDerivedFromAlloca(function, incoming.value, depth + 1)) break :blk false;
+            }
+            break :blk true;
+        },
+        else => false,
+    };
+}
+
 fn instructionByResult(function: ir.Function, result_name: []const u8) ?ir.Instruction {
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
@@ -1610,6 +1817,22 @@ fn instructionByResult(function: ir.Function, result_name: []const u8) ?ir.Instr
         }
     }
     return null;
+}
+
+fn isMemcpyInline16BetweenMemmoveStorage(function: ir.Function, call: ir.CallInst) bool {
+    if (call.callee_value != null or call.inline_asm != null or call.ret_ty != .void or call.args.items.len != 4) return false;
+    if (!isCalleeName(call.callee, "llvm.memcpy.inline.p0.p0.i64")) return false;
+    if (!call.args.items[0].ty.eql(.ptr) or !call.args.items[1].ty.eql(.ptr) or
+        !call.args.items[2].ty.eql(.{ .int = 64 }) or !isInt(call.args.items[2].value, 16) or
+        !call.args.items[3].ty.eql(.{ .int = 1 }) or !isInt(call.args.items[3].value, 0)) return false;
+
+    const dst = call.args.items[0].value;
+    const src = call.args.items[1].value;
+    const dst_is_output = valueDerivedFromMemmovePointer(function, dst, function.params.items[0].name, 0);
+    const src_is_input = valueDerivedFromMemmovePointer(function, src, function.params.items[1].name, 0);
+    const dst_is_temp = valueDerivedFromAlloca(function, dst, 0);
+    const src_is_temp = valueDerivedFromAlloca(function, src, 0);
+    return (dst_is_temp and src_is_input) or (dst_is_output and src_is_temp);
 }
 
 fn isMemcpyBodyMetadataCall(call: ir.CallInst) bool {

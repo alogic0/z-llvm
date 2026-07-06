@@ -227,6 +227,31 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xeb, 0x03, // jmp 4f
                 0x44, 0x29, 0xc0, // subl %r8d, %eax
             }),
+            .memcpy_rdi_rsi_rdx_rax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x89, 0xf8, // movq %rdi, %rax
+                0x48, 0x85, 0xd2, // testq %rdx, %rdx
+                0x74, 0x06, // je 2f
+                0xfc, // cld
+                0x48, 0x89, 0xd1, // movq %rdx, %rcx
+                0xf3, 0xa4, // rep movsb
+            }),
+            .memmove_rdi_rsi_rdx_rax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x89, 0xf8, // movq %rdi, %rax
+                0x48, 0x85, 0xd2, // testq %rdx, %rdx
+                0x74, 0x1e, // je 4f
+                0x48, 0x39, 0xf7, // cmpq %rsi, %rdi
+                0x77, 0x08, // ja 2f
+                0xfc, // cld
+                0x48, 0x89, 0xd1, // movq %rdx, %rcx
+                0xf3, 0xa4, // rep movsb
+                0xeb, 0x11, // jmp 4f
+                0xfd, // std
+                0x48, 0x8d, 0x7c, 0x17, 0xff, // leaq -1(%rdi,%rdx), %rdi
+                0x48, 0x8d, 0x74, 0x16, 0xff, // leaq -1(%rsi,%rdx), %rsi
+                0x48, 0x89, 0xd1, // movq %rdx, %rcx
+                0xf3, 0xa4, // rep movsb
+                0xfc, // cld
+            }),
             .guarded_memset_rdi_sil_rdx_rcx_rax => try bytes.appendSlice(allocator, &.{
                 0x48, 0x39, 0xd1, // cmpq %rdx, %rcx
                 0x73, 0x02, // jae 1f
@@ -797,6 +822,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .movzx_dil_edi, .load_rax_rdi_u8_eax => 4,
         .bcmp_rdi_rsi_rdx_eax => 33,
         .memcmp_rdi_rsi_rdx_eax => 36,
+        .memcpy_rdi_rsi_rdx_rax => 14,
+        .memmove_rdi_rsi_rdx_rax => 38,
         .guarded_memset_rdi_sil_rdx_rcx_rax => 29,
         .guarded_memcpy_rdi_rsi_rdx_rcx_rax => 24,
         .guarded_strncat_rdi_rsi_rdx_rcx_rax => 74,

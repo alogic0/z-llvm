@@ -621,6 +621,96 @@ test "x86_64 generic cfg lowers guarded strncpy copy pad loop without name admis
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers memmove overlap body without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
+        \\
+        \\define internal ptr @any_overlap_copy(ptr %dst, ptr %src, i64 %len) {
+        \\entry:
+        \\  %tmp = alloca [16 x i8], align 1
+        \\  %small = icmp ult i64 %len, 16
+        \\  br i1 %small, label %small.copy, label %big
+        \\small.copy:
+        \\  %byte = load i8, ptr %src, align 1
+        \\  store i8 %byte, ptr %dst, align 1
+        \\  br label %done
+        \\big:
+        \\  %src.before.dst = icmp ult ptr %src, %dst
+        \\  br i1 %src.before.dst, label %backward, label %forward
+        \\backward:
+        \\  call void @llvm.memcpy.inline.p0.p0.i64(ptr %tmp, ptr %src, i64 16, i1 false)
+        \\  call void @llvm.memcpy.inline.p0.p0.i64(ptr %dst, ptr %tmp, i64 16, i1 false)
+        \\  br label %done
+        \\forward:
+        \\  %src.vec = getelementptr inbounds [1 x i8], ptr %src, i64 16
+        \\  %dst.vec = getelementptr inbounds [1 x i8], ptr %dst, i64 16
+        \\  %vec = load <16 x i8>, ptr %src.vec, align 1
+        \\  store <16 x i8> %vec, ptr %dst.vec, align 1
+        \\  br label %done
+        \\done:
+        \\  ret ptr %dst
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.memmove_rdi_rsi_rdx_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 generic cfg lowers memcpy body without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal ptr @any_forward_copy(ptr %dst, ptr %src, i64 %len) {
+        \\entry:
+        \\  %small = icmp ult i64 %len, 16
+        \\  br i1 %small, label %small.copy, label %big
+        \\small.copy:
+        \\  %byte = load i8, ptr %src, align 1
+        \\  store i8 %byte, ptr %dst, align 1
+        \\  br label %done
+        \\big:
+        \\  %src.vec = getelementptr inbounds [1 x i8], ptr %src, i64 16
+        \\  %dst.vec = getelementptr inbounds [1 x i8], ptr %dst, i64 16
+        \\  %vec = load <16 x i8>, ptr %src.vec, align 1
+        \\  store <16 x i8> %vec, ptr %dst.vec, align 1
+        \\  br label %done
+        \\done:
+        \\  ret ptr %dst
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.memcpy_rdi_rsi_rdx_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers guarded strcpy copy loop without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

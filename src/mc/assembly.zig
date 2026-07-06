@@ -208,6 +208,35 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tsubl %r8d, %eax\n" ++
                     "4:\n",
             ),
+            .memcpy_rdi_rsi_rdx_rax => try writer.writeAll(
+                "\tmovq %rdi, %rax\n" ++
+                    "\ttestq %rdx, %rdx\n" ++
+                    "\tje 2f\n" ++
+                    "\tcld\n" ++
+                    "\tmovq %rdx, %rcx\n" ++
+                    "\trep movsb\n" ++
+                    "2:\n",
+            ),
+            .memmove_rdi_rsi_rdx_rax => try writer.writeAll(
+                "\tmovq %rdi, %rax\n" ++
+                    "\ttestq %rdx, %rdx\n" ++
+                    "\tje 4f\n" ++
+                    "\tcmpq %rsi, %rdi\n" ++
+                    "\tja 2f\n" ++
+                    "1:\n" ++
+                    "\tcld\n" ++
+                    "\tmovq %rdx, %rcx\n" ++
+                    "\trep movsb\n" ++
+                    "\tjmp 4f\n" ++
+                    "2:\n" ++
+                    "\tstd\n" ++
+                    "\tleaq -1(%rdi,%rdx), %rdi\n" ++
+                    "\tleaq -1(%rsi,%rdx), %rsi\n" ++
+                    "\tmovq %rdx, %rcx\n" ++
+                    "\trep movsb\n" ++
+                    "\tcld\n" ++
+                    "4:\n",
+            ),
             .guarded_memset_rdi_sil_rdx_rcx_rax => try writer.writeAll(
                 "\tcmpq %rdx, %rcx\n" ++
                     "\tjae 1f\n" ++
