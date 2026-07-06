@@ -39,7 +39,7 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-06 after byte-copy fast family cycle:
+Stop state recorded 2026-07-06 after stack-probe cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
@@ -65,10 +65,13 @@ Stop state recorded 2026-07-06 after byte-copy fast family cycle:
   lowered without name admission; the noreturn trap stub in
   `compiler_rt.ssp.__chk_fail` is lowered without name admission; the
   unguarded byte-copy fast family in `compiler_rt.memmove.memmoveFast` and
-  `compiler_rt.memcpy.memcpyFast` is lowered without name admission; item 12a
-  added tmp/cache hygiene between the copy and string-append fixes. The
-  focused build now fails at `compiler_rt.stack_probe.zig_probe_stack` with
-  `error.InstructionNeedsResult`.
+  `compiler_rt.memcpy.memcpyFast` is lowered without name admission; the
+  naked stack-probe inline-asm/unreachable body in
+  `compiler_rt.stack_probe.zig_probe_stack` is lowered without name
+  admission; item 12a added tmp/cache hygiene between the copy and
+  string-append fixes. The focused build now fails at
+  `compiler_rt.atomics.__atomic_load` with
+  `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -83,8 +86,8 @@ Stop state recorded 2026-07-06 after byte-copy fast family cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_memmoveFast.log`,
-  `tmp/distribution_all_after_memmoveFast.log`,
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_zig_probe_stack.log`,
+  `tmp/distribution_all_after_zig_probe_stack.log`,
   `tmp/clean_tmp_fixture_pair.log`, and
   `tmp/real_rows_releasefast_after_clean_tmp.log`.
 - Tracked evidence summaries:
@@ -96,11 +99,11 @@ Stop state recorded 2026-07-06 after byte-copy fast family cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
   `docs/evidence/clean_tmp.summary`.
 - Recommended next action: continue item 12 by fixing
-  `compiler_rt.stack_probe.zig_probe_stack`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=zig_probe_stack` on the focused Debug std-hello
-  build. The current diagnostic is `error.InstructionNeedsResult` on the
-  naked stack-probe inline-asm/unreachable body; keep the lowering model-owned
-  and fail-closed. For remaining
+  `compiler_rt.atomics.__atomic_load`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__atomic_load` on the focused Debug std-hello
+  build. The current diagnostic is `error.UnsupportedCodegenControlFlow`;
+  check whether the remaining compiler_rt atomic wrappers share one
+  model-owned family shape, and keep unsupported variants fail-closed. For remaining
   compiler_rt builtin families, use width-parametric lowerings where the
   model-owned shapes match, recording partial item-14 credit when a
   parametric family subsumes per-width special cases.

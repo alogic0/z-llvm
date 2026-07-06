@@ -252,6 +252,21 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xf3, 0xa4, // rep movsb
                 0xfc, // cld
             }),
+            .stack_probe_rax_rcx_rsp => try bytes.appendSlice(allocator, &.{
+                0x51, // pushq %rcx
+                0x48, 0x89, 0xc1, // movq %rax, %rcx
+                0x48, 0x81, 0xf9, 0x00, 0x10, 0x00, 0x00, // cmpq $0x1000, %rcx
+                0x72, 0x1c, // jb 2f
+                0x48, 0x81, 0xec, 0x00, 0x10, 0x00, 0x00, // subq $0x1000, %rsp
+                0x83, 0x4c, 0x24, 0x10, 0x00, // orl $0, 16(%rsp)
+                0x48, 0x81, 0xe9, 0x00, 0x10, 0x00, 0x00, // subq $0x1000, %rcx
+                0x48, 0x81, 0xf9, 0x00, 0x10, 0x00, 0x00, // cmpq $0x1000, %rcx
+                0x77, 0xe4, // ja 1b
+                0x48, 0x29, 0xcc, // subq %rcx, %rsp
+                0x83, 0x4c, 0x24, 0x10, 0x00, // orl $0, 16(%rsp)
+                0x48, 0x01, 0xc4, // addq %rax, %rsp
+                0x59, // popq %rcx
+            }),
             .guarded_memset_rdi_sil_rdx_rcx_rax => try bytes.appendSlice(allocator, &.{
                 0x48, 0x39, 0xd1, // cmpq %rdx, %rcx
                 0x73, 0x02, // jae 1f
@@ -824,6 +839,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .memcmp_rdi_rsi_rdx_eax => 36,
         .memcpy_rdi_rsi_rdx_rax => 14,
         .memmove_rdi_rsi_rdx_rax => 38,
+        .stack_probe_rax_rcx_rsp => 53,
         .guarded_memset_rdi_sil_rdx_rcx_rax => 29,
         .guarded_memcpy_rdi_rsi_rdx_rcx_rax => 24,
         .guarded_strncat_rdi_rsi_rdx_rcx_rax => 74,

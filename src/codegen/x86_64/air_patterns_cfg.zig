@@ -99,7 +99,8 @@ pub fn lowerStraightLineUnreachable(
     function: ir.Function,
     block: ir.BasicBlock,
 ) !void {
-    _ = function;
+    if (try lowerNakedStackProbeUnreachable(allocator, machine, function, block)) return;
+
     for (block.instructions.items) |instruction| {
         if (instruction.removed) continue;
         switch (instruction.kind) {
@@ -119,6 +120,70 @@ pub fn lowerStraightLineUnreachable(
     }
     try machine.instructions.append(allocator, .ud2);
 }
+
+fn lowerNakedStackProbeUnreachable(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !bool {
+    if (function.ret_ty != .void or function.params.items.len != 0) return false;
+
+    const terminator = block.terminator orelse return error.BlockWithoutTerminator;
+    switch (terminator) {
+        .@"unreachable" => {},
+        .ret, .br, .condbr, .@"switch", .indirectbr => return false,
+    }
+
+    var stack_probe_call: ?ir.CallInst = null;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const call = switch (instruction.kind) {
+            .call => |call| call,
+            else => return false,
+        };
+        if (call.isDebugVariableLocation()) {
+            if (instruction.result != null) return error.VoidCallHasResult;
+            continue;
+        }
+        if (instruction.result != null) return false;
+        if (stack_probe_call != null) return false;
+        stack_probe_call = call;
+    }
+
+    const call = stack_probe_call orelse return false;
+    if (!isStackProbeInlineAsm(call)) return false;
+    try machine.instructions.append(allocator, .stack_probe_rax_rcx_rsp);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn isStackProbeInlineAsm(call: ir.CallInst) bool {
+    const inline_asm = call.inline_asm orelse return false;
+    if (call.ret_ty != .void or call.args.items.len != 0) return false;
+    if (call.callee_value != null or call.calling_conv != null or call.ret_attrs != null or call.operand_bundle != null) return false;
+    if (!inline_asm.sideeffect) return false;
+    if (!std.mem.eql(u8, inline_asm.constraints, "~{dirflag},~{fpsr},~{flags}")) return false;
+    return std.mem.eql(u8, inline_asm.template, stack_probe_inline_asm_template);
+}
+
+const stack_probe_inline_asm_template =
+    "        push   %rcx\\0A" ++
+    "        mov    %rax, %rcx\\0A" ++
+    "        cmp    $$0x1000,%rcx\\0A" ++
+    "        jb     2f\\0A" ++
+    " 1:\\0A" ++
+    "        sub    $$0x1000,%rsp\\0A" ++
+    "        orl    $$0,16(%rsp)\\0A" ++
+    "        sub    $$0x1000,%rcx\\0A" ++
+    "        cmp    $$0x1000,%rcx\\0A" ++
+    "        ja     1b\\0A" ++
+    " 2:\\0A" ++
+    "        sub    %rcx, %rsp\\0A" ++
+    "        orl    $$0,16(%rsp)\\0A" ++
+    "        add    %rax,%rsp\\0A" ++
+    "        pop    %rcx\\0A" ++
+    "        ret";
 
 pub fn lowerCall(
     allocator: std.mem.Allocator,

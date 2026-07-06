@@ -237,6 +237,23 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tcld\n" ++
                     "4:\n",
             ),
+            .stack_probe_rax_rcx_rsp => try writer.writeAll(
+                "\tpushq %rcx\n" ++
+                    "\tmovq %rax, %rcx\n" ++
+                    "\tcmpq $0x1000, %rcx\n" ++
+                    "\tjb 2f\n" ++
+                    "1:\n" ++
+                    "\tsubq $0x1000, %rsp\n" ++
+                    "\torl $0, 16(%rsp)\n" ++
+                    "\tsubq $0x1000, %rcx\n" ++
+                    "\tcmpq $0x1000, %rcx\n" ++
+                    "\tja 1b\n" ++
+                    "2:\n" ++
+                    "\tsubq %rcx, %rsp\n" ++
+                    "\torl $0, 16(%rsp)\n" ++
+                    "\taddq %rax, %rsp\n" ++
+                    "\tpopq %rcx\n",
+            ),
             .guarded_memset_rdi_sil_rdx_rcx_rax => try writer.writeAll(
                 "\tcmpq %rdx, %rcx\n" ++
                     "\tjae 1f\n" ++

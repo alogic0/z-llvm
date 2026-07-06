@@ -1304,6 +1304,39 @@ test "x86_64 lowers noreturn trap stub without name admission" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ud2, machine.instructions.items[0]);
 }
 
+test "x86_64 lowers naked stack probe inline asm without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal void @any_stack_probe() #0 {
+        \\entry:
+        \\  tail call void asm sideeffect "        push   %rcx\0A        mov    %rax, %rcx\0A        cmp    $$0x1000,%rcx\0A        jb     2f\0A 1:\0A        sub    $$0x1000,%rsp\0A        orl    $$0,16(%rsp)\0A        sub    $$0x1000,%rcx\0A        cmp    $$0x1000,%rcx\0A        ja     1b\0A 2:\0A        sub    %rcx, %rsp\0A        orl    $$0,16(%rsp)\0A        add    %rax,%rsp\0A        pop    %rcx\0A        ret", "~{dirflag},~{fpsr},~{flags}"()
+        \\  unreachable
+        \\}
+        \\
+        \\attributes #0 = { naked nounwind }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.stack_probe_rax_rcx_rsp, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqual(@as(usize, 54), bytes.len);
+}
+
 test "x86_64 codegen routes boolean branch-mix select through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
