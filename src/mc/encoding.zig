@@ -235,6 +235,25 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x48, 0x89, 0xd1, // movq %rdx, %rcx
                 0xf3, 0xa4, // rep movsb
             }),
+            .spinlocked_memcpy_rsi_to_rdx_len_edi => try bytes.appendSlice(allocator, &.{
+                0x48, 0x89, 0xf0, // movq %rsi, %rax
+                0x48, 0xc1, 0xe8, 0x03, // shrq $3, %rax
+                0x48, 0x83, 0xe0, 0x3f, // andq $63, %rax
+                0x4c, 0x8d, 0x05, 0, 0, 0, 0, // leaq spinlocks(%rip), %r8
+                0x4d, 0x8d, 0x04, 0x00, // leaq (%r8,%rax), %r8
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x49, 0x87, 0x00, // xchgq %rax, (%r8)
+                0x48, 0x85, 0xc0, // testq %rax, %rax
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x75, 0xf3, // jne 1b
+                0x85, 0xff, // testl %edi, %edi
+                0x74, 0x08, // je 2f
+                0xfc, // cld
+                0x89, 0xf9, // movl %edi, %ecx
+                0x48, 0x89, 0xd7, // movq %rdx, %rdi
+                0xf3, 0xa4, // rep movsb
+                0x49, 0xc7, 0x00, 0, 0, 0, 0, // movq $0, (%r8)
+            }),
             .memmove_rdi_rsi_rdx_rax => try bytes.appendSlice(allocator, &.{
                 0x48, 0x89, 0xf8, // movq %rdi, %rax
                 0x48, 0x85, 0xd2, // testq %rdx, %rdx
@@ -838,6 +857,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .bcmp_rdi_rsi_rdx_eax => 33,
         .memcmp_rdi_rsi_rdx_eax => 36,
         .memcpy_rdi_rsi_rdx_rax => 14,
+        .spinlocked_memcpy_rsi_to_rdx_len_edi => 59,
         .memmove_rdi_rsi_rdx_rax => 38,
         .stack_probe_rax_rcx_rsp => 53,
         .guarded_memset_rdi_sil_rdx_rcx_rax => 29,

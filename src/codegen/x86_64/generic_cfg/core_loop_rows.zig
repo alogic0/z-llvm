@@ -9,6 +9,7 @@ const MachineFunction = shared.MachineFunction;
 const isNamed = shared.isNamed;
 const isInt = shared.isInt;
 const isCalleeName = shared.isCalleeName;
+const globalSymbolNameFromValue = shared.globalSymbolNameFromValue;
 const paramReg = cabi_abi_helpers.paramReg;
 const appendDirectCall = shared.appendDirectCall;
 const appendPanicCall = shared.appendPanicCall;
@@ -1072,6 +1073,18 @@ pub fn lowerMemcpyBody(allocator: std.mem.Allocator, machine: *MachineFunction, 
     return true;
 }
 
+pub fn lowerSpinlockedMemcpyBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    const spinlock_symbol = (try matchSpinlockedMemcpyBody(function)) orelse return false;
+    const len_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    const src_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    const dst_reg = try paramReg(function, function.params.items[2].name, .ptr);
+    if (len_reg != .rdi or src_reg != .rsi or dst_reg != .rdx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .{ .spinlocked_memcpy_rsi_to_rdx_len_edi = spinlock_symbol });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 pub fn lowerGuardedStrncatBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesGuardedStrncatBody(function)) return false;
     const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -1839,6 +1852,129 @@ fn isMemcpyBodyMetadataCall(call: ir.CallInst) bool {
     if (call.callee_value != null or call.inline_asm != null or call.ret_ty != .void) return false;
     return isCalleeName(call.callee, "llvm.experimental.noalias.scope.decl") or
         isCalleeName(call.callee, "llvm.assume");
+}
+
+fn matchSpinlockedMemcpyBody(function: ir.Function) !?[]const u8 {
+    if (function.ret_ty != .void or function.params.items.len != 4) return null;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or
+        !function.params.items[1].ty.eql(.ptr) or
+        !function.params.items[2].ty.eql(.ptr) or
+        !function.params.items[3].ty.eql(.{ .int = 32 })) return null;
+    if (function.blocks.items.len != 3) return null;
+
+    const len_name = function.params.items[0].name;
+    const src_name = function.params.items[1].name;
+    const dst_name = function.params.items[2].name;
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const exit = function.blocks.items[2];
+
+    if (entry.instructions.items.len != 4 or loop.instructions.items.len != 2 or exit.instructions.items.len != 3) return null;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) return null;
+        }
+    }
+
+    const ptr_int_name = entry.instructions.items[0].result orelse return null;
+    const ptr_int = switch (entry.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (ptr_int.op != .ptrtoint or !ptr_int.from_ty.eql(.ptr) or !ptr_int.to_ty.eql(.{ .int = 64 }) or !isNamed(ptr_int.value, src_name)) return null;
+
+    const shifted_name = entry.instructions.items[1].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[1], .lshr, ptr_int_name, 3)) return null;
+    const slot_name = entry.instructions.items[2].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[2], .@"and", shifted_name, 63)) return null;
+
+    const lock_ptr_name = entry.instructions.items[3].result orelse return null;
+    const spinlock_symbol = try matchSpinlockGep(entry.instructions.items[3], slot_name);
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, entry_br.target, loop.name)) return null;
+
+    const old_lock_name = loop.instructions.items[0].result orelse return null;
+    const atomic = switch (loop.instructions.items[0].kind) {
+        .atomicrmw => |atomicrmw| atomicrmw,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, atomic.op, "xchg") or !atomic.ty.eql(.{ .int = 64 }) or
+        !isNamed(atomic.ptr, lock_ptr_name) or !isInt(atomic.value, 1) or
+        !std.mem.eql(u8, atomic.ordering, "acquire") or atomic.syncscope != null or
+        atomic.is_volatile or atomic.@"align" != 8) return null;
+
+    const acquired_name = loop.instructions.items[1].result orelse return null;
+    const acquired = switch (loop.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (acquired.predicate != .eq or !acquired.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(acquired.lhs, old_lock_name) or !isInt(acquired.rhs, 0)) return null;
+    const loop_br = switch (loop.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!loop_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(loop_br.cond, acquired_name) or
+        !std.mem.eql(u8, loop_br.then_target, exit.name) or !std.mem.eql(u8, loop_br.else_target, loop.name)) return null;
+
+    const len64_name = exit.instructions.items[0].result orelse return null;
+    const len64 = switch (exit.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (len64.op != .zext or !len64.from_ty.eql(.{ .int = 32 }) or !len64.to_ty.eql(.{ .int = 64 }) or !isNamed(len64.value, len_name)) return null;
+
+    const memcpy = switch (exit.instructions.items[1].kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!isSpinlockedMemcpyCall(memcpy, dst_name, src_name, len64_name)) return null;
+
+    const release = switch (exit.instructions.items[2].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!release.ty.eql(.{ .int = 64 }) or !isInt(release.value, 0) or !isNamed(release.ptr, lock_ptr_name) or
+        release.attrs.atomic_ordering == null or !std.mem.eql(u8, release.attrs.atomic_ordering.?, "release") or
+        release.attrs.@"align" != 64 or release.attrs.is_volatile) return null;
+    const ret = switch (exit.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (ret.ty != .void or ret.value != null) return null;
+
+    return spinlock_symbol;
+}
+
+fn matchI64BinaryNamedImm(instruction: ir.Instruction, op: ir.BinaryOp, lhs_name: []const u8, rhs: i128) bool {
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    return binary.op == op and binary.ty.eql(.{ .int = 64 }) and isNamed(binary.lhs, lhs_name) and isInt(binary.rhs, rhs);
+}
+
+fn matchSpinlockGep(instruction: ir.Instruction, index_name: []const u8) ![]const u8 {
+    const gep = switch (instruction.kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (gep.indices.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 }) or !isNamed(index.value, index_name)) return error.UnsupportedCodegenInstruction;
+    return globalSymbolNameFromValue(gep.ptr) catch return error.UnsupportedCodegenValue;
+}
+
+fn isSpinlockedMemcpyCall(call: ir.CallInst, dst_name: []const u8, src_name: []const u8, len_name: []const u8) bool {
+    if (call.callee_value != null or call.inline_asm != null or call.ret_ty != .void or call.args.items.len != 4) return false;
+    if (!isCalleeName(call.callee, "llvm.memcpy.inline.p0.p0.i64")) return false;
+    return call.args.items[0].ty.eql(.ptr) and isNamed(call.args.items[0].value, dst_name) and
+        call.args.items[1].ty.eql(.ptr) and isNamed(call.args.items[1].value, src_name) and
+        call.args.items[2].ty.eql(.{ .int = 64 }) and isNamed(call.args.items[2].value, len_name) and
+        call.args.items[3].ty.eql(.{ .int = 1 }) and isInt(call.args.items[3].value, 0);
 }
 
 fn matchesByteScanLenLoop(function: ir.Function) bool {

@@ -499,6 +499,15 @@ fn collectCallRelocations(
                     .addend = -4,
                 });
             },
+            .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 14,
+                    .symbol_index = symbol_index,
+                    .kind = 2,
+                    .addend = -4,
+                });
+            },
             .load_f128_const_xmm0, .load_f128_const_xmm1 => |symbol| {
                 const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
                 try relocations.append(allocator, .{

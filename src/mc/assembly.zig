@@ -217,6 +217,28 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\trep movsb\n" ++
                     "2:\n",
             ),
+            .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| try writer.print(
+                "\tmovq %rsi, %rax\n" ++
+                    "\tshrq $3, %rax\n" ++
+                    "\tandq $63, %rax\n" ++
+                    "\tleaq {s}(%rip), %r8\n" ++
+                    "\tleaq (%r8,%rax), %r8\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "1:\n" ++
+                    "\txchgq %rax, (%r8)\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjne 1b\n" ++
+                    "\ttestl %edi, %edi\n" ++
+                    "\tje 2f\n" ++
+                    "\tcld\n" ++
+                    "\tmovl %edi, %ecx\n" ++
+                    "\tmovq %rdx, %rdi\n" ++
+                    "\trep movsb\n" ++
+                    "2:\n" ++
+                    "\tmovq $0, (%r8)\n",
+                .{symbol},
+            ),
             .memmove_rdi_rsi_rdx_rax => try writer.writeAll(
                 "\tmovq %rdi, %rax\n" ++
                     "\ttestq %rdx, %rdx\n" ++

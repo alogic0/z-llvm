@@ -114,6 +114,7 @@ pub const Instruction = union(enum) {
     bcmp_rdi_rsi_rdx_eax,
     memcmp_rdi_rsi_rdx_eax,
     memcpy_rdi_rsi_rdx_rax,
+    spinlocked_memcpy_rsi_to_rdx_len_edi: []const u8,
     memmove_rdi_rsi_rdx_rax,
     stack_probe_rax_rcx_rsp,
     guarded_memset_rdi_sil_rdx_rcx_rax,
