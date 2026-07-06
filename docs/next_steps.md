@@ -39,7 +39,7 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-06 after atomic fetch-umax cycle:
+Stop state recorded 2026-07-06 after atomic fetch-nand cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
@@ -86,9 +86,12 @@ Stop state recorded 2026-07-06 after atomic fetch-umax cycle:
   shape around `llvm.umin.i128`; the atomic fetch unsigned-max family in
   `compiler_rt.atomics.__atomic_fetch_umax_{1,2,4,8,16}` is lowered without
   name admission using scalar seq_cst `cmpxchg` loops and an i128 spinlock
-  shape around `llvm.umax.i128`; item 12a added tmp/cache hygiene between the
-  copy and string-append fixes. The focused build now fails at
-  `compiler_rt.atomics.__atomic_fetch_nand_16` with
+  shape around `llvm.umax.i128`; the atomic fetch NAND family in
+  `compiler_rt.atomics.__atomic_fetch_nand_{1,2,4,8,16}` is lowered without
+  name admission using scalar seq_cst `cmpxchg` loops and an i128 spinlock
+  shape around the `and`/`xor -1` update; item 12a added tmp/cache hygiene
+  between the copy and string-append fixes. The focused build now fails at
+  `compiler_rt.atomics.__atomic_fetch_xor_16` with
   `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
@@ -104,8 +107,8 @@ Stop state recorded 2026-07-06 after atomic fetch-umax cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_fetch_umax.log`,
-  `tmp/distribution_all_after_fetch_umax.log`,
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_fetch_nand.log`,
+  `tmp/distribution_all_after_fetch_nand.log`,
   `tmp/clean_tmp_fixture_pair.log`, and
   `tmp/real_rows_releasefast_after_clean_tmp.log`.
 - Tracked evidence summaries:
@@ -117,8 +120,8 @@ Stop state recorded 2026-07-06 after atomic fetch-umax cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
   `docs/evidence/clean_tmp.summary`.
 - Recommended next action: continue item 12 by fixing
-  `compiler_rt.atomics.__atomic_fetch_nand_16`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__atomic_fetch_nand_16` on the focused
+  `compiler_rt.atomics.__atomic_fetch_xor_16`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__atomic_fetch_xor_16` on the focused
   Debug std-hello build. The current diagnostic is
   `error.UnsupportedCodegenControlFlow`; check whether the remaining
   compiler_rt atomic fetch wrappers share one model-owned family shape, and

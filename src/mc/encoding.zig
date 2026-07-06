@@ -260,6 +260,40 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xf0, 0x48, 0x0f, 0xb1, 0x0f, // lock cmpxchgq %rcx, (%rdi)
                 0x75, 0xef, // jne 1b
             }),
+            .atomic_fetch_nand_i8_rdi_sil_eax => try bytes.appendSlice(allocator, &.{
+                0x0f, 0xb6, 0x07, // movzbl (%rdi), %eax
+                0x89, 0xc1, // movl %eax, %ecx
+                0x40, 0x20, 0xf1, // andb %sil, %cl
+                0xf6, 0xd1, // notb %cl
+                0xf0, 0x0f, 0xb0, 0x0f, // lock cmpxchgb %cl, (%rdi)
+                0x75, 0xf3, // jne 1b
+                0x0f, 0xb6, 0xc0, // movzbl %al, %eax
+            }),
+            .atomic_fetch_nand_i16_rdi_si_eax => try bytes.appendSlice(allocator, &.{
+                0x0f, 0xb7, 0x07, // movzwl (%rdi), %eax
+                0x89, 0xc1, // movl %eax, %ecx
+                0x66, 0x21, 0xf1, // andw %si, %cx
+                0x66, 0xf7, 0xd1, // notw %cx
+                0xf0, 0x66, 0x0f, 0xb1, 0x0f, // lock cmpxchgw %cx, (%rdi)
+                0x75, 0xf1, // jne 1b
+                0x0f, 0xb7, 0xc0, // movzwl %ax, %eax
+            }),
+            .atomic_fetch_nand_i32_rdi_esi_eax => try bytes.appendSlice(allocator, &.{
+                0x8b, 0x07, // movl (%rdi), %eax
+                0x89, 0xc1, // movl %eax, %ecx
+                0x21, 0xf1, // andl %esi, %ecx
+                0xf7, 0xd1, // notl %ecx
+                0xf0, 0x0f, 0xb1, 0x0f, // lock cmpxchgl %ecx, (%rdi)
+                0x75, 0xf4, // jne 1b
+            }),
+            .atomic_fetch_nand_i64_rdi_rsi_rax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x8b, 0x07, // movq (%rdi), %rax
+                0x48, 0x89, 0xc1, // movq %rax, %rcx
+                0x48, 0x21, 0xf1, // andq %rsi, %rcx
+                0x48, 0xf7, 0xd1, // notq %rcx
+                0xf0, 0x48, 0x0f, 0xb1, 0x0f, // lock cmpxchgq %rcx, (%rdi)
+                0x75, 0xf0, // jne 1b
+            }),
             .load_rcx_ptr_u8_eax => try bytes.appendSlice(allocator, &.{ 0x0f, 0xb6, 0x01 }),
             .load_rcx_ptr_u16_eax => try bytes.appendSlice(allocator, &.{ 0x0f, 0xb7, 0x01 }),
             .load_rcx_ptr_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x01 }),
@@ -504,6 +538,30 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x73, 0x07, // jae 2f
                 0x48, 0x89, 0x37, // movq %rsi, (%rdi)
                 0x4c, 0x89, 0x4f, 0x08, // movq %r9, 8(%rdi)
+                0x49, 0xc7, 0x02, 0, 0, 0, 0, // movq $0, (%r10)
+            }),
+            .spinlocked_fetch_nand_i128_rdi_rsi_rdx_rax_rdx => try bytes.appendSlice(allocator, &.{
+                0x49, 0x89, 0xd1, // movq %rdx, %r9
+                0x49, 0x89, 0xf8, // movq %rdi, %r8
+                0x49, 0xc1, 0xe8, 0x03, // shrq $3, %r8
+                0x49, 0x83, 0xe0, 0x3e, // andq $62, %r8
+                0x4c, 0x8d, 0x15, 0, 0, 0, 0, // leaq spinlocks(%rip), %r10
+                0x4d, 0x01, 0xc2, // addq %r8, %r10
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x49, 0x87, 0x02, // xchgq %rax, (%r10)
+                0x48, 0x85, 0xc0, // testq %rax, %rax
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x75, 0xf3, // jne 1b
+                0x48, 0x8b, 0x07, // movq (%rdi), %rax
+                0x48, 0x8b, 0x57, 0x08, // movq 8(%rdi), %rdx
+                0x49, 0x89, 0xc0, // movq %rax, %r8
+                0x49, 0x21, 0xf0, // andq %rsi, %r8
+                0x49, 0xf7, 0xd0, // notq %r8
+                0x49, 0x89, 0xd3, // movq %rdx, %r11
+                0x4d, 0x21, 0xcb, // andq %r9, %r11
+                0x49, 0xf7, 0xd3, // notq %r11
+                0x4c, 0x89, 0x07, // movq %r8, (%rdi)
+                0x4c, 0x89, 0x5f, 0x08, // movq %r11, 8(%rdi)
                 0x49, 0xc7, 0x02, 0, 0, 0, 0, // movq $0, (%r10)
             }),
             .memmove_rdi_rsi_rdx_rax => try bytes.appendSlice(allocator, &.{
@@ -1104,6 +1162,10 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .atomic_fetch_umax_i16_rdi_si_eax => 22,
         .atomic_fetch_umax_i32_rdi_esi_eax => 15,
         .atomic_fetch_umax_i64_rdi_rsi_rax => 20,
+        .atomic_fetch_nand_i8_rdi_sil_eax => 19,
+        .atomic_fetch_nand_i16_rdi_si_eax => 21,
+        .atomic_fetch_nand_i32_rdi_esi_eax => 14,
+        .atomic_fetch_nand_i64_rdi_rsi_rax => 19,
         .store_eax_rdi_rcx4_ptr => 3,
         .load_rcx_ptr_u8_eax => 3,
         .load_rcx_ptr_u16_eax => 3,
@@ -1135,6 +1197,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .spinlocked_load_i128_rdi_rax_rdx => 53,
         .spinlocked_fetch_umin_i128_rdi_rsi_rdx_rax_rdx => 75,
         .spinlocked_fetch_umax_i128_rdi_rsi_rdx_rax_rdx => 75,
+        .spinlocked_fetch_nand_i128_rdi_rsi_rdx_rax_rdx => 81,
         .memmove_rdi_rsi_rdx_rax => 38,
         .stack_probe_rax_rcx_rsp => 53,
         .guarded_memset_rdi_sil_rdx_rcx_rax => 29,
