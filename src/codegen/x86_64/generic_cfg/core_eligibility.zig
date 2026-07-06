@@ -11,6 +11,7 @@ const ir = shared.ir;
 pub const GenericCfgLoopSumPlan = loop_rows.GenericCfgLoopSumPlan;
 pub const lowerAtomicExchangeFamily = loop_rows.lowerAtomicExchangeFamily;
 pub const lowerAtomicFetchUminFamily = loop_rows.lowerAtomicFetchUminFamily;
+pub const lowerAtomicFetchUmaxFamily = loop_rows.lowerAtomicFetchUmaxFamily;
 pub const lowerAtomicLoadFamily = loop_rows.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = loop_rows.lowerAtomicStoreFamily;
 
@@ -178,6 +179,10 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.Ma
         return true;
     }
     if (try loop_rows.lowerAtomicFetchUminFamily(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try loop_rows.lowerAtomicFetchUmaxFamily(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

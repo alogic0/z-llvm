@@ -203,6 +203,48 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tlock cmpxchgq %rcx, (%rdi)\n" ++
                     "\tjne 1b\n",
             ),
+            .atomic_fetch_umax_i8_rdi_sil_eax => try writer.writeAll(
+                "\tmovzbl (%rdi), %eax\n" ++
+                    "1:\n" ++
+                    "\tmovl %esi, %ecx\n" ++
+                    "\tcmpb %sil, %al\n" ++
+                    "\tjb 2f\n" ++
+                    "\tmovl %eax, %ecx\n" ++
+                    "2:\n" ++
+                    "\tlock cmpxchgb %cl, (%rdi)\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovzbl %al, %eax\n",
+            ),
+            .atomic_fetch_umax_i16_rdi_si_eax => try writer.writeAll(
+                "\tmovzwl (%rdi), %eax\n" ++
+                    "1:\n" ++
+                    "\tmovl %esi, %ecx\n" ++
+                    "\tcmpw %si, %ax\n" ++
+                    "\tjb 2f\n" ++
+                    "\tmovl %eax, %ecx\n" ++
+                    "2:\n" ++
+                    "\tlock cmpxchgw %cx, (%rdi)\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovzwl %ax, %eax\n",
+            ),
+            .atomic_fetch_umax_i32_rdi_esi_eax => try writer.writeAll(
+                "\tmovl (%rdi), %eax\n" ++
+                    "1:\n" ++
+                    "\tmovl %esi, %ecx\n" ++
+                    "\tcmpl %esi, %eax\n" ++
+                    "\tcmovael %eax, %ecx\n" ++
+                    "\tlock cmpxchgl %ecx, (%rdi)\n" ++
+                    "\tjne 1b\n",
+            ),
+            .atomic_fetch_umax_i64_rdi_rsi_rax => try writer.writeAll(
+                "\tmovq (%rdi), %rax\n" ++
+                    "1:\n" ++
+                    "\tmovq %rsi, %rcx\n" ++
+                    "\tcmpq %rsi, %rax\n" ++
+                    "\tcmovaeq %rax, %rcx\n" ++
+                    "\tlock cmpxchgq %rcx, (%rdi)\n" ++
+                    "\tjne 1b\n",
+            ),
             .load_rcx_ptr_u8_eax => try writer.writeAll("\tmovzbl (%rcx), %eax\n"),
             .load_rcx_ptr_u16_eax => try writer.writeAll("\tmovzwl (%rcx), %eax\n"),
             .load_rcx_ptr_eax => try writer.writeAll("\tmovl (%rcx), %eax\n"),
@@ -453,6 +495,33 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tja 3f\n" ++
                     "\tcmpq %rsi, %rax\n" ++
                     "\tjbe 2f\n" ++
+                    "3:\n" ++
+                    "\tmovq %rsi, (%rdi)\n" ++
+                    "\tmovq %r9, 8(%rdi)\n" ++
+                    "2:\n" ++
+                    "\tmovq $0, (%r10)\n",
+                .{symbol},
+            ),
+            .spinlocked_fetch_umax_i128_rdi_rsi_rdx_rax_rdx => |symbol| try writer.print(
+                "\tmovq %rdx, %r9\n" ++
+                    "\tmovq %rdi, %r8\n" ++
+                    "\tshrq $3, %r8\n" ++
+                    "\tandq $62, %r8\n" ++
+                    "\tleaq {s}(%rip), %r10\n" ++
+                    "\taddq %r8, %r10\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "1:\n" ++
+                    "\txchgq %rax, (%r10)\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovq (%rdi), %rax\n" ++
+                    "\tmovq 8(%rdi), %rdx\n" ++
+                    "\tcmpq %r9, %rdx\n" ++
+                    "\tja 2f\n" ++
+                    "\tjb 3f\n" ++
+                    "\tcmpq %rsi, %rax\n" ++
+                    "\tjae 2f\n" ++
                     "3:\n" ++
                     "\tmovq %rsi, (%rdi)\n" ++
                     "\tmovq %r9, 8(%rdi)\n" ++

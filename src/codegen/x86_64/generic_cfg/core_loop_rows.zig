@@ -1211,6 +1211,31 @@ pub fn lowerAtomicFetchUminFamily(allocator: std.mem.Allocator, machine: *Machin
     return false;
 }
 
+pub fn lowerAtomicFetchUmaxFamily(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try matchAtomicFetchUmaxScalar(function)) |bits| {
+        const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+        const value_reg = try paramReg(function, function.params.items[1].name, .{ .int = bits });
+        if (ptr_reg != .rdi or value_reg != .rsi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, switch (bits) {
+            8 => .atomic_fetch_umax_i8_rdi_sil_eax,
+            16 => .atomic_fetch_umax_i16_rdi_si_eax,
+            32 => .atomic_fetch_umax_i32_rdi_esi_eax,
+            64 => .atomic_fetch_umax_i64_rdi_rsi_rax,
+            else => unreachable,
+        });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    if (try matchSpinlockedFetchUmaxI128(function)) |spinlock_symbol| {
+        const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+        if (ptr_reg != .rdi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .{ .spinlocked_fetch_umax_i128_rdi_rsi_rdx_rax_rdx = spinlock_symbol });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    return false;
+}
+
 pub fn lowerGuardedStrncatBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesGuardedStrncatBody(function)) return false;
     const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -2569,6 +2594,14 @@ fn matchSpinlockedLoadI128(function: ir.Function) !?[]const u8 {
 }
 
 fn matchAtomicFetchUminScalar(function: ir.Function) !?u16 {
+    return matchAtomicFetchScalar(function, "umin");
+}
+
+fn matchAtomicFetchUmaxScalar(function: ir.Function) !?u16 {
+    return matchAtomicFetchScalar(function, "umax");
+}
+
+fn matchAtomicFetchScalar(function: ir.Function, op: []const u8) !?u16 {
     if (function.params.items.len != 3 or !function.params.items[0].ty.eql(.ptr) or !function.params.items[2].ty.eql(.{ .int = 32 })) return null;
     const bits = scalarAtomicCompareExchangeBits(function.ret_ty) orelse return null;
     if (bits == 128 or !function.params.items[1].ty.eql(.{ .int = bits })) return null;
@@ -2584,7 +2617,7 @@ fn matchAtomicFetchUminScalar(function: ir.Function) !?u16 {
         .atomicrmw => |atomicrmw| atomicrmw,
         else => return null,
     };
-    if (!std.mem.eql(u8, atomic.op, "umin") or !atomic.ty.eql(.{ .int = bits }) or
+    if (!std.mem.eql(u8, atomic.op, op) or !atomic.ty.eql(.{ .int = bits }) or
         !isNamed(atomic.ptr, ptr_name) or !isNamed(atomic.value, value_name) or
         !std.mem.eql(u8, atomic.ordering, "seq_cst") or atomic.syncscope != null or
         atomic.is_volatile or atomic.@"align" != bits / 8) return null;
@@ -2597,6 +2630,14 @@ fn matchAtomicFetchUminScalar(function: ir.Function) !?u16 {
 }
 
 fn matchSpinlockedFetchUminI128(function: ir.Function) !?[]const u8 {
+    return matchSpinlockedFetchExtremumI128(function, "llvm.umin.i128");
+}
+
+fn matchSpinlockedFetchUmaxI128(function: ir.Function) !?[]const u8 {
+    return matchSpinlockedFetchExtremumI128(function, "llvm.umax.i128");
+}
+
+fn matchSpinlockedFetchExtremumI128(function: ir.Function, callee: []const u8) !?[]const u8 {
     if (!function.ret_ty.eql(.{ .int = 128 }) or function.params.items.len != 3) return null;
     if (!function.params.items[0].ty.eql(.ptr) or
         !function.params.items[1].ty.eql(.{ .int = 128 }) or
@@ -2643,7 +2684,7 @@ fn matchSpinlockedFetchUminI128(function: ir.Function) !?[]const u8 {
         else => return null,
     };
     if (min_call.callee_value != null or min_call.inline_asm != null or !min_call.ret_ty.eql(.{ .int = 128 }) or
-        min_call.args.items.len != 2 or !isCalleeName(min_call.callee, "llvm.umin.i128") or
+        min_call.args.items.len != 2 or !isCalleeName(min_call.callee, callee) or
         !min_call.args.items[0].ty.eql(.{ .int = 128 }) or !isNamed(min_call.args.items[0].value, old_name) or
         !min_call.args.items[1].ty.eql(.{ .int = 128 }) or !isNamed(min_call.args.items[1].value, value_name)) return null;
     const value_store = switch (exit.instructions.items[2].kind) {
