@@ -84,13 +84,19 @@ Stop state recorded 2026-07-05 after item 12 guarded-memcpy cycle:
   `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary`, and
   `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`,
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`.
-- Recommended next action: continue item 12 by fixing
-  `compiler_rt.ssp.__strncat_chk`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__strncat_chk` on the focused Debug std-hello
-  build. Keep the lowering model-owned and fail-closed. For remaining
-  compiler_rt builtin families, use width-parametric lowerings where the
-  model-owned shapes match, recording partial item-14 credit when a
-  parametric family subsumes per-width special cases.
+- Recommended next action: take tracker item 12a first (the
+  `tools/clean_tmp.zig` tool plus export-cache self-pruning; full spec on
+  the item) as the next cycle — `tmp/` refills with every pin bump and
+  long run, so land the hygiene tool before resuming the blocker chain.
+  Then continue item 12 by fixing `compiler_rt.ssp.__strncat_chk`,
+  starting from `ZLLVM_DEBUG_DUMP_IR_SOURCE=__strncat_chk` on the focused
+  Debug std-hello build; before fixing it alone, check whether the
+  remaining ssp `_chk` wrappers share a guard/trap/body shape that one
+  model-owned family lowering can cover. Keep the lowering model-owned and
+  fail-closed. For remaining compiler_rt builtin families, use
+  width-parametric lowerings where the model-owned shapes match, recording
+  partial item-14 credit when a parametric family subsumes per-width
+  special cases.
 
 When the worker stops, record only:
 
