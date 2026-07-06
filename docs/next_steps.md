@@ -62,9 +62,11 @@ Stop state recorded 2026-07-06 after checked string copy family cycle:
   `compiler_rt.ssp.__strncat_chk` and `compiler_rt.ssp.__strcat_chk`
   without name admission; the checked string copy family in
   `compiler_rt.ssp.__strncpy_chk` and `compiler_rt.ssp.__strcpy_chk` is also
-  lowered without name admission; item 12a added tmp/cache hygiene between
-  the copy and string-append fixes. The focused build now fails at
-  `compiler_rt.ssp.__chk_fail` with `error.UnsupportedCodegenInstruction`.
+  lowered without name admission; the noreturn trap stub in
+  `compiler_rt.ssp.__chk_fail` is lowered without name admission; item 12a
+  added tmp/cache hygiene between the copy and string-append fixes. The
+  focused build now fails at `compiler_rt.memmove.memmoveFast` with
+  `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -79,8 +81,8 @@ Stop state recorded 2026-07-06 after checked string copy family cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_strncpy_chk.log`,
-  `tmp/distribution_all_after_strncpy_chk.log`,
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_chk_fail.log`,
+  `tmp/distribution_all_after_chk_fail.log`,
   `tmp/clean_tmp_fixture_pair.log`, and
   `tmp/real_rows_releasefast_after_clean_tmp.log`.
 - Tracked evidence summaries:
@@ -92,9 +94,11 @@ Stop state recorded 2026-07-06 after checked string copy family cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
   `docs/evidence/clean_tmp.summary`.
 - Recommended next action: continue item 12 by fixing
-  `compiler_rt.ssp.__chk_fail`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__chk_fail` on the focused Debug std-hello
-  build. Keep the lowering model-owned and fail-closed. For remaining
+  `compiler_rt.memmove.memmoveFast`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=memmoveFast` on the focused Debug std-hello
+  build. Check whether it shares one model-owned shape with remaining
+  memmove/memcpy internals before fixing it alone. Keep the lowering
+  model-owned and fail-closed. For remaining
   compiler_rt builtin families, use width-parametric lowerings where the
   model-owned shapes match, recording partial item-14 credit when a
   parametric family subsumes per-width special cases.

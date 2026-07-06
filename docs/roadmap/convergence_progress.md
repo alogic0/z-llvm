@@ -337,6 +337,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt cfg:guarded strncat append body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned checked string append body shape used by `compiler_rt.ssp.__strncat_chk`: the matcher validates destination NUL scanning, source-derived byte loads, destination-derived source-byte and terminator stores, trap exits, max-bound use, and `ret dst`, then emits a guarded append loop without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__strcat_chk`. Evidence `tmp/std_debug_hello_debug_build_after_strncat_chk.log` |
 | `real-program object-emission compiler_rt cfg:guarded strcat append body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned checked unbounded string append body shape used by `compiler_rt.ssp.__strcat_chk`: the matcher validates destination NUL scanning, source-derived byte loads, destination-derived source-byte and terminator stores, trap exits, and `ret dst`, then emits a guarded append loop without weakening the separate `strncat` max-bound model. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__strncpy_chk`. Evidence `tmp/std_debug_hello_debug_build_after_strcat_chk.log` |
 | `real-program object-emission compiler_rt cfg:checked string copy family` | 0 | Closed | 2 | Item 12 std-hello Debug discovery now lowers the model-owned checked string copy family used by `compiler_rt.ssp.__strncpy_chk` and `compiler_rt.ssp.__strcpy_chk`: bounded `strncpy` validates `guard >= len`, copies source bytes up to the bound, and zero-pads the tail; unbounded `strcpy` validates the object-size guard, copies source bytes until NUL, and writes the terminator. The next open cluster is object-emission `UnsupportedCodegenInstruction` in `compiler_rt.ssp.__chk_fail`. Evidence `tmp/std_debug_hello_debug_build_after_strncpy_chk.log` |
+| `real-program object-emission compiler_rt cfg:noreturn trap stub` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned single-block noreturn trap stub used by `compiler_rt.ssp.__chk_fail`: straight-line unreachable lowering now admits the metadata-debug plus `llvm.trap` form and emits `ud2` without function-name admission, while preserving the existing inline-asm unreachable path. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.memmove.memmoveFast`. Evidence `tmp/std_debug_hello_debug_build_after_chk_fail.log` |
 
 ## Progress Log
 
@@ -727,6 +728,16 @@ One line per completed cycle, append-only, newest last. This is the
   `UnsupportedCodegenInstruction` in `compiler_rt.ssp.__chk_fail`; strict
   real-row enforcement remains at 100. Recognizer count still 1 (no
   recognizer reorder or pre-pass).
+- 2026-07-06 (this commit) Item 12 std-hello discovery fix: straight-line
+  unreachable lowering now admits the model-owned noreturn trap-stub shape
+  used by compiler_rt `ssp.__chk_fail`, accepting the metadata-debug plus
+  `llvm.trap` form and lowering it to `ud2` without function-name admission
+  while preserving the existing inline-asm unreachable path. Debug std-hello
+  moved from object-emission
+  `UnsupportedCodegenInstruction` in `compiler_rt.ssp.__chk_fail` to
+  object-emission `UnsupportedCodegenControlFlow` in
+  `compiler_rt.memmove.memmoveFast`; strict real-row enforcement remains at
+  100. Recognizer count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 

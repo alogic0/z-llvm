@@ -1186,6 +1186,34 @@ test "x86_64 generic cfg lowers debug assert as local trap boundary" {
     try std.testing.expect(saw_trap);
 }
 
+test "x86_64 lowers noreturn trap stub without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.trap()
+        \\
+        \\define internal void @any_noreturn_trap_stub() {
+        \\entry:
+        \\  call void @llvm.trap()
+        \\  unreachable
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ud2, machine.instructions.items[0]);
+}
+
 test "x86_64 codegen routes boolean branch-mix select through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

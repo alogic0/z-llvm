@@ -103,7 +103,17 @@ pub fn lowerStraightLineUnreachable(
     for (block.instructions.items) |instruction| {
         if (instruction.removed) continue;
         switch (instruction.kind) {
-            .call => |call| try lowerInlineAsmCall(allocator, machine, instruction.result, call),
+            .call => |call| {
+                if (call.isDebugVariableLocation()) {
+                    if (instruction.result != null) return error.VoidCallHasResult;
+                    continue;
+                }
+                if (std.mem.eql(u8, call.callee, "llvm.trap")) {
+                    if (instruction.result != null or call.callee_value != null or call.inline_asm != null or call.ret_ty != .void or call.args.items.len != 0) return error.UnsupportedCodegenInstruction;
+                    continue;
+                }
+                try lowerInlineAsmCall(allocator, machine, instruction.result, call);
+            },
             .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
         }
     }
