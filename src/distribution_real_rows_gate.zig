@@ -282,6 +282,7 @@ fn loadOrExportDescriptor(
             try printCacheEvent(stdout, mode, "hit", elapsedMs(io, cache_start), &cache_key, descriptor.len);
             return descriptor;
         }
+        try pruneOldPinCacheEntries(allocator, io, ziglang_pin);
     }
 
     const export_start = std.Io.Timestamp.now(io, .awake);
@@ -399,6 +400,32 @@ fn metadataValue(meta: []const u8, key: []const u8) ?[]const u8 {
         if (std.mem.eql(u8, line[0..key.len], key)) return line[key.len + 1 ..];
     }
     return null;
+}
+
+fn pruneOldPinCacheEntries(allocator: std.mem.Allocator, io: std.Io, current_pin: []const u8) !void {
+    var cache_dir = std.Io.Dir.cwd().openDir(io, export_cache_dir, .{ .iterate = true }) catch |err| switch (err) {
+        error.FileNotFound => return,
+        else => return err,
+    };
+    defer cache_dir.close(io);
+
+    var iter = cache_dir.iterate();
+    while (try iter.next(io)) |entry| {
+        if (entry.kind != .file or !std.mem.endsWith(u8, entry.name, ".meta")) continue;
+        const stem = entry.name[0 .. entry.name.len - ".meta".len];
+        const meta_path = try std.fmt.allocPrint(allocator, "{s}/{s}.meta", .{ export_cache_dir, stem });
+        defer allocator.free(meta_path);
+        const air_path = try std.fmt.allocPrint(allocator, "{s}/{s}.air", .{ export_cache_dir, stem });
+        defer allocator.free(air_path);
+
+        const meta = std.Io.Dir.cwd().readFileAlloc(io, meta_path, allocator, .limited(64 * 1024)) catch continue;
+        defer allocator.free(meta);
+        const pin = metadataValue(meta, "ziglang_pin") orelse continue;
+        if (std.mem.eql(u8, pin, current_pin)) continue;
+
+        std.Io.Dir.cwd().deleteFile(io, meta_path) catch {};
+        std.Io.Dir.cwd().deleteFile(io, air_path) catch {};
+    }
 }
 
 fn cachePath(allocator: std.mem.Allocator, cache_key: *const [64]u8, suffix: []const u8) ![]const u8 {

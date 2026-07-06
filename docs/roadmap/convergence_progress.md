@@ -197,7 +197,7 @@ list and the visible record of progress. Evidence summaries under
   boundary gate as proof. If a soft-float f80/f128 arithmetic family needs
   more than one new generic-CFG shape, stop for item-15 architectural review
   instead of stacking shapes.
-- [ ] 12a. tmp hygiene (small infrastructure cycle; may be taken between
+- [x] 12a. tmp hygiene (small infrastructure cycle; may be taken between
   item-12 cluster cycles when a short cycle fits): a Zig tool
   `tools/clean_tmp.zig`, wired as `zig build clean-tmp`, that (a) deletes
   export-cache `.meta`/`.air` pairs whose recorded `ziglang_pin` differs
@@ -218,6 +218,12 @@ list and the visible record of progress. Evidence summaries under
   dir and record the evidence summary. Context: a manual cleanup on
   2026-07-04 reclaimed ~61 GB, most of it old-pin cache generations; every
   hook-contract pin bump recreates the problem.
+
+  Closed by `docs/evidence/clean_tmp.summary`, which records a fixture
+  dry-run/delete pair: dry-run reported one old-pin cache pair and one
+  scratch directory with zero deletions, while `--delete` removed both and
+  preserved the current-pin cache pair plus `*.log` file. The real-row export
+  cache now self-prunes old-pin entries after a fail-closed key miss.
 - [ ] 13. Milestone 2b, one real std test file (e.g. a `std.mem` subset)
   builds, links natively, runs, exits 0 in Debug + all three release modes.
 
@@ -684,6 +690,14 @@ One line per completed cycle, append-only, newest last. This is the
   same stage/diagnostic in `compiler_rt.ssp.__strncat_chk`; strict real-row
   enforcement remains at 100. Recognizer count still 1 (no recognizer reorder
   or pre-pass).
+- 2026-07-05 (this commit) Item 12a tmp hygiene cycle: `zig build clean-tmp`
+  now defaults to dry-run, requires `--delete` to reclaim stale tmp entries,
+  validates `.meta`/`.air` export-cache pairs before acting, preserves
+  current-pin cache entries plus `*.log`/`*.txt` files, and reports per-item
+  sizes plus reclaimed bytes. `distribution-real-rows` now self-prunes
+  old-pin cache generations after a fail-closed cache miss; fixture evidence
+  is `docs/evidence/clean_tmp.summary`. Strict real-row enforcement remains
+  at 100. Recognizer count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 

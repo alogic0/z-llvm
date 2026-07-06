@@ -39,7 +39,7 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-05 after item 12 guarded-memcpy cycle:
+Stop state recorded 2026-07-05 after item 12a tmp hygiene cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
@@ -58,7 +58,8 @@ Stop state recorded 2026-07-05 after item 12 guarded-memcpy cycle:
   prints `hello\n` and exits 0. Item 12 std hello remains open. The latest
   Debug std-hello cycles lowered the model-owned guarded direct-call wrapper
   in `compiler_rt.ssp.__memmove_chk` and the guarded copy body in
-  `compiler_rt.ssp.__memcpy_chk` without name admission; the focused build now
+  `compiler_rt.ssp.__memcpy_chk` without name admission; item 12a then added
+  tmp/cache hygiene without moving the program blocker. The focused build now
   fails at `compiler_rt.ssp.__strncat_chk` with
   `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
@@ -75,28 +76,27 @@ Stop state recorded 2026-07-05 after item 12 guarded-memcpy cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_memcpy_chk.log`
-  and `tmp/distribution_all_after_memcpy_chk.log`.
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_memcpy_chk.log`,
+  `tmp/distribution_all_after_memcpy_chk.log`,
+  `tmp/clean_tmp_fixture_pair.log`, and
+  `tmp/real_rows_releasefast_after_clean_tmp.log`.
 - Tracked evidence summaries:
   `docs/evidence/ziglang_pin_stage4_optional_layout.summary`,
   `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary`,
   `docs/evidence/real_rows_releasesafe_limit100_after_intcast_safe.summary`,
   `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary`, and
   `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`,
-  `docs/evidence/zig_integrated_exe_syscall_hello.summary`.
-- Recommended next action: take tracker item 12a first (the
-  `tools/clean_tmp.zig` tool plus export-cache self-pruning; full spec on
-  the item) as the next cycle — `tmp/` refills with every pin bump and
-  long run, so land the hygiene tool before resuming the blocker chain.
-  Then continue item 12 by fixing `compiler_rt.ssp.__strncat_chk`,
-  starting from `ZLLVM_DEBUG_DUMP_IR_SOURCE=__strncat_chk` on the focused
-  Debug std-hello build; before fixing it alone, check whether the
-  remaining ssp `_chk` wrappers share a guard/trap/body shape that one
-  model-owned family lowering can cover. Keep the lowering model-owned and
-  fail-closed. For remaining compiler_rt builtin families, use
-  width-parametric lowerings where the model-owned shapes match, recording
-  partial item-14 credit when a parametric family subsumes per-width
-  special cases.
+  `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
+  `docs/evidence/clean_tmp.summary`.
+- Recommended next action: continue item 12 by fixing
+  `compiler_rt.ssp.__strncat_chk`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__strncat_chk` on the focused Debug std-hello
+  build; before fixing it alone, check whether the remaining ssp `_chk`
+  wrappers share a guard/trap/body shape that one model-owned family lowering
+  can cover. Keep the lowering model-owned and fail-closed. For remaining
+  compiler_rt builtin families, use width-parametric lowerings where the
+  model-owned shapes match, recording partial item-14 credit when a
+  parametric family subsumes per-width special cases.
 
 When the worker stops, record only:
 
