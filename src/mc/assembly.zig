@@ -224,6 +224,19 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tjne 2b\n" ++
                     "3:\n",
             ),
+            .guarded_memcpy_rdi_rsi_rdx_rcx_rax => try writer.writeAll(
+                "\tcmpq %rdx, %rcx\n" ++
+                    "\tjae 1f\n" ++
+                    "\tud2\n" ++
+                    "1:\n" ++
+                    "\tmovq %rdi, %rax\n" ++
+                    "\ttestq %rdx, %rdx\n" ++
+                    "\tje 2f\n" ++
+                    "\tcld\n" ++
+                    "\tmovq %rdx, %rcx\n" ++
+                    "\trep movsb\n" ++
+                    "2:\n",
+            ),
             .memset_rdi_sil_rdx_rax => try writer.writeAll(
                 "\tmovq %rdi, %rax\n" ++
                     "\ttestq %rdx, %rdx\n" ++

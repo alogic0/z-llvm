@@ -1035,6 +1035,19 @@ pub fn lowerGuardedMemmoveCall(allocator: std.mem.Allocator, machine: *MachineFu
     return true;
 }
 
+pub fn lowerGuardedMemcpyBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesGuardedMemcpyBody(function)) return false;
+    const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const src_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    const guard_reg = try paramReg(function, function.params.items[3].name, .{ .int = 64 });
+    if (dst_reg != .rdi or src_reg != .rsi or len_reg != .rdx or guard_reg != .rcx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .guarded_memcpy_rdi_rsi_rdx_rcx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 pub fn lowerByteMemsetLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesByteMemsetLoop(function)) return false;
     const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -1103,6 +1116,127 @@ fn matchesTrapBlock(block: ir.BasicBlock) bool {
         .@"unreachable" => true,
         else => false,
     };
+}
+
+fn matchesGuardedMemcpyBody(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.ptr)) return false;
+    if (function.params.items.len != 4 or function.params.items[0].ty != .ptr or
+        function.params.items[1].ty != .ptr or !function.params.items[2].ty.eql(.{ .int = 64 }) or
+        !function.params.items[3].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len < 4) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const guard_cmp_name = entry.instructions.items[0].result orelse return false;
+    const guard_cmp = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (guard_cmp.predicate != .ult or !guard_cmp.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(guard_cmp.lhs, function.params.items[3].name) or !isNamed(guard_cmp.rhs, function.params.items[2].name)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, guard_cmp_name)) return false;
+
+    const trap_block = blockByName(function, entry_br.then_target) orelse return false;
+    if (!matchesTrapBlock(trap_block)) return false;
+    const body_entry = blockByName(function, entry_br.else_target) orelse return false;
+
+    var saw_body_entry = false;
+    var saw_load = false;
+    var saw_store = false;
+    var saw_ret = false;
+    for (function.blocks.items) |block| {
+        if (std.mem.eql(u8, block.name, entry.name) or std.mem.eql(u8, block.name, trap_block.name)) continue;
+        if (std.mem.eql(u8, block.name, body_entry.name)) saw_body_entry = true;
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .binary, .icmp, .phi, .gep, .cast => {},
+                .load => |load| {
+                    if (load.attrs.isBarrier()) return false;
+                    if (!valueDerivedFromPointer(function, load.ptr, function.params.items[1].name, 0)) return false;
+                    saw_load = true;
+                },
+                .store => |store| {
+                    if (store.attrs.isBarrier()) return false;
+                    if (!valueDerivedFromPointer(function, store.ptr, function.params.items[0].name, 0)) return false;
+                    if (!valueIsLoadFromPointer(function, store.value, function.params.items[1].name)) return false;
+                    saw_store = true;
+                },
+                .call => |call| {
+                    if (!isMemcpyBodyMetadataCall(call)) return false;
+                },
+                .freeze, .fcmp, .select, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+            }
+        }
+
+        switch (block.terminator orelse return false) {
+            .br, .condbr => {},
+            .ret => |ret| {
+                if (!ret.ty.eql(.ptr) or !isNamed(ret.value orelse return false, function.params.items[0].name)) return false;
+                saw_ret = true;
+            },
+            .@"unreachable", .@"switch", .indirectbr => return false,
+        }
+    }
+
+    return saw_body_entry and saw_load and saw_store and saw_ret;
+}
+
+fn valueIsLoadFromPointer(function: ir.Function, value: ir.Value, root_name: []const u8) bool {
+    const name = switch (value) {
+        .named => |name| name,
+        else => return false,
+    };
+    const instruction = instructionByResult(function, name) orelse return false;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    return !load.attrs.isBarrier() and valueDerivedFromPointer(function, load.ptr, root_name, 0);
+}
+
+fn valueDerivedFromPointer(function: ir.Function, value: ir.Value, root_name: []const u8, depth: u8) bool {
+    if (depth > 16) return false;
+    const name = switch (value) {
+        .named => |name| name,
+        else => return false,
+    };
+    if (std.mem.eql(u8, name, root_name)) return true;
+    const instruction = instructionByResult(function, name) orelse return false;
+    return switch (instruction.kind) {
+        .gep => |gep| valueDerivedFromPointer(function, gep.ptr, root_name, depth + 1),
+        .cast => |cast| cast.to_ty.eql(.ptr) and valueDerivedFromPointer(function, cast.value, root_name, depth + 1),
+        .phi => |phi| blk: {
+            if (phi.incoming.items.len == 0 or !phi.ty.eql(.ptr)) break :blk false;
+            for (phi.incoming.items) |incoming| {
+                if (!valueDerivedFromPointer(function, incoming.value, root_name, depth + 1)) break :blk false;
+            }
+            break :blk true;
+        },
+        else => false,
+    };
+}
+
+fn instructionByResult(function: ir.Function, result_name: []const u8) ?ir.Instruction {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, result_name)) return instruction;
+            }
+        }
+    }
+    return null;
+}
+
+fn isMemcpyBodyMetadataCall(call: ir.CallInst) bool {
+    if (call.callee_value != null or call.inline_asm != null or call.ret_ty != .void) return false;
+    return isCalleeName(call.callee, "llvm.experimental.noalias.scope.decl") or
+        isCalleeName(call.callee, "llvm.assume");
 }
 
 fn matchesByteScanLenLoop(function: ir.Function) bool {

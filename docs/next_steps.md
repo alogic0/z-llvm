@@ -39,7 +39,7 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-05 after item 12 guarded-memmove cycle:
+Stop state recorded 2026-07-05 after item 12 guarded-memcpy cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
@@ -56,9 +56,10 @@ Stop state recorded 2026-07-05 after item 12 guarded-memmove cycle:
   z_llvm object emission and Zig native `build-exe -fno-lld` build a no-std
   `_start` executable in ReleaseFast, ReleaseSafe, and ReleaseSmall; each run
   prints `hello\n` and exits 0. Item 12 std hello remains open. The latest
-  Debug std-hello cycle lowered the model-owned guarded trap/direct-call
-  wrapper shape in `compiler_rt.ssp.__memmove_chk` without name admission;
-  the focused build now fails at `compiler_rt.ssp.__memcpy_chk` with
+  Debug std-hello cycles lowered the model-owned guarded direct-call wrapper
+  in `compiler_rt.ssp.__memmove_chk` and the guarded copy body in
+  `compiler_rt.ssp.__memcpy_chk` without name admission; the focused build now
+  fails at `compiler_rt.ssp.__strncat_chk` with
   `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
@@ -74,8 +75,8 @@ Stop state recorded 2026-07-05 after item 12 guarded-memmove cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_memmove_chk.log`
-  and `tmp/distribution_all_after_memmove_chk.log`.
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_memcpy_chk.log`
+  and `tmp/distribution_all_after_memcpy_chk.log`.
 - Tracked evidence summaries:
   `docs/evidence/ziglang_pin_stage4_optional_layout.summary`,
   `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary`,
@@ -84,10 +85,9 @@ Stop state recorded 2026-07-05 after item 12 guarded-memmove cycle:
   `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`,
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`.
 - Recommended next action: continue item 12 by fixing
-  `compiler_rt.ssp.__memcpy_chk`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__memcpy_chk` on the focused Debug std-hello
-  build. The outer guard/trap matches the previous wrapper, but the copy body
-  is inlined; keep the lowering model-owned and fail-closed. For remaining
+  `compiler_rt.ssp.__strncat_chk`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__strncat_chk` on the focused Debug std-hello
+  build. Keep the lowering model-owned and fail-closed. For remaining
   compiler_rt builtin families, use width-parametric lowerings where the
   model-owned shapes match, recording partial item-14 credit when a
   parametric family subsumes per-width special cases.

@@ -240,6 +240,17 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x48, 0x39, 0xca, // cmpq %rcx, %rdx
                 0x75, 0xf4, // jne 2b
             }),
+            .guarded_memcpy_rdi_rsi_rdx_rcx_rax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x39, 0xd1, // cmpq %rdx, %rcx
+                0x73, 0x02, // jae 1f
+                0x0f, 0x0b, // ud2
+                0x48, 0x89, 0xf8, // movq %rdi, %rax
+                0x48, 0x85, 0xd2, // testq %rdx, %rdx
+                0x74, 0x06, // je 2f
+                0xfc, // cld
+                0x48, 0x89, 0xd1, // movq %rdx, %rcx
+                0xf3, 0xa4, // rep movsb
+            }),
             .memset_rdi_sil_rdx_rax => try bytes.appendSlice(allocator, &.{
                 0x48, 0x89, 0xf8, // movq %rdi, %rax
                 0x48, 0x85, 0xd2, // testq %rdx, %rdx
@@ -699,6 +710,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .bcmp_rdi_rsi_rdx_eax => 33,
         .memcmp_rdi_rsi_rdx_eax => 36,
         .guarded_memset_rdi_sil_rdx_rcx_rax => 29,
+        .guarded_memcpy_rdi_rsi_rdx_rcx_rax => 24,
         .memset_rdi_sil_rdx_rax => 22,
         .and_edi_imm8 => 3,
         .smin_i32_edi_esi_eax, .umin_i32_edi_esi_eax, .smax_i32_edi_esi_eax, .umax_i32_edi_esi_eax => 7,
