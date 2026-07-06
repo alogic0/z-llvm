@@ -157,6 +157,10 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .add_rdi_rcx4_ptr_eax => try writer.writeAll("\taddl (%rdi,%rcx,4), %eax\n"),
             .load_rdi_rcx4_ptr_r8d => try writer.writeAll("\tmovl (%rdi,%rcx,4), %r8d\n"),
             .store_eax_rdi_rcx4_ptr => try writer.writeAll("\tmovl %eax, (%rdi,%rcx,4)\n"),
+            .load_rdi_ptr_u8_eax => try writer.writeAll("\tmovzbl (%rdi), %eax\n"),
+            .load_rdi_ptr_u16_eax => try writer.writeAll("\tmovzwl (%rdi), %eax\n"),
+            .load_rdi_ptr_eax => try writer.writeAll("\tmovl (%rdi), %eax\n"),
+            .load_rdi_ptr_rax => try writer.writeAll("\tmovq (%rdi), %rax\n"),
             .load_rcx_ptr_u8_eax => try writer.writeAll("\tmovzbl (%rcx), %eax\n"),
             .load_rcx_ptr_u16_eax => try writer.writeAll("\tmovzwl (%rcx), %eax\n"),
             .load_rcx_ptr_eax => try writer.writeAll("\tmovl (%rcx), %eax\n"),
@@ -367,6 +371,23 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tjne 1b\n" ++
                     "\tmovq %rsi, (%rdi)\n" ++
                     "\tmovq %r9, 8(%rdi)\n" ++
+                    "\tmovq $0, (%r10)\n",
+                .{symbol},
+            ),
+            .spinlocked_load_i128_rdi_rax_rdx => |symbol| try writer.print(
+                "\tmovq %rdi, %r8\n" ++
+                    "\tshrq $3, %r8\n" ++
+                    "\tandq $62, %r8\n" ++
+                    "\tleaq {s}(%rip), %r10\n" ++
+                    "\taddq %r8, %r10\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "1:\n" ++
+                    "\txchgq %rax, (%r10)\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovq (%rdi), %rax\n" ++
+                    "\tmovq 8(%rdi), %rdx\n" ++
                     "\tmovq $0, (%r10)\n",
                 .{symbol},
             ),

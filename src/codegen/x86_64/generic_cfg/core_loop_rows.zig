@@ -1162,6 +1162,30 @@ pub fn lowerAtomicStoreFamily(allocator: std.mem.Allocator, machine: *MachineFun
     return false;
 }
 
+pub fn lowerAtomicLoadFamily(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try matchAtomicLoadScalar(function)) |bits| {
+        const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+        if (ptr_reg != .rdi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, switch (bits) {
+            8 => .load_rdi_ptr_u8_eax,
+            16 => .load_rdi_ptr_u16_eax,
+            32 => .load_rdi_ptr_eax,
+            64 => .load_rdi_ptr_rax,
+            else => unreachable,
+        });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    if (try matchSpinlockedLoadI128(function)) |spinlock_symbol| {
+        const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+        if (ptr_reg != .rdi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .{ .spinlocked_load_i128_rdi_rax_rdx = spinlock_symbol });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    return false;
+}
+
 pub fn lowerGuardedStrncatBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesGuardedStrncatBody(function)) return false;
     const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -2434,6 +2458,88 @@ fn matchSpinlockedStoreI128(function: ir.Function) !?[]const u8 {
         else => return null,
     };
     if (ret.ty != .void or ret.value != null) return null;
+    return spinlock_symbol;
+}
+
+fn matchAtomicLoadScalar(function: ir.Function) !?u16 {
+    if (function.params.items.len != 2 or !function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 32 })) return null;
+    const bits = scalarAtomicCompareExchangeBits(function.ret_ty) orelse return null;
+    if (bits == 128) return null;
+    if (function.blocks.items.len != 1) return null;
+    if (!functionHasNoRemovedInstructions(function)) return null;
+
+    const ptr_name = function.params.items[0].name;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return null;
+    const load_name = entry.instructions.items[0].result orelse return null;
+    const load = switch (entry.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = bits }) or
+        !isNamed(load.ptr, ptr_name) or
+        load.attrs.atomic_ordering == null or
+        !std.mem.eql(u8, load.attrs.atomic_ordering.?, "seq_cst") or
+        load.attrs.@"align" != bits / 8 or
+        load.attrs.is_volatile) return null;
+    const ret = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = bits }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return null;
+    return bits;
+}
+
+fn matchSpinlockedLoadI128(function: ir.Function) !?[]const u8 {
+    if (!function.ret_ty.eql(.{ .int = 128 }) or function.params.items.len != 2) return null;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 32 })) return null;
+    if (function.blocks.items.len != 3) return null;
+    if (!functionHasNoRemovedInstructions(function)) return null;
+
+    const ptr_name = function.params.items[0].name;
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const exit = function.blocks.items[2];
+    if (entry.instructions.items.len != 4 or loop.instructions.items.len != 2 or exit.instructions.items.len != 2) return null;
+
+    const ptr_int_name = entry.instructions.items[0].result orelse return null;
+    const ptr_int = switch (entry.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (ptr_int.op != .ptrtoint or !ptr_int.from_ty.eql(.ptr) or !ptr_int.to_ty.eql(.{ .int = 64 }) or !isNamed(ptr_int.value, ptr_name)) return null;
+    const shifted_name = entry.instructions.items[1].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[1], .lshr, ptr_int_name, 3)) return null;
+    const slot_name = entry.instructions.items[2].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[2], .@"and", shifted_name, 62)) return null;
+    const lock_ptr_name = entry.instructions.items[3].result orelse return null;
+    const spinlock_symbol = try matchSpinlockGep(entry.instructions.items[3], slot_name);
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, entry_br.target, loop.name)) return null;
+
+    if (!matchSpinlockAcquireLoop(loop, lock_ptr_name, exit.name)) return null;
+
+    const load_name = exit.instructions.items[0].result orelse return null;
+    const load = switch (exit.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 128 }) or !isNamed(load.ptr, ptr_name) or load.attrs.isBarrier()) return null;
+    const release = switch (exit.instructions.items[1].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!release.ty.eql(.{ .int = 64 }) or !isInt(release.value, 0) or !isNamed(release.ptr, lock_ptr_name) or
+        release.attrs.atomic_ordering == null or !std.mem.eql(u8, release.attrs.atomic_ordering.?, "release") or
+        release.attrs.@"align" != 64 or release.attrs.is_volatile) return null;
+    const ret = switch (exit.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 128 }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return null;
     return spinlock_symbol;
 }
 

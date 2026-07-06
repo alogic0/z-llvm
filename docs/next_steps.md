@@ -39,7 +39,7 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-06 after atomic-store cycle:
+Stop state recorded 2026-07-06 after atomic-load cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
@@ -77,16 +77,18 @@ Stop state recorded 2026-07-06 after atomic-store cycle:
   is lowered without name admission using scalar `atomicrmw xchg` and i128
   spinlock shapes; the atomic store family in
   `compiler_rt.atomics.__atomic_store_{1,2,4,8,16}` is lowered without name
-  admission using scalar seq_cst `xchg` and i128 spinlock shapes; item
+  admission using scalar seq_cst `xchg` and i128 spinlock shapes; the atomic
+  load family in `compiler_rt.atomics.__atomic_load_{1,2,4,8,16}` is lowered
+  without name admission using scalar seq_cst loads and i128 spinlock shapes; item
   12a added tmp/cache hygiene between the copy and string-append fixes. The
   focused build now fails at
-  `compiler_rt.atomics.__atomic_load_16` with
+  `compiler_rt.atomics.__atomic_fetch_umin_16` with
   `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
   `real_functions_lowered=100`, `real_objects_emitted=100`,
-  `real_native_linked=100`, `real_executed=0`, `real_programs_ok=0`.
+  `real_native_linked=100`, `real_executed=0`, `real_programs_ok=1`.
 - Current candidate denominator:
   `docs/evidence/real_candidates_release_v2.tsv`,
   hash
@@ -96,8 +98,8 @@ Stop state recorded 2026-07-06 after atomic-store cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_atomic_store.log`,
-  `tmp/distribution_all_after_atomic_store.log`,
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_atomic_load16.log`,
+  `tmp/distribution_all_after_atomic_load16.log`,
   `tmp/clean_tmp_fixture_pair.log`, and
   `tmp/real_rows_releasefast_after_clean_tmp.log`.
 - Tracked evidence summaries:
@@ -109,11 +111,11 @@ Stop state recorded 2026-07-06 after atomic-store cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
   `docs/evidence/clean_tmp.summary`.
 - Recommended next action: continue item 12 by fixing
-  `compiler_rt.atomics.__atomic_load_16`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__atomic_load_16` on the focused
+  `compiler_rt.atomics.__atomic_fetch_umin_16`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__atomic_fetch_umin_16` on the focused
   Debug std-hello build. The current diagnostic is
   `error.UnsupportedCodegenControlFlow`; check whether the remaining
-  compiler_rt atomic load wrappers share one model-owned family shape, and keep
+  compiler_rt atomic fetch-min/max wrappers share one model-owned family shape, and keep
   unsupported variants fail-closed. For remaining compiler_rt builtin
   families, use width-parametric lowerings where the model-owned shapes match,
   recording partial item-14 credit when a parametric family subsumes per-width

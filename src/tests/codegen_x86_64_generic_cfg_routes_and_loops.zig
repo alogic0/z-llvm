@@ -987,6 +987,75 @@ test "x86_64 generic cfg lowers spinlocked i128 atomic store without name admiss
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers scalar atomic load family without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @any_atomic_load_width(ptr %ptr, i32 %ordering) {
+        \\entry:
+        \\  %loaded = load atomic i32, ptr %ptr seq_cst, align 4
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_atomic_load_width"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.load_rdi_ptr_eax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 generic cfg lowers spinlocked i128 atomic load without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@locks_for_any_load = internal global [64 x i8] zeroinitializer, align 64
+        \\
+        \\define i128 @any_spinlocked_load(ptr %ptr, i32 %ordering) {
+        \\entry:
+        \\  %addr = ptrtoint ptr %ptr to i64
+        \\  %shift = lshr exact i64 %addr, 3
+        \\  %slot = and i64 %shift, 62
+        \\  %lock = getelementptr inbounds nuw [64 x i8], ptr @locks_for_any_load, i64 %slot
+        \\  br label %loop
+        \\loop:
+        \\  %old.lock = atomicrmw xchg ptr %lock, i64 1 acquire, align 8
+        \\  %acquired = icmp eq i64 %old.lock, 0
+        \\  br i1 %acquired, label %load, label %loop
+        \\load:
+        \\  %loaded = load i128, ptr %ptr, align 16
+        \\  store atomic i64 0, ptr %lock release, align 64
+        \\  ret i128 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_spinlocked_load"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqualStrings("locks_for_any_load", machine.instructions.items[0].spinlocked_load_i128_rdi_rax_rdx);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers guarded strcpy copy loop without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
