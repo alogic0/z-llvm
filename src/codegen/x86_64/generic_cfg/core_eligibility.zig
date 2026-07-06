@@ -9,6 +9,7 @@ const std = shared.std;
 const ir = shared.ir;
 
 pub const GenericCfgLoopSumPlan = loop_rows.GenericCfgLoopSumPlan;
+pub const lowerAtomicExchangeFamily = loop_rows.lowerAtomicExchangeFamily;
 
 pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.MachineFunction, function: ir.Function) !bool {
     if (try multi_block_rows.lowerGenericCfgGuardReturnNoreturn(allocator, machine, function)) {
@@ -158,6 +159,10 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.Ma
         return true;
     }
     if (try loop_rows.lowerAtomicCompareExchangeFamily(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try loop_rows.lowerAtomicExchangeFamily(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

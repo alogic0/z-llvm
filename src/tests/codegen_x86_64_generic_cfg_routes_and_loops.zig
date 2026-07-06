@@ -848,6 +848,76 @@ test "x86_64 generic cfg lowers spinlocked i128 compare exchange without name ad
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers scalar atomic exchange family without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @any_atomic_exchange_width(ptr %ptr, i32 %replacement, i32 %ordering) {
+        \\entry:
+        \\  %old = atomicrmw xchg ptr %ptr, i32 %replacement seq_cst, align 4
+        \\  ret i32 %old
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_atomic_exchange_width"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.xchg_ptr_value_i32_eax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 generic cfg lowers spinlocked i128 atomic exchange without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@locks_for_any_exchange = internal global [64 x i8] zeroinitializer, align 64
+        \\
+        \\define i128 @any_spinlocked_exchange(ptr %ptr, i128 %replacement, i32 %ordering) {
+        \\entry:
+        \\  %addr = ptrtoint ptr %ptr to i64
+        \\  %shift = lshr i64 %addr, 3
+        \\  %slot = and i64 %shift, 62
+        \\  %lock = getelementptr [64 x i8], ptr @locks_for_any_exchange, i64 %slot
+        \\  br label %loop
+        \\loop:
+        \\  %old.lock = atomicrmw xchg ptr %lock, i64 1 acquire, align 8
+        \\  %acquired = icmp eq i64 %old.lock, 0
+        \\  br i1 %acquired, label %exchange, label %loop
+        \\exchange:
+        \\  %old.value = load i128, ptr %ptr, align 16
+        \\  store i128 %replacement, ptr %ptr, align 16
+        \\  store atomic i64 0, ptr %lock release, align 64
+        \\  ret i128 %old.value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_spinlocked_exchange"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqualStrings("locks_for_any_exchange", machine.instructions.items[0].spinlocked_xchg_i128_rdi_rsi_rdx_rax);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers guarded strcpy copy loop without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

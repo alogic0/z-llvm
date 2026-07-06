@@ -38,6 +38,7 @@ pub const lowerCheckedTableLookup = diagnostics.lowerCheckedTableLookup;
 pub const lowerCheckedTinyAdd = diagnostics.lowerCheckedTinyAdd;
 pub const lowerCheckedTlsBump = diagnostics.lowerCheckedTlsBump;
 pub const lowerControlFlowLoopSum = loop_phi.lowerControlFlowLoopSum;
+pub const lowerAtomicExchangeFamily = eligibility.lowerAtomicExchangeFamily;
 pub const lowerDebugLogicalPointerCompileError = diagnostics.lowerDebugLogicalPointerCompileError;
 pub const lowerDebugSpirvMergeLogicalPointers = diagnostics.lowerDebugSpirvMergeLogicalPointers;
 pub const lowerDescriptorTableLoopMain = diagnostics.lowerDescriptorTableLoopMain;
