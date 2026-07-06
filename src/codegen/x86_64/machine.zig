@@ -125,6 +125,7 @@ pub const Instruction = union(enum) {
     xchg_ptr_value_i32_eax,
     xchg_ptr_value_i64_rax,
     spinlocked_xchg_i128_rdi_rsi_rdx_rax: []const u8,
+    spinlocked_store_i128_rdi_rsi_rdx: []const u8,
     memmove_rdi_rsi_rdx_rax,
     stack_probe_rax_rcx_rsp,
     guarded_memset_rdi_sil_rdx_rcx_rax,

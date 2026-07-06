@@ -352,6 +352,24 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tmovq %rcx, %rdx\n",
                 .{symbol},
             ),
+            .spinlocked_store_i128_rdi_rsi_rdx => |symbol| try writer.print(
+                "\tmovq %rdx, %r9\n" ++
+                    "\tmovq %rdi, %r8\n" ++
+                    "\tshrq $3, %r8\n" ++
+                    "\tandq $62, %r8\n" ++
+                    "\tleaq {s}(%rip), %r10\n" ++
+                    "\taddq %r8, %r10\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "1:\n" ++
+                    "\txchgq %rax, (%r10)\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovq %rsi, (%rdi)\n" ++
+                    "\tmovq %r9, 8(%rdi)\n" ++
+                    "\tmovq $0, (%r10)\n",
+                .{symbol},
+            ),
             .memmove_rdi_rsi_rdx_rax => try writer.writeAll(
                 "\tmovq %rdi, %rax\n" ++
                     "\ttestq %rdx, %rdx\n" ++

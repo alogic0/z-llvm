@@ -303,6 +303,7 @@ const lowerGenericCfgSingleBlockUpdateGetMain = x86_64_generic_cfg.lowerGenericC
 const lowerGenericCfgSingleBlockVoid = x86_64_generic_cfg.lowerGenericCfgSingleBlockVoid;
 const lowerGenericCfgSingleBlockVoidCallMain = x86_64_generic_cfg.lowerGenericCfgSingleBlockVoidCallMain;
 const lowerAtomicExchangeFamily = x86_64_generic_cfg.lowerAtomicExchangeFamily;
+const lowerAtomicStoreFamily = x86_64_generic_cfg.lowerAtomicStoreFamily;
 const lowerGetauxvalImpl = x86_64_generic_cfg.lowerGetauxvalImpl;
 const lowerRuntimeSliceSumPreoptHelper = x86_64_generic_cfg.lowerRuntimeSliceSumPreoptHelper;
 const lowerSelectedInfiniteLoop = x86_64_generic_cfg.lowerSelectedInfiniteLoop;
@@ -946,6 +947,12 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerAtomicExchangeFamily(allocator, &machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerAtomicStoreFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
         try verifyFunction(machine);
         return machine;
