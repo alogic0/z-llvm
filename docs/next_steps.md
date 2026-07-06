@@ -39,7 +39,7 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-06 after atomic-load cycle:
+Stop state recorded 2026-07-06 after atomic-compare-exchange cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
@@ -69,10 +69,13 @@ Stop state recorded 2026-07-06 after atomic-load cycle:
   naked stack-probe inline-asm/unreachable body in
   `compiler_rt.stack_probe.zig_probe_stack` is lowered without name
   admission; the spinlock-protected variable memcpy shape in
-  `compiler_rt.atomics.__atomic_load` is lowered without name admission; item
+  `compiler_rt.atomics.__atomic_load` is lowered without name admission; the
+  atomic compare-exchange family in
+  `compiler_rt.atomics.__atomic_compare_exchange_{1,2,4,8,16}` is lowered
+  without name admission using scalar `cmpxchg` and i128 spinlock shapes; item
   12a added tmp/cache hygiene between the copy and string-append fixes. The
   focused build now fails at
-  `compiler_rt.atomics.__atomic_compare_exchange_16` with
+  `compiler_rt.atomics.__atomic_exchange_16` with
   `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
@@ -88,8 +91,8 @@ Stop state recorded 2026-07-06 after atomic-load cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_atomic_load.log`,
-  `tmp/distribution_all_after_atomic_load.log`,
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_atomic_cmpxchg.log`,
+  `tmp/distribution_all_after_atomic_cmpxchg.log`,
   `tmp/clean_tmp_fixture_pair.log`, and
   `tmp/real_rows_releasefast_after_clean_tmp.log`.
 - Tracked evidence summaries:
@@ -101,12 +104,12 @@ Stop state recorded 2026-07-06 after atomic-load cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
   `docs/evidence/clean_tmp.summary`.
 - Recommended next action: continue item 12 by fixing
-  `compiler_rt.atomics.__atomic_compare_exchange_16`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__atomic_compare_exchange_16` on the focused
+  `compiler_rt.atomics.__atomic_exchange_16`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__atomic_exchange_16` on the focused
   Debug std-hello build. The current diagnostic is
   `error.UnsupportedCodegenControlFlow`; check whether the remaining
-  compiler_rt atomic wrappers share one model-owned family shape, and keep
-  unsupported variants fail-closed. For remaining compiler_rt builtin
+  compiler_rt atomic exchange wrappers share one model-owned family shape, and
+  keep unsupported variants fail-closed. For remaining compiler_rt builtin
   families, use width-parametric lowerings where the model-owned shapes match,
   recording partial item-14 credit when a parametric family subsumes per-width
   special cases.

@@ -341,6 +341,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt cfg:byte copy fast family` | 0 | Closed | 2 | Item 12 std-hello Debug discovery now lowers the model-owned unguarded byte-copy fast family used by `compiler_rt.memmove.memmoveFast` and `compiler_rt.memcpy.memcpyFast`: `memmove` validates the overlap split, temporary 16-byte copy buffers, source-derived loads, destination-derived stores including aligned `ptrtoint`/`inttoptr` address derivation, and `ret dst`; `memcpy` validates the same source-to-destination copy body without overlap temporaries. The next open cluster is object-emission `InstructionNeedsResult` in `compiler_rt.stack_probe.zig_probe_stack`. Evidence `tmp/std_debug_hello_debug_build_after_memmoveFast.log` |
 | `real-program object-emission compiler_rt cfg:naked stack probe inline asm` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned naked stack-probe inline-asm/unreachable body used by `compiler_rt.stack_probe.zig_probe_stack`: the matcher requires the void no-arg side-effecting stack-probe template and explicit clobbers, emits a bounded x86_64 stack-probe machine op plus normal return, and keeps other inline-asm unreachable bodies fail-closed. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_load`. Evidence `tmp/std_debug_hello_debug_build_after_zig_probe_stack.log` |
 | `real-program object-emission compiler_rt cfg:spinlocked variable memcpy` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned spinlock-protected variable-length copy shape used by compiler_rt `atomics.__atomic_load`: the matcher validates the `(src >> 3) & 63` spinlock-table index, `atomicrmw xchg` acquire loop, inline memcpy from source to destination using the zexted size parameter, and release store before emitting a symbol-relocated x86_64 spinlocked copy op. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_compare_exchange_16`. Evidence `tmp/std_debug_hello_debug_build_after_atomic_load.log` |
+| `real-program object-emission compiler_rt atomics:compare-exchange family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic compare-exchange family for compiler_rt `atomics.__atomic_compare_exchange_{1,2,4,8,16}`: scalar widths validate the `cmpxchg` result/update CFG and emit width-specific x86_64 `lock cmpxchg` primitives; the i128 form validates the spinlock slot, acquire loop, load/compare/store branches, and release store before emitting a symbol-relocated spinlocked compare-exchange primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_exchange_16`. Evidence `tmp/std_debug_hello_debug_build_after_atomic_cmpxchg.log` |
 
 ## Progress Log
 
@@ -774,6 +775,20 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.atomics.__atomic_compare_exchange_16`; strict real-row
   enforcement remains at 100. Recognizer count still 1 (no recognizer reorder
   or pre-pass).
+- 2026-07-06 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned atomic compare-exchange family for compiler_rt
+  `atomics.__atomic_compare_exchange_{1,2,4,8,16}`. Widths 1/2/4/8 bytes
+  share the `cmpxchg` result/update CFG matcher and width-specific
+  `lock cmpxchg` backend primitives; the 16-byte form shares the spinlock
+  acquire/release validation style and emits a symbol-relocated i128
+  compare-exchange primitive. Debug std-hello moved from object-emission
+  `UnsupportedCodegenControlFlow` in
+  `compiler_rt.atomics.__atomic_compare_exchange_16` to the same
+  stage/diagnostic in `compiler_rt.atomics.__atomic_exchange_16`; strict
+  real-row enforcement remains at 100. Recognizer count still 1 (no
+  recognizer reorder or pre-pass). Partial item-14 credit recorded for
+  handling the compare-exchange builtin family parametrically instead of by
+  width.
 
 ## Ratchet State
 

@@ -239,6 +239,80 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tmovq $0, (%r8)\n",
                 .{symbol},
             ),
+            .cmpxchg_ptr_expected_desired_i8_eax => try writer.writeAll(
+                "\tmovb (%rsi), %al\n" ++
+                    "\tlock cmpxchgb %dl, (%rdi)\n" ++
+                    "\tjne 1f\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjmp 2f\n" ++
+                    "1:\n" ++
+                    "\tmovb %al, (%rsi)\n" ++
+                    "\txorl %eax, %eax\n" ++
+                    "2:\n",
+            ),
+            .cmpxchg_ptr_expected_desired_i16_eax => try writer.writeAll(
+                "\tmovw (%rsi), %ax\n" ++
+                    "\tlock cmpxchgw %dx, (%rdi)\n" ++
+                    "\tjne 1f\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjmp 2f\n" ++
+                    "1:\n" ++
+                    "\tmovw %ax, (%rsi)\n" ++
+                    "\txorl %eax, %eax\n" ++
+                    "2:\n",
+            ),
+            .cmpxchg_ptr_expected_desired_i32_eax => try writer.writeAll(
+                "\tmovl (%rsi), %eax\n" ++
+                    "\tlock cmpxchgl %edx, (%rdi)\n" ++
+                    "\tjne 1f\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjmp 2f\n" ++
+                    "1:\n" ++
+                    "\tmovl %eax, (%rsi)\n" ++
+                    "\txorl %eax, %eax\n" ++
+                    "2:\n",
+            ),
+            .cmpxchg_ptr_expected_desired_i64_eax => try writer.writeAll(
+                "\tmovq (%rsi), %rax\n" ++
+                    "\tlock cmpxchgq %rdx, (%rdi)\n" ++
+                    "\tjne 1f\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjmp 2f\n" ++
+                    "1:\n" ++
+                    "\tmovq %rax, (%rsi)\n" ++
+                    "\txorl %eax, %eax\n" ++
+                    "2:\n",
+            ),
+            .spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax => |symbol| try writer.print(
+                "\tmovq %rdi, %rax\n" ++
+                    "\tshrq $3, %rax\n" ++
+                    "\tandq $62, %rax\n" ++
+                    "\tleaq {s}(%rip), %r8\n" ++
+                    "\tleaq (%r8,%rax), %r8\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "1:\n" ++
+                    "\txchgq %rax, (%r8)\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovq (%rdi), %rax\n" ++
+                    "\tmovq 8(%rdi), %r10\n" ++
+                    "\tcmpq (%rsi), %rax\n" ++
+                    "\tjne 2f\n" ++
+                    "\tcmpq 8(%rsi), %r10\n" ++
+                    "\tjne 2f\n" ++
+                    "\tmovq %rdx, (%rdi)\n" ++
+                    "\tmovq %rcx, 8(%rdi)\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjmp 3f\n" ++
+                    "2:\n" ++
+                    "\tmovq %rax, (%rsi)\n" ++
+                    "\tmovq %r10, 8(%rsi)\n" ++
+                    "\txorl %eax, %eax\n" ++
+                    "3:\n" ++
+                    "\tmovq $0, (%r8)\n",
+                .{symbol},
+            ),
             .memmove_rdi_rsi_rdx_rax => try writer.writeAll(
                 "\tmovq %rdi, %rax\n" ++
                     "\ttestq %rdx, %rdx\n" ++

@@ -254,6 +254,68 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xf3, 0xa4, // rep movsb
                 0x49, 0xc7, 0x00, 0, 0, 0, 0, // movq $0, (%r8)
             }),
+            .cmpxchg_ptr_expected_desired_i8_eax => try bytes.appendSlice(allocator, &.{
+                0x8a, 0x06, // movb (%rsi), %al
+                0xf0, 0x0f, 0xb0, 0x17, // lock cmpxchgb %dl, (%rdi)
+                0x75, 0x07, // jne 1f
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0xeb, 0x04, // jmp 2f
+                0x88, 0x06, // movb %al, (%rsi)
+                0x31, 0xc0, // xorl %eax, %eax
+            }),
+            .cmpxchg_ptr_expected_desired_i16_eax => try bytes.appendSlice(allocator, &.{
+                0x66, 0x8b, 0x06, // movw (%rsi), %ax
+                0xf0, 0x66, 0x0f, 0xb1, 0x17, // lock cmpxchgw %dx, (%rdi)
+                0x75, 0x07, // jne 1f
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0xeb, 0x05, // jmp 2f
+                0x66, 0x89, 0x06, // movw %ax, (%rsi)
+                0x31, 0xc0, // xorl %eax, %eax
+            }),
+            .cmpxchg_ptr_expected_desired_i32_eax => try bytes.appendSlice(allocator, &.{
+                0x8b, 0x06, // movl (%rsi), %eax
+                0xf0, 0x0f, 0xb1, 0x17, // lock cmpxchgl %edx, (%rdi)
+                0x75, 0x07, // jne 1f
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0xeb, 0x04, // jmp 2f
+                0x89, 0x06, // movl %eax, (%rsi)
+                0x31, 0xc0, // xorl %eax, %eax
+            }),
+            .cmpxchg_ptr_expected_desired_i64_eax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x8b, 0x06, // movq (%rsi), %rax
+                0xf0, 0x48, 0x0f, 0xb1, 0x17, // lock cmpxchgq %rdx, (%rdi)
+                0x75, 0x07, // jne 1f
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0xeb, 0x05, // jmp 2f
+                0x48, 0x89, 0x06, // movq %rax, (%rsi)
+                0x31, 0xc0, // xorl %eax, %eax
+            }),
+            .spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x89, 0xf8, // movq %rdi, %rax
+                0x48, 0xc1, 0xe8, 0x03, // shrq $3, %rax
+                0x48, 0x83, 0xe0, 0x3e, // andq $62, %rax
+                0x4c, 0x8d, 0x05, 0, 0, 0, 0, // leaq spinlocks(%rip), %r8
+                0x4d, 0x8d, 0x04, 0x00, // leaq (%r8,%rax), %r8
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x49, 0x87, 0x00, // xchgq %rax, (%r8)
+                0x48, 0x85, 0xc0, // testq %rax, %rax
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x75, 0xf3, // jne 1b
+                0x48, 0x8b, 0x07, // movq (%rdi), %rax
+                0x4c, 0x8b, 0x57, 0x08, // movq 8(%rdi), %r10
+                0x48, 0x3b, 0x06, // cmpq (%rsi), %rax
+                0x75, 0x14, // jne 2f
+                0x4c, 0x3b, 0x56, 0x08, // cmpq 8(%rsi), %r10
+                0x75, 0x0e, // jne 2f
+                0x48, 0x89, 0x17, // movq %rdx, (%rdi)
+                0x48, 0x89, 0x4f, 0x08, // movq %rcx, 8(%rdi)
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0xeb, 0x09, // jmp 3f
+                0x48, 0x89, 0x06, // movq %rax, (%rsi)
+                0x4c, 0x89, 0x56, 0x08, // movq %r10, 8(%rsi)
+                0x31, 0xc0, // xorl %eax, %eax
+                0x49, 0xc7, 0x00, 0, 0, 0, 0, // movq $0, (%r8)
+            }),
             .memmove_rdi_rsi_rdx_rax => try bytes.appendSlice(allocator, &.{
                 0x48, 0x89, 0xf8, // movq %rdi, %rax
                 0x48, 0x85, 0xd2, // testq %rdx, %rdx
@@ -858,6 +920,11 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .memcmp_rdi_rsi_rdx_eax => 36,
         .memcpy_rdi_rsi_rdx_rax => 14,
         .spinlocked_memcpy_rsi_to_rdx_len_edi => 59,
+        .cmpxchg_ptr_expected_desired_i8_eax => 19,
+        .cmpxchg_ptr_expected_desired_i16_eax => 22,
+        .cmpxchg_ptr_expected_desired_i32_eax => 19,
+        .cmpxchg_ptr_expected_desired_i64_eax => 22,
+        .spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax => 88,
         .memmove_rdi_rsi_rdx_rax => 38,
         .stack_probe_rax_rcx_rsp => 53,
         .guarded_memset_rdi_sil_rdx_rcx_rax => 29,

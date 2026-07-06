@@ -754,6 +754,100 @@ test "x86_64 generic cfg lowers spinlocked variable memcpy without name admissio
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers scalar atomic compare exchange family without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @any_cmpxchg_width(ptr %ptr, ptr %expected, i32 %desired, i32 %success, i32 %failure) {
+        \\entry:
+        \\  %scratch = alloca i8, align 4
+        \\  %old.expected = load i32, ptr %expected, align 4
+        \\  %pair = cmpxchg ptr %ptr, i32 %old.expected, i32 %desired seq_cst seq_cst, align 4
+        \\  %ok = extractvalue { i32, i1 } %pair, 1
+        \\  %failed = xor i1 %ok, true
+        \\  store i1 %failed, ptr %scratch, align 4
+        \\  %failed.byte = load i8, ptr %scratch, align 4
+        \\  %success.path = icmp eq i8 %failed.byte, 0
+        \\  br i1 %success.path, label %ret, label %update.expected
+        \\ret:
+        \\  %result = phi i32 [ 1, %entry ], [ 0, %update.expected ]
+        \\  ret i32 %result
+        \\update.expected:
+        \\  %old.value = extractvalue { i32, i1 } %pair, 0
+        \\  store i32 %old.value, ptr %expected, align 4
+        \\  br label %ret
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_cmpxchg_width"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.cmpxchg_ptr_expected_desired_i32_eax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 generic cfg lowers spinlocked i128 compare exchange without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@locks_for_any_compare = internal global [64 x i8] zeroinitializer, align 64
+        \\
+        \\define i32 @any_spinlocked_cmpxchg(ptr %ptr, ptr %expected, i128 %desired, i32 %success, i32 %failure) {
+        \\entry:
+        \\  %addr = ptrtoint ptr %ptr to i64
+        \\  %shift = lshr i64 %addr, 3
+        \\  %slot = and i64 %shift, 62
+        \\  %lock = getelementptr [64 x i8], ptr @locks_for_any_compare, i64 %slot
+        \\  br label %loop
+        \\loop:
+        \\  %old.lock = atomicrmw xchg ptr %lock, i64 1 acquire, align 8
+        \\  %acquired = icmp eq i64 %old.lock, 0
+        \\  br i1 %acquired, label %compare, label %loop
+        \\compare:
+        \\  %old.value = load i128, ptr %ptr, align 16
+        \\  %expected.value = load i128, ptr %expected, align 16
+        \\  %equal = icmp eq i128 %old.value, %expected.value
+        \\  br i1 %equal, label %store.desired, label %store.expected
+        \\ret:
+        \\  %result = phi i32 [ 1, %store.desired ], [ 0, %store.expected ]
+        \\  store atomic i64 0, ptr %lock release, align 64
+        \\  ret i32 %result
+        \\store.desired:
+        \\  store i128 %desired, ptr %ptr, align 16
+        \\  br label %ret
+        \\store.expected:
+        \\  store i128 %old.value, ptr %expected, align 16
+        \\  br label %ret
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_spinlocked_cmpxchg"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqualStrings("locks_for_any_compare", machine.instructions.items[0].spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers guarded strcpy copy loop without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

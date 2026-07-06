@@ -1085,6 +1085,33 @@ pub fn lowerSpinlockedMemcpyBody(allocator: std.mem.Allocator, machine: *Machine
     return true;
 }
 
+pub fn lowerAtomicCompareExchangeFamily(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try matchAtomicCompareExchangeScalar(function)) |bits| {
+        const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+        const expected_reg = try paramReg(function, function.params.items[1].name, .ptr);
+        const desired_reg = try paramReg(function, function.params.items[2].name, .{ .int = bits });
+        if (ptr_reg != .rdi or expected_reg != .rsi or desired_reg != .rdx) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, switch (bits) {
+            8 => .cmpxchg_ptr_expected_desired_i8_eax,
+            16 => .cmpxchg_ptr_expected_desired_i16_eax,
+            32 => .cmpxchg_ptr_expected_desired_i32_eax,
+            64 => .cmpxchg_ptr_expected_desired_i64_eax,
+            else => unreachable,
+        });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    if (try matchSpinlockedCompareExchangeI128(function)) |spinlock_symbol| {
+        const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+        const expected_reg = try paramReg(function, function.params.items[1].name, .ptr);
+        if (ptr_reg != .rdi or expected_reg != .rsi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .{ .spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax = spinlock_symbol });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    return false;
+}
+
 pub fn lowerGuardedStrncatBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesGuardedStrncatBody(function)) return false;
     const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -1949,12 +1976,297 @@ fn matchSpinlockedMemcpyBody(function: ir.Function) !?[]const u8 {
     return spinlock_symbol;
 }
 
+fn matchAtomicCompareExchangeScalar(function: ir.Function) !?u16 {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 5) return null;
+    const bits = scalarAtomicCompareExchangeBits(function.params.items[2].ty) orelse return null;
+    if (bits == 128) return null;
+    if (!function.params.items[0].ty.eql(.ptr) or
+        !function.params.items[1].ty.eql(.ptr) or
+        !function.params.items[3].ty.eql(.{ .int = 32 }) or
+        !function.params.items[4].ty.eql(.{ .int = 32 })) return null;
+    if (function.blocks.items.len != 3) return null;
+    if (!functionHasNoRemovedInstructions(function)) return null;
+
+    const ptr_name = function.params.items[0].name;
+    const expected_ptr_name = function.params.items[1].name;
+    const desired_name = function.params.items[2].name;
+    const entry = function.blocks.items[0];
+    const ret_block = function.blocks.items[1];
+    const fail_block = function.blocks.items[2];
+    if (entry.instructions.items.len != 8 or ret_block.instructions.items.len != 1 or fail_block.instructions.items.len != 2) return null;
+
+    const scratch_name = entry.instructions.items[0].result orelse return null;
+    const scratch = switch (entry.instructions.items[0].kind) {
+        .alloca => |alloca| alloca,
+        else => return null,
+    };
+    if (!scratch.allocated_ty.eql(.{ .int = 8 })) return null;
+
+    const expected_value_name = entry.instructions.items[1].result orelse return null;
+    const expected_load = switch (entry.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!expected_load.ty.eql(.{ .int = bits }) or !isNamed(expected_load.ptr, expected_ptr_name) or expected_load.attrs.isBarrier()) return null;
+
+    const cmpxchg_name = entry.instructions.items[2].result orelse return null;
+    const cmpxchg = switch (entry.instructions.items[2].kind) {
+        .cmpxchg => |cmpxchg| cmpxchg,
+        else => return null,
+    };
+    if (!cmpxchg.ty.eql(.{ .int = bits }) or !isNamed(cmpxchg.ptr, ptr_name) or
+        !isNamed(cmpxchg.expected, expected_value_name) or !isNamed(cmpxchg.replacement, desired_name) or
+        !std.mem.eql(u8, cmpxchg.success_ordering, "seq_cst") or
+        !std.mem.eql(u8, cmpxchg.failure_ordering, "seq_cst") or
+        cmpxchg.syncscope != null or cmpxchg.is_weak or cmpxchg.is_volatile or cmpxchg.@"align" != bits / 8) return null;
+
+    const success_name = entry.instructions.items[3].result orelse return null;
+    if (!matchExtractValue(entry.instructions.items[3], cmpxchg_name, "1", .{ .int = 1 })) return null;
+
+    const failure_flag_name = entry.instructions.items[4].result orelse return null;
+    const failure_flag = switch (entry.instructions.items[4].kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (failure_flag.op != .xor or !failure_flag.ty.eql(.{ .int = 1 }) or
+        !isNamed(failure_flag.lhs, success_name) or !isInt(failure_flag.rhs, 1)) return null;
+
+    const scratch_store = switch (entry.instructions.items[5].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!scratch_store.ty.eql(.{ .int = 1 }) or !isNamed(scratch_store.value, failure_flag_name) or
+        !isNamed(scratch_store.ptr, scratch_name) or scratch_store.attrs.isBarrier()) return null;
+
+    const scratch_loaded_name = entry.instructions.items[6].result orelse return null;
+    const scratch_load = switch (entry.instructions.items[6].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!scratch_load.ty.eql(.{ .int = 8 }) or !isNamed(scratch_load.ptr, scratch_name) or scratch_load.attrs.isBarrier()) return null;
+
+    const branch_cond_name = entry.instructions.items[7].result orelse return null;
+    const branch_cond = switch (entry.instructions.items[7].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (branch_cond.predicate != .eq or !branch_cond.operand_ty.eql(.{ .int = 8 }) or
+        !isNamed(branch_cond.lhs, scratch_loaded_name) or !isInt(branch_cond.rhs, 0)) return null;
+
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, branch_cond_name) or
+        !std.mem.eql(u8, entry_br.then_target, ret_block.name) or !std.mem.eql(u8, entry_br.else_target, fail_block.name)) return null;
+
+    const phi_name = ret_block.instructions.items[0].result orelse return null;
+    const phi = switch (ret_block.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    if (!phi.ty.eql(.{ .int = 32 }) or !phiHasIncomingInt(phi, 1, entry.name) or !phiHasIncomingInt(phi, 0, fail_block.name)) return null;
+    const ret = switch (ret_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, phi_name)) return null;
+
+    const old_value_name = fail_block.instructions.items[0].result orelse return null;
+    if (!matchExtractValue(fail_block.instructions.items[0], cmpxchg_name, "0", .{ .int = bits })) return null;
+    const old_store = switch (fail_block.instructions.items[1].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!old_store.ty.eql(.{ .int = bits }) or !isNamed(old_store.value, old_value_name) or
+        !isNamed(old_store.ptr, expected_ptr_name) or old_store.attrs.isBarrier()) return null;
+    const fail_br = switch (fail_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, fail_br.target, ret_block.name)) return null;
+    return bits;
+}
+
+fn matchSpinlockedCompareExchangeI128(function: ir.Function) !?[]const u8 {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 5) return null;
+    if (!function.params.items[0].ty.eql(.ptr) or
+        !function.params.items[1].ty.eql(.ptr) or
+        !function.params.items[2].ty.eql(.{ .int = 128 }) or
+        !function.params.items[3].ty.eql(.{ .int = 32 }) or
+        !function.params.items[4].ty.eql(.{ .int = 32 })) return null;
+    if (function.blocks.items.len != 6) return null;
+    if (!functionHasNoRemovedInstructions(function)) return null;
+
+    const ptr_name = function.params.items[0].name;
+    const expected_ptr_name = function.params.items[1].name;
+    const desired_name = function.params.items[2].name;
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const compare = function.blocks.items[2];
+    const ret_block = function.blocks.items[3];
+    const success_block = function.blocks.items[4];
+    const fail_block = function.blocks.items[5];
+    if (entry.instructions.items.len != 4 or loop.instructions.items.len != 2 or
+        compare.instructions.items.len != 3 or ret_block.instructions.items.len != 2 or
+        success_block.instructions.items.len != 1 or fail_block.instructions.items.len != 1) return null;
+
+    const ptr_int_name = entry.instructions.items[0].result orelse return null;
+    const ptr_int = switch (entry.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (ptr_int.op != .ptrtoint or !ptr_int.from_ty.eql(.ptr) or !ptr_int.to_ty.eql(.{ .int = 64 }) or !isNamed(ptr_int.value, ptr_name)) return null;
+    const shifted_name = entry.instructions.items[1].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[1], .lshr, ptr_int_name, 3)) return null;
+    const slot_name = entry.instructions.items[2].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[2], .@"and", shifted_name, 62)) return null;
+    const lock_ptr_name = entry.instructions.items[3].result orelse return null;
+    const spinlock_symbol = try matchSpinlockGep(entry.instructions.items[3], slot_name);
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, entry_br.target, loop.name)) return null;
+
+    if (!matchSpinlockAcquireLoop(loop, lock_ptr_name, compare.name)) return null;
+
+    const loaded_name = compare.instructions.items[0].result orelse return null;
+    const loaded = switch (compare.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!loaded.ty.eql(.{ .int = 128 }) or !isNamed(loaded.ptr, ptr_name) or loaded.attrs.isBarrier()) return null;
+    const expected_name = compare.instructions.items[1].result orelse return null;
+    const expected = switch (compare.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!expected.ty.eql(.{ .int = 128 }) or !isNamed(expected.ptr, expected_ptr_name) or expected.attrs.isBarrier()) return null;
+    const equal_name = compare.instructions.items[2].result orelse return null;
+    const equal = switch (compare.instructions.items[2].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (equal.predicate != .eq or !equal.operand_ty.eql(.{ .int = 128 }) or
+        !isNamed(equal.lhs, loaded_name) or !isNamed(equal.rhs, expected_name)) return null;
+    const compare_br = switch (compare.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!compare_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(compare_br.cond, equal_name) or
+        !std.mem.eql(u8, compare_br.then_target, success_block.name) or
+        !std.mem.eql(u8, compare_br.else_target, fail_block.name)) return null;
+
+    const phi_name = ret_block.instructions.items[0].result orelse return null;
+    const phi = switch (ret_block.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    if (!phi.ty.eql(.{ .int = 32 }) or !phiHasIncomingInt(phi, 1, success_block.name) or !phiHasIncomingInt(phi, 0, fail_block.name)) return null;
+    const release = switch (ret_block.instructions.items[1].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!release.ty.eql(.{ .int = 64 }) or !isInt(release.value, 0) or !isNamed(release.ptr, lock_ptr_name) or
+        release.attrs.atomic_ordering == null or !std.mem.eql(u8, release.attrs.atomic_ordering.?, "release") or
+        release.attrs.@"align" != 64 or release.attrs.is_volatile) return null;
+    const ret = switch (ret_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, phi_name)) return null;
+
+    const success_store = switch (success_block.instructions.items[0].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!success_store.ty.eql(.{ .int = 128 }) or !isNamed(success_store.value, desired_name) or
+        !isNamed(success_store.ptr, ptr_name) or success_store.attrs.isBarrier()) return null;
+    const success_br = switch (success_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, success_br.target, ret_block.name)) return null;
+
+    const fail_store = switch (fail_block.instructions.items[0].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!fail_store.ty.eql(.{ .int = 128 }) or !isNamed(fail_store.value, loaded_name) or
+        !isNamed(fail_store.ptr, expected_ptr_name) or fail_store.attrs.isBarrier()) return null;
+    const fail_br = switch (fail_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, fail_br.target, ret_block.name)) return null;
+    return spinlock_symbol;
+}
+
 fn matchI64BinaryNamedImm(instruction: ir.Instruction, op: ir.BinaryOp, lhs_name: []const u8, rhs: i128) bool {
     const binary = switch (instruction.kind) {
         .binary => |binary| binary,
         else => return false,
     };
     return binary.op == op and binary.ty.eql(.{ .int = 64 }) and isNamed(binary.lhs, lhs_name) and isInt(binary.rhs, rhs);
+}
+
+fn functionHasNoRemovedInstructions(function: ir.Function) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) return false;
+        }
+    }
+    return true;
+}
+
+fn scalarAtomicCompareExchangeBits(ty: ir.Type) ?u16 {
+    const bits = switch (ty) {
+        .int => |bits| bits,
+        else => return null,
+    };
+    return switch (bits) {
+        8, 16, 32, 64, 128 => @intCast(bits),
+        else => null,
+    };
+}
+
+fn matchExtractValue(instruction: ir.Instruction, aggregate_name: []const u8, indices: []const u8, result_ty: ir.Type) bool {
+    const extract = switch (instruction.kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    return extract.result_ty.eql(result_ty) and
+        isNamed(extract.aggregate, aggregate_name) and
+        std.mem.eql(u8, extract.indices, indices);
+}
+
+fn matchSpinlockAcquireLoop(loop: ir.BasicBlock, lock_ptr_name: []const u8, acquired_target: []const u8) bool {
+    if (loop.instructions.items.len != 2) return false;
+    const old_lock_name = loop.instructions.items[0].result orelse return false;
+    const atomic = switch (loop.instructions.items[0].kind) {
+        .atomicrmw => |atomicrmw| atomicrmw,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, atomic.op, "xchg") or !atomic.ty.eql(.{ .int = 64 }) or
+        !isNamed(atomic.ptr, lock_ptr_name) or !isInt(atomic.value, 1) or
+        !std.mem.eql(u8, atomic.ordering, "acquire") or atomic.syncscope != null or
+        atomic.is_volatile or atomic.@"align" != 8) return false;
+
+    const acquired_name = loop.instructions.items[1].result orelse return false;
+    const acquired = switch (loop.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (acquired.predicate != .eq or !acquired.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(acquired.lhs, old_lock_name) or !isInt(acquired.rhs, 0)) return false;
+    const loop_br = switch (loop.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    return loop_br.cond_ty.eql(.{ .int = 1 }) and isNamed(loop_br.cond, acquired_name) and
+        std.mem.eql(u8, loop_br.then_target, acquired_target) and
+        std.mem.eql(u8, loop_br.else_target, loop.name);
 }
 
 fn matchSpinlockGep(instruction: ir.Instruction, index_name: []const u8) ![]const u8 {
