@@ -116,6 +116,8 @@ fn scanExportCache(
     stdout: *std.Io.Writer,
     totals: *Totals,
 ) !void {
+    const now_ns: i128 = std.Io.Timestamp.now(io, .real).nanoseconds;
+    const threshold_ns: i128 = @as(i128, @intCast(options.older_than_seconds)) * std.time.ns_per_s;
     const cache_dir_path = try std.fs.path.join(allocator, &.{ options.tmp_dir, export_cache_name });
     defer allocator.free(cache_dir_path);
 
@@ -158,16 +160,25 @@ fn scanExportCache(
 
     for (seen_meta.keys()) |stem| {
         if (!seen_air.contains(stem)) {
-            try common.validationError(io, "cache layout error: missing .air pair for {s}/{s}.meta\n", .{ cache_dir_path, stem });
+            const meta_name = try std.fmt.allocPrint(allocator, "{s}.meta", .{stem});
+            defer allocator.free(meta_name);
+            const meta_path = try std.fs.path.join(allocator, &.{ cache_dir_path, meta_name });
+            defer allocator.free(meta_path);
+            try maybeReportOrphanCacheFile(io, stdout, options.delete, now_ns, threshold_ns, meta_path, "orphan-cache-meta", totals);
         }
     }
     for (seen_air.keys()) |stem| {
         if (!seen_meta.contains(stem)) {
-            try common.validationError(io, "cache layout error: missing .meta pair for {s}/{s}.air\n", .{ cache_dir_path, stem });
+            const air_name = try std.fmt.allocPrint(allocator, "{s}.air", .{stem});
+            defer allocator.free(air_name);
+            const air_path = try std.fs.path.join(allocator, &.{ cache_dir_path, air_name });
+            defer allocator.free(air_path);
+            try maybeReportOrphanCacheFile(io, stdout, options.delete, now_ns, threshold_ns, air_path, "orphan-cache-air", totals);
         }
     }
 
     for (seen_meta.keys()) |stem| {
+        if (!seen_air.contains(stem)) continue;
         const meta_name = try std.fmt.allocPrint(allocator, "{s}.meta", .{stem});
         defer allocator.free(meta_name);
         const air_name = try std.fmt.allocPrint(allocator, "{s}.air", .{stem});
@@ -223,25 +234,24 @@ fn scanScratchDirs(
         if (entry.kind != .directory or !isScratchDirName(entry.name)) continue;
         const path = try std.fs.path.join(allocator, &.{ options.tmp_dir, entry.name });
         defer allocator.free(path);
-        const stat = try std.Io.Dir.cwd().statFile(io, path, .{});
-        if (now_ns - @as(i128, stat.mtime.nanoseconds) < threshold_ns) continue;
 
-        const protected = try containsProtectedFile(allocator, io, path);
-        const bytes = try treeSize(allocator, io, path);
-        if (protected) {
-            try reportCandidate(stdout, false, "scratch-dir-skip-protected", path, bytes, "reason", "contains-log-or-txt");
+        const facts = try treeFacts(allocator, io, path);
+        if (now_ns - @as(i128, facts.newest_mtime_ns) < threshold_ns) continue;
+
+        if (facts.contains_protected_file) {
+            try reportCandidate(stdout, false, "scratch-dir-skip-protected", path, facts.size, "reason", "contains-log-or-txt");
             totals.scratch_dirs_skipped += 1;
             continue;
         }
 
-        try reportCandidate(stdout, options.delete, "scratch-dir", path, bytes, "reason", "older-than-threshold");
+        try reportCandidate(stdout, options.delete, "scratch-dir", path, facts.size, "reason", "older-than-threshold");
         totals.candidates += 1;
         totals.scratch_dirs += 1;
-        totals.bytes_reclaimable += bytes;
+        totals.bytes_reclaimable += facts.size;
         if (options.delete) {
             try std.Io.Dir.cwd().deleteTree(io, path);
             totals.deleted += 1;
-            totals.bytes_deleted += bytes;
+            totals.bytes_deleted += facts.size;
         }
     }
 }
@@ -261,40 +271,75 @@ fn isScratchDirName(name: []const u8) bool {
     return false;
 }
 
-fn containsProtectedFile(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !bool {
-    var dir = std.Io.Dir.cwd().openDir(io, path, .{ .iterate = true }) catch |err| switch (err) {
-        error.NotDir => return false,
-        else => return err,
-    };
-    defer dir.close(io);
+const TreeFacts = struct {
+    size: u64 = 0,
+    newest_mtime_ns: i128 = std.math.minInt(i128),
+    contains_protected_file: bool = false,
+};
 
-    var iter = dir.iterate();
-    while (try iter.next(io)) |entry| {
-        if (entry.kind == .file and (std.mem.endsWith(u8, entry.name, ".log") or std.mem.endsWith(u8, entry.name, ".txt"))) return true;
-        if (entry.kind == .directory) {
-            const child = try std.fs.path.join(allocator, &.{ path, entry.name });
-            defer allocator.free(child);
-            if (try containsProtectedFile(allocator, io, child)) return true;
-        }
-    }
-    return false;
-}
-
-fn treeSize(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !u64 {
+fn treeFacts(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !TreeFacts {
     const stat = try std.Io.Dir.cwd().statFile(io, path, .{});
-    if (stat.kind != .directory) return stat.size;
+    var facts: TreeFacts = .{
+        .size = stat.size,
+        .newest_mtime_ns = stat.mtime.nanoseconds,
+        .contains_protected_file = isProtectedFileName(std.fs.path.basename(path)),
+    };
+    if (stat.kind != .directory) return facts;
 
     var dir = try std.Io.Dir.cwd().openDir(io, path, .{ .iterate = true });
     defer dir.close(io);
 
-    var size: u64 = 0;
     var iter = dir.iterate();
     while (try iter.next(io)) |entry| {
         const child = try std.fs.path.join(allocator, &.{ path, entry.name });
         defer allocator.free(child);
-        size += try treeSize(allocator, io, child);
+        if (entry.kind == .directory) {
+            const child_facts = try treeFacts(allocator, io, child);
+            facts.size += child_facts.size;
+            facts.newest_mtime_ns = @max(facts.newest_mtime_ns, child_facts.newest_mtime_ns);
+            facts.contains_protected_file = facts.contains_protected_file or child_facts.contains_protected_file;
+            continue;
+        }
+
+        const child_stat = std.Io.Dir.cwd().statFile(io, child, .{}) catch |err| switch (err) {
+            error.FileNotFound => continue,
+            else => return err,
+        };
+        facts.size += child_stat.size;
+        facts.newest_mtime_ns = @max(facts.newest_mtime_ns, child_stat.mtime.nanoseconds);
+        facts.contains_protected_file = facts.contains_protected_file or isProtectedFileName(entry.name);
     }
-    return size;
+    return facts;
+}
+
+fn isProtectedFileName(name: []const u8) bool {
+    return std.mem.endsWith(u8, name, ".log") or std.mem.endsWith(u8, name, ".txt");
+}
+
+fn maybeReportOrphanCacheFile(
+    io: std.Io,
+    stdout: *std.Io.Writer,
+    delete: bool,
+    now_ns: i128,
+    threshold_ns: i128,
+    path: []const u8,
+    kind: []const u8,
+    totals: *Totals,
+) !void {
+    const stat = std.Io.Dir.cwd().statFile(io, path, .{}) catch |err| switch (err) {
+        error.FileNotFound => return,
+        else => return err,
+    };
+    if (now_ns - @as(i128, stat.mtime.nanoseconds) < threshold_ns) return;
+
+    try reportCandidate(stdout, delete, kind, path, stat.size, "reason", "missing-pair");
+    totals.candidates += 1;
+    totals.bytes_reclaimable += stat.size;
+    if (delete) {
+        try std.Io.Dir.cwd().deleteFile(io, path);
+        totals.deleted += 1;
+        totals.bytes_deleted += stat.size;
+    }
 }
 
 fn reportCandidate(
