@@ -334,6 +334,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt int:clz ladder width-parametric` | 0 | Closed | 2 | Item 12 std-hello Debug discovery now lowers the model-owned clz ladder family width-parametrically for i32/i64/i128; it subsumes the former i32-only ladder recognizer, adds SysV `rdi`/`rsi:rdi` backend ops for i64/i128, and moves Debug std-hello from object-emission `UnsupportedCodegenInstruction` in `compiler_rt.count0bits.__clzti2` to object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__memmove_chk` without function-name admission. Partial item-14 credit recorded for deleting the per-width i32 special-case entry point. Evidence `tmp/std_debug_hello_debug_build_after_clz_family.log` |
 | `real-program object-emission compiler_rt cfg:guarded memmove direct call` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned guard/trap/direct-call wrapper shape used by `compiler_rt.ssp.__memmove_chk` through generic CFG without function-name admission, preserving the returned destination pointer across the internal `memmoveFast` call. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__memcpy_chk`, whose guarded copy body is inlined rather than a direct call. Evidence `tmp/std_debug_hello_debug_build_after_memmove_chk.log` |
 | `real-program object-emission compiler_rt cfg:guarded memcpy body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned guarded copy-wrapper semantics used by `compiler_rt.ssp.__memcpy_chk`: the matcher validates the guard/trap entry, source-derived loads, destination-derived stores, metadata-only intrinsics, and `ret dst`, then emits a guarded `rep movsb` copy without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__strncat_chk`. Evidence `tmp/std_debug_hello_debug_build_after_memcpy_chk.log` |
+| `real-program object-emission compiler_rt cfg:guarded strncat append body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned checked string append body shape used by `compiler_rt.ssp.__strncat_chk`: the matcher validates destination NUL scanning, source-derived byte loads, destination-derived source-byte and terminator stores, trap exits, max-bound use, and `ret dst`, then emits a guarded append loop without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__strcat_chk`. Evidence `tmp/std_debug_hello_debug_build_after_strncat_chk.log` |
 
 ## Progress Log
 
@@ -698,6 +699,15 @@ One line per completed cycle, append-only, newest last. This is the
   old-pin cache generations after a fail-closed cache miss; fixture evidence
   is `docs/evidence/clean_tmp.summary`. Strict real-row enforcement remains
   at 100. Recognizer count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-05 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned checked string append shape used by compiler_rt
+  `ssp.__strncat_chk`, validating destination scanning, source-byte copying,
+  terminator storage, trap exits, and max-bound use before emitting a guarded
+  append loop that returns the original destination pointer. Debug std-hello
+  moved from object-emission `UnsupportedCodegenControlFlow` in
+  `compiler_rt.ssp.__strncat_chk` to the same stage/diagnostic in
+  `compiler_rt.ssp.__strcat_chk`; strict real-row enforcement remains at 100.
+  Recognizer count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 

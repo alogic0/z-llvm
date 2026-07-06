@@ -237,6 +237,39 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\trep movsb\n" ++
                     "2:\n",
             ),
+            .guarded_strncat_rdi_rsi_rdx_rcx_rax => try writer.writeAll(
+                "\tmovq %rdi, %rax\n" ++
+                    "\ttestq %rcx, %rcx\n" ++
+                    "\tjne 1f\n" ++
+                    "0:\n" ++
+                    "\tud2\n" ++
+                    "1:\n" ++
+                    "\txorl %r8d, %r8d\n" ++
+                    "2:\n" ++
+                    "\tcmpb $0, (%rdi,%r8)\n" ++
+                    "\tje 3f\n" ++
+                    "\tincq %r8\n" ++
+                    "\tdecq %rcx\n" ++
+                    "\tje 0b\n" ++
+                    "\tjmp 2b\n" ++
+                    "3:\n" ++
+                    "\tleaq (%rdi,%r8), %r9\n" ++
+                    "\ttestq %rdx, %rdx\n" ++
+                    "\tje 5f\n" ++
+                    "\txorl %r8d, %r8d\n" ++
+                    "4:\n" ++
+                    "\tmovzbl (%rsi,%r8), %r10d\n" ++
+                    "\ttestb %r10b, %r10b\n" ++
+                    "\tje 5f\n" ++
+                    "\tmovb %r10b, (%r9,%r8)\n" ++
+                    "\tdecq %rcx\n" ++
+                    "\tje 0b\n" ++
+                    "\tincq %r8\n" ++
+                    "\tcmpq %rdx, %r8\n" ++
+                    "\tjb 4b\n" ++
+                    "5:\n" ++
+                    "\tmovb $0, (%r9,%r8)\n",
+            ),
             .memset_rdi_sil_rdx_rax => try writer.writeAll(
                 "\tmovq %rdi, %rax\n" ++
                     "\ttestq %rdx, %rdx\n" ++

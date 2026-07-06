@@ -420,6 +420,82 @@ test "x86_64 generic cfg lowers guarded byte memset loop without name admission"
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers guarded strncat append loop without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.trap()
+        \\
+        \\define internal ptr @any_guarded_strncat_append(ptr %dst, ptr %src, i64 %max, i64 %guard) {
+        \\entry:
+        \\  %guard.zero = icmp eq i64 %guard, 0
+        \\  br i1 %guard.zero, label %trap1, label %scan
+        \\scan:
+        \\  %dst.idx = phi i64 [ %dst.next, %scan.next ], [ 0, %entry ]
+        \\  %remaining = phi i64 [ %remaining.next, %scan.next ], [ %guard, %entry ]
+        \\  %dst.ptr = getelementptr inbounds [1 x i8], ptr %dst, i64 %dst.idx
+        \\  %dst.byte = load i8, ptr %dst.ptr, align 1
+        \\  %dst.zero = icmp eq i8 %dst.byte, 0
+        \\  br i1 %dst.zero, label %copy.preheader, label %scan.next
+        \\scan.next:
+        \\  %remaining.next = add i64 %remaining, -1
+        \\  %dst.next = add nuw i64 %dst.idx, 1
+        \\  %guard.done = icmp eq i64 %remaining.next, 0
+        \\  br i1 %guard.done, label %trap1, label %scan
+        \\trap1:
+        \\  call void @llvm.trap()
+        \\  unreachable
+        \\copy.preheader:
+        \\  %append.ptr = getelementptr inbounds [1 x i8], ptr %dst, i64 %dst.idx
+        \\  %max.zero = icmp eq i64 %max, 0
+        \\  br i1 %max.zero, label %finish, label %copy
+        \\copy:
+        \\  %copy.idx = phi i64 [ %copy.next, %copy.next.block ], [ 0, %copy.preheader ]
+        \\  %copy.remaining = phi i64 [ %copy.remaining.next, %copy.next.block ], [ %remaining, %copy.preheader ]
+        \\  %src.ptr = getelementptr inbounds [1 x i8], ptr %src, i64 %copy.idx
+        \\  %src.byte = load i8, ptr %src.ptr, align 1
+        \\  %src.zero = icmp eq i8 %src.byte, 0
+        \\  br i1 %src.zero, label %finish, label %copy.next.block
+        \\copy.next.block:
+        \\  %store.ptr = getelementptr [1 x i8], ptr %append.ptr, i64 %copy.idx
+        \\  store i8 %src.byte, ptr %store.ptr, align 1
+        \\  %copy.remaining.next = add i64 %copy.remaining, -1
+        \\  %copy.next = add nuw i64 %copy.idx, 1
+        \\  %has.guard = icmp ne i64 %copy.remaining.next, 0
+        \\  %under.max = icmp ult i64 %copy.next, %max
+        \\  %cont = select i1 %has.guard, i1 %under.max, i1 false
+        \\  br i1 %cont, label %copy, label %post.copy
+        \\post.copy:
+        \\  %guard.empty = icmp eq i64 %copy.remaining.next, 0
+        \\  br i1 %guard.empty, label %trap2, label %finish
+        \\trap2:
+        \\  call void @llvm.trap()
+        \\  unreachable
+        \\finish:
+        \\  %term.idx = phi i64 [ 0, %copy.preheader ], [ %copy.idx, %copy ], [ %copy.next, %post.copy ]
+        \\  %term.ptr = getelementptr [1 x i8], ptr %append.ptr, i64 %term.idx
+        \\  store i8 0, ptr %term.ptr, align 1
+        \\  ret ptr %dst
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.guarded_strncat_rdi_rsi_rdx_rcx_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers byte memset loop without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

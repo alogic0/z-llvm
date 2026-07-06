@@ -57,10 +57,11 @@ Stop state recorded 2026-07-05 after item 12a tmp hygiene cycle:
   `_start` executable in ReleaseFast, ReleaseSafe, and ReleaseSmall; each run
   prints `hello\n` and exits 0. Item 12 std hello remains open. The latest
   Debug std-hello cycles lowered the model-owned guarded direct-call wrapper
-  in `compiler_rt.ssp.__memmove_chk` and the guarded copy body in
-  `compiler_rt.ssp.__memcpy_chk` without name admission; item 12a then added
-  tmp/cache hygiene without moving the program blocker. The focused build now
-  fails at `compiler_rt.ssp.__strncat_chk` with
+  in `compiler_rt.ssp.__memmove_chk`, the guarded copy body in
+  `compiler_rt.ssp.__memcpy_chk`, and the checked string append body in
+  `compiler_rt.ssp.__strncat_chk` without name admission; item 12a added
+  tmp/cache hygiene between the copy and string-append fixes. The focused
+  build now fails at `compiler_rt.ssp.__strcat_chk` with
   `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
@@ -76,8 +77,8 @@ Stop state recorded 2026-07-05 after item 12a tmp hygiene cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_memcpy_chk.log`,
-  `tmp/distribution_all_after_memcpy_chk.log`,
+- Saved log paths: `tmp/std_debug_hello_debug_build_after_strncat_chk.log`,
+  `tmp/distribution_all_after_strncat_chk.log`,
   `tmp/clean_tmp_fixture_pair.log`, and
   `tmp/real_rows_releasefast_after_clean_tmp.log`.
 - Tracked evidence summaries:
@@ -89,11 +90,11 @@ Stop state recorded 2026-07-05 after item 12a tmp hygiene cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
   `docs/evidence/clean_tmp.summary`.
 - Recommended next action: continue item 12 by fixing
-  `compiler_rt.ssp.__strncat_chk`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__strncat_chk` on the focused Debug std-hello
-  build; before fixing it alone, check whether the remaining ssp `_chk`
-  wrappers share a guard/trap/body shape that one model-owned family lowering
-  can cover. Keep the lowering model-owned and fail-closed. For remaining
+  `compiler_rt.ssp.__strcat_chk`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__strcat_chk` on the focused Debug std-hello
+  build; check whether it can reuse the checked string append family shape
+  with no weakening of the `strncat` bounds model. Keep the lowering
+  model-owned and fail-closed. For remaining
   compiler_rt builtin families, use width-parametric lowerings where the
   model-owned shapes match, recording partial item-14 credit when a
   parametric family subsumes per-width special cases.
