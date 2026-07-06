@@ -300,6 +300,51 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "5:\n" ++
                     "\tmovb $0, (%r9,%r8)\n",
             ),
+            .guarded_strncpy_rdi_rsi_rdx_rcx_rax => try writer.writeAll(
+                "\tmovq %rdi, %rax\n" ++
+                    "\tcmpq %rdx, %rcx\n" ++
+                    "\tjae 1f\n" ++
+                    "0:\n" ++
+                    "\tud2\n" ++
+                    "1:\n" ++
+                    "\ttestq %rdx, %rdx\n" ++
+                    "\tje 5f\n" ++
+                    "\txorl %r8d, %r8d\n" ++
+                    "2:\n" ++
+                    "\tmovzbl (%rsi,%r8), %r9d\n" ++
+                    "\ttestb %r9b, %r9b\n" ++
+                    "\tje 3f\n" ++
+                    "\tmovb %r9b, (%rdi,%r8)\n" ++
+                    "\tincq %r8\n" ++
+                    "\tcmpq %rdx, %r8\n" ++
+                    "\tjb 2b\n" ++
+                    "\tjmp 5f\n" ++
+                    "3:\n" ++
+                    "\tmovb $0, (%rdi,%r8)\n" ++
+                    "\tincq %r8\n" ++
+                    "\tcmpq %rdx, %r8\n" ++
+                    "\tjb 3b\n",
+            ),
+            .guarded_strcpy_rdi_rsi_rdx_rax => try writer.writeAll(
+                "\tmovq %rdi, %rax\n" ++
+                    "\ttestq %rdx, %rdx\n" ++
+                    "\tjne 1f\n" ++
+                    "0:\n" ++
+                    "\tud2\n" ++
+                    "1:\n" ++
+                    "\txorl %r8d, %r8d\n" ++
+                    "2:\n" ++
+                    "\tmovzbl (%rsi,%r8), %r9d\n" ++
+                    "\ttestb %r9b, %r9b\n" ++
+                    "\tje 3f\n" ++
+                    "\tmovb %r9b, (%rdi,%r8)\n" ++
+                    "\tdecq %rdx\n" ++
+                    "\tje 0b\n" ++
+                    "\tincq %r8\n" ++
+                    "\tjmp 2b\n" ++
+                    "3:\n" ++
+                    "\tmovb $0, (%rdi,%r8)\n",
+            ),
             .memset_rdi_sil_rdx_rax => try writer.writeAll(
                 "\tmovq %rdi, %rax\n" ++
                     "\ttestq %rdx, %rdx\n" ++

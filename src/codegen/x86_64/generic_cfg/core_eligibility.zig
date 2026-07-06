@@ -157,6 +157,14 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.Ma
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try loop_rows.lowerGuardedStrncpyBody(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try loop_rows.lowerGuardedStrcpyBody(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try loop_rows.lowerGuardedByteMemsetLoop(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;

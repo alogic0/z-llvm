@@ -302,6 +302,43 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xeb, 0xe8, // jmp 4b
                 0x43, 0xc6, 0x04, 0x01, 0x00, // movb $0, (%r9,%r8)
             }),
+            .guarded_strncpy_rdi_rsi_rdx_rcx_rax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x89, 0xf8, // movq %rdi, %rax
+                0x48, 0x39, 0xd1, // cmpq %rdx, %rcx
+                0x73, 0x02, // jae 1f
+                0x0f, 0x0b, // ud2
+                0x48, 0x85, 0xd2, // testq %rdx, %rdx
+                0x74, 0x28, // je 5f
+                0x45, 0x31, 0xc0, // xorl %r8d, %r8d
+                0x46, 0x0f, 0xb6, 0x0c, 0x06, // movzbl (%rsi,%r8), %r9d
+                0x45, 0x84, 0xc9, // testb %r9b, %r9b
+                0x74, 0x0e, // je 3f
+                0x46, 0x88, 0x0c, 0x07, // movb %r9b, (%rdi,%r8)
+                0x49, 0xff, 0xc0, // incq %r8
+                0x49, 0x39, 0xd0, // cmpq %rdx, %r8
+                0x72, 0xea, // jb 2b
+                0xeb, 0x0d, // jmp 5f
+                0x42, 0xc6, 0x04, 0x07, 0x00, // movb $0, (%rdi,%r8)
+                0x49, 0xff, 0xc0, // incq %r8
+                0x49, 0x39, 0xd0, // cmpq %rdx, %r8
+                0x72, 0xf3, // jb 3b
+            }),
+            .guarded_strcpy_rdi_rsi_rdx_rax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x89, 0xf8, // movq %rdi, %rax
+                0x48, 0x85, 0xd2, // testq %rdx, %rdx
+                0x75, 0x02, // jne 1f
+                0x0f, 0x0b, // ud2
+                0x45, 0x31, 0xc0, // xorl %r8d, %r8d
+                0x46, 0x0f, 0xb6, 0x0c, 0x06, // movzbl (%rsi,%r8), %r9d
+                0x45, 0x84, 0xc9, // testb %r9b, %r9b
+                0x74, 0x0e, // je 3f
+                0x46, 0x88, 0x0c, 0x07, // movb %r9b, (%rdi,%r8)
+                0x48, 0xff, 0xca, // decq %rdx
+                0x74, 0xe8, // je 0b
+                0x49, 0xff, 0xc0, // incq %r8
+                0xeb, 0xe8, // jmp 2b
+                0x42, 0xc6, 0x04, 0x07, 0x00, // movb $0, (%rdi,%r8)
+            }),
             .memset_rdi_sil_rdx_rax => try bytes.appendSlice(allocator, &.{
                 0x48, 0x89, 0xf8, // movq %rdi, %rax
                 0x48, 0x85, 0xd2, // testq %rdx, %rdx
@@ -764,6 +801,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .guarded_memcpy_rdi_rsi_rdx_rcx_rax => 24,
         .guarded_strncat_rdi_rsi_rdx_rcx_rax => 74,
         .guarded_strcat_rdi_rsi_rdx_rax => 66,
+        .guarded_strncpy_rdi_rsi_rdx_rcx_rax => 55,
+        .guarded_strcpy_rdi_rsi_rdx_rax => 42,
         .memset_rdi_sil_rdx_rax => 22,
         .and_edi_imm8 => 3,
         .smin_i32_edi_esi_eax, .umin_i32_edi_esi_eax, .smax_i32_edi_esi_eax, .umax_i32_edi_esi_eax => 7,

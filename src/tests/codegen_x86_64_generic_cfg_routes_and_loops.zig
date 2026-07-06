@@ -564,6 +564,111 @@ test "x86_64 generic cfg lowers guarded strcat append loop without name admissio
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers guarded strncpy copy pad loop without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.trap()
+        \\
+        \\define internal ptr @any_guarded_strncpy_copy_pad(ptr %dst, ptr %src, i64 %len, i64 %guard) {
+        \\entry:
+        \\  %bad = icmp ult i64 %guard, %len
+        \\  br i1 %bad, label %trap, label %check
+        \\trap:
+        \\  call void @llvm.trap()
+        \\  unreachable
+        \\check:
+        \\  %empty = icmp eq i64 %len, 0
+        \\  br i1 %empty, label %done, label %copy
+        \\copy:
+        \\  %idx = phi i64 [ 0, %check ], [ %next, %store ]
+        \\  %src.ptr = getelementptr inbounds [1 x i8], ptr %src, i64 %idx
+        \\  %byte = load i8, ptr %src.ptr, align 1
+        \\  %zero = icmp eq i8 %byte, 0
+        \\  br i1 %zero, label %pad, label %store
+        \\store:
+        \\  %dst.ptr = getelementptr inbounds [1 x i8], ptr %dst, i64 %idx
+        \\  store i8 %byte, ptr %dst.ptr, align 1
+        \\  %next = add nuw i64 %idx, 1
+        \\  %copy.done = icmp eq i64 %next, %len
+        \\  br i1 %copy.done, label %done, label %copy
+        \\pad:
+        \\  %pad.idx = phi i64 [ %idx, %copy ], [ %pad.next, %pad ]
+        \\  %pad.ptr = getelementptr inbounds [1 x i8], ptr %dst, i64 %pad.idx
+        \\  store i8 0, ptr %pad.ptr, align 1
+        \\  %pad.next = add nuw i64 %pad.idx, 1
+        \\  %pad.done = icmp eq i64 %pad.next, %len
+        \\  br i1 %pad.done, label %done, label %pad
+        \\done:
+        \\  ret ptr %dst
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.guarded_strncpy_rdi_rsi_rdx_rcx_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 generic cfg lowers guarded strcpy copy loop without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.trap()
+        \\
+        \\define internal ptr @any_guarded_strcpy_copy(ptr %dst, ptr %src, i64 %guard) {
+        \\entry:
+        \\  %guard.zero = icmp eq i64 %guard, 0
+        \\  br i1 %guard.zero, label %trap, label %copy
+        \\copy:
+        \\  %idx = phi i64 [ 0, %entry ], [ %next, %store ]
+        \\  %src.ptr = getelementptr inbounds [1 x i8], ptr %src, i64 %idx
+        \\  %byte = load i8, ptr %src.ptr, align 1
+        \\  %zero = icmp eq i8 %byte, 0
+        \\  %dst.ptr = getelementptr inbounds [1 x i8], ptr %dst, i64 %idx
+        \\  br i1 %zero, label %finish, label %store
+        \\store:
+        \\  store i8 %byte, ptr %dst.ptr, align 1
+        \\  %next = add nuw i64 %idx, 1
+        \\  %guard.done = icmp eq i64 %next, %guard
+        \\  br i1 %guard.done, label %trap, label %copy
+        \\trap:
+        \\  call void @llvm.trap()
+        \\  unreachable
+        \\finish:
+        \\  store i8 0, ptr %dst.ptr, align 1
+        \\  ret ptr %dst
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.guarded_strcpy_rdi_rsi_rdx_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers byte memset loop without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -1073,6 +1073,31 @@ pub fn lowerGuardedStrcatBody(allocator: std.mem.Allocator, machine: *MachineFun
     return true;
 }
 
+pub fn lowerGuardedStrncpyBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesGuardedStrncpyBody(function)) return false;
+    const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const src_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    const guard_reg = try paramReg(function, function.params.items[3].name, .{ .int = 64 });
+    if (dst_reg != .rdi or src_reg != .rsi or len_reg != .rdx or guard_reg != .rcx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .guarded_strncpy_rdi_rsi_rdx_rcx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGuardedStrcpyBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!matchesGuardedStrcpyBody(function)) return false;
+    const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const src_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    const guard_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
+    if (dst_reg != .rdi or src_reg != .rsi or guard_reg != .rdx) return error.UnsupportedCodegenAbi;
+
+    try machine.instructions.append(allocator, .guarded_strcpy_rdi_rsi_rdx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 pub fn lowerByteMemsetLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesByteMemsetLoop(function)) return false;
     const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -1382,6 +1407,162 @@ fn matchesGuardedStrcatBody(function: ir.Function) bool {
 
     return saw_dst_load and saw_src_load and saw_src_store and saw_zero_terminator and
         saw_ret and saw_trap;
+}
+
+fn matchesGuardedStrncpyBody(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.ptr)) return false;
+    if (function.params.items.len != 4 or function.params.items[0].ty != .ptr or
+        function.params.items[1].ty != .ptr or !function.params.items[2].ty.eql(.{ .int = 64 }) or
+        !function.params.items[3].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len < 5) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len == 0) return false;
+    const guard_cmp_name = entry.instructions.items[entry.instructions.items.len - 1].result orelse return false;
+    const guard_cmp = switch (entry.instructions.items[entry.instructions.items.len - 1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (guard_cmp.predicate != .ult or !guard_cmp.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(guard_cmp.lhs, function.params.items[3].name) or !isNamed(guard_cmp.rhs, function.params.items[2].name)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, guard_cmp_name)) return false;
+
+    var saw_src_load = false;
+    var saw_src_store = false;
+    var saw_zero_padding = false;
+    var saw_ret = false;
+    var saw_trap = false;
+    var saw_len_bound = false;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .binary, .phi, .gep, .cast => {},
+                .icmp => |icmp| {
+                    if (icmp.operand_ty.eql(.{ .int = 64 }) and
+                        (isNamed(icmp.lhs, function.params.items[2].name) or isNamed(icmp.rhs, function.params.items[2].name))) saw_len_bound = true;
+                },
+                .load => |load| {
+                    if (load.attrs.isBarrier() or !load.ty.eql(.{ .int = 8 })) return false;
+                    if (!valueDerivedFromPointer(function, load.ptr, function.params.items[1].name, 0)) return false;
+                    saw_src_load = true;
+                },
+                .store => |store| {
+                    if (store.attrs.isBarrier()) return false;
+                    if (!valueDerivedFromPointer(function, store.ptr, function.params.items[0].name, 0)) return false;
+                    if (valueIsLoadFromPointer(function, store.value, function.params.items[1].name)) {
+                        saw_src_store = true;
+                    } else if (store.value.eql(.{ .int = 0 })) {
+                        saw_zero_padding = true;
+                    } else {
+                        return false;
+                    }
+                },
+                .call => |call| {
+                    if (isCalleeName(call.callee, "llvm.trap")) {
+                        if (call.callee_value != null or call.inline_asm != null or call.ret_ty != .void or call.args.items.len != 0) return false;
+                        saw_trap = true;
+                    } else if (!isMemcpyBodyMetadataCall(call)) {
+                        return false;
+                    }
+                },
+                .freeze, .fcmp, .select, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+            }
+        }
+
+        switch (block.terminator orelse return false) {
+            .br, .condbr => {},
+            .ret => |ret| {
+                if (!ret.ty.eql(.ptr) or !isNamed(ret.value orelse return false, function.params.items[0].name)) return false;
+                saw_ret = true;
+            },
+            .@"unreachable" => {},
+            .@"switch", .indirectbr => return false,
+        }
+    }
+
+    return saw_src_load and saw_src_store and saw_zero_padding and saw_ret and
+        saw_trap and saw_len_bound;
+}
+
+fn matchesGuardedStrcpyBody(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.ptr)) return false;
+    if (function.params.items.len != 3 or function.params.items[0].ty != .ptr or
+        function.params.items[1].ty != .ptr or !function.params.items[2].ty.eql(.{ .int = 64 })) return false;
+    if (function.blocks.items.len < 4) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len == 0) return false;
+    const guard_zero_name = entry.instructions.items[entry.instructions.items.len - 1].result orelse return false;
+    const guard_zero = switch (entry.instructions.items[entry.instructions.items.len - 1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (guard_zero.predicate != .eq or !guard_zero.operand_ty.eql(.{ .int = 64 }) or
+        !isNamed(guard_zero.lhs, function.params.items[2].name) or !guard_zero.rhs.eql(.{ .int = 0 })) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, guard_zero_name)) return false;
+
+    var saw_src_load = false;
+    var saw_src_store = false;
+    var saw_zero_terminator = false;
+    var saw_ret = false;
+    var saw_trap = false;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .binary, .phi, .gep, .cast => {},
+                .icmp => {},
+                .load => |load| {
+                    if (load.attrs.isBarrier() or !load.ty.eql(.{ .int = 8 })) return false;
+                    if (!valueDerivedFromPointer(function, load.ptr, function.params.items[1].name, 0)) return false;
+                    saw_src_load = true;
+                },
+                .store => |store| {
+                    if (store.attrs.isBarrier()) return false;
+                    if (!valueDerivedFromPointer(function, store.ptr, function.params.items[0].name, 0)) return false;
+                    if (valueIsLoadFromPointer(function, store.value, function.params.items[1].name)) {
+                        saw_src_store = true;
+                    } else if (store.value.eql(.{ .int = 0 })) {
+                        saw_zero_terminator = true;
+                    } else {
+                        return false;
+                    }
+                },
+                .call => |call| {
+                    if (isCalleeName(call.callee, "llvm.trap")) {
+                        if (call.callee_value != null or call.inline_asm != null or call.ret_ty != .void or call.args.items.len != 0) return false;
+                        saw_trap = true;
+                    } else if (!isMemcpyBodyMetadataCall(call)) {
+                        return false;
+                    }
+                },
+                .freeze, .fcmp, .select, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+            }
+        }
+
+        switch (block.terminator orelse return false) {
+            .br, .condbr => {},
+            .ret => |ret| {
+                if (!ret.ty.eql(.ptr) or !isNamed(ret.value orelse return false, function.params.items[0].name)) return false;
+                saw_ret = true;
+            },
+            .@"unreachable" => {},
+            .@"switch", .indirectbr => return false,
+        }
+    }
+
+    return saw_src_load and saw_src_store and saw_zero_terminator and saw_ret and saw_trap;
 }
 
 fn valueIsLoadFromPointer(function: ir.Function, value: ir.Value, root_name: []const u8) bool {
