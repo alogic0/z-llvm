@@ -335,6 +335,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt cfg:guarded memmove direct call` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned guard/trap/direct-call wrapper shape used by `compiler_rt.ssp.__memmove_chk` through generic CFG without function-name admission, preserving the returned destination pointer across the internal `memmoveFast` call. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__memcpy_chk`, whose guarded copy body is inlined rather than a direct call. Evidence `tmp/std_debug_hello_debug_build_after_memmove_chk.log` |
 | `real-program object-emission compiler_rt cfg:guarded memcpy body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned guarded copy-wrapper semantics used by `compiler_rt.ssp.__memcpy_chk`: the matcher validates the guard/trap entry, source-derived loads, destination-derived stores, metadata-only intrinsics, and `ret dst`, then emits a guarded `rep movsb` copy without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__strncat_chk`. Evidence `tmp/std_debug_hello_debug_build_after_memcpy_chk.log` |
 | `real-program object-emission compiler_rt cfg:guarded strncat append body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned checked string append body shape used by `compiler_rt.ssp.__strncat_chk`: the matcher validates destination NUL scanning, source-derived byte loads, destination-derived source-byte and terminator stores, trap exits, max-bound use, and `ret dst`, then emits a guarded append loop without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__strcat_chk`. Evidence `tmp/std_debug_hello_debug_build_after_strncat_chk.log` |
+| `real-program object-emission compiler_rt cfg:guarded strcat append body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned checked unbounded string append body shape used by `compiler_rt.ssp.__strcat_chk`: the matcher validates destination NUL scanning, source-derived byte loads, destination-derived source-byte and terminator stores, trap exits, and `ret dst`, then emits a guarded append loop without weakening the separate `strncat` max-bound model. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.ssp.__strncpy_chk`. Evidence `tmp/std_debug_hello_debug_build_after_strcat_chk.log` |
 
 ## Progress Log
 
@@ -708,6 +709,14 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.ssp.__strncat_chk` to the same stage/diagnostic in
   `compiler_rt.ssp.__strcat_chk`; strict real-row enforcement remains at 100.
   Recognizer count still 1 (no recognizer reorder or pre-pass).
+- 2026-07-06 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned no-max checked string append shape used by
+  compiler_rt `ssp.__strcat_chk`, keeping it separate from the bounded
+  `strncat` matcher so the max-bound contract remains fail-closed. Debug
+  std-hello moved from object-emission `UnsupportedCodegenControlFlow` in
+  `compiler_rt.ssp.__strcat_chk` to the same stage/diagnostic in
+  `compiler_rt.ssp.__strncpy_chk`; strict real-row enforcement remains at
+  100. Recognizer count still 1 (no recognizer reorder or pre-pass).
 
 ## Ratchet State
 
