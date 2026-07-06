@@ -345,6 +345,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt atomics:exchange family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic exchange family for compiler_rt `atomics.__atomic_exchange_{1,2,4,8,16}`: scalar widths validate the single-block `atomicrmw xchg seq_cst` CFG and emit width-specific x86_64 `xchg` primitives that return the old value; the i128 form validates the spinlock slot, acquire loop, old-value load, replacement store, and release store before emitting a symbol-relocated spinlocked exchange primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_store_16`. Evidence `tmp/std_debug_hello_debug_build_after_atomic_exchange.log` |
 | `real-program object-emission compiler_rt atomics:store family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic store family for compiler_rt `atomics.__atomic_store_{1,2,4,8,16}`: scalar widths validate the single-block `store atomic ... seq_cst` CFG and reuse width-specific x86_64 `xchg` primitives so the old value is discarded but seq_cst ordering is preserved; the i128 form validates the spinlock slot, acquire loop, replacement store, and release store before emitting a symbol-relocated spinlocked store primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_load_16`. Evidence `tmp/std_debug_hello_debug_build_after_atomic_store.log` |
 | `real-program object-emission compiler_rt atomics:load family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic load family for compiler_rt `atomics.__atomic_load_{1,2,4,8,16}`: scalar widths validate the single-block `load atomic ... seq_cst` CFG and emit width-specific x86_64 loads from the pointer argument; the i128 form validates the spinlock slot, acquire loop, load, and release store before emitting a symbol-relocated spinlocked load primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_fetch_umin_16`. Evidence `tmp/std_debug_hello_debug_build_after_atomic_load16.log` |
+| `real-program object-emission compiler_rt atomics:fetch-umin family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic fetch unsigned-min family for compiler_rt `atomics.__atomic_fetch_umin_{1,2,4,8,16}`: scalar widths validate the single-block `atomicrmw umin seq_cst` CFG and emit width-specific x86_64 `cmpxchg` loops that return the old value; the i128 form validates the spinlock slot, acquire loop, old-value load, `llvm.umin.i128`, value store, and release store before emitting a symbol-relocated spinlocked fetch-umin primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_fetch_umax_16`. Evidence `tmp/std_debug_hello_debug_build_after_fetch_umin.log` |
 
 ## Progress Log
 
@@ -830,6 +831,19 @@ One line per completed cycle, append-only, newest last. This is the
   remains at 100. Recognizer count still 1 (no recognizer reorder or
   pre-pass). Partial item-14 credit recorded for handling the load builtin
   family parametrically instead of by width.
+- 2026-07-06 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned atomic fetch unsigned-min family for compiler_rt
+  `atomics.__atomic_fetch_umin_{1,2,4,8,16}`. Widths 1/2/4/8 bytes share the
+  single-block `atomicrmw umin seq_cst` matcher and width-specific x86_64
+  `cmpxchg` loops; the 16-byte form shares the spinlock acquire/release
+  validation style and emits a symbol-relocated i128 fetch-umin primitive
+  after validating `llvm.umin.i128`. Debug std-hello moved from
+  object-emission `UnsupportedCodegenControlFlow` in
+  `compiler_rt.atomics.__atomic_fetch_umin_16` to the same stage/diagnostic
+  in `compiler_rt.atomics.__atomic_fetch_umax_16`; strict real-row
+  enforcement remains at 100. Recognizer count still 1 (no recognizer reorder
+  or pre-pass). Partial item-14 credit recorded for handling the fetch-umin
+  builtin family parametrically instead of by width.
 
 ## Ratchet State
 

@@ -117,6 +117,7 @@ pub const lowerCheckedTinyAdd = impl.lowerCheckedTinyAdd;
 pub const lowerCheckedTlsBump = impl.lowerCheckedTlsBump;
 pub const lowerControlFlowLoopSum = impl.lowerControlFlowLoopSum;
 pub const lowerAtomicExchangeFamily = impl.lowerAtomicExchangeFamily;
+pub const lowerAtomicFetchUminFamily = impl.lowerAtomicFetchUminFamily;
 pub const lowerAtomicLoadFamily = impl.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = impl.lowerAtomicStoreFamily;
 pub const lowerDebugLogicalPointerCompileError = impl.lowerDebugLogicalPointerCompileError;

@@ -39,6 +39,7 @@ pub const lowerCheckedTinyAdd = diagnostics.lowerCheckedTinyAdd;
 pub const lowerCheckedTlsBump = diagnostics.lowerCheckedTlsBump;
 pub const lowerControlFlowLoopSum = loop_phi.lowerControlFlowLoopSum;
 pub const lowerAtomicExchangeFamily = eligibility.lowerAtomicExchangeFamily;
+pub const lowerAtomicFetchUminFamily = eligibility.lowerAtomicFetchUminFamily;
 pub const lowerAtomicLoadFamily = eligibility.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = eligibility.lowerAtomicStoreFamily;
 pub const lowerDebugLogicalPointerCompileError = diagnostics.lowerDebugLogicalPointerCompileError;
