@@ -120,6 +120,7 @@ pub const lowerAtomicExchangeFamily = impl.lowerAtomicExchangeFamily;
 pub const lowerAtomicFetchAndFamily = impl.lowerAtomicFetchAndFamily;
 pub const lowerAtomicFetchNandFamily = impl.lowerAtomicFetchNandFamily;
 pub const lowerAtomicFetchOrFamily = impl.lowerAtomicFetchOrFamily;
+pub const lowerAtomicFetchSubFamily = impl.lowerAtomicFetchSubFamily;
 pub const lowerAtomicFetchUminFamily = impl.lowerAtomicFetchUminFamily;
 pub const lowerAtomicFetchUmaxFamily = impl.lowerAtomicFetchUmaxFamily;
 pub const lowerAtomicFetchXorFamily = impl.lowerAtomicFetchXorFamily;

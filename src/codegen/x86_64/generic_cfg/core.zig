@@ -42,6 +42,7 @@ pub const lowerAtomicExchangeFamily = eligibility.lowerAtomicExchangeFamily;
 pub const lowerAtomicFetchAndFamily = eligibility.lowerAtomicFetchAndFamily;
 pub const lowerAtomicFetchNandFamily = eligibility.lowerAtomicFetchNandFamily;
 pub const lowerAtomicFetchOrFamily = eligibility.lowerAtomicFetchOrFamily;
+pub const lowerAtomicFetchSubFamily = eligibility.lowerAtomicFetchSubFamily;
 pub const lowerAtomicFetchUminFamily = eligibility.lowerAtomicFetchUminFamily;
 pub const lowerAtomicFetchUmaxFamily = eligibility.lowerAtomicFetchUmaxFamily;
 pub const lowerAtomicFetchXorFamily = eligibility.lowerAtomicFetchXorFamily;
