@@ -303,6 +303,7 @@ const lowerGenericCfgSingleBlockUpdateGetMain = x86_64_generic_cfg.lowerGenericC
 const lowerGenericCfgSingleBlockVoid = x86_64_generic_cfg.lowerGenericCfgSingleBlockVoid;
 const lowerGenericCfgSingleBlockVoidCallMain = x86_64_generic_cfg.lowerGenericCfgSingleBlockVoidCallMain;
 const lowerAtomicExchangeFamily = x86_64_generic_cfg.lowerAtomicExchangeFamily;
+const lowerAtomicFetchAndFamily = x86_64_generic_cfg.lowerAtomicFetchAndFamily;
 const lowerAtomicFetchNandFamily = x86_64_generic_cfg.lowerAtomicFetchNandFamily;
 const lowerAtomicFetchOrFamily = x86_64_generic_cfg.lowerAtomicFetchOrFamily;
 const lowerAtomicFetchUminFamily = x86_64_generic_cfg.lowerAtomicFetchUminFamily;
@@ -995,6 +996,12 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerAtomicFetchOrFamily(allocator, &machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerAtomicFetchAndFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
         try verifyFunction(machine);
         return machine;
