@@ -13,6 +13,7 @@ pub const lowerAtomicExchangeFamily = loop_rows.lowerAtomicExchangeFamily;
 pub const lowerAtomicFetchNandFamily = loop_rows.lowerAtomicFetchNandFamily;
 pub const lowerAtomicFetchUminFamily = loop_rows.lowerAtomicFetchUminFamily;
 pub const lowerAtomicFetchUmaxFamily = loop_rows.lowerAtomicFetchUmaxFamily;
+pub const lowerAtomicFetchXorFamily = loop_rows.lowerAtomicFetchXorFamily;
 pub const lowerAtomicLoadFamily = loop_rows.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = loop_rows.lowerAtomicStoreFamily;
 
@@ -188,6 +189,10 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.Ma
         return true;
     }
     if (try loop_rows.lowerAtomicFetchNandFamily(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try loop_rows.lowerAtomicFetchXorFamily(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

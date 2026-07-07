@@ -348,6 +348,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt atomics:fetch-umin family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic fetch unsigned-min family for compiler_rt `atomics.__atomic_fetch_umin_{1,2,4,8,16}`: scalar widths validate the single-block `atomicrmw umin seq_cst` CFG and emit width-specific x86_64 `cmpxchg` loops that return the old value; the i128 form validates the spinlock slot, acquire loop, old-value load, `llvm.umin.i128`, value store, and release store before emitting a symbol-relocated spinlocked fetch-umin primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_fetch_umax_16`. Evidence `tmp/std_debug_hello_debug_build_after_fetch_umin.log` |
 | `real-program object-emission compiler_rt atomics:fetch-umax family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic fetch unsigned-max family for compiler_rt `atomics.__atomic_fetch_umax_{1,2,4,8,16}`: scalar widths validate the single-block `atomicrmw umax seq_cst` CFG and emit width-specific x86_64 `cmpxchg` loops that return the old value; the i128 form validates the spinlock slot, acquire loop, old-value load, `llvm.umax.i128`, value store, and release store before emitting a symbol-relocated spinlocked fetch-umax primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_fetch_nand_16`. Evidence `tmp/std_debug_hello_debug_build_after_fetch_umax.log` |
 | `real-program object-emission compiler_rt atomics:fetch-nand family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic fetch NAND family for compiler_rt `atomics.__atomic_fetch_nand_{1,2,4,8,16}`: scalar widths validate the single-block `atomicrmw nand seq_cst` CFG and emit width-specific x86_64 `cmpxchg` loops that return the old value; the i128 form validates the spinlock slot, acquire loop, old-value load, `and` with the replacement, `xor -1`, value store, and release store before emitting a symbol-relocated spinlocked fetch-nand primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_fetch_xor_16`. Evidence `tmp/std_debug_hello_debug_build_after_fetch_nand.log` |
+| `real-program object-emission compiler_rt atomics:fetch-xor family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic fetch XOR family for compiler_rt `atomics.__atomic_fetch_xor_{1,2,4,8,16}`: scalar widths validate the single-block `atomicrmw xor seq_cst` CFG and emit width-specific x86_64 `cmpxchg` loops that return the old value; the i128 form validates the spinlock slot, acquire loop, old-value load, `xor` with the replacement, value store, and release store before emitting a symbol-relocated spinlocked fetch-xor primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_fetch_or_16`. Evidence `tmp/std_debug_hello_debug_build_after_fetch_xor.log` |
 
 ## Progress Log
 
@@ -871,6 +872,19 @@ One line per completed cycle, append-only, newest last. This is the
   in `compiler_rt.atomics.__atomic_fetch_xor_16`; strict real-row enforcement
   remains at 100. Recognizer count still 1 (no recognizer reorder or
   pre-pass). Partial item-14 credit recorded for handling the fetch-nand
+  builtin family parametrically instead of by width.
+- 2026-07-06 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned atomic fetch XOR family for compiler_rt
+  `atomics.__atomic_fetch_xor_{1,2,4,8,16}`. Widths 1/2/4/8 bytes share the
+  single-block `atomicrmw xor seq_cst` matcher and width-specific x86_64
+  `cmpxchg` loops; the 16-byte form shares the spinlock acquire/release
+  validation style and emits a symbol-relocated i128 fetch-xor primitive after
+  validating the `xor` update. Debug std-hello moved from object-emission
+  `UnsupportedCodegenControlFlow` in
+  `compiler_rt.atomics.__atomic_fetch_xor_16` to the same stage/diagnostic in
+  `compiler_rt.atomics.__atomic_fetch_or_16`; strict real-row enforcement
+  remains at 100. Recognizer count still 1 (no recognizer reorder or
+  pre-pass). Partial item-14 credit recorded for handling the fetch-xor
   builtin family parametrically instead of by width.
 
 ## Ratchet State

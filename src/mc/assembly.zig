@@ -283,6 +283,40 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tlock cmpxchgq %rcx, (%rdi)\n" ++
                     "\tjne 1b\n",
             ),
+            .atomic_fetch_xor_i8_rdi_sil_eax => try writer.writeAll(
+                "\tmovzbl (%rdi), %eax\n" ++
+                    "1:\n" ++
+                    "\tmovl %eax, %ecx\n" ++
+                    "\txorb %sil, %cl\n" ++
+                    "\tlock cmpxchgb %cl, (%rdi)\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovzbl %al, %eax\n",
+            ),
+            .atomic_fetch_xor_i16_rdi_si_eax => try writer.writeAll(
+                "\tmovzwl (%rdi), %eax\n" ++
+                    "1:\n" ++
+                    "\tmovl %eax, %ecx\n" ++
+                    "\txorw %si, %cx\n" ++
+                    "\tlock cmpxchgw %cx, (%rdi)\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovzwl %ax, %eax\n",
+            ),
+            .atomic_fetch_xor_i32_rdi_esi_eax => try writer.writeAll(
+                "\tmovl (%rdi), %eax\n" ++
+                    "1:\n" ++
+                    "\tmovl %eax, %ecx\n" ++
+                    "\txorl %esi, %ecx\n" ++
+                    "\tlock cmpxchgl %ecx, (%rdi)\n" ++
+                    "\tjne 1b\n",
+            ),
+            .atomic_fetch_xor_i64_rdi_rsi_rax => try writer.writeAll(
+                "\tmovq (%rdi), %rax\n" ++
+                    "1:\n" ++
+                    "\tmovq %rax, %rcx\n" ++
+                    "\txorq %rsi, %rcx\n" ++
+                    "\tlock cmpxchgq %rcx, (%rdi)\n" ++
+                    "\tjne 1b\n",
+            ),
             .load_rcx_ptr_u8_eax => try writer.writeAll("\tmovzbl (%rcx), %eax\n"),
             .load_rcx_ptr_u16_eax => try writer.writeAll("\tmovzwl (%rcx), %eax\n"),
             .load_rcx_ptr_eax => try writer.writeAll("\tmovl (%rcx), %eax\n"),
@@ -588,6 +622,30 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tmovq %rdx, %r11\n" ++
                     "\tandq %r9, %r11\n" ++
                     "\tnotq %r11\n" ++
+                    "\tmovq %r8, (%rdi)\n" ++
+                    "\tmovq %r11, 8(%rdi)\n" ++
+                    "\tmovq $0, (%r10)\n",
+                .{symbol},
+            ),
+            .spinlocked_fetch_xor_i128_rdi_rsi_rdx_rax_rdx => |symbol| try writer.print(
+                "\tmovq %rdx, %r9\n" ++
+                    "\tmovq %rdi, %r8\n" ++
+                    "\tshrq $3, %r8\n" ++
+                    "\tandq $62, %r8\n" ++
+                    "\tleaq {s}(%rip), %r10\n" ++
+                    "\taddq %r8, %r10\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "1:\n" ++
+                    "\txchgq %rax, (%r10)\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjne 1b\n" ++
+                    "\tmovq (%rdi), %rax\n" ++
+                    "\tmovq 8(%rdi), %rdx\n" ++
+                    "\tmovq %rax, %r8\n" ++
+                    "\txorq %rsi, %r8\n" ++
+                    "\tmovq %rdx, %r11\n" ++
+                    "\txorq %r9, %r11\n" ++
                     "\tmovq %r8, (%rdi)\n" ++
                     "\tmovq %r11, 8(%rdi)\n" ++
                     "\tmovq $0, (%r10)\n",

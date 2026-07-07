@@ -42,6 +42,7 @@ pub const lowerAtomicExchangeFamily = eligibility.lowerAtomicExchangeFamily;
 pub const lowerAtomicFetchNandFamily = eligibility.lowerAtomicFetchNandFamily;
 pub const lowerAtomicFetchUminFamily = eligibility.lowerAtomicFetchUminFamily;
 pub const lowerAtomicFetchUmaxFamily = eligibility.lowerAtomicFetchUmaxFamily;
+pub const lowerAtomicFetchXorFamily = eligibility.lowerAtomicFetchXorFamily;
 pub const lowerAtomicLoadFamily = eligibility.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = eligibility.lowerAtomicStoreFamily;
 pub const lowerDebugLogicalPointerCompileError = diagnostics.lowerDebugLogicalPointerCompileError;

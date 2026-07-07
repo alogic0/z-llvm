@@ -120,6 +120,7 @@ pub const lowerAtomicExchangeFamily = impl.lowerAtomicExchangeFamily;
 pub const lowerAtomicFetchNandFamily = impl.lowerAtomicFetchNandFamily;
 pub const lowerAtomicFetchUminFamily = impl.lowerAtomicFetchUminFamily;
 pub const lowerAtomicFetchUmaxFamily = impl.lowerAtomicFetchUmaxFamily;
+pub const lowerAtomicFetchXorFamily = impl.lowerAtomicFetchXorFamily;
 pub const lowerAtomicLoadFamily = impl.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = impl.lowerAtomicStoreFamily;
 pub const lowerDebugLogicalPointerCompileError = impl.lowerDebugLogicalPointerCompileError;
