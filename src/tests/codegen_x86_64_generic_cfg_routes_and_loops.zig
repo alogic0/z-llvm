@@ -711,6 +711,80 @@ test "x86_64 generic cfg lowers memcpy body without name admission" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers limb absolute-value body without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc i16 @zig.target.intByteSize(i16)
+        \\declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
+        \\declare { i64, i1 } @llvm.uadd.with.overflow.i64(i64, i64)
+        \\
+        \\define internal void @any_limb_abs_body(ptr %dst, ptr %src, i16 %bits) {
+        \\entry:
+        \\  %overflow.slot = alloca i8, align 8
+        \\  %carry.slot = alloca i8, align 1
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %limbs16 = lshr exact i16 %bytes, 3
+        \\  %limbs64 = zext i16 %limbs16 to i64
+        \\  %end = getelementptr [8 x i8], ptr %src, i64 %limbs64
+        \\  %last.ptr = getelementptr i8, ptr %end, i64 -8
+        \\  %last = load i64, ptr %last.ptr, align 8
+        \\  %nonnegative = icmp sgt i64 %last, -1
+        \\  br i1 %nonnegative, label %copy, label %neg.entry
+        \\
+        \\done:
+        \\  ret void
+        \\
+        \\copy:
+        \\  %byte.len = shl nuw nsw i64 %limbs64, 3
+        \\  call void @llvm.memcpy.inline.p0.p0.i64(ptr %dst, ptr %src, i64 %byte.len, i1 false)
+        \\  br label %done
+        \\
+        \\neg.entry:
+        \\  store i1 true, ptr %carry.slot, align 1
+        \\  %zero = icmp eq i16 %bytes, 0
+        \\  br i1 %zero, label %done, label %neg.loop
+        \\
+        \\neg.loop:
+        \\  %i = phi i64 [ %next, %neg.loop ], [ 0, %neg.entry ]
+        \\  %src.gep = getelementptr inbounds nuw [8 x i8], ptr %src, i64 %i
+        \\  %value = load i64, ptr %src.gep, align 8
+        \\  %inverted = xor i64 %value, -1
+        \\  %carry.raw = load i8, ptr %carry.slot, align 1
+        \\  %carry.bit = and i8 %carry.raw, 1
+        \\  %carry64 = zext i8 %carry.bit to i64
+        \\  %sum = call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 %inverted, i64 %carry64)
+        \\  %result = extractvalue { i64, i1 } %sum, 0
+        \\  %carry = extractvalue { i64, i1 } %sum, 1
+        \\  store i1 %carry, ptr %overflow.slot, align 8
+        \\  %carry.reload = load i8, ptr %overflow.slot, align 8
+        \\  %dst.gep = getelementptr inbounds nuw [8 x i8], ptr %dst, i64 %i
+        \\  store i64 %result, ptr %dst.gep, align 8
+        \\  %carry.trunc = trunc i8 %carry.reload to i1
+        \\  store i1 %carry.trunc, ptr %carry.slot, align 1
+        \\  %next = add nuw nsw i64 %i, 1
+        \\  %exit = icmp eq i64 %next, %limbs64
+        \\  br i1 %exit, label %done, label %neg.loop
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.abs_limb64_rdi_rsi_dx_rcx_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers spinlocked variable memcpy without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

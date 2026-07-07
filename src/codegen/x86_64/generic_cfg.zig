@@ -127,6 +127,7 @@ pub const lowerAtomicFetchUmaxFamily = impl.lowerAtomicFetchUmaxFamily;
 pub const lowerAtomicFetchXorFamily = impl.lowerAtomicFetchXorFamily;
 pub const lowerAtomicLoadFamily = impl.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = impl.lowerAtomicStoreFamily;
+pub const lowerLimbAbsTwosComplementBody = impl.lowerLimbAbsTwosComplementBody;
 pub const lowerValgrindDiscardTranslationsClientRequest = impl.lowerValgrindDiscardTranslationsClientRequest;
 pub const lowerDebugLogicalPointerCompileError = impl.lowerDebugLogicalPointerCompileError;
 pub const lowerDebugSpirvMergeLogicalPointers = impl.lowerDebugSpirvMergeLogicalPointers;

@@ -357,6 +357,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt atomics:variable exchange` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned variable-size spinlocked exchange wrapper used by compiler_rt `atomics.__atomic_exchange`: the matcher validates the size-to-spinlock slot derivation, acquire loop, object-to-output old-value copy, desired-to-object replacement copy, release store, and `void` result before emitting a symbol-relocated x86_64 primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_store`. Evidence `tmp/std_debug_hello_debug_build_atomic_exchange_after.log` |
 | `real-program object-emission compiler_rt atomics:variable store` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned variable-size spinlocked store wrapper used by compiler_rt `atomics.__atomic_store`: the matcher validates the size-to-spinlock slot derivation, acquire loop, desired-to-object replacement copy, release store, and `void` result before emitting a symbol-relocated x86_64 primitive. The next open cluster is object-emission `UnsupportedCodegenInstruction` in `compiler_rt.clear_cache.clear_cache`. Evidence `tmp/std_debug_hello_debug_build_atomic_store_after.log` |
 | `real-program object-emission compiler_rt cfg:valgrind discard-translations client request` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned Valgrind discard-translations client-request block reached through compiler_rt `clear_cache`: the matcher validates the two `usize` parameters, request-block alloca, length subtraction, six-word request payload, exact side-effecting client-request inline-asm template/constraints, lifetime calls, and `ret void`, then emits a no-op return for the x86_64 cache-clear path without function-name admission. `distribution-all` now enforces strict real-row limit 100 through explicit ReleaseFast, ReleaseSafe, and ReleaseSmall invocations, avoiding the quiet implicit all-mode runner stall while preserving the same three-mode coverage. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.limb64.__abs_limb64`. Evidence `tmp/std_debug_hello_debug_build_clear_cache_after.log`; `tmp/distribution_all_after_clear_cache.log` |
+| `real-program object-emission compiler_rt cfg:limb64 abs twos-complement body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned limb64 absolute-value body used by compiler_rt `limb64.__abs_limb64`: the matcher validates the limb count derived from the bit count, high-limb sign test, positive memcpy path, and negative xor-plus-carry loop with separate overflow and carry byte slots, then emits a qword copy/two's-complement loop without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.limb64.__mulo_limb64`. Evidence `tmp/std_debug_hello_debug_build_abs_limb64_after.log`; `tmp/distribution_all_after_abs_limb64.log` |
 
 ## Progress Log
 
@@ -996,6 +997,18 @@ One line per completed cycle, append-only, newest last. This is the
   real-row enforcement remains at 100. Recognizer count still 1 (no recognizer
   reorder or pre-pass). Partial item-14 credit recorded for keeping the
   compiler_rt helper shape model-owned.
+- 2026-07-07 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned limb64 absolute-value helper body used by compiler_rt
+  `limb64.__abs_limb64`. The matcher validates the bit-count to limb-count
+  derivation, high-limb sign test, positive memcpy path, and negative
+  xor-plus-carry two's-complement loop before emitting a qword copy/negation
+  x86_64 primitive without function-name admission. Debug std-hello moved from
+  object-emission `UnsupportedCodegenControlFlow` in
+  `compiler_rt.limb64.__abs_limb64` to the same stage/diagnostic in
+  `compiler_rt.limb64.__mulo_limb64`; strict real-row enforcement remains at
+  100. Recognizer count still 1 (no recognizer reorder or pre-pass). Partial
+  item-14 credit recorded for keeping the compiler_rt limb helper shape
+  model-owned.
 
 ## Ratchet State
 

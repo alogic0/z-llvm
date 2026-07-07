@@ -495,6 +495,31 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x48, 0x89, 0xd1, // movq %rdx, %rcx
                 0xf3, 0xa4, // rep movsb
             }),
+            .abs_limb64_rdi_rsi_dx_rcx_rax => try bytes.appendSlice(allocator, &.{
+                0x0f, 0xb7, 0xd2, // movzwl %dx, %edx
+                0x83, 0xc2, 0x3f, // addl $63, %edx
+                0xc1, 0xea, 0x06, // shrl $6, %edx
+                0x85, 0xd2, // testl %edx, %edx
+                0x74, 0x38, // je 3f
+                0x89, 0xd1, // movl %edx, %ecx
+                0x48, 0x8b, 0x44, 0xce, 0xf8, // movq -8(%rsi,%rcx,8), %rax
+                0x48, 0x85, 0xc0, // testq %rax, %rax
+                0x78, 0x06, // js 1f
+                0xfc, // cld
+                0xf3, 0x48, 0xa5, // rep movsq
+                0xeb, 0x26, // jmp 3f
+                0x31, 0xc9, // xorl %ecx, %ecx
+                0x41, 0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %r8d
+                0x48, 0x8b, 0x04, 0xce, // movq (%rsi,%rcx,8), %rax
+                0x48, 0xf7, 0xd0, // notq %rax
+                0x45, 0x0f, 0xb6, 0xc0, // movzbl %r8b, %r8d
+                0x4c, 0x01, 0xc0, // addq %r8, %rax
+                0x41, 0x0f, 0x92, 0xc0, // setc %r8b
+                0x48, 0x89, 0x04, 0xcf, // movq %rax, (%rdi,%rcx,8)
+                0x48, 0xff, 0xc1, // incq %rcx
+                0x48, 0x39, 0xd1, // cmpq %rdx, %rcx
+                0x75, 0xe2, // jne 2b
+            }),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => try bytes.appendSlice(allocator, &.{
                 0x48, 0x89, 0xf0, // movq %rsi, %rax
                 0x48, 0xc1, 0xe8, 0x03, // shrq $3, %rax
@@ -1546,6 +1571,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .bcmp_rdi_rsi_rdx_eax => 33,
         .memcmp_rdi_rsi_rdx_eax => 36,
         .memcpy_rdi_rsi_rdx_rax => 14,
+        .abs_limb64_rdi_rsi_dx_rcx_rax => 69,
         .spinlocked_memcpy_rsi_to_rdx_len_edi => 59,
         .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax => 104,
         .spinlocked_var_xchg_edi_rsi_rdx_rcx => 82,

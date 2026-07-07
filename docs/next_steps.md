@@ -39,7 +39,7 @@ Stay on the selected goal until:
 
 None.
 
-Stop state recorded 2026-07-06 after atomic fetch-and cycle:
+Stop state recorded 2026-07-07 after limb64 absolute-value cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
@@ -56,51 +56,12 @@ Stop state recorded 2026-07-06 after atomic fetch-and cycle:
   z_llvm object emission and Zig native `build-exe -fno-lld` build a no-std
   `_start` executable in ReleaseFast, ReleaseSafe, and ReleaseSmall; each run
   prints `hello\n` and exits 0. Item 12 std hello remains open. The latest
-  Debug std-hello cycles lowered the model-owned guarded direct-call wrapper
-  in `compiler_rt.ssp.__memmove_chk`, the guarded copy body in
-  `compiler_rt.ssp.__memcpy_chk`, and the checked string append bodies in
-  `compiler_rt.ssp.__strncat_chk` and `compiler_rt.ssp.__strcat_chk`
-  without name admission; the checked string copy family in
-  `compiler_rt.ssp.__strncpy_chk` and `compiler_rt.ssp.__strcpy_chk` is also
-  lowered without name admission; the noreturn trap stub in
-  `compiler_rt.ssp.__chk_fail` is lowered without name admission; the
-  unguarded byte-copy fast family in `compiler_rt.memmove.memmoveFast` and
-  `compiler_rt.memcpy.memcpyFast` is lowered without name admission; the
-  naked stack-probe inline-asm/unreachable body in
-  `compiler_rt.stack_probe.zig_probe_stack` is lowered without name
-  admission; the spinlock-protected variable memcpy shape in
-  `compiler_rt.atomics.__atomic_load` is lowered without name admission; the
-  atomic compare-exchange family in
-  `compiler_rt.atomics.__atomic_compare_exchange_{1,2,4,8,16}` is lowered
-  without name admission using scalar `cmpxchg` and i128 spinlock shapes; the
-  atomic exchange family in `compiler_rt.atomics.__atomic_exchange_{1,2,4,8,16}`
-  is lowered without name admission using scalar `atomicrmw xchg` and i128
-  spinlock shapes; the atomic store family in
-  `compiler_rt.atomics.__atomic_store_{1,2,4,8,16}` is lowered without name
-  admission using scalar seq_cst `xchg` and i128 spinlock shapes; the atomic
-  load family in `compiler_rt.atomics.__atomic_load_{1,2,4,8,16}` is lowered
-  without name admission using scalar seq_cst loads and i128 spinlock shapes;
-  the atomic fetch unsigned-min family in
-  `compiler_rt.atomics.__atomic_fetch_umin_{1,2,4,8,16}` is lowered without
-  name admission using scalar seq_cst `cmpxchg` loops and an i128 spinlock
-  shape around `llvm.umin.i128`; the atomic fetch unsigned-max family in
-  `compiler_rt.atomics.__atomic_fetch_umax_{1,2,4,8,16}` is lowered without
-  name admission using scalar seq_cst `cmpxchg` loops and an i128 spinlock
-  shape around `llvm.umax.i128`; the atomic fetch NAND family in
-  `compiler_rt.atomics.__atomic_fetch_nand_{1,2,4,8,16}` is lowered without
-  name admission using scalar seq_cst `cmpxchg` loops and an i128 spinlock
-  shape around the `and`/`xor -1` update; the atomic fetch XOR family in
-  `compiler_rt.atomics.__atomic_fetch_xor_{1,2,4,8,16}` is lowered without
-  name admission using scalar seq_cst `cmpxchg` loops and an i128 spinlock
-  shape around the `xor` update; the atomic fetch OR family in
-  `compiler_rt.atomics.__atomic_fetch_or_{1,2,4,8,16}` is lowered without
-  name admission using scalar seq_cst `cmpxchg` loops and an i128 spinlock
-  shape around the `or` update; the atomic fetch AND family in
-  `compiler_rt.atomics.__atomic_fetch_and_{1,2,4,8,16}` is lowered without
-  name admission using scalar seq_cst `cmpxchg` loops and an i128 spinlock
-  shape around the `and` update; item 12a added tmp/cache hygiene between the
-  copy and string-append fixes. The focused build now fails at
-  `compiler_rt.atomics.__atomic_fetch_sub_16` with
+  Debug std-hello cycles lowered the model-owned compiler_rt ssp wrappers,
+  byte-copy fast family, stack probe, atomic fixed-width families, atomic
+  variable-size wrappers, clear-cache Valgrind client request, and now the
+  limb64 absolute-value body without function-name admission. The focused
+  Debug std-hello build now fails at
+  `compiler_rt.limb64.__mulo_limb64` with
   `error.UnsupportedCodegenControlFlow`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
@@ -116,8 +77,11 @@ Stop state recorded 2026-07-06 after atomic fetch-and cycle:
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
   `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_after_fetch_and.log`,
-  `tmp/distribution_all_after_fetch_and.log`,
+- Saved log paths: `tmp/std_debug_hello_debug_build_abs_limb64_after.log`,
+  `tmp/distribution_all_after_abs_limb64.log`,
+  `tmp/real_rows_strict_limit100_releasefast_after_abs_limb64.log`,
+  `tmp/real_rows_strict_limit100_releasesafe_after_abs_limb64.log`,
+  `tmp/real_rows_strict_limit100_releasesmall_after_abs_limb64.log`,
   `tmp/clean_tmp_fixture_pair.log`, and
   `tmp/real_rows_releasefast_after_clean_tmp.log`.
 - Tracked evidence summaries:
@@ -129,15 +93,17 @@ Stop state recorded 2026-07-06 after atomic fetch-and cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
   `docs/evidence/clean_tmp.summary`.
 - Recommended next action: continue item 12 by fixing
-  `compiler_rt.atomics.__atomic_fetch_sub_16`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__atomic_fetch_sub_16` on the focused
-  Debug std-hello build. The current diagnostic is
-  `error.UnsupportedCodegenControlFlow`; check whether the remaining
-  compiler_rt atomic fetch wrappers share one model-owned family shape, and
-  keep unsupported variants fail-closed. For remaining compiler_rt builtin
-  families, use width-parametric lowerings where the model-owned shapes match,
-  recording partial item-14 credit when a parametric family subsumes per-width
-  special cases.
+  `compiler_rt.limb64.__mulo_limb64`, starting from
+  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__mulo_limb64` on the focused Debug std-hello
+  build. The current diagnostic is `error.UnsupportedCodegenControlFlow`;
+  check whether the remaining limb64 multiply/divide helpers share one
+  model-owned family shape, and keep unsupported variants fail-closed. For
+  remaining compiler_rt builtin families, use width-parametric lowerings where
+  the model-owned shapes match, recording partial item-14 credit when a
+  parametric family subsumes per-width special cases. The soft-float
+  escalation rule still applies: more than one new CFG shape for a single
+  soft-float family means stop and recommend item 15 rather than stacking
+  shapes.
 
 When the worker stops, record only:
 

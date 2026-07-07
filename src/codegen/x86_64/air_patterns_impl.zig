@@ -313,6 +313,7 @@ const lowerAtomicFetchUmaxFamily = x86_64_generic_cfg.lowerAtomicFetchUmaxFamily
 const lowerAtomicFetchXorFamily = x86_64_generic_cfg.lowerAtomicFetchXorFamily;
 const lowerAtomicLoadFamily = x86_64_generic_cfg.lowerAtomicLoadFamily;
 const lowerAtomicStoreFamily = x86_64_generic_cfg.lowerAtomicStoreFamily;
+const lowerLimbAbsTwosComplementBody = x86_64_generic_cfg.lowerLimbAbsTwosComplementBody;
 const lowerValgrindDiscardTranslationsClientRequest = x86_64_generic_cfg.lowerValgrindDiscardTranslationsClientRequest;
 const lowerGetauxvalImpl = x86_64_generic_cfg.lowerGetauxvalImpl;
 const lowerRuntimeSliceSumPreoptHelper = x86_64_generic_cfg.lowerRuntimeSliceSumPreoptHelper;
@@ -1023,6 +1024,12 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerValgrindDiscardTranslationsClientRequest(allocator, &machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerLimbAbsTwosComplementBody(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
         try verifyFunction(machine);
         return machine;

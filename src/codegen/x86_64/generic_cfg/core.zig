@@ -49,6 +49,7 @@ pub const lowerAtomicFetchUmaxFamily = eligibility.lowerAtomicFetchUmaxFamily;
 pub const lowerAtomicFetchXorFamily = eligibility.lowerAtomicFetchXorFamily;
 pub const lowerAtomicLoadFamily = eligibility.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = eligibility.lowerAtomicStoreFamily;
+pub const lowerLimbAbsTwosComplementBody = eligibility.lowerLimbAbsTwosComplementBody;
 pub const lowerValgrindDiscardTranslationsClientRequest = eligibility.lowerValgrindDiscardTranslationsClientRequest;
 pub const lowerDebugLogicalPointerCompileError = diagnostics.lowerDebugLogicalPointerCompileError;
 pub const lowerDebugSpirvMergeLogicalPointers = diagnostics.lowerDebugSpirvMergeLogicalPointers;

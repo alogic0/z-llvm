@@ -513,6 +513,34 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\trep movsb\n" ++
                     "2:\n",
             ),
+            .abs_limb64_rdi_rsi_dx_rcx_rax => try writer.writeAll(
+                "\tmovzwl %dx, %edx\n" ++
+                    "\taddl $63, %edx\n" ++
+                    "\tshrl $6, %edx\n" ++
+                    "\ttestl %edx, %edx\n" ++
+                    "\tje 3f\n" ++
+                    "\tmovl %edx, %ecx\n" ++
+                    "\tmovq -8(%rsi,%rcx,8), %rax\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tjs 1f\n" ++
+                    "\tcld\n" ++
+                    "\trep movsq\n" ++
+                    "\tjmp 3f\n" ++
+                    "1:\n" ++
+                    "\txorl %ecx, %ecx\n" ++
+                    "\tmovl $1, %r8d\n" ++
+                    "2:\n" ++
+                    "\tmovq (%rsi,%rcx,8), %rax\n" ++
+                    "\tnotq %rax\n" ++
+                    "\tmovzbl %r8b, %r8d\n" ++
+                    "\taddq %r8, %rax\n" ++
+                    "\tsetc %r8b\n" ++
+                    "\tmovq %rax, (%rdi,%rcx,8)\n" ++
+                    "\tincq %rcx\n" ++
+                    "\tcmpq %rdx, %rcx\n" ++
+                    "\tjne 2b\n" ++
+                    "3:\n",
+            ),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| try writer.print(
                 "\tmovq %rsi, %rax\n" ++
                     "\tshrq $3, %rax\n" ++
