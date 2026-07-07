@@ -50,6 +50,7 @@ const codegen_x86_64_parser_cfg_routes = @import("codegen_x86_64_parser_cfg_rout
 const codegen_x86_64_opt_and_normalization = @import("codegen_x86_64_opt_and_normalization.zig");
 const codegen_x86_64_parser_atomics = @import("codegen_x86_64_parser_atomics.zig");
 const codegen_x86_64_main_wrapper_routes = @import("codegen_x86_64_main_wrapper_routes.zig");
+const codegen_x86_64_generic_cfg_selector = @import("codegen_x86_64_generic_cfg_selector.zig");
 
 test {
     _ = codegen_x86_64_assembly;
@@ -64,4 +65,5 @@ test {
     _ = codegen_x86_64_opt_and_normalization;
     _ = codegen_x86_64_parser_atomics;
     _ = codegen_x86_64_main_wrapper_routes;
+    _ = codegen_x86_64_generic_cfg_selector;
 }

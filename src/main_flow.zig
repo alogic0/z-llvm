@@ -23,7 +23,7 @@ const fatal = main_flow_writer.fatal;
 const Emit = main_flow_writer.Emit;
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--report-all-codegen-failures] [--pass-limit=N] [--input-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--report-all-codegen-failures] [--generic-cfg-selector] [--pass-limit=N] [--input-limit=N] <input.ll>
     \\       z_llvm --emit=ir-writer
     \\       z_llvm --emit=semantic-descriptor
     \\
@@ -48,6 +48,7 @@ pub fn main(init: std.process.Init) !void {
     var timing = false;
     var quiet = false;
     var report_all_codegen_failures = envFlag(init.environ_map, "ZLLVM_CODEGEN_REPORT_ALL");
+    var generic_cfg_selector = envFlag(init.environ_map, "ZLLVM_GENERIC_CFG_SELECTOR");
     var pass_limit: ?usize = null;
     var input_limit: usize = default_input_limit;
     var emit: Emit = .ir;
@@ -70,6 +71,8 @@ pub fn main(init: std.process.Init) !void {
             quiet = true;
         } else if (std.mem.eql(u8, arg, "--report-all-codegen-failures")) {
             report_all_codegen_failures = true;
+        } else if (std.mem.eql(u8, arg, "--generic-cfg-selector")) {
+            generic_cfg_selector = true;
         } else if (std.mem.startsWith(u8, arg, "--pass-limit=")) {
             pass_limit = try std.fmt.parseInt(usize, arg["--pass-limit=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--input-limit=")) {
@@ -151,6 +154,7 @@ pub fn main(init: std.process.Init) !void {
             try emitCodegenModule(allocator, io, lowered.module, emit, target_triple, .{
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
+                .generic_cfg_selector = generic_cfg_selector,
             });
             return;
         }
@@ -183,6 +187,7 @@ pub fn main(init: std.process.Init) !void {
             try emitCodegenModule(allocator, io, module, emit, target_triple, .{
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
+                .generic_cfg_selector = generic_cfg_selector,
             });
             return;
         }
@@ -212,6 +217,7 @@ pub fn main(init: std.process.Init) !void {
             try emitCodegenModule(allocator, io, module, emit, target_triple, .{
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
+                .generic_cfg_selector = generic_cfg_selector,
             });
             return;
         }
@@ -243,6 +249,7 @@ pub fn main(init: std.process.Init) !void {
         try emitCodegenModule(allocator, io, module, emit, target_triple, .{
             .quiet = quiet,
             .report_all_failures = report_all_codegen_failures,
+            .generic_cfg_selector = generic_cfg_selector,
         });
         return;
     }

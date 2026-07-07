@@ -11,6 +11,7 @@ pub const XmmReg = x86_64_types.XmmReg;
 pub const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 pub const FrameIndex = x86_64_types.FrameIndex;
 pub const CodegenPath = x86_64_types.CodegenPath;
+pub const CodegenOptions = x86_64_types.CodegenOptions;
 pub const SysVAggregateEightbyteClass = sysv_abi.AggregateEightbyteClass;
 pub const SysVAggregateKind = sysv_abi.AggregateKind;
 pub const SysVAggregateClassification = sysv_abi.AggregateClassification;
@@ -25,5 +26,6 @@ pub const Instruction = x86_64_machine.Instruction;
 pub const MachineFunction = x86_64_machine.MachineFunction;
 
 pub const lowerFunction = x86_64_air_patterns.lowerFunction;
+pub const lowerFunctionWithOptions = x86_64_air_patterns.lowerFunctionWithOptions;
 pub const verifyFunction = x86_64_verify.verifyFunction;
 pub const classifySysVAggregateForTest = x86_64_air_patterns.classifySysVAggregateForTest;

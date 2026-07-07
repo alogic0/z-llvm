@@ -166,3 +166,7 @@ pub const CodegenPath = enum {
     structural_matcher,
     generic_cfg,
 };
+
+pub const CodegenOptions = struct {
+    generic_cfg_selector: bool = false,
+};

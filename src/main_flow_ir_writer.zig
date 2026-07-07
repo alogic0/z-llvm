@@ -88,6 +88,7 @@ pub const Emit = enum {
 pub const CodegenEmitOptions = struct {
     quiet: bool = false,
     report_all_failures: bool = false,
+    generic_cfg_selector: bool = false,
 };
 
 pub fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {
@@ -470,7 +471,9 @@ pub fn emitCodegenModule(
     for (module.functions.items) |function| {
         if (!shouldLowerCodegenFunction(module, function)) continue;
         selected_functions += 1;
-        var machine = codegen.x86_64.lowerFunction(allocator, triple, function) catch |err| {
+        var machine = codegen.x86_64.lowerFunctionWithOptions(allocator, triple, function, .{
+            .generic_cfg_selector = options.generic_cfg_selector,
+        }) catch |err| {
             if (options.report_all_failures) {
                 if (failed_functions == 0) {
                     first_failing_function = function.name;

@@ -9,6 +9,7 @@ const x86_64_emit = @import("emit.zig");
 const x86_64_match = @import("match.zig");
 const runtime_float = @import("runtime_float.zig");
 const x86_64_generic_cfg = @import("generic_cfg.zig");
+const x86_64_generic_cfg_selector = @import("generic_cfg_selector.zig");
 const air_patterns_abi_bridge = @import("air_patterns_abi_bridge.zig");
 const air_patterns_cfg = @import("air_patterns_cfg.zig");
 const air_patterns_optional_pointer = @import("air_patterns_optional_pointer.zig");
@@ -23,6 +24,7 @@ pub const XmmReg = x86_64_types.XmmReg;
 pub const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 pub const FrameIndex = x86_64_types.FrameIndex;
 pub const CodegenPath = x86_64_types.CodegenPath;
+pub const CodegenOptions = x86_64_types.CodegenOptions;
 pub const SysVAggregateEightbyteClass = sysv_abi.AggregateEightbyteClass;
 pub const SysVAggregateKind = sysv_abi.AggregateKind;
 pub const SysVAggregateClassification = sysv_abi.AggregateClassification;
@@ -354,11 +356,31 @@ pub const Instruction = x86_64_machine.Instruction;
 pub const MachineFunction = x86_64_machine.MachineFunction;
 
 pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, function: ir.Function) !MachineFunction {
+    return lowerFunctionWithOptions(allocator, triple_text, function, .{});
+}
+
+pub fn lowerFunctionWithOptions(
+    allocator: std.mem.Allocator,
+    triple_text: []const u8,
+    function: ir.Function,
+    options: CodegenOptions,
+) !MachineFunction {
     const parsed_triple = try target.Triple.parse(triple_text);
     if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) return error.UnsupportedTarget;
 
     var machine = MachineFunction.init(symbolName(function.name), function.ret_ty);
     errdefer machine.deinit(allocator);
+
+    if (options.generic_cfg_selector) {
+        switch (try x86_64_generic_cfg_selector.tryLower(allocator, &machine, function)) {
+            .selected => {
+                machine.codegen_path = .generic_cfg;
+                try verifyFunction(machine);
+                return machine;
+            },
+            .unsupported => {},
+        }
+    }
 
     if (try lowerSingleStackSlotCallFunction(allocator, &machine, function)) {
         try verifyFunction(machine);

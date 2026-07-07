@@ -1108,6 +1108,15 @@ One line per completed cycle, append-only, newest last. This is the
   selector bucket, then soft-float; the 44 `UnsupportedTailCallAbi` rows are a
   separate ordinary ABI family, not a selector concern. Recognizer count still
   1 (no new recognizer reorder or pre-pass).
+- 2026-07-07 (this commit) Item 15 stage-one selector skeleton: added an
+  opt-in generic-CFG selector probe behind `--generic-cfg-selector` /
+  `ZLLVM_GENERIC_CFG_SELECTOR=1`, wired through the shared codegen emission
+  path while keeping existing shape recognizers as fallback. The skeleton
+  returns structured fail-closed diagnostics for unsupported control-flow,
+  instruction, type, value, pressure, and no-emitter cases, but emits no rows
+  yet, so existing route behavior and ratchets are unchanged. Recognizer count
+  still 1 (no new recognizer reorder or pre-pass); `shape_recognizer_functions`
+  is unchanged for this skeleton slice.
 
 ## Ratchet State
 
