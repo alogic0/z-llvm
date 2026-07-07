@@ -1286,6 +1286,31 @@ pub fn lowerAtomicFetchXorFamily(allocator: std.mem.Allocator, machine: *Machine
     return false;
 }
 
+pub fn lowerAtomicFetchOrFamily(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try matchAtomicFetchOrScalar(function)) |bits| {
+        const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+        const value_reg = try paramReg(function, function.params.items[1].name, .{ .int = bits });
+        if (ptr_reg != .rdi or value_reg != .rsi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, switch (bits) {
+            8 => .atomic_fetch_or_i8_rdi_sil_eax,
+            16 => .atomic_fetch_or_i16_rdi_si_eax,
+            32 => .atomic_fetch_or_i32_rdi_esi_eax,
+            64 => .atomic_fetch_or_i64_rdi_rsi_rax,
+            else => unreachable,
+        });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    if (try matchSpinlockedFetchOrI128(function)) |spinlock_symbol| {
+        const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+        if (ptr_reg != .rdi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .{ .spinlocked_fetch_or_i128_rdi_rsi_rdx_rax_rdx = spinlock_symbol });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    return false;
+}
+
 pub fn lowerGuardedStrncatBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesGuardedStrncatBody(function)) return false;
     const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -2659,6 +2684,10 @@ fn matchAtomicFetchXorScalar(function: ir.Function) !?u16 {
     return matchAtomicFetchScalar(function, "xor");
 }
 
+fn matchAtomicFetchOrScalar(function: ir.Function) !?u16 {
+    return matchAtomicFetchScalar(function, "or");
+}
+
 fn matchAtomicFetchScalar(function: ir.Function, op: []const u8) !?u16 {
     if (function.params.items.len != 3 or !function.params.items[0].ty.eql(.ptr) or !function.params.items[2].ty.eql(.{ .int = 32 })) return null;
     const bits = scalarAtomicCompareExchangeBits(function.ret_ty) orelse return null;
@@ -2824,6 +2853,75 @@ fn matchSpinlockedFetchXorI128(function: ir.Function) !?[]const u8 {
         else => return null,
     };
     if (!value_store.ty.eql(.{ .int = 128 }) or !isNamed(value_store.value, xor_name) or
+        !isNamed(value_store.ptr, ptr_name) or value_store.attrs.isBarrier()) return null;
+    const release = switch (exit.instructions.items[3].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!release.ty.eql(.{ .int = 64 }) or !isInt(release.value, 0) or !isNamed(release.ptr, lock_ptr_name) or
+        release.attrs.atomic_ordering == null or !std.mem.eql(u8, release.attrs.atomic_ordering.?, "release") or
+        release.attrs.@"align" != 64 or release.attrs.is_volatile) return null;
+    const ret = switch (exit.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 128 }) or !isNamed(ret.value orelse return error.InvalidRet, old_name)) return null;
+    return spinlock_symbol;
+}
+
+fn matchSpinlockedFetchOrI128(function: ir.Function) !?[]const u8 {
+    if (!function.ret_ty.eql(.{ .int = 128 }) or function.params.items.len != 3) return null;
+    if (!function.params.items[0].ty.eql(.ptr) or
+        !function.params.items[1].ty.eql(.{ .int = 128 }) or
+        !function.params.items[2].ty.eql(.{ .int = 32 })) return null;
+    if (function.blocks.items.len != 3) return null;
+    if (!functionHasNoRemovedInstructions(function)) return null;
+
+    const ptr_name = function.params.items[0].name;
+    const value_name = function.params.items[1].name;
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const exit = function.blocks.items[2];
+    if (entry.instructions.items.len != 4 or loop.instructions.items.len != 2 or exit.instructions.items.len != 4) return null;
+
+    const ptr_int_name = entry.instructions.items[0].result orelse return null;
+    const ptr_int = switch (entry.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (ptr_int.op != .ptrtoint or !ptr_int.from_ty.eql(.ptr) or !ptr_int.to_ty.eql(.{ .int = 64 }) or !isNamed(ptr_int.value, ptr_name)) return null;
+    const shifted_name = entry.instructions.items[1].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[1], .lshr, ptr_int_name, 3)) return null;
+    const slot_name = entry.instructions.items[2].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[2], .@"and", shifted_name, 62)) return null;
+    const lock_ptr_name = entry.instructions.items[3].result orelse return null;
+    const spinlock_symbol = try matchSpinlockGep(entry.instructions.items[3], slot_name);
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, entry_br.target, loop.name)) return null;
+
+    if (!matchSpinlockAcquireLoop(loop, lock_ptr_name, exit.name)) return null;
+
+    const old_name = exit.instructions.items[0].result orelse return null;
+    const old_load = switch (exit.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!old_load.ty.eql(.{ .int = 128 }) or !isNamed(old_load.ptr, ptr_name) or old_load.attrs.isBarrier()) return null;
+    const or_name = exit.instructions.items[1].result orelse return null;
+    const or_inst = switch (exit.instructions.items[1].kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (or_inst.op != .@"or" or !or_inst.ty.eql(.{ .int = 128 }) or
+        !isNamed(or_inst.lhs, old_name) or !isNamed(or_inst.rhs, value_name)) return null;
+    const value_store = switch (exit.instructions.items[2].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!value_store.ty.eql(.{ .int = 128 }) or !isNamed(value_store.value, or_name) or
         !isNamed(value_store.ptr, ptr_name) or value_store.attrs.isBarrier()) return null;
     const release = switch (exit.instructions.items[3].kind) {
         .store => |store| store,

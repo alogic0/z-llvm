@@ -1168,6 +1168,34 @@ test "x86_64 generic cfg lowers scalar atomic fetch xor family without name admi
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers scalar atomic fetch or family without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @any_atomic_fetch_or_width(ptr %ptr, i32 %replacement, i32 %ordering) {
+        \\entry:
+        \\  %old = atomicrmw or ptr %ptr, i32 %replacement seq_cst, align 4
+        \\  ret i32 %old
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_atomic_fetch_or_width"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.atomic_fetch_or_i32_rdi_esi_eax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers spinlocked i128 atomic fetch umin without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1342,6 +1370,49 @@ test "x86_64 generic cfg lowers spinlocked i128 atomic fetch xor without name ad
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqualStrings("locks_for_any_fetch_xor", machine.instructions.items[0].spinlocked_fetch_xor_i128_rdi_rsi_rdx_rax_rdx);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 generic cfg lowers spinlocked i128 atomic fetch or without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@locks_for_any_fetch_or = internal global [64 x i8] zeroinitializer, align 64
+        \\
+        \\define i128 @any_spinlocked_fetch_or(ptr %ptr, i128 %replacement, i32 %ordering) {
+        \\entry:
+        \\  %addr = ptrtoint ptr %ptr to i64
+        \\  %shift = lshr exact i64 %addr, 3
+        \\  %slot = and i64 %shift, 62
+        \\  %lock = getelementptr inbounds nuw [64 x i8], ptr @locks_for_any_fetch_or, i64 %slot
+        \\  br label %loop
+        \\loop:
+        \\  %old.lock = atomicrmw xchg ptr %lock, i64 1 acquire, align 8
+        \\  %acquired = icmp eq i64 %old.lock, 0
+        \\  br i1 %acquired, label %update, label %loop
+        \\update:
+        \\  %old.value = load i128, ptr %ptr, align 16
+        \\  %new.value = or i128 %old.value, %replacement
+        \\  store i128 %new.value, ptr %ptr, align 16
+        \\  store atomic i64 0, ptr %lock release, align 64
+        \\  ret i128 %old.value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_spinlocked_fetch_or"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqualStrings("locks_for_any_fetch_or", machine.instructions.items[0].spinlocked_fetch_or_i128_rdi_rsi_rdx_rax_rdx);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 

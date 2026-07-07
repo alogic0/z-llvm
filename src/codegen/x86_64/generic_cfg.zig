@@ -118,6 +118,7 @@ pub const lowerCheckedTlsBump = impl.lowerCheckedTlsBump;
 pub const lowerControlFlowLoopSum = impl.lowerControlFlowLoopSum;
 pub const lowerAtomicExchangeFamily = impl.lowerAtomicExchangeFamily;
 pub const lowerAtomicFetchNandFamily = impl.lowerAtomicFetchNandFamily;
+pub const lowerAtomicFetchOrFamily = impl.lowerAtomicFetchOrFamily;
 pub const lowerAtomicFetchUminFamily = impl.lowerAtomicFetchUminFamily;
 pub const lowerAtomicFetchUmaxFamily = impl.lowerAtomicFetchUmaxFamily;
 pub const lowerAtomicFetchXorFamily = impl.lowerAtomicFetchXorFamily;
