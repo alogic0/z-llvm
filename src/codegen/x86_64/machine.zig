@@ -152,6 +152,7 @@ pub const Instruction = union(enum) {
     memcpy_rdi_rsi_rdx_rax,
     spinlocked_memcpy_rsi_to_rdx_len_edi: []const u8,
     spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax: []const u8,
+    spinlocked_var_xchg_edi_rsi_rdx_rcx: []const u8,
     cmpxchg_ptr_expected_desired_i8_eax,
     cmpxchg_ptr_expected_desired_i16_eax,
     cmpxchg_ptr_expected_desired_i32_eax,

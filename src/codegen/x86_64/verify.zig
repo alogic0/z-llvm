@@ -129,6 +129,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .memcpy_rdi_rsi_rdx_rax,
         .spinlocked_memcpy_rsi_to_rdx_len_edi,
         .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax,
+        .spinlocked_var_xchg_edi_rsi_rdx_rcx,
         .cmpxchg_ptr_expected_desired_i8_eax,
         .cmpxchg_ptr_expected_desired_i16_eax,
         .cmpxchg_ptr_expected_desired_i32_eax,
@@ -349,7 +350,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm32_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .mov_rax_rsi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64 => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .mov_rax_rsi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64, .spinlocked_var_xchg_edi_rsi_rdx_rcx => {},
         .reload_rsp_eax, .reload_rsp_rax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -499,6 +500,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .memcpy_rdi_rsi_rdx_rax,
         .spinlocked_memcpy_rsi_to_rdx_len_edi,
         .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax,
+        .spinlocked_var_xchg_edi_rsi_rdx_rcx,
         .cmpxchg_ptr_expected_desired_i8_eax,
         .cmpxchg_ptr_expected_desired_i16_eax,
         .cmpxchg_ptr_expected_desired_i32_eax,

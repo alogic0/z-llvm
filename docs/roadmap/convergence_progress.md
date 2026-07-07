@@ -354,6 +354,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt atomics:fetch-sub family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic fetch SUB family for compiler_rt `atomics.__atomic_fetch_sub_{1,2,4,8,16}`: scalar widths validate the single-block `atomicrmw sub seq_cst` CFG and emit width-specific x86_64 `cmpxchg` loops that return the old value; the i128 form validates the spinlock slot, acquire loop, old-value load, `sub` with the replacement, value store, and release store before emitting a symbol-relocated spinlocked fetch-sub primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_fetch_add_16`. Evidence `tmp/std_debug_hello_debug_build_fetch_sub16_after.log` |
 | `real-program object-emission compiler_rt atomics:fetch-add family` | 0 | Closed | 5 | Item 12 std-hello Debug discovery now lowers the model-owned atomic fetch ADD family for compiler_rt `atomics.__atomic_fetch_add_{1,2,4,8,16}`: scalar widths validate the single-block `atomicrmw add seq_cst` CFG and emit width-specific x86_64 `cmpxchg` loops that return the old value; the i128 form validates the spinlock slot, acquire loop, old-value load, `add` with the replacement, value store, and release store before emitting a symbol-relocated spinlocked fetch-add primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_compare_exchange`. Evidence `tmp/std_debug_hello_debug_build_fetch_add16_after.log` |
 | `real-program object-emission compiler_rt atomics:variable compare-exchange` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned variable-size spinlocked compare-exchange wrapper used by compiler_rt `atomics.__atomic_compare_exchange`: the matcher validates the size-to-spinlock slot derivation, acquire loop, zero-size success path, bytewise object/expected compare loop, desired-to-object success copy, object-to-expected fail copy, release store, and `i32` success result before emitting a symbol-relocated x86_64 primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_exchange`. Evidence `tmp/std_debug_hello_debug_build_atomic_compare_exchange_after.log` |
+| `real-program object-emission compiler_rt atomics:variable exchange` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned variable-size spinlocked exchange wrapper used by compiler_rt `atomics.__atomic_exchange`: the matcher validates the size-to-spinlock slot derivation, acquire loop, object-to-output old-value copy, desired-to-object replacement copy, release store, and `void` result before emitting a symbol-relocated x86_64 primitive. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.atomics.__atomic_store`. Evidence `tmp/std_debug_hello_debug_build_atomic_exchange_after.log` |
 
 ## Progress Log
 
@@ -955,6 +956,18 @@ One line per completed cycle, append-only, newest last. This is the
   strict real-row enforcement remains at 100. Recognizer count still 1 (no
   recognizer reorder or pre-pass). Partial item-14 credit recorded for keeping
   the atomics wrapper handling model-owned and shape-parametric.
+- 2026-07-06 (this commit) Item 12 std-hello discovery fix: generic CFG now
+  lowers the model-owned variable-size spinlocked exchange wrapper used by
+  compiler_rt `atomics.__atomic_exchange`. The matcher validates the
+  size-to-spinlock slot derivation, acquire loop, old-value copy from object to
+  output, replacement copy from desired to object, release store, and `void`
+  result before emitting a symbol-relocated x86_64 primitive. Debug std-hello
+  moved from object-emission `UnsupportedCodegenControlFlow` in
+  `compiler_rt.atomics.__atomic_exchange` to the same stage/diagnostic in
+  `compiler_rt.atomics.__atomic_store`; strict real-row enforcement remains at
+  100. Recognizer count still 1 (no recognizer reorder or pre-pass). Partial
+  item-14 credit recorded for keeping the atomics wrapper handling model-owned
+  and shape-parametric.
 
 ## Ratchet State
 
