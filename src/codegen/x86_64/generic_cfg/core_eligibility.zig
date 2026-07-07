@@ -20,6 +20,7 @@ pub const lowerAtomicFetchUmaxFamily = loop_rows.lowerAtomicFetchUmaxFamily;
 pub const lowerAtomicFetchXorFamily = loop_rows.lowerAtomicFetchXorFamily;
 pub const lowerAtomicLoadFamily = loop_rows.lowerAtomicLoadFamily;
 pub const lowerAtomicStoreFamily = loop_rows.lowerAtomicStoreFamily;
+pub const lowerValgrindDiscardTranslationsClientRequest = loop_rows.lowerValgrindDiscardTranslationsClientRequest;
 
 pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.MachineFunction, function: ir.Function) !bool {
     if (try multi_block_rows.lowerGenericCfgGuardReturnNoreturn(allocator, machine, function)) {
@@ -213,6 +214,10 @@ pub fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *shared.Ma
         return true;
     }
     if (try loop_rows.lowerAtomicFetchAddFamily(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try loop_rows.lowerValgrindDiscardTranslationsClientRequest(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

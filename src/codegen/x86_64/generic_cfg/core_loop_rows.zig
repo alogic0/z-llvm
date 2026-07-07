@@ -1709,6 +1709,64 @@ pub fn lowerAtomicFetchAddFamily(allocator: std.mem.Allocator, machine: *Machine
     return false;
 }
 
+pub fn lowerValgrindDiscardTranslationsClientRequest(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (function.ret_ty != .void or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 64 }) or !function.params.items[1].ty.eql(.{ .int = 64 })) return false;
+    const start_name = function.params.items[0].name;
+    const end_name = function.params.items[1].name;
+
+    if (function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len != 16) return false;
+
+    const request_name = block.instructions.items[0].result orelse return false;
+    const request_alloca = switch (block.instructions.items[0].kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    if (!request_alloca.allocated_ty.eql(.{ .aggregate = "[6 x i64]" }) or
+        request_alloca.allocated_ty_addrspace != null)
+    {
+        return false;
+    }
+
+    const len_name = block.instructions.items[1].result orelse return false;
+    const len_sub = switch (block.instructions.items[1].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (len_sub.op != .sub or !len_sub.flags.nuw or len_sub.flags.nsw or
+        len_sub.flags.exact or len_sub.flags.disjoint or !len_sub.ty.eql(.{ .int = 64 }) or
+        !isNamed(len_sub.lhs, end_name) or !isNamed(len_sub.rhs, start_name))
+    {
+        return false;
+    }
+
+    try validateLifetimeCall(block.instructions.items[2], "llvm.lifetime.start.p0", request_name);
+    try validateRequestStore(block.instructions.items[3], 4098, request_name);
+    const start_slot = try validateRequestGep(block.instructions.items[4], request_name, 8);
+    try validateRequestStoreNamed(block.instructions.items[5], start_name, start_slot);
+    const len_slot = try validateRequestGep(block.instructions.items[6], request_name, 16);
+    try validateRequestStoreNamed(block.instructions.items[7], len_name, len_slot);
+    const arg3_slot = try validateRequestGep(block.instructions.items[8], request_name, 24);
+    try validateRequestStore(block.instructions.items[9], 0, arg3_slot);
+    const arg4_slot = try validateRequestGep(block.instructions.items[10], request_name, 32);
+    try validateRequestStore(block.instructions.items[11], 0, arg4_slot);
+    const arg5_slot = try validateRequestGep(block.instructions.items[12], request_name, 40);
+    try validateRequestStore(block.instructions.items[13], 0, arg5_slot);
+    try validateValgrindClientRequestAsm(block.instructions.items[14], request_name);
+    try validateLifetimeCall(block.instructions.items[15], "llvm.lifetime.end.p0", request_name);
+
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (ret.ty != .void or ret.value != null) return false;
+
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 pub fn lowerGuardedStrncatBody(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesGuardedStrncatBody(function)) return false;
     const dst_reg = try paramReg(function, function.params.items[0].name, .ptr);
@@ -1827,6 +1885,70 @@ fn matchesTrapBlock(block: ir.BasicBlock) bool {
         .@"unreachable" => true,
         else => false,
     };
+}
+
+fn validateLifetimeCall(instruction: ir.Instruction, callee: []const u8, ptr_name: []const u8) !void {
+    if (instruction.removed or instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, call.callee, callee) or call.ret_ty != .void or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (call.callee_value != null or call.inline_asm != null or call.calling_conv != null or call.ret_attrs != null or call.operand_bundle != null) return error.UnsupportedCodegenInstruction;
+    const arg = call.args.items[0];
+    if (arg.ty != .ptr or !isNamed(arg.value, ptr_name)) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateRequestGep(instruction: ir.Instruction, request_name: []const u8, offset: i128) ![]const u8 {
+    if (instruction.removed) return error.UnsupportedCodegenInstruction;
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const gep = switch (instruction.kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!gep.source_ty.eql(.{ .int = 8 }) or !isNamed(gep.ptr, request_name) or gep.ptr_addrspace != null) return error.UnsupportedCodegenInstruction;
+    if (gep.indices.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 }) or !isInt(index.value, offset)) return error.UnsupportedCodegenInstruction;
+    return result;
+}
+
+fn validateRequestStore(instruction: ir.Instruction, value: i128, ptr_name: []const u8) !void {
+    if (instruction.removed or instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const store = switch (instruction.kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(.{ .int = 64 }) or !isInt(store.value, value) or !isNamed(store.ptr, ptr_name)) return error.UnsupportedCodegenInstruction;
+    if (store.ty_addrspace != null or store.ptr_addrspace != null or store.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateRequestStoreNamed(instruction: ir.Instruction, value_name: []const u8, ptr_name: []const u8) !void {
+    if (instruction.removed or instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const store = switch (instruction.kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(.{ .int = 64 }) or !isNamed(store.value, value_name) or !isNamed(store.ptr, ptr_name)) return error.UnsupportedCodegenInstruction;
+    if (store.ty_addrspace != null or store.ptr_addrspace != null or store.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateValgrindClientRequestAsm(instruction: ir.Instruction, request_name: []const u8) !void {
+    if (instruction.removed or instruction.result == null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    const inline_asm = call.inline_asm orelse return error.UnsupportedCodegenInstruction;
+    if (!call.ret_ty.eql(.{ .int = 64 }) or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+    if (call.callee_value != null or call.calling_conv != null or call.ret_attrs != null or call.operand_bundle != null) return error.UnsupportedCodegenInstruction;
+    if (!inline_asm.sideeffect) return error.UnsupportedCodegenInstruction;
+    if (!std.mem.eql(u8, inline_asm.template, " rolq  $$3,    %rdi ; rolq $$13, %rdi\\0A rolq  $$61,   %rdi ; rolq $$51, %rdi\\0A xchgq %rbx, %rbx")) {
+        return error.UnsupportedCodegenInstruction;
+    }
+    if (!std.mem.eql(u8, inline_asm.constraints, "={rdx},{rax},{rdx},~{memory},~{dirflag},~{fpsr},~{flags}")) return error.UnsupportedCodegenInstruction;
+    if (call.args.items[0].ty != .ptr or !isNamed(call.args.items[0].value, request_name)) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[1].ty.eql(.{ .int = 64 }) or !isInt(call.args.items[1].value, 0)) return error.UnsupportedCodegenInstruction;
 }
 
 fn matchesGuardedMemcpyBody(function: ir.Function) bool {

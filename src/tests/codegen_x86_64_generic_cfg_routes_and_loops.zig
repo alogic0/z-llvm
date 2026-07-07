@@ -2406,6 +2406,50 @@ test "x86_64 lowers naked stack probe inline asm without name admission" {
     try std.testing.expectEqual(@as(usize, 54), bytes.len);
 }
 
+test "x86_64 lowers valgrind discard-translations client request without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.lifetime.start.p0(ptr)
+        \\declare void @llvm.lifetime.end.p0(ptr)
+        \\
+        \\define internal void @any_discard_translations(i64 %lo, i64 %hi) {
+        \\entry:
+        \\  %request = alloca [6 x i64], align 8
+        \\  %len = sub nuw i64 %hi, %lo
+        \\  call void @llvm.lifetime.start.p0(ptr nonnull %request)
+        \\  store i64 4098, ptr %request, align 8
+        \\  %slot1 = getelementptr inbounds nuw i8, ptr %request, i64 8
+        \\  store i64 %lo, ptr %slot1, align 8
+        \\  %slot2 = getelementptr inbounds nuw i8, ptr %request, i64 16
+        \\  store i64 %len, ptr %slot2, align 8
+        \\  %slot3 = getelementptr inbounds nuw i8, ptr %request, i64 24
+        \\  store i64 0, ptr %slot3, align 8
+        \\  %slot4 = getelementptr inbounds nuw i8, ptr %request, i64 32
+        \\  store i64 0, ptr %slot4, align 8
+        \\  %slot5 = getelementptr inbounds nuw i8, ptr %request, i64 40
+        \\  store i64 0, ptr %slot5, align 8
+        \\  %ignored = call i64 asm sideeffect " rolq  $$3,    %rdi ; rolq $$13, %rdi\0A rolq  $$61,   %rdi ; rolq $$51, %rdi\0A xchgq %rbx, %rbx", "={rdx},{rax},{rdx},~{memory},~{dirflag},~{fpsr},~{flags}"(ptr nonnull %request, i64 0)
+        \\  call void @llvm.lifetime.end.p0(ptr nonnull %request)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[0]);
+}
+
 test "x86_64 codegen routes boolean branch-mix select through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
