@@ -1086,6 +1086,16 @@ pub fn lowerSpinlockedMemcpyBody(allocator: std.mem.Allocator, machine: *Machine
 }
 
 pub fn lowerAtomicCompareExchangeFamily(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try matchSpinlockedVariableCompareExchange(function)) |spinlock_symbol| {
+        const len_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+        const ptr_reg = try paramReg(function, function.params.items[1].name, .ptr);
+        const expected_reg = try paramReg(function, function.params.items[2].name, .ptr);
+        const desired_reg = try paramReg(function, function.params.items[3].name, .ptr);
+        if (len_reg != .rdi or ptr_reg != .rsi or expected_reg != .rdx or desired_reg != .rcx) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .{ .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax = spinlock_symbol });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
     if (try matchAtomicCompareExchangeScalar(function)) |bits| {
         const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
         const expected_reg = try paramReg(function, function.params.items[1].name, .ptr);
@@ -1110,6 +1120,169 @@ pub fn lowerAtomicCompareExchangeFamily(allocator: std.mem.Allocator, machine: *
         return true;
     }
     return false;
+}
+
+fn matchSpinlockedVariableCompareExchange(function: ir.Function) !?[]const u8 {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 6) return null;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or
+        !function.params.items[1].ty.eql(.ptr) or
+        !function.params.items[2].ty.eql(.ptr) or
+        !function.params.items[3].ty.eql(.ptr) or
+        !function.params.items[4].ty.eql(.{ .int = 32 }) or
+        !function.params.items[5].ty.eql(.{ .int = 32 })) return null;
+    if (function.blocks.items.len != 8) return null;
+    if (!functionHasNoRemovedInstructions(function)) return null;
+
+    const len_name = function.params.items[0].name;
+    const ptr_name = function.params.items[1].name;
+    const expected_name = function.params.items[2].name;
+    const desired_name = function.params.items[3].name;
+    const entry = function.blocks.items[0];
+    const lock_loop = function.blocks.items[1];
+    const after_lock = function.blocks.items[2];
+    const ret_block = function.blocks.items[3];
+    const increment_block = function.blocks.items[4];
+    const compare_block = function.blocks.items[5];
+    const success_block = function.blocks.items[6];
+    const fail_block = function.blocks.items[7];
+    if (entry.instructions.items.len != 4 or lock_loop.instructions.items.len != 2 or
+        after_lock.instructions.items.len != 2 or ret_block.instructions.items.len != 2 or
+        increment_block.instructions.items.len != 2 or compare_block.instructions.items.len != 6 or
+        success_block.instructions.items.len != 1 or
+        fail_block.instructions.items.len != 1) return null;
+
+    const ptr_int_name = entry.instructions.items[0].result orelse return null;
+    const ptr_int = switch (entry.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (ptr_int.op != .ptrtoint or !ptr_int.from_ty.eql(.ptr) or !ptr_int.to_ty.eql(.{ .int = 64 }) or !isNamed(ptr_int.value, ptr_name)) return null;
+    const shifted_name = entry.instructions.items[1].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[1], .lshr, ptr_int_name, 3)) return null;
+    const slot_name = entry.instructions.items[2].result orelse return null;
+    if (!matchI64BinaryNamedImm(entry.instructions.items[2], .@"and", shifted_name, 63)) return null;
+    const lock_ptr_name = entry.instructions.items[3].result orelse return null;
+    const spinlock_symbol = try matchSpinlockGep(entry.instructions.items[3], slot_name);
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, entry_br.target, lock_loop.name)) return null;
+    if (!matchSpinlockAcquireLoop(lock_loop, lock_ptr_name, after_lock.name)) return null;
+
+    const len64_name = after_lock.instructions.items[0].result orelse return null;
+    const len64 = switch (after_lock.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (len64.op != .zext or !len64.from_ty.eql(.{ .int = 32 }) or !len64.to_ty.eql(.{ .int = 64 }) or !isNamed(len64.value, len_name)) return null;
+    const zero_len_name = after_lock.instructions.items[1].result orelse return null;
+    const zero_len = switch (after_lock.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (zero_len.predicate != .eq or !zero_len.operand_ty.eql(.{ .int = 32 }) or !isNamed(zero_len.lhs, len_name) or !isInt(zero_len.rhs, 0)) return null;
+    const after_lock_br = switch (after_lock.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!after_lock_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(after_lock_br.cond, zero_len_name) or
+        !std.mem.eql(u8, after_lock_br.then_target, success_block.name) or
+        !std.mem.eql(u8, after_lock_br.else_target, compare_block.name)) return null;
+
+    const phi_name = ret_block.instructions.items[0].result orelse return null;
+    const phi = switch (ret_block.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    if (!phi.ty.eql(.{ .int = 32 }) or !phiHasIncomingInt(phi, 1, success_block.name) or !phiHasIncomingInt(phi, 0, fail_block.name)) return null;
+    const release = switch (ret_block.instructions.items[1].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!release.ty.eql(.{ .int = 64 }) or !isInt(release.value, 0) or !isNamed(release.ptr, lock_ptr_name) or
+        release.attrs.atomic_ordering == null or !std.mem.eql(u8, release.attrs.atomic_ordering.?, "release") or
+        release.attrs.@"align" != 64 or release.attrs.is_volatile) return null;
+    const ret = switch (ret_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, phi_name)) return null;
+
+    const idx_name = compare_block.instructions.items[0].result orelse return null;
+    const idx = switch (compare_block.instructions.items[0].kind) {
+        .phi => |idx_phi| idx_phi,
+        else => return null,
+    };
+    if (!idx.ty.eql(.{ .int = 64 })) return null;
+    const next_name = increment_block.instructions.items[0].result orelse return null;
+    if (!phiHasIncomingInt(idx, 0, after_lock.name) or !phiHasIncoming(idx, next_name, increment_block.name)) return null;
+
+    const object_gep_name = compare_block.instructions.items[1].result orelse return null;
+    if (!matchByteGep(compare_block.instructions.items[1], ptr_name, idx_name)) return null;
+    const object_byte_name = compare_block.instructions.items[2].result orelse return null;
+    if (!matchPlainI8Load(compare_block.instructions.items[2], object_gep_name)) return null;
+    const expected_gep_name = compare_block.instructions.items[3].result orelse return null;
+    if (!matchByteGep(compare_block.instructions.items[3], expected_name, idx_name)) return null;
+    const expected_byte_name = compare_block.instructions.items[4].result orelse return null;
+    if (!matchPlainI8Load(compare_block.instructions.items[4], expected_gep_name)) return null;
+    const equal_name = compare_block.instructions.items[5].result orelse return null;
+    const equal = switch (compare_block.instructions.items[5].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (equal.predicate != .eq or !equal.operand_ty.eql(.{ .int = 8 }) or
+        !isNamed(equal.lhs, expected_byte_name) or !isNamed(equal.rhs, object_byte_name)) return null;
+    const compare_br = switch (compare_block.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!compare_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(compare_br.cond, equal_name) or
+        !std.mem.eql(u8, compare_br.then_target, increment_block.name) or
+        !std.mem.eql(u8, compare_br.else_target, fail_block.name)) return null;
+
+    const next = switch (increment_block.instructions.items[0].kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (next.op != .add or !next.ty.eql(.{ .int = 64 }) or !isNamed(next.lhs, idx_name) or !isInt(next.rhs, 1)) return null;
+    const exit_name = increment_block.instructions.items[1].result orelse return null;
+    const exit_cmp = switch (increment_block.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (exit_cmp.predicate != .eq or !exit_cmp.operand_ty.eql(.{ .int = 64 }) or !isNamed(exit_cmp.lhs, next_name) or !isNamed(exit_cmp.rhs, len64_name)) return null;
+    const increment_br = switch (increment_block.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!increment_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(increment_br.cond, exit_name) or
+        !std.mem.eql(u8, increment_br.then_target, success_block.name) or
+        !std.mem.eql(u8, increment_br.else_target, compare_block.name)) return null;
+
+    const success_copy = switch (success_block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!isSpinlockedMemcpyCall(success_copy, ptr_name, desired_name, len64_name)) return null;
+    const success_br = switch (success_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, success_br.target, ret_block.name)) return null;
+
+    const fail_copy = switch (fail_block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!isSpinlockedMemcpyCall(fail_copy, expected_name, ptr_name, len64_name)) return null;
+    const fail_br = switch (fail_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, fail_br.target, ret_block.name)) return null;
+
+    return spinlock_symbol;
 }
 
 pub fn lowerAtomicExchangeFamily(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -3339,6 +3512,25 @@ fn matchExtractValue(instruction: ir.Instruction, aggregate_name: []const u8, in
     return extract.result_ty.eql(result_ty) and
         isNamed(extract.aggregate, aggregate_name) and
         std.mem.eql(u8, extract.indices, indices);
+}
+
+fn matchByteGep(instruction: ir.Instruction, ptr_name: []const u8, index_name: []const u8) bool {
+    const gep = switch (instruction.kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" }) or !isNamed(gep.ptr, ptr_name)) return false;
+    if (gep.indices.items.len != 1) return false;
+    const index = gep.indices.items[0];
+    return index.ty.eql(.{ .int = 64 }) and isNamed(index.value, index_name);
+}
+
+fn matchPlainI8Load(instruction: ir.Instruction, ptr_name: []const u8) bool {
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    return load.ty.eql(.{ .int = 8 }) and !load.attrs.isBarrier() and isNamed(load.ptr, ptr_name);
 }
 
 fn matchSpinlockAcquireLoop(loop: ir.BasicBlock, lock_ptr_name: []const u8, acquired_target: []const u8) bool {

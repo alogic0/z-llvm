@@ -754,6 +754,70 @@ test "x86_64 generic cfg lowers spinlocked variable memcpy without name admissio
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers spinlocked variable compare exchange without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@locks_for_any_var_cmpxchg = internal global [64 x i8] zeroinitializer, align 64
+        \\declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
+        \\
+        \\define i32 @any_spinlocked_var_cmpxchg(i32 %len, ptr %ptr, ptr %expected, ptr %desired, i32 %success_order, i32 %failure_order) {
+        \\entry:
+        \\  %addr = ptrtoint ptr %ptr to i64
+        \\  %shift = lshr i64 %addr, 3
+        \\  %slot = and i64 %shift, 63
+        \\  %lock = getelementptr [64 x i8], ptr @locks_for_any_var_cmpxchg, i64 %slot
+        \\  br label %lock_loop
+        \\lock_loop:
+        \\  %old_lock = atomicrmw xchg ptr %lock, i64 1 acquire, align 8
+        \\  %acquired = icmp eq i64 %old_lock, 0
+        \\  br i1 %acquired, label %after_lock, label %lock_loop
+        \\after_lock:
+        \\  %len64 = zext i32 %len to i64
+        \\  %zero = icmp eq i32 %len, 0
+        \\  br i1 %zero, label %success_copy, label %compare
+        \\ret_block:
+        \\  %result = phi i32 [ 1, %success_copy ], [ 0, %fail_copy ]
+        \\  store atomic i64 0, ptr %lock release, align 64
+        \\  ret i32 %result
+        \\increment:
+        \\  %next = add nuw nsw i64 %idx, 1
+        \\  %done = icmp eq i64 %next, %len64
+        \\  br i1 %done, label %success_copy, label %compare
+        \\compare:
+        \\  %idx = phi i64 [ 0, %after_lock ], [ %next, %increment ]
+        \\  %object_gep = getelementptr [1 x i8], ptr %ptr, i64 %idx
+        \\  %object_byte = load i8, ptr %object_gep, align 1
+        \\  %expected_gep = getelementptr [1 x i8], ptr %expected, i64 %idx
+        \\  %expected_byte = load i8, ptr %expected_gep, align 1
+        \\  %same = icmp eq i8 %expected_byte, %object_byte
+        \\  br i1 %same, label %increment, label %fail_copy
+        \\success_copy:
+        \\  call void @llvm.memcpy.inline.p0.p0.i64(ptr %ptr, ptr %desired, i64 %len64, i1 false)
+        \\  br label %ret_block
+        \\fail_copy:
+        \\  call void @llvm.memcpy.inline.p0.p0.i64(ptr %expected, ptr %ptr, i64 %len64, i1 false)
+        \\  br label %ret_block
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_spinlocked_var_cmpxchg"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqualStrings("locks_for_any_var_cmpxchg", machine.instructions.items[0].spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers scalar atomic compare exchange family without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

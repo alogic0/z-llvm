@@ -535,6 +535,47 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tmovq $0, (%r8)\n",
                 .{symbol},
             ),
+            .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax => |symbol| try writer.print(
+                "\tmovq %rsi, %rax\n" ++
+                    "\tshrq $3, %rax\n" ++
+                    "\tandq $63, %rax\n" ++
+                    "\tleaq {s}(%rip), %r8\n" ++
+                    "\tleaq (%r8,%rax), %r8\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "1:\n" ++
+                    "\txchgq %rax, (%r8)\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjne 1b\n" ++
+                    "\ttestl %edi, %edi\n" ++
+                    "\tje 4f\n" ++
+                    "\txorl %r9d, %r9d\n" ++
+                    "2:\n" ++
+                    "\tmovzbl (%rsi,%r9), %eax\n" ++
+                    "\tcmpb (%rdx,%r9), %al\n" ++
+                    "\tjne 5f\n" ++
+                    "\tincq %r9\n" ++
+                    "\tcmpq %r9, %rdi\n" ++
+                    "\tjne 2b\n" ++
+                    "4:\n" ++
+                    "\tmovq %rcx, %r10\n" ++
+                    "\tmovl %edi, %ecx\n" ++
+                    "\tmovq %rsi, %rdi\n" ++
+                    "\tmovq %r10, %rsi\n" ++
+                    "\tcld\n" ++
+                    "\trep movsb\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjmp 6f\n" ++
+                    "5:\n" ++
+                    "\tmovl %edi, %ecx\n" ++
+                    "\tmovq %rdx, %rdi\n" ++
+                    "\tcld\n" ++
+                    "\trep movsb\n" ++
+                    "\txorl %eax, %eax\n" ++
+                    "6:\n" ++
+                    "\tmovq $0, (%r8)\n",
+                .{symbol},
+            ),
             .cmpxchg_ptr_expected_desired_i8_eax => try writer.writeAll(
                 "\tmovb (%rsi), %al\n" ++
                     "\tlock cmpxchgb %dl, (%rdi)\n" ++

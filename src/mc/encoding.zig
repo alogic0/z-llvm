@@ -514,6 +514,41 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xf3, 0xa4, // rep movsb
                 0x49, 0xc7, 0x00, 0, 0, 0, 0, // movq $0, (%r8)
             }),
+            .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax => try bytes.appendSlice(allocator, &.{
+                0x48, 0x89, 0xf0, // movq %rsi, %rax
+                0x48, 0xc1, 0xe8, 0x03, // shrq $3, %rax
+                0x48, 0x83, 0xe0, 0x3f, // andq $63, %rax
+                0x4c, 0x8d, 0x05, 0, 0, 0, 0, // leaq spinlocks(%rip), %r8
+                0x4d, 0x8d, 0x04, 0x00, // leaq (%r8,%rax), %r8
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x49, 0x87, 0x00, // xchgq %rax, (%r8)
+                0x48, 0x85, 0xc0, // testq %rax, %rax
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x75, 0xf3, // jne 1b
+                0x85, 0xff, // testl %edi, %edi
+                0x74, 0x16, // je 4f
+                0x45, 0x31, 0xc9, // xorl %r9d, %r9d
+                0x42, 0x0f, 0xb6, 0x04, 0x0e, // movzbl (%rsi,%r9), %eax
+                0x42, 0x3a, 0x04, 0x0a, // cmpb (%rdx,%r9), %al
+                0x75, 0x1d, // jne 5f
+                0x49, 0xff, 0xc1, // incq %r9
+                0x4c, 0x39, 0xcf, // cmpq %r9, %rdi
+                0x75, 0xed, // jne 2b
+                0x49, 0x89, 0xca, // movq %rcx, %r10
+                0x89, 0xf9, // movl %edi, %ecx
+                0x48, 0x89, 0xf7, // movq %rsi, %rdi
+                0x4c, 0x89, 0xd6, // movq %r10, %rsi
+                0xfc, // cld
+                0xf3, 0xa4, // rep movsb
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0xeb, 0x0a, // jmp 6f
+                0x89, 0xf9, // movl %edi, %ecx
+                0x48, 0x89, 0xd7, // movq %rdx, %rdi
+                0xfc, // cld
+                0xf3, 0xa4, // rep movsb
+                0x31, 0xc0, // xorl %eax, %eax
+                0x49, 0xc7, 0x00, 0, 0, 0, 0, // movq $0, (%r8)
+            }),
             .cmpxchg_ptr_expected_desired_i8_eax => try bytes.appendSlice(allocator, &.{
                 0x8a, 0x06, // movb (%rsi), %al
                 0xf0, 0x0f, 0xb0, 0x17, // lock cmpxchgb %dl, (%rdi)
@@ -1463,6 +1498,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .memcmp_rdi_rsi_rdx_eax => 36,
         .memcpy_rdi_rsi_rdx_rax => 14,
         .spinlocked_memcpy_rsi_to_rdx_len_edi => 59,
+        .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax => 104,
         .cmpxchg_ptr_expected_desired_i8_eax => 19,
         .cmpxchg_ptr_expected_desired_i16_eax => 22,
         .cmpxchg_ptr_expected_desired_i32_eax => 19,
