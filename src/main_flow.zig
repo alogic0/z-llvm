@@ -23,7 +23,7 @@ const fatal = main_flow_writer.fatal;
 const Emit = main_flow_writer.Emit;
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--report-all-codegen-failures] [--pass-limit=N] [--input-limit=N] <input.ll>
     \\       z_llvm --emit=ir-writer
     \\       z_llvm --emit=semantic-descriptor
     \\
@@ -47,6 +47,7 @@ pub fn main(init: std.process.Init) !void {
     var trace = false;
     var timing = false;
     var quiet = false;
+    var report_all_codegen_failures = envFlag(init.environ_map, "ZLLVM_CODEGEN_REPORT_ALL");
     var pass_limit: ?usize = null;
     var input_limit: usize = default_input_limit;
     var emit: Emit = .ir;
@@ -67,6 +68,8 @@ pub fn main(init: std.process.Init) !void {
             timing = true;
         } else if (std.mem.eql(u8, arg, "--quiet")) {
             quiet = true;
+        } else if (std.mem.eql(u8, arg, "--report-all-codegen-failures")) {
+            report_all_codegen_failures = true;
         } else if (std.mem.startsWith(u8, arg, "--pass-limit=")) {
             pass_limit = try std.fmt.parseInt(usize, arg["--pass-limit=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--input-limit=")) {
@@ -145,7 +148,10 @@ pub fn main(init: std.process.Init) !void {
             lowered.module.target_triple = triple;
         }
         if (emit == .obj or emit == .@"asm") {
-            try emitCodegenModule(allocator, io, lowered.module, emit, target_triple, quiet);
+            try emitCodegenModule(allocator, io, lowered.module, emit, target_triple, .{
+                .quiet = quiet,
+                .report_all_failures = report_all_codegen_failures,
+            });
             return;
         }
         if (emit != .ir) return error.UnsupportedEmitMode;
@@ -174,7 +180,10 @@ pub fn main(init: std.process.Init) !void {
                 if (module.target_triple == null) module.target_triple = triple;
             }
             try runStructuredDirectAcceptedPipelineForSurface(allocator, io, &module, init.environ_map, descriptor.surface);
-            try emitCodegenModule(allocator, io, module, emit, target_triple, quiet);
+            try emitCodegenModule(allocator, io, module, emit, target_triple, .{
+                .quiet = quiet,
+                .report_all_failures = report_all_codegen_failures,
+            });
             return;
         }
     } else if (resolveDirectIrWriterCase(input)) |ir_writer_case| {
@@ -200,7 +209,10 @@ pub fn main(init: std.process.Init) !void {
                 if (module.target_triple == null) module.target_triple = triple;
             }
             try runStructuredDirectAcceptedPipeline(allocator, io, &module, init.environ_map, ir_writer_case);
-            try emitCodegenModule(allocator, io, module, emit, target_triple, quiet);
+            try emitCodegenModule(allocator, io, module, emit, target_triple, .{
+                .quiet = quiet,
+                .report_all_failures = report_all_codegen_failures,
+            });
             return;
         }
     }
@@ -228,7 +240,10 @@ pub fn main(init: std.process.Init) !void {
     const stdout = if (quiet) &discard_writer.writer else &stdout_writer.interface;
 
     if (emit == .@"asm" or emit == .obj) {
-        try emitCodegenModule(allocator, io, module, emit, target_triple, quiet);
+        try emitCodegenModule(allocator, io, module, emit, target_triple, .{
+            .quiet = quiet,
+            .report_all_failures = report_all_codegen_failures,
+        });
         return;
     }
 
@@ -244,6 +259,15 @@ pub fn main(init: std.process.Init) !void {
     });
     if (!trace and !quiet) try module.print(stdout);
     try stdout.flush();
+}
+
+fn envFlag(environ: *const std.process.Environ.Map, name: []const u8) bool {
+    const value = environ.get(name) orelse return false;
+    return std.mem.eql(u8, value, "1") or
+        std.mem.eql(u8, value, "true") or
+        std.mem.eql(u8, value, "TRUE") or
+        std.mem.eql(u8, value, "yes") or
+        std.mem.eql(u8, value, "YES");
 }
 
 fn reportAirLowering(

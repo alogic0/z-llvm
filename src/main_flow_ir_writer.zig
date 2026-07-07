@@ -85,6 +85,11 @@ pub const Emit = enum {
     semantic_descriptor,
 };
 
+pub const CodegenEmitOptions = struct {
+    quiet: bool = false,
+    report_all_failures: bool = false,
+};
+
 pub fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {
     var stderr_buffer: [4096]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
@@ -439,7 +444,7 @@ pub fn emitCodegenModule(
     module: ir.Module,
     emit: Emit,
     target_triple: ?[]const u8,
-    quiet: bool,
+    options: CodegenEmitOptions,
 ) !void {
     const triple = target_triple orelse module.target_triple orelse {
         try fatal(io, "missing target triple for codegen emit; pass --target=<triple> or include target triple in the input\n", .{});
@@ -456,20 +461,52 @@ pub fn emitCodegenModule(
         for (machines.items) |*machine| machine.deinit(allocator);
         machines.deinit(allocator);
     }
+    var selected_functions: usize = 0;
+    var failed_functions: usize = 0;
+    var first_failing_function: []const u8 = "-";
+    var first_failing_diagnostic: []const u8 = "-";
+    var stderr_buffer: [4096]u8 = undefined;
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
     for (module.functions.items) |function| {
         if (!shouldLowerCodegenFunction(module, function)) continue;
+        selected_functions += 1;
         var machine = codegen.x86_64.lowerFunction(allocator, triple, function) catch |err| {
+            if (options.report_all_failures) {
+                if (failed_functions == 0) {
+                    first_failing_function = function.name;
+                    first_failing_diagnostic = @errorName(err);
+                }
+                failed_functions += 1;
+                try stderr_writer.interface.print("zllvm-codegen-failure function={s} diagnostic={s}\n", .{ function.name, @errorName(err) });
+                continue;
+            }
             try fatal(io, "codegen failed for function {s}: {any}\n", .{ function.name, err });
         };
         errdefer machine.deinit(allocator);
         try machines.append(allocator, machine);
+    }
+    if (options.report_all_failures) {
+        try stderr_writer.interface.print(
+            "summary zllvm-codegen-report-all target={s} selected_functions={} emitted_functions={} failed_functions={} first_failing_function={s} first_failing_diagnostic={s} local_fail={}\n",
+            .{
+                triple,
+                selected_functions,
+                machines.items.len,
+                failed_functions,
+                first_failing_function,
+                first_failing_diagnostic,
+                @intFromBool(failed_functions != 0),
+            },
+        );
+        try stderr_writer.interface.flush();
+        if (failed_functions != 0) std.process.exit(1);
     }
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     var discard_buffer: [4096]u8 = undefined;
     var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
-    const stdout = if (quiet) &discard_writer.writer else &stdout_writer.interface;
+    const stdout = if (options.quiet) &discard_writer.writer else &stdout_writer.interface;
     if (emit == .@"asm") {
         for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
     } else {

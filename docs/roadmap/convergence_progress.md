@@ -197,6 +197,13 @@ list and the visible record of progress. Evidence summaries under
   boundary gate as proof. If a soft-float f80/f128 arithmetic family needs
   more than one new generic-CFG shape, stop for item-15 architectural review
   instead of stacking shapes.
+
+  Method annotation (2026-07-07): extend the parametric rule across operation
+  families too. When family members differ only by the inner operation, own
+  one model shape with an operation parameter rather than one lowering per
+  operation. Width-parametric plus operation-parametric is the default for the
+  remaining item-12 compiler_rt cycles; unsupported operations and variants
+  remain fail-closed.
 - [x] 12a. tmp hygiene (small infrastructure cycle; may be taken between
   item-12 cluster cycles when a short cycle fits): a Zig tool
   `tools/clean_tmp.zig`, wired as `zig build clean-tmp`, that (a) deletes
@@ -293,6 +300,7 @@ changes the counts; cite the discovery/fix evidence summary.
 | ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
 | ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
 | ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
+| Debug compiler_rt | std-hello | 443 selected | 103 emitting | 340 failures | `docs/evidence/std_debug_hello_compiler_rt_report_all.summary` |
 
 ## Cluster Board (item 9a onward)
 
@@ -358,6 +366,9 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt atomics:variable store` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned variable-size spinlocked store wrapper used by compiler_rt `atomics.__atomic_store`: the matcher validates the size-to-spinlock slot derivation, acquire loop, desired-to-object replacement copy, release store, and `void` result before emitting a symbol-relocated x86_64 primitive. The next open cluster is object-emission `UnsupportedCodegenInstruction` in `compiler_rt.clear_cache.clear_cache`. Evidence `tmp/std_debug_hello_debug_build_atomic_store_after.log` |
 | `real-program object-emission compiler_rt cfg:valgrind discard-translations client request` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned Valgrind discard-translations client-request block reached through compiler_rt `clear_cache`: the matcher validates the two `usize` parameters, request-block alloca, length subtraction, six-word request payload, exact side-effecting client-request inline-asm template/constraints, lifetime calls, and `ret void`, then emits a no-op return for the x86_64 cache-clear path without function-name admission. `distribution-all` now enforces strict real-row limit 100 through explicit ReleaseFast, ReleaseSafe, and ReleaseSmall invocations, avoiding the quiet implicit all-mode runner stall while preserving the same three-mode coverage. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.limb64.__abs_limb64`. Evidence `tmp/std_debug_hello_debug_build_clear_cache_after.log`; `tmp/distribution_all_after_clear_cache.log` |
 | `real-program object-emission compiler_rt cfg:limb64 abs twos-complement body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned limb64 absolute-value body used by compiler_rt `limb64.__abs_limb64`: the matcher validates the limb count derived from the bit count, high-limb sign test, positive memcpy path, and negative xor-plus-carry loop with separate overflow and carry byte slots, then emits a qword copy/two's-complement loop without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.limb64.__mulo_limb64`. Evidence `tmp/std_debug_hello_debug_build_abs_limb64_after.log`; `tmp/distribution_all_after_abs_limb64.log` |
+| `real-program object-emission compiler_rt soft-float/libm/conversion helpers` | 259 | Open | 0 | Report-all object emission on the current Debug std-hello compiler_rt module found the largest remaining cluster in soft-float, libm-style, complex-float, comparison, and float/int conversion helpers. Representative first failure is `compiler_rt.trunc.__trunch`; diagnostics are `UnsupportedCodegenControlFlow` 225, `UnsupportedTailCallAbi` 23, and `UnsupportedCodegenInstruction` 11. Mechanical family/diagnostic buckets: 180 across 157 namespace families, which triggers the soft-float architectural-review decision point before implementing this cluster. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
+| `real-program object-emission compiler_rt integer helper families` | 66 | Open | 0 | Report-all object emission found the second-largest remaining cluster in integer helper families after the soft-float cluster. Representative first failure is `compiler_rt.udivmodei4.__udivei4`; diagnostics are `UnsupportedCodegenControlFlow` 35, `UnsupportedTailCallAbi` 21, and `UnsupportedCodegenInstruction` 10. Mechanical family/diagnostic buckets: 26 across 21 namespace families. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
+| `real-program object-emission compiler_rt limb64 loops` | 15 | Open | 0 | Report-all object emission found the current limb64 queue as the third-largest remaining cluster. Representative first failure remains `compiler_rt.limb64.__mulo_limb64`; all 15 rows are `UnsupportedCodegenControlFlow` and fit one mechanical family/diagnostic bucket. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
 
 ## Progress Log
 
@@ -1009,6 +1020,19 @@ One line per completed cycle, append-only, newest last. This is the
   100. Recognizer count still 1 (no recognizer reorder or pre-pass). Partial
   item-14 credit recorded for keeping the compiler_rt limb helper shape
   model-owned.
+- 2026-07-07 (this commit) Item 12 process-improvement cycle: z_llvm object
+  emission now has opt-in report-all codegen failure mode
+  (`--report-all-codegen-failures` or `ZLLVM_CODEGEN_REPORT_ALL=1`). It
+  records each selected per-function codegen diagnostic, continues inventory,
+  and exits before writing object/assembly output when any selected function
+  failed. A Debug std-hello compiler_rt run reports 443 selected functions,
+  103 emitting functions, and 340 remaining failures. The Cluster Board is
+  reordered largest-first: soft-float/libm/conversion helpers 259, integer
+  helper families 66, limb64 loops 15. Soft-float has 180 mechanical
+  family/diagnostic buckets, so the stop state recommends pulling item 15
+  forward before implementing that cluster. Recognizer count still 1 (no
+  recognizer reorder or pre-pass). Method annotation extended item 12 from
+  width-parametric to width-plus-operation-parametric lowering by default.
 
 ## Ratchet State
 

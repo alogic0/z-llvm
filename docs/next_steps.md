@@ -37,9 +37,13 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None.
+Architectural review: item 12 report-all inventory shows the largest
+remaining compiler_rt cluster is soft-float/libm/conversion work with 259
+failures and 180 mechanical family/diagnostic buckets. Per the item-12
+soft-float escalation rule, pull item 15 forward before implementing this
+cluster rather than stacking generic-CFG shapes one family at a time.
 
-Stop state recorded 2026-07-07 after limb64 absolute-value cycle:
+Stop state recorded 2026-07-07 after compiler_rt report-all inventory cycle:
 
 - Active convergence-progress item: item 12 on the std-hello real-program
   track. The real-row track closed item 10 at strict
@@ -56,13 +60,16 @@ Stop state recorded 2026-07-07 after limb64 absolute-value cycle:
   z_llvm object emission and Zig native `build-exe -fno-lld` build a no-std
   `_start` executable in ReleaseFast, ReleaseSafe, and ReleaseSmall; each run
   prints `hello\n` and exits 0. Item 12 std hello remains open. The latest
-  Debug std-hello cycles lowered the model-owned compiler_rt ssp wrappers,
-  byte-copy fast family, stack probe, atomic fixed-width families, atomic
-  variable-size wrappers, clear-cache Valgrind client request, and now the
-  limb64 absolute-value body without function-name admission. The focused
-  Debug std-hello build now fails at
-  `compiler_rt.limb64.__mulo_limb64` with
-  `error.UnsupportedCodegenControlFlow`.
+  process-improvement cycle added opt-in z_llvm report-all object-emission
+  mode for the focused compiler_rt sub-compilation. The Debug std-hello
+  report-all run selected 443 compiler_rt functions, emitted 103, and
+  reported 340 failures before failing closed with no object output. The
+  remaining Cluster Board order is now largest-first: soft-float/libm/
+  conversion helpers 259 failures, integer helper families 66 failures, and
+  limb64 loops 15 failures. The previous first failing function remains
+  `compiler_rt.limb64.__mulo_limb64`, but it is no longer the largest cluster.
+  The soft-float cluster has 180 mechanical family/diagnostic buckets across
+  157 namespace families.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -76,8 +83,10 @@ Stop state recorded 2026-07-07 after limb64 absolute-value cycle:
   `bdee02bc0c7f227c0f11bc9a449df673fe803540`. The migration from selector-v1
   is recorded in `docs/evidence/real_candidates_release_v2.summary`.
 - Enforcement state: `distribution-all` runs
-  `distribution-real-rows --strict --limit=100`.
-- Saved log paths: `tmp/std_debug_hello_debug_build_abs_limb64_after.log`,
+  `src/distribution_real_rows_gate.zig --strict --limit=100` for ReleaseFast,
+  ReleaseSafe, and ReleaseSmall.
+- Saved log paths: `tmp/std_debug_hello_debug_report_all.log`,
+  `tmp/std_debug_hello_debug_build_abs_limb64_after.log`,
   `tmp/distribution_all_after_abs_limb64.log`,
   `tmp/real_rows_strict_limit100_releasefast_after_abs_limb64.log`,
   `tmp/real_rows_strict_limit100_releasesafe_after_abs_limb64.log`,
@@ -90,20 +99,18 @@ Stop state recorded 2026-07-07 after limb64 absolute-value cycle:
   `docs/evidence/real_rows_releasesafe_limit100_after_intcast_safe.summary`,
   `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary`, and
   `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`,
-  `docs/evidence/zig_integrated_exe_syscall_hello.summary`, and
-  `docs/evidence/clean_tmp.summary`.
-- Recommended next action: continue item 12 by fixing
-  `compiler_rt.limb64.__mulo_limb64`, starting from
-  `ZLLVM_DEBUG_DUMP_IR_SOURCE=__mulo_limb64` on the focused Debug std-hello
-  build. The current diagnostic is `error.UnsupportedCodegenControlFlow`;
-  check whether the remaining limb64 multiply/divide helpers share one
-  model-owned family shape, and keep unsupported variants fail-closed. For
-  remaining compiler_rt builtin families, use width-parametric lowerings where
-  the model-owned shapes match, recording partial item-14 credit when a
-  parametric family subsumes per-width special cases. The soft-float
-  escalation rule still applies: more than one new CFG shape for a single
-  soft-float family means stop and recommend item 15 rather than stacking
-  shapes.
+  `docs/evidence/zig_integrated_exe_syscall_hello.summary`,
+  `docs/evidence/clean_tmp.summary`, and
+  `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`.
+- Recommended next action: do an item-15 architectural-review cycle before
+  implementing the soft-float/libm/conversion cluster. The review should
+  decide whether to introduce a broader generic-CFG/semantic lowering
+  architecture for the 259-row soft-float cluster instead of adding many
+  family-specific CFG recognizers. If the review explicitly defers soft-float,
+  continue item 12 largest-actionable-cluster-first with the 66-row integer
+  helper cluster, using width-plus-operation-parametric lowerings where the
+  model-owned shapes match. The limb64 queue, including
+  `compiler_rt.limb64.__mulo_limb64`, is now third by size with 15 rows.
 
 When the worker stops, record only:
 
