@@ -37,17 +37,15 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-Architectural review: item 12 report-all inventory shows the largest
-remaining compiler_rt cluster is soft-float/libm/conversion work with 259
-failures and 180 mechanical family/diagnostic buckets. Per the item-12
-soft-float escalation rule, pull item 15 forward before implementing this
-cluster rather than stacking generic-CFG shapes one family at a time.
+None. The item-15 architectural review was approved and recorded; proceed with
+the item-15 migration order before soft-float implementation.
 
-Stop state recorded 2026-07-07 after compiler_rt report-all inventory cycle:
+Stop state recorded 2026-07-07 after item-15 architectural-review cycle:
 
-- Active convergence-progress item: item 12 on the std-hello real-program
-  track. The real-row track closed item 10 at strict
-  `--limit=100`, but every stop report still states both tracks.
+- Active convergence-progress item: item 15 is pulled forward as an
+  architectural migration under item 12's std-hello real-program track. The
+  real-row track closed item 10 at strict `--limit=100`, but every stop report
+  still states both tracks.
 - Real-row track status: strict `distribution-real-rows --strict --limit=100`
   is green in ReleaseFast, ReleaseSafe, and ReleaseSmall, and
   `distribution-all` enforces that strict limit. Selector-v2 ReleaseFast
@@ -64,12 +62,15 @@ Stop state recorded 2026-07-07 after compiler_rt report-all inventory cycle:
   mode for the focused compiler_rt sub-compilation. The Debug std-hello
   report-all run selected 443 compiler_rt functions, emitted 103, and
   reported 340 failures before failing closed with no object output. The
-  remaining Cluster Board order is now largest-first: soft-float/libm/
-  conversion helpers 259 failures, integer helper families 66 failures, and
-  limb64 loops 15 failures. The previous first failing function remains
-  `compiler_rt.limb64.__mulo_limb64`, but it is no longer the largest cluster.
-  The soft-float cluster has 180 mechanical family/diagnostic buckets across
-  157 namespace families.
+  item-15 architectural review split the remaining report-all inventory into
+  selector/codegen buckets and an ordinary ABI bucket: soft-float/libm/
+  conversion selector candidates 236 rows, integer helper selector candidates
+  45 rows, tail-call ABI 44 rows, and limb64 loops 15 rows. The historical
+  259-row soft-float-adjacent bucket had 180 mechanical family/diagnostic
+  buckets across 157 namespace families before separating 23 tail-call ABI
+  rows. The previous first failing function remains
+  `compiler_rt.limb64.__mulo_limb64`; it is now the first selector proof
+  bucket, not the largest bucket.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -102,15 +103,16 @@ Stop state recorded 2026-07-07 after compiler_rt report-all inventory cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`,
   `docs/evidence/clean_tmp.summary`, and
   `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`.
-- Recommended next action: do an item-15 architectural-review cycle before
-  implementing the soft-float/libm/conversion cluster. The review should
-  decide whether to introduce a broader generic-CFG/semantic lowering
-  architecture for the 259-row soft-float cluster instead of adding many
-  family-specific CFG recognizers. If the review explicitly defers soft-float,
-  continue item 12 largest-actionable-cluster-first with the 66-row integer
-  helper cluster, using width-plus-operation-parametric lowerings where the
-  model-owned shapes match. The limb64 queue, including
-  `compiler_rt.limb64.__mulo_limb64`, is now third by size with 15 rows.
+- Recommended next action: implement item 15 in the recorded validation order.
+  Start with the incremental generic instruction selector proving itself on
+  the 15-row limb64 bucket (`compiler_rt.limb64.__mulo_limb64` first), then
+  the 45 non-tail-call integer helper selector rows from the historical 66-row
+  integer helper cluster, then the 236-row soft-float/libm/conversion selector
+  bucket. Keep existing shape recognizers as transitional fallback and ratchet
+  `shape_recognizer_functions` toward zero on the real-program gate. Treat the
+  44 `UnsupportedTailCallAbi` rows as a separate ordinary ABI family, not a
+  selector concern. `distribution-all` must stay green before every commit; if
+  captured rows regress, use the loop-sum bisect discipline.
 
 When the worker stops, record only:
 

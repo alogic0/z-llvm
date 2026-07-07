@@ -204,6 +204,15 @@ list and the visible record of progress. Evidence summaries under
   operation. Width-parametric plus operation-parametric is the default for the
   remaining item-12 compiler_rt cycles; unsupported operations and variants
   remain fail-closed.
+
+  Estimate update (2026-07-07 report-all inventory): Debug std-hello
+  compiler_rt has 340 remaining object-emission failures after 443 selected
+  functions and 103 emitting functions. After separating ordinary tail-call ABI
+  work from selector/codegen work, the open buckets are: soft-float/libm/
+  conversion selector candidates 236 rows, integer helper selector candidates
+  45 rows, tail-call ABI 44 rows, and limb64 loops 15 rows. The item-15
+  validation order pulls the generic selector forward on limb64 first, then
+  the integer helper cluster, before attempting soft-float.
 - [x] 12a. tmp hygiene (small infrastructure cycle; may be taken between
   item-12 cluster cycles when a short cycle fits): a Zig tool
   `tools/clean_tmp.zig`, wired as `zig build clean-tmp`, that (a) deletes
@@ -262,6 +271,57 @@ list and the visible record of progress. Evidence summaries under
   scratch; z_llvm's differentiation stays in the optimizing release path,
   not in encoder tables. Assess reuse vs. rewrite at this item's
   architectural review.
+
+  Architectural decision (2026-07-07): pull item 15 forward before
+  implementing the soft-float/libm/conversion cluster. The report-all
+  compiler_rt inventory shows 259 soft-float-adjacent failures when tail-call
+  ABI rows are included, or 236 selector/codegen rows after separating the
+  ordinary tail-call ABI family. That scale is too broad for more
+  recognizer-specific generic-CFG shapes.
+
+  The replacement direction is an incremental instruction-selection layer for
+  the generic CFG path over z_llvm IR. It is designed from the start around
+  liveness and eventual spilling, even though delivery stays incremental:
+  first, select individual z_llvm IR instructions to target operations inside
+  each generic-CFG block without changing the existing block recognizer
+  contract; second, compute per-block and cross-edge live-in/live-out sets and
+  track register pressure while still rejecting rows that exceed the proven
+  no-spill envelope; third, add spill-slot allocation, reload/store insertion,
+  and frame-size accounting once real rows force it. Unsupported instruction
+  forms, clobbers, calling-convention edges, and pressure states continue to
+  fail closed.
+
+  Upstream self-hosted backend reuse assessment: reuse the x86_64 instruction
+  encoding data and operand modeling where practical (`encoder.zig`,
+  `Encoding.zig`, `encodings.zon`, and compatible pieces of `bits.zig`) so
+  z_llvm does not maintain a divergent encoding table. Treat upstream
+  `CodeGen.zig`, `Lower.zig`, `Mir.zig`, `Emit.zig`, and `abi.zig` as
+  reference-first rather than drop-in components: they are tightly coupled to
+  Zig AIR, `Zcu`, `InternPool`, linker/debug-info state, and Zig's MIR
+  pipeline, while z_llvm's selector consumes z_llvm IR after the local
+  optimizer and must preserve z_llvm's explicit ownership boundaries. Reuse
+  algorithms and tested ABI/register ideas from those files when they fit, but
+  keep the z_llvm selector, liveness model, and fail-closed diagnostics local.
+
+  Migration plan: keep the existing shape-recognizer path as a transitional
+  fallback while the selector proves coverage. Every migrated family records
+  selector-owned rows and remaining recognizer-owned rows in report output;
+  `shape_recognizer_functions` ratchets down on the real-program gate and must
+  eventually reach zero before item 15 closes. Do not add new recognizer-chain
+  ordering constraints or whole-function pre-passes as part of this migration;
+  such a need means the selector contract is missing a typed fact or CFG
+  capability.
+
+  Validation sequence: prove the selector first on the 15-row limb64 loop
+  bucket, then on the integer helper cluster before soft-float. The historical
+  66-row integer helper cluster contains 21 `UnsupportedTailCallAbi` rows; the
+  selector proof targets the 45 non-tail-call rows, while the 44 total
+  `UnsupportedTailCallAbi` rows across compiler_rt are tracked as a separate
+  ordinary ABI family rather than a selector concern. Only after limb64 and
+  integer selector rows are green should the migration attempt the 236-row
+  soft-float/libm/conversion selector bucket. `distribution-all` must stay
+  green before every commit; if captured rows regress, use the loop-sum bisect
+  discipline before proceeding.
 - [ ] 16. ABI-level differential harness: same real function compiled by
   stock LLVM Zig and z_llvm behind a shared input-generating C harness;
   outputs, exit codes, and ReleaseSafe panic behavior compared; runs on
@@ -366,9 +426,10 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt atomics:variable store` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned variable-size spinlocked store wrapper used by compiler_rt `atomics.__atomic_store`: the matcher validates the size-to-spinlock slot derivation, acquire loop, desired-to-object replacement copy, release store, and `void` result before emitting a symbol-relocated x86_64 primitive. The next open cluster is object-emission `UnsupportedCodegenInstruction` in `compiler_rt.clear_cache.clear_cache`. Evidence `tmp/std_debug_hello_debug_build_atomic_store_after.log` |
 | `real-program object-emission compiler_rt cfg:valgrind discard-translations client request` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned Valgrind discard-translations client-request block reached through compiler_rt `clear_cache`: the matcher validates the two `usize` parameters, request-block alloca, length subtraction, six-word request payload, exact side-effecting client-request inline-asm template/constraints, lifetime calls, and `ret void`, then emits a no-op return for the x86_64 cache-clear path without function-name admission. `distribution-all` now enforces strict real-row limit 100 through explicit ReleaseFast, ReleaseSafe, and ReleaseSmall invocations, avoiding the quiet implicit all-mode runner stall while preserving the same three-mode coverage. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.limb64.__abs_limb64`. Evidence `tmp/std_debug_hello_debug_build_clear_cache_after.log`; `tmp/distribution_all_after_clear_cache.log` |
 | `real-program object-emission compiler_rt cfg:limb64 abs twos-complement body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned limb64 absolute-value body used by compiler_rt `limb64.__abs_limb64`: the matcher validates the limb count derived from the bit count, high-limb sign test, positive memcpy path, and negative xor-plus-carry loop with separate overflow and carry byte slots, then emits a qword copy/two's-complement loop without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.limb64.__mulo_limb64`. Evidence `tmp/std_debug_hello_debug_build_abs_limb64_after.log`; `tmp/distribution_all_after_abs_limb64.log` |
-| `real-program object-emission compiler_rt soft-float/libm/conversion helpers` | 259 | Open | 0 | Report-all object emission on the current Debug std-hello compiler_rt module found the largest remaining cluster in soft-float, libm-style, complex-float, comparison, and float/int conversion helpers. Representative first failure is `compiler_rt.trunc.__trunch`; diagnostics are `UnsupportedCodegenControlFlow` 225, `UnsupportedTailCallAbi` 23, and `UnsupportedCodegenInstruction` 11. Mechanical family/diagnostic buckets: 180 across 157 namespace families, which triggers the soft-float architectural-review decision point before implementing this cluster. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
-| `real-program object-emission compiler_rt integer helper families` | 66 | Open | 0 | Report-all object emission found the second-largest remaining cluster in integer helper families after the soft-float cluster. Representative first failure is `compiler_rt.udivmodei4.__udivei4`; diagnostics are `UnsupportedCodegenControlFlow` 35, `UnsupportedTailCallAbi` 21, and `UnsupportedCodegenInstruction` 10. Mechanical family/diagnostic buckets: 26 across 21 namespace families. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
-| `real-program object-emission compiler_rt limb64 loops` | 15 | Open | 0 | Report-all object emission found the current limb64 queue as the third-largest remaining cluster. Representative first failure remains `compiler_rt.limb64.__mulo_limb64`; all 15 rows are `UnsupportedCodegenControlFlow` and fit one mechanical family/diagnostic bucket. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
+| `real-program object-emission compiler_rt soft-float/libm/conversion selector candidates` | 236 | Open | 0 | Report-all object emission on the current Debug std-hello compiler_rt module found the largest remaining selector/codegen bucket in soft-float, libm-style, complex-float, comparison, and float/int conversion helpers after separating 23 tail-call ABI rows. Representative first selector failure is `compiler_rt.trunc.__trunch`; non-tail diagnostics are `UnsupportedCodegenControlFlow` 225 and `UnsupportedCodegenInstruction` 11. Mechanical family/diagnostic buckets before tail-call separation were 180 across 157 namespace families, which triggered the item-15 architectural review before implementing this cluster. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
+| `real-program object-emission compiler_rt integer helper selector candidates` | 45 | Open | 0 | Report-all object emission found the integer helper selector/codegen bucket after separating 21 tail-call ABI rows from the historical 66-row integer helper cluster. Representative first failure is `compiler_rt.udivmodei4.__udivei4`; non-tail diagnostics are `UnsupportedCodegenControlFlow` 35 and `UnsupportedCodegenInstruction` 10. This bucket is the second selector validation target after limb64 and before soft-float. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
+| `real-program object-emission compiler_rt tail-call ABI family` | 44 | Open | 0 | Report-all object emission found 44 `UnsupportedTailCallAbi` rows across compiler_rt: 23 in soft-float/libm/conversion helpers and 21 in integer helper families. This is tracked as a separate ordinary ABI family, not an item-15 selector concern. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
+| `real-program object-emission compiler_rt limb64 loops` | 15 | Open | 0 | Report-all object emission found the current limb64 queue as the first item-15 selector proof bucket. Representative first failure remains `compiler_rt.limb64.__mulo_limb64`; all 15 rows are `UnsupportedCodegenControlFlow` and fit one mechanical family/diagnostic bucket. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
 
 ## Progress Log
 
@@ -1033,6 +1094,20 @@ One line per completed cycle, append-only, newest last. This is the
   forward before implementing that cluster. Recognizer count still 1 (no
   recognizer reorder or pre-pass). Method annotation extended item 12 from
   width-parametric to width-plus-operation-parametric lowering by default.
+- 2026-07-07 (this commit) Item 15 architectural-review cycle: item 15 is
+  pulled forward before soft-float implementation. The decision is an
+  incremental generic instruction-selection layer over z_llvm IR for the
+  generic CFG path: per-instruction selection first, then liveness and
+  register-pressure tracking, then spill support, designed from the start for
+  liveness/spilling while remaining fail-closed at each step. Upstream Zig's
+  self-hosted x86_64 backend will be reused where practical for encoding data
+  and operand modeling, while its AIR/Zcu/MIR-coupled lowering pipeline remains
+  reference-only. Existing shape recognizers stay as a transitional fallback,
+  with `shape_recognizer_functions` ratcheting toward zero on real-program
+  gates. Validation order is limb64 selector bucket, then the integer helper
+  selector bucket, then soft-float; the 44 `UnsupportedTailCallAbi` rows are a
+  separate ordinary ABI family, not a selector concern. Recognizer count still
+  1 (no new recognizer reorder or pre-pass).
 
 ## Ratchet State
 
