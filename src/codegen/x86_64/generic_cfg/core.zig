@@ -39,6 +39,7 @@ pub const lowerCheckedTinyAdd = diagnostics.lowerCheckedTinyAdd;
 pub const lowerCheckedTlsBump = diagnostics.lowerCheckedTlsBump;
 pub const lowerControlFlowLoopSum = loop_phi.lowerControlFlowLoopSum;
 pub const lowerAtomicExchangeFamily = eligibility.lowerAtomicExchangeFamily;
+pub const lowerAtomicFetchAddFamily = eligibility.lowerAtomicFetchAddFamily;
 pub const lowerAtomicFetchAndFamily = eligibility.lowerAtomicFetchAndFamily;
 pub const lowerAtomicFetchNandFamily = eligibility.lowerAtomicFetchNandFamily;
 pub const lowerAtomicFetchOrFamily = eligibility.lowerAtomicFetchOrFamily;
