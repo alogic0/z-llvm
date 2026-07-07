@@ -1117,6 +1117,15 @@ One line per completed cycle, append-only, newest last. This is the
   yet, so existing route behavior and ratchets are unchanged. Recognizer count
   still 1 (no new recognizer reorder or pre-pass); `shape_recognizer_functions`
   is unchanged for this skeleton slice.
+- 2026-07-07 (this commit) Item 15 stage-one selector planning slice: the
+  opt-in selector inspection now admits scalar phi nodes, direct scalar helper
+  calls, `llvm.assume`, and the `{ i64, i1 }` overflow-intrinsic/extractvalue
+  pair used by the first limb64 proof target, while keeping unsupported
+  aggregate extracts, indirect calls, inline asm calls, raw call args, and
+  operand bundles fail-closed. The selector still emits zero rows and existing
+  recognizers remain the fallback, so `shape_recognizer_functions` and all
+  real-row ratchets are unchanged. Recognizer count still 1 (no new recognizer
+  reorder or pre-pass).
 
 ## Ratchet State
 

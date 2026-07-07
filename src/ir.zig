@@ -40,6 +40,7 @@ pub const InsertElementInst = core.InsertElementInst;
 pub const ShuffleVectorInst = core.ShuffleVectorInst;
 pub const GepIndex = core.GepIndex;
 pub const GepInst = core.GepInst;
+pub const ExtractValueInst = core.ExtractValueInst;
 pub const InsertValueInst = core.InsertValueInst;
 pub const CallArg = core.CallArg;
 pub const InlineAsm = core.InlineAsm;

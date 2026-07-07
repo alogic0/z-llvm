@@ -79,8 +79,8 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .load => |load| if (isSelectorScalarType(load.ty)) null else .{ .unsupported_type = "load" },
         .store => |store| if (isSelectorScalarType(store.ty)) null else .{ .unsupported_type = "store" },
         .gep => null,
-        .call => |call| if (call.isDebugVariableLocation()) null else .{ .unsupported_instruction = "call" },
-        .phi => .{ .unsupported_instruction = "phi" },
+        .call => |call| inspectCall(call),
+        .phi => |phi| if (isSelectorScalarType(phi.ty)) null else .{ .unsupported_type = "phi" },
         .freeze => .{ .unsupported_instruction = "freeze" },
         .fcmp => .{ .unsupported_instruction = "fcmp" },
         .atomicrmw => .{ .unsupported_instruction = "atomicrmw" },
@@ -89,7 +89,7 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .extractelement => .{ .unsupported_instruction = "extractelement" },
         .insertelement => .{ .unsupported_instruction = "insertelement" },
         .shufflevector => .{ .unsupported_instruction = "shufflevector" },
-        .extractvalue => .{ .unsupported_instruction = "extractvalue" },
+        .extractvalue => |extract| inspectExtractValue(extract),
         .insertvalue => .{ .unsupported_instruction = "insertvalue" },
     };
 }
@@ -126,6 +126,45 @@ fn inspectSelect(select: ir.SelectInst) ?Diagnostic {
     };
 }
 
+fn inspectCall(call: ir.CallInst) ?Diagnostic {
+    if (call.inline_asm != null) return .{ .unsupported_instruction = "inline-asm-call" };
+    if (call.callee_value != null) return .{ .unsupported_value = "indirect-call" };
+    if (call.raw_args != null) return .{ .unsupported_instruction = "raw-call-args" };
+    if (call.operand_bundle != null) return .{ .unsupported_instruction = "operand-bundle-call" };
+    if (call.isDebugVariableLocation()) return null;
+    if (std.mem.eql(u8, call.callee, "llvm.assume")) {
+        if (call.ret_ty != .void or call.args.items.len != 1) return .{ .unsupported_instruction = "llvm.assume" };
+        return if (call.args.items[0].ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "llvm.assume" };
+    }
+    if (isOverflowIntrinsic(call.callee)) {
+        if (!call.ret_ty.eql(.{ .aggregate = "{ i64, i1 }" }) or call.args.items.len != 2) {
+            return .{ .unsupported_type = "overflow-intrinsic" };
+        }
+        for (call.args.items) |arg| {
+            if (!arg.ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "overflow-intrinsic-arg" };
+        }
+        return null;
+    }
+    if (!isScalarReturnType(call.ret_ty)) return .{ .unsupported_type = "call-ret" };
+    for (call.args.items) |arg| {
+        if (!isSelectorScalarType(arg.ty)) return .{ .unsupported_type = "call-arg" };
+    }
+    return null;
+}
+
+fn inspectExtractValue(extract: ir.ExtractValueInst) ?Diagnostic {
+    if (!extract.aggregate_ty.eql(.{ .aggregate = "{ i64, i1 }" })) {
+        return .{ .unsupported_type = "extractvalue-aggregate" };
+    }
+    if (std.mem.eql(u8, extract.indices, "0")) {
+        return if (extract.result_ty.eql(.{ .int = 64 })) null else .{ .unsupported_type = "extractvalue-result" };
+    }
+    if (std.mem.eql(u8, extract.indices, "1")) {
+        return if (extract.result_ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "extractvalue-result" };
+    }
+    return .{ .unsupported_value = "extractvalue-index" };
+}
+
 fn inspectTerminator(terminator: ir.Terminator) ?Diagnostic {
     return switch (terminator) {
         .ret => |ret| if (isScalarReturnType(ret.ty)) null else .{ .unsupported_type = "ret" },
@@ -150,6 +189,11 @@ fn isSelectorScalarType(ty: ir.Type) bool {
         .ptr => true,
         .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
     };
+}
+
+fn isOverflowIntrinsic(callee: []const u8) bool {
+    return std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i64") or
+        std.mem.eql(u8, callee, "llvm.usub.with.overflow.i64");
 }
 
 fn unsupported(diagnostic: Diagnostic) SelectionResult {
