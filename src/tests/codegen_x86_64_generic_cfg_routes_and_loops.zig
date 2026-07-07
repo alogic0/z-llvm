@@ -1054,6 +1054,49 @@ test "x86_64 generic cfg lowers scalar atomic store family without name admissio
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 generic cfg lowers spinlocked variable atomic store without name admission" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@locks_for_any_var_store = internal global [64 x i8] zeroinitializer, align 64
+        \\declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
+        \\
+        \\define void @any_spinlocked_var_store(i32 %len, ptr %ptr, ptr %desired, i32 %ordering) {
+        \\entry:
+        \\  %addr = ptrtoint ptr %ptr to i64
+        \\  %shift = lshr i64 %addr, 3
+        \\  %slot = and i64 %shift, 63
+        \\  %lock = getelementptr [64 x i8], ptr @locks_for_any_var_store, i64 %slot
+        \\  br label %lock_loop
+        \\lock_loop:
+        \\  %old_lock = atomicrmw xchg ptr %lock, i64 1 acquire, align 8
+        \\  %acquired = icmp eq i64 %old_lock, 0
+        \\  br i1 %acquired, label %store, label %lock_loop
+        \\store:
+        \\  %len64 = zext i32 %len to i64
+        \\  call void @llvm.memcpy.inline.p0.p0.i64(ptr %ptr, ptr %desired, i64 %len64, i1 false)
+        \\  store atomic i64 0, ptr %lock release, align 64
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        try testFunctionByName(module, "any_spinlocked_var_store"),
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqualStrings("locks_for_any_var_store", machine.instructions.items[0].spinlocked_var_store_edi_rsi_rdx);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 generic cfg lowers spinlocked i128 atomic store without name admission" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

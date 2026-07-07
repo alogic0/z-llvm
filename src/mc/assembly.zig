@@ -606,6 +606,31 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tmovq $0, (%r8)\n",
                 .{symbol},
             ),
+            .spinlocked_var_store_edi_rsi_rdx => |symbol| try writer.print(
+                "\tmovq %rsi, %rax\n" ++
+                    "\tshrq $3, %rax\n" ++
+                    "\tandq $63, %rax\n" ++
+                    "\tleaq {s}(%rip), %r8\n" ++
+                    "\tleaq (%r8,%rax), %r8\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "1:\n" ++
+                    "\txchgq %rax, (%r8)\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tmovl $1, %eax\n" ++
+                    "\tjne 1b\n" ++
+                    "\ttestl %edi, %edi\n" ++
+                    "\tje 2f\n" ++
+                    "\tmovq %rsi, %r9\n" ++
+                    "\tmovq %rdx, %r10\n" ++
+                    "\tcld\n" ++
+                    "\tmovl %edi, %ecx\n" ++
+                    "\tmovq %r9, %rdi\n" ++
+                    "\tmovq %r10, %rsi\n" ++
+                    "\trep movsb\n" ++
+                    "2:\n" ++
+                    "\tmovq $0, (%r8)\n",
+                .{symbol},
+            ),
             .cmpxchg_ptr_expected_desired_i8_eax => try writer.writeAll(
                 "\tmovb (%rsi), %al\n" ++
                     "\tlock cmpxchgb %dl, (%rdi)\n" ++

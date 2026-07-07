@@ -576,6 +576,28 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xf3, 0xa4, // rep movsb
                 0x49, 0xc7, 0x00, 0, 0, 0, 0, // movq $0, (%r8)
             }),
+            .spinlocked_var_store_edi_rsi_rdx => try bytes.appendSlice(allocator, &.{
+                0x48, 0x89, 0xf0, // movq %rsi, %rax
+                0x48, 0xc1, 0xe8, 0x03, // shrq $3, %rax
+                0x48, 0x83, 0xe0, 0x3f, // andq $63, %rax
+                0x4c, 0x8d, 0x05, 0, 0, 0, 0, // leaq spinlocks(%rip), %r8
+                0x4d, 0x8d, 0x04, 0x00, // leaq (%r8,%rax), %r8
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x49, 0x87, 0x00, // xchgq %rax, (%r8)
+                0x48, 0x85, 0xc0, // testq %rax, %rax
+                0xb8, 0x01, 0x00, 0x00, 0x00, // movl $1, %eax
+                0x75, 0xf3, // jne 1b
+                0x85, 0xff, // testl %edi, %edi
+                0x74, 0x11, // je 2f
+                0x49, 0x89, 0xf1, // movq %rsi, %r9
+                0x49, 0x89, 0xd2, // movq %rdx, %r10
+                0xfc, // cld
+                0x89, 0xf9, // movl %edi, %ecx
+                0x4c, 0x89, 0xcf, // movq %r9, %rdi
+                0x4c, 0x89, 0xd6, // movq %r10, %rsi
+                0xf3, 0xa4, // rep movsb
+                0x49, 0xc7, 0x00, 0, 0, 0, 0, // movq $0, (%r8)
+            }),
             .cmpxchg_ptr_expected_desired_i8_eax => try bytes.appendSlice(allocator, &.{
                 0x8a, 0x06, // movb (%rsi), %al
                 0xf0, 0x0f, 0xb0, 0x17, // lock cmpxchgb %dl, (%rdi)
@@ -1527,6 +1549,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .spinlocked_memcpy_rsi_to_rdx_len_edi => 59,
         .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax => 104,
         .spinlocked_var_xchg_edi_rsi_rdx_rcx => 82,
+        .spinlocked_var_store_edi_rsi_rdx => 69,
         .cmpxchg_ptr_expected_desired_i8_eax => 19,
         .cmpxchg_ptr_expected_desired_i16_eax => 22,
         .cmpxchg_ptr_expected_desired_i32_eax => 19,
