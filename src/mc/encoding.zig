@@ -540,6 +540,9 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .popcount_limb64_rdi_si_ax => try bytes.appendSlice(allocator, &selector_bytes.popcount_limb64_rdi_si_ax),
             .ctz_limb64_rdi_si_ax => try bytes.appendSlice(allocator, &selector_bytes.ctz_limb64_rdi_si_ax),
             .clz_limb64_rdi_si_ax => try bytes.appendSlice(allocator, &selector_bytes.clz_limb64_rdi_si_ax),
+            .udivei4_before_intbytesize => try bytes.appendSlice(allocator, &selector_bytes.udivei4_before_intbytesize),
+            .udivei4_between_intbytesize_and_memset => try bytes.appendSlice(allocator, &selector_bytes.udivei4_between_intbytesize_and_memset),
+            .udivei4_after_memset => try bytes.appendSlice(allocator, &selector_bytes.udivei4_after_memset),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => try bytes.appendSlice(allocator, &.{
                 0x48, 0x89, 0xf0, // movq %rsi, %rax
                 0x48, 0xc1, 0xe8, 0x03, // shrq $3, %rax
@@ -1611,6 +1614,9 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .popcount_limb64_rdi_si_ax => selector_bytes.popcount_limb64_rdi_si_ax.len,
         .ctz_limb64_rdi_si_ax => selector_bytes.ctz_limb64_rdi_si_ax.len,
         .clz_limb64_rdi_si_ax => selector_bytes.clz_limb64_rdi_si_ax.len,
+        .udivei4_before_intbytesize => selector_bytes.udivei4_before_intbytesize.len,
+        .udivei4_between_intbytesize_and_memset => selector_bytes.udivei4_between_intbytesize_and_memset.len,
+        .udivei4_after_memset => selector_bytes.udivei4_after_memset.len,
         .spinlocked_memcpy_rsi_to_rdx_len_edi => 59,
         .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax => 104,
         .spinlocked_var_xchg_edi_rsi_rdx_rcx => 82,

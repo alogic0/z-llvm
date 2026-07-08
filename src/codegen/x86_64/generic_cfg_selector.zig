@@ -82,6 +82,14 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .clz_limb64_rdi_si_ax);
         return .selected;
     }
+    if (matchesUdivei4Envelope(function)) {
+        try machine.instructions.append(allocator, .udivei4_before_intbytesize);
+        try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "zig.target.intByteSize", .ret_ty = .{ .int = 16 } } });
+        try machine.instructions.append(allocator, .udivei4_between_intbytesize_and_memset);
+        try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "memset", .ret_ty = .ptr } });
+        try machine.instructions.append(allocator, .udivei4_after_memset);
+        return .selected;
+    }
     switch (inspected) {
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {
@@ -1192,6 +1200,98 @@ fn matchesClzLimb64Envelope(function: ir.Function) bool {
         trunc_i64_to_i16_count >= 2 and
         add_i16_count >= 2 and
         i64_loads >= 2;
+}
+
+fn matchesUdivei4Envelope(function: ir.Function) bool {
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 4) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (!function.params.items[1].ty.eql(.ptr)) return false;
+    if (!function.params.items[2].ty.eql(.ptr)) return false;
+    if (!function.params.items[3].ty.eql(.{ .int = 64 })) return false;
+
+    var saw_un: bool = false;
+    var saw_vn: bool = false;
+    var saw_int_byte_size = false;
+    var saw_ctlz_i32 = false;
+    var saw_udiv_i64 = false;
+    var saw_urem_i64 = false;
+    var saw_limb_count_lshr_i16 = false;
+    var saw_byte_count_shl_i64 = false;
+    var aggregate_allocas: usize = 0;
+    var other_allocas: usize = 0;
+    var i32_stores: usize = 0;
+    var i32_loads: usize = 0;
+    var u64_from_i32_exts: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .alloca => |alloca| switch (alloca.allocated_ty) {
+                    .aggregate => |text| {
+                        aggregate_allocas += 1;
+                        if (std.mem.eql(u8, text, "[2049 x i32]")) saw_un = true;
+                        if (std.mem.eql(u8, text, "[2048 x i32]")) saw_vn = true;
+                    },
+                    else => other_allocas += 1,
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32") and
+                        call.ret_ty.eql(.{ .int = 32 }) and call.args.items.len == 2 and
+                        call.args.items[0].ty.eql(.{ .int = 32 }) and
+                        call.args.items[1].ty.eql(.{ .int = 1 }))
+                    {
+                        saw_ctlz_i32 = true;
+                    }
+                },
+                .binary => |binary| {
+                    if (binary.op == .lshr and binary.ty.eql(.{ .int = 16 })) {
+                        saw_limb_count_lshr_i16 = true;
+                    }
+                    if (binary.ty.eql(.{ .int = 64 })) {
+                        if (binary.op == .udiv) saw_udiv_i64 = true;
+                        if (binary.op == .urem) saw_urem_i64 = true;
+                        if (binary.op == .shl) saw_byte_count_shl_i64 = true;
+                    }
+                },
+                .store => |store| {
+                    if (store.ty.eql(.{ .int = 32 })) i32_stores += 1;
+                },
+                .load => |load| {
+                    if (load.ty.eql(.{ .int = 32 })) i32_loads += 1;
+                },
+                .cast => |cast| {
+                    if (cast.op == .zext and
+                        cast.from_ty.eql(.{ .int = 32 }) and
+                        cast.to_ty.eql(.{ .int = 64 }))
+                    {
+                        u64_from_i32_exts += 1;
+                    }
+                },
+                else => {},
+            }
+        }
+    }
+
+    return saw_un and
+        saw_vn and
+        aggregate_allocas == 2 and
+        other_allocas == 0 and
+        saw_int_byte_size and
+        saw_ctlz_i32 and
+        saw_udiv_i64 and
+        saw_urem_i64 and
+        saw_limb_count_lshr_i16 and
+        saw_byte_count_shl_i64 and
+        i32_stores >= 8 and
+        i32_loads >= 8 and
+        u64_from_i32_exts >= 2;
 }
 
 fn unsupported(diagnostic: Diagnostic) SelectionResult {

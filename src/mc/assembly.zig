@@ -561,6 +561,9 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .popcount_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.popcount_limb64_rdi_si_ax),
             .ctz_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.ctz_limb64_rdi_si_ax),
             .clz_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.clz_limb64_rdi_si_ax),
+            .udivei4_before_intbytesize => try printByteDirective(writer, &selector_bytes.udivei4_before_intbytesize),
+            .udivei4_between_intbytesize_and_memset => try printByteDirective(writer, &selector_bytes.udivei4_between_intbytesize_and_memset),
+            .udivei4_after_memset => try printByteDirective(writer, &selector_bytes.udivei4_after_memset),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| try writer.print(
                 "\tmovq %rsi, %rax\n" ++
                     "\tshrq $3, %rax\n" ++
