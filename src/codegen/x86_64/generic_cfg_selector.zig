@@ -31,6 +31,21 @@ pub const SelectionResult = union(enum) {
     unsupported: Diagnostic,
 };
 
+pub const StageTwoSummary = struct {
+    blocks: usize,
+    edges: usize,
+    max_live_in: usize,
+    max_live_out: usize,
+    max_pressure: usize,
+    no_spill_limit: usize,
+
+    pub fn exceedsNoSpill(summary: StageTwoSummary) bool {
+        return summary.max_pressure > summary.no_spill_limit;
+    }
+};
+
+const no_spill_register_values = 6;
+
 pub fn tryLower(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -107,8 +122,21 @@ pub fn tryLower(
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {
             .no_emitter => {},
+            .unsupported_control_flow => {
+                if (function.blocks.items.len > 1) {
+                    const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
+                    if (stage_two.exceedsNoSpill()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
+                    return .{ .unsupported = .{ .no_emitter = "stage2-liveness-required" } };
+                }
+                return inspected;
+            },
             else => return inspected,
         },
+    }
+    if (function.blocks.items.len > 1) {
+        const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
+        if (stage_two.exceedsNoSpill()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
+        return .{ .unsupported = .{ .no_emitter = "stage2-liveness-required" } };
     }
     const composed_start_len = machine.instructions.items.len;
     switch (try tryLowerComposedBlock(allocator, machine, function)) {
@@ -122,6 +150,294 @@ pub fn tryLower(
         },
     }
     return inspected;
+}
+
+pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir.Function) !StageTwoSummary {
+    var blocks: std.ArrayList(StageTwoBlock) = .empty;
+    defer {
+        for (blocks.items) |*block| block.deinit();
+        blocks.deinit(allocator);
+    }
+
+    for (function.blocks.items) |block| {
+        try blocks.append(allocator, StageTwoBlock.init(allocator, block.name));
+    }
+    if (blocks.items.len == 0) {
+        return .{
+            .blocks = 0,
+            .edges = 0,
+            .max_live_in = 0,
+            .max_live_out = 0,
+            .max_pressure = 0,
+            .no_spill_limit = no_spill_register_values,
+        };
+    }
+
+    for (function.params.items) |param| {
+        try blocks.items[0].defs.put(param.name, {});
+    }
+
+    var edge_count: usize = 0;
+    for (function.blocks.items, 0..) |block, block_index| {
+        try collectBlockUsesAndDefs(&blocks.items[block_index], block);
+        const block_successors = try successors(block);
+        for (block_successors.names[0..block_successors.len]) |successor_name| {
+            if (successor_name.len == 0) continue;
+            edge_count += 1;
+            _ = function.blockIndex(successor_name) orelse return error.UnsupportedCodegenControlFlow;
+        }
+    }
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed or instruction.kind != .phi) continue;
+            const phi = instruction.kind.phi;
+            for (phi.incoming.items) |incoming| {
+                const predecessor_index = function.blockIndex(incoming.block) orelse return error.UnsupportedCodegenControlFlow;
+                try addNamedValue(&blocks.items[predecessor_index].phi_out, incoming.value);
+            }
+        }
+    }
+
+    var changed = true;
+    while (changed) {
+        changed = false;
+        var reverse_index = blocks.items.len;
+        while (reverse_index > 0) {
+            reverse_index -= 1;
+            var next_live_out = NameSet.init(allocator);
+            defer next_live_out.deinit();
+            try unionSet(&next_live_out, blocks.items[reverse_index].phi_out);
+            const block_successors = try successors(function.blocks.items[reverse_index]);
+            for (block_successors.names[0..block_successors.len]) |successor_name| {
+                if (successor_name.len == 0) continue;
+                const successor_index = function.blockIndex(successor_name) orelse return error.UnsupportedCodegenControlFlow;
+                try unionSet(&next_live_out, blocks.items[successor_index].live_in);
+            }
+
+            var next_live_in = NameSet.init(allocator);
+            defer next_live_in.deinit();
+            try unionSet(&next_live_in, next_live_out);
+            var def_it = blocks.items[reverse_index].defs.iterator();
+            while (def_it.next()) |entry| {
+                _ = next_live_in.remove(entry.key_ptr.*);
+            }
+            try unionSet(&next_live_in, blocks.items[reverse_index].uses);
+
+            if (try replaceSet(&blocks.items[reverse_index].live_out, next_live_out)) changed = true;
+            if (try replaceSet(&blocks.items[reverse_index].live_in, next_live_in)) changed = true;
+        }
+    }
+
+    var max_live_in: usize = 0;
+    var max_live_out: usize = 0;
+    for (blocks.items) |block| {
+        max_live_in = @max(max_live_in, block.live_in.count());
+        max_live_out = @max(max_live_out, block.live_out.count());
+    }
+    const max_pressure = @max(max_live_in, max_live_out);
+    return .{
+        .blocks = blocks.items.len,
+        .edges = edge_count,
+        .max_live_in = max_live_in,
+        .max_live_out = max_live_out,
+        .max_pressure = max_pressure,
+        .no_spill_limit = no_spill_register_values,
+    };
+}
+
+const NameSet = std.StringHashMap(void);
+
+const StageTwoBlock = struct {
+    name: []const u8,
+    defs: NameSet,
+    uses: NameSet,
+    phi_out: NameSet,
+    live_in: NameSet,
+    live_out: NameSet,
+
+    fn init(allocator: std.mem.Allocator, name: []const u8) StageTwoBlock {
+        return .{
+            .name = name,
+            .defs = NameSet.init(allocator),
+            .uses = NameSet.init(allocator),
+            .phi_out = NameSet.init(allocator),
+            .live_in = NameSet.init(allocator),
+            .live_out = NameSet.init(allocator),
+        };
+    }
+
+    fn deinit(block: *StageTwoBlock) void {
+        block.defs.deinit();
+        block.uses.deinit();
+        block.phi_out.deinit();
+        block.live_in.deinit();
+        block.live_out.deinit();
+    }
+};
+
+fn collectBlockUsesAndDefs(stage_block: *StageTwoBlock, block: ir.BasicBlock) !void {
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        if (instruction.kind != .phi) try collectInstructionUses(stage_block, instruction);
+        if (instruction.result) |result| try stage_block.defs.put(result, {});
+    }
+    if (block.terminator) |terminator| try collectTerminatorUses(stage_block, terminator);
+}
+
+fn collectInstructionUses(stage_block: *StageTwoBlock, instruction: ir.Instruction) !void {
+    switch (instruction.kind) {
+        .binary => |binary| {
+            try addBlockUse(stage_block, binary.lhs);
+            try addBlockUse(stage_block, binary.rhs);
+        },
+        .cast => |cast| try addBlockUse(stage_block, cast.value),
+        .freeze => |freeze| try addBlockUse(stage_block, freeze.value),
+        .icmp => |icmp| {
+            try addBlockUse(stage_block, icmp.lhs);
+            try addBlockUse(stage_block, icmp.rhs);
+        },
+        .fcmp => |fcmp| {
+            try addBlockUse(stage_block, fcmp.lhs);
+            try addBlockUse(stage_block, fcmp.rhs);
+        },
+        .select => |select| {
+            try addBlockUse(stage_block, select.cond);
+            try addBlockUse(stage_block, select.true_value);
+            try addBlockUse(stage_block, select.false_value);
+        },
+        .phi => {},
+        .alloca, .fence => {},
+        .load => |load| try addBlockUse(stage_block, load.ptr),
+        .store => |store| {
+            try addBlockUse(stage_block, store.value);
+            try addBlockUse(stage_block, store.ptr);
+        },
+        .atomicrmw => |atomicrmw| {
+            try addBlockUse(stage_block, atomicrmw.ptr);
+            try addBlockUse(stage_block, atomicrmw.value);
+        },
+        .cmpxchg => |cmpxchg| {
+            try addBlockUse(stage_block, cmpxchg.ptr);
+            try addBlockUse(stage_block, cmpxchg.expected);
+            try addBlockUse(stage_block, cmpxchg.replacement);
+        },
+        .extractelement => |extract| {
+            try addBlockUse(stage_block, extract.vector);
+            try addBlockUse(stage_block, extract.index);
+        },
+        .insertelement => |insert| {
+            try addBlockUse(stage_block, insert.vector);
+            try addBlockUse(stage_block, insert.value);
+            try addBlockUse(stage_block, insert.index);
+        },
+        .shufflevector => |shuffle| {
+            try addBlockUse(stage_block, shuffle.lhs);
+            try addBlockUse(stage_block, shuffle.rhs);
+            try addBlockUse(stage_block, shuffle.mask);
+        },
+        .extractvalue => |extract| try addBlockUse(stage_block, extract.aggregate),
+        .insertvalue => |insert| {
+            try addBlockUse(stage_block, insert.aggregate);
+            try addBlockUse(stage_block, insert.value);
+        },
+        .gep => |gep| {
+            try addBlockUse(stage_block, gep.ptr);
+            for (gep.indices.items) |index| try addBlockUse(stage_block, index.value);
+        },
+        .call => |call| {
+            if (call.isDebugVariableLocation()) return;
+            if (call.callee_value) |callee| try addBlockUse(stage_block, callee);
+            for (call.args.items) |arg| try addBlockUse(stage_block, arg.value);
+        },
+    }
+}
+
+fn collectTerminatorUses(stage_block: *StageTwoBlock, terminator: ir.Terminator) !void {
+    switch (terminator) {
+        .ret => |ret| if (ret.value) |value| try addBlockUse(stage_block, value),
+        .br => {},
+        .condbr => |condbr| try addBlockUse(stage_block, condbr.cond),
+        .@"switch" => |switch_term| {
+            try addBlockUse(stage_block, switch_term.cond);
+            for (switch_term.cases.items) |case| try addBlockUse(stage_block, case.value);
+        },
+        .indirectbr => |indirectbr| try addBlockUse(stage_block, indirectbr.addr),
+        .@"unreachable" => {},
+    }
+}
+
+fn addBlockUse(stage_block: *StageTwoBlock, value: ir.Value) !void {
+    const name = namedValue(value) orelse return;
+    if (stage_block.defs.contains(name)) return;
+    try stage_block.uses.put(name, {});
+}
+
+fn addNamedValue(set: *NameSet, value: ir.Value) !void {
+    const name = namedValue(value) orelse return;
+    try set.put(name, {});
+}
+
+fn namedValue(value: ir.Value) ?[]const u8 {
+    return switch (value) {
+        .named => |name| if (std.mem.startsWith(u8, name, "@") or std.mem.startsWith(u8, name, "!")) null else name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+    };
+}
+
+fn unionSet(dst: *NameSet, src: NameSet) !void {
+    var it = src.iterator();
+    while (it.next()) |entry| try dst.put(entry.key_ptr.*, {});
+}
+
+fn replaceSet(dst: *NameSet, src: NameSet) !bool {
+    if (setEquals(dst.*, src)) return false;
+    dst.clearRetainingCapacity();
+    try unionSet(dst, src);
+    return true;
+}
+
+fn setEquals(lhs: NameSet, rhs: NameSet) bool {
+    if (lhs.count() != rhs.count()) return false;
+    var it = lhs.iterator();
+    while (it.next()) |entry| {
+        if (!rhs.contains(entry.key_ptr.*)) return false;
+    }
+    return true;
+}
+
+const BlockSuccessors = struct {
+    names: [16][]const u8 = .{""} ** 16,
+    len: usize = 0,
+
+    fn add(successors_list: *BlockSuccessors, name: []const u8) !void {
+        if (successors_list.len == successors_list.names.len) return error.UnsupportedCodegenControlFlow;
+        successors_list.names[successors_list.len] = name;
+        successors_list.len += 1;
+    }
+};
+
+fn successors(block: ir.BasicBlock) !BlockSuccessors {
+    var result = BlockSuccessors{};
+    if (block.terminator) |terminator| switch (terminator) {
+        .br => |br| try result.add(br.target),
+        .condbr => |condbr| {
+            try result.add(condbr.then_target);
+            if (!std.mem.eql(u8, condbr.then_target, condbr.else_target)) try result.add(condbr.else_target);
+        },
+        .@"switch" => |switch_term| {
+            try result.add(switch_term.default_target);
+            for (switch_term.cases.items) |case| {
+                var seen = std.mem.eql(u8, case.target, switch_term.default_target);
+                for (result.names[0..result.len]) |name| {
+                    if (std.mem.eql(u8, name, case.target)) seen = true;
+                }
+                if (!seen) try result.add(case.target);
+            }
+        },
+        .indirectbr, .ret, .@"unreachable" => {},
+    };
+    return result;
 }
 
 const ValueLoc = union(enum) {

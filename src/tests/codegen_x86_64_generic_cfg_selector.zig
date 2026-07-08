@@ -53,6 +53,89 @@ test "generic cfg selector skeleton preserves recognizer fallback while opt-in" 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "generic cfg selector stage two computes cross-block liveness" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @branch_live(i32 %a, i32 %b, i1 %cond) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\else:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
+    try std.testing.expectEqual(@as(usize, 3), summary.blocks);
+    try std.testing.expectEqual(@as(usize, 2), summary.edges);
+    try std.testing.expect(summary.max_live_out >= 2);
+    try std.testing.expect(!summary.exceedsNoSpill());
+}
+
+test "generic cfg selector stage two requires liveness before multi-block emission" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @branch_live(i32 %a, i32 %b, i1 %cond) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\else:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("branch_live", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqualStrings("stage2-liveness-required", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "generic cfg selector stage two rejects pressure above no-spill envelope" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @pressure(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\entry:
+        \\  br label %body
+        \\body:
+        \\  %s1 = add i32 %a, %b
+        \\  %s2 = add i32 %c, %d
+        \\  %s3 = add i32 %e, %f
+        \\  %s4 = add i32 %s1, %s2
+        \\  %s5 = add i32 %s4, %s3
+        \\  %s6 = add i32 %s5, %g
+        \\  ret i32 %s6
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
+    try std.testing.expectEqual(@as(usize, 2), summary.blocks);
+    try std.testing.expect(summary.max_pressure > summary.no_spill_limit);
+    try std.testing.expect(summary.exceedsNoSpill());
+}
+
 test "generic cfg selector composes single-block i32 add through machine instructions" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
