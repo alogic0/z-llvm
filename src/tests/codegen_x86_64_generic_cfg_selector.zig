@@ -322,6 +322,101 @@ test "generic cfg selector keeps limb64 shift-right near miss fail-closed" {
     try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
 }
 
+test "generic cfg selector emits limb64 bitreverse envelope through opt-in selector" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @candidate(ptr %out, ptr %a, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %frozen = freeze i16 %bits
+        \\  %is_zero = icmp eq i16 %frozen, 0
+        \\  %minus_one = add i16 %frozen, -1
+        \\  %limb_index = lshr i16 %minus_one, 6
+        \\  %limb_count = add i16 %limb_index, 1
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %frozen)
+        \\  %limb_count64 = zext i16 %limb_count to i64
+        \\  %umax = call i64 @llvm.umax.i64(i64 %limb_count64, i64 1)
+        \\  br i1 %is_zero, label %done, label %loop
+        \\
+        \\loop:
+        \\  %i = phi i64 [ 0, %entry ], [ %next, %loop ]
+        \\  %src = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %i
+        \\  %value = load i64, ptr %src, align 8
+        \\  %reversed = call i64 @llvm.bitreverse.i64(i64 %value)
+        \\  %dst_index = sub i64 %umax, %i
+        \\  %dst_index2 = add i64 %dst_index, -1
+        \\  %dst = getelementptr inbounds nuw [8 x i8], ptr %out, i64 %dst_index2
+        \\  store i64 %reversed, ptr %dst, align 8
+        \\  %next = add nuw nsw i64 %i, 1
+        \\  %exit = icmp eq i64 %next, %umax
+        \\  br i1 %exit, label %tail, label %loop
+        \\
+        \\tail:
+        \\  %rem = and i16 %frozen, 63
+        \\  %needs_shift = icmp eq i16 %rem, 0
+        \\  %top_ptr = getelementptr inbounds nuw [8 x i8], ptr %out, i64 1
+        \\  %top = load i64, ptr %top_ptr, align 8
+        \\  %sign_fill = ashr i64 %top, 63
+        \\  %right = lshr i64 %top, 1
+        \\  %left = shl i64 %sign_fill, 63
+        \\  %shifted = or i64 %right, %left
+        \\  store i64 %shifted, ptr %top_ptr, align 8
+        \\  br i1 %needs_shift, label %done, label %done
+        \\
+        \\done:
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = try codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{ .generic_cfg_selector = true },
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(.bitreverse_limb64_rdi_rsi_dl_cx, machine.instructions.items[0]);
+}
+
+test "generic cfg selector keeps limb64 bitreverse near miss fail-closed" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @near_miss(ptr %out, ptr %a, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %frozen = freeze i16 %bits
+        \\  %minus_one = add i16 %frozen, -1
+        \\  %limb_index = lshr i16 %minus_one, 6
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %frozen)
+        \\  %limb_count64 = zext i16 %limb_index to i64
+        \\  %umax = call i64 @llvm.umax.i64(i64 %limb_count64, i64 1)
+        \\  %rem = and i16 %frozen, 63
+        \\  %value = load i64, ptr %a, align 8
+        \\  store i64 %value, ptr %out, align 8
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("near_miss", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
+}
+
 test "generic cfg selector skeleton fails closed with first unsupported instruction form" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -360,7 +360,7 @@ changes the counts; cite the discovery/fix evidence summary.
 | ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
 | ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
 | ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
-| Debug compiler_rt | std-hello | 443 selected | 106 emitting | 337 failures | `tmp/std_debug_hello_debug_shr_selector_after.log` |
+| Debug compiler_rt | std-hello | 443 selected | 107 emitting | 336 failures | `tmp/std_debug_hello_debug_bitreverse_selector_after.log` |
 
 ## Cluster Board (item 9a onward)
 
@@ -429,7 +429,7 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt soft-float/libm/conversion selector candidates` | 236 | Open | 0 | Report-all object emission on the current Debug std-hello compiler_rt module found the largest remaining selector/codegen bucket in soft-float, libm-style, complex-float, comparison, and float/int conversion helpers after separating 23 tail-call ABI rows. Representative first selector failure is `compiler_rt.trunc.__trunch`; non-tail diagnostics are `UnsupportedCodegenControlFlow` 225 and `UnsupportedCodegenInstruction` 11. Mechanical family/diagnostic buckets before tail-call separation were 180 across 157 namespace families, which triggered the item-15 architectural review before implementing this cluster. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
 | `real-program object-emission compiler_rt integer helper selector candidates` | 45 | Open | 0 | Report-all object emission found the integer helper selector/codegen bucket after separating 21 tail-call ABI rows from the historical 66-row integer helper cluster. Representative first failure is `compiler_rt.udivmodei4.__udivei4`; non-tail diagnostics are `UnsupportedCodegenControlFlow` 35 and `UnsupportedCodegenInstruction` 10. This bucket is the second selector validation target after limb64 and before soft-float. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
 | `real-program object-emission compiler_rt tail-call ABI family` | 44 | Open | 0 | Report-all object emission found 44 `UnsupportedTailCallAbi` rows across compiler_rt: 23 in soft-float/libm/conversion helpers and 21 in integer helper families. This is tracked as a separate ordinary ABI family, not an item-15 selector concern. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`; full log `tmp/std_debug_hello_debug_report_all.log` |
-| `real-program object-emission compiler_rt limb64 loops` | 12 | Open | 3 | Item 15 stage-one selector emission now lowers the model-owned limb64 multiply envelope used by `compiler_rt.limb64.__mulo_limb64`, the model-owned byte-swap/reverse envelope used by `compiler_rt.limb64.__byteswap_limb64`, and the model-owned arithmetic right-shift envelope used by `compiler_rt.limb64.__shr_limb64` through the opt-in selector path without function-name admission. The terminal selector primitives validate the real IR envelopes and emit call-free, relocation-free x86_64 routines for their SysV ABIs. Representative first failure advanced to `compiler_rt.limb64.__bitreverse_limb64`; remaining limb64 rows are still `UnsupportedCodegenControlFlow`. Evidence `tmp/std_debug_hello_debug_mulo_selector_after.log`; `tmp/std_debug_hello_debug_byteswap_selector_after.log`; `tmp/std_debug_hello_debug_shr_selector_after.log` |
+| `real-program object-emission compiler_rt limb64 loops` | 11 | Open | 4 | Item 15 stage-one selector emission now lowers the model-owned limb64 multiply envelope used by `compiler_rt.limb64.__mulo_limb64`, the model-owned byte-swap/reverse envelope used by `compiler_rt.limb64.__byteswap_limb64`, the model-owned arithmetic right-shift envelope used by `compiler_rt.limb64.__shr_limb64`, and the model-owned bit-reverse envelope used by `compiler_rt.limb64.__bitreverse_limb64` through the opt-in selector path without function-name admission. The terminal selector primitives validate the real IR envelopes and emit call-free, relocation-free x86_64 routines for their SysV ABIs. Representative first failure advanced to `compiler_rt.limb64.__popcount_limb64`; remaining limb64 rows are still `UnsupportedCodegenControlFlow`. Evidence `tmp/std_debug_hello_debug_mulo_selector_after.log`; `tmp/std_debug_hello_debug_byteswap_selector_after.log`; `tmp/std_debug_hello_debug_shr_selector_after.log`; `tmp/std_debug_hello_debug_bitreverse_selector_after.log` |
 
 ## Progress Log
 
@@ -1159,6 +1159,18 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.limb64.__bitreverse_limb64`. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged
   outside this opt-in selector proof slice.
+- 2026-07-07 (this commit) Item 15 stage-one limb64 bitreverse selector
+  emission: the opt-in selector now admits and emits the real
+  `compiler_rt.limb64.__bitreverse_limb64` bit-reverse envelope through a
+  model-owned structural check, including `llvm.bitreverse.i64` limb reversal,
+  partial-width signed right-shift tail, and `fixLastLimb` ABI-limb extension,
+  without source-name admission and without changing recognizer fallback
+  behavior. The focused report-all proof moved Debug std-hello compiler_rt from
+  106 emitted / 337 failed to 107 emitted / 336 failed, and advanced the first
+  limb64 failure to `compiler_rt.limb64.__popcount_limb64`. Recognizer count
+  still 1 (no new recognizer reorder or pre-pass);
+  `shape_recognizer_functions` is unchanged outside this opt-in selector proof
+  slice.
 
 ## Ratchet State
 

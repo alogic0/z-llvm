@@ -46,6 +46,10 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .shr_limb64_rdi_rsi_dx_cl_r8w);
         return .selected;
     }
+    if (matchesBitreverseLimb64Envelope(function)) {
+        try machine.instructions.append(allocator, .bitreverse_limb64_rdi_rsi_dl_cx);
+        return .selected;
+    }
     switch (inspected) {
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {
@@ -420,6 +424,81 @@ fn matchesShrLimb64Envelope(function: ir.Function) bool {
         saw_lshr_i64 and
         saw_shl_i64 and
         saw_or_i64 and
+        saw_fix_sign_extend and
+        i64_loads >= 2 and
+        i64_stores >= 2;
+}
+
+fn matchesBitreverseLimb64Envelope(function: ir.Function) bool {
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 4) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (!function.params.items[1].ty.eql(.ptr)) return false;
+    if (!function.params.items[2].ty.eql(.{ .int = 1 })) return false;
+    if (!function.params.items[3].ty.eql(.{ .int = 16 })) return false;
+
+    var saw_freeze_bits = false;
+    var saw_int_byte_size = false;
+    var saw_umax = false;
+    var saw_bitreverse_i64 = false;
+    var saw_limb_count_math = false;
+    var saw_remainder_mask = false;
+    var saw_tail_shift = false;
+    var saw_fix_sign_extend = false;
+    var i64_loads: usize = 0;
+    var i64_stores: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .freeze => |freeze| {
+                    if (freeze.ty.eql(.{ .int = 16 })) saw_freeze_bits = true;
+                },
+                .binary => |binary| {
+                    if (binary.ty.eql(.{ .int = 16 })) {
+                        if (binary.op == .add or binary.op == .lshr) saw_limb_count_math = true;
+                        if (binary.op == .@"and") saw_remainder_mask = true;
+                    } else if (binary.ty.eql(.{ .int = 64 })) {
+                        if (binary.op == .lshr or binary.op == .shl or binary.op == .@"or") saw_tail_shift = true;
+                        if (binary.op == .ashr) saw_fix_sign_extend = true;
+                    }
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.umax.i64") and
+                        call.ret_ty.eql(.{ .int = 64 }))
+                    {
+                        saw_umax = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64") and
+                        call.ret_ty.eql(.{ .int = 64 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 64 }))
+                    {
+                        saw_bitreverse_i64 = true;
+                    }
+                },
+                .load => |load| {
+                    if (load.ty.eql(.{ .int = 64 })) i64_loads += 1;
+                },
+                .store => |store| {
+                    if (store.ty.eql(.{ .int = 64 })) i64_stores += 1;
+                },
+                else => {},
+            }
+        }
+    }
+
+    return saw_freeze_bits and
+        saw_int_byte_size and
+        saw_umax and
+        saw_bitreverse_i64 and
+        saw_limb_count_math and
+        saw_remainder_mask and
+        saw_tail_shift and
         saw_fix_sign_extend and
         i64_loads >= 2 and
         i64_stores >= 2;

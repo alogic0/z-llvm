@@ -82,6 +82,7 @@ pub const Instruction = union(enum) {
     mulo_limb64_rdi_rsi_rdx_cl_r8w_al,
     byteswap_limb64_rdi_rsi_dl_cx,
     shr_limb64_rdi_rsi_dx_cl_r8w,
+    bitreverse_limb64_rdi_rsi_dl_cx,
     ctz_i128_rdi_rsi_eax,
     ctz_i64_rdi_eax,
     ffs_i128_rdi_rsi_eax,
