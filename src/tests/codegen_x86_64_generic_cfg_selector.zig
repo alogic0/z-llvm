@@ -507,6 +507,109 @@ test "generic cfg selector keeps limb64 popcount near miss fail-closed" {
     try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
 }
 
+test "generic cfg selector emits limb64 ctz envelope through opt-in selector" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i16 @candidate(ptr %a, i16 %bits) {
+        \\entry:
+        \\  %is_zero = icmp eq i16 %bits, 0
+        \\  %minus_one = add i16 %bits, -1
+        \\  %last = lshr i16 %minus_one, 6
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %selected_last = select i1 %is_zero, i16 -1, i16 %last
+        \\  %last64 = zext i16 %selected_last to i64
+        \\  %has_prefix = icmp eq i16 %selected_last, 0
+        \\  br i1 %has_prefix, label %tail, label %preheader
+        \\
+        \\preheader:
+        \\  %prefix_bits = shl i16 %selected_last, 6
+        \\  br label %loop
+        \\
+        \\loop:
+        \\  %sum = phi i16 [ 0, %preheader ], [ %sum_next, %zero_limb ]
+        \\  %i = phi i64 [ 0, %preheader ], [ %next, %zero_limb ]
+        \\  %ptr = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %i
+        \\  %value = load i64, ptr %ptr, align 8
+        \\  %value_is_zero = icmp eq i64 %value, 0
+        \\  br i1 %value_is_zero, label %zero_limb, label %found
+        \\
+        \\zero_limb:
+        \\  %sum_next = add i16 %sum, 64
+        \\  %next = add i64 %i, 1
+        \\  %exit = icmp eq i64 %next, %last64
+        \\  br i1 %exit, label %tail, label %loop
+        \\
+        \\tail:
+        \\  %prefix = phi i16 [ 0, %entry ], [ %prefix_bits, %zero_limb ]
+        \\  %tail_ptr = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %last64
+        \\  %tail_value = load i64, ptr %tail_ptr, align 8
+        \\  %rem = and i16 %bits, 63
+        \\  %has_rem = icmp ne i16 %rem, 0
+        \\  %tail_is_zero = icmp eq i64 %tail_value, 0
+        \\  %partial_zero = select i1 %has_rem, i1 %tail_is_zero, i1 false
+        \\  %partial_total = or i16 %prefix, %rem
+        \\  %tail_count = call i64 @llvm.cttz.i64(i64 %tail_value, i1 false)
+        \\  %tail_narrow = trunc i64 %tail_count to i16
+        \\  %tail_total = add i16 %prefix, %tail_narrow
+        \\  %total = select i1 %partial_zero, i16 %partial_total, i16 %tail_total
+        \\  ret i16 %total
+        \\
+        \\found:
+        \\  %count = call i64 @llvm.cttz.i64(i64 %value, i1 true)
+        \\  %narrow = trunc i64 %count to i16
+        \\  %found_total = or i16 %sum, %narrow
+        \\  ret i16 %found_total
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = try codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{ .generic_cfg_selector = true },
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(.ctz_limb64_rdi_si_ax, machine.instructions.items[0]);
+}
+
+test "generic cfg selector keeps limb64 ctz near miss fail-closed" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i16 @near_miss(ptr %a, i16 %bits) {
+        \\entry:
+        \\  %minus_one = add i16 %bits, -1
+        \\  %last = lshr i16 %minus_one, 6
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %last64 = zext i16 %last to i64
+        \\  %ptr = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %last64
+        \\  %value = load i64, ptr %ptr, align 8
+        \\  %count = trunc i64 %value to i16
+        \\  ret i16 %count
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("near_miss", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+}
+
 test "generic cfg selector skeleton fails closed with first unsupported instruction form" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

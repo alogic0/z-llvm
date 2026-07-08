@@ -54,6 +54,10 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .popcount_limb64_rdi_si_ax);
         return .selected;
     }
+    if (matchesCtzLimb64Envelope(function)) {
+        try machine.instructions.append(allocator, .ctz_limb64_rdi_si_ax);
+        return .selected;
+    }
     switch (inspected) {
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {
@@ -572,6 +576,78 @@ fn matchesPopcountLimb64Envelope(function: ir.Function) bool {
         ctpop_i64_count >= 2 and
         trunc_i64_to_i16_count >= 2 and
         add_i16_count >= 2 and
+        i64_loads >= 2;
+}
+
+fn matchesCtzLimb64Envelope(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.{ .int = 16 })) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (!function.params.items[1].ty.eql(.{ .int = 16 })) return false;
+
+    var saw_int_byte_size = false;
+    var saw_limb_count_math = false;
+    var saw_remainder_mask = false;
+    var saw_zero_limb_branch = false;
+    var cttz_i64_count: usize = 0;
+    var trunc_i64_to_i16_count: usize = 0;
+    var add_i16_count: usize = 0;
+    var or_i16_count: usize = 0;
+    var i64_loads: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .binary => |binary| {
+                    if (binary.ty.eql(.{ .int = 16 })) {
+                        if (binary.op == .add or binary.op == .lshr or binary.op == .shl) saw_limb_count_math = true;
+                        if (binary.op == .@"and") saw_remainder_mask = true;
+                        if (binary.op == .add) add_i16_count += 1;
+                        if (binary.op == .@"or") or_i16_count += 1;
+                    }
+                },
+                .cast => |cast| {
+                    if (cast.op == .trunc and
+                        cast.from_ty.eql(.{ .int = 64 }) and
+                        cast.to_ty.eql(.{ .int = 16 }))
+                    {
+                        trunc_i64_to_i16_count += 1;
+                    }
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.cttz.i64") and
+                        call.ret_ty.eql(.{ .int = 64 }) and call.args.items.len == 2 and
+                        call.args.items[0].ty.eql(.{ .int = 64 }) and
+                        call.args.items[1].ty.eql(.{ .int = 1 }))
+                    {
+                        cttz_i64_count += 1;
+                    }
+                },
+                .icmp => |icmp| {
+                    if (icmp.predicate == .eq and icmp.operand_ty.eql(.{ .int = 64 })) saw_zero_limb_branch = true;
+                },
+                .load => |load| {
+                    if (load.ty.eql(.{ .int = 64 })) i64_loads += 1;
+                },
+                else => {},
+            }
+        }
+    }
+
+    return saw_int_byte_size and
+        saw_limb_count_math and
+        saw_remainder_mask and
+        saw_zero_limb_branch and
+        cttz_i64_count >= 2 and
+        trunc_i64_to_i16_count >= 2 and
+        add_i16_count >= 2 and
+        or_i16_count >= 1 and
         i64_loads >= 2;
 }
 
