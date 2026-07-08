@@ -166,6 +166,87 @@ test "generic cfg selector stage two composes acyclic branch with labels" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector stage two materializes unconditional phi edges" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @branch_phi(i64 %a, i64 %b) {
+        \\entry:
+        \\  %cond = icmp ult i64 %a, 10
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %left = add i64 %a, 1
+        \\  br label %merge
+        \\else:
+        \\  %right = add i64 %b, 2
+        \\  br label %merge
+        \\merge:
+        \\  %value = phi i64 [ %left, %then ], [ %right, %else ]
+        \\  ret i64 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("branch_phi", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    var phi_moves: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        switch (instruction) {
+            .mov_arg64_arg => |mov| {
+                if (mov.dst == .r8) phi_moves += 1;
+            },
+            else => {},
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 2), phi_moves);
+    try expectNamedInstruction(machine.instructions.items, .label, "merge");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector stage two rejects conditional phi edge materialization" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @cond_phi_edge(i64 %a, i64 %b) {
+        \\entry:
+        \\  %cond = icmp ult i64 %a, 10
+        \\  br i1 %cond, label %merge, label %else
+        \\else:
+        \\  br label %merge
+        \\merge:
+        \\  %value = phi i64 [ %a, %entry ], [ %b, %else ]
+        \\  ret i64 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("cond_phi_edge", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqualStrings("stage2-condbr-phi-edge", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
 test "generic cfg selector stage two rejects pressure above no-spill envelope" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

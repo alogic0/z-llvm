@@ -162,7 +162,6 @@ fn tryLowerComposedCfg(
     if (ret_bits != 32 and ret_bits != 64) return unsupported(.{ .no_emitter = "stage2-ret-width" });
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > 16) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
-    if (hasPhi(function)) return unsupported(.{ .no_emitter = "stage2-phi-not-owned" });
     if (!isForwardOnlyCfg(function)) return unsupported(.{ .no_emitter = "stage2-backedge-not-owned" });
 
     const start_len = machine.instructions.items.len;
@@ -170,6 +169,7 @@ fn tryLowerComposedCfg(
     defer composed.deinit();
 
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
+    if (try composed.bindPhiResults(function)) |diagnostic| return unsupported(diagnostic);
 
     for (function.blocks.items, 0..) |block, block_index| {
         if (block_index != 0) try machine.instructions.append(allocator, .{ .label = block.name });
@@ -445,15 +445,6 @@ fn setEquals(lhs: NameSet, rhs: NameSet) bool {
     return true;
 }
 
-fn hasPhi(function: ir.Function) bool {
-    for (function.blocks.items) |block| {
-        for (block.instructions.items) |instruction| {
-            if (!instruction.removed and instruction.kind == .phi) return true;
-        }
-    }
-    return false;
-}
-
 fn isForwardOnlyCfg(function: ir.Function) bool {
     for (function.blocks.items, 0..) |block, block_index| {
         const block_successors = successors(block) catch return false;
@@ -516,6 +507,7 @@ const ComposedBlockSelector = struct {
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     values: std.StringHashMap(ValueLoc),
+    phi_value_count: usize = 0,
     current_eax_name: ?[]const u8 = null,
     current_scratch_names: [6]?[]const u8 = .{null} ** 6,
     current_pair_a_name: ?[]const u8 = null,
@@ -562,9 +554,33 @@ const ComposedBlockSelector = struct {
         return null;
     }
 
+    fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                if (instruction.removed or instruction.kind != .phi) continue;
+                const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
+                const phi = instruction.kind.phi;
+                const bits = intBits(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
+                if (bits != 32 and bits != 64) return .{ .no_emitter = "stage2-phi-width" };
+                const reg = selector.nextPhiReg() orelse return .{ .no_spill_envelope = "stage2-phi-registers" };
+                try selector.values.put(result_name, if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg });
+            }
+        }
+        return null;
+    }
+
+    fn nextPhiReg(selector: *ComposedBlockSelector) ?ArgReg {
+        const regs = [_]ArgReg{ .r8, .r9, .rcx };
+        if (selector.phi_value_count >= regs.len) return null;
+        const reg = regs[selector.phi_value_count];
+        selector.phi_value_count += 1;
+        return reg;
+    }
+
     fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
         if (instruction.removed) return null;
         return switch (instruction.kind) {
+            .phi => null,
             .binary => |binary| try selector.lowerBinary(instruction.result, binary),
             .alloca => |alloca| try selector.lowerAlloca(instruction.result, alloca),
             .cast => |cast| try selector.lowerCast(instruction.result, cast),
@@ -948,6 +964,7 @@ const ComposedBlockSelector = struct {
             .ret => |ret| try selector.lowerReturn(ret),
             .br => |br| {
                 const target_index = function.blockIndex(br.target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+                if (try selector.emitPhiEdgeMoves(function.blocks.items[target_index], function.blocks.items[block_index].name)) |diagnostic| return diagnostic;
                 if (target_index != block_index + 1) {
                     try selector.machine.instructions.append(selector.allocator, .{ .jmp = br.target });
                 }
@@ -955,9 +972,15 @@ const ComposedBlockSelector = struct {
             },
             .condbr => |condbr| {
                 if (!condbr.cond_ty.eql(.{ .int = 1 })) return .{ .no_emitter = "stage2-condbr-type" };
+                const then_index = function.blockIndex(condbr.then_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+                const else_index = function.blockIndex(condbr.else_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+                if (blockHasPhiIncomingFrom(function.blocks.items[then_index], function.blocks.items[block_index].name) or
+                    blockHasPhiIncomingFrom(function.blocks.items[else_index], function.blocks.items[block_index].name))
+                {
+                    return .{ .no_emitter = "stage2-condbr-phi-edge" };
+                }
                 if (try selector.emitBranchCondition(condbr.cond)) |diagnostic| return diagnostic;
                 try selector.machine.instructions.append(selector.allocator, .{ .jne = condbr.then_target });
-                const else_index = function.blockIndex(condbr.else_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
                 if (else_index != block_index + 1) {
                     try selector.machine.instructions.append(selector.allocator, .{ .jmp = condbr.else_target });
                 }
@@ -965,6 +988,63 @@ const ComposedBlockSelector = struct {
             },
             .@"switch", .indirectbr, .@"unreachable" => .{ .no_emitter = "stage2-terminator-not-owned" },
         };
+    }
+
+    fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock, predecessor: []const u8) !?Diagnostic {
+        for (target.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const phi = switch (instruction.kind) {
+                .phi => |phi| phi,
+                else => break,
+            };
+            const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
+            const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
+            const dst = selector.values.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
+            if (try selector.emitValueIntoLoc(incoming.value, dst)) |diagnostic| return diagnostic;
+            switch (dst) {
+                .scratch32 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
+                .scratch64 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
+                .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack64, .spill64 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            }
+        }
+        return null;
+    }
+
+    fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: ValueLoc) !?Diagnostic {
+        switch (dst) {
+            .scratch32 => |reg| {
+                switch (value) {
+                    .int => |int| {
+                        selector.invalidateScratchContaining(reg);
+                        selector.invalidatePairContaining(reg);
+                        selector.current_eax_name = null;
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) });
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg });
+                    },
+                    .named => {
+                        selector.emitValueIntoScratch(value, reg, 32) catch return .{ .unsupported_value = "stage2-phi-src" };
+                    },
+                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
+                }
+            },
+            .scratch64 => |reg| {
+                switch (value) {
+                    .int => |int| {
+                        selector.invalidateScratchContaining(reg);
+                        selector.invalidatePairContaining(reg);
+                        selector.current_eax_name = null;
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(int) });
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = reg });
+                    },
+                    .named => {
+                        selector.emitValueIntoScratch(value, reg, 64) catch return .{ .unsupported_value = "stage2-phi-src" };
+                    },
+                    .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
+                }
+            },
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack64, .spill64 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+        }
+        return null;
     }
 
     fn emitBranchCondition(selector: *ComposedBlockSelector, value: ir.Value) !?Diagnostic {
@@ -1409,6 +1489,25 @@ const ComposedBlockSelector = struct {
         };
     }
 };
+
+fn blockHasPhiIncomingFrom(block: ir.BasicBlock, predecessor: []const u8) bool {
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        if (phiIncomingFrom(phi, predecessor) != null) return true;
+    }
+    return false;
+}
+
+fn phiIncomingFrom(phi: ir.PhiInst, predecessor: []const u8) ?ir.PhiIncoming {
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, predecessor)) return incoming;
+    }
+    return null;
+}
 
 const RegPair = struct {
     lo: ArgReg,
