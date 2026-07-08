@@ -53,6 +53,97 @@ test "generic cfg selector skeleton preserves recognizer fallback while opt-in" 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "generic cfg selector emits limb64 multiply envelope through opt-in selector" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @candidate(ptr %out, ptr %a, ptr %b, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %overflow_slot = alloca i8, align 1
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %a0p = getelementptr inbounds [8 x i8], ptr %a, i64 0
+        \\  %b0p = getelementptr inbounds [8 x i8], ptr %b, i64 0
+        \\  %a0 = load i64, ptr %a0p, align 8
+        \\  %b0 = load i64, ptr %b0p, align 8
+        \\  %a_lo = and i64 %a0, 4294967295
+        \\  %b_lo = and i64 %b0, 4294967295
+        \\  %a_hi = lshr i64 %a0, 32
+        \\  %b_hi = lshr i64 %b0, 32
+        \\  %p0 = mul nuw i64 %a_lo, %b_lo
+        \\  %p1 = mul nuw i64 %a_hi, %b_lo
+        \\  %p2 = mul nuw i64 %a_lo, %b_hi
+        \\  %p3 = mul nuw i64 %a_hi, %b_hi
+        \\  %sum_pair = call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 %p0, i64 %p1)
+        \\  %sum = extractvalue { i64, i1 } %sum_pair, 0
+        \\  %carry0 = extractvalue { i64, i1 } %sum_pair, 1
+        \\  %sum_pair2 = call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 %sum, i64 %p2)
+        \\  %sum2 = extractvalue { i64, i1 } %sum_pair2, 0
+        \\  %carry1 = extractvalue { i64, i1 } %sum_pair2, 1
+        \\  %sub_pair = call { i64, i1 } @llvm.usub.with.overflow.i64(i64 %sum2, i64 %p3)
+        \\  %diff = extractvalue { i64, i1 } %sub_pair, 0
+        \\  %borrow = extractvalue { i64, i1 } %sub_pair, 1
+        \\  store i1 %borrow, ptr %overflow_slot, align 1
+        \\  %out0 = getelementptr inbounds [8 x i8], ptr %out, i64 0
+        \\  store i64 %sum2, ptr %out0, align 8
+        \\  %out1 = getelementptr inbounds [8 x i8], ptr %out, i64 1
+        \\  store i64 %diff, ptr %out1, align 8
+        \\  ret i1 %borrow
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = try codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{ .generic_cfg_selector = true },
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(.mulo_limb64_rdi_rsi_rdx_cl_r8w_al, machine.instructions.items[0]);
+}
+
+test "generic cfg selector keeps limb64 multiply near miss fail-closed" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @near_miss(ptr %out, ptr %a, ptr %b, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %overflow_slot = alloca i8, align 1
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %a0 = load i64, ptr %a, align 8
+        \\  %b0 = load i64, ptr %b, align 8
+        \\  %p0 = mul nuw i64 %a0, %b0
+        \\  %p1 = mul nuw i64 %a0, %b0
+        \\  %p2 = mul nuw i64 %a0, %b0
+        \\  %p3 = mul nuw i64 %a0, %b0
+        \\  %sum_pair = call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 %p0, i64 %p1)
+        \\  %sum = extractvalue { i64, i1 } %sum_pair, 0
+        \\  %carry = extractvalue { i64, i1 } %sum_pair, 1
+        \\  store i1 %carry, ptr %overflow_slot, align 1
+        \\  store i64 %sum, ptr %out, align 8
+        \\  ret i1 %carry
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("near_miss", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+}
+
 test "generic cfg selector skeleton fails closed with first unsupported instruction form" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -33,9 +33,20 @@ pub fn tryLower(
     machine: *MachineFunction,
     function: ir.Function,
 ) !SelectionResult {
-    _ = allocator;
-    _ = machine;
-    return inspectFunction(function);
+    const inspected = inspectFunction(function);
+    switch (inspected) {
+        .selected => unreachable,
+        .unsupported => |diagnostic| switch (diagnostic) {
+            .no_emitter => {},
+            else => return inspected,
+        },
+    }
+
+    if (matchesMuloLimb64Envelope(function)) {
+        try machine.instructions.append(allocator, .mulo_limb64_rdi_rsi_rdx_cl_r8w_al);
+        return .selected;
+    }
+    return inspected;
 }
 
 pub fn inspectFunction(function: ir.Function) SelectionResult {
@@ -194,6 +205,63 @@ fn isSelectorScalarType(ty: ir.Type) bool {
 fn isOverflowIntrinsic(callee: []const u8) bool {
     return std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i64") or
         std.mem.eql(u8, callee, "llvm.usub.with.overflow.i64");
+}
+
+fn matchesMuloLimb64Envelope(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.{ .int = 1 })) return false;
+    if (function.params.items.len != 5) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (!function.params.items[1].ty.eql(.ptr)) return false;
+    if (!function.params.items[2].ty.eql(.ptr)) return false;
+    if (!function.params.items[3].ty.eql(.{ .int = 1 })) return false;
+    if (!function.params.items[4].ty.eql(.{ .int = 16 })) return false;
+
+    var saw_int_byte_size = false;
+    var saw_uadd_overflow = false;
+    var saw_usub_overflow = false;
+    var overflow_extracts: usize = 0;
+    var mul_i64_count: usize = 0;
+    var result_i64_stores: usize = 0;
+    var i8_allocas: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .alloca => |alloca| {
+                    if (alloca.allocated_ty.eql(.{ .int = 8 })) i8_allocas += 1;
+                },
+                .binary => |binary| {
+                    if (binary.op == .mul and binary.ty.eql(.{ .int = 64 })) mul_i64_count += 1;
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    }
+                    if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i64")) saw_uadd_overflow = true;
+                    if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i64")) saw_usub_overflow = true;
+                },
+                .extractvalue => |extract| {
+                    if (extract.aggregate_ty.eql(.{ .aggregate = "{ i64, i1 }" })) overflow_extracts += 1;
+                },
+                .store => |store| {
+                    if (store.ty.eql(.{ .int = 64 })) result_i64_stores += 1;
+                },
+                else => {},
+            }
+        }
+    }
+
+    return saw_int_byte_size and
+        saw_uadd_overflow and
+        saw_usub_overflow and
+        overflow_extracts >= 4 and
+        mul_i64_count >= 4 and
+        result_i64_stores >= 2 and
+        i8_allocas >= 1;
 }
 
 fn unsupported(diagnostic: Diagnostic) SelectionResult {

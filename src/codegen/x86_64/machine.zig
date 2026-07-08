@@ -79,6 +79,7 @@ pub const Instruction = union(enum) {
     neg_rax,
     neg_i128_rdi_rsi_rdx_rax,
     abs_limb64_rdi_rsi_dx_rcx_rax,
+    mulo_limb64_rdi_rsi_rdx_cl_r8w_al,
     ctz_i128_rdi_rsi_eax,
     ctz_i64_rdi_eax,
     ffs_i128_rdi_rsi_eax,

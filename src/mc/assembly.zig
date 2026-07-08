@@ -1,5 +1,6 @@
 const std = @import("std");
 const x86_64 = @import("../codegen/x86_64.zig");
+const selector_bytes = @import("../codegen/x86_64/selector_bytes.zig");
 
 pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
     try writer.writeAll("\t.text\n");
@@ -541,6 +542,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tjne 2b\n" ++
                     "3:\n",
             ),
+            .mulo_limb64_rdi_rsi_rdx_cl_r8w_al => try printByteDirective(writer, &selector_bytes.mulo_limb64_rdi_rsi_rdx_cl_r8w_al),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| try writer.print(
                 "\tmovq %rsi, %rax\n" ++
                     "\tshrq $3, %rax\n" ++
@@ -1450,6 +1452,20 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .ret => try writer.writeAll("\tretq\n"),
         }
     }
+}
+
+fn printByteDirective(writer: anytype, bytes: []const u8) !void {
+    var index: usize = 0;
+    while (index < bytes.len) : (index += 1) {
+        if (index % 16 == 0) {
+            if (index != 0) try writer.writeByte('\n');
+            try writer.writeAll("\t.byte ");
+        } else {
+            try writer.writeAll(", ");
+        }
+        try writer.print("0x{x:0>2}", .{bytes[index]});
+    }
+    try writer.writeByte('\n');
 }
 
 fn frameAddress(frame_index: x86_64.FrameIndex) []const u8 {

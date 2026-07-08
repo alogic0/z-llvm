@@ -1,5 +1,6 @@
 const std = @import("std");
 const x86_64 = @import("../codegen/x86_64.zig");
+const selector_bytes = @import("../codegen/x86_64/selector_bytes.zig");
 
 pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunction) ![]u8 {
     try x86_64.verifyFunction(function);
@@ -520,6 +521,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x48, 0x39, 0xd1, // cmpq %rdx, %rcx
                 0x75, 0xe2, // jne 2b
             }),
+            .mulo_limb64_rdi_rsi_rdx_cl_r8w_al => try bytes.appendSlice(allocator, &selector_bytes.mulo_limb64_rdi_rsi_rdx_cl_r8w_al),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => try bytes.appendSlice(allocator, &.{
                 0x48, 0x89, 0xf0, // movq %rsi, %rax
                 0x48, 0xc1, 0xe8, 0x03, // shrq $3, %rax
@@ -1572,6 +1574,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .memcmp_rdi_rsi_rdx_eax => 36,
         .memcpy_rdi_rsi_rdx_rax => 14,
         .abs_limb64_rdi_rsi_dx_rcx_rax => 69,
+        .mulo_limb64_rdi_rsi_rdx_cl_r8w_al => selector_bytes.mulo_limb64_rdi_rsi_rdx_cl_r8w_al.len,
         .spinlocked_memcpy_rsi_to_rdx_len_edi => 59,
         .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax => 104,
         .spinlocked_var_xchg_edi_rsi_rdx_rcx => 82,
