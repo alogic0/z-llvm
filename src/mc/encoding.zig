@@ -61,6 +61,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .movq_xmm_rax => |reg| try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x0f, 0x7e, @as(u8, 0xc0) + (@as(u8, reg.lowCode()) << 3) }),
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
             .mov_eax_to_arg => |reg| try encodeEaxToReg32(&bytes, allocator, reg),
+            .mov_rax_to_arg => |reg| try encodeRaxToReg64(&bytes, allocator, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
             .mov_arg64_arg => |mov| try encodeReg64ToReg64(&bytes, allocator, mov.dst, mov.src),
             .push_arg => |reg| try encodePushArg(&bytes, allocator, reg),
@@ -70,6 +71,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .push_byval_tail_arg_ptr => |copy| try encodePushByvalTailArgPtr(&bytes, allocator, copy.reg, copy.offset, copy.len),
             .push_byval_tail_stack_ptr => |copy| try encodePushByvalTailStackPtr(&bytes, allocator, copy.stack_disp, copy.offset, copy.len),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
+            .binary_arg_rax => |binary| try encodeRegToRax64Binary(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .add_arg64_rax => |reg| try encodeRegToRax64Binary(&bytes, allocator, 0x01, reg),
             .add_arg_high32_eax => |reg| try encodeAddHigh32ToEax(&bytes, allocator, reg),
             .add_stack_disp8_eax => |disp| {
@@ -101,6 +103,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, amount);
             },
             .shr_arg_imm5 => |shift| try encodeShiftReg32Imm5(&bytes, allocator, 5, shift.reg, shift.amount),
+            .shr_arg64_imm6 => |shift| try encodeShiftReg64Imm6(&bytes, allocator, 5, shift.reg, shift.amount),
             .shr_eax_cl => try bytes.appendSlice(allocator, &.{ 0xd3, 0xe8 }),
             .or_eax_imm32 => |value| {
                 try bytes.append(allocator, 0x0d);
@@ -1499,6 +1502,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .movq_xmm_rax => 5,
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_eax_to_arg => |reg| if (reg.rexB()) 3 else 2,
+        .mov_rax_to_arg => 3,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .mov_arg64_arg => 3,
         .push_arg => |reg| if (reg.rexB()) 2 else 1,
@@ -1508,6 +1512,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .push_byval_tail_arg_ptr => |copy| pushByvalTailArgPtrSize(copy.reg, copy.offset, copy.len),
         .push_byval_tail_stack_ptr => |copy| pushByvalTailStackPtrSize(copy.len),
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
+        .binary_arg_rax => |binary| if (binary.reg.rexR()) 4 else 3,
         .add_arg64_rax => 3,
         .add_arg_high32_eax => |reg| (if (reg.rexR()) @as(u32, 3) else 3) + 6,
         .add_stack_disp8_eax => 4,
@@ -1518,6 +1523,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .shl_eax_imm5 => 3,
         .shr_eax_imm5 => 3,
         .shr_arg_imm5 => |shift| if (shift.reg.rexB()) 4 else 3,
+        .shr_arg64_imm6 => 4,
         .shr_eax_cl => 2,
         .or_eax_imm32 => 5,
         .imul_eax_imm32 => 6,
@@ -1879,6 +1885,12 @@ fn encodeEaxToReg32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg
     try bytes.append(allocator, 0xc0 | @as(u8, reg.lowCode()));
 }
 
+fn encodeRaxToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    try bytes.append(allocator, if (reg.rexB()) 0x49 else 0x48);
+    try bytes.append(allocator, 0x89);
+    try bytes.append(allocator, 0xc0 | @as(u8, reg.lowCode()));
+}
+
 fn encodeShiftReg32Imm5(
     bytes: *std.ArrayList(u8),
     allocator: std.mem.Allocator,
@@ -1887,6 +1899,21 @@ fn encodeShiftReg32Imm5(
     amount: u5,
 ) !void {
     if (reg.rexB()) try bytes.append(allocator, 0x41);
+    try bytes.append(allocator, 0xc1);
+    try bytes.append(allocator, 0xc0 | (@as(u8, opcode_ext) << 3) | @as(u8, reg.lowCode()));
+    try bytes.append(allocator, amount);
+}
+
+fn encodeShiftReg64Imm6(
+    bytes: *std.ArrayList(u8),
+    allocator: std.mem.Allocator,
+    opcode_ext: u3,
+    reg: x86_64.ArgReg,
+    amount: u6,
+) !void {
+    var rex: u8 = 0x48;
+    if (reg.rexB()) rex |= 0x01;
+    try bytes.append(allocator, rex);
     try bytes.append(allocator, 0xc1);
     try bytes.append(allocator, 0xc0 | (@as(u8, opcode_ext) << 3) | @as(u8, reg.lowCode()));
     try bytes.append(allocator, amount);

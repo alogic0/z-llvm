@@ -24,6 +24,7 @@ pub const Instruction = union(enum) {
     movq_xmm_rax: XmmReg,
     mov_arg_eax: ArgReg,
     mov_eax_to_arg: ArgReg,
+    mov_rax_to_arg: ArgReg,
     mov_arg_arg: struct {
         dst: ArgReg,
         src: ArgReg,
@@ -50,6 +51,10 @@ pub const Instruction = union(enum) {
         op: MachineBinaryOp,
         reg: ArgReg,
     },
+    binary_arg_rax: struct {
+        op: MachineBinaryOp,
+        reg: ArgReg,
+    },
     add_arg64_rax: ArgReg,
     add_arg_high32_eax: ArgReg,
     add_stack_disp8_eax: u8,
@@ -62,6 +67,10 @@ pub const Instruction = union(enum) {
     shr_arg_imm5: struct {
         reg: ArgReg,
         amount: u5,
+    },
+    shr_arg64_imm6: struct {
+        reg: ArgReg,
+        amount: u6,
     },
     shr_eax_cl,
     or_eax_imm32: i32,

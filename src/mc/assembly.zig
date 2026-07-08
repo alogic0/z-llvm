@@ -23,6 +23,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .movq_xmm_rax => |reg| try writer.print("\tmovq {s}, %rax\n", .{reg.name()}),
             .mov_arg_eax => |reg| try writer.print("\tmovl {s}, %eax\n", .{reg.name32()}),
             .mov_eax_to_arg => |reg| try writer.print("\tmovl %eax, {s}\n", .{reg.name32()}),
+            .mov_rax_to_arg => |reg| try writer.print("\tmovq %rax, {s}\n", .{reg.name64()}),
             .mov_arg_arg => |mov| try writer.print("\tmovl {s}, {s}\n", .{ mov.src.name32(), mov.dst.name32() }),
             .mov_arg64_arg => |mov| try writer.print("\tmovq {s}, {s}\n", .{ mov.src.name64(), mov.dst.name64() }),
             .push_arg => |reg| try writer.print("\tpushq {s}\n", .{reg.name64()}),
@@ -44,6 +45,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                 }
             },
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
+            .binary_arg_rax => |binary| try writer.print("\t{s} {s}, %rax\n", .{ binary.op.mnemonic64(), binary.reg.name64() }),
             .add_arg64_rax => |reg| try writer.print("\taddq {s}, %rax\n", .{reg.name64()}),
             .add_arg_high32_eax => |reg| try writer.print("\tmovq {s}, %rcx\n\tshrq $32, %rcx\n\taddl %ecx, %eax\n", .{reg.name64()}),
             .add_stack_disp8_eax => |offset| try writer.print("\taddl {}(%rsp), %eax\n", .{offset}),
@@ -54,6 +56,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .shl_eax_imm5 => |amount| try writer.print("\tshll ${}, %eax\n", .{amount}),
             .shr_eax_imm5 => |amount| try writer.print("\tshrl ${}, %eax\n", .{amount}),
             .shr_arg_imm5 => |shift| try writer.print("\tshrl ${}, {s}\n", .{ shift.amount, shift.reg.name32() }),
+            .shr_arg64_imm6 => |shift| try writer.print("\tshrq ${}, {s}\n", .{ shift.amount, shift.reg.name64() }),
             .shr_eax_cl => try writer.writeAll("\tshrl %cl, %eax\n"),
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),

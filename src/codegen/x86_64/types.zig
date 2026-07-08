@@ -144,6 +144,16 @@ pub const MachineBinaryOp = enum {
             .xor => "xorl",
         };
     }
+
+    pub fn mnemonic64(op: MachineBinaryOp) []const u8 {
+        return switch (op) {
+            .add => "addq",
+            .sub => "subq",
+            .@"and" => "andq",
+            .@"or" => "orq",
+            .xor => "xorq",
+        };
+    }
 };
 
 pub const FrameIndex = enum {

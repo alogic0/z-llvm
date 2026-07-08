@@ -109,7 +109,7 @@ test "generic cfg selector rejects composed row that needs another live accumula
         .unsupported => |diagnostic| diagnostic,
     };
     try std.testing.expectEqualStrings("no_spill_envelope", diagnostic.tagName());
-    try std.testing.expectEqualStrings("composed-block-two-address-rhs-eax", diagnostic.detail());
+    try std.testing.expectEqualStrings("composed-block-two-address-rhs-accumulator", diagnostic.detail());
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
@@ -156,6 +156,53 @@ test "generic cfg selector composes parity i32 through assigned scratch register
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_eax_to_arg = .rcx }, machine.instructions.items[4]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.shr_eax_cl, machine.instructions.items[13]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[16]);
+}
+
+test "generic cfg selector composes parity i64 through assigned scratch register" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @parity64(i64 %x) {
+        \\entry:
+        \\  %shr32 = lshr i64 %x, 32
+        \\  %xor32 = xor i64 %shr32, %x
+        \\  %shr16 = lshr i64 %xor32, 16
+        \\  %xor16 = xor i64 %shr16, %xor32
+        \\  %shr8 = lshr i64 %xor16, 8
+        \\  %xor8 = xor i64 %shr8, %xor16
+        \\  %shr4 = lshr i64 %xor8, 4
+        \\  %xor4 = xor i64 %shr4, %xor8
+        \\  %narrow = trunc i64 %xor4 to i16
+        \\  %nibble = and i16 %narrow, 15
+        \\  %table = lshr i16 27030, %nibble
+        \\  %bit = and i16 %table, 1
+        \\  %ret = zext i16 %bit to i32
+        \\  ret i32 %ret
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("parity64", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(@as(usize, 20), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shr_arg64_imm6 = .{ .reg = .rcx, .amount = 32 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .binary_arg_rax = .{ .op = .xor, .reg = .rdi } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rax_to_arg = .rcx }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.shr_eax_cl, machine.instructions.items[16]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[19]);
 }
 
 test "generic cfg selector emits limb64 multiply envelope through opt-in selector" {
