@@ -50,6 +50,10 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .shlo_limb64_rdi_rsi_dx_cl_r8w_al);
         return .selected;
     }
+    if (matchesNotLimb64Envelope(function)) {
+        try machine.instructions.append(allocator, .not_limb64_rdi_rsi_dl_cx);
+        return .selected;
+    }
     if (matchesBitreverseLimb64Envelope(function)) {
         try machine.instructions.append(allocator, .bitreverse_limb64_rdi_rsi_dl_cx);
         return .selected;
@@ -635,6 +639,81 @@ fn matchesBitreverseLimb64Envelope(function: ir.Function) bool {
         saw_remainder_mask and
         saw_tail_shift and
         saw_fix_sign_extend and
+        i64_loads >= 2 and
+        i64_stores >= 2;
+}
+
+fn matchesNotLimb64Envelope(function: ir.Function) bool {
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 4) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (!function.params.items[1].ty.eql(.ptr)) return false;
+    if (!function.params.items[2].ty.eql(.{ .int = 1 })) return false;
+    if (!function.params.items[3].ty.eql(.{ .int = 16 })) return false;
+
+    var saw_int_byte_size = false;
+    var saw_assume = false;
+    var saw_limb_count_math = false;
+    var saw_limb_count_select = false;
+    var saw_unary_not = false;
+    var saw_partial_unsigned_mask = false;
+    var saw_signed_high_fill = false;
+    var saw_fix_last_limb_compare = false;
+    var i64_loads: usize = 0;
+    var i64_stores: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .binary => |binary| {
+                    if (binary.ty.eql(.{ .int = 16 })) {
+                        if (binary.op == .add or binary.op == .lshr) saw_limb_count_math = true;
+                        if (binary.op == .@"and" or binary.op == .sub) saw_partial_unsigned_mask = true;
+                    } else if (binary.ty.eql(.{ .int = 64 })) {
+                        if (binary.op == .xor and (binary.rhs.eql(.{ .int = -1 }) or binary.lhs.eql(.{ .int = -1 }))) {
+                            saw_unary_not = true;
+                        }
+                        if (binary.op == .lshr or binary.op == .@"and") saw_partial_unsigned_mask = true;
+                        if (binary.op == .ashr) saw_signed_high_fill = true;
+                    }
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.assume") and call.ret_ty == .void) {
+                        saw_assume = true;
+                    }
+                },
+                .icmp => |icmp| {
+                    if (icmp.operand_ty.eql(.{ .int = 16 })) saw_fix_last_limb_compare = true;
+                    if (icmp.operand_ty.eql(.{ .int = 64 }) and icmp.predicate == .slt) saw_signed_high_fill = true;
+                },
+                .select => |select| {
+                    if (select.cond_ty.eql(.{ .int = 1 }) and select.ty.eql(.{ .int = 16 })) saw_limb_count_select = true;
+                },
+                .load => |load| {
+                    if (load.ty.eql(.{ .int = 64 })) i64_loads += 1;
+                },
+                .store => |store| {
+                    if (store.ty.eql(.{ .int = 64 })) i64_stores += 1;
+                },
+                else => {},
+            }
+        }
+    }
+
+    return saw_int_byte_size and
+        saw_assume and
+        saw_limb_count_math and
+        saw_limb_count_select and
+        saw_unary_not and
+        saw_partial_unsigned_mask and
+        saw_signed_high_fill and
+        saw_fix_last_limb_compare and
         i64_loads >= 2 and
         i64_stores >= 2;
 }
