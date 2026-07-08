@@ -5,6 +5,13 @@ const codegen = common.codegen;
 const ir = common.ir;
 const selector = @import("../codegen/x86_64/generic_cfg_selector.zig");
 
+fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected: codegen.x86_64.Instruction) !void {
+    for (instructions) |instruction| {
+        if (std.meta.eql(instruction, expected)) return;
+    }
+    return error.ExpectedInstructionNotFound;
+}
+
 test "generic cfg selector skeleton reports no emitter for supported straight-line integer shape" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1644,13 +1651,63 @@ test "generic cfg selector composes stack out-param direct call and i64 return" 
     }
 
     try std.testing.expectEqual(@as(usize, 6), machine.instructions.items.len);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_24, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rsp_arg64 = .rdx }, machine.instructions.items[1]);
     try std.testing.expectEqualStrings("callee", machine.instructions.items[2].direct_call.symbol);
     try std.testing.expect(machine.instructions.items[2].direct_call.ret_ty.eql(.{ .int = 64 }));
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 0 }, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[4]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+}
+
+test "generic cfg selector composes signed i64 remainder stack call with spills" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @llvm.abs.i64(i64, i1)
+        \\declare i64 @udivmod(i64, i64, ptr)
+        \\
+        \\define i64 @signed_rem(i64 %a, i64 %b) {
+        \\entry:
+        \\  %slot = alloca i64, align 8
+        \\  %sign = ashr i64 %a, 63
+        \\  %xor0 = xor i64 %sign, %a
+        \\  %mag_a = sub i64 %xor0, %sign
+        \\  %mag_b = tail call i64 @llvm.abs.i64(i64 %b, i1 false)
+        \\  %unused = call i64 @udivmod(i64 %mag_a, i64 %mag_b, ptr %slot)
+        \\  %rem = load i64, ptr %slot, align 8
+        \\  %xor1 = xor i64 %rem, %sign
+        \\  %signed = sub i64 %xor1, %sign
+        \\  ret i64 %signed
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("signed_rem", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_24, machine.instructions.items[0]);
+    try expectInstruction(machine.instructions.items, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } });
+    try expectInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rcx } });
+    try expectInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot4 });
+    try expectInstruction(machine.instructions.items, .abs_i64_rdi_rax);
+    try expectInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot4 } });
+    try expectInstruction(machine.instructions.items, .{ .mov_rax_to_arg = .rsi });
+    try expectInstruction(machine.instructions.items, .{ .mov_rsp_arg64 = .rdx });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_rax = 0 });
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[machine.instructions.items.len - 2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
 test "generic cfg selector skeleton fails closed with first unsupported instruction form" {

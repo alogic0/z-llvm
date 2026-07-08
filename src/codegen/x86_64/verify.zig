@@ -44,6 +44,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .shr_eax_imm5,
         .shr_arg_imm5,
         .shr_arg64_imm6,
+        .sar_arg64_imm6,
         .shr_eax_cl,
         .or_eax_imm32,
         .imul_eax_imm32,
@@ -383,7 +384,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm32_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .mov_rax_rsi, .mov_eax_to_arg, .mov_rax_to_arg, .movsxd_arg32_arg64, .imul_arg64_arg64, .add_arg64_imm32, .shr_arg_imm5, .shr_arg64_imm6, .mov_rsp_arg64, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64, .spinlocked_var_xchg_edi_rsi_rdx_rcx, .spinlocked_var_store_edi_rsi_rdx => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .mov_rax_rsi, .mov_eax_to_arg, .mov_rax_to_arg, .movsxd_arg32_arg64, .imul_arg64_arg64, .add_arg64_imm32, .shr_arg_imm5, .shr_arg64_imm6, .sar_arg64_imm6, .mov_rsp_arg64, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64, .spinlocked_var_xchg_edi_rsi_rdx_rcx, .spinlocked_var_store_edi_rsi_rdx => {},
         .reload_rsp_eax, .reload_rsp_rax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -594,6 +595,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .shr_eax_imm5,
         .shr_arg_imm5,
         .shr_arg64_imm6,
+        .sar_arg64_imm6,
         .shr_eax_cl,
         .or_eax_imm32,
         .imul_eax_imm32,

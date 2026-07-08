@@ -85,6 +85,10 @@ pub const Instruction = union(enum) {
         reg: ArgReg,
         amount: u6,
     },
+    sar_arg64_imm6: struct {
+        reg: ArgReg,
+        amount: u6,
+    },
     shr_eax_cl,
     or_eax_imm32: i32,
     imul_eax_imm32: i32,
