@@ -86,6 +86,7 @@ pub const Instruction = union(enum) {
     not_limb64_rdi_rsi_dl_cx,
     bitwise_limb64_rdi_rsi_rdx_cx: Limb64BitwiseOp,
     cmp_limb64_rdi_rsi_dl_cx_ax,
+    overflow_limb64_rdi_rsi_rdx_cl_r8w_al: Limb64OverflowOp,
     bitreverse_limb64_rdi_rsi_dl_cx,
     popcount_limb64_rdi_si_ax,
     ctz_limb64_rdi_si_ax,
@@ -525,6 +526,11 @@ pub const Limb64BitwiseOp = enum {
     xor,
     @"or",
     @"and",
+};
+
+pub const Limb64OverflowOp = enum {
+    add,
+    sub,
 };
 
 pub const MachineFunction = struct {

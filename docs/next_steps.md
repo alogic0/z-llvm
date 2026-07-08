@@ -40,7 +40,7 @@ Stay on the selected goal until:
 None. The item-15 architectural review was approved and recorded; proceed with
 the item-15 migration order before soft-float implementation.
 
-Stop state recorded 2026-07-07 after item-15 architectural-review cycle:
+Stop state recorded 2026-07-08 after item-15 limb64 stage-one checkpoint:
 
 - Active convergence-progress item: item 15 is pulled forward as an
   architectural migration under item 12's std-hello real-program track. The
@@ -57,20 +57,19 @@ Stop state recorded 2026-07-07 after item-15 architectural-review cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`. Patched Zig plus
   z_llvm object emission and Zig native `build-exe -fno-lld` build a no-std
   `_start` executable in ReleaseFast, ReleaseSafe, and ReleaseSmall; each run
-  prints `hello\n` and exits 0. Item 12 std hello remains open. The latest
-  process-improvement cycle added opt-in z_llvm report-all object-emission
-  mode for the focused compiler_rt sub-compilation. The Debug std-hello
-  report-all run selected 443 compiler_rt functions, emitted 103, and
-  reported 340 failures before failing closed with no object output. The
-  item-15 architectural review split the remaining report-all inventory into
-  selector/codegen buckets and an ordinary ABI bucket: soft-float/libm/
-  conversion selector candidates 236 rows, integer helper selector candidates
-  45 rows, tail-call ABI 44 rows, and limb64 loops 15 rows. The historical
-  259-row soft-float-adjacent bucket had 180 mechanical family/diagnostic
-  buckets across 157 namespace families before separating 23 tail-call ABI
-  rows. The previous first failing function remains
-  `compiler_rt.limb64.__mulo_limb64`; it is now the first selector proof
-  bucket, not the largest bucket.
+  prints `hello\n` and exits 0. Item 12 std hello remains open. The item-15
+  architectural review split the Debug std-hello compiler_rt report-all
+  inventory into selector/codegen buckets and an ordinary ABI bucket:
+  soft-float/libm/conversion selector candidates 236 rows, integer helper
+  selector candidates 45 rows, tail-call ABI 44 rows, and limb64 loops 15
+  rows. Item-15 stage one has now closed the limb64 selector bucket: 15/15
+  limb64 rows emit through the opt-in selector path, 0 limb64 rows use
+  recognizer fallback for the migrated bucket, and 0 no-spill envelope
+  rejections were introduced. The latest focused report-all run selected 443
+  compiler_rt functions, emitted 118, and reported 325 failures before failing
+  closed with no object output. The next first failing function is
+  `compiler_rt.udivmodei4.__udivei4`, the first row of the 45-row non-tail-call
+  integer helper selector bucket.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -88,6 +87,7 @@ Stop state recorded 2026-07-07 after item-15 architectural-review cycle:
   ReleaseSafe, and ReleaseSmall.
 - Saved log paths: `tmp/std_debug_hello_debug_report_all.log`,
   `tmp/std_debug_hello_debug_build_abs_limb64_after.log`,
+  `tmp/std_debug_hello_debug_addsub_selector_after.log`,
   `tmp/distribution_all_after_abs_limb64.log`,
   `tmp/real_rows_strict_limit100_releasefast_after_abs_limb64.log`,
   `tmp/real_rows_strict_limit100_releasesafe_after_abs_limb64.log`,
@@ -103,16 +103,15 @@ Stop state recorded 2026-07-07 after item-15 architectural-review cycle:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`,
   `docs/evidence/clean_tmp.summary`, and
   `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`.
-- Recommended next action: implement item 15 in the recorded validation order.
-  Start with the incremental generic instruction selector proving itself on
-  the 15-row limb64 bucket (`compiler_rt.limb64.__mulo_limb64` first), then
-  the 45 non-tail-call integer helper selector rows from the historical 66-row
-  integer helper cluster, then the 236-row soft-float/libm/conversion selector
-  bucket. Keep existing shape recognizers as transitional fallback and ratchet
-  `shape_recognizer_functions` toward zero on the real-program gate. Treat the
-  44 `UnsupportedTailCallAbi` rows as a separate ordinary ABI family, not a
-  selector concern. `distribution-all` must stay green before every commit; if
-  captured rows regress, use the loop-sum bisect discipline.
+- Recommended next action: continue item 15 in the recorded validation order
+  with the 45 non-tail-call integer helper selector rows from the historical
+  66-row integer helper cluster, starting at
+  `compiler_rt.udivmodei4.__udivei4`. Keep existing shape recognizers as
+  transitional fallback and ratchet `shape_recognizer_functions` toward zero on
+  the real-program gate. Treat the 44 `UnsupportedTailCallAbi` rows as a
+  separate ordinary ABI family, not a selector concern. `distribution-all` must
+  stay green before every commit; if captured rows regress, use the loop-sum
+  bisect discipline.
 
 When the worker stops, record only:
 

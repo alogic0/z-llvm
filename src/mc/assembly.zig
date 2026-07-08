@@ -553,6 +553,10 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                 .@"and" => try printByteDirective(writer, &selector_bytes.and_limb64_rdi_rsi_rdx_cx),
             },
             .cmp_limb64_rdi_rsi_dl_cx_ax => try printByteDirective(writer, &selector_bytes.cmp_limb64_rdi_rsi_dl_cx_ax),
+            .overflow_limb64_rdi_rsi_rdx_cl_r8w_al => |op| switch (op) {
+                .add => try printByteDirective(writer, &selector_bytes.addo_limb64_rdi_rsi_rdx_cl_r8w_al),
+                .sub => try printByteDirective(writer, &selector_bytes.subo_limb64_rdi_rsi_rdx_cl_r8w_al),
+            },
             .bitreverse_limb64_rdi_rsi_dl_cx => try printByteDirective(writer, &selector_bytes.bitreverse_limb64_rdi_rsi_dl_cx),
             .popcount_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.popcount_limb64_rdi_si_ax),
             .ctz_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.ctz_limb64_rdi_si_ax),

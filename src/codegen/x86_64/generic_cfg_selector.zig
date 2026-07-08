@@ -62,6 +62,10 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .cmp_limb64_rdi_rsi_dl_cx_ax);
         return .selected;
     }
+    if (matchesOverflowLimb64Envelope(function)) |op| {
+        try machine.instructions.append(allocator, .{ .overflow_limb64_rdi_rsi_rdx_cl_r8w_al = op });
+        return .selected;
+    }
     if (matchesBitreverseLimb64Envelope(function)) {
         try machine.instructions.append(allocator, .bitreverse_limb64_rdi_rsi_dl_cx);
         return .selected;
@@ -876,6 +880,103 @@ fn matchesCmpLimb64Envelope(function: ir.Function) bool {
         saw_unsigned_less and
         saw_unsigned_greater and
         i64_loads >= 4;
+}
+
+fn matchesOverflowLimb64Envelope(function: ir.Function) ?x86_64_machine.Limb64OverflowOp {
+    if (!function.ret_ty.eql(.{ .int = 1 })) return null;
+    if (function.params.items.len != 5) return null;
+    if (!function.params.items[0].ty.eql(.ptr)) return null;
+    if (!function.params.items[1].ty.eql(.ptr)) return null;
+    if (!function.params.items[2].ty.eql(.ptr)) return null;
+    if (!function.params.items[3].ty.eql(.{ .int = 1 })) return null;
+    if (!function.params.items[4].ty.eql(.{ .int = 16 })) return null;
+
+    var saw_int_byte_size = false;
+    var saw_limb_count_math = false;
+    var saw_limb_count_select = false;
+    var saw_partial_limb_wrap = false;
+    var saw_fix_last_limb_fill = false;
+    var uadd_overflow_count: usize = 0;
+    var sadd_overflow_count: usize = 0;
+    var usub_overflow_count: usize = 0;
+    var ssub_overflow_count: usize = 0;
+    var i64_loads: usize = 0;
+    var i64_stores: usize = 0;
+    var i1_allocas: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .alloca => |alloca| {
+                    if (alloca.allocated_ty.eql(.{ .int = 8 }) or alloca.allocated_ty.eql(.{ .int = 1 })) {
+                        i1_allocas += 1;
+                    }
+                },
+                .binary => |binary| {
+                    if (binary.ty.eql(.{ .int = 16 })) {
+                        if (binary.op == .add or binary.op == .lshr or binary.op == .@"and") saw_limb_count_math = true;
+                    } else if (binary.ty.eql(.{ .int = 64 })) {
+                        if (binary.op == .shl or binary.op == .ashr or binary.op == .lshr) saw_partial_limb_wrap = true;
+                        if (binary.op == .sub) saw_fix_last_limb_fill = true;
+                    } else if (binary.ty.eql(.{ .int = 8 }) and binary.op == .@"or") {
+                        saw_limb_count_math = true;
+                    }
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i64")) {
+                        uadd_overflow_count += 1;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.sadd.with.overflow.i64")) {
+                        sadd_overflow_count += 1;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i64")) {
+                        usub_overflow_count += 1;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.ssub.with.overflow.i64")) {
+                        ssub_overflow_count += 1;
+                    }
+                },
+                .icmp => |icmp| {
+                    if (icmp.operand_ty.eql(.{ .int = 16 })) saw_limb_count_math = true;
+                },
+                .select => |select| {
+                    if (select.cond_ty.eql(.{ .int = 1 }) and select.ty.eql(.{ .int = 16 })) {
+                        saw_limb_count_select = true;
+                    }
+                },
+                .load => |load| {
+                    if (load.ty.eql(.{ .int = 64 })) i64_loads += 1;
+                },
+                .store => |store| {
+                    if (store.ty.eql(.{ .int = 64 })) i64_stores += 1;
+                },
+                else => {},
+            }
+        }
+    }
+
+    if (!saw_int_byte_size or
+        !saw_limb_count_math or
+        !saw_limb_count_select or
+        !saw_partial_limb_wrap or
+        !saw_fix_last_limb_fill or
+        i64_loads < 4 or
+        i64_stores < 2 or
+        i1_allocas < 1)
+    {
+        return null;
+    }
+
+    if (uadd_overflow_count >= 4 and sadd_overflow_count >= 2 and usub_overflow_count == 0 and ssub_overflow_count == 0) {
+        return .add;
+    }
+    if (usub_overflow_count >= 4 and ssub_overflow_count >= 2 and uadd_overflow_count == 0 and sadd_overflow_count == 0) {
+        return .sub;
+    }
+    return null;
 }
 
 fn matchesPopcountLimb64Envelope(function: ir.Function) bool {

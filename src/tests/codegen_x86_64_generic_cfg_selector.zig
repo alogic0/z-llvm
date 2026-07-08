@@ -1140,6 +1140,151 @@ test "generic cfg selector keeps limb64 compare near miss fail-closed" {
     try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
 }
 
+test "generic cfg selector emits limb64 overflow envelopes through opt-in selector" {
+    const cases = [_]struct {
+        unsigned_op: []const u8,
+        signed_op: []const u8,
+        expected: codegen.x86_64.Instruction,
+    }{
+        .{
+            .unsigned_op = "uadd",
+            .signed_op = "sadd",
+            .expected = .{ .overflow_limb64_rdi_rsi_rdx_cl_r8w_al = .add },
+        },
+        .{
+            .unsigned_op = "usub",
+            .signed_op = "ssub",
+            .expected = .{ .overflow_limb64_rdi_rsi_rdx_cl_r8w_al = .sub },
+        },
+    };
+
+    for (cases) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\target triple = "x86_64-unknown-linux-gnu"
+            \\
+            \\define i1 @candidate(ptr %out, ptr %a, ptr %b, i1 %signed, i16 %bits) {{
+            \\entry:
+            \\  %slot = alloca i8, align 1
+            \\  store i8 0, ptr %slot, align 1
+            \\  %is_zero = icmp eq i16 %bits, 0
+            \\  %minus_one = add i16 %bits, -1
+            \\  %last = lshr i16 %minus_one, 6
+            \\  %nraw = add i16 %last, 1
+            \\  %nlimbs = select i1 %is_zero, i16 0, i16 %nraw
+            \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+            \\  %nlimbs64 = zext i16 %nlimbs to i64
+            \\  %last_index = add i16 %nlimbs, -1
+            \\  %last64 = zext i16 %last_index to i64
+            \\  %a0p = getelementptr inbounds nuw [8 x i8], ptr %a, i64 0
+            \\  %a0 = load i64, ptr %a0p, align 8
+            \\  %b0p = getelementptr inbounds nuw [8 x i8], ptr %b, i64 0
+            \\  %b0 = load i64, ptr %b0p, align 8
+            \\  %lo0 = call {{ i64, i1 }} @llvm.{s}.with.overflow.i64(i64 %a0, i64 %b0)
+            \\  %lo0v = extractvalue {{ i64, i1 }} %lo0, 0
+            \\  %lo0o = extractvalue {{ i64, i1 }} %lo0, 1
+            \\  %carry0 = zext i1 %lo0o to i64
+            \\  %lo1 = call {{ i64, i1 }} @llvm.{s}.with.overflow.i64(i64 %lo0v, i64 %carry0)
+            \\  %lo1v = extractvalue {{ i64, i1 }} %lo1, 0
+            \\  store i64 %lo1v, ptr %out, align 8
+            \\  %ap = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %last64
+            \\  %av = load i64, ptr %ap, align 8
+            \\  %bp = getelementptr inbounds nuw [8 x i8], ptr %b, i64 %last64
+            \\  %bv = load i64, ptr %bp, align 8
+            \\  br i1 %signed, label %signed_final, label %unsigned_final
+            \\
+            \\unsigned_final:
+            \\  %u0 = call {{ i64, i1 }} @llvm.{s}.with.overflow.i64(i64 %av, i64 %bv)
+            \\  %u0v = extractvalue {{ i64, i1 }} %u0, 0
+            \\  %u0o = extractvalue {{ i64, i1 }} %u0, 1
+            \\  %ucarry = zext i1 %u0o to i64
+            \\  %u1 = call {{ i64, i1 }} @llvm.{s}.with.overflow.i64(i64 %u0v, i64 %ucarry)
+            \\  %uv = extractvalue {{ i64, i1 }} %u1, 0
+            \\  br label %wrap
+            \\
+            \\signed_final:
+            \\  %s0 = call {{ i64, i1 }} @llvm.{s}.with.overflow.i64(i64 %av, i64 %bv)
+            \\  %s0v = extractvalue {{ i64, i1 }} %s0, 0
+            \\  %s0o = extractvalue {{ i64, i1 }} %s0, 1
+            \\  %scarry = zext i1 %s0o to i64
+            \\  %s1 = call {{ i64, i1 }} @llvm.{s}.with.overflow.i64(i64 %s0v, i64 %scarry)
+            \\  %sv = extractvalue {{ i64, i1 }} %s1, 0
+            \\  br label %wrap
+            \\
+            \\wrap:
+            \\  %result = phi i64 [ %uv, %unsigned_final ], [ %sv, %signed_final ]
+            \\  %rem = and i16 %bits, 63
+            \\  %rem64 = zext i16 %rem to i64
+            \\  %shifted = shl i64 %result, %rem64
+            \\  %wrapped = ashr i64 %shifted, %rem64
+            \\  %fill = sub i64 %nlimbs64, %last64
+            \\  %outp = getelementptr inbounds nuw [8 x i8], ptr %out, i64 %fill
+            \\  store i64 %wrapped, ptr %outp, align 8
+            \\  %overflow = icmp ne i64 %wrapped, %result
+            \\  ret i1 %overflow
+            \\}}
+            \\
+        , .{
+            case.unsigned_op,
+            case.unsigned_op,
+            case.unsigned_op,
+            case.unsigned_op,
+            case.signed_op,
+            case.signed_op,
+        });
+        defer std.testing.allocator.free(text);
+
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+
+        var machine = try codegen.x86_64.lowerFunctionWithOptions(
+            std.testing.allocator,
+            module.target_triple.?,
+            module.functions.items[0],
+            .{ .generic_cfg_selector = true },
+        );
+        defer machine.deinit(std.testing.allocator);
+
+        try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+        try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+        try std.testing.expectEqual(case.expected, machine.instructions.items[0]);
+    }
+}
+
+test "generic cfg selector keeps limb64 overflow near miss fail-closed" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @near_miss(ptr %out, ptr %a, ptr %b, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %is_zero = icmp eq i16 %bits, 0
+        \\  %minus_one = add i16 %bits, -1
+        \\  %last = lshr i16 %minus_one, 6
+        \\  %nraw = add i16 %last, 1
+        \\  %nlimbs = select i1 %is_zero, i16 0, i16 %nraw
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %a0 = load i64, ptr %a, align 8
+        \\  %b0 = load i64, ptr %b, align 8
+        \\  %sum = call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 %a0, i64 %b0)
+        \\  %sumv = extractvalue { i64, i1 } %sum, 0
+        \\  store i64 %sumv, ptr %out, align 8
+        \\  ret i1 false
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("near_miss", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+}
+
 test "generic cfg selector skeleton fails closed with first unsupported instruction form" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

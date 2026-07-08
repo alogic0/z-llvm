@@ -532,6 +532,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 .@"and" => try bytes.appendSlice(allocator, &selector_bytes.and_limb64_rdi_rsi_rdx_cx),
             },
             .cmp_limb64_rdi_rsi_dl_cx_ax => try bytes.appendSlice(allocator, &selector_bytes.cmp_limb64_rdi_rsi_dl_cx_ax),
+            .overflow_limb64_rdi_rsi_rdx_cl_r8w_al => |op| switch (op) {
+                .add => try bytes.appendSlice(allocator, &selector_bytes.addo_limb64_rdi_rsi_rdx_cl_r8w_al),
+                .sub => try bytes.appendSlice(allocator, &selector_bytes.subo_limb64_rdi_rsi_rdx_cl_r8w_al),
+            },
             .bitreverse_limb64_rdi_rsi_dl_cx => try bytes.appendSlice(allocator, &selector_bytes.bitreverse_limb64_rdi_rsi_dl_cx),
             .popcount_limb64_rdi_si_ax => try bytes.appendSlice(allocator, &selector_bytes.popcount_limb64_rdi_si_ax),
             .ctz_limb64_rdi_si_ax => try bytes.appendSlice(allocator, &selector_bytes.ctz_limb64_rdi_si_ax),
@@ -1599,6 +1603,10 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
             .@"and" => selector_bytes.and_limb64_rdi_rsi_rdx_cx.len,
         },
         .cmp_limb64_rdi_rsi_dl_cx_ax => selector_bytes.cmp_limb64_rdi_rsi_dl_cx_ax.len,
+        .overflow_limb64_rdi_rsi_rdx_cl_r8w_al => |op| switch (op) {
+            .add => selector_bytes.addo_limb64_rdi_rsi_rdx_cl_r8w_al.len,
+            .sub => selector_bytes.subo_limb64_rdi_rsi_rdx_cl_r8w_al.len,
+        },
         .bitreverse_limb64_rdi_rsi_dl_cx => selector_bytes.bitreverse_limb64_rdi_rsi_dl_cx.len,
         .popcount_limb64_rdi_si_ax => selector_bytes.popcount_limb64_rdi_si_ax.len,
         .ctz_limb64_rdi_si_ax => selector_bytes.ctz_limb64_rdi_si_ax.len,
