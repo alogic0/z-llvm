@@ -548,6 +548,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .bitreverse_limb64_rdi_rsi_dl_cx => try printByteDirective(writer, &selector_bytes.bitreverse_limb64_rdi_rsi_dl_cx),
             .popcount_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.popcount_limb64_rdi_si_ax),
             .ctz_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.ctz_limb64_rdi_si_ax),
+            .clz_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.clz_limb64_rdi_si_ax),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| try writer.print(
                 "\tmovq %rsi, %rax\n" ++
                     "\tshrq $3, %rax\n" ++
