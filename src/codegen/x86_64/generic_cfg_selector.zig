@@ -127,6 +127,7 @@ pub fn tryLower(
 const ValueLoc = union(enum) {
     arg32: ArgReg,
     eax,
+    scratch32: ArgReg,
 };
 
 const ComposedBlockSelector = struct {
@@ -134,6 +135,7 @@ const ComposedBlockSelector = struct {
     machine: *MachineFunction,
     values: std.StringHashMap(ValueLoc),
     current_eax_name: ?[]const u8 = null,
+    current_scratch_name: ?[]const u8 = null,
 
     fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
         return .{
@@ -161,32 +163,130 @@ const ComposedBlockSelector = struct {
         if (instruction.removed) return null;
         return switch (instruction.kind) {
             .binary => |binary| try selector.lowerBinary(instruction.result, binary),
+            .cast => |cast| try selector.lowerCast(instruction.result, cast),
+            .call => |call| if (call.isDebugVariableLocation()) null else .{ .no_emitter = "composed-block-call-not-owned" },
             else => .{ .no_emitter = "composed-block-instruction-not-owned" },
         };
     }
 
     fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-        if (!binary.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-binary-not-i32" };
+        const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+        if (bits != 16 and bits != 32) return .{ .no_emitter = "composed-block-binary-width" };
+
+        if (valueIsInt(binary.rhs)) {
+            return try selector.lowerBinaryImmediateRhs(result_name, binary);
+        }
+        if (valueIsInt(binary.lhs)) {
+            return try selector.lowerBinaryImmediateLhs(result_name, binary);
+        }
+
         const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
-
         const lhs = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
-        switch (lhs) {
-            .arg32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_eax = reg }),
-            .eax => {},
-        }
-
         const rhs = selector.resolveValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
-        switch (rhs) {
-            .arg32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{
+
+        if (locIsEax(rhs) and !locIsEax(lhs) and isCommutative(op)) {
+            try selector.emitBinaryLocIntoEax(op, lhs);
+        } else {
+            try selector.emitValueIntoEax(binary.lhs);
+            const rhs_reg = switch (rhs) {
+                .arg32, .scratch32 => |reg| reg,
+                .eax => return .{ .no_spill_envelope = "composed-block-two-address-rhs-eax" },
+            };
+            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{
                 .op = op,
-                .reg = reg,
-            } }),
-            .eax => return .{ .no_spill_envelope = "composed-block-two-address-rhs-eax" },
+                .reg = rhs_reg,
+            } });
         }
 
-        try selector.values.put(result_name, .eax);
-        selector.current_eax_name = result_name;
+        try selector.bindEax(result_name);
+        return null;
+    }
+
+    fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
+        const rhs = switch (binary.rhs) {
+            .int => |int| int,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
+        };
+        switch (binary.op) {
+            .lshr => {
+                const amount = try shiftAmount5(rhs);
+                try selector.emitValueIntoScratch(binary.lhs, .rcx);
+                if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shr_arg_imm5 = .{
+                    .reg = .rcx,
+                    .amount = amount,
+                } });
+                try selector.bindScratch(result_name, .rcx);
+            },
+            .@"and" => {
+                try selector.emitValueIntoEax(binary.lhs);
+                try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = try i32Value(rhs) });
+                try selector.bindEax(result_name);
+            },
+            .@"or" => {
+                try selector.emitValueIntoEax(binary.lhs);
+                try selector.machine.instructions.append(selector.allocator, .{ .or_eax_imm32 = try i32Value(rhs) });
+                try selector.bindEax(result_name);
+            },
+            .add => {
+                try selector.emitValueIntoEax(binary.lhs);
+                try selector.machine.instructions.append(selector.allocator, .{ .add_eax_imm32 = try i32Value(rhs) });
+                try selector.bindEax(result_name);
+            },
+            .sub => {
+                try selector.emitValueIntoEax(binary.lhs);
+                try selector.machine.instructions.append(selector.allocator, .{ .add_eax_imm32 = -try i32Value(rhs) });
+                try selector.bindEax(result_name);
+            },
+            else => return .{ .no_emitter = "composed-block-binary-imm-rhs" },
+        }
+        return null;
+    }
+
+    fn lowerBinaryImmediateLhs(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
+        const lhs = switch (binary.lhs) {
+            .int => |int| int,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
+        };
+        if (binary.op != .lshr) return .{ .no_emitter = "composed-block-binary-imm-lhs" };
+        const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+        if (bits > 32) return .{ .no_emitter = "composed-block-variable-shift-width" };
+
+        try selector.emitValueIntoScratch(binary.rhs, .rcx);
+        selector.current_eax_name = null;
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(lhs) });
+        try selector.machine.instructions.append(selector.allocator, .shr_eax_cl);
+        try selector.bindEax(result_name);
+        return null;
+    }
+
+    fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        const from_bits = intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-block-cast-from-not-int" };
+        const to_bits = intBits(cast.to_ty) orelse return .{ .no_emitter = "composed-block-cast-to-not-int" };
+        if (from_bits > 32 or to_bits > 32) return .{ .no_emitter = "composed-block-cast-width" };
+
+        switch (cast.op) {
+            .trunc, .bitcast => {
+                const loc = selector.resolveValue(cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
+                try selector.values.put(result_name, loc);
+                switch (loc) {
+                    .eax => selector.current_eax_name = result_name,
+                    .scratch32 => selector.current_scratch_name = result_name,
+                    .arg32 => {},
+                }
+            },
+            .zext => {
+                try selector.emitValueIntoEax(cast.value);
+                if (from_bits < 32) {
+                    const shift: u5 = @intCast(from_bits);
+                    const mask = (@as(i32, 1) << shift) - 1;
+                    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = mask });
+                }
+                try selector.bindEax(result_name);
+            },
+            else => return .{ .no_emitter = "composed-block-cast-op" },
+        }
         return null;
     }
 
@@ -196,16 +296,80 @@ const ComposedBlockSelector = struct {
         switch (value) {
             .int => |int| try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) }),
             .named => {
-                const loc = selector.resolveValue(value) orelse return .{ .unsupported_value = "composed-block-unknown-ret" };
-                switch (loc) {
-                    .arg32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_eax = reg }),
-                    .eax => {},
-                }
+                _ = selector.resolveValue(value) orelse return .{ .unsupported_value = "composed-block-unknown-ret" };
+                try selector.emitValueIntoEax(value);
             },
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-ret-value" },
         }
         try selector.machine.instructions.append(selector.allocator, .ret);
         return null;
+    }
+
+    fn bindEax(selector: *ComposedBlockSelector, name: []const u8) !void {
+        try selector.values.put(name, .eax);
+        selector.current_eax_name = name;
+    }
+
+    fn bindScratch(selector: *ComposedBlockSelector, name: []const u8, reg: ArgReg) !void {
+        try selector.values.put(name, .{ .scratch32 = reg });
+        selector.current_scratch_name = name;
+    }
+
+    fn emitValueIntoEax(selector: *ComposedBlockSelector, value: ir.Value) !void {
+        switch (value) {
+            .int => |int| {
+                selector.current_eax_name = null;
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) });
+            },
+            .named => {
+                const loc = selector.resolveValue(value) orelse return error.UnsupportedCodegenValue;
+                switch (loc) {
+                    .arg32, .scratch32 => |reg| {
+                        selector.current_eax_name = null;
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_eax = reg });
+                    },
+                    .eax => {},
+                }
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        }
+    }
+
+    fn emitValueIntoScratch(selector: *ComposedBlockSelector, value: ir.Value, reg: ArgReg) !void {
+        selector.current_scratch_name = null;
+        switch (value) {
+            .int => return error.UnsupportedCodegenValue,
+            .named => {
+                const loc = selector.resolveValue(value) orelse return error.UnsupportedCodegenValue;
+                switch (loc) {
+                    .arg32 => |src| {
+                        if (src != reg) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{
+                            .dst = reg,
+                            .src = src,
+                        } });
+                    },
+                    .scratch32 => |src| {
+                        if (src != reg) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{
+                            .dst = reg,
+                            .src = src,
+                        } });
+                    },
+                    .eax => try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg }),
+                }
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        }
+    }
+
+    fn emitBinaryLocIntoEax(selector: *ComposedBlockSelector, op: MachineBinaryOp, loc: ValueLoc) !void {
+        const reg = switch (loc) {
+            .arg32, .scratch32 => |reg| reg,
+            .eax => return error.UnsupportedCodegenValue,
+        };
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{
+            .op = op,
+            .reg = reg,
+        } });
     }
 
     fn resolveValue(selector: ComposedBlockSelector, value: ir.Value) ?ValueLoc {
@@ -215,6 +379,10 @@ const ComposedBlockSelector = struct {
                 return switch (loc) {
                     .arg32 => loc,
                     .eax => if (selector.current_eax_name) |current| blk: {
+                        if (std.mem.eql(u8, current, name)) break :blk loc;
+                        return null;
+                    } else null,
+                    .scratch32 => if (selector.current_scratch_name) |current| blk: {
                         if (std.mem.eql(u8, current, name)) break :blk loc;
                         return null;
                     } else null,
@@ -262,6 +430,39 @@ fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
         .xor => .xor,
         .fadd, .fsub, .fmul, .fdiv, .frem, .mul, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => null,
     };
+}
+
+fn isCommutative(op: MachineBinaryOp) bool {
+    return switch (op) {
+        .add, .@"and", .@"or", .xor => true,
+        .sub => false,
+    };
+}
+
+fn locIsEax(loc: ValueLoc) bool {
+    return switch (loc) {
+        .eax => true,
+        .arg32, .scratch32 => false,
+    };
+}
+
+fn valueIsInt(value: ir.Value) bool {
+    return switch (value) {
+        .int => true,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn intBits(ty: ir.Type) ?u16 {
+    return switch (ty) {
+        .int => |bits| bits,
+        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => null,
+    };
+}
+
+fn shiftAmount5(value: i128) !u5 {
+    if (value < 0 or value > std.math.maxInt(u5)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
 }
 
 fn i32Value(value: i128) !i32 {
