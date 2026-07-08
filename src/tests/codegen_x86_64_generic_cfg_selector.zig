@@ -12,6 +12,16 @@ fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected:
     return error.ExpectedInstructionNotFound;
 }
 
+fn expectNamedInstruction(instructions: []const codegen.x86_64.Instruction, comptime tag: std.meta.Tag(codegen.x86_64.Instruction), expected: []const u8) !void {
+    for (instructions) |instruction| {
+        switch (instruction) {
+            tag => |actual| if (std.mem.eql(u8, actual, expected)) return,
+            else => {},
+        }
+    }
+    return error.ExpectedInstructionNotFound;
+}
+
 test "generic cfg selector skeleton reports no emitter for supported straight-line integer shape" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -85,25 +95,26 @@ test "generic cfg selector stage two computes cross-block liveness" {
     try std.testing.expect(!summary.exceedsNoSpill());
 }
 
-test "generic cfg selector stage two requires liveness before multi-block emission" {
+test "generic cfg selector stage two rejects backedges before cross-block loop emission" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\define i32 @branch_live(i32 %a, i32 %b, i1 %cond) {
+        \\define i32 @loop_live(i32 %a, i32 %b) {
         \\entry:
-        \\  br i1 %cond, label %then, label %else
-        \\then:
+        \\  br label %loop
+        \\loop:
         \\  %sum = add i32 %a, %b
+        \\  %again = icmp ult i64 0, 1
+        \\  br i1 %again, label %loop, label %exit
+        \\exit:
         \\  ret i32 %sum
-        \\else:
-        \\  ret i32 %a
         \\}
         \\
     ;
     var module = try ir.Module.parse(std.testing.allocator, text);
     defer module.deinit();
 
-    var machine = codegen.x86_64.MachineFunction.init("branch_live", .{ .int = 32 });
+    var machine = codegen.x86_64.MachineFunction.init("loop_live", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
@@ -112,8 +123,47 @@ test "generic cfg selector stage two requires liveness before multi-block emissi
         .unsupported => |diagnostic| diagnostic,
     };
     try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
-    try std.testing.expectEqualStrings("stage2-liveness-required", diagnostic.detail());
+    try std.testing.expectEqualStrings("stage2-backedge-not-owned", diagnostic.detail());
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "generic cfg selector stage two composes acyclic branch with labels" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @branch_live(i64 %a, i64 %b) {
+        \\entry:
+        \\  %cond = icmp ult i64 %a, 10
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %sum = add i64 %a, %b
+        \\  ret i64 %sum
+        \\else:
+        \\  ret i64 %a
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("branch_live", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .test_eax_eax);
+    try expectNamedInstruction(machine.instructions.items, .jne, "then");
+    try expectNamedInstruction(machine.instructions.items, .jmp, "else");
+    try expectNamedInstruction(machine.instructions.items, .label, "then");
+    try expectNamedInstruction(machine.instructions.items, .label, "else");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
 test "generic cfg selector stage two rejects pressure above no-spill envelope" {

@@ -127,7 +127,7 @@ pub fn tryLower(
                 if (function.blocks.items.len > 1) {
                     const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
                     if (stage_two.exceedsNoSpill()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
-                    return .{ .unsupported = .{ .no_emitter = "stage2-liveness-required" } };
+                    return tryLowerComposedCfg(allocator, machine, function);
                 }
                 return inspected;
             },
@@ -137,7 +137,7 @@ pub fn tryLower(
     if (function.blocks.items.len > 1) {
         const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
         if (stage_two.exceedsNoSpill()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
-        return .{ .unsupported = .{ .no_emitter = "stage2-liveness-required" } };
+        return tryLowerComposedCfg(allocator, machine, function);
     }
     const composed_start_len = machine.instructions.items.len;
     switch (try tryLowerComposedBlock(allocator, machine, function)) {
@@ -151,6 +151,44 @@ pub fn tryLower(
         },
     }
     return inspected;
+}
+
+fn tryLowerComposedCfg(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !SelectionResult {
+    const ret_bits = intBits(function.ret_ty) orelse return unsupported(.{ .no_emitter = "stage2-ret-not-int" });
+    if (ret_bits != 32 and ret_bits != 64) return unsupported(.{ .no_emitter = "stage2-ret-width" });
+    if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
+    if (function.blocks.items.len > 16) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
+    if (hasPhi(function)) return unsupported(.{ .no_emitter = "stage2-phi-not-owned" });
+    if (!isForwardOnlyCfg(function)) return unsupported(.{ .no_emitter = "stage2-backedge-not-owned" });
+
+    const start_len = machine.instructions.items.len;
+    var composed = ComposedBlockSelector.init(allocator, machine);
+    defer composed.deinit();
+
+    if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
+
+    for (function.blocks.items, 0..) |block, block_index| {
+        if (block_index != 0) try machine.instructions.append(allocator, .{ .label = block.name });
+        for (block.instructions.items) |instruction| {
+            if (try composed.lowerInstruction(instruction)) |diagnostic| {
+                machine.instructions.items.len = start_len;
+                return unsupported(diagnostic);
+            }
+        }
+        const terminator = block.terminator orelse {
+            machine.instructions.items.len = start_len;
+            return unsupported(.{ .unsupported_control_flow = "stage2-missing-terminator" });
+        };
+        if (try composed.lowerCfgTerminator(function, block_index, terminator)) |diagnostic| {
+            machine.instructions.items.len = start_len;
+            return unsupported(diagnostic);
+        }
+    }
+    return .selected;
 }
 
 pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir.Function) !StageTwoSummary {
@@ -403,6 +441,26 @@ fn setEquals(lhs: NameSet, rhs: NameSet) bool {
     var it = lhs.iterator();
     while (it.next()) |entry| {
         if (!rhs.contains(entry.key_ptr.*)) return false;
+    }
+    return true;
+}
+
+fn hasPhi(function: ir.Function) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (!instruction.removed and instruction.kind == .phi) return true;
+        }
+    }
+    return false;
+}
+
+fn isForwardOnlyCfg(function: ir.Function) bool {
+    for (function.blocks.items, 0..) |block, block_index| {
+        const block_successors = successors(block) catch return false;
+        for (block_successors.names[0..block_successors.len]) |successor_name| {
+            const successor_index = function.blockIndex(successor_name) orelse return false;
+            if (successor_index <= block_index) return false;
+        }
     }
     return true;
 }
@@ -877,6 +935,45 @@ const ComposedBlockSelector = struct {
             try selector.machine.instructions.append(selector.allocator, .add_rsp_8);
         }
         try selector.machine.instructions.append(selector.allocator, .ret);
+        return null;
+    }
+
+    fn lowerCfgTerminator(
+        selector: *ComposedBlockSelector,
+        function: ir.Function,
+        block_index: usize,
+        terminator: ir.Terminator,
+    ) !?Diagnostic {
+        return switch (terminator) {
+            .ret => |ret| try selector.lowerReturn(ret),
+            .br => |br| {
+                const target_index = function.blockIndex(br.target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+                if (target_index != block_index + 1) {
+                    try selector.machine.instructions.append(selector.allocator, .{ .jmp = br.target });
+                }
+                return null;
+            },
+            .condbr => |condbr| {
+                if (!condbr.cond_ty.eql(.{ .int = 1 })) return .{ .no_emitter = "stage2-condbr-type" };
+                if (try selector.emitBranchCondition(condbr.cond)) |diagnostic| return diagnostic;
+                try selector.machine.instructions.append(selector.allocator, .{ .jne = condbr.then_target });
+                const else_index = function.blockIndex(condbr.else_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+                if (else_index != block_index + 1) {
+                    try selector.machine.instructions.append(selector.allocator, .{ .jmp = condbr.else_target });
+                }
+                return null;
+            },
+            .@"switch", .indirectbr, .@"unreachable" => .{ .no_emitter = "stage2-terminator-not-owned" },
+        };
+    }
+
+    fn emitBranchCondition(selector: *ComposedBlockSelector, value: ir.Value) !?Diagnostic {
+        const loc = selector.resolveValue(value) orelse return .{ .unsupported_value = "stage2-unknown-cond" };
+        switch (loc) {
+            .eax => try selector.machine.instructions.append(selector.allocator, .test_eax_eax),
+            .arg32, .scratch32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .test_arg8 = reg }),
+            .arg64, .scratch64, .arg128, .scratch128, .rax, .stack64, .spill64 => return .{ .no_emitter = "stage2-cond-loc" },
+        }
         return null;
     }
 
