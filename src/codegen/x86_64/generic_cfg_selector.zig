@@ -162,7 +162,6 @@ fn tryLowerComposedCfg(
     if (ret_bits != 32 and ret_bits != 64) return unsupported(.{ .no_emitter = "stage2-ret-width" });
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > 16) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
-    if (!isForwardOnlyCfg(function)) return unsupported(.{ .no_emitter = "stage2-backedge-not-owned" });
 
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
@@ -173,6 +172,10 @@ fn tryLowerComposedCfg(
 
     for (function.blocks.items, 0..) |block, block_index| {
         if (block_index != 0) try machine.instructions.append(allocator, .{ .label = block.name });
+        if (try composed.enterBlock(block)) |diagnostic| {
+            machine.instructions.items.len = start_len;
+            return unsupported(diagnostic);
+        }
         for (block.instructions.items) |instruction| {
             if (try composed.lowerInstruction(instruction)) |diagnostic| {
                 machine.instructions.items.len = start_len;
@@ -445,17 +448,6 @@ fn setEquals(lhs: NameSet, rhs: NameSet) bool {
     return true;
 }
 
-fn isForwardOnlyCfg(function: ir.Function) bool {
-    for (function.blocks.items, 0..) |block, block_index| {
-        const block_successors = successors(block) catch return false;
-        for (block_successors.names[0..block_successors.len]) |successor_name| {
-            const successor_index = function.blockIndex(successor_name) orelse return false;
-            if (successor_index <= block_index) return false;
-        }
-    }
-    return true;
-}
-
 const BlockSuccessors = struct {
     names: [16][]const u8 = .{""} ** 16,
     len: usize = 0,
@@ -508,6 +500,7 @@ const ComposedBlockSelector = struct {
     machine: *MachineFunction,
     values: std.StringHashMap(ValueLoc),
     phi_value_count: usize = 0,
+    edge_label_count: usize = 0,
     current_eax_name: ?[]const u8 = null,
     current_scratch_names: [6]?[]const u8 = .{null} ** 6,
     current_pair_a_name: ?[]const u8 = null,
@@ -575,6 +568,25 @@ const ComposedBlockSelector = struct {
         const reg = regs[selector.phi_value_count];
         selector.phi_value_count += 1;
         return reg;
+    }
+
+    fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnostic {
+        selector.clearVolatileRegisterCache();
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .phi => {},
+                else => break,
+            }
+            const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
+            const loc = selector.values.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
+            switch (loc) {
+                .scratch32 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
+                .scratch64 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
+                .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack64, .spill64 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            }
+        }
+        return null;
     }
 
     fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
@@ -843,7 +855,7 @@ const ComposedBlockSelector = struct {
             .int => |int| int,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-icmp-rhs" },
         };
-        try selector.emitValueIntoScratch(icmp.lhs, .rcx, 64);
+        selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
         selector.current_eax_name = null;
         try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = try i64Value(rhs) } });
         try selector.machine.instructions.append(selector.allocator, .setb_eax);
@@ -974,12 +986,12 @@ const ComposedBlockSelector = struct {
                 if (!condbr.cond_ty.eql(.{ .int = 1 })) return .{ .no_emitter = "stage2-condbr-type" };
                 const then_index = function.blockIndex(condbr.then_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
                 const else_index = function.blockIndex(condbr.else_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
-                if (blockHasPhiIncomingFrom(function.blocks.items[then_index], function.blocks.items[block_index].name) or
-                    blockHasPhiIncomingFrom(function.blocks.items[else_index], function.blocks.items[block_index].name))
-                {
-                    return .{ .no_emitter = "stage2-condbr-phi-edge" };
-                }
+                const then_has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[then_index], function.blocks.items[block_index].name);
+                const else_has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[else_index], function.blocks.items[block_index].name);
                 if (try selector.emitBranchCondition(condbr.cond)) |diagnostic| return diagnostic;
+                if (then_has_phi_edge or else_has_phi_edge) {
+                    return try selector.lowerConditionalPhiEdges(function, block_index, then_index, else_index);
+                }
                 try selector.machine.instructions.append(selector.allocator, .{ .jne = condbr.then_target });
                 if (else_index != block_index + 1) {
                     try selector.machine.instructions.append(selector.allocator, .{ .jmp = condbr.else_target });
@@ -988,6 +1000,42 @@ const ComposedBlockSelector = struct {
             },
             .@"switch", .indirectbr, .@"unreachable" => .{ .no_emitter = "stage2-terminator-not-owned" },
         };
+    }
+
+    fn lowerConditionalPhiEdges(
+        selector: *ComposedBlockSelector,
+        function: ir.Function,
+        block_index: usize,
+        then_index: usize,
+        else_index: usize,
+    ) !?Diagnostic {
+        const predecessor = function.blocks.items[block_index].name;
+        const then_target = function.blocks.items[then_index].name;
+        const else_target = function.blocks.items[else_index].name;
+        const branch_cache = selector.saveRegisterCache();
+        const then_edge_label = try selector.ownedEdgeLabel();
+
+        try selector.machine.instructions.append(selector.allocator, .{ .jne = then_edge_label });
+
+        selector.restoreRegisterCache(branch_cache);
+        if (try selector.emitPhiEdgeMoves(function.blocks.items[else_index], predecessor)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .{ .jmp = else_target });
+
+        try selector.machine.instructions.append(selector.allocator, .{ .label = then_edge_label });
+        selector.restoreRegisterCache(branch_cache);
+        if (try selector.emitPhiEdgeMoves(function.blocks.items[then_index], predecessor)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .{ .jmp = then_target });
+
+        selector.clearVolatileRegisterCache();
+        return null;
+    }
+
+    fn ownedEdgeLabel(selector: *ComposedBlockSelector) ![]const u8 {
+        const label = try std.fmt.allocPrint(selector.allocator, "__zllvm_stage2_phi_edge_{d}", .{selector.edge_label_count});
+        errdefer selector.allocator.free(label);
+        selector.edge_label_count += 1;
+        try selector.machine.owned_labels.append(selector.allocator, label);
+        return label;
     }
 
     fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock, predecessor: []const u8) !?Diagnostic {
@@ -1446,6 +1494,39 @@ const ComposedBlockSelector = struct {
         selector.current_pair_a_name = null;
         selector.current_pair_b_name = null;
         selector.call_clobbered_regs = true;
+    }
+
+    const RegisterCache = struct {
+        current_eax_name: ?[]const u8,
+        current_scratch_names: [6]?[]const u8,
+        current_pair_a_name: ?[]const u8,
+        current_pair_b_name: ?[]const u8,
+        call_clobbered_regs: bool,
+    };
+
+    fn saveRegisterCache(selector: ComposedBlockSelector) RegisterCache {
+        return .{
+            .current_eax_name = selector.current_eax_name,
+            .current_scratch_names = selector.current_scratch_names,
+            .current_pair_a_name = selector.current_pair_a_name,
+            .current_pair_b_name = selector.current_pair_b_name,
+            .call_clobbered_regs = selector.call_clobbered_regs,
+        };
+    }
+
+    fn restoreRegisterCache(selector: *ComposedBlockSelector, cache: RegisterCache) void {
+        selector.current_eax_name = cache.current_eax_name;
+        selector.current_scratch_names = cache.current_scratch_names;
+        selector.current_pair_a_name = cache.current_pair_a_name;
+        selector.current_pair_b_name = cache.current_pair_b_name;
+        selector.call_clobbered_regs = cache.call_clobbered_regs;
+    }
+
+    fn clearVolatileRegisterCache(selector: *ComposedBlockSelector) void {
+        selector.current_eax_name = null;
+        selector.current_scratch_names = .{null} ** 6;
+        selector.current_pair_a_name = null;
+        selector.current_pair_b_name = null;
     }
 
     fn resolvePairValue(selector: ComposedBlockSelector, value: ir.Value) ?RegPair {

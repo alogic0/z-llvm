@@ -95,7 +95,7 @@ test "generic cfg selector stage two computes cross-block liveness" {
     try std.testing.expect(!summary.exceedsNoSpill());
 }
 
-test "generic cfg selector stage two rejects backedges before cross-block loop emission" {
+test "generic cfg selector stage two rejects unsupported loop condition operands" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -122,8 +122,8 @@ test "generic cfg selector stage two rejects backedges before cross-block loop e
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| diagnostic,
     };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
-    try std.testing.expectEqualStrings("stage2-backedge-not-owned", diagnostic.detail());
+    try std.testing.expectEqualStrings("unsupported_value", diagnostic.tagName());
+    try std.testing.expectEqualStrings("composed-block-icmp-lhs", diagnostic.detail());
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
@@ -215,7 +215,7 @@ test "generic cfg selector stage two materializes unconditional phi edges" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
-test "generic cfg selector stage two rejects conditional phi edge materialization" {
+test "generic cfg selector stage two materializes conditional phi edge blocks" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -238,13 +238,57 @@ test "generic cfg selector stage two rejects conditional phi edge materializatio
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
-    try std.testing.expectEqualStrings("stage2-condbr-phi-edge", diagnostic.detail());
-    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    try expectNamedInstruction(machine.instructions.items, .label, "__zllvm_stage2_phi_edge_0");
+    try expectNamedInstruction(machine.instructions.items, .jmp, "merge");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector stage two materializes loop backedge phi moves" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @loop_phi(i64 %a) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %iv = phi i64 [ %a, %entry ], [ %next, %loop ]
+        \\  %next = add i64 %iv, 1
+        \\  %cond = icmp ult i64 %next, 5
+        \\  br i1 %cond, label %loop, label %exit
+        \\exit:
+        \\  %out = phi i64 [ %next, %loop ]
+        \\  ret i64 %out
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("loop_phi", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    try expectNamedInstruction(machine.instructions.items, .label, "loop");
+    try expectNamedInstruction(machine.instructions.items, .label, "__zllvm_stage2_phi_edge_0");
+    try expectNamedInstruction(machine.instructions.items, .jmp, "loop");
+    try expectNamedInstruction(machine.instructions.items, .label, "exit");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
 test "generic cfg selector stage two rejects pressure above no-spill envelope" {
