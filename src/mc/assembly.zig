@@ -564,6 +564,10 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .udivei4_before_intbytesize => try printByteDirective(writer, &selector_bytes.udivei4_before_intbytesize),
             .udivei4_between_intbytesize_and_memset => try printByteDirective(writer, &selector_bytes.udivei4_between_intbytesize_and_memset),
             .udivei4_after_memset => try printByteDirective(writer, &selector_bytes.udivei4_after_memset),
+            .umodei5_before_intbytesize => try printByteDirective(writer, &selector_bytes.umodei5_before_intbytesize),
+            .umodei5_between_intbytesize_and_memset => try printByteDirective(writer, &selector_bytes.umodei5_between_intbytesize_and_memset),
+            .umodei5_after_memset_before_memcpy => try printByteDirective(writer, &selector_bytes.umodei5_after_memset_before_memcpy),
+            .umodei5_after_memcpy => try printByteDirective(writer, &selector_bytes.umodei5_after_memcpy),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| try writer.print(
                 "\tmovq %rsi, %rax\n" ++
                     "\tshrq $3, %rax\n" ++
@@ -1369,6 +1373,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_rsp_rdi => try writer.writeAll("\tmovq %rsp, %rdi\n"),
             .and_rsp_neg16 => try writer.writeAll("\tandq $-16, %rsp\n"),
             .direct_call => |call| try writer.print("\tcallq {s}\n", .{call.symbol}),
+            .direct_jump => |symbol| try writer.print("\tjmp {s}\n", .{symbol}),
             .indirect_call_rax => try writer.writeAll("\tcallq *%rax\n"),
             .noreturn_direct_call => |symbol| try writer.print("\tcallq {s}\n", .{symbol}),
             .cmp_arg8_imm8 => |cmp| try writer.print("\tcmpb ${}, {s}\n", .{ cmp.imm, cmp.reg.name8() }),

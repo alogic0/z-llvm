@@ -543,6 +543,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .udivei4_before_intbytesize => try bytes.appendSlice(allocator, &selector_bytes.udivei4_before_intbytesize),
             .udivei4_between_intbytesize_and_memset => try bytes.appendSlice(allocator, &selector_bytes.udivei4_between_intbytesize_and_memset),
             .udivei4_after_memset => try bytes.appendSlice(allocator, &selector_bytes.udivei4_after_memset),
+            .umodei5_before_intbytesize => try bytes.appendSlice(allocator, &selector_bytes.umodei5_before_intbytesize),
+            .umodei5_between_intbytesize_and_memset => try bytes.appendSlice(allocator, &selector_bytes.umodei5_between_intbytesize_and_memset),
+            .umodei5_after_memset_before_memcpy => try bytes.appendSlice(allocator, &selector_bytes.umodei5_after_memset_before_memcpy),
+            .umodei5_after_memcpy => try bytes.appendSlice(allocator, &selector_bytes.umodei5_after_memcpy),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => try bytes.appendSlice(allocator, &.{
                 0x48, 0x89, 0xf0, // movq %rsi, %rax
                 0x48, 0xc1, 0xe8, 0x03, // shrq $3, %rax
@@ -1382,6 +1386,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, 0xe8);
                 try appendI32(&bytes, allocator, 0);
             },
+            .direct_jump => {
+                try bytes.append(allocator, 0xe9);
+                try appendI32(&bytes, allocator, 0);
+            },
             .indirect_call_rax => try bytes.appendSlice(allocator, &.{ 0xff, 0xd0 }),
             .cmp_arg8_imm8 => |cmp| try encodeCmp8Imm(&bytes, allocator, cmp.reg, cmp.imm),
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
@@ -1617,6 +1625,10 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .udivei4_before_intbytesize => selector_bytes.udivei4_before_intbytesize.len,
         .udivei4_between_intbytesize_and_memset => selector_bytes.udivei4_between_intbytesize_and_memset.len,
         .udivei4_after_memset => selector_bytes.udivei4_after_memset.len,
+        .umodei5_before_intbytesize => selector_bytes.umodei5_before_intbytesize.len,
+        .umodei5_between_intbytesize_and_memset => selector_bytes.umodei5_between_intbytesize_and_memset.len,
+        .umodei5_after_memset_before_memcpy => selector_bytes.umodei5_after_memset_before_memcpy.len,
+        .umodei5_after_memcpy => selector_bytes.umodei5_after_memcpy.len,
         .spinlocked_memcpy_rsi_to_rdx_len_edi => 59,
         .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax => 104,
         .spinlocked_var_xchg_edi_rsi_rdx_rcx => 82,
@@ -1776,6 +1788,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_rsp_rdi => 3,
         .and_rsp_neg16 => 4,
         .direct_call, .noreturn_direct_call => 5,
+        .direct_jump => 5,
         .indirect_call_rax => 2,
         .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,

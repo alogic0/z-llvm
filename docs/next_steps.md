@@ -40,7 +40,8 @@ Stay on the selected goal until:
 None. The item-15 architectural review was approved and recorded; proceed with
 the item-15 migration order before soft-float implementation.
 
-Stop state recorded 2026-07-08 after item-15 limb64 stage-one checkpoint:
+Stop state recorded 2026-07-08 after the interrupted item-15 `__umodei5`
+terminal-template cycle:
 
 - Active convergence-progress item: item 15 is pulled forward as an
   architectural migration under item 12's std-hello real-program track. The
@@ -65,11 +66,15 @@ Stop state recorded 2026-07-08 after item-15 limb64 stage-one checkpoint:
   rows. Item-15 stage one has now closed the limb64 selector bucket: 15/15
   limb64 rows emit through the opt-in selector path, 0 limb64 rows use
   recognizer fallback for the migrated bucket, and 0 no-spill envelope
-  rejections were introduced. The latest focused report-all run selected 443
-  compiler_rt functions, emitted 118, and reported 325 failures before failing
-  closed with no object output. The next first failing function is
-  `compiler_rt.udivmodei4.__udivei4`, the first row of the 45-row non-tail-call
-  integer helper selector bucket.
+  rejections were introduced. The current interrupted cycle also closed
+  `compiler_rt.udivmodei4.__umodei5` as a validated terminal-template routine,
+  after the previously committed `__udivei4` template. These closures stand but
+  are not composed per-instruction selection. Current item-15 accounting is
+  composed-selection rows 0, terminal-template rows 17 (15 limb64 plus
+  `__udivei4` and `__umodei5`), and open integer-helper fallback candidates 43.
+  The latest focused report-all run selected 443 compiler_rt functions, emitted
+  120, and reported 323 failures before failing closed with no object output.
+  The next first failing function is `compiler_rt.udivmodei4.__udivei5`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -88,6 +93,8 @@ Stop state recorded 2026-07-08 after item-15 limb64 stage-one checkpoint:
 - Saved log paths: `tmp/std_debug_hello_debug_report_all.log`,
   `tmp/std_debug_hello_debug_build_abs_limb64_after.log`,
   `tmp/std_debug_hello_debug_addsub_selector_after.log`,
+  `tmp/std_debug_hello_debug_umodei5_selector_after.log`,
+  `tmp/distribution_all_after_umodei5_selector_rerun.log`,
   `tmp/distribution_all_after_abs_limb64.log`,
   `tmp/real_rows_strict_limit100_releasefast_after_abs_limb64.log`,
   `tmp/real_rows_strict_limit100_releasesafe_after_abs_limb64.log`,
@@ -103,15 +110,18 @@ Stop state recorded 2026-07-08 after item-15 limb64 stage-one checkpoint:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`,
   `docs/evidence/clean_tmp.summary`, and
   `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`.
-- Recommended next action: continue item 15 in the recorded validation order
-  with the 45 non-tail-call integer helper selector rows from the historical
-  66-row integer helper cluster, starting at
-  `compiler_rt.udivmodei4.__udivei4`. Keep existing shape recognizers as
-  transitional fallback and ratchet `shape_recognizer_functions` toward zero on
-  the real-program gate. Treat the 44 `UnsupportedTailCallAbi` rows as a
-  separate ordinary ABI family, not a selector concern. `distribution-all` must
-  stay green before every commit; if captured rows regress, use the loop-sum
-  bisect discipline.
+- Recommended next action: do not template more rows. Continue item 15 by
+  implementing block-local per-instruction selection with operand and register
+  assignment, then prove it on one real remaining integer row, starting at
+  `compiler_rt.udivmodei4.__udivei5` unless a simpler remaining row is selected
+  first. The proof must be composed selection, with no terminal byte spans and
+  no whole-function envelope. If that immediately requires liveness or spill
+  handling, record it as the item-15 stage-two trigger and begin stage two per
+  the design note. Keep existing shape recognizers as transitional fallback and
+  ratchet `shape_recognizer_functions` toward zero on the real-program gate.
+  Treat the 44 `UnsupportedTailCallAbi` rows as a separate ordinary ABI family,
+  not a selector concern. `distribution-all` must stay green before every
+  commit; if captured rows regress, use the loop-sum bisect discipline.
 
 When the worker stops, record only:
 

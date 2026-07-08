@@ -94,6 +94,10 @@ pub const Instruction = union(enum) {
     udivei4_before_intbytesize,
     udivei4_between_intbytesize_and_memset,
     udivei4_after_memset,
+    umodei5_before_intbytesize,
+    umodei5_between_intbytesize_and_memset,
+    umodei5_after_memset_before_memcpy,
+    umodei5_after_memcpy,
     ctz_i128_rdi_rsi_eax,
     ctz_i64_rdi_eax,
     ffs_i128_rdi_rsi_eax,
@@ -500,6 +504,7 @@ pub const Instruction = union(enum) {
         symbol: []const u8,
         ret_ty: ir.Type,
     },
+    direct_jump: []const u8,
     indirect_call_rax: ir.Type,
     noreturn_direct_call: []const u8,
     cmp_arg8_imm8: struct {
