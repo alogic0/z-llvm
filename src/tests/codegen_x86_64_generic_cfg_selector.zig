@@ -196,6 +196,53 @@ test "generic cfg selector rejects composed row that needs another live accumula
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "generic cfg selector composes mulo i32 overflow flag through assigned registers" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @mulosi4(i32 %a, i32 %b, ptr %overflow) {
+        \\entry:
+        \\  %sa = sext i32 %a to i64
+        \\  %sb = sext i32 %b to i64
+        \\  %product = mul nsw i64 %sb, %sa
+        \\  %biased = add nsw i64 %product, -2147483648
+        \\  %too_large = icmp ult i64 %biased, -4294967296
+        \\  %flag = zext i1 %too_large to i32
+        \\  store i32 %flag, ptr %overflow, align 4
+        \\  %retv = trunc i64 %product to i32
+        \\  ret i32 %retv
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("mulosi4", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(@as(usize, 11), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movsxd_arg32_arg64 = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .movsxd_arg32_arg64 = .{ .dst = .r9, .src = .rsi } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .imul_arg64_arg64 = .{ .dst = .r9, .src = .r8 } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .r9 } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = -2147483648 } }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = -4294967296 } }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.setb_eax, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .and_eax_imm32 = 1 }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_eax_arg_ptr = .rdx }, machine.instructions.items[8]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .r9 }, machine.instructions.items[9]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[10]);
+}
+
 test "generic cfg selector composes parity i32 through assigned scratch register" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
