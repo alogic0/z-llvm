@@ -543,6 +543,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "3:\n",
             ),
             .mulo_limb64_rdi_rsi_rdx_cl_r8w_al => try printByteDirective(writer, &selector_bytes.mulo_limb64_rdi_rsi_rdx_cl_r8w_al),
+            .byteswap_limb64_rdi_rsi_dl_cx => try printByteDirective(writer, &selector_bytes.byteswap_limb64_rdi_rsi_dl_cx),
             .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| try writer.print(
                 "\tmovq %rsi, %rax\n" ++
                     "\tshrq $3, %rax\n" ++

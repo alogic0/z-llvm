@@ -34,17 +34,20 @@ pub fn tryLower(
     function: ir.Function,
 ) !SelectionResult {
     const inspected = inspectFunction(function);
+    if (matchesMuloLimb64Envelope(function)) {
+        try machine.instructions.append(allocator, .mulo_limb64_rdi_rsi_rdx_cl_r8w_al);
+        return .selected;
+    }
+    if (matchesByteswapLimb64Envelope(function)) {
+        try machine.instructions.append(allocator, .byteswap_limb64_rdi_rsi_dl_cx);
+        return .selected;
+    }
     switch (inspected) {
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {
             .no_emitter => {},
             else => return inspected,
         },
-    }
-
-    if (matchesMuloLimb64Envelope(function)) {
-        try machine.instructions.append(allocator, .mulo_limb64_rdi_rsi_rdx_cl_r8w_al);
-        return .selected;
     }
     return inspected;
 }
@@ -262,6 +265,73 @@ fn matchesMuloLimb64Envelope(function: ir.Function) bool {
         mul_i64_count >= 4 and
         result_i64_stores >= 2 and
         i8_allocas >= 1;
+}
+
+fn matchesByteswapLimb64Envelope(function: ir.Function) bool {
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 4) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (!function.params.items[1].ty.eql(.ptr)) return false;
+    if (!function.params.items[2].ty.eql(.{ .int = 1 })) return false;
+    if (!function.params.items[3].ty.eql(.{ .int = 16 })) return false;
+
+    var saw_freeze_bits = false;
+    var saw_int_byte_size = false;
+    var saw_assume = false;
+    var saw_bswap_i64 = false;
+    var saw_limb_count_math = false;
+    var saw_remainder_mask = false;
+    var i64_loads: usize = 0;
+    var i64_stores: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .freeze => |freeze| {
+                    if (freeze.ty.eql(.{ .int = 16 })) saw_freeze_bits = true;
+                },
+                .binary => |binary| {
+                    if (binary.ty.eql(.{ .int = 16 })) {
+                        if (binary.op == .add) saw_limb_count_math = true;
+                        if (binary.op == .lshr) saw_limb_count_math = true;
+                        if (binary.op == .@"and") saw_remainder_mask = true;
+                    }
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.assume") and call.ret_ty == .void) {
+                        saw_assume = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.bswap.i64") and
+                        call.ret_ty.eql(.{ .int = 64 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 64 }))
+                    {
+                        saw_bswap_i64 = true;
+                    }
+                },
+                .load => |load| {
+                    if (load.ty.eql(.{ .int = 64 })) i64_loads += 1;
+                },
+                .store => |store| {
+                    if (store.ty.eql(.{ .int = 64 })) i64_stores += 1;
+                },
+                else => {},
+            }
+        }
+    }
+
+    return saw_freeze_bits and
+        saw_int_byte_size and
+        saw_assume and
+        saw_bswap_i64 and
+        saw_limb_count_math and
+        saw_remainder_mask and
+        i64_loads >= 1 and
+        i64_stores >= 1;
 }
 
 fn unsupported(diagnostic: Diagnostic) SelectionResult {

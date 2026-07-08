@@ -144,6 +144,90 @@ test "generic cfg selector keeps limb64 multiply near miss fail-closed" {
     try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
 }
 
+test "generic cfg selector emits limb64 byteswap envelope through opt-in selector" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @candidate(ptr %out, ptr %a, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %frozen = freeze i16 %bits
+        \\  %is_zero = icmp eq i16 %frozen, 0
+        \\  %minus_one = add i16 %frozen, -1
+        \\  %limb_index = lshr i16 %minus_one, 6
+        \\  %limb_count = add i16 %limb_index, 1
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %frozen)
+        \\  %rem = and i16 %frozen, 7
+        \\  %byte_aligned = icmp eq i16 %rem, 0
+        \\  call void @llvm.assume(i1 %byte_aligned)
+        \\  br i1 %is_zero, label %done, label %loop
+        \\
+        \\loop:
+        \\  %i = phi i64 [ 0, %entry ], [ %next, %loop ]
+        \\  %src = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %i
+        \\  %value = load i64, ptr %src, align 8
+        \\  %swapped = call i64 @llvm.bswap.i64(i64 %value)
+        \\  %dst_index16 = sub i16 %limb_count, 1
+        \\  %dst_index = zext i16 %dst_index16 to i64
+        \\  %dst = getelementptr inbounds nuw [8 x i8], ptr %out, i64 %dst_index
+        \\  store i64 %swapped, ptr %dst, align 8
+        \\  %next = add nuw nsw i64 %i, 1
+        \\  %exit = icmp eq i64 %next, 1
+        \\  br i1 %exit, label %done, label %loop
+        \\
+        \\done:
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = try codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{ .generic_cfg_selector = true },
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(.byteswap_limb64_rdi_rsi_dl_cx, machine.instructions.items[0]);
+}
+
+test "generic cfg selector keeps limb64 byteswap near miss fail-closed" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @near_miss(ptr %out, ptr %a, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %frozen = freeze i16 %bits
+        \\  %minus_one = add i16 %frozen, -1
+        \\  %limb_index = lshr i16 %minus_one, 6
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %frozen)
+        \\  %rem = and i16 %frozen, 7
+        \\  %byte_aligned = icmp eq i16 %rem, 0
+        \\  call void @llvm.assume(i1 %byte_aligned)
+        \\  %value = load i64, ptr %a, align 8
+        \\  store i64 %value, ptr %out, align 8
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("near_miss", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
+}
+
 test "generic cfg selector skeleton fails closed with first unsupported instruction form" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
