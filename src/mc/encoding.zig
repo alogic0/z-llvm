@@ -64,6 +64,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .mov_rax_to_arg => |reg| try encodeRaxToReg64(&bytes, allocator, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
             .mov_arg64_arg => |mov| try encodeReg64ToReg64(&bytes, allocator, mov.dst, mov.src),
+            .mov_rsp_arg64 => |reg| try encodeRspToReg64(&bytes, allocator, reg),
             .movsxd_arg32_arg64 => |mov| try encodeMovsxdReg32ToReg64(&bytes, allocator, mov.dst, mov.src),
             .push_arg => |reg| try encodePushArg(&bytes, allocator, reg),
             .pop_arg => |reg| try encodePopArg(&bytes, allocator, reg),
@@ -1508,7 +1509,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_eax_to_arg => |reg| if (reg.rexB()) 3 else 2,
         .mov_rax_to_arg => 3,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
-        .mov_arg64_arg => 3,
+        .mov_arg64_arg, .mov_rsp_arg64 => 3,
         .movsxd_arg32_arg64 => 3,
         .push_arg => |reg| if (reg.rexB()) 2 else 1,
         .pop_arg => |reg| if (reg.rexB()) 2 else 1,
@@ -1964,6 +1965,14 @@ fn encodeReg64ToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, d
     try bytes.append(allocator, rex);
     try bytes.append(allocator, 0x89);
     try bytes.append(allocator, 0xc0 | (@as(u8, src.lowCode()) << 3) | @as(u8, dst.lowCode()));
+}
+
+fn encodeRspToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: x86_64.ArgReg) !void {
+    var rex: u8 = 0x48;
+    if (dst.rexB()) rex |= 0x01;
+    try bytes.append(allocator, rex);
+    try bytes.append(allocator, 0x89);
+    try bytes.append(allocator, 0xe0 | @as(u8, dst.lowCode()));
 }
 
 fn encodeMovsxdReg32ToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: x86_64.ArgReg, src: x86_64.ArgReg) !void {

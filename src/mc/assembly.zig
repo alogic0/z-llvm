@@ -26,6 +26,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_rax_to_arg => |reg| try writer.print("\tmovq %rax, {s}\n", .{reg.name64()}),
             .mov_arg_arg => |mov| try writer.print("\tmovl {s}, {s}\n", .{ mov.src.name32(), mov.dst.name32() }),
             .mov_arg64_arg => |mov| try writer.print("\tmovq {s}, {s}\n", .{ mov.src.name64(), mov.dst.name64() }),
+            .mov_rsp_arg64 => |reg| try writer.print("\tmovq %rsp, {s}\n", .{reg.name64()}),
             .movsxd_arg32_arg64 => |mov| try writer.print("\tmovslq {s}, {s}\n", .{ mov.src.name32(), mov.dst.name64() }),
             .push_arg => |reg| try writer.print("\tpushq {s}\n", .{reg.name64()}),
             .pop_arg => |reg| try writer.print("\tpopq {s}\n", .{reg.name64()}),

@@ -33,6 +33,7 @@ pub const Instruction = union(enum) {
         dst: ArgReg,
         src: ArgReg,
     },
+    mov_rsp_arg64: ArgReg,
     movsxd_arg32_arg64: struct {
         dst: ArgReg,
         src: ArgReg,

@@ -1616,6 +1616,43 @@ test "generic cfg selector keeps limb64 overflow near miss fail-closed" {
     try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
 }
 
+test "generic cfg selector composes stack out-param direct call and i64 return" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @callee(i64, i64, ptr)
+        \\
+        \\define i64 @stack_call(i64 %a, i64 %b) {
+        \\entry:
+        \\  %slot = alloca i64, align 8
+        \\  %unused = call i64 @callee(i64 %a, i64 %b, ptr %slot)
+        \\  %rem = load i64, ptr %slot, align 8
+        \\  ret i64 %rem
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_call", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| return std.testing.expectEqualStrings("selected", diagnostic.tagName()),
+    }
+
+    try std.testing.expectEqual(@as(usize, 6), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rsp_arg64 = .rdx }, machine.instructions.items[1]);
+    try std.testing.expectEqualStrings("callee", machine.instructions.items[2].direct_call.symbol);
+    try std.testing.expect(machine.instructions.items[2].direct_call.ret_ty.eql(.{ .int = 64 }));
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 0 }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+}
+
 test "generic cfg selector skeleton fails closed with first unsupported instruction form" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
