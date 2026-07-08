@@ -240,6 +240,25 @@ list and the visible record of progress. Evidence summaries under
   scratch directory with zero deletions, while `--delete` removed both and
   preserved the current-pin cache pair plus `*.log` file. The real-row export
   cache now self-prunes old-pin entries after a fail-closed key miss.
+- [ ] 12b. Export-cache storage key dedup (small infrastructure cycle; may
+  be taken between selector buckets when a short cycle fits): the cache
+  currently keys stored artifacts on the full gate-run identity (pin,
+  stage4 version, exporter state, mode, selector version, candidate-file
+  hash, limit, slice hash), but the stored artifact — the whole-module AIR
+  descriptor for one mode — depends only on (pin, exporter state, mode).
+  The extra components fragment identical exports into duplicate ~1.3 GB
+  entries per (limit, selector) combination: 10 current-pin entries where
+  3 suffice (observed 13 GB where ~4 GB is the true footprint). Re-key the
+  *storage* on (pin, exporter-relevant z_llvm state, mode) only; keep
+  selector version, candidate hash, limit, and slice validation at the
+  gate's read layer, which already checks them, so "any mismatch means
+  re-export, never a stale read" is preserved for every content-relevant
+  component. Migrate by letting old-key entries age out via the existing
+  pin-bump self-pruning or one `clean-tmp` sweep; no compatibility shim.
+  Optionally add a `--keep-newest-per-mode` sweep to `tools/clean_tmp.zig`
+  as an upper bound on cache growth. Validate by proving a re-keyed cache
+  hit and a fresh export produce identical gate summary lines (same
+  standard as item 8a) and record the evidence summary.
 - [ ] 13. Milestone 2b, one real std test file (e.g. a `std.mem` subset)
   builds, links natively, runs, exits 0 in Debug + all three release modes.
 
