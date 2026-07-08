@@ -7,9 +7,10 @@ const default_max_age_seconds = 2 * 60 * 60;
 const export_cache_name = "real_rows_air_export_cache";
 
 const usage =
-    \\usage: zig build clean-tmp -- [--delete] [--tmp-dir=PATH] [--pin-file=PATH] [--older-than-seconds=N]
+    \\usage: zig build clean-tmp -- [--delete] [--tmp-dir=PATH] [--pin-file=PATH] [--older-than-seconds=N] [--keep-newest-per-mode]
     \\
     \\Dry-run is the default. --delete is required to remove stale tmp files.
+    \\--keep-newest-per-mode keeps at most one current-pin export-cache entry per mode.
     \\
 ;
 
@@ -18,6 +19,7 @@ const Options = struct {
     tmp_dir: []const u8 = default_tmp_dir,
     pin_file: []const u8 = default_pin_file,
     older_than_seconds: u64 = default_max_age_seconds,
+    keep_newest_per_mode: bool = false,
 };
 
 const Totals = struct {
@@ -26,9 +28,24 @@ const Totals = struct {
     bytes_reclaimable: u64 = 0,
     bytes_deleted: u64 = 0,
     old_pin_cache_pairs: usize = 0,
+    duplicate_mode_cache_pairs: usize = 0,
     scratch_dirs: usize = 0,
     cache_pairs_kept: usize = 0,
     scratch_dirs_skipped: usize = 0,
+};
+
+const CurrentCachePair = struct {
+    meta_path: []u8,
+    air_path: []u8,
+    mode: []u8,
+    bytes: u64,
+    newest_mtime_ns: i128,
+
+    fn deinit(pair: CurrentCachePair, allocator: std.mem.Allocator) void {
+        allocator.free(pair.meta_path);
+        allocator.free(pair.air_path);
+        allocator.free(pair.mode);
+    }
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -42,8 +59,8 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
     try stdout.print(
-        "clean-tmp tmp_dir={s} pin_file={s} current_pin={s} delete={} older_than_seconds={}\n",
-        .{ options.tmp_dir, options.pin_file, current_pin, options.delete, options.older_than_seconds },
+        "clean-tmp tmp_dir={s} pin_file={s} current_pin={s} delete={} older_than_seconds={} keep_newest_per_mode={}\n",
+        .{ options.tmp_dir, options.pin_file, current_pin, options.delete, options.older_than_seconds, options.keep_newest_per_mode },
     );
 
     var cwd = std.Io.Dir.cwd();
@@ -57,11 +74,12 @@ pub fn main(init: std.process.Init) !void {
     try scanScratchDirs(allocator, io, options, stdout, &totals);
 
     try stdout.print(
-        "summary clean-tmp mode={s} tmp_dir={s} old_pin_cache_pairs={} scratch_dirs={} candidates={} deleted={} bytes_reclaimable={} bytes_deleted={} cache_pairs_kept={} scratch_dirs_skipped={} local_fail=0\n",
+        "summary clean-tmp mode={s} tmp_dir={s} old_pin_cache_pairs={} duplicate_mode_cache_pairs={} scratch_dirs={} candidates={} deleted={} bytes_reclaimable={} bytes_deleted={} cache_pairs_kept={} scratch_dirs_skipped={} local_fail=0\n",
         .{
             if (options.delete) "delete" else "dry-run",
             options.tmp_dir,
             totals.old_pin_cache_pairs,
+            totals.duplicate_mode_cache_pairs,
             totals.scratch_dirs,
             totals.candidates,
             totals.deleted,
@@ -83,6 +101,8 @@ fn parseOptions(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--delete")) {
             options.delete = true;
+        } else if (std.mem.eql(u8, arg, "--keep-newest-per-mode")) {
+            options.keep_newest_per_mode = true;
         } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
             var stdout_buffer: [1024]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
@@ -136,6 +156,11 @@ fn scanExportCache(
     defer {
         for (seen_air.keys()) |key| allocator.free(key);
         seen_air.deinit(allocator);
+    }
+    var current_pairs: std.ArrayListUnmanaged(CurrentCachePair) = .empty;
+    defer {
+        for (current_pairs.items) |pair| pair.deinit(allocator);
+        current_pairs.deinit(allocator);
     }
 
     var iter = cache_dir.iterate();
@@ -194,7 +219,28 @@ fn scanExportCache(
             try common.validationError(io, "cache layout error: missing ziglang_pin in {s}\n", .{meta_path});
         };
         if (std.mem.eql(u8, pin, current_pin)) {
-            totals.cache_pairs_kept += 1;
+            if (!options.keep_newest_per_mode) {
+                totals.cache_pairs_kept += 1;
+                continue;
+            }
+
+            const mode = metadataValue(meta, "mode") orelse {
+                try common.validationError(io, "cache layout error: missing mode in {s}\n", .{meta_path});
+            };
+            if (modeSlot(mode) == null) {
+                try common.validationError(io, "cache layout error: unsupported mode {s} in {s}\n", .{ mode, meta_path });
+            }
+            const meta_stat = try std.Io.Dir.cwd().statFile(io, meta_path, .{});
+            const air_stat = try std.Io.Dir.cwd().statFile(io, air_path, .{});
+            const current_pair: CurrentCachePair = .{
+                .meta_path = try allocator.dupe(u8, meta_path),
+                .air_path = try allocator.dupe(u8, air_path),
+                .mode = try allocator.dupe(u8, mode),
+                .bytes = meta_stat.size + air_stat.size,
+                .newest_mtime_ns = @max(meta_stat.mtime.nanoseconds, air_stat.mtime.nanoseconds),
+            };
+            errdefer current_pair.deinit(allocator);
+            try current_pairs.append(allocator, current_pair);
             continue;
         }
 
@@ -211,6 +257,56 @@ fn scanExportCache(
             totals.bytes_deleted += bytes;
         }
     }
+
+    try pruneDuplicateCurrentCachePairs(io, options, stdout, totals, current_pairs.items);
+}
+
+fn pruneDuplicateCurrentCachePairs(
+    io: std.Io,
+    options: Options,
+    stdout: *std.Io.Writer,
+    totals: *Totals,
+    current_pairs: []const CurrentCachePair,
+) !void {
+    if (!options.keep_newest_per_mode) return;
+
+    var best_by_mode: [3]?usize = .{ null, null, null };
+    for (current_pairs, 0..) |pair, index| {
+        const slot = modeSlot(pair.mode) orelse unreachable;
+        if (best_by_mode[slot]) |best_index| {
+            if (pair.newest_mtime_ns > current_pairs[best_index].newest_mtime_ns) {
+                best_by_mode[slot] = index;
+            }
+        } else {
+            best_by_mode[slot] = index;
+        }
+    }
+
+    for (current_pairs, 0..) |pair, index| {
+        const slot = modeSlot(pair.mode) orelse unreachable;
+        if (best_by_mode[slot].? == index) {
+            totals.cache_pairs_kept += 1;
+            continue;
+        }
+
+        try reportCandidate(stdout, options.delete, "duplicate-mode-cache", pair.meta_path, pair.bytes, "mode", pair.mode);
+        totals.candidates += 1;
+        totals.duplicate_mode_cache_pairs += 1;
+        totals.bytes_reclaimable += pair.bytes;
+        if (options.delete) {
+            try std.Io.Dir.cwd().deleteFile(io, pair.meta_path);
+            try std.Io.Dir.cwd().deleteFile(io, pair.air_path);
+            totals.deleted += 1;
+            totals.bytes_deleted += pair.bytes;
+        }
+    }
+}
+
+fn modeSlot(mode: []const u8) ?usize {
+    if (std.mem.eql(u8, mode, "ReleaseFast")) return 0;
+    if (std.mem.eql(u8, mode, "ReleaseSafe")) return 1;
+    if (std.mem.eql(u8, mode, "ReleaseSmall")) return 2;
+    return null;
 }
 
 fn scanScratchDirs(

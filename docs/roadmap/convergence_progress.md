@@ -240,7 +240,7 @@ list and the visible record of progress. Evidence summaries under
   scratch directory with zero deletions, while `--delete` removed both and
   preserved the current-pin cache pair plus `*.log` file. The real-row export
   cache now self-prunes old-pin entries after a fail-closed key miss.
-- [ ] 12b. Export-cache storage key dedup (small infrastructure cycle; may
+- [x] 12b. Export-cache storage key dedup (small infrastructure cycle; may
   be taken between selector buckets when a short cycle fits): the cache
   currently keys stored artifacts on the full gate-run identity (pin,
   stage4 version, exporter state, mode, selector version, candidate-file
@@ -259,6 +259,16 @@ list and the visible record of progress. Evidence summaries under
   as an upper bound on cache growth. Validate by proving a re-keyed cache
   hit and a fresh export produce identical gate summary lines (same
   standard as item 8a) and record the evidence summary.
+
+  Closed by `docs/evidence/real_rows_cache_rekey.summary`: schema-2 cache
+  storage is keyed only by Zig pin, exporter-relevant z_llvm state, and
+  release mode; selector version, candidate-file hash, limit, and slice
+  checks remain read-layer validation. The fresh-export strict limit-100
+  all-mode run and the re-keyed cache-hit run produced identical
+  `summary distribution-real-rows` lines. `tools/clean_tmp.zig` gained
+  `--keep-newest-per-mode`; the close used one `clean-tmp --delete` sweep to
+  remove old-key current-pin duplicates, leaving exactly one cache entry per
+  mode.
 - [ ] 13. Milestone 2b, one real std test file (e.g. a `std.mem` subset)
   builds, links natively, runs, exits 0 in Debug + all three release modes.
 
@@ -1304,6 +1314,16 @@ One line per completed cycle, append-only, newest last. This is the
   rejections. Recognizer count still 1 (no new recognizer reorder or pre-pass);
   `shape_recognizer_functions` is unchanged outside this opt-in selector proof
   slice.
+- 2026-07-08 (this commit) Item 12b export-cache storage re-key: real-row AIR
+  export cache schema 2 stores artifacts by content identity only (Zig pin,
+  exporter-relevant z_llvm state, release mode), while selector version,
+  candidate-file hash, limit, and slice membership stay as read-layer
+  validation. Fresh-export and cache-hit strict limit-100 all-mode summaries
+  matched, with fresh export timings of 512197/531795/425464 ms and cache-hit
+  timings of 15686/17114/12541 ms for ReleaseFast/ReleaseSafe/ReleaseSmall.
+  `clean-tmp --keep-newest-per-mode --delete` removed 10 duplicate current-pin
+  cache pairs and left exactly one cache entry per mode. Evidence
+  `docs/evidence/real_rows_cache_rekey.summary`.
 
 ## Ratchet State
 

@@ -225,7 +225,6 @@ fn runMode(
         mode,
         options,
         candidates,
-        candidate_hash,
         descriptor_path,
         zig_cache_path,
         zig_emitter,
@@ -248,29 +247,20 @@ fn loadOrExportDescriptor(
     mode: Mode,
     options: Options,
     candidates: []const Candidate,
-    candidate_hash: *const [64]u8,
     descriptor_path: []const u8,
     zig_cache_path: []const u8,
     zig_emitter: []const u8,
 ) !?[]u8 {
     const ziglang_pin = try readZiglangPin(allocator, io);
     defer allocator.free(ziglang_pin);
-    const stage4_version = try readStage4Version(allocator, io, zig_emitter);
-    defer allocator.free(stage4_version);
     const z_llvm_export_state = try exporterRelevantStateHash(allocator, io);
-    const slice_hash = candidateSliceHash(candidates);
     const cache_key_text = try std.fmt.allocPrint(
         allocator,
-        "schema=1\nziglang_pin={s}\nstage4_version={s}\nz_llvm_export_state={s}\nmode={s}\nselector_version={s}\ncandidate_file_hash={s}\nlimit={}\nslice_hash={s}\n",
+        "schema=2\nziglang_pin={s}\nz_llvm_export_state={s}\nmode={s}\n",
         .{
             ziglang_pin,
-            stage4_version,
             &z_llvm_export_state,
             mode.name(),
-            selector_version,
-            candidate_hash,
-            options.limit,
-            &slice_hash,
         },
     );
     defer allocator.free(cache_key_text);
@@ -325,7 +315,7 @@ fn loadOrExportDescriptor(
         try printCacheEvent(stdout, mode, "export-invalid", duration_ms, &cache_key, descriptor.len);
         return null;
     }
-    try storeCachedDescriptor(allocator, io, &cache_key, cache_key_text, descriptor);
+    try storeCachedDescriptor(allocator, io, &cache_key, cache_key_text, ziglang_pin, &z_llvm_export_state, mode, descriptor);
     try printCacheEvent(stdout, mode, if (options.fresh_export) "fresh-export" else "miss-export", duration_ms, &cache_key, descriptor.len);
     return descriptor;
 }
@@ -361,6 +351,9 @@ fn storeCachedDescriptor(
     io: std.Io,
     cache_key: *const [64]u8,
     cache_key_text: []const u8,
+    ziglang_pin: []const u8,
+    z_llvm_export_state: *const [64]u8,
+    mode: Mode,
     descriptor: []const u8,
 ) !void {
     var cwd = std.Io.Dir.cwd();
@@ -373,8 +366,8 @@ fn storeCachedDescriptor(
     const descriptor_hash = sha256Hex(descriptor);
     const meta = try std.fmt.allocPrint(
         allocator,
-        "schema=1\ncache_key={s}\ndescriptor_sha256={s}\nkey_begin\n{s}key_end\n",
-        .{ cache_key, &descriptor_hash, cache_key_text },
+        "schema=2\ncache_key={s}\nziglang_pin={s}\nz_llvm_export_state={s}\nmode={s}\ndescriptor_sha256={s}\nkey_begin\n{s}key_end\n",
+        .{ cache_key, ziglang_pin, z_llvm_export_state, mode.name(), &descriptor_hash, cache_key_text },
     );
     defer allocator.free(meta);
     try cwd.writeFile(io, .{ .sub_path = descriptor_path, .data = descriptor });
@@ -383,7 +376,7 @@ fn storeCachedDescriptor(
 
 fn metadataMatches(meta: []const u8, cache_key: *const [64]u8, cache_key_text: []const u8) bool {
     const schema = metadataValue(meta, "schema") orelse return false;
-    if (!std.mem.eql(u8, schema, "1")) return false;
+    if (!std.mem.eql(u8, schema, "2")) return false;
     const stored_key = metadataValue(meta, "cache_key") orelse return false;
     if (!std.mem.eql(u8, stored_key, cache_key)) return false;
     const key_begin = std.mem.indexOf(u8, meta, "key_begin\n") orelse return false;
