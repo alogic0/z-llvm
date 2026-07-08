@@ -526,6 +526,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .shr_limb64_rdi_rsi_dx_cl_r8w => try bytes.appendSlice(allocator, &selector_bytes.shr_limb64_rdi_rsi_dx_cl_r8w),
             .shlo_limb64_rdi_rsi_dx_cl_r8w_al => try bytes.appendSlice(allocator, &selector_bytes.shlo_limb64_rdi_rsi_dx_cl_r8w_al),
             .not_limb64_rdi_rsi_dl_cx => try bytes.appendSlice(allocator, &selector_bytes.not_limb64_rdi_rsi_dl_cx),
+            .bitwise_limb64_rdi_rsi_rdx_cx => |op| switch (op) {
+                .xor => try bytes.appendSlice(allocator, &selector_bytes.xor_limb64_rdi_rsi_rdx_cx),
+                .@"or" => try bytes.appendSlice(allocator, &selector_bytes.or_limb64_rdi_rsi_rdx_cx),
+                .@"and" => try bytes.appendSlice(allocator, &selector_bytes.and_limb64_rdi_rsi_rdx_cx),
+            },
             .bitreverse_limb64_rdi_rsi_dl_cx => try bytes.appendSlice(allocator, &selector_bytes.bitreverse_limb64_rdi_rsi_dl_cx),
             .popcount_limb64_rdi_si_ax => try bytes.appendSlice(allocator, &selector_bytes.popcount_limb64_rdi_si_ax),
             .ctz_limb64_rdi_si_ax => try bytes.appendSlice(allocator, &selector_bytes.ctz_limb64_rdi_si_ax),
@@ -1587,6 +1592,11 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .shr_limb64_rdi_rsi_dx_cl_r8w => selector_bytes.shr_limb64_rdi_rsi_dx_cl_r8w.len,
         .shlo_limb64_rdi_rsi_dx_cl_r8w_al => selector_bytes.shlo_limb64_rdi_rsi_dx_cl_r8w_al.len,
         .not_limb64_rdi_rsi_dl_cx => selector_bytes.not_limb64_rdi_rsi_dl_cx.len,
+        .bitwise_limb64_rdi_rsi_rdx_cx => |op| switch (op) {
+            .xor => selector_bytes.xor_limb64_rdi_rsi_rdx_cx.len,
+            .@"or" => selector_bytes.or_limb64_rdi_rsi_rdx_cx.len,
+            .@"and" => selector_bytes.and_limb64_rdi_rsi_rdx_cx.len,
+        },
         .bitreverse_limb64_rdi_rsi_dl_cx => selector_bytes.bitreverse_limb64_rdi_rsi_dl_cx.len,
         .popcount_limb64_rdi_si_ax => selector_bytes.popcount_limb64_rdi_si_ax.len,
         .ctz_limb64_rdi_si_ax => selector_bytes.ctz_limb64_rdi_si_ax.len,

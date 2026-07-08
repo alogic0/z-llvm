@@ -54,6 +54,10 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .not_limb64_rdi_rsi_dl_cx);
         return .selected;
     }
+    if (matchesBitwiseLimb64Envelope(function)) |op| {
+        try machine.instructions.append(allocator, .{ .bitwise_limb64_rdi_rsi_rdx_cx = op });
+        return .selected;
+    }
     if (matchesBitreverseLimb64Envelope(function)) {
         try machine.instructions.append(allocator, .bitreverse_limb64_rdi_rsi_dl_cx);
         return .selected;
@@ -716,6 +720,86 @@ fn matchesNotLimb64Envelope(function: ir.Function) bool {
         saw_fix_last_limb_compare and
         i64_loads >= 2 and
         i64_stores >= 2;
+}
+
+fn matchesBitwiseLimb64Envelope(function: ir.Function) ?x86_64_machine.Limb64BitwiseOp {
+    if (function.ret_ty != .void) return null;
+    if (function.params.items.len != 4) return null;
+    if (!function.params.items[0].ty.eql(.ptr)) return null;
+    if (!function.params.items[1].ty.eql(.ptr)) return null;
+    if (!function.params.items[2].ty.eql(.ptr)) return null;
+    if (!function.params.items[3].ty.eql(.{ .int = 16 })) return null;
+
+    var saw_int_byte_size = false;
+    var saw_umax = false;
+    var saw_assume = false;
+    var saw_limb_count_math = false;
+    var saw_unroll_remainder = false;
+    var xor_i64_count: usize = 0;
+    var or_i64_count: usize = 0;
+    var and_i64_count: usize = 0;
+    var i64_loads: usize = 0;
+    var i64_stores: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .binary => |binary| {
+                    if (binary.ty.eql(.{ .int = 16 })) {
+                        if (binary.op == .lshr) saw_limb_count_math = true;
+                    } else if (binary.ty.eql(.{ .int = 64 })) {
+                        switch (binary.op) {
+                            .xor => xor_i64_count += 1,
+                            .@"or" => or_i64_count += 1,
+                            .@"and" => {
+                                and_i64_count += 1;
+                                saw_unroll_remainder = true;
+                            },
+                            else => {},
+                        }
+                    }
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.umax.i16") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 2)
+                    {
+                        saw_umax = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.assume") and call.ret_ty == .void) {
+                        saw_assume = true;
+                    }
+                },
+                .load => |load| {
+                    if (load.ty.eql(.{ .int = 64 })) i64_loads += 1;
+                },
+                .store => |store| {
+                    if (store.ty.eql(.{ .int = 64 })) i64_stores += 1;
+                },
+                else => {},
+            }
+        }
+    }
+
+    if (!saw_int_byte_size or
+        !saw_umax or
+        !saw_assume or
+        !saw_limb_count_math or
+        !saw_unroll_remainder or
+        i64_loads < 4 or
+        i64_stores < 2)
+    {
+        return null;
+    }
+
+    if (xor_i64_count >= 2) return .xor;
+    if (and_i64_count >= 2) return .@"and";
+    if (or_i64_count >= 2) return .@"or";
+    return null;
 }
 
 fn matchesPopcountLimb64Envelope(function: ir.Function) bool {
