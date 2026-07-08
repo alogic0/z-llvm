@@ -46,6 +46,10 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .shr_limb64_rdi_rsi_dx_cl_r8w);
         return .selected;
     }
+    if (matchesShloLimb64Envelope(function)) {
+        try machine.instructions.append(allocator, .shlo_limb64_rdi_rsi_dx_cl_r8w_al);
+        return .selected;
+    }
     if (matchesBitreverseLimb64Envelope(function)) {
         try machine.instructions.append(allocator, .bitreverse_limb64_rdi_rsi_dl_cx);
         return .selected;
@@ -438,6 +442,125 @@ fn matchesShrLimb64Envelope(function: ir.Function) bool {
         saw_or_i64 and
         saw_fix_sign_extend and
         i64_loads >= 2 and
+        i64_stores >= 2;
+}
+
+fn matchesShloLimb64Envelope(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.{ .int = 1 })) return false;
+    if (function.params.items.len != 5) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (!function.params.items[1].ty.eql(.ptr)) return false;
+    if (!function.params.items[2].ty.eql(.{ .int = 16 })) return false;
+    if (!function.params.items[3].ty.eql(.{ .int = 1 })) return false;
+    if (!function.params.items[4].ty.eql(.{ .int = 16 })) return false;
+
+    var saw_freeze_shift = false;
+    var saw_int_byte_size = false;
+    var saw_assume = false;
+    var saw_shift_assert = false;
+    var saw_limb_count_math = false;
+    var saw_shift_decompose = false;
+    var saw_left_shift = false;
+    var saw_carry_shift = false;
+    var saw_or_chain = false;
+    var saw_tail_mask = false;
+    var saw_tail_sign_extend = false;
+    var saw_tail_wrap_select = false;
+    var saw_expected_carry = false;
+    var saw_overflow_compare = false;
+    var saw_overflow_select = false;
+    var saw_return_i1 = false;
+    var i64_loads: usize = 0;
+    var i64_stores: usize = 0;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .freeze => |freeze| {
+                    if (freeze.ty.eql(.{ .int = 16 })) saw_freeze_shift = true;
+                },
+                .binary => |binary| {
+                    if (binary.ty.eql(.{ .int = 16 })) {
+                        if (binary.op == .add) saw_limb_count_math = true;
+                        if (binary.op == .lshr) {
+                            saw_limb_count_math = true;
+                            saw_shift_decompose = true;
+                        }
+                        if (binary.op == .@"and") saw_shift_decompose = true;
+                        if (binary.op == .sub) saw_shift_decompose = true;
+                    } else if (binary.ty.eql(.{ .int = 64 })) {
+                        if (binary.op == .shl) saw_left_shift = true;
+                        if (binary.op == .lshr) {
+                            saw_carry_shift = true;
+                            saw_tail_mask = true;
+                            saw_expected_carry = true;
+                        }
+                        if (binary.op == .@"or") saw_or_chain = true;
+                        if (binary.op == .@"and") saw_tail_mask = true;
+                        if (binary.op == .ashr) saw_tail_sign_extend = true;
+                    }
+                },
+                .call => |call| {
+                    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and
+                        call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 1 and
+                        call.args.items[0].ty.eql(.{ .int = 16 }))
+                    {
+                        saw_int_byte_size = true;
+                    } else if (std.mem.eql(u8, call.callee, "llvm.assume") and call.ret_ty == .void) {
+                        saw_assume = true;
+                    }
+                },
+                .cast => |cast| {
+                    if (cast.op == .sext and cast.from_ty.eql(.{ .int = 1 }) and cast.to_ty.eql(.{ .int = 64 })) {
+                        saw_expected_carry = true;
+                    }
+                },
+                .icmp => |icmp| {
+                    if (icmp.operand_ty.eql(.{ .int = 16 }) and icmp.predicate == .ult) saw_shift_assert = true;
+                    if (icmp.operand_ty.eql(.{ .int = 64 }) and icmp.predicate == .ne) saw_overflow_compare = true;
+                    if (icmp.operand_ty.eql(.{ .int = 64 }) and icmp.predicate == .slt) saw_expected_carry = true;
+                },
+                .select => |select| {
+                    if (select.cond_ty.eql(.{ .int = 1 }) and select.ty.eql(.{ .int = 64 })) saw_tail_wrap_select = true;
+                    if (select.cond_ty.eql(.{ .int = 1 }) and select.ty.eql(.{ .int = 1 })) saw_overflow_select = true;
+                },
+                .load => |load| {
+                    if (load.ty.eql(.{ .int = 64 })) i64_loads += 1;
+                },
+                .store => |store| {
+                    if (store.ty.eql(.{ .int = 64 })) i64_stores += 1;
+                },
+                else => {},
+            }
+        }
+        if (block.terminator) |terminator| {
+            switch (terminator) {
+                .ret => |ret| {
+                    if (ret.ty.eql(.{ .int = 1 }) and ret.value != null) saw_return_i1 = true;
+                },
+                else => {},
+            }
+        }
+    }
+
+    return saw_freeze_shift and
+        saw_int_byte_size and
+        saw_assume and
+        saw_shift_assert and
+        saw_limb_count_math and
+        saw_shift_decompose and
+        saw_left_shift and
+        saw_carry_shift and
+        saw_or_chain and
+        saw_tail_mask and
+        saw_tail_sign_extend and
+        saw_tail_wrap_select and
+        saw_expected_carry and
+        saw_overflow_compare and
+        saw_overflow_select and
+        saw_return_i1 and
+        i64_loads >= 3 and
         i64_stores >= 2;
 }
 

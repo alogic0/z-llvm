@@ -322,6 +322,118 @@ test "generic cfg selector keeps limb64 shift-right near miss fail-closed" {
     try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
 }
 
+test "generic cfg selector emits limb64 shift-left-overflow envelope through opt-in selector" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @candidate(ptr %out, ptr %a, i16 %shift, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %frozen_shift = freeze i16 %shift
+        \\  %minus_one = add i16 %bits, -1
+        \\  %limb_index = lshr i16 %minus_one, 6
+        \\  %limb_count = add i16 %limb_index, 1
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %shift_ok = icmp ult i16 %frozen_shift, %bits
+        \\  call void @llvm.assume(i1 %shift_ok)
+        \\  %limb_shift = lshr i16 %frozen_shift, 6
+        \\  %bit_shift16 = and i16 %frozen_shift, 63
+        \\  %bit_shift = zext i16 %bit_shift16 to i64
+        \\  %neg_shift = sub i16 0, %frozen_shift
+        \\  %carry_shift16 = and i16 %neg_shift, 63
+        \\  %carry_shift = zext i16 %carry_shift16 to i64
+        \\  %src0 = load i64, ptr %a, align 8
+        \\  %left = shl i64 %src0, %bit_shift
+        \\  %carry = lshr i64 %src0, %carry_shift
+        \\  %raw_last = or i64 %left, 0
+        \\  %tail_bits = and i16 %bits, 63
+        \\  %tail_is_full = icmp eq i16 %tail_bits, 0
+        \\  br i1 %tail_is_full, label %full, label %partial
+        \\
+        \\partial:
+        \\  %neg_bits = sub i16 0, %bits
+        \\  %mask_shift16 = and i16 %neg_bits, 63
+        \\  %mask_shift = zext i16 %mask_shift16 to i64
+        \\  %mask = lshr i64 -1, %mask_shift
+        \\  %masked = and i64 %raw_last, %mask
+        \\  %sign_shifted = shl i64 %raw_last, %mask_shift
+        \\  %signed_tail = ashr exact i64 %sign_shifted, %mask_shift
+        \\  %wrapped = select i1 %signed, i64 %signed_tail, i64 %masked
+        \\  br label %full
+        \\
+        \\full:
+        \\  %last = phi i64 [ %raw_last, %entry ], [ %wrapped, %partial ]
+        \\  store i64 %last, ptr %out, align 8
+        \\  %last_negative = icmp slt i64 %last, 0
+        \\  %use_sign = select i1 %signed, i1 %last_negative, i1 false
+        \\  %sign = sext i1 %use_sign to i64
+        \\  %expected_carry = lshr i64 %sign, %carry_shift
+        \\  %carry_overflow = icmp ne i64 %carry, %expected_carry
+        \\  %wrap_overflow = icmp ne i64 %raw_last, %last
+        \\  %overflow0 = select i1 %carry_overflow, i1 true, i1 %wrap_overflow
+        \\  %src1_ptr = getelementptr inbounds nuw [8 x i8], ptr %a, i64 1
+        \\  %src1 = load i64, ptr %src1_ptr, align 8
+        \\  %src2_ptr = getelementptr inbounds nuw [8 x i8], ptr %a, i64 2
+        \\  %src2 = load i64, ptr %src2_ptr, align 8
+        \\  %extra = or i64 %src1, %src2
+        \\  %extra_overflow = icmp ne i64 %extra, %sign
+        \\  %overflow = select i1 %overflow0, i1 true, i1 %extra_overflow
+        \\  %dst1 = getelementptr inbounds nuw [8 x i8], ptr %out, i64 1
+        \\  store i64 %sign, ptr %dst1, align 8
+        \\  ret i1 %overflow
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = try codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{ .generic_cfg_selector = true },
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(.shlo_limb64_rdi_rsi_dx_cl_r8w_al, machine.instructions.items[0]);
+}
+
+test "generic cfg selector keeps limb64 shift-left-overflow near miss fail-closed" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @near_miss(ptr %out, ptr %a, i16 %shift, i1 %signed, i16 %bits) {
+        \\entry:
+        \\  %frozen_shift = freeze i16 %shift
+        \\  %minus_one = add i16 %bits, -1
+        \\  %limb_index = lshr i16 %minus_one, 6
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %shift_ok = icmp ult i16 %frozen_shift, %bits
+        \\  call void @llvm.assume(i1 %shift_ok)
+        \\  %bit_shift16 = and i16 %frozen_shift, 63
+        \\  %bit_shift = zext i16 %bit_shift16 to i64
+        \\  %src0 = load i64, ptr %a, align 8
+        \\  %left = shl i64 %src0, %bit_shift
+        \\  store i64 %left, ptr %out, align 8
+        \\  ret i1 false
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("near_miss", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
+}
+
 test "generic cfg selector emits limb64 bitreverse envelope through opt-in selector" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

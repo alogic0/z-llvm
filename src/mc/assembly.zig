@@ -545,6 +545,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mulo_limb64_rdi_rsi_rdx_cl_r8w_al => try printByteDirective(writer, &selector_bytes.mulo_limb64_rdi_rsi_rdx_cl_r8w_al),
             .byteswap_limb64_rdi_rsi_dl_cx => try printByteDirective(writer, &selector_bytes.byteswap_limb64_rdi_rsi_dl_cx),
             .shr_limb64_rdi_rsi_dx_cl_r8w => try printByteDirective(writer, &selector_bytes.shr_limb64_rdi_rsi_dx_cl_r8w),
+            .shlo_limb64_rdi_rsi_dx_cl_r8w_al => try printByteDirective(writer, &selector_bytes.shlo_limb64_rdi_rsi_dx_cl_r8w_al),
             .bitreverse_limb64_rdi_rsi_dl_cx => try printByteDirective(writer, &selector_bytes.bitreverse_limb64_rdi_rsi_dl_cx),
             .popcount_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.popcount_limb64_rdi_si_ax),
             .ctz_limb64_rdi_si_ax => try printByteDirective(writer, &selector_bytes.ctz_limb64_rdi_si_ax),
