@@ -1365,6 +1365,20 @@ One line per completed cycle, append-only, newest last. This is the
   triggers item-15 stage two. Evidence
   `tmp/std_debug_hello_debug_umodei5_selector_after.log`;
   `tmp/distribution_all_after_umodei5_selector_rerun.log`.
+- 2026-07-08 (this commit) Item 15 composition machinery slice: the opt-in
+  selector now has a block-local composed selection path for single-block i32
+  integer operations, with explicit parameter-to-SysV-register binding,
+  accumulator ownership, machine-instruction emission through the normal x86_64
+  instruction layer, rollback before fallback on rejected rows, and a
+  fail-closed no-spill-envelope diagnostic when a row needs another live
+  accumulator copy. This is machinery only, not a real-row closure:
+  composed-selection rows remain 0, terminal-template rows remain 17, and open
+  integer-helper fallback candidates remain 43. Recognizer count still 1 (no
+  new recognizer reorder or pre-pass); `shape_recognizer_functions` is
+  unchanged outside this opt-in selector proof slice. Verification:
+  `zig build test`; `tmp/distribution_all_after_composed_block_skeleton.log`.
+  The next required proof remains a real integer-helper row through composed
+  per-instruction selection, with no terminal byte spans.
 
 ## Ratchet State
 

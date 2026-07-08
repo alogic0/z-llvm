@@ -1,8 +1,11 @@
 const std = @import("std");
 const ir = @import("../../ir.zig");
 const x86_64_machine = @import("machine.zig");
+const x86_64_types = @import("types.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
+const ArgReg = x86_64_types.ArgReg;
+const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 
 pub const Diagnostic = union(enum) {
     unsupported_control_flow: []const u8,
@@ -107,7 +110,163 @@ pub fn tryLower(
             else => return inspected,
         },
     }
+    const composed_start_len = machine.instructions.items.len;
+    switch (try tryLowerComposedBlock(allocator, machine, function)) {
+        .selected => return .selected,
+        .unsupported => |diagnostic| switch (diagnostic) {
+            .no_emitter => machine.instructions.items.len = composed_start_len,
+            else => {
+                machine.instructions.items.len = composed_start_len;
+                return .{ .unsupported = diagnostic };
+            },
+        },
+    }
     return inspected;
+}
+
+const ValueLoc = union(enum) {
+    arg32: ArgReg,
+    eax,
+};
+
+const ComposedBlockSelector = struct {
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    values: std.StringHashMap(ValueLoc),
+    current_eax_name: ?[]const u8 = null,
+
+    fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
+        return .{
+            .allocator = allocator,
+            .machine = machine,
+            .values = std.StringHashMap(ValueLoc).init(allocator),
+        };
+    }
+
+    fn deinit(selector: *ComposedBlockSelector) void {
+        selector.values.deinit();
+    }
+
+    fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+        if (function.params.items.len > 6) return .{ .unsupported_value = "composed-block-too-many-params" };
+        for (function.params.items, 0..) |param, index| {
+            if (!param.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-param-not-i32" };
+            const reg = ArgReg.fromIndex(index) catch return .{ .unsupported_value = "composed-block-param-reg" };
+            try selector.values.put(param.name, .{ .arg32 = reg });
+        }
+        return null;
+    }
+
+    fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
+        if (instruction.removed) return null;
+        return switch (instruction.kind) {
+            .binary => |binary| try selector.lowerBinary(instruction.result, binary),
+            else => .{ .no_emitter = "composed-block-instruction-not-owned" },
+        };
+    }
+
+    fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        if (!binary.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-binary-not-i32" };
+        const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
+
+        const lhs = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
+        switch (lhs) {
+            .arg32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_eax = reg }),
+            .eax => {},
+        }
+
+        const rhs = selector.resolveValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
+        switch (rhs) {
+            .arg32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{
+                .op = op,
+                .reg = reg,
+            } }),
+            .eax => return .{ .no_spill_envelope = "composed-block-two-address-rhs-eax" },
+        }
+
+        try selector.values.put(result_name, .eax);
+        selector.current_eax_name = result_name;
+        return null;
+    }
+
+    fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic {
+        if (!ret.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-ret-not-i32" };
+        const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
+        switch (value) {
+            .int => |int| try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) }),
+            .named => {
+                const loc = selector.resolveValue(value) orelse return .{ .unsupported_value = "composed-block-unknown-ret" };
+                switch (loc) {
+                    .arg32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_eax = reg }),
+                    .eax => {},
+                }
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-ret-value" },
+        }
+        try selector.machine.instructions.append(selector.allocator, .ret);
+        return null;
+    }
+
+    fn resolveValue(selector: ComposedBlockSelector, value: ir.Value) ?ValueLoc {
+        return switch (value) {
+            .named => |name| {
+                const loc = selector.values.get(name) orelse return null;
+                return switch (loc) {
+                    .arg32 => loc,
+                    .eax => if (selector.current_eax_name) |current| blk: {
+                        if (std.mem.eql(u8, current, name)) break :blk loc;
+                        return null;
+                    } else null,
+                };
+            },
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+        };
+    }
+};
+
+fn tryLowerComposedBlock(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !SelectionResult {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return unsupported(.{ .no_emitter = "composed-block-ret-not-i32" });
+    if (function.blocks.items.len != 1) return unsupported(.{ .no_emitter = "composed-block-not-single-block" });
+
+    var composed = ComposedBlockSelector.init(allocator, machine);
+    defer composed.deinit();
+
+    if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
+
+    const block = function.blocks.items[0];
+    for (block.instructions.items) |instruction| {
+        if (try composed.lowerInstruction(instruction)) |diagnostic| return unsupported(diagnostic);
+    }
+
+    const terminator = block.terminator orelse return unsupported(.{ .unsupported_control_flow = "composed-block-missing-terminator" });
+    switch (terminator) {
+        .ret => |ret| {
+            if (try composed.lowerReturn(ret)) |diagnostic| return unsupported(diagnostic);
+        },
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return unsupported(.{ .no_emitter = "composed-block-terminator-not-owned" }),
+    }
+    return .selected;
+}
+
+fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
+    return switch (op) {
+        .add => .add,
+        .sub => .sub,
+        .@"and" => .@"and",
+        .@"or" => .@"or",
+        .xor => .xor,
+        .fadd, .fsub, .fmul, .fdiv, .frem, .mul, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => null,
+    };
+}
+
+fn i32Value(value: i128) !i32 {
+    if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
 }
 
 pub fn inspectFunction(function: ir.Function) SelectionResult {
