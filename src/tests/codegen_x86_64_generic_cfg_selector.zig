@@ -417,6 +417,96 @@ test "generic cfg selector keeps limb64 bitreverse near miss fail-closed" {
     try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
 }
 
+test "generic cfg selector emits limb64 popcount envelope through opt-in selector" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i16 @candidate(ptr %a, i16 %bits) {
+        \\entry:
+        \\  %is_zero = icmp eq i16 %bits, 0
+        \\  %minus_one = add i16 %bits, -1
+        \\  %last = lshr i16 %minus_one, 6
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %selected_last = select i1 %is_zero, i16 -1, i16 %last
+        \\  %last64 = zext i16 %selected_last to i64
+        \\  %has_prefix = icmp eq i16 %selected_last, 0
+        \\  br i1 %has_prefix, label %tail, label %loop
+        \\
+        \\loop:
+        \\  %sum = phi i16 [ 0, %entry ], [ %sum_next, %loop ]
+        \\  %i = phi i64 [ 0, %entry ], [ %next, %loop ]
+        \\  %ptr = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %i
+        \\  %value = load i64, ptr %ptr, align 8
+        \\  %count = call i64 @llvm.ctpop.i64(i64 %value)
+        \\  %narrow = trunc i64 %count to i16
+        \\  %sum_next = add i16 %sum, %narrow
+        \\  %next = add i64 %i, 1
+        \\  %exit = icmp eq i64 %next, %last64
+        \\  br i1 %exit, label %tail, label %loop
+        \\
+        \\tail:
+        \\  %prefix = phi i16 [ 0, %entry ], [ %sum_next, %loop ]
+        \\  %tail_ptr = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %last64
+        \\  %tail_value = load i64, ptr %tail_ptr, align 8
+        \\  %rem = and i16 %bits, 63
+        \\  %neg_bits = sub i16 0, %bits
+        \\  %tail_shift16 = and i16 %neg_bits, 63
+        \\  %tail_shift = zext i16 %tail_shift16 to i64
+        \\  %masked = shl i64 %tail_value, %tail_shift
+        \\  %tail_count = call i64 @llvm.ctpop.i64(i64 %masked)
+        \\  %tail_narrow = trunc i64 %tail_count to i16
+        \\  %total = add i16 %prefix, %tail_narrow
+        \\  ret i16 %total
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = try codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{ .generic_cfg_selector = true },
+    );
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(.popcount_limb64_rdi_si_ax, machine.instructions.items[0]);
+}
+
+test "generic cfg selector keeps limb64 popcount near miss fail-closed" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i16 @near_miss(ptr %a, i16 %bits) {
+        \\entry:
+        \\  %minus_one = add i16 %bits, -1
+        \\  %last = lshr i16 %minus_one, 6
+        \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %last64 = zext i16 %last to i64
+        \\  %ptr = getelementptr inbounds nuw [8 x i8], ptr %a, i64 %last64
+        \\  %value = load i64, ptr %ptr, align 8
+        \\  %count = trunc i64 %value to i16
+        \\  ret i16 %count
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("near_miss", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+}
+
 test "generic cfg selector skeleton fails closed with first unsupported instruction form" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
