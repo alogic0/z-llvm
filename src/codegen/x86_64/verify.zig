@@ -62,6 +62,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .shlo_limb64_rdi_rsi_dx_cl_r8w_al,
         .not_limb64_rdi_rsi_dl_cx,
         .bitwise_limb64_rdi_rsi_rdx_cx,
+        .cmp_limb64_rdi_rsi_dl_cx_ax,
         .bitreverse_limb64_rdi_rsi_dl_cx,
         .popcount_limb64_rdi_si_ax,
         .ctz_limb64_rdi_si_ax,
@@ -442,6 +443,12 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
+        .cmp_limb64_rdi_rsi_dl_cx_ax => {
+            if (!function.ret_ty.eql(.{ .int = 8 })) return error.ReturnTypeMismatch;
+            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+            saw_terminator = true;
+            eax_defined = true;
+        },
         .bitreverse_limb64_rdi_rsi_dl_cx => {
             if (function.ret_ty != .void) return error.ReturnTypeMismatch;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -537,6 +544,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .shlo_limb64_rdi_rsi_dx_cl_r8w_al,
         .not_limb64_rdi_rsi_dl_cx,
         .bitwise_limb64_rdi_rsi_rdx_cx,
+        .cmp_limb64_rdi_rsi_dl_cx_ax,
         .bitreverse_limb64_rdi_rsi_dl_cx,
         .popcount_limb64_rdi_si_ax,
         .ctz_limb64_rdi_si_ax,
