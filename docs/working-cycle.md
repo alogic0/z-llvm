@@ -47,11 +47,16 @@ The strategy reference is
 
 At the start of every cycle:
 
-1.  Read `docs/roadmap/convergence_progress.md`.
-2.  Read `docs/next_steps.md` for active blocker notes.
-3.  Check the latest tracked evidence summaries under `docs/evidence/` (and
+1.  Read `docs/worker_inbox.md` if it exists — the docs/verification
+    agent's mailbox. An unacknowledged Active entry overrides the goal
+    order below; acknowledge it by citing its id in your next stop state
+    or cycle commit message. Never edit that file; it is gitignored and
+    never counts against the clean-worktree rule.
+2.  Read `docs/roadmap/convergence_progress.md`.
+3.  Read `docs/next_steps.md` for active blocker notes.
+4.  Check the latest tracked evidence summaries under `docs/evidence/` (and
     saved logs under `tmp/` for the current cycle only).
-4.  Pick the cycle goal in this priority order:
+5.  Pick the cycle goal in this priority order:
     1.  the first failing `distribution-real-rows` entry, when that gate
         exists;
     2.  the first failing real-program milestone gate

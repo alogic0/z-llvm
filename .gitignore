@@ -17,3 +17,6 @@ zig-out/
 /build-*/
 /docgen_tmp/
 tmp/
+
+# agent mailbox (single-writer: docs agent; read-only for the worker)
+docs/worker_inbox.md
