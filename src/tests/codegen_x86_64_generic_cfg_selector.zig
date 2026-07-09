@@ -2329,6 +2329,44 @@ test "generic cfg selector composes stack out-param direct call and i64 return" 
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
 
+test "generic cfg selector composes i128 stack out-param direct call wrapper" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc i128 @callee(i128, i128, ptr)
+        \\
+        \\define i128 @stack_call(i128 %a, i128 %b) {
+        \\entry:
+        \\  %slot = alloca i128, align 16
+        \\  %unused = call fastcc i128 @callee(i128 %a, i128 %b, ptr %slot)
+        \\  %rem = load i128, ptr %slot, align 16
+        \\  ret i128 %rem
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_call", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| return std.testing.expectEqualStrings("selected", diagnostic.tagName()),
+    }
+
+    try std.testing.expectEqual(@as(usize, 7), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_24, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rsp_arg64 = .r8 }, machine.instructions.items[1]);
+    try std.testing.expectEqualStrings("callee", machine.instructions.items[2].direct_call.symbol);
+    try std.testing.expect(machine.instructions.items[2].direct_call.ret_ty.eql(.{ .int = 128 }));
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_arg64 = .{ .reg = .rdx, .disp = 8 } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 0 }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
+}
+
 test "generic cfg selector composes signed i64 remainder stack call with spills" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

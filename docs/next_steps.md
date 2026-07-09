@@ -60,9 +60,11 @@ Current operating note recorded 2026-07-09:
   `docs/evidence/zig_integrated_exe_syscall_hello.summary`. Item 12 std hello
   remains open. Item 15 stage one closed 15 limb64 terminal selector routines,
   and the interrupted integer-helper work left `__udivei4` and `__umodei5` as
-  validated terminal-template routines. Current item-15 accounting is
-  composed-selection rows 6, terminal-template rows 17, stage-two-boundary rows
-  2, and open integer-helper fallback candidates 36. Pressure diagnostics:
+  validated terminal-template routines. The composed selector now also closes
+  `compiler_rt.udivmod.__umodti3` as an i128 stack out-param direct-call
+  wrapper. Current item-15 accounting is composed-selection rows 7,
+  terminal-template rows 17, stage-two-boundary rows 2, and open
+  integer-helper fallback candidates 35. Pressure diagnostics:
   `compiler_rt.udivmodei4.__udivei5` records `max_live_values=16`,
   `max_spill_slots_needed=10`, `max_spill_slots_over_envelope=4`,
   `first_exceed_block=Then8.prol`, `first_exceed_boundary=live_out`,
@@ -86,13 +88,18 @@ Current operating note recorded 2026-07-09:
   `src/distribution_real_rows_gate.zig --strict --limit=100` for ReleaseFast,
   ReleaseSafe, and ReleaseSmall.
 - Saved log paths: `tmp/std_debug_hello_udivei5_pressure.log`,
-  `tmp/std_debug_hello_umodei4_pressure.log`, and
-  `tmp/distribution_all_after_umodei4_pressure.log`.
+  `tmp/std_debug_hello_umodei4_pressure.log`,
+  `tmp/std_debug_hello_debug_umodti3_composed.log`, and
+  `tmp/distribution_all_after_umodti3_composed.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
-  `docs/evidence/std_debug_hello_umodei4_pressure.tsv`.
+  `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
+  `docs/evidence/std_debug_hello_umodti3_composed.summary`.
 - Recommended next action: continue the remaining integer-helper rows in rank
-  order through composed selection, starting at
-  `compiler_rt.udivmod.__umodti3`, recording for every row whether it fits the
+  order through composed selection. Keep the intervening
+  `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and `__udivti3`
+  `UnsupportedTailCallAbi` rows in the separate ABI family; the next active
+  composed-selector integer-helper candidate is
+  `compiler_rt.udivmod.__modti3`. Record for every row whether it fits the
   current envelope and, if not, its live-value count. If five or more remaining
   rows hit the pressure boundary, the next major slice is the reviewed real
   register allocator with `__udivei5` as the acceptance row; otherwise revisit
