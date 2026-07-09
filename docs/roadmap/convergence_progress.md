@@ -1866,6 +1866,21 @@ One line per completed cycle, append-only, newest last. This is the
   `shape_recognizer_functions` is unchanged. Evidence
   `tmp/std_debug_hello_debug_scalar_planned_spill.log`; distribution-all proof
   `tmp/distribution_all_after_scalar_planned_spill.log`.
+- 2026-07-09 (this commit) Item 15 allocator-consumption slice: planned
+  128-bit value spills now consume two deterministic stage-two frame slots and
+  materialize pair stores when the composed selector already owns a pressure
+  frame. The allocator plan now counts pair spills as two slots so following
+  scalar spills cannot alias the pair, while rows without a pressure frame and
+  spill indexes outside the deterministic frame remain fail-closed. The nine
+  composed rows remain the regression set, and Debug std-hello compiler_rt
+  report-all stayed at 443 selected, 129 emitted, and 314 failed;
+  `compiler_rt.mulXi3.__multi3` remains the allocator acceptance row. Item-15
+  accounting remains composed-selection rows 9, terminal-template rows 17,
+  stage-two-boundary rows 2, open integer-helper fallback candidates 33, and
+  one allocator acceptance row pending. Recognizer count still 1 (no new
+  recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
+  Evidence `tmp/std_debug_hello_debug_pair_planned_spill.log`;
+  distribution-all proof `tmp/distribution_all_after_pair_planned_spill.log`.
 
 ## Ratchet State
 

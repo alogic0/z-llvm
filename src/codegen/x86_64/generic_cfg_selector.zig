@@ -740,7 +740,7 @@ fn allocateSelectorIntervals(allocator: std.mem.Allocator, intervals: []const Se
     for (ordered.items) |interval| {
         expireSelectorIntervals(&active, &occupied, interval.start);
         const assignment = allocateSelectorInterval(&occupied, interval, plan.spill_slots);
-        if (std.meta.activeTag(assignment) == .spill) plan.spill_slots += 1;
+        if (std.meta.activeTag(assignment) == .spill) plan.spill_slots += selectorSpillSlotCount(interval);
         try plan.assignments.put(interval.name, assignment);
         if (assignmentUsesRegisters(assignment)) {
             try active.append(allocator, .{ .end = interval.end, .assignment = assignment });
@@ -748,6 +748,10 @@ fn allocateSelectorIntervals(allocator: std.mem.Allocator, intervals: []const Se
         }
     }
     return plan;
+}
+
+fn selectorSpillSlotCount(interval: SelectorValueInterval) usize {
+    return if (interval.bits > 64) 2 else 1;
 }
 
 fn selectorIntervalLessThan(_: void, lhs: SelectorValueInterval, rhs: SelectorValueInterval) bool {
@@ -2264,13 +2268,14 @@ const ComposedBlockSelector = struct {
                 else => null,
             },
             .stack_object, .stack_pointer => actual,
-            .spill => |index| switch (actual) {
+            .spill => |index| if (selector.stack_frame_bytes >= stage2SpillReservedBytes()) switch (actual) {
                 .arg64, .scratch64, .rax, .spill64 => if (spillFrameIndexMaybe(index)) |frame_index| .{ .spill64 = frame_index } else null,
+                .arg128, .scratch128, .spill128 => if (pairSpillFrameIndexMaybe(index)) |spill| .{ .spill128 = spill } else null,
                 else => null,
-            },
+            } else null,
         };
         const target = planned orelse return null;
-        if (std.meta.activeTag(target) == .spill64) return target;
+        if (std.meta.activeTag(target) == .spill64 or std.meta.activeTag(target) == .spill128) return target;
         return if (valueLocEql(actual, target)) target else null;
     }
 
@@ -2351,7 +2356,19 @@ const ComposedBlockSelector = struct {
                     .arg32, .scratch32, .arg128, .scratch128, .eax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return error.UnsupportedCodegenValue,
                 }
             },
-            .arg32, .arg64, .arg128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return error.UnsupportedCodegenValue,
+            .spill128 => |spill| {
+                if (selector.stack_frame_bytes < stage2SpillReservedBytes()) return error.UnsupportedCodegenValue;
+                switch (actual) {
+                    .arg128, .scratch128 => |pair| {
+                        try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.lo, .reg = pair.lo } });
+                        try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = pair.hi } });
+                        selector.invalidatePair(pair);
+                    },
+                    .spill128 => {},
+                    .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
+                }
+            },
+            .arg32, .arg64, .arg128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return error.UnsupportedCodegenValue,
         }
     }
 
@@ -2540,6 +2557,12 @@ const ComposedBlockSelector = struct {
             6 => .slot14,
             else => null,
         };
+    }
+
+    fn pairSpillFrameIndexMaybe(index: usize) ?PairSpillLoc {
+        const lo = spillFrameIndexMaybe(index) orelse return null;
+        const hi = spillFrameIndexMaybe(index + 1) orelse return null;
+        return .{ .lo = lo, .hi = hi };
     }
 
     fn emitValueIntoEax(selector: *ComposedBlockSelector, value: ir.Value) !void {
@@ -3022,6 +3045,28 @@ test "generic cfg selector stores scalar planned spills in deterministic frame s
     try std.testing.expect(selector.current_scratch_names[argRegIndex(.rcx)] == null);
 }
 
+test "generic cfg selector stores planned pair spills in deterministic frame slots" {
+    var machine = MachineFunction.init("planned-pair-spill", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("pair", .{ .spill = 3 });
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    selector.current_pair_a_name = "pair";
+
+    try selector.bindResultLoc("pair", .{ .scratch128 = pair_a });
+    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot8, .hi = .slot10 } }, selector.valueLoc("pair").?);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = pair_a.lo } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot10, .reg = pair_a.hi } }, machine.instructions.items[1]);
+    try std.testing.expect(selector.current_pair_a_name == null);
+}
+
 test "generic cfg selector allocation plan reuses expired registers deterministically" {
     const intervals = [_]SelectorValueInterval{
         .{ .name = "a", .class = .gpr64, .bits = 64, .start = 0, .end = 1 },
@@ -3052,6 +3097,25 @@ test "generic cfg selector allocation plan spills beyond register pool" {
     try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rdi }, plan.assignment("v0").?);
     try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rsi }, plan.assignment("v1").?);
     try std.testing.expectEqual(PlannedValueAssignment{ .spill = 0 }, plan.assignment("v6").?);
+}
+
+test "generic cfg selector allocation plan reserves two slots for pair spills" {
+    const intervals = [_]SelectorValueInterval{
+        .{ .name = "a0", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "a1", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "a2", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "a3", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "a4", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "a5", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "zwide", .class = .gpr128, .bits = 128, .start = 0, .end = 10 },
+        .{ .name = "zzscalar", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+    };
+    var plan = try allocateSelectorIntervals(std.testing.allocator, intervals[0..]);
+    defer plan.deinit();
+
+    try std.testing.expectEqual(@as(usize, 3), plan.spill_slots);
+    try std.testing.expectEqual(PlannedValueAssignment{ .spill = 0 }, plan.assignment("zwide").?);
+    try std.testing.expectEqual(PlannedValueAssignment{ .spill = 2 }, plan.assignment("zzscalar").?);
 }
 
 fn blockHasPhiIncomingFrom(block: ir.BasicBlock, predecessor: []const u8) bool {
