@@ -62,9 +62,11 @@ Current operating note recorded 2026-07-09:
   and the interrupted integer-helper work left `__udivei4` and `__umodei5` as
   validated terminal-template routines. The composed selector now also closes
   `compiler_rt.udivmod.__umodti3` as an i128 stack out-param direct-call
-  wrapper. Current item-15 accounting is composed-selection rows 7,
+  wrapper and `compiler_rt.udivmod.__modti3` as a signed i128 stack out-param
+  direct-call wrapper with bounded pair spills. Current item-15 accounting is
+  composed-selection rows 8,
   terminal-template rows 17, stage-two-boundary rows 2, and open
-  integer-helper fallback candidates 35. Pressure diagnostics:
+  integer-helper fallback candidates 34. Pressure diagnostics:
   `compiler_rt.udivmodei4.__udivei5` records `max_live_values=16`,
   `max_spill_slots_needed=10`, `max_spill_slots_over_envelope=4`,
   `first_exceed_block=Then8.prol`, `first_exceed_boundary=live_out`,
@@ -90,16 +92,18 @@ Current operating note recorded 2026-07-09:
 - Saved log paths: `tmp/std_debug_hello_udivei5_pressure.log`,
   `tmp/std_debug_hello_umodei4_pressure.log`,
   `tmp/std_debug_hello_debug_umodti3_composed.log`, and
-  `tmp/distribution_all_after_umodti3_composed.log`.
+  `tmp/std_debug_hello_debug_modti3_composed.log`; latest distribution-all
+  proof path is `tmp/distribution_all_after_modti3_composed.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
-  `docs/evidence/std_debug_hello_umodti3_composed.summary`.
+  `docs/evidence/std_debug_hello_umodti3_composed.summary`; and
+  `docs/evidence/std_debug_hello_modti3_composed.summary`.
 - Recommended next action: continue the remaining integer-helper rows in rank
   order through composed selection. Keep the intervening
   `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and `__udivti3`
   `UnsupportedTailCallAbi` rows in the separate ABI family; the next active
   composed-selector integer-helper candidate is
-  `compiler_rt.udivmod.__modti3`. Record for every row whether it fits the
+  `compiler_rt.mulXi3.__mulsi3`. Record for every row whether it fits the
   current envelope and, if not, its live-value count. If five or more remaining
   rows hit the pressure boundary, the next major slice is the reviewed real
   register allocator with `__udivei5` as the acceptance row; otherwise revisit

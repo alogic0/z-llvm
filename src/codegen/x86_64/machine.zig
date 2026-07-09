@@ -60,6 +60,7 @@ pub const Instruction = union(enum) {
         op: MachineBinaryOp,
         reg: ArgReg,
     },
+    sbb_arg64_rax: ArgReg,
     imul_arg64_arg64: struct {
         dst: ArgReg,
         src: ArgReg,
