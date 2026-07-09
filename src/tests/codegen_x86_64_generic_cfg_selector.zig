@@ -22,6 +22,39 @@ fn expectNamedInstruction(instructions: []const codegen.x86_64.Instruction, comp
     return error.ExpectedInstructionNotFound;
 }
 
+fn makeBranchChainIr(allocator: std.mem.Allocator, block_count: usize) ![]u8 {
+    if (block_count < 2) return error.InvalidBlockCount;
+    var text: std.ArrayList(u8) = .empty;
+    errdefer text.deinit(allocator);
+
+    try text.appendSlice(allocator,
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @branch_chain(i32 %x) {
+        \\entry:
+        \\  br label %b1
+        \\
+    );
+    for (1..block_count) |index| {
+        const block_text = if (index + 1 == block_count)
+            try std.fmt.allocPrint(allocator,
+                \\b{d}:
+                \\  ret i32 %x
+                \\
+            , .{index})
+        else
+            try std.fmt.allocPrint(allocator,
+                \\b{d}:
+                \\  br label %b{d}
+                \\
+            , .{ index, index + 1 });
+        defer allocator.free(block_text);
+        try text.appendSlice(allocator, block_text);
+    }
+    try text.appendSlice(allocator, "}\n");
+    return try text.toOwnedSlice(allocator);
+}
+
 test "generic cfg selector skeleton reports no emitter for supported straight-line integer shape" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -93,6 +126,47 @@ test "generic cfg selector stage two computes cross-block liveness" {
     try std.testing.expectEqual(@as(usize, 2), summary.edges);
     try std.testing.expect(summary.max_live_out >= 2);
     try std.testing.expect(!summary.exceedsNoSpill());
+}
+
+test "generic cfg selector stage two composes CFG above initial block envelope" {
+    const text = try makeBranchChainIr(std.testing.allocator, 17);
+    defer std.testing.allocator.free(text);
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("branch_chain", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectNamedInstruction(machine.instructions.items, .label, "b16");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector stage two rejects beyond block envelope" {
+    const text = try makeBranchChainIr(std.testing.allocator, 65);
+    defer std.testing.allocator.free(text);
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("branch_chain", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_spill_envelope", diagnostic.tagName());
+    try std.testing.expectEqualStrings("stage2-block-count", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
 test "generic cfg selector stage two rejects unsupported loop condition operands" {

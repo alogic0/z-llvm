@@ -46,6 +46,7 @@ pub const StageTwoSummary = struct {
 };
 
 const no_spill_register_values = 6;
+const stage2_max_blocks = 64;
 
 pub fn tryLower(
     allocator: std.mem.Allocator,
@@ -160,7 +161,7 @@ fn tryLowerComposedCfg(
 ) !SelectionResult {
     if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "stage2-ret-type" });
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
-    if (function.blocks.items.len > 16) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
+    if (function.blocks.items.len > stage2_max_blocks) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
 
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
