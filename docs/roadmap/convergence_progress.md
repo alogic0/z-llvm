@@ -1797,6 +1797,19 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.mulXi3.__multi3`, then the parked `__udivei5` and `__umodei4`
   pressure-boundary rows. Recognizer count still 1 (no new recognizer reorder
   or pre-pass); `shape_recognizer_functions` is unchanged.
+- 2026-07-09 (this commit) Item 15 register-allocator implementation slice:
+  the composed selector now records each named value as a virtual-register
+  binding plus its current physical/frame assignment. This is the first
+  virtual-register rewrite step and intentionally preserves the existing
+  emitted instruction stream: allocation and spill insertion still use the
+  current assignments, while later slices can allocate from the recorded
+  virtual value model. The nine composed rows remain the regression set, and
+  the acceptance order is unchanged (`__multi3`, then `__udivei5` and
+  `__umodei4`). Item-15 accounting remains composed-selection rows 9,
+  terminal-template rows 17, stage-two-boundary rows 2, open integer-helper
+  fallback candidates 33, and one allocator acceptance row pending. Recognizer
+  count still 1 (no new recognizer reorder or pre-pass);
+  `shape_recognizer_functions` is unchanged.
 
 ## Ratchet State
 
