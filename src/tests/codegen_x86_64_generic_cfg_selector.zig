@@ -169,6 +169,32 @@ test "generic cfg selector stage two rejects beyond block envelope" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "generic cfg selector reports structured fallback diagnostic through codegen options" {
+    const text = try makeBranchChainIr(std.testing.allocator, 65);
+    defer std.testing.allocator.free(text);
+
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var diagnostic_tag: ?[]const u8 = null;
+    var diagnostic_detail: ?[]const u8 = null;
+    try std.testing.expectError(
+        error.UnsupportedCodegenControlFlow,
+        codegen.x86_64.lowerFunctionWithOptions(
+            std.testing.allocator,
+            module.target_triple.?,
+            module.functions.items[0],
+            .{
+                .generic_cfg_selector = true,
+                .generic_cfg_selector_diagnostic_tag = &diagnostic_tag,
+                .generic_cfg_selector_diagnostic_detail = &diagnostic_detail,
+            },
+        ),
+    );
+    try std.testing.expectEqualStrings("no_spill_envelope", diagnostic_tag orelse return error.MissingSelectorDiagnostic);
+    try std.testing.expectEqualStrings("stage2-block-count", diagnostic_detail orelse return error.MissingSelectorDiagnostic);
+}
+
 test "generic cfg selector stage two rejects unsupported loop condition operands" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

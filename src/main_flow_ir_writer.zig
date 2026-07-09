@@ -466,21 +466,37 @@ pub fn emitCodegenModule(
     var failed_functions: usize = 0;
     var first_failing_function: []const u8 = "-";
     var first_failing_diagnostic: []const u8 = "-";
+    var first_failing_selector_tag: []const u8 = "-";
+    var first_failing_selector_detail: []const u8 = "-";
     var stderr_buffer: [4096]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
     for (module.functions.items) |function| {
         if (!shouldLowerCodegenFunction(module, function)) continue;
         selected_functions += 1;
+        var selector_diagnostic_tag: ?[]const u8 = null;
+        var selector_diagnostic_detail: ?[]const u8 = null;
         var machine = codegen.x86_64.lowerFunctionWithOptions(allocator, triple, function, .{
             .generic_cfg_selector = options.generic_cfg_selector,
+            .generic_cfg_selector_diagnostic_tag = &selector_diagnostic_tag,
+            .generic_cfg_selector_diagnostic_detail = &selector_diagnostic_detail,
         }) catch |err| {
             if (options.report_all_failures) {
                 if (failed_functions == 0) {
                     first_failing_function = function.name;
                     first_failing_diagnostic = @errorName(err);
+                    first_failing_selector_tag = selector_diagnostic_tag orelse "-";
+                    first_failing_selector_detail = selector_diagnostic_detail orelse "-";
                 }
                 failed_functions += 1;
-                try stderr_writer.interface.print("zllvm-codegen-failure function={s} diagnostic={s}\n", .{ function.name, @errorName(err) });
+                try stderr_writer.interface.print(
+                    "zllvm-codegen-failure function={s} diagnostic={s} selector_tag={s} selector_detail={s}\n",
+                    .{
+                        function.name,
+                        @errorName(err),
+                        selector_diagnostic_tag orelse "-",
+                        selector_diagnostic_detail orelse "-",
+                    },
+                );
                 continue;
             }
             try fatal(io, "codegen failed for function {s}: {any}\n", .{ function.name, err });
@@ -490,7 +506,7 @@ pub fn emitCodegenModule(
     }
     if (options.report_all_failures) {
         try stderr_writer.interface.print(
-            "summary zllvm-codegen-report-all target={s} selected_functions={} emitted_functions={} failed_functions={} first_failing_function={s} first_failing_diagnostic={s} local_fail={}\n",
+            "summary zllvm-codegen-report-all target={s} selected_functions={} emitted_functions={} failed_functions={} first_failing_function={s} first_failing_diagnostic={s} first_failing_selector_tag={s} first_failing_selector_detail={s} local_fail={}\n",
             .{
                 triple,
                 selected_functions,
@@ -498,6 +514,8 @@ pub fn emitCodegenModule(
                 failed_functions,
                 first_failing_function,
                 first_failing_diagnostic,
+                first_failing_selector_tag,
+                first_failing_selector_detail,
                 @intFromBool(failed_functions != 0),
             },
         );

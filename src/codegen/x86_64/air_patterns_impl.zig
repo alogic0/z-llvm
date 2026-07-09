@@ -378,7 +378,10 @@ pub fn lowerFunctionWithOptions(
                 try verifyFunction(machine);
                 return machine;
             },
-            .unsupported => {},
+            .unsupported => |diagnostic| {
+                if (options.generic_cfg_selector_diagnostic_tag) |tag| tag.* = diagnostic.tagName();
+                if (options.generic_cfg_selector_diagnostic_detail) |detail| detail.* = diagnostic.detail();
+            },
         }
     }
 
