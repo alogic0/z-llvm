@@ -41,6 +41,15 @@ pub const StageTwoSummary = struct {
     no_spill_limit: usize,
     spill_slot_count: usize,
     spill_envelope_limit: usize,
+    max_pressure_block: []const u8,
+    max_pressure_boundary: []const u8,
+    max_pressure_spill_slots_needed: usize,
+    max_pressure_spill_slots_over_envelope: usize,
+    first_exceeding_block: []const u8,
+    first_exceeding_boundary: []const u8,
+    first_exceeding_live_values: usize,
+    first_exceeding_spill_slots_needed: usize,
+    first_exceeding_spill_slots_over_envelope: usize,
 
     pub fn exceedsNoSpill(summary: StageTwoSummary) bool {
         return summary.max_pressure > summary.no_spill_limit;
@@ -233,6 +242,15 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
             .no_spill_limit = no_spill_register_values,
             .spill_slot_count = stage2_spill_slots,
             .spill_envelope_limit = no_spill_register_values + stage2_spill_slots,
+            .max_pressure_block = "-",
+            .max_pressure_boundary = "-",
+            .max_pressure_spill_slots_needed = 0,
+            .max_pressure_spill_slots_over_envelope = 0,
+            .first_exceeding_block = "-",
+            .first_exceeding_boundary = "-",
+            .first_exceeding_live_values = 0,
+            .first_exceeding_spill_slots_needed = 0,
+            .first_exceeding_spill_slots_over_envelope = 0,
         };
     }
 
@@ -294,11 +312,41 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
 
     var max_live_in: usize = 0;
     var max_live_out: usize = 0;
+    var max_pressure_block: []const u8 = "-";
+    var max_pressure_boundary: []const u8 = "-";
+    var max_pressure_seen: usize = 0;
+    var first_exceeding_block: []const u8 = "-";
+    var first_exceeding_boundary: []const u8 = "-";
+    var first_exceeding_live_values: usize = 0;
     for (blocks.items) |block| {
-        max_live_in = @max(max_live_in, block.live_in.count());
-        max_live_out = @max(max_live_out, block.live_out.count());
+        const live_in_count = block.live_in.count();
+        const live_out_count = block.live_out.count();
+        if (live_in_count > max_live_in) max_live_in = live_in_count;
+        if (live_out_count > max_live_out) max_live_out = live_out_count;
+        if (live_in_count > max_pressure_seen or std.mem.eql(u8, max_pressure_block, "-")) {
+            max_pressure_seen = live_in_count;
+            max_pressure_block = block.name;
+            max_pressure_boundary = "live_in";
+        }
+        if (live_out_count > max_pressure_seen) {
+            max_pressure_seen = live_out_count;
+            max_pressure_block = block.name;
+            max_pressure_boundary = "live_out";
+        }
+        if (first_exceeding_live_values == 0 and live_in_count > no_spill_register_values + stage2_spill_slots) {
+            first_exceeding_block = block.name;
+            first_exceeding_boundary = "live_in";
+            first_exceeding_live_values = live_in_count;
+        }
+        if (first_exceeding_live_values == 0 and live_out_count > no_spill_register_values + stage2_spill_slots) {
+            first_exceeding_block = block.name;
+            first_exceeding_boundary = "live_out";
+            first_exceeding_live_values = live_out_count;
+        }
     }
     const max_pressure = @max(max_live_in, max_live_out);
+    const max_spill_slots_needed = stage2SpillSlotsNeeded(max_pressure);
+    const first_exceeding_spill_slots_needed = stage2SpillSlotsNeeded(first_exceeding_live_values);
     return .{
         .blocks = blocks.items.len,
         .edges = edge_count,
@@ -308,7 +356,24 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
         .no_spill_limit = no_spill_register_values,
         .spill_slot_count = stage2_spill_slots,
         .spill_envelope_limit = no_spill_register_values + stage2_spill_slots,
+        .max_pressure_block = max_pressure_block,
+        .max_pressure_boundary = max_pressure_boundary,
+        .max_pressure_spill_slots_needed = max_spill_slots_needed,
+        .max_pressure_spill_slots_over_envelope = stage2SpillSlotsOverEnvelope(max_spill_slots_needed),
+        .first_exceeding_block = first_exceeding_block,
+        .first_exceeding_boundary = first_exceeding_boundary,
+        .first_exceeding_live_values = first_exceeding_live_values,
+        .first_exceeding_spill_slots_needed = first_exceeding_spill_slots_needed,
+        .first_exceeding_spill_slots_over_envelope = stage2SpillSlotsOverEnvelope(first_exceeding_spill_slots_needed),
     };
+}
+
+fn stage2SpillSlotsNeeded(live_values: usize) usize {
+    return if (live_values > no_spill_register_values) live_values - no_spill_register_values else 0;
+}
+
+fn stage2SpillSlotsOverEnvelope(spill_slots_needed: usize) usize {
+    return if (spill_slots_needed > stage2_spill_slots) spill_slots_needed - stage2_spill_slots else 0;
 }
 
 const NameSet = std.StringHashMap(void);

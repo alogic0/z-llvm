@@ -643,6 +643,10 @@ test "generic cfg selector stage two computes pressure above no-spill envelope" 
     try std.testing.expect(summary.max_pressure > summary.no_spill_limit);
     try std.testing.expect(summary.exceedsNoSpill());
     try std.testing.expectEqual(@as(usize, 6), summary.spill_slot_count);
+    try std.testing.expectEqual(@as(usize, 1), summary.max_pressure_spill_slots_needed);
+    try std.testing.expectEqual(@as(usize, 0), summary.max_pressure_spill_slots_over_envelope);
+    try std.testing.expectEqualStrings("-", summary.first_exceeding_block);
+    try std.testing.expectEqual(@as(usize, 0), summary.first_exceeding_live_values);
     try std.testing.expect(!summary.exceedsSpillEnvelope());
 }
 
@@ -685,6 +689,13 @@ test "generic cfg selector stage two rejects pressure above spill envelope" {
     const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
     try std.testing.expect(summary.max_pressure > summary.spill_envelope_limit);
     try std.testing.expect(summary.exceedsSpillEnvelope());
+    try std.testing.expectEqualStrings("entry", summary.max_pressure_block);
+    try std.testing.expectEqualStrings("live_out", summary.max_pressure_boundary);
+    try std.testing.expectEqual(summary.max_pressure - summary.no_spill_limit, summary.max_pressure_spill_slots_needed);
+    try std.testing.expect(summary.max_pressure_spill_slots_over_envelope > 0);
+    try std.testing.expectEqualStrings("entry", summary.first_exceeding_block);
+    try std.testing.expectEqualStrings("live_out", summary.first_exceeding_boundary);
+    try std.testing.expectEqual(summary.max_pressure, summary.first_exceeding_live_values);
 
     var machine = codegen.x86_64.MachineFunction.init("pressure", module.functions.items[0].ret_ty);
     defer machine.deinit(std.testing.allocator);

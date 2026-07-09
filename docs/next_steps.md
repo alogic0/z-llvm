@@ -37,19 +37,18 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-Item 15 stage-two pressure blocker. The same row,
-`compiler_rt.udivmodei4.__udivei5`, has failed three consecutive fix attempts
-without leaving `no_spill_envelope` / `stage2-register-pressure`:
-unsigned div/rem instruction support moved it to the pressure boundary, then
-stack-object pressure exemption and the bounded spill-frame slice both left it
-at the same boundary. Stop here per the hard-stop rule; do not template the row.
+None.
 
-Stop state recorded 2026-07-09:
+Current operating note recorded 2026-07-09:
 
-- Active convergence-progress item: item 15 is pulled forward as an
-  architectural migration under item 12's std-hello real-program track. The
-  real-row track remains closed through item 10 at strict `--limit=100`, but
-  every stop report still states both tracks.
+- Active convergence-progress item: item 15 remains pulled forward as an
+  architectural migration under item 12's std-hello real-program track.
+  `compiler_rt.udivmodei4.__udivei5` is a recorded stage-two-boundary row, not
+  the next fix target; do not attempt it again until the remaining
+  integer-helper rows have pressure data or the register-allocator slice is
+  selected by the decision rule. The real-row track remains closed through
+  item 10 at strict `--limit=100`, but every stop report still states both
+  tracks.
 - Real-row track status: strict `distribution-real-rows --strict --limit=100`
   is green in ReleaseFast, ReleaseSafe, and ReleaseSmall, and
   `distribution-all` enforces that strict limit. Selector-v2 ReleaseFast
@@ -62,12 +61,13 @@ Stop state recorded 2026-07-09:
   remains open. Item 15 stage one closed 15 limb64 terminal selector routines,
   and the interrupted integer-helper work left `__udivei4` and `__umodei5` as
   validated terminal-template routines. Current item-15 accounting is
-  composed-selection rows 6, terminal-template rows 17, and open
-  integer-helper fallback candidates 37. The latest focused report-all run
-  selected 443 compiler_rt functions, emitted 126, and reported 317 failures
-  before failing closed with no object output. The first failing function is
-  `compiler_rt.udivmodei4.__udivei5` at selector tag/detail
-  `no_spill_envelope` / `stage2-register-pressure`.
+  composed-selection rows 6, terminal-template rows 17, stage-two-boundary rows
+  1, and open integer-helper fallback candidates 37. The pressure diagnostic
+  for `compiler_rt.udivmodei4.__udivei5` records `max_live_values=16`,
+  `max_spill_slots_needed=10`, `max_spill_slots_over_envelope=4`,
+  `first_exceed_block=Then8.prol`, `first_exceed_boundary=live_out`,
+  `first_exceed_live_values=13`, and
+  `first_exceed_spill_slots_needed=7`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -82,17 +82,16 @@ Stop state recorded 2026-07-09:
 - Enforcement state: `distribution-all` runs
   `src/distribution_real_rows_gate.zig --strict --limit=100` for ReleaseFast,
   ReleaseSafe, and ReleaseSmall.
-- Saved log paths: `tmp/std_debug_hello_debug_stage2_spill_frame.log` and
-  `tmp/distribution_all_after_stage2_spill_frame.log`.
-- Tracked evidence summary:
-  `docs/evidence/std_debug_hello_stage2_spill_frame.summary`.
-- Recommended next action: review the item-15 stage-two pressure design before
-  making another `__udivei5` fix attempt. The next implementation slice should
-  add explicit pressure diagnostics and a real liveness-driven spill plan for
-  high-pressure multi-loop functions with large stack-array payloads, then
-  resume composed selection. Keep terminal routines prohibited for this row,
-  keep recognizers as fallback only, and keep the 44 `UnsupportedTailCallAbi`
-  rows as a separate ABI family.
+- Saved log paths: `tmp/std_debug_hello_udivei5_pressure.log` and
+  `tmp/distribution_all_after_udivei5_pressure.log`.
+- Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv`.
+- Recommended next action: continue the remaining integer-helper rows in rank
+  order through composed selection, recording for every row whether it fits the
+  current envelope and, if not, its live-value count. If five or more remaining
+  rows hit the pressure boundary, the next major slice is the reviewed real
+  register allocator with `__udivei5` as the acceptance row; otherwise revisit
+  `__udivei5` as an outlier after the bucket. Keep terminal routines frozen and
+  keep the 44 `UnsupportedTailCallAbi` rows as a separate ABI family.
 
 When the worker stops, record only:
 
