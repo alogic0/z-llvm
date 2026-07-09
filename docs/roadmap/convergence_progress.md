@@ -351,6 +351,27 @@ list and the visible record of progress. Evidence summaries under
   soft-float/libm/conversion selector bucket. `distribution-all` must stay
   green before every commit; if captured rows regress, use the loop-sum bisect
   discipline before proceeding.
+
+  Stage-two allocator design note (2026-07-09): the composed selector's value
+  model is virtual registers, not opportunistic physical-register ownership.
+  Per-instruction selection should assign each z_llvm IR value a deterministic
+  virtual register in SSA/block order, attach register-class constraints to
+  each selected operation, and attach fixed-register constraints for SysV
+  arguments, returns, machine instructions with fixed operands, and explicit
+  clobbers. Allocation runs over the existing stage-two live sets with a
+  linear-scan-or-equivalent algorithm chosen for implementability and
+  deterministic output. Physical assignment must be liveness-aware: intervals
+  expire by program point, fixed/clobber registers reserve their points, and
+  unsupported register-class or pressure states fail closed with the row and
+  diagnostic recorded. Spill capacity is frame-sized rather than the old
+  six-slot envelope: spilled virtual registers get deterministic stack slots,
+  reloads/stores are inserted at selected instruction boundaries, and frame
+  size/accounting replaces ad hoc local spill slots. Acceptance order is
+  binding: keep the existing nine composed rows green as the regression set,
+  then close `compiler_rt.mulXi3.__multi3` through composed selection, then
+  retry the parked pressure-boundary rows `__udivei5` and `__umodei4` with the
+  saved diagnostics as expected-pressure checks. Terminal templates remain
+  frozen except for the documented sub-ten-instruction leaf exception.
 - [ ] 16. ABI-level differential harness: same real function compiled by
   stock LLVM Zig and z_llvm behind a shared input-generating C harness;
   outputs, exit codes, and ReleaseSafe panic behavior compared; runs on
@@ -1765,6 +1786,17 @@ One line per completed cycle, append-only, newest last. This is the
   or pre-pass); `shape_recognizer_functions` is unchanged. Focused log
   `tmp/std_debug_hello_debug_multi3_composed_after_liveness_preserve.log`;
   failed patch saved at `tmp/generic_cfg_selector_failed_multi3_attempt.patch`.
+- 2026-07-09 (this commit) Item 15 register-allocator design note: the
+  approved stage-two allocator slice is now binding on the tracker. The
+  composed selector moves to virtual registers as its value model, allocation
+  is liveness-aware over the existing stage-two live sets with a
+  linear-scan-or-equivalent algorithm, spill capacity is frame-sized instead of
+  the six-slot envelope, calling-convention and clobber requirements are
+  expressed as register-class or fixed-assignment constraints, and output must
+  be deterministic. Acceptance order is the nine existing composed rows,
+  `compiler_rt.mulXi3.__multi3`, then the parked `__udivei5` and `__umodei4`
+  pressure-boundary rows. Recognizer count still 1 (no new recognizer reorder
+  or pre-pass); `shape_recognizer_functions` is unchanged.
 
 ## Ratchet State
 
