@@ -49,6 +49,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
             .binary_arg_rax => |binary| try writer.print("\t{s} {s}, %rax\n", .{ binary.op.mnemonic64(), binary.reg.name64() }),
             .imul_arg64_arg64 => |imul| try writer.print("\timulq {s}, {s}\n", .{ imul.src.name64(), imul.dst.name64() }),
+            .xor_edx_edx => try writer.writeAll("\txorl %edx, %edx\n"),
+            .div_arg64 => |reg| try writer.print("\tdivq {s}\n", .{reg.name64()}),
             .add_arg64_rax => |reg| try writer.print("\taddq {s}, %rax\n", .{reg.name64()}),
             .add_arg64_imm32 => |add| try writer.print("\taddq ${}, {s}\n", .{ add.imm, add.reg.name64() }),
             .add_arg_high32_eax => |reg| try writer.print("\tmovq {s}, %rcx\n\tshrq $32, %rcx\n\taddl %ecx, %eax\n", .{reg.name64()}),

@@ -32,6 +32,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .binary_arg_eax,
         .binary_arg_rax,
         .imul_arg64_arg64,
+        .xor_edx_edx,
+        .div_arg64,
         .add_arg64_rax,
         .add_arg64_imm32,
         .add_arg_high32_eax,
@@ -392,7 +394,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm32_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .mov_rax_rsi, .mov_eax_to_arg, .mov_rax_to_arg, .movsxd_arg32_arg64, .imul_arg64_arg64, .add_arg64_imm32, .shr_arg_imm5, .shr_arg64_imm6, .sar_arg64_imm6, .mov_rsp_arg64, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64, .spinlocked_var_xchg_edi_rsi_rdx_rcx, .spinlocked_var_store_edi_rsi_rdx => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .mov_rax_rsi, .mov_eax_to_arg, .mov_rax_to_arg, .movsxd_arg32_arg64, .imul_arg64_arg64, .div_arg64, .add_arg64_imm32, .shr_arg_imm5, .shr_arg64_imm6, .sar_arg64_imm6, .mov_rsp_arg64, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64, .spinlocked_var_xchg_edi_rsi_rdx_rcx, .spinlocked_var_store_edi_rsi_rdx => {},
         .reload_rsp_eax, .reload_rsp_rax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -553,7 +555,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .shl_rcx_imm6, .shl_r8_imm6, .or_rcx_rax, .or_rcx_rdx, .add_rcx_imm32, .add_r8_rcx, .sub_r8_rcx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .store_eax_rdi_rcx4_ptr, .store_al_rcx_ptr, .store_ax_rcx_ptr, .store_eax_rcx_ptr, .store_rax_rcx_ptr, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .stack_probe_rax_rcx_rsp, .spinlocked_memcpy_rsi_to_rdx_len_edi, .spinlocked_store_i128_rdi_rsi_rdx, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_al_arg_ptr_disp8, .store_al_arg_ptr_disp32, .store_ax_arg_ptr_disp8, .store_ax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_xmm0_f32_arg_ptr_disp8, .store_xmm0_f32_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .load_stack_disp8_xmm_f32, .load_stack_disp32_xmm_f32, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .syscall, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => {},
+        .mov_arg_arg, .mov_arg64_arg, .xor_edx_edx, .shl_rdx_imm6, .shl_rcx_imm6, .shl_r8_imm6, .or_rcx_rax, .or_rcx_rdx, .add_rcx_imm32, .add_r8_rcx, .sub_r8_rcx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .store_eax_rdi_rcx4_ptr, .store_al_rcx_ptr, .store_ax_rcx_ptr, .store_eax_rcx_ptr, .store_rax_rcx_ptr, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .stack_probe_rax_rcx_rsp, .spinlocked_memcpy_rsi_to_rdx_len_edi, .spinlocked_store_i128_rdi_rsi_rdx, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_al_arg_ptr_disp8, .store_al_arg_ptr_disp32, .store_ax_arg_ptr_disp8, .store_ax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_xmm0_f32_arg_ptr_disp8, .store_xmm0_f32_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .load_stack_disp8_xmm_f32, .load_stack_disp32_xmm_f32, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .syscall, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -594,6 +596,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .binary_arg_eax,
         .binary_arg_rax,
         .imul_arg64_arg64,
+        .xor_edx_edx,
+        .div_arg64,
         .add_arg64_rax,
         .add_arg64_imm32,
         .add_arg_high32_eax,

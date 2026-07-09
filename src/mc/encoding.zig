@@ -75,6 +75,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .binary_arg_rax => |binary| try encodeRegToRax64Binary(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .imul_arg64_arg64 => |imul| try encodeImulReg64Reg64(&bytes, allocator, imul.dst, imul.src),
+            .xor_edx_edx => try bytes.appendSlice(allocator, &.{ 0x31, 0xd2 }),
+            .div_arg64 => |reg| try encodeDivReg64(&bytes, allocator, reg),
             .add_arg64_rax => |reg| try encodeRegToRax64Binary(&bytes, allocator, 0x01, reg),
             .add_arg64_imm32 => |add| try encodeAddReg64Imm32(&bytes, allocator, add.reg, add.imm),
             .add_arg_high32_eax => |reg| try encodeAddHigh32ToEax(&bytes, allocator, reg),
@@ -1544,6 +1546,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
         .binary_arg_rax => |binary| if (binary.reg.rexR()) 4 else 3,
         .imul_arg64_arg64 => 4,
+        .xor_edx_edx => 2,
+        .div_arg64 => |reg| if (reg.rexB()) 4 else 3,
         .add_arg64_rax => 3,
         .add_arg64_imm32 => 7,
         .add_arg_high32_eax => |reg| (if (reg.rexR()) @as(u32, 3) else 3) + 6,
@@ -1970,6 +1974,14 @@ fn encodeRegToRax64Binary(bytes: *std.ArrayList(u8), allocator: std.mem.Allocato
     try bytes.append(allocator, rex);
     try bytes.append(allocator, opcode);
     try bytes.append(allocator, 0xc0 | (@as(u8, reg.lowCode()) << 3));
+}
+
+fn encodeDivReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    var rex: u8 = 0x48;
+    if (reg.rexB()) rex |= 0x01;
+    try bytes.append(allocator, rex);
+    try bytes.append(allocator, 0xf7);
+    try bytes.append(allocator, 0xf0 | @as(u8, reg.lowCode()));
 }
 
 fn encodeAddHigh32ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {

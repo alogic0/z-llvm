@@ -124,6 +124,13 @@ pub fn tryLower(
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {
             .no_emitter => {},
+            .unsupported_instruction => |detail| {
+                if (!std.mem.eql(u8, detail, "udiv") and
+                    !std.mem.eql(u8, detail, "urem"))
+                {
+                    return inspected;
+                }
+            },
             .unsupported_control_flow => {
                 if (function.blocks.items.len > 1) {
                     const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
@@ -709,6 +716,9 @@ const ComposedBlockSelector = struct {
         if (bits == 128) return try selector.lowerPairBinary(result_name, binary);
 
         if (binary.op == .mul and bits == 64) return try selector.lowerMul64(result_name, binary);
+        if ((binary.op == .udiv or binary.op == .urem) and bits == 64) {
+            return try selector.lowerUnsignedDivRem64(result_name, binary);
+        }
 
         const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
         const lhs = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
@@ -848,6 +858,33 @@ const ComposedBlockSelector = struct {
         };
         try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } });
         try selector.bindScratch(result_name, dst, 64);
+        return null;
+    }
+
+    fn lowerUnsignedDivRem64(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
+        const rhs = selector.resolveValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
+        if (rhs == .rax) {
+            try selector.emitValueIntoScratch(binary.rhs, .rcx, 64);
+            try selector.emitValueIntoRax(binary.lhs);
+        } else {
+            try selector.emitValueIntoRax(binary.lhs);
+            try selector.emitValueIntoScratch(binary.rhs, .rcx, 64);
+        }
+        selector.invalidateScratchContaining(.rdx);
+        selector.invalidatePairContaining(.rdx);
+        try selector.machine.instructions.append(selector.allocator, .xor_edx_edx);
+        try selector.machine.instructions.append(selector.allocator, .{ .div_arg64 = .rcx });
+        switch (binary.op) {
+            .udiv => {
+                try selector.bindRax(result_name);
+                selector.invalidateScratchContaining(.rdx);
+            },
+            .urem => {
+                selector.current_eax_name = null;
+                try selector.bindScratch(result_name, .rdx, 64);
+            },
+            else => unreachable,
+        }
         return null;
     }
 

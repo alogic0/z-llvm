@@ -676,6 +676,75 @@ test "generic cfg selector composes single-block i32 add through machine instruc
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
+test "generic cfg selector composes i64 unsigned quotient through assigned registers" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @quotient(i64 %a, i64 %b) {
+        \\entry:
+        \\  %q = udiv i64 %a, %b
+        \\  ret i64 %q
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("quotient", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(@as(usize, 5), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rsi } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.xor_edx_edx, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .div_arg64 = .rcx }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
+}
+
+test "generic cfg selector composes i64 unsigned remainder through assigned registers" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @remainder(i64 %a, i64 %b) {
+        \\entry:
+        \\  %r = urem i64 %a, %b
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("remainder", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(@as(usize, 6), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rsi } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.xor_edx_edx, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .div_arg64 = .rcx }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdx }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+}
+
 test "generic cfg selector rejects composed row that needs another live accumulator copy" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
