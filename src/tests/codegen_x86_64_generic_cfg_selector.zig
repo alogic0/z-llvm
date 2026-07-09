@@ -644,6 +644,39 @@ test "generic cfg selector stage two rejects pressure above no-spill envelope" {
     try std.testing.expect(summary.exceedsNoSpill());
 }
 
+test "generic cfg selector stage two excludes stack objects from register pressure" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_pressure(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i1 %cond) {
+        \\entry:
+        \\  %slot = alloca [4 x i32], align 4
+        \\  %ptr = getelementptr inbounds [4 x i32], ptr %slot, i64 0, i64 0
+        \\  store i32 %a, ptr %ptr, align 4
+        \\  br i1 %cond, label %body, label %exit
+        \\body:
+        \\  %loaded = load i32, ptr %ptr, align 4
+        \\  %s1 = add i32 %a, %b
+        \\  %s2 = add i32 %c, %d
+        \\  %s3 = add i32 %e, %f
+        \\  %s4 = add i32 %s1, %s2
+        \\  %s5 = add i32 %s4, %s3
+        \\  %s6 = add i32 %s5, %loaded
+        \\  ret i32 %s6
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
+    try std.testing.expectEqual(@as(usize, 3), summary.blocks);
+    try std.testing.expectEqual(summary.no_spill_limit, summary.max_pressure);
+    try std.testing.expect(!summary.exceedsNoSpill());
+}
+
 test "generic cfg selector composes single-block i32 add through machine instructions" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

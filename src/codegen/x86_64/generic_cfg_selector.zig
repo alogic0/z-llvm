@@ -203,6 +203,10 @@ fn tryLowerComposedCfg(
 }
 
 pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir.Function) !StageTwoSummary {
+    var pressure_exempt_values = NameSet.init(allocator);
+    defer pressure_exempt_values.deinit();
+    try collectPressureExemptValues(&pressure_exempt_values, function);
+
     var blocks: std.ArrayList(StageTwoBlock) = .empty;
     defer {
         for (blocks.items) |*block| block.deinit();
@@ -229,7 +233,7 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
 
     var edge_count: usize = 0;
     for (function.blocks.items, 0..) |block, block_index| {
-        try collectBlockUsesAndDefs(&blocks.items[block_index], block);
+        try collectBlockUsesAndDefs(&blocks.items[block_index], block, pressure_exempt_values);
         const block_successors = try successors(block);
         for (block_successors.names[0..block_successors.len]) |successor_name| {
             if (successor_name.len == 0) continue;
@@ -326,99 +330,133 @@ const StageTwoBlock = struct {
     }
 };
 
-fn collectBlockUsesAndDefs(stage_block: *StageTwoBlock, block: ir.BasicBlock) !void {
-    for (block.instructions.items) |instruction| {
-        if (instruction.removed) continue;
-        if (instruction.kind != .phi) try collectInstructionUses(stage_block, instruction);
-        if (instruction.result) |result| try stage_block.defs.put(result, {});
+fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !void {
+    var changed = true;
+    while (changed) {
+        changed = false;
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                if (instruction.removed) continue;
+                const result = instruction.result orelse continue;
+                switch (instruction.kind) {
+                    .alloca => {
+                        if (!exempt_values.contains(result)) {
+                            try exemptValuesPut(exempt_values, result);
+                            changed = true;
+                        }
+                    },
+                    .gep => |gep| {
+                        const ptr_name = namedValue(gep.ptr) orelse continue;
+                        if (exempt_values.contains(ptr_name) and !exempt_values.contains(result)) {
+                            try exemptValuesPut(exempt_values, result);
+                            changed = true;
+                        }
+                    },
+                    else => {},
+                }
+            }
+        }
     }
-    if (block.terminator) |terminator| try collectTerminatorUses(stage_block, terminator);
 }
 
-fn collectInstructionUses(stage_block: *StageTwoBlock, instruction: ir.Instruction) !void {
+fn exemptValuesPut(exempt_values: *NameSet, name: []const u8) !void {
+    try exempt_values.put(name, {});
+}
+
+fn collectBlockUsesAndDefs(stage_block: *StageTwoBlock, block: ir.BasicBlock, pressure_exempt_values: NameSet) !void {
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        if (instruction.kind != .phi) try collectInstructionUses(stage_block, instruction, pressure_exempt_values);
+        if (instruction.result) |result| try stage_block.defs.put(result, {});
+    }
+    if (block.terminator) |terminator| try collectTerminatorUses(stage_block, terminator, pressure_exempt_values);
+}
+
+fn collectInstructionUses(stage_block: *StageTwoBlock, instruction: ir.Instruction, pressure_exempt_values: NameSet) !void {
     switch (instruction.kind) {
         .binary => |binary| {
-            try addBlockUse(stage_block, binary.lhs);
-            try addBlockUse(stage_block, binary.rhs);
+            try addBlockUse(stage_block, binary.lhs, pressure_exempt_values);
+            try addBlockUse(stage_block, binary.rhs, pressure_exempt_values);
         },
-        .cast => |cast| try addBlockUse(stage_block, cast.value),
-        .freeze => |freeze| try addBlockUse(stage_block, freeze.value),
+        .cast => |cast| try addBlockUse(stage_block, cast.value, pressure_exempt_values),
+        .freeze => |freeze| try addBlockUse(stage_block, freeze.value, pressure_exempt_values),
         .icmp => |icmp| {
-            try addBlockUse(stage_block, icmp.lhs);
-            try addBlockUse(stage_block, icmp.rhs);
+            try addBlockUse(stage_block, icmp.lhs, pressure_exempt_values);
+            try addBlockUse(stage_block, icmp.rhs, pressure_exempt_values);
         },
         .fcmp => |fcmp| {
-            try addBlockUse(stage_block, fcmp.lhs);
-            try addBlockUse(stage_block, fcmp.rhs);
+            try addBlockUse(stage_block, fcmp.lhs, pressure_exempt_values);
+            try addBlockUse(stage_block, fcmp.rhs, pressure_exempt_values);
         },
         .select => |select| {
-            try addBlockUse(stage_block, select.cond);
-            try addBlockUse(stage_block, select.true_value);
-            try addBlockUse(stage_block, select.false_value);
+            try addBlockUse(stage_block, select.cond, pressure_exempt_values);
+            try addBlockUse(stage_block, select.true_value, pressure_exempt_values);
+            try addBlockUse(stage_block, select.false_value, pressure_exempt_values);
         },
         .phi => {},
         .alloca, .fence => {},
-        .load => |load| try addBlockUse(stage_block, load.ptr),
+        .load => |load| try addBlockUse(stage_block, load.ptr, pressure_exempt_values),
         .store => |store| {
-            try addBlockUse(stage_block, store.value);
-            try addBlockUse(stage_block, store.ptr);
+            try addBlockUse(stage_block, store.value, pressure_exempt_values);
+            try addBlockUse(stage_block, store.ptr, pressure_exempt_values);
         },
         .atomicrmw => |atomicrmw| {
-            try addBlockUse(stage_block, atomicrmw.ptr);
-            try addBlockUse(stage_block, atomicrmw.value);
+            try addBlockUse(stage_block, atomicrmw.ptr, pressure_exempt_values);
+            try addBlockUse(stage_block, atomicrmw.value, pressure_exempt_values);
         },
         .cmpxchg => |cmpxchg| {
-            try addBlockUse(stage_block, cmpxchg.ptr);
-            try addBlockUse(stage_block, cmpxchg.expected);
-            try addBlockUse(stage_block, cmpxchg.replacement);
+            try addBlockUse(stage_block, cmpxchg.ptr, pressure_exempt_values);
+            try addBlockUse(stage_block, cmpxchg.expected, pressure_exempt_values);
+            try addBlockUse(stage_block, cmpxchg.replacement, pressure_exempt_values);
         },
         .extractelement => |extract| {
-            try addBlockUse(stage_block, extract.vector);
-            try addBlockUse(stage_block, extract.index);
+            try addBlockUse(stage_block, extract.vector, pressure_exempt_values);
+            try addBlockUse(stage_block, extract.index, pressure_exempt_values);
         },
         .insertelement => |insert| {
-            try addBlockUse(stage_block, insert.vector);
-            try addBlockUse(stage_block, insert.value);
-            try addBlockUse(stage_block, insert.index);
+            try addBlockUse(stage_block, insert.vector, pressure_exempt_values);
+            try addBlockUse(stage_block, insert.value, pressure_exempt_values);
+            try addBlockUse(stage_block, insert.index, pressure_exempt_values);
         },
         .shufflevector => |shuffle| {
-            try addBlockUse(stage_block, shuffle.lhs);
-            try addBlockUse(stage_block, shuffle.rhs);
-            try addBlockUse(stage_block, shuffle.mask);
+            try addBlockUse(stage_block, shuffle.lhs, pressure_exempt_values);
+            try addBlockUse(stage_block, shuffle.rhs, pressure_exempt_values);
+            try addBlockUse(stage_block, shuffle.mask, pressure_exempt_values);
         },
-        .extractvalue => |extract| try addBlockUse(stage_block, extract.aggregate),
+        .extractvalue => |extract| try addBlockUse(stage_block, extract.aggregate, pressure_exempt_values),
         .insertvalue => |insert| {
-            try addBlockUse(stage_block, insert.aggregate);
-            try addBlockUse(stage_block, insert.value);
+            try addBlockUse(stage_block, insert.aggregate, pressure_exempt_values);
+            try addBlockUse(stage_block, insert.value, pressure_exempt_values);
         },
         .gep => |gep| {
-            try addBlockUse(stage_block, gep.ptr);
-            for (gep.indices.items) |index| try addBlockUse(stage_block, index.value);
+            try addBlockUse(stage_block, gep.ptr, pressure_exempt_values);
+            for (gep.indices.items) |index| try addBlockUse(stage_block, index.value, pressure_exempt_values);
         },
         .call => |call| {
             if (call.isDebugVariableLocation()) return;
-            if (call.callee_value) |callee| try addBlockUse(stage_block, callee);
-            for (call.args.items) |arg| try addBlockUse(stage_block, arg.value);
+            if (call.callee_value) |callee| try addBlockUse(stage_block, callee, pressure_exempt_values);
+            for (call.args.items) |arg| try addBlockUse(stage_block, arg.value, pressure_exempt_values);
         },
     }
 }
 
-fn collectTerminatorUses(stage_block: *StageTwoBlock, terminator: ir.Terminator) !void {
+fn collectTerminatorUses(stage_block: *StageTwoBlock, terminator: ir.Terminator, pressure_exempt_values: NameSet) !void {
     switch (terminator) {
-        .ret => |ret| if (ret.value) |value| try addBlockUse(stage_block, value),
+        .ret => |ret| if (ret.value) |value| try addBlockUse(stage_block, value, pressure_exempt_values),
         .br => {},
-        .condbr => |condbr| try addBlockUse(stage_block, condbr.cond),
+        .condbr => |condbr| try addBlockUse(stage_block, condbr.cond, pressure_exempt_values),
         .@"switch" => |switch_term| {
-            try addBlockUse(stage_block, switch_term.cond);
-            for (switch_term.cases.items) |case| try addBlockUse(stage_block, case.value);
+            try addBlockUse(stage_block, switch_term.cond, pressure_exempt_values);
+            for (switch_term.cases.items) |case| try addBlockUse(stage_block, case.value, pressure_exempt_values);
         },
-        .indirectbr => |indirectbr| try addBlockUse(stage_block, indirectbr.addr),
+        .indirectbr => |indirectbr| try addBlockUse(stage_block, indirectbr.addr, pressure_exempt_values),
         .@"unreachable" => {},
     }
 }
 
-fn addBlockUse(stage_block: *StageTwoBlock, value: ir.Value) !void {
+fn addBlockUse(stage_block: *StageTwoBlock, value: ir.Value, pressure_exempt_values: NameSet) !void {
     const name = namedValue(value) orelse return;
+    if (pressure_exempt_values.contains(name)) return;
     if (stage_block.defs.contains(name)) return;
     try stage_block.uses.put(name, {});
 }
