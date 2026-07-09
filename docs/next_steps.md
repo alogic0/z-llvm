@@ -37,7 +37,16 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None.
+Item 15 stage-two allocator review/implementation boundary for the std-hello
+real-program track. `compiler_rt.mulXi3.__multi3` hit the same-row
+three-attempt stop rule during composed-selection implementation: the focused
+Debug report advanced to `%10`, where six spill slots were occupied by
+still-live values and preserving `%9` for its later `%11` use required a
+seventh scalar spill. The failed local-preservation attempt is saved as
+`tmp/generic_cfg_selector_failed_multi3_attempt.patch`; the decisive focused
+log is `tmp/std_debug_hello_debug_multi3_composed_after_liveness_preserve.log`.
+Start the reviewed real register allocator slice next, with `__multi3` as the
+acceptance row, rather than adding more ad hoc preservation rules.
 
 Current operating note recorded 2026-07-09:
 
@@ -68,7 +77,10 @@ Current operating note recorded 2026-07-09:
   item-15 accounting is composed-selection rows 9, terminal-template rows 17,
   stage-two-boundary rows 2, and open integer-helper fallback candidates 33.
   `__mulsi3` fits the current envelope with `max_live_values=3`,
-  `max_spill_slots_needed=0`, and no six-slot-envelope exceedance. Pressure
+  `max_spill_slots_needed=0`, and no six-slot-envelope exceedance. A focused
+  `__multi3` composed-selection attempt reached `%10` before exhausting the
+  six-slot local strategy while all six slots still held values needed later;
+  this row is now the real register allocator acceptance row. Pressure
   diagnostics:
   `compiler_rt.mulXi3.__multi3` records `max_live_values=10`,
   `max_spill_slots_needed=4`, `max_spill_slots_over_envelope=0`,
@@ -99,27 +111,29 @@ Current operating note recorded 2026-07-09:
   `tmp/std_debug_hello_umodei4_pressure.log`,
   `tmp/std_debug_hello_debug_umodti3_composed.log`,
   `tmp/std_debug_hello_debug_modti3_composed.log`, and
-  `tmp/std_debug_hello_debug_mulsi3_composed.log`; latest distribution-all
-  proof path is `tmp/distribution_all_after_multi3_pressure.log`.
+  `tmp/std_debug_hello_debug_mulsi3_composed.log`; allocator-boundary
+  diagnostic path is
+  `tmp/std_debug_hello_debug_multi3_composed_after_liveness_preserve.log`;
+  latest distribution-all proof path is
+  `tmp/distribution_all_after_multi3_pressure.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
   `docs/evidence/std_debug_hello_modti3_composed.summary`;
   `docs/evidence/std_debug_hello_mulsi3_composed.summary`; and
   `docs/evidence/std_debug_hello_multi3_pressure.tsv`.
-- Recommended next action: continue the remaining integer-helper rows in rank
-  order through composed selection. Keep the intervening
+- Recommended next action: start item 15 stage two as the real register
+  allocator slice for the composed selector: virtual registers, liveness-aware
+  allocation, and frame-sized spill capacity replacing ad hoc physical
+  assignment. Use `compiler_rt.mulXi3.__multi3` as the first acceptance row
+  because it is the first real integer-helper row where the current six-slot
+  preservation strategy exhausted despite report-mode pressure evidence.
+  After `__multi3` is green through composed selection, resume the remaining
+  integer-helper rows in rank order; keep the intervening
   `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and `__udivti3`
-  `UnsupportedTailCallAbi` rows in the separate ABI family; the next active
-  composed-selector integer-helper candidate is
-  `compiler_rt.mulXi3.__multi3`, now with pressure evidence showing it fits
-  the six-slot spill envelope (`max_live_values=10`, spill slots needed `4`).
-  Record for every row whether it fits the current envelope and, if not, its
-  live-value count. If five or more remaining rows hit the pressure boundary,
-  the next major slice is the reviewed real register allocator with
-  `__udivei5` as the acceptance row; otherwise revisit the two `udivmodei4`
-  pressure rows as outliers after the bucket. Keep terminal routines frozen and
-  keep the 44 `UnsupportedTailCallAbi` rows as a separate ABI family.
+  `UnsupportedTailCallAbi` rows in the separate ABI family. Keep terminal
+  routines frozen and keep the 44 `UnsupportedTailCallAbi` rows as a separate
+  ABI family.
 
 When the worker stops, record only:
 
