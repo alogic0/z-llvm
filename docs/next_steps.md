@@ -37,10 +37,12 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None. The item 15 stage-two allocator review has been approved; continue with
-the virtual-register rewrite of the composed selector path, keeping the nine
-existing composed rows green as the regression set before allocation and spill
-insertion.
+Item 15 register-allocator slice is stopped at the `__multi3` acceptance row.
+The design note, virtual-register binding rewrite, allocation-plan prepass, and
+frame-sized spill-capacity slices are committed; do not add another ad hoc
+`__multi3` preservation patch. The next cycle should consume the allocation
+plan as the source of truth for value locations and insert real reload/spill
+code.
 
 Current operating note recorded 2026-07-09:
 
@@ -67,9 +69,13 @@ Current operating note recorded 2026-07-09:
   `compiler_rt.udivmod.__umodti3` as an i128 stack out-param direct-call
   wrapper, `compiler_rt.udivmod.__modti3` as a signed i128 stack out-param
   direct-call wrapper with bounded pair spills, and
-  `compiler_rt.mulXi3.__mulsi3` as a composed i32 multiply loop. Current
-  item-15 accounting is composed-selection rows 9, terminal-template rows 17,
-  stage-two-boundary rows 2, and open integer-helper fallback candidates 33.
+  `compiler_rt.mulXi3.__mulsi3` as a composed i32 multiply loop. The committed
+  allocator-prep baseline is `2036dc40` (design note), `3e27a4a7`
+  (virtual-register bindings), `c03bd160` (allocation-plan prepass), and
+  `0cc2b5b2` (frame-sized selector spill capacity). Current item-15 accounting
+  is composed-selection rows 9, terminal-template rows 17,
+  stage-two-boundary rows 2, open integer-helper fallback candidates 33, and
+  one allocator acceptance row pending.
   `__mulsi3` fits the current envelope with `max_live_values=3`,
   `max_spill_slots_needed=0`, and no six-slot-envelope exceedance. A focused
   `__multi3` composed-selection attempt reached `%10` before exhausting the
@@ -107,23 +113,29 @@ Current operating note recorded 2026-07-09:
   `tmp/std_debug_hello_debug_modti3_composed.log`, and
   `tmp/std_debug_hello_debug_mulsi3_composed.log`; allocator-boundary
   diagnostic path is
-  `tmp/std_debug_hello_debug_multi3_composed_after_liveness_preserve.log`;
-  latest distribution-all proof path is
-  `tmp/distribution_all_after_multi3_pressure.log`.
+  `tmp/std_debug_hello_debug_multi3_composed_after_liveness_preserve.log`.
+  Post-commit `__multi3` probes that taught local i64 masking, i128 pair
+  scratch separation, reloads from local spills, and clobber preservation
+  advanced past `%10` but again failed at `composed-block-spill-slots`; those
+  probe edits were reverted and should be treated as evidence that the real
+  allocator consumption slice is required. Latest distribution-all proof path
+  for the committed baseline is
+  `tmp/distribution_all_after_stage2_spill_capacity.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
   `docs/evidence/std_debug_hello_modti3_composed.summary`;
   `docs/evidence/std_debug_hello_mulsi3_composed.summary`; and
   `docs/evidence/std_debug_hello_multi3_pressure.tsv`.
-- Recommended next action: implement the item 15 stage-two allocator slice in
-  order. First rewrite the composed selector path around deterministic virtual
-  registers while keeping the nine existing composed rows green; then add
-  liveness-aware allocation; then add frame-sized spill insertion. Use
+- Recommended next action: implement the allocator-consumption slice. Make the
+  composed selector use the deterministic virtual-register allocation plan for
+  result locations, fixed register/class constraints, real spill-slot
+  allocation and reuse from live intervals, and reload insertion around uses.
+  Keep the nine existing composed rows green as the regression set. Use
   `compiler_rt.mulXi3.__multi3` as the first allocator acceptance row because
-  it is the first real integer-helper row where the current six-slot
-  preservation strategy exhausted despite report-mode pressure evidence. After
-  `__multi3` is green through composed selection, retry the parked
+  local preservation exhausted fixed spill slots while all current slots held
+  values needed later. After `__multi3` is green through composed selection,
+  retry the parked
   `__udivei5` and `__umodei4` pressure-boundary rows, then resume the
   remaining integer-helper rows in rank order; keep the intervening
   `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and `__udivti3`
