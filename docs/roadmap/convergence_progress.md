@@ -1881,6 +1881,23 @@ One line per completed cycle, append-only, newest last. This is the
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
   Evidence `tmp/std_debug_hello_debug_pair_planned_spill.log`;
   distribution-all proof `tmp/distribution_all_after_pair_planned_spill.log`.
+- 2026-07-09 (this commit) Item 15 allocator-consumption slice: the selector
+  allocation plan now records interval end positions, and the composed path can
+  consume a mismatched planned register only when the current lowering position
+  proves every conflicting value in that register has expired. The expiry check
+  is non-destructive, so value bindings remain available for fail-closed reload
+  and use validation, and production reuse is limited to pure i128 arithmetic
+  rows while call-shaped and established smaller composed rows keep their
+  current placement. The nine composed rows remain the regression set, and
+  Debug std-hello compiler_rt report-all stayed at 443 selected, 129 emitted,
+  and 314 failed; `compiler_rt.mulXi3.__multi3` remains the allocator
+  acceptance row. Item-15 accounting remains composed-selection rows 9,
+  terminal-template rows 17, stage-two-boundary rows 2, open integer-helper
+  fallback candidates 33, and one allocator acceptance row pending. Recognizer
+  count still 1 (no new recognizer reorder or pre-pass);
+  `shape_recognizer_functions` is unchanged. Evidence
+  `tmp/std_debug_hello_debug_expired_plan_reuse.log`; distribution-all proof
+  `tmp/distribution_all_after_expired_plan_reuse.log`.
 
 ## Ratchet State
 

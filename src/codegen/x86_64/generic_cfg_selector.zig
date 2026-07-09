@@ -233,6 +233,7 @@ fn tryLowerComposedCfg(
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
     composed.allocation_plan = &allocation_plan;
+    composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
     defer composed.deinit();
 
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
@@ -255,10 +256,12 @@ fn tryLowerComposedCfg(
             machine.instructions.items.len = start_len;
             return unsupported(.{ .unsupported_control_flow = "stage2-missing-terminator" });
         };
+        try composed.expireExpiredBindings();
         if (try composed.lowerCfgTerminator(function, block_index, terminator)) |diagnostic| {
             machine.instructions.items.len = start_len;
             return unsupported(diagnostic);
         }
+        composed.current_position += 1;
     }
     return .selected;
 }
@@ -566,6 +569,7 @@ const PlannedValueAssignment = union(enum) {
 const SelectorAllocationPlan = struct {
     allocator: std.mem.Allocator,
     assignments: std.StringHashMap(PlannedValueAssignment),
+    interval_ends: std.StringHashMap(usize),
     spill_slots: usize = 0,
     max_active_values: usize = 0,
 
@@ -573,15 +577,21 @@ const SelectorAllocationPlan = struct {
         return .{
             .allocator = allocator,
             .assignments = std.StringHashMap(PlannedValueAssignment).init(allocator),
+            .interval_ends = std.StringHashMap(usize).init(allocator),
         };
     }
 
     fn deinit(plan: *SelectorAllocationPlan) void {
+        plan.interval_ends.deinit();
         plan.assignments.deinit();
     }
 
     fn assignment(plan: SelectorAllocationPlan, name: []const u8) ?PlannedValueAssignment {
         return plan.assignments.get(name);
+    }
+
+    fn intervalEnd(plan: SelectorAllocationPlan, name: []const u8) ?usize {
+        return plan.interval_ends.get(name);
     }
 };
 
@@ -742,6 +752,7 @@ fn allocateSelectorIntervals(allocator: std.mem.Allocator, intervals: []const Se
         const assignment = allocateSelectorInterval(&occupied, interval, plan.spill_slots);
         if (std.meta.activeTag(assignment) == .spill) plan.spill_slots += selectorSpillSlotCount(interval);
         try plan.assignments.put(interval.name, assignment);
+        try plan.interval_ends.put(interval.name, interval.end);
         if (assignmentUsesRegisters(assignment)) {
             try active.append(allocator, .{ .end = interval.end, .assignment = assignment });
             if (active.items.len > plan.max_active_values) plan.max_active_values = active.items.len;
@@ -1190,6 +1201,9 @@ const ComposedBlockSelector = struct {
     stack_array_allocated: bool = false,
     stack_array_count: usize = 0,
     stack_frame_bytes: u32 = 0,
+    current_position: usize = 1,
+    expired_binding_this_position: bool = false,
+    enable_expired_plan_register_reuse: bool = false,
     spill_slot_names: [stage2_spill_slots]?[]const u8 = .{null} ** stage2_spill_slots,
     call_clobbered_regs: bool = false,
 
@@ -1277,6 +1291,8 @@ const ComposedBlockSelector = struct {
 
     fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
         if (instruction.removed) return null;
+        try selector.expireExpiredBindings();
+        defer selector.current_position += 1;
         return switch (instruction.kind) {
             .phi => null,
             .binary => |binary| try selector.lowerBinary(instruction.result, binary),
@@ -2276,7 +2292,66 @@ const ComposedBlockSelector = struct {
         };
         const target = planned orelse return null;
         if (std.meta.activeTag(target) == .spill64 or std.meta.activeTag(target) == .spill128) return target;
-        return if (valueLocEql(actual, target)) target else null;
+        if (valueLocEql(actual, target)) return target;
+        return if (selector.enable_expired_plan_register_reuse and selector.expired_binding_this_position and selector.targetLocHasOnlyExpiredConflicts(target)) target else null;
+    }
+
+    fn targetLocHasOnlyExpiredConflicts(selector: ComposedBlockSelector, target: ValueLoc) bool {
+        return switch (target) {
+            .scratch32, .scratch64 => |reg| selector.regHasOnlyExpiredConflicts(reg),
+            .scratch128 => |pair| blk: {
+                var saw_conflict = false;
+                if (selector.regConflictStatus(pair.lo)) |expired| {
+                    if (!expired) break :blk false;
+                    saw_conflict = true;
+                }
+                if (selector.regConflictStatus(pair.hi)) |expired| {
+                    if (!expired) break :blk false;
+                    saw_conflict = true;
+                }
+                break :blk saw_conflict;
+            },
+            .arg32, .arg64, .arg128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => false,
+        };
+    }
+
+    fn regHasOnlyExpiredConflicts(selector: ComposedBlockSelector, reg: ArgReg) bool {
+        var saw_conflict = false;
+        if (selector.regConflictStatus(reg)) |expired| {
+            if (!expired) return false;
+            saw_conflict = true;
+        }
+        return saw_conflict;
+    }
+
+    fn regConflictStatus(selector: ComposedBlockSelector, reg: ArgReg) ?bool {
+        const plan = selector.allocation_plan orelse return null;
+        var saw_conflict = false;
+        var all_expired = true;
+
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (!locContainsReg(entry.value_ptr.loc, reg)) continue;
+            saw_conflict = true;
+            const end = plan.intervalEnd(entry.key_ptr.*) orelse {
+                all_expired = false;
+                continue;
+            };
+            if (end >= selector.current_position) all_expired = false;
+        }
+
+        return if (saw_conflict) all_expired else null;
+    }
+
+    fn expireExpiredBindings(selector: *ComposedBlockSelector) !void {
+        selector.expired_binding_this_position = false;
+        const plan = selector.allocation_plan orelse return;
+
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            const end = plan.intervalEnd(entry.key_ptr.*) orelse continue;
+            if (end < selector.current_position) selector.expired_binding_this_position = true;
+        }
     }
 
     fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc, target: ValueLoc) !void {
@@ -3025,6 +3100,36 @@ test "generic cfg selector consumes matching no-spill planned result locations" 
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "generic cfg selector expires planned intervals before register reuse" {
+    var machine = MachineFunction.init("planned-reuse", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("old", .{ .gpr64 = .rdi });
+    try plan.interval_ends.put("old", 1);
+    try plan.assignments.put("new", .{ .gpr64 = .rdi });
+    try plan.interval_ends.put("new", 2);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.enable_expired_plan_register_reuse = true;
+    selector.current_position = 2;
+
+    try selector.bindValueLoc("old", .{ .arg64 = .rdi });
+    try selector.bindValueLoc("source", .{ .scratch64 = .rcx });
+    selector.current_scratch_names[argRegIndex(.rcx)] = "source";
+
+    try selector.expireExpiredBindings();
+    try std.testing.expectEqual(ValueLoc{ .arg64 = .rdi }, selector.valueLoc("old").?);
+
+    try selector.bindResultLoc("new", .{ .scratch64 = .rcx });
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.valueLoc("new").?);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rcx } }, machine.instructions.items[0]);
+}
+
 test "generic cfg selector stores scalar planned spills in deterministic frame slots" {
     var machine = MachineFunction.init("planned-spill", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
@@ -3078,6 +3183,8 @@ test "generic cfg selector allocation plan reuses expired registers deterministi
     try std.testing.expectEqual(@as(usize, 0), plan.spill_slots);
     try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rdi }, plan.assignment("a").?);
     try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rdi }, plan.assignment("b").?);
+    try std.testing.expectEqual(@as(usize, 1), plan.intervalEnd("a").?);
+    try std.testing.expectEqual(@as(usize, 3), plan.intervalEnd("b").?);
 }
 
 test "generic cfg selector allocation plan spills beyond register pool" {
@@ -3179,6 +3286,7 @@ fn tryLowerComposedBlock(
     }
 
     const terminator = block.terminator orelse return unsupported(.{ .unsupported_control_flow = "composed-block-missing-terminator" });
+    try composed.expireExpiredBindings();
     switch (terminator) {
         .ret => |ret| {
             if (try composed.lowerReturn(ret)) |diagnostic| return unsupported(diagnostic);
@@ -3186,6 +3294,17 @@ fn tryLowerComposedBlock(
         .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return unsupported(.{ .no_emitter = "composed-block-terminator-not-owned" }),
     }
     return .selected;
+}
+
+fn canUseExpiredPlanRegisterReuse(function: ir.Function) bool {
+    if (intBits(function.ret_ty) != 128) return false;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.kind == .call) return false;
+        }
+    }
+    return true;
 }
 
 fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
@@ -3230,6 +3349,14 @@ fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .stack_i32_ptr => |ptr| ptr.disp == rhs.stack_i32_ptr.disp and ptr.index == null and rhs.stack_i32_ptr.index == null,
         .spill64 => |frame_index| frame_index == rhs.spill64,
         .spill128 => |spill| spill.lo == rhs.spill128.lo and spill.hi == rhs.spill128.hi,
+    };
+}
+
+fn locContainsReg(loc: ValueLoc, reg: ArgReg) bool {
+    return switch (loc) {
+        .arg32, .arg64, .scratch32, .scratch64 => |value_reg| value_reg == reg,
+        .arg128, .scratch128 => |pair| pair.contains(reg),
+        .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => false,
     };
 }
 
