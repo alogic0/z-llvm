@@ -615,6 +615,7 @@ const ComposedBlockSelector = struct {
             .binary => |binary| try selector.lowerBinary(instruction.result, binary),
             .alloca => |alloca| try selector.lowerAlloca(instruction.result, alloca),
             .cast => |cast| try selector.lowerCast(instruction.result, cast),
+            .freeze => |freeze| try selector.lowerFreeze(instruction.result, freeze),
             .icmp => |icmp| try selector.lowerIcmp(instruction.result, icmp),
             .load => |load| try selector.lowerLoad(instruction.result, load),
             .store => |store| try selector.lowerStore(store),
@@ -922,6 +923,26 @@ const ComposedBlockSelector = struct {
                 try selector.bindScratch(result_name, dst, 64);
             },
             else => return .{ .no_emitter = "composed-block-cast-op" },
+        }
+        return null;
+    }
+
+    fn lowerFreeze(selector: *ComposedBlockSelector, result: ?[]const u8, freeze: ir.FreezeInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        const bits = intBits(freeze.ty) orelse return .{ .no_emitter = "composed-block-freeze-type" };
+        if (bits != 32 and bits != 64) return .{ .no_emitter = "composed-block-freeze-width" };
+        const loc = selector.resolveValue(freeze.value) orelse return .{ .unsupported_value = "composed-block-unknown-freeze" };
+        switch (loc) {
+            .arg32, .scratch32, .eax => if (bits != 32) return .{ .no_emitter = "composed-block-freeze-width" },
+            .arg64, .scratch64, .rax, .spill64 => if (bits != 64) return .{ .no_emitter = "composed-block-freeze-width" },
+            .arg128, .scratch128, .stack64, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "composed-block-freeze-loc" },
+        }
+        try selector.values.put(result_name, loc);
+        switch (loc) {
+            .eax, .rax => selector.current_eax_name = result_name,
+            .scratch32, .scratch64 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
+            .arg32, .arg64, .spill64 => {},
+            .arg128, .scratch128, .stack64, .stack_i32_array, .stack_i32_ptr => unreachable,
         }
         return null;
     }
@@ -1960,7 +1981,7 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .gep => null,
         .call => |call| inspectCall(call),
         .phi => |phi| if (isSelectorScalarType(phi.ty)) null else .{ .unsupported_type = "phi" },
-        .freeze => .{ .unsupported_instruction = "freeze" },
+        .freeze => |freeze| if (isSelectorScalarType(freeze.ty)) null else .{ .unsupported_type = "freeze" },
         .fcmp => .{ .unsupported_instruction = "fcmp" },
         .atomicrmw => .{ .unsupported_instruction = "atomicrmw" },
         .cmpxchg => .{ .unsupported_instruction = "cmpxchg" },

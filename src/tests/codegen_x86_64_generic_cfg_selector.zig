@@ -178,6 +178,64 @@ test "generic cfg selector stage two emits cross-block void returns" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector composes scalar freeze as identity" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @freeze_identity(i64 %x) {
+        \\entry:
+        \\  %frozen = freeze i64 %x
+        \\  ret i64 %frozen
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("freeze_identity", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector stage two composes scalar freeze across branch" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @freeze_branch(i64 %x) {
+        \\entry:
+        \\  %cond = icmp ult i64 %x, 10
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %frozen = freeze i64 %x
+        \\  ret i64 %frozen
+        \\else:
+        \\  ret i64 %x
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("freeze_branch", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectNamedInstruction(machine.instructions.items, .label, "then");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector rejects value-bearing void return" {
     var function = ir.Function.init("bad_void_ret", .void);
     defer function.deinit(std.testing.allocator);
@@ -906,7 +964,7 @@ test "generic cfg selector keeps limb64 byteswap near miss fail-closed" {
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| diagnostic,
     };
-    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
 }
 
 test "generic cfg selector emits limb64 shift-right envelope through opt-in selector" {
@@ -1000,7 +1058,7 @@ test "generic cfg selector keeps limb64 shift-right near miss fail-closed" {
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| diagnostic,
     };
-    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
 }
 
 test "generic cfg selector emits limb64 shift-left-overflow envelope through opt-in selector" {
@@ -1112,7 +1170,7 @@ test "generic cfg selector keeps limb64 shift-left-overflow near miss fail-close
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| diagnostic,
     };
-    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
 }
 
 test "generic cfg selector emits limb64 bitreverse envelope through opt-in selector" {
@@ -1207,7 +1265,7 @@ test "generic cfg selector keeps limb64 bitreverse near miss fail-closed" {
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| diagnostic,
     };
-    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
 }
 
 test "generic cfg selector emits limb64 popcount envelope through opt-in selector" {
