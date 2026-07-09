@@ -383,10 +383,10 @@ test "generic cfg selector composes constant i32 stack array gep load store" {
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
-    try expectInstruction(machine.instructions.items, .sub_rsp_24);
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 8 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 8 });
-    try expectInstruction(machine.instructions.items, .add_rsp_24);
+    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 88 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 64 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 64 });
+    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 88 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -412,11 +412,11 @@ test "generic cfg selector composes dynamic i32 stack array gep index" {
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
-    try expectInstruction(machine.instructions.items, .sub_rsp_24);
+    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 88 });
     try expectInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp8 = 0 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_rcx4_disp8_eax = 0 });
-    try expectInstruction(machine.instructions.items, .add_rsp_24);
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp8 = 56 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_rcx4_disp8_eax = 56 });
+    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 88 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -445,11 +445,11 @@ test "generic cfg selector composes multiple constant i32 stack arrays in one fr
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
-    try expectInstruction(machine.instructions.items, .sub_rsp_40);
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 8 });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 20 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 20 });
-    try expectInstruction(machine.instructions.items, .add_rsp_40);
+    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 88 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 64 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 76 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 76 });
+    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 88 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -617,7 +617,7 @@ test "generic cfg selector stage two materializes loop backedge phi moves" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
-test "generic cfg selector stage two rejects pressure above no-spill envelope" {
+test "generic cfg selector stage two computes pressure above no-spill envelope" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -642,6 +642,61 @@ test "generic cfg selector stage two rejects pressure above no-spill envelope" {
     try std.testing.expectEqual(@as(usize, 2), summary.blocks);
     try std.testing.expect(summary.max_pressure > summary.no_spill_limit);
     try std.testing.expect(summary.exceedsNoSpill());
+    try std.testing.expectEqual(@as(usize, 6), summary.spill_slot_count);
+    try std.testing.expect(!summary.exceedsSpillEnvelope());
+}
+
+test "generic cfg selector stage two rejects pressure above spill envelope" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @pressure(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f) {
+        \\entry:
+        \\  %p1 = add i32 %a, %b
+        \\  %p2 = add i32 %c, %d
+        \\  %p3 = add i32 %e, %f
+        \\  %p4 = add i32 %a, %f
+        \\  %p5 = add i32 %b, %e
+        \\  %p6 = add i32 %c, %f
+        \\  %p7 = add i32 %d, %e
+        \\  %p8 = add i32 %a, %c
+        \\  br label %body
+        \\body:
+        \\  %s1 = add i32 %a, %b
+        \\  %s2 = add i32 %c, %d
+        \\  %s3 = add i32 %e, %f
+        \\  %s4 = add i32 %p1, %p2
+        \\  %s5 = add i32 %p3, %p4
+        \\  %s6 = add i32 %p5, %p6
+        \\  %s7 = add i32 %p7, %p8
+        \\  %s8 = add i32 %s1, %s2
+        \\  %s9 = add i32 %s3, %s4
+        \\  %s10 = add i32 %s5, %s6
+        \\  %s11 = add i32 %s7, %s8
+        \\  %s12 = add i32 %s9, %s10
+        \\  %s13 = add i32 %s11, %s12
+        \\  ret i32 %s13
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
+    try std.testing.expect(summary.max_pressure > summary.spill_envelope_limit);
+    try std.testing.expect(summary.exceedsSpillEnvelope());
+
+    var machine = codegen.x86_64.MachineFunction.init("pressure", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_spill_envelope", diagnostic.tagName());
+    try std.testing.expectEqualStrings("stage2-register-pressure", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
 test "generic cfg selector stage two excludes stack objects from register pressure" {

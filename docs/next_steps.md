@@ -37,16 +37,19 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None. The item-15 architectural review was approved and recorded; proceed with
-the item-15 migration order before soft-float implementation.
+Item 15 stage-two pressure blocker. The same row,
+`compiler_rt.udivmodei4.__udivei5`, has failed three consecutive fix attempts
+without leaving `no_spill_envelope` / `stage2-register-pressure`:
+unsigned div/rem instruction support moved it to the pressure boundary, then
+stack-object pressure exemption and the bounded spill-frame slice both left it
+at the same boundary. Stop here per the hard-stop rule; do not template the row.
 
-Stop state recorded 2026-07-08 after the interrupted item-15 `__umodei5`
-terminal-template cycle:
+Stop state recorded 2026-07-09:
 
 - Active convergence-progress item: item 15 is pulled forward as an
   architectural migration under item 12's std-hello real-program track. The
-  real-row track closed item 10 at strict `--limit=100`, but every stop report
-  still states both tracks.
+  real-row track remains closed through item 10 at strict `--limit=100`, but
+  every stop report still states both tracks.
 - Real-row track status: strict `distribution-real-rows --strict --limit=100`
   is green in ReleaseFast, ReleaseSafe, and ReleaseSmall, and
   `distribution-all` enforces that strict limit. Selector-v2 ReleaseFast
@@ -55,26 +58,16 @@ terminal-template cycle:
   counters `real_functions_lowered=200`, `real_objects_emitted=200`,
   `real_native_linked=200`, `real_executed=0`, `real_programs_ok=0`.
 - Real-program track status: item 11 syscall hello is closed by
-  `docs/evidence/zig_integrated_exe_syscall_hello.summary`. Patched Zig plus
-  z_llvm object emission and Zig native `build-exe -fno-lld` build a no-std
-  `_start` executable in ReleaseFast, ReleaseSafe, and ReleaseSmall; each run
-  prints `hello\n` and exits 0. Item 12 std hello remains open. The item-15
-  architectural review split the Debug std-hello compiler_rt report-all
-  inventory into selector/codegen buckets and an ordinary ABI bucket:
-  soft-float/libm/conversion selector candidates 236 rows, integer helper
-  selector candidates 45 rows, tail-call ABI 44 rows, and limb64 loops 15
-  rows. Item-15 stage one has now closed the limb64 selector bucket: 15/15
-  limb64 rows emit through the opt-in selector path, 0 limb64 rows use
-  recognizer fallback for the migrated bucket, and 0 no-spill envelope
-  rejections were introduced. The current interrupted cycle also closed
-  `compiler_rt.udivmodei4.__umodei5` as a validated terminal-template routine,
-  after the previously committed `__udivei4` template. These closures stand but
-  are not composed per-instruction selection. Current item-15 accounting is
-  composed-selection rows 0, terminal-template rows 17 (15 limb64 plus
-  `__udivei4` and `__umodei5`), and open integer-helper fallback candidates 43.
-  The latest focused report-all run selected 443 compiler_rt functions, emitted
-  120, and reported 323 failures before failing closed with no object output.
-  The next first failing function is `compiler_rt.udivmodei4.__udivei5`.
+  `docs/evidence/zig_integrated_exe_syscall_hello.summary`. Item 12 std hello
+  remains open. Item 15 stage one closed 15 limb64 terminal selector routines,
+  and the interrupted integer-helper work left `__udivei4` and `__umodei5` as
+  validated terminal-template routines. Current item-15 accounting is
+  composed-selection rows 6, terminal-template rows 17, and open
+  integer-helper fallback candidates 37. The latest focused report-all run
+  selected 443 compiler_rt functions, emitted 126, and reported 317 failures
+  before failing closed with no object output. The first failing function is
+  `compiler_rt.udivmodei4.__udivei5` at selector tag/detail
+  `no_spill_envelope` / `stage2-register-pressure`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -85,43 +78,21 @@ terminal-template cycle:
   hash
   `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`,
   selector `real-candidate-selector-v2`, Zig pin
-  `bdee02bc0c7f227c0f11bc9a449df673fe803540`. The migration from selector-v1
-  is recorded in `docs/evidence/real_candidates_release_v2.summary`.
+  `bdee02bc0c7f227c0f11bc9a449df673fe803540`.
 - Enforcement state: `distribution-all` runs
   `src/distribution_real_rows_gate.zig --strict --limit=100` for ReleaseFast,
   ReleaseSafe, and ReleaseSmall.
-- Saved log paths: `tmp/std_debug_hello_debug_report_all.log`,
-  `tmp/std_debug_hello_debug_build_abs_limb64_after.log`,
-  `tmp/std_debug_hello_debug_addsub_selector_after.log`,
-  `tmp/std_debug_hello_debug_umodei5_selector_after.log`,
-  `tmp/distribution_all_after_umodei5_selector_rerun.log`,
-  `tmp/distribution_all_after_abs_limb64.log`,
-  `tmp/real_rows_strict_limit100_releasefast_after_abs_limb64.log`,
-  `tmp/real_rows_strict_limit100_releasesafe_after_abs_limb64.log`,
-  `tmp/real_rows_strict_limit100_releasesmall_after_abs_limb64.log`,
-  `tmp/clean_tmp_fixture_pair.log`, and
-  `tmp/real_rows_releasefast_after_clean_tmp.log`.
-- Tracked evidence summaries:
-  `docs/evidence/ziglang_pin_stage4_optional_layout.summary`,
-  `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary`,
-  `docs/evidence/real_rows_releasesafe_limit100_after_intcast_safe.summary`,
-  `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary`, and
-  `docs/evidence/real_rows_strict_limit100_after_optional_layout_failure.summary`,
-  `docs/evidence/zig_integrated_exe_syscall_hello.summary`,
-  `docs/evidence/clean_tmp.summary`, and
-  `docs/evidence/std_debug_hello_compiler_rt_report_all.summary`.
-- Recommended next action: do not template more rows. Continue item 15 by
-  implementing block-local per-instruction selection with operand and register
-  assignment, then prove it on one real remaining integer row, starting at
-  `compiler_rt.udivmodei4.__udivei5` unless a simpler remaining row is selected
-  first. The proof must be composed selection, with no terminal byte spans and
-  no whole-function envelope. If that immediately requires liveness or spill
-  handling, record it as the item-15 stage-two trigger and begin stage two per
-  the design note. Keep existing shape recognizers as transitional fallback and
-  ratchet `shape_recognizer_functions` toward zero on the real-program gate.
-  Treat the 44 `UnsupportedTailCallAbi` rows as a separate ordinary ABI family,
-  not a selector concern. `distribution-all` must stay green before every
-  commit; if captured rows regress, use the loop-sum bisect discipline.
+- Saved log paths: `tmp/std_debug_hello_debug_stage2_spill_frame.log` and
+  `tmp/distribution_all_after_stage2_spill_frame.log`.
+- Tracked evidence summary:
+  `docs/evidence/std_debug_hello_stage2_spill_frame.summary`.
+- Recommended next action: review the item-15 stage-two pressure design before
+  making another `__udivei5` fix attempt. The next implementation slice should
+  add explicit pressure diagnostics and a real liveness-driven spill plan for
+  high-pressure multi-loop functions with large stack-array payloads, then
+  resume composed selection. Keep terminal routines prohibited for this row,
+  keep recognizers as fallback only, and keep the 44 `UnsupportedTailCallAbi`
+  rows as a separate ABI family.
 
 When the worker stops, record only:
 

@@ -39,13 +39,20 @@ pub const StageTwoSummary = struct {
     max_live_out: usize,
     max_pressure: usize,
     no_spill_limit: usize,
+    spill_slot_count: usize,
+    spill_envelope_limit: usize,
 
     pub fn exceedsNoSpill(summary: StageTwoSummary) bool {
         return summary.max_pressure > summary.no_spill_limit;
     }
+
+    pub fn exceedsSpillEnvelope(summary: StageTwoSummary) bool {
+        return summary.max_pressure > summary.spill_envelope_limit;
+    }
 };
 
 const no_spill_register_values = 6;
+const stage2_spill_slots = 6;
 const stage2_max_blocks = 64;
 
 pub fn tryLower(
@@ -134,7 +141,7 @@ pub fn tryLower(
             .unsupported_control_flow => {
                 if (function.blocks.items.len > 1) {
                     const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
-                    if (stage_two.exceedsNoSpill()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
+                    if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
                     return tryLowerComposedCfg(allocator, machine, function);
                 }
                 return inspected;
@@ -144,7 +151,7 @@ pub fn tryLower(
     }
     if (function.blocks.items.len > 1) {
         const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
-        if (stage_two.exceedsNoSpill()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
+        if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
         return tryLowerComposedCfg(allocator, machine, function);
     }
     const composed_start_len = machine.instructions.items.len;
@@ -224,6 +231,8 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
             .max_live_out = 0,
             .max_pressure = 0,
             .no_spill_limit = no_spill_register_values,
+            .spill_slot_count = stage2_spill_slots,
+            .spill_envelope_limit = no_spill_register_values + stage2_spill_slots,
         };
     }
 
@@ -297,6 +306,8 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
         .max_live_out = max_live_out,
         .max_pressure = max_pressure,
         .no_spill_limit = no_spill_register_values,
+        .spill_slot_count = stage2_spill_slots,
+        .spill_envelope_limit = no_spill_register_values + stage2_spill_slots,
     };
 }
 
@@ -572,7 +583,7 @@ const ComposedBlockSelector = struct {
     stack_array_allocated: bool = false,
     stack_array_count: usize = 0,
     stack_frame_bytes: u32 = 0,
-    spill_slot_names: [2]?[]const u8 = .{null} ** 2,
+    spill_slot_names: [stage2_spill_slots]?[]const u8 = .{null} ** stage2_spill_slots,
     call_clobbered_regs: bool = false,
 
     fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
@@ -718,6 +729,7 @@ const ComposedBlockSelector = struct {
                     try selector.values.put(result_name, .{ .stack64 = 0 });
                 } else if (parseI32ArrayType(alloca.allocated_ty)) |len| {
                     if (scalar_slot_count != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
+                    if (array_count == 0) payload_bytes = stage2SpillReservedBytes();
                     array_count += 1;
                     if (array_count > 4) return .{ .no_spill_envelope = "composed-block-stack-array-count" };
                     const array_bytes = std.math.mul(u32, len, 4) catch return .{ .no_spill_envelope = "composed-block-stack-array-size" };
@@ -1523,6 +1535,10 @@ const ComposedBlockSelector = struct {
         return switch (index) {
             0 => .slot2,
             1 => .slot4,
+            2 => .slot6,
+            3 => .slot8,
+            4 => .slot10,
+            5 => .slot12,
             else => unreachable,
         };
     }
@@ -1970,6 +1986,10 @@ fn alignedCallFrameBytes(payload_bytes: u32) ?u32 {
     if (payload_bytes == 0) return null;
     const rounded_payload = std.mem.alignForward(u32, payload_bytes, 16);
     return std.math.add(u32, rounded_payload, 8) catch null;
+}
+
+fn stage2SpillReservedBytes() u32 {
+    return 56;
 }
 
 fn isComposedReturnType(ty: ir.Type) bool {
