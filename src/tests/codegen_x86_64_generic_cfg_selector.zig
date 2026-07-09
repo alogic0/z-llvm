@@ -647,7 +647,7 @@ test "generic cfg selector stage two composes i32 multiply loop" {
     defer module.deinit();
 
     const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
-    try std.testing.expectEqual(@as(usize, 3), summary.max_pressure);
+    try std.testing.expectEqual(@as(usize, 4), summary.max_pressure);
     try std.testing.expect(!summary.exceedsNoSpill());
 
     var machine = codegen.x86_64.MachineFunction.init("mul_loop_i32", module.functions.items[0].ret_ty);
@@ -702,6 +702,40 @@ test "generic cfg selector stage two computes pressure above no-spill envelope" 
     try std.testing.expect(!summary.exceedsSpillEnvelope());
 }
 
+test "generic cfg selector stage two reports intra-block pressure" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @single_block_pressure(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g, i32 %h) {
+        \\entry:
+        \\  %p1 = add i32 %a, %b
+        \\  %p2 = add i32 %c, %d
+        \\  %p3 = add i32 %e, %f
+        \\  %p4 = add i32 %g, %h
+        \\  %s1 = add i32 %p1, %p2
+        \\  %s2 = add i32 %p3, %p4
+        \\  %result = add i32 %s1, %s2
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
+    try std.testing.expectEqual(@as(usize, 1), summary.blocks);
+    try std.testing.expectEqual(@as(usize, 0), summary.max_live_in);
+    try std.testing.expectEqual(@as(usize, 0), summary.max_live_out);
+    try std.testing.expectEqual(@as(usize, 8), summary.max_pressure);
+    try std.testing.expectEqualStrings("entry", summary.max_pressure_block);
+    try std.testing.expectEqualStrings("p1", summary.max_pressure_boundary);
+    try std.testing.expect(summary.exceedsNoSpill());
+    try std.testing.expect(!summary.exceedsSpillEnvelope());
+    try std.testing.expectEqual(@as(usize, 2), summary.max_pressure_spill_slots_needed);
+    try std.testing.expectEqual(@as(usize, 0), summary.max_pressure_spill_slots_over_envelope);
+    try std.testing.expectEqualStrings("-", summary.first_exceeding_block);
+}
+
 test "generic cfg selector stage two rejects pressure above spill envelope" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -742,12 +776,12 @@ test "generic cfg selector stage two rejects pressure above spill envelope" {
     try std.testing.expect(summary.max_pressure > summary.spill_envelope_limit);
     try std.testing.expect(summary.exceedsSpillEnvelope());
     try std.testing.expectEqualStrings("entry", summary.max_pressure_block);
-    try std.testing.expectEqualStrings("live_out", summary.max_pressure_boundary);
+    try std.testing.expectEqualStrings("terminator", summary.max_pressure_boundary);
     try std.testing.expectEqual(summary.max_pressure - summary.no_spill_limit, summary.max_pressure_spill_slots_needed);
     try std.testing.expect(summary.max_pressure_spill_slots_over_envelope > 0);
     try std.testing.expectEqualStrings("entry", summary.first_exceeding_block);
-    try std.testing.expectEqualStrings("live_out", summary.first_exceeding_boundary);
-    try std.testing.expectEqual(summary.max_pressure, summary.first_exceeding_live_values);
+    try std.testing.expectEqualStrings("p8", summary.first_exceeding_boundary);
+    try std.testing.expectEqual(@as(usize, 13), summary.first_exceeding_live_values);
 
     var machine = codegen.x86_64.MachineFunction.init("pressure", module.functions.items[0].ret_ty);
     defer machine.deinit(std.testing.allocator);
@@ -791,8 +825,9 @@ test "generic cfg selector stage two excludes stack objects from register pressu
 
     const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
     try std.testing.expectEqual(@as(usize, 3), summary.blocks);
-    try std.testing.expectEqual(summary.no_spill_limit, summary.max_pressure);
-    try std.testing.expect(!summary.exceedsNoSpill());
+    try std.testing.expectEqual(@as(usize, 7), summary.max_pressure);
+    try std.testing.expect(summary.exceedsNoSpill());
+    try std.testing.expect(!summary.exceedsSpillEnvelope());
 }
 
 test "generic cfg selector composes single-block i32 add through machine instructions" {

@@ -262,6 +262,9 @@ fn tryLowerComposedCfg(
 pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir.Function) !StageTwoSummary {
     var liveness = try buildStageTwoLiveness(allocator, function);
     defer liveness.deinit();
+    var pressure_exempt_values = NameSet.init(allocator);
+    defer pressure_exempt_values.deinit();
+    try collectPressureExemptValues(&pressure_exempt_values, function);
 
     if (liveness.blocks.items.len == 0) {
         return .{
@@ -293,33 +296,23 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
     var first_exceeding_block: []const u8 = "-";
     var first_exceeding_boundary: []const u8 = "-";
     var first_exceeding_live_values: usize = 0;
-    for (liveness.blocks.items) |block| {
+    var pressure_summary = PressureSummaryState{};
+    for (liveness.blocks.items, 0..) |block, block_index| {
         const live_in_count = block.live_in.count();
         const live_out_count = block.live_out.count();
         if (live_in_count > max_live_in) max_live_in = live_in_count;
         if (live_out_count > max_live_out) max_live_out = live_out_count;
-        if (live_in_count > max_pressure_seen or std.mem.eql(u8, max_pressure_block, "-")) {
-            max_pressure_seen = live_in_count;
-            max_pressure_block = block.name;
-            max_pressure_boundary = "live_in";
-        }
-        if (live_out_count > max_pressure_seen) {
-            max_pressure_seen = live_out_count;
-            max_pressure_block = block.name;
-            max_pressure_boundary = "live_out";
-        }
-        if (first_exceeding_live_values == 0 and live_in_count > no_spill_register_values + stage2_spill_slots) {
-            first_exceeding_block = block.name;
-            first_exceeding_boundary = "live_in";
-            first_exceeding_live_values = live_in_count;
-        }
-        if (first_exceeding_live_values == 0 and live_out_count > no_spill_register_values + stage2_spill_slots) {
-            first_exceeding_block = block.name;
-            first_exceeding_boundary = "live_out";
-            first_exceeding_live_values = live_out_count;
-        }
+        pressure_summary.record(block.name, "live_in", live_in_count);
+        try collectIntraBlockPressure(allocator, &pressure_summary, function.blocks.items[block_index], block, pressure_exempt_values);
+        pressure_summary.record(block.name, "live_out", live_out_count);
     }
-    const max_pressure = @max(max_live_in, max_live_out);
+    max_pressure_seen = pressure_summary.max_live_values;
+    max_pressure_block = pressure_summary.max_block;
+    max_pressure_boundary = pressure_summary.max_boundary;
+    first_exceeding_block = pressure_summary.first_exceeding_block;
+    first_exceeding_boundary = pressure_summary.first_exceeding_boundary;
+    first_exceeding_live_values = pressure_summary.first_exceeding_live_values;
+    const max_pressure = max_pressure_seen;
     const max_spill_slots_needed = stage2SpillSlotsNeeded(max_pressure);
     const first_exceeding_spill_slots_needed = stage2SpillSlotsNeeded(first_exceeding_live_values);
     return .{
@@ -341,6 +334,83 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
         .first_exceeding_spill_slots_needed = first_exceeding_spill_slots_needed,
         .first_exceeding_spill_slots_over_envelope = stage2SpillSlotsOverEnvelope(first_exceeding_spill_slots_needed),
     };
+}
+
+const PressureSummaryState = struct {
+    max_live_values: usize = 0,
+    max_block: []const u8 = "-",
+    max_boundary: []const u8 = "-",
+    first_exceeding_block: []const u8 = "-",
+    first_exceeding_boundary: []const u8 = "-",
+    first_exceeding_live_values: usize = 0,
+
+    fn record(summary: *PressureSummaryState, block: []const u8, boundary: []const u8, live_values: usize) void {
+        if (live_values > summary.max_live_values or std.mem.eql(u8, summary.max_block, "-")) {
+            summary.max_live_values = live_values;
+            summary.max_block = block;
+            summary.max_boundary = boundary;
+        }
+        if (summary.first_exceeding_live_values == 0 and live_values > no_spill_register_values + stage2_spill_slots) {
+            summary.first_exceeding_block = block;
+            summary.first_exceeding_boundary = boundary;
+            summary.first_exceeding_live_values = live_values;
+        }
+    }
+};
+
+const PressurePoint = struct {
+    boundary: []const u8,
+    live_values: usize,
+};
+
+fn collectIntraBlockPressure(
+    allocator: std.mem.Allocator,
+    summary: *PressureSummaryState,
+    ir_block: ir.BasicBlock,
+    stage_block: StageTwoBlock,
+    pressure_exempt_values: NameSet,
+) !void {
+    var live = NameSet.init(allocator);
+    defer live.deinit();
+    try unionSet(&live, stage_block.live_out);
+
+    var reverse_points: std.ArrayList(PressurePoint) = .empty;
+    defer reverse_points.deinit(allocator);
+
+    if (ir_block.terminator) |terminator| {
+        var terminator_uses = NameSet.init(allocator);
+        defer terminator_uses.deinit();
+        try collectTerminatorNamedUses(&terminator_uses, terminator, pressure_exempt_values);
+        try unionSet(&live, terminator_uses);
+        try reverse_points.append(allocator, .{ .boundary = "terminator", .live_values = live.count() });
+    }
+
+    var instruction_index = ir_block.instructions.items.len;
+    while (instruction_index > 0) {
+        instruction_index -= 1;
+        const instruction = ir_block.instructions.items[instruction_index];
+        if (instruction.removed) continue;
+        if (instruction.result) |result| {
+            if (!pressure_exempt_values.contains(result)) _ = live.remove(result);
+        }
+        if (instruction.kind != .phi) {
+            var instruction_uses = NameSet.init(allocator);
+            defer instruction_uses.deinit();
+            try collectInstructionNamedUses(&instruction_uses, instruction, pressure_exempt_values);
+            try unionSet(&live, instruction_uses);
+        }
+        try reverse_points.append(allocator, .{
+            .boundary = instructionPressureBoundary(instruction),
+            .live_values = live.count(),
+        });
+    }
+
+    var pressure_index = reverse_points.items.len;
+    while (pressure_index > 0) {
+        pressure_index -= 1;
+        const point = reverse_points.items[pressure_index];
+        summary.record(ir_block.name, point.boundary, point.live_values);
+    }
 }
 
 fn buildStageTwoLiveness(allocator: std.mem.Allocator, function: ir.Function) !StageTwoLiveness {
@@ -594,6 +664,98 @@ fn collectTerminatorUses(stage_block: *StageTwoBlock, terminator: ir.Terminator,
         .indirectbr => |indirectbr| try addBlockUse(stage_block, indirectbr.addr, pressure_exempt_values),
         .@"unreachable" => {},
     }
+}
+
+fn collectInstructionNamedUses(uses: *NameSet, instruction: ir.Instruction, pressure_exempt_values: NameSet) !void {
+    switch (instruction.kind) {
+        .binary => |binary| {
+            try addNamedPressureUse(uses, binary.lhs, pressure_exempt_values);
+            try addNamedPressureUse(uses, binary.rhs, pressure_exempt_values);
+        },
+        .cast => |cast| try addNamedPressureUse(uses, cast.value, pressure_exempt_values),
+        .freeze => |freeze| try addNamedPressureUse(uses, freeze.value, pressure_exempt_values),
+        .icmp => |icmp| {
+            try addNamedPressureUse(uses, icmp.lhs, pressure_exempt_values);
+            try addNamedPressureUse(uses, icmp.rhs, pressure_exempt_values);
+        },
+        .fcmp => |fcmp| {
+            try addNamedPressureUse(uses, fcmp.lhs, pressure_exempt_values);
+            try addNamedPressureUse(uses, fcmp.rhs, pressure_exempt_values);
+        },
+        .select => |select| {
+            try addNamedPressureUse(uses, select.cond, pressure_exempt_values);
+            try addNamedPressureUse(uses, select.true_value, pressure_exempt_values);
+            try addNamedPressureUse(uses, select.false_value, pressure_exempt_values);
+        },
+        .phi => {},
+        .alloca, .fence => {},
+        .load => |load| try addNamedPressureUse(uses, load.ptr, pressure_exempt_values),
+        .store => |store| {
+            try addNamedPressureUse(uses, store.value, pressure_exempt_values);
+            try addNamedPressureUse(uses, store.ptr, pressure_exempt_values);
+        },
+        .atomicrmw => |atomicrmw| {
+            try addNamedPressureUse(uses, atomicrmw.ptr, pressure_exempt_values);
+            try addNamedPressureUse(uses, atomicrmw.value, pressure_exempt_values);
+        },
+        .cmpxchg => |cmpxchg| {
+            try addNamedPressureUse(uses, cmpxchg.ptr, pressure_exempt_values);
+            try addNamedPressureUse(uses, cmpxchg.expected, pressure_exempt_values);
+            try addNamedPressureUse(uses, cmpxchg.replacement, pressure_exempt_values);
+        },
+        .extractelement => |extract| {
+            try addNamedPressureUse(uses, extract.vector, pressure_exempt_values);
+            try addNamedPressureUse(uses, extract.index, pressure_exempt_values);
+        },
+        .insertelement => |insert| {
+            try addNamedPressureUse(uses, insert.vector, pressure_exempt_values);
+            try addNamedPressureUse(uses, insert.value, pressure_exempt_values);
+            try addNamedPressureUse(uses, insert.index, pressure_exempt_values);
+        },
+        .shufflevector => |shuffle| {
+            try addNamedPressureUse(uses, shuffle.lhs, pressure_exempt_values);
+            try addNamedPressureUse(uses, shuffle.rhs, pressure_exempt_values);
+            try addNamedPressureUse(uses, shuffle.mask, pressure_exempt_values);
+        },
+        .extractvalue => |extract| try addNamedPressureUse(uses, extract.aggregate, pressure_exempt_values),
+        .insertvalue => |insert| {
+            try addNamedPressureUse(uses, insert.aggregate, pressure_exempt_values);
+            try addNamedPressureUse(uses, insert.value, pressure_exempt_values);
+        },
+        .gep => |gep| {
+            try addNamedPressureUse(uses, gep.ptr, pressure_exempt_values);
+            for (gep.indices.items) |index| try addNamedPressureUse(uses, index.value, pressure_exempt_values);
+        },
+        .call => |call| {
+            if (call.isDebugVariableLocation()) return;
+            if (call.callee_value) |callee| try addNamedPressureUse(uses, callee, pressure_exempt_values);
+            for (call.args.items) |arg| try addNamedPressureUse(uses, arg.value, pressure_exempt_values);
+        },
+    }
+}
+
+fn collectTerminatorNamedUses(uses: *NameSet, terminator: ir.Terminator, pressure_exempt_values: NameSet) !void {
+    switch (terminator) {
+        .ret => |ret| if (ret.value) |value| try addNamedPressureUse(uses, value, pressure_exempt_values),
+        .br => {},
+        .condbr => |condbr| try addNamedPressureUse(uses, condbr.cond, pressure_exempt_values),
+        .@"switch" => |switch_term| {
+            try addNamedPressureUse(uses, switch_term.cond, pressure_exempt_values);
+            for (switch_term.cases.items) |case| try addNamedPressureUse(uses, case.value, pressure_exempt_values);
+        },
+        .indirectbr => |indirectbr| try addNamedPressureUse(uses, indirectbr.addr, pressure_exempt_values),
+        .@"unreachable" => {},
+    }
+}
+
+fn instructionPressureBoundary(instruction: ir.Instruction) []const u8 {
+    return instruction.result orelse @tagName(instruction.kind);
+}
+
+fn addNamedPressureUse(set: *NameSet, value: ir.Value, pressure_exempt_values: NameSet) !void {
+    const name = namedValue(value) orelse return;
+    if (pressure_exempt_values.contains(name)) return;
+    try set.put(name, {});
 }
 
 fn addBlockUse(stage_block: *StageTwoBlock, value: ir.Value, pressure_exempt_values: NameSet) !void {

@@ -70,6 +70,9 @@ Current operating note recorded 2026-07-09:
   `__mulsi3` fits the current envelope with `max_live_values=3`,
   `max_spill_slots_needed=0`, and no six-slot-envelope exceedance. Pressure
   diagnostics:
+  `compiler_rt.mulXi3.__multi3` records `max_live_values=10`,
+  `max_spill_slots_needed=4`, `max_spill_slots_over_envelope=0`,
+  `first_exceed_block=-`, and no six-slot-envelope exceedance;
   `compiler_rt.udivmodei4.__udivei5` records `max_live_values=16`,
   `max_spill_slots_needed=10`, `max_spill_slots_over_envelope=4`,
   `first_exceed_block=Then8.prol`, `first_exceed_boundary=live_out`,
@@ -97,24 +100,26 @@ Current operating note recorded 2026-07-09:
   `tmp/std_debug_hello_debug_umodti3_composed.log`,
   `tmp/std_debug_hello_debug_modti3_composed.log`, and
   `tmp/std_debug_hello_debug_mulsi3_composed.log`; latest distribution-all
-  proof path is `tmp/distribution_all_after_mulsi3_composed.log`.
+  proof path is `tmp/distribution_all_after_multi3_pressure.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
-  `docs/evidence/std_debug_hello_modti3_composed.summary`; and
-  `docs/evidence/std_debug_hello_mulsi3_composed.summary`.
+  `docs/evidence/std_debug_hello_modti3_composed.summary`;
+  `docs/evidence/std_debug_hello_mulsi3_composed.summary`; and
+  `docs/evidence/std_debug_hello_multi3_pressure.tsv`.
 - Recommended next action: continue the remaining integer-helper rows in rank
   order through composed selection. Keep the intervening
   `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and `__udivti3`
   `UnsupportedTailCallAbi` rows in the separate ABI family; the next active
   composed-selector integer-helper candidate is
-  `compiler_rt.mulXi3.__multi3`. Record for every row whether it fits the
-  current envelope and, if not, its live-value count. If five or more remaining
-  rows hit the pressure boundary, the next major slice is the reviewed real
-  register allocator with `__udivei5` as the acceptance row; otherwise revisit
-  the two `udivmodei4` pressure rows as outliers after the bucket. Keep
-  terminal routines frozen and keep the 44 `UnsupportedTailCallAbi` rows as a
-  separate ABI family.
+  `compiler_rt.mulXi3.__multi3`, now with pressure evidence showing it fits
+  the six-slot spill envelope (`max_live_values=10`, spill slots needed `4`).
+  Record for every row whether it fits the current envelope and, if not, its
+  live-value count. If five or more remaining rows hit the pressure boundary,
+  the next major slice is the reviewed real register allocator with
+  `__udivei5` as the acceptance row; otherwise revisit the two `udivmodei4`
+  pressure rows as outliers after the bucket. Keep terminal routines frozen and
+  keep the 44 `UnsupportedTailCallAbi` rows as a separate ABI family.
 
 When the worker stops, record only:
 
