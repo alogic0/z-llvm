@@ -2264,9 +2264,13 @@ const ComposedBlockSelector = struct {
                 else => null,
             },
             .stack_object, .stack_pointer => actual,
-            .spill => null,
+            .spill => |index| switch (actual) {
+                .arg64, .scratch64, .rax, .spill64 => if (spillFrameIndexMaybe(index)) |frame_index| .{ .spill64 = frame_index } else null,
+                else => null,
+            },
         };
         const target = planned orelse return null;
+        if (std.meta.activeTag(target) == .spill64) return target;
         return if (valueLocEql(actual, target)) target else null;
     }
 
@@ -2329,7 +2333,25 @@ const ComposedBlockSelector = struct {
                 },
                 .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
             },
-            .arg32, .arg64, .arg128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return error.UnsupportedCodegenValue,
+            .spill64 => |frame_index| {
+                if (selector.stack_frame_bytes < stage2SpillReservedBytes()) return error.UnsupportedCodegenValue;
+                switch (actual) {
+                    .arg64, .scratch64 => |src| {
+                        try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = src } });
+                        switch (actual) {
+                            .scratch64 => selector.invalidateScratchContaining(src),
+                            else => {},
+                        }
+                    },
+                    .rax => {
+                        try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = frame_index });
+                        selector.current_eax_name = null;
+                    },
+                    .spill64 => {},
+                    .arg32, .scratch32, .arg128, .scratch128, .eax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return error.UnsupportedCodegenValue,
+                }
+            },
+            .arg32, .arg64, .arg128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return error.UnsupportedCodegenValue,
         }
     }
 
@@ -2504,6 +2526,10 @@ const ComposedBlockSelector = struct {
     }
 
     fn spillFrameIndex(index: usize) FrameIndex {
+        return spillFrameIndexMaybe(index) orelse unreachable;
+    }
+
+    fn spillFrameIndexMaybe(index: usize) ?FrameIndex {
         return switch (index) {
             0 => .slot2,
             1 => .slot4,
@@ -2512,7 +2538,7 @@ const ComposedBlockSelector = struct {
             4 => .slot10,
             5 => .slot12,
             6 => .slot14,
-            else => unreachable,
+            else => null,
         };
     }
 
@@ -2974,6 +3000,26 @@ test "generic cfg selector consumes matching no-spill planned result locations" 
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("deferred").?);
     try std.testing.expectEqualStrings("deferred", selector.current_scratch_names[argRegIndex(.r8)].?);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "generic cfg selector stores scalar planned spills in deterministic frame slots" {
+    var machine = MachineFunction.init("planned-spill", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("spilled", .{ .spill = 2 });
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+
+    try selector.bindResultLoc("spilled", .{ .scratch64 = .rcx });
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot6 }, selector.valueLoc("spilled").?);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = .rcx } }, machine.instructions.items[0]);
+    try std.testing.expect(selector.current_scratch_names[argRegIndex(.rcx)] == null);
 }
 
 test "generic cfg selector allocation plan reuses expired registers deterministically" {
