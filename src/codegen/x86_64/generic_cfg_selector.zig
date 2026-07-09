@@ -158,8 +158,7 @@ fn tryLowerComposedCfg(
     machine: *MachineFunction,
     function: ir.Function,
 ) !SelectionResult {
-    const ret_bits = intBits(function.ret_ty) orelse return unsupported(.{ .no_emitter = "stage2-ret-not-int" });
-    if (ret_bits != 32 and ret_bits != 64) return unsupported(.{ .no_emitter = "stage2-ret-width" });
+    if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "stage2-ret-type" });
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > 16) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
 
@@ -943,7 +942,12 @@ const ComposedBlockSelector = struct {
     }
 
     fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic {
-        const bits = intBits(ret.ty) orelse return .{ .no_emitter = "composed-block-ret-not-int" };
+        if (ret.ty == .void) {
+            if (ret.value != null) return .{ .unsupported_value = "composed-block-void-ret-value" };
+            try selector.emitReturnEpilogue();
+            return null;
+        }
+        const bits = intBits(ret.ty) orelse return .{ .no_emitter = "composed-block-ret-type" };
         if (bits != 32 and bits != 64) return .{ .no_emitter = "composed-block-ret-width" };
         const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
         switch (value) {
@@ -957,13 +961,17 @@ const ComposedBlockSelector = struct {
             },
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-ret-value" },
         }
+        try selector.emitReturnEpilogue();
+        return null;
+    }
+
+    fn emitReturnEpilogue(selector: *ComposedBlockSelector) !void {
         if (selector.stack_frame_bytes == 24) {
             try selector.machine.instructions.append(selector.allocator, .add_rsp_24);
         } else if (selector.stack_frame_bytes == 8) {
             try selector.machine.instructions.append(selector.allocator, .add_rsp_8);
         }
         try selector.machine.instructions.append(selector.allocator, .ret);
-        return null;
     }
 
     fn lowerCfgTerminator(
@@ -1611,8 +1619,7 @@ fn tryLowerComposedBlock(
     machine: *MachineFunction,
     function: ir.Function,
 ) !SelectionResult {
-    const ret_bits = intBits(function.ret_ty) orelse return unsupported(.{ .no_emitter = "composed-block-ret-not-int" });
-    if (ret_bits != 32 and ret_bits != 64) return unsupported(.{ .no_emitter = "composed-block-ret-width" });
+    if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "composed-block-ret-type" });
     if (function.blocks.items.len != 1) return unsupported(.{ .no_emitter = "composed-block-not-single-block" });
 
     var composed = ComposedBlockSelector.init(allocator, machine);
@@ -1672,6 +1679,12 @@ fn intBits(ty: ir.Type) ?u16 {
         .int => |bits| bits,
         .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => null,
     };
+}
+
+fn isComposedReturnType(ty: ir.Type) bool {
+    if (ty == .void) return true;
+    const bits = intBits(ty) orelse return false;
+    return bits == 32 or bits == 64;
 }
 
 fn shiftAmount5(value: i128) !u5 {

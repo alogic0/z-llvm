@@ -127,6 +127,82 @@ test "generic cfg selector stage two rejects unsupported loop condition operands
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "generic cfg selector emits single-block void return" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @void_leaf() {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("void_leaf", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[0]);
+}
+
+test "generic cfg selector stage two emits cross-block void returns" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @void_branch(i64 %n) {
+        \\entry:
+        \\  %cond = icmp ult i64 %n, 4
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  ret void
+        \\else:
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("void_branch", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectNamedInstruction(machine.instructions.items, .jne, "then");
+    try expectNamedInstruction(machine.instructions.items, .label, "then");
+    try expectNamedInstruction(machine.instructions.items, .label, "else");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector rejects value-bearing void return" {
+    var function = ir.Function.init("bad_void_ret", .void);
+    defer function.deinit(std.testing.allocator);
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(std.testing.allocator);
+    block.terminator = .{ .ret = .{
+        .ty = .void,
+        .value = .{ .int = 0 },
+    } };
+    try function.blocks.append(std.testing.allocator, block);
+
+    var machine = codegen.x86_64.MachineFunction.init("bad_void_ret", function.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, function);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("unsupported_value", diagnostic.tagName());
+    try std.testing.expectEqualStrings("composed-block-void-ret-value", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
 test "generic cfg selector stage two composes acyclic branch with labels" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
