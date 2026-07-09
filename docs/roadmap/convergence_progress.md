@@ -1810,6 +1810,18 @@ One line per completed cycle, append-only, newest last. This is the
   fallback candidates 33, and one allocator acceptance row pending. Recognizer
   count still 1 (no new recognizer reorder or pre-pass);
   `shape_recognizer_functions` is unchanged.
+- 2026-07-09 (this commit) Item 15 register-allocator implementation slice:
+  the composed selector now builds a deterministic linear-scan allocation plan
+  from named scalar live intervals before emission. The plan uses virtual
+  registers as the value model, assigns fixed register classes in stable order,
+  and records frame-sized spill indices instead of rejecting at the old
+  six-slot envelope; this commit keeps emission on the current assignments so
+  the nine composed rows remain the regression set for the next consumption
+  slice. Item-15 accounting remains composed-selection rows 9,
+  terminal-template rows 17, stage-two-boundary rows 2, open integer-helper
+  fallback candidates 33, and one allocator acceptance row pending. Recognizer
+  count still 1 (no new recognizer reorder or pre-pass);
+  `shape_recognizer_functions` is unchanged.
 
 ## Ratchet State
 

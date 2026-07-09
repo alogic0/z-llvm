@@ -227,8 +227,12 @@ fn tryLowerComposedCfg(
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > stage2_max_blocks) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
 
+    var allocation_plan = try buildSelectorAllocationPlan(allocator, function);
+    defer allocation_plan.deinit();
+
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
+    composed.allocation_plan = &allocation_plan;
     defer composed.deinit();
 
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
@@ -541,6 +545,279 @@ const StageTwoBlock = struct {
         block.live_out.deinit();
     }
 };
+
+const SelectorValueInterval = struct {
+    name: []const u8,
+    class: VirtualRegClass,
+    bits: u16,
+    start: usize,
+    end: usize,
+};
+
+const PlannedValueAssignment = union(enum) {
+    gpr32: ArgReg,
+    gpr64: ArgReg,
+    gpr128: RegPair,
+    stack_object,
+    stack_pointer: ArgReg,
+    spill: usize,
+};
+
+const SelectorAllocationPlan = struct {
+    allocator: std.mem.Allocator,
+    assignments: std.StringHashMap(PlannedValueAssignment),
+    spill_slots: usize = 0,
+    max_active_values: usize = 0,
+
+    fn init(allocator: std.mem.Allocator) SelectorAllocationPlan {
+        return .{
+            .allocator = allocator,
+            .assignments = std.StringHashMap(PlannedValueAssignment).init(allocator),
+        };
+    }
+
+    fn deinit(plan: *SelectorAllocationPlan) void {
+        plan.assignments.deinit();
+    }
+
+    fn assignment(plan: SelectorAllocationPlan, name: []const u8) ?PlannedValueAssignment {
+        return plan.assignments.get(name);
+    }
+};
+
+const ActiveAllocation = struct {
+    end: usize,
+    assignment: PlannedValueAssignment,
+};
+
+fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Function) !SelectorAllocationPlan {
+    var pressure_exempt_values = NameSet.init(allocator);
+    defer pressure_exempt_values.deinit();
+    try collectPressureExemptValues(&pressure_exempt_values, function);
+
+    var intervals: std.ArrayList(SelectorValueInterval) = .empty;
+    defer intervals.deinit(allocator);
+
+    var interval_indexes = std.StringHashMap(usize).init(allocator);
+    defer interval_indexes.deinit();
+
+    var position: usize = 0;
+    for (function.params.items) |param| {
+        const metadata = selectorValueMetadata(param.ty) orelse return error.UnsupportedCodegenValue;
+        try recordSelectorIntervalDef(allocator, &intervals, &interval_indexes, param.name, metadata, position);
+    }
+
+    position = 1;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |result| {
+                if (!pressure_exempt_values.contains(result)) {
+                    const metadata = selectorInstructionResultMetadata(instruction) orelse return error.UnsupportedCodegenValue;
+                    try recordSelectorIntervalDef(allocator, &intervals, &interval_indexes, result, metadata, position);
+                }
+            }
+            position += 1;
+        }
+        if (block.terminator != null) position += 1;
+    }
+
+    position = 1;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            var uses = NameSet.init(allocator);
+            defer uses.deinit();
+            if (instruction.kind == .phi) {
+                for (instruction.kind.phi.incoming.items) |incoming| {
+                    try addNamedPressureUse(&uses, incoming.value, pressure_exempt_values);
+                }
+            } else {
+                try collectInstructionNamedUses(&uses, instruction, pressure_exempt_values);
+            }
+            try recordSelectorIntervalUses(intervals.items, interval_indexes, uses, position);
+            position += 1;
+        }
+        if (block.terminator) |terminator| {
+            var uses = NameSet.init(allocator);
+            defer uses.deinit();
+            try collectTerminatorNamedUses(&uses, terminator, pressure_exempt_values);
+            try recordSelectorIntervalUses(intervals.items, interval_indexes, uses, position);
+            position += 1;
+        }
+    }
+
+    return try allocateSelectorIntervals(allocator, intervals.items);
+}
+
+fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {
+    if (ty == .ptr) return .{ .class = .gpr64, .bits = 64 };
+    const bits = intBits(ty) orelse return null;
+    return switch (bits) {
+        1...32 => .{ .class = .gpr32, .bits = 32 },
+        33...64 => .{ .class = .gpr64, .bits = 64 },
+        65...128 => .{ .class = .gpr128, .bits = 128 },
+        else => null,
+    };
+}
+
+fn selectorInstructionResultMetadata(instruction: ir.Instruction) ?VirtualRegMetadata {
+    return switch (instruction.kind) {
+        .binary => |binary| selectorValueMetadata(binary.ty),
+        .cast => |cast| selectorValueMetadata(cast.to_ty),
+        .freeze => |freeze| selectorValueMetadata(freeze.ty),
+        .icmp => .{ .class = .gpr32, .bits = 32 },
+        .load => |load| selectorValueMetadata(load.ty),
+        .call => |call| if (call.ret_ty == .void) null else selectorValueMetadata(call.ret_ty),
+        .select => |select| selectorValueMetadata(select.ty),
+        .phi => |phi| selectorValueMetadata(phi.ty),
+        .gep => .{ .class = .stack_pointer, .bits = 64 },
+        .alloca => .{ .class = .stack_object, .bits = 0 },
+        .store,
+        .atomicrmw,
+        .cmpxchg,
+        .extractelement,
+        .insertelement,
+        .shufflevector,
+        .extractvalue,
+        .insertvalue,
+        .fcmp,
+        .fence,
+        => null,
+    };
+}
+
+fn recordSelectorIntervalDef(
+    allocator: std.mem.Allocator,
+    intervals: *std.ArrayList(SelectorValueInterval),
+    interval_indexes: *std.StringHashMap(usize),
+    name: []const u8,
+    metadata: VirtualRegMetadata,
+    position: usize,
+) !void {
+    if (interval_indexes.get(name)) |index| {
+        intervals.items[index].start = @min(intervals.items[index].start, position);
+        intervals.items[index].end = @max(intervals.items[index].end, position);
+        return;
+    }
+    const index = intervals.items.len;
+    try intervals.append(allocator, .{
+        .name = name,
+        .class = metadata.class,
+        .bits = metadata.bits,
+        .start = position,
+        .end = position,
+    });
+    try interval_indexes.put(name, index);
+}
+
+fn recordSelectorIntervalUses(
+    intervals: []SelectorValueInterval,
+    interval_indexes: std.StringHashMap(usize),
+    uses: NameSet,
+    position: usize,
+) !void {
+    var it = uses.iterator();
+    while (it.next()) |entry| {
+        const index = interval_indexes.get(entry.key_ptr.*) orelse return error.UnsupportedCodegenValue;
+        intervals[index].end = @max(intervals[index].end, position);
+    }
+}
+
+fn allocateSelectorIntervals(allocator: std.mem.Allocator, intervals: []const SelectorValueInterval) !SelectorAllocationPlan {
+    var ordered: std.ArrayList(SelectorValueInterval) = .empty;
+    defer ordered.deinit(allocator);
+    try ordered.appendSlice(allocator, intervals);
+    std.mem.sort(SelectorValueInterval, ordered.items, {}, selectorIntervalLessThan);
+
+    var plan = SelectorAllocationPlan.init(allocator);
+    errdefer plan.deinit();
+
+    var active: std.ArrayList(ActiveAllocation) = .empty;
+    defer active.deinit(allocator);
+
+    var occupied = [_]bool{false} ** 6;
+    for (ordered.items) |interval| {
+        expireSelectorIntervals(&active, &occupied, interval.start);
+        const assignment = allocateSelectorInterval(&occupied, interval, plan.spill_slots);
+        if (std.meta.activeTag(assignment) == .spill) plan.spill_slots += 1;
+        try plan.assignments.put(interval.name, assignment);
+        if (assignmentUsesRegisters(assignment)) {
+            try active.append(allocator, .{ .end = interval.end, .assignment = assignment });
+            if (active.items.len > plan.max_active_values) plan.max_active_values = active.items.len;
+        }
+    }
+    return plan;
+}
+
+fn selectorIntervalLessThan(_: void, lhs: SelectorValueInterval, rhs: SelectorValueInterval) bool {
+    if (lhs.start != rhs.start) return lhs.start < rhs.start;
+    return std.mem.lessThan(u8, lhs.name, rhs.name);
+}
+
+fn expireSelectorIntervals(active: *std.ArrayList(ActiveAllocation), occupied: *[6]bool, position: usize) void {
+    var index: usize = 0;
+    while (index < active.items.len) {
+        if (active.items[index].end < position) {
+            releaseSelectorAssignment(occupied, active.items[index].assignment);
+            _ = active.swapRemove(index);
+            continue;
+        }
+        index += 1;
+    }
+}
+
+fn allocateSelectorInterval(occupied: *[6]bool, interval: SelectorValueInterval, next_spill_slot: usize) PlannedValueAssignment {
+    return switch (interval.class) {
+        .gpr32 => if (allocateSelectorReg(occupied)) |reg| .{ .gpr32 = reg } else .{ .spill = next_spill_slot },
+        .gpr64 => if (allocateSelectorReg(occupied)) |reg| .{ .gpr64 = reg } else .{ .spill = next_spill_slot },
+        .gpr128 => if (allocateSelectorPair(occupied)) |pair| .{ .gpr128 = pair } else .{ .spill = next_spill_slot },
+        .stack_object => .stack_object,
+        .stack_pointer => if (allocateSelectorReg(occupied)) |reg| .{ .stack_pointer = reg } else .{ .spill = next_spill_slot },
+    };
+}
+
+fn allocateSelectorReg(occupied: *[6]bool) ?ArgReg {
+    for (selector_allocatable_regs) |reg| {
+        const index = argRegIndex(reg);
+        if (!occupied[index]) {
+            occupied[index] = true;
+            return reg;
+        }
+    }
+    return null;
+}
+
+fn allocateSelectorPair(occupied: *[6]bool) ?RegPair {
+    for (selector_allocatable_pairs) |pair| {
+        const lo = argRegIndex(pair.lo);
+        const hi = argRegIndex(pair.hi);
+        if (!occupied[lo] and !occupied[hi]) {
+            occupied[lo] = true;
+            occupied[hi] = true;
+            return pair;
+        }
+    }
+    return null;
+}
+
+fn releaseSelectorAssignment(occupied: *[6]bool, assignment: PlannedValueAssignment) void {
+    switch (assignment) {
+        .gpr32, .gpr64, .stack_pointer => |reg| occupied[argRegIndex(reg)] = false,
+        .gpr128 => |pair| {
+            occupied[argRegIndex(pair.lo)] = false;
+            occupied[argRegIndex(pair.hi)] = false;
+        },
+        .stack_object, .spill => {},
+    }
+}
+
+fn assignmentUsesRegisters(assignment: PlannedValueAssignment) bool {
+    return switch (assignment) {
+        .gpr32, .gpr64, .gpr128, .stack_pointer => true,
+        .stack_object, .spill => false,
+    };
+}
 
 fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !void {
     var changed = true;
@@ -897,6 +1174,7 @@ const StackIndexLoc = struct {
 const ComposedBlockSelector = struct {
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
+    allocation_plan: ?*const SelectorAllocationPlan = null,
     values: std.StringHashMap(ValueBinding),
     next_virtual_reg: usize = 0,
     edge_label_count: usize = 0,
@@ -915,6 +1193,7 @@ const ComposedBlockSelector = struct {
         return .{
             .allocator = allocator,
             .machine = machine,
+            .allocation_plan = null,
             .values = std.StringHashMap(ValueBinding).init(allocator),
         };
     }
@@ -2566,6 +2845,38 @@ test "generic cfg selector virtual register metadata follows assignment class" {
     try std.testing.expectEqual(VirtualRegMetadata{ .class = .stack_pointer, .bits = 64 }, ComposedBlockSelector.virtualRegMetadata(.{ .stack_i32_ptr = .{ .disp = 16 } }));
 }
 
+test "generic cfg selector allocation plan reuses expired registers deterministically" {
+    const intervals = [_]SelectorValueInterval{
+        .{ .name = "a", .class = .gpr64, .bits = 64, .start = 0, .end = 1 },
+        .{ .name = "b", .class = .gpr64, .bits = 64, .start = 2, .end = 3 },
+    };
+    var plan = try allocateSelectorIntervals(std.testing.allocator, intervals[0..]);
+    defer plan.deinit();
+
+    try std.testing.expectEqual(@as(usize, 0), plan.spill_slots);
+    try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rdi }, plan.assignment("a").?);
+    try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rdi }, plan.assignment("b").?);
+}
+
+test "generic cfg selector allocation plan spills beyond register pool" {
+    const intervals = [_]SelectorValueInterval{
+        .{ .name = "v0", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "v1", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "v2", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "v3", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "v4", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "v5", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "v6", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+    };
+    var plan = try allocateSelectorIntervals(std.testing.allocator, intervals[0..]);
+    defer plan.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), plan.spill_slots);
+    try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rdi }, plan.assignment("v0").?);
+    try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rsi }, plan.assignment("v1").?);
+    try std.testing.expectEqual(PlannedValueAssignment{ .spill = 0 }, plan.assignment("v6").?);
+}
+
 fn blockHasPhiIncomingFrom(block: ir.BasicBlock, predecessor: []const u8) bool {
     for (block.instructions.items) |instruction| {
         if (instruction.removed) continue;
@@ -2600,6 +2911,8 @@ const RegPair = struct {
 
 const pair_a: RegPair = .{ .lo = .rcx, .hi = .rdx };
 const pair_b: RegPair = .{ .lo = .r8, .hi = .r9 };
+const selector_allocatable_regs = [_]ArgReg{ .rdi, .rsi, .rdx, .rcx, .r8, .r9 };
+const selector_allocatable_pairs = [_]RegPair{ pair_a, pair_b };
 
 fn tryLowerComposedBlock(
     allocator: std.mem.Allocator,
@@ -2609,7 +2922,11 @@ fn tryLowerComposedBlock(
     if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "composed-block-ret-type" });
     if (function.blocks.items.len != 1) return unsupported(.{ .no_emitter = "composed-block-not-single-block" });
 
+    var allocation_plan = try buildSelectorAllocationPlan(allocator, function);
+    defer allocation_plan.deinit();
+
     var composed = ComposedBlockSelector.init(allocator, machine);
+    composed.allocation_plan = &allocation_plan;
     defer composed.deinit();
 
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
