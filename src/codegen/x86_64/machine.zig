@@ -267,6 +267,7 @@ pub const Instruction = union(enum) {
     cmp_rdx_rdi,
     cmp_rax_rdx,
     setb_eax,
+    sete_eax,
     test_eax_eax,
     test_rax_rax,
     test_rdx_rdx,

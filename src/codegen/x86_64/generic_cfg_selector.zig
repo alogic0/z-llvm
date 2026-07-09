@@ -63,6 +63,7 @@ pub const StageTwoSummary = struct {
 const no_spill_register_values = 6;
 const stage2_spill_slots = 6;
 const stage2_max_blocks = 64;
+const phi_regs = [_]ArgReg{ .r8, .r9, .rcx };
 
 pub fn tryLower(
     allocator: std.mem.Allocator,
@@ -151,7 +152,7 @@ pub fn tryLower(
                 if (function.blocks.items.len > 1) {
                     const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
                     if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
-                    return tryLowerComposedCfg(allocator, machine, function);
+                    return tryLowerComposedCfgFailClosed(allocator, machine, function);
                 }
                 return inspected;
             },
@@ -161,10 +162,10 @@ pub fn tryLower(
     if (function.blocks.items.len > 1) {
         const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
         if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
-        return tryLowerComposedCfg(allocator, machine, function);
+        return tryLowerComposedCfgFailClosed(allocator, machine, function);
     }
     const composed_start_len = machine.instructions.items.len;
-    switch (try tryLowerComposedBlock(allocator, machine, function)) {
+    switch (try tryLowerComposedBlockFailClosed(allocator, machine, function)) {
         .selected => return .selected,
         .unsupported => |diagnostic| switch (diagnostic) {
             .no_emitter => machine.instructions.items.len = composed_start_len,
@@ -175,6 +176,46 @@ pub fn tryLower(
         },
     }
     return inspected;
+}
+
+fn tryLowerComposedBlockFailClosed(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !SelectionResult {
+    const start_len = machine.instructions.items.len;
+    const result = tryLowerComposedBlock(allocator, machine, function) catch |err| {
+        machine.instructions.items.len = start_len;
+        return switch (err) {
+            error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "composed-block-unsupported-value" }),
+            else => err,
+        };
+    };
+    switch (result) {
+        .selected => {},
+        .unsupported => machine.instructions.items.len = start_len,
+    }
+    return result;
+}
+
+fn tryLowerComposedCfgFailClosed(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !SelectionResult {
+    const start_len = machine.instructions.items.len;
+    const result = tryLowerComposedCfg(allocator, machine, function) catch |err| {
+        machine.instructions.items.len = start_len;
+        return switch (err) {
+            error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "stage2-unsupported-value" }),
+            else => err,
+        };
+    };
+    switch (result) {
+        .selected => {},
+        .unsupported => machine.instructions.items.len = start_len,
+    }
+    return result;
 }
 
 fn tryLowerComposedCfg(
@@ -219,20 +260,10 @@ fn tryLowerComposedCfg(
 }
 
 pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir.Function) !StageTwoSummary {
-    var pressure_exempt_values = NameSet.init(allocator);
-    defer pressure_exempt_values.deinit();
-    try collectPressureExemptValues(&pressure_exempt_values, function);
+    var liveness = try buildStageTwoLiveness(allocator, function);
+    defer liveness.deinit();
 
-    var blocks: std.ArrayList(StageTwoBlock) = .empty;
-    defer {
-        for (blocks.items) |*block| block.deinit();
-        blocks.deinit(allocator);
-    }
-
-    for (function.blocks.items) |block| {
-        try blocks.append(allocator, StageTwoBlock.init(allocator, block.name));
-    }
-    if (blocks.items.len == 0) {
+    if (liveness.blocks.items.len == 0) {
         return .{
             .blocks = 0,
             .edges = 0,
@@ -254,8 +285,83 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
         };
     }
 
-    for (function.params.items) |param| {
-        try blocks.items[0].defs.put(param.name, {});
+    var max_live_in: usize = 0;
+    var max_live_out: usize = 0;
+    var max_pressure_block: []const u8 = "-";
+    var max_pressure_boundary: []const u8 = "-";
+    var max_pressure_seen: usize = 0;
+    var first_exceeding_block: []const u8 = "-";
+    var first_exceeding_boundary: []const u8 = "-";
+    var first_exceeding_live_values: usize = 0;
+    for (liveness.blocks.items) |block| {
+        const live_in_count = block.live_in.count();
+        const live_out_count = block.live_out.count();
+        if (live_in_count > max_live_in) max_live_in = live_in_count;
+        if (live_out_count > max_live_out) max_live_out = live_out_count;
+        if (live_in_count > max_pressure_seen or std.mem.eql(u8, max_pressure_block, "-")) {
+            max_pressure_seen = live_in_count;
+            max_pressure_block = block.name;
+            max_pressure_boundary = "live_in";
+        }
+        if (live_out_count > max_pressure_seen) {
+            max_pressure_seen = live_out_count;
+            max_pressure_block = block.name;
+            max_pressure_boundary = "live_out";
+        }
+        if (first_exceeding_live_values == 0 and live_in_count > no_spill_register_values + stage2_spill_slots) {
+            first_exceeding_block = block.name;
+            first_exceeding_boundary = "live_in";
+            first_exceeding_live_values = live_in_count;
+        }
+        if (first_exceeding_live_values == 0 and live_out_count > no_spill_register_values + stage2_spill_slots) {
+            first_exceeding_block = block.name;
+            first_exceeding_boundary = "live_out";
+            first_exceeding_live_values = live_out_count;
+        }
+    }
+    const max_pressure = @max(max_live_in, max_live_out);
+    const max_spill_slots_needed = stage2SpillSlotsNeeded(max_pressure);
+    const first_exceeding_spill_slots_needed = stage2SpillSlotsNeeded(first_exceeding_live_values);
+    return .{
+        .blocks = liveness.blocks.items.len,
+        .edges = liveness.edge_count,
+        .max_live_in = max_live_in,
+        .max_live_out = max_live_out,
+        .max_pressure = max_pressure,
+        .no_spill_limit = no_spill_register_values,
+        .spill_slot_count = stage2_spill_slots,
+        .spill_envelope_limit = no_spill_register_values + stage2_spill_slots,
+        .max_pressure_block = max_pressure_block,
+        .max_pressure_boundary = max_pressure_boundary,
+        .max_pressure_spill_slots_needed = max_spill_slots_needed,
+        .max_pressure_spill_slots_over_envelope = stage2SpillSlotsOverEnvelope(max_spill_slots_needed),
+        .first_exceeding_block = first_exceeding_block,
+        .first_exceeding_boundary = first_exceeding_boundary,
+        .first_exceeding_live_values = first_exceeding_live_values,
+        .first_exceeding_spill_slots_needed = first_exceeding_spill_slots_needed,
+        .first_exceeding_spill_slots_over_envelope = stage2SpillSlotsOverEnvelope(first_exceeding_spill_slots_needed),
+    };
+}
+
+fn buildStageTwoLiveness(allocator: std.mem.Allocator, function: ir.Function) !StageTwoLiveness {
+    var pressure_exempt_values = NameSet.init(allocator);
+    defer pressure_exempt_values.deinit();
+    try collectPressureExemptValues(&pressure_exempt_values, function);
+
+    var blocks: std.ArrayList(StageTwoBlock) = .empty;
+    errdefer {
+        for (blocks.items) |*block| block.deinit();
+        blocks.deinit(allocator);
+    }
+
+    for (function.blocks.items) |block| {
+        try blocks.append(allocator, StageTwoBlock.init(allocator, block.name));
+    }
+
+    if (blocks.items.len != 0) {
+        for (function.params.items) |param| {
+            try blocks.items[0].defs.put(param.name, {});
+        }
     }
 
     var edge_count: usize = 0;
@@ -310,61 +416,10 @@ pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir
         }
     }
 
-    var max_live_in: usize = 0;
-    var max_live_out: usize = 0;
-    var max_pressure_block: []const u8 = "-";
-    var max_pressure_boundary: []const u8 = "-";
-    var max_pressure_seen: usize = 0;
-    var first_exceeding_block: []const u8 = "-";
-    var first_exceeding_boundary: []const u8 = "-";
-    var first_exceeding_live_values: usize = 0;
-    for (blocks.items) |block| {
-        const live_in_count = block.live_in.count();
-        const live_out_count = block.live_out.count();
-        if (live_in_count > max_live_in) max_live_in = live_in_count;
-        if (live_out_count > max_live_out) max_live_out = live_out_count;
-        if (live_in_count > max_pressure_seen or std.mem.eql(u8, max_pressure_block, "-")) {
-            max_pressure_seen = live_in_count;
-            max_pressure_block = block.name;
-            max_pressure_boundary = "live_in";
-        }
-        if (live_out_count > max_pressure_seen) {
-            max_pressure_seen = live_out_count;
-            max_pressure_block = block.name;
-            max_pressure_boundary = "live_out";
-        }
-        if (first_exceeding_live_values == 0 and live_in_count > no_spill_register_values + stage2_spill_slots) {
-            first_exceeding_block = block.name;
-            first_exceeding_boundary = "live_in";
-            first_exceeding_live_values = live_in_count;
-        }
-        if (first_exceeding_live_values == 0 and live_out_count > no_spill_register_values + stage2_spill_slots) {
-            first_exceeding_block = block.name;
-            first_exceeding_boundary = "live_out";
-            first_exceeding_live_values = live_out_count;
-        }
-    }
-    const max_pressure = @max(max_live_in, max_live_out);
-    const max_spill_slots_needed = stage2SpillSlotsNeeded(max_pressure);
-    const first_exceeding_spill_slots_needed = stage2SpillSlotsNeeded(first_exceeding_live_values);
     return .{
-        .blocks = blocks.items.len,
-        .edges = edge_count,
-        .max_live_in = max_live_in,
-        .max_live_out = max_live_out,
-        .max_pressure = max_pressure,
-        .no_spill_limit = no_spill_register_values,
-        .spill_slot_count = stage2_spill_slots,
-        .spill_envelope_limit = no_spill_register_values + stage2_spill_slots,
-        .max_pressure_block = max_pressure_block,
-        .max_pressure_boundary = max_pressure_boundary,
-        .max_pressure_spill_slots_needed = max_spill_slots_needed,
-        .max_pressure_spill_slots_over_envelope = stage2SpillSlotsOverEnvelope(max_spill_slots_needed),
-        .first_exceeding_block = first_exceeding_block,
-        .first_exceeding_boundary = first_exceeding_boundary,
-        .first_exceeding_live_values = first_exceeding_live_values,
-        .first_exceeding_spill_slots_needed = first_exceeding_spill_slots_needed,
-        .first_exceeding_spill_slots_over_envelope = stage2SpillSlotsOverEnvelope(first_exceeding_spill_slots_needed),
+        .allocator = allocator,
+        .blocks = blocks,
+        .edge_count = edge_count,
     };
 }
 
@@ -377,6 +432,17 @@ fn stage2SpillSlotsOverEnvelope(spill_slots_needed: usize) usize {
 }
 
 const NameSet = std.StringHashMap(void);
+
+const StageTwoLiveness = struct {
+    allocator: std.mem.Allocator,
+    blocks: std.ArrayList(StageTwoBlock),
+    edge_count: usize,
+
+    fn deinit(liveness: *StageTwoLiveness) void {
+        for (liveness.blocks.items) |*block| block.deinit();
+        liveness.blocks.deinit(liveness.allocator);
+    }
+};
 
 const StageTwoBlock = struct {
     name: []const u8,
@@ -646,7 +712,6 @@ const ComposedBlockSelector = struct {
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     values: std.StringHashMap(ValueLoc),
-    phi_value_count: usize = 0,
     edge_label_count: usize = 0,
     current_eax_name: ?[]const u8 = null,
     current_scratch_names: [6]?[]const u8 = .{null} ** 6,
@@ -698,25 +763,27 @@ const ComposedBlockSelector = struct {
 
     fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
         for (function.blocks.items) |block| {
+            var used_in_block = [_]bool{false} ** phi_regs.len;
             for (block.instructions.items) |instruction| {
                 if (instruction.removed or instruction.kind != .phi) continue;
                 const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
                 const phi = instruction.kind.phi;
                 const bits = intBits(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
                 if (bits != 32 and bits != 64) return .{ .no_emitter = "stage2-phi-width" };
-                const reg = selector.nextPhiReg() orelse return .{ .no_spill_envelope = "stage2-phi-registers" };
+                const reg = nextPhiReg(&used_in_block) orelse return .{ .no_spill_envelope = "stage2-phi-registers" };
                 try selector.values.put(result_name, if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg });
             }
         }
         return null;
     }
 
-    fn nextPhiReg(selector: *ComposedBlockSelector) ?ArgReg {
-        const regs = [_]ArgReg{ .r8, .r9, .rcx };
-        if (selector.phi_value_count >= regs.len) return null;
-        const reg = regs[selector.phi_value_count];
-        selector.phi_value_count += 1;
-        return reg;
+    fn nextPhiReg(used_in_block: *[phi_regs.len]bool) ?ArgReg {
+        for (phi_regs, 0..) |reg, index| {
+            if (used_in_block[index]) continue;
+            used_in_block[index] = true;
+            return reg;
+        }
+        return null;
     }
 
     fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnostic {
@@ -751,6 +818,7 @@ const ComposedBlockSelector = struct {
             .store => |store| try selector.lowerStore(store),
             .gep => |gep| try selector.lowerGep(instruction.result, gep),
             .call => |call| try selector.lowerCall(instruction.result, call),
+            .select => |select| try selector.lowerSelect(instruction.result, select),
             else => .{ .no_emitter = "composed-block-instruction-not-owned" },
         };
     }
@@ -918,6 +986,22 @@ const ComposedBlockSelector = struct {
                     else => return .{ .no_emitter = "composed-block-binary-width" },
                 }
             },
+            .shl => {
+                if (bits > 32) return .{ .no_emitter = "composed-block-shl-imm-width" };
+                const amount = try shiftAmount5(rhs);
+                const lhs_loc = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
+                if (try selector.preserveCurrentEaxIntoScratch()) |diagnostic| return diagnostic;
+                try selector.emitValueIntoEax(binary.lhs);
+                if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shl_eax_imm5 = amount });
+                switch (lhs_loc) {
+                    .scratch32 => |reg| {
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg });
+                        try selector.bindScratch(result_name, reg, bits);
+                        selector.current_eax_name = null;
+                    },
+                    .arg32, .arg64, .scratch64, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => try selector.bindEax(result_name),
+                }
+            },
             .ashr => {
                 if (bits == 128) {
                     const amount = try shiftAmount7(rhs);
@@ -974,6 +1058,22 @@ const ComposedBlockSelector = struct {
             },
             else => return .{ .no_emitter = "composed-block-binary-imm-rhs" },
         }
+        return null;
+    }
+
+    fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select: ir.SelectInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        if (!select.cond_ty.eql(.{ .int = 1 })) return .{ .no_emitter = "composed-block-select-cond" };
+        const bits = intBits(select.ty) orelse return .{ .no_emitter = "composed-block-select-type" };
+        if (bits != 32 and bits != 64) return .{ .no_emitter = "composed-block-select-width" };
+
+        if (try selector.emitBranchCondition(select.cond)) |diagnostic| return diagnostic;
+        try selector.emitValueIntoAccumulator(select.false_value, bits);
+        const end_label = try selector.ownedSelectEndLabel();
+        try selector.machine.instructions.append(selector.allocator, .{ .je = end_label });
+        try selector.emitValueIntoAccumulator(select.true_value, bits);
+        try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
+        try selector.bindAccumulator(result_name, bits);
         return null;
     }
 
@@ -1139,15 +1239,42 @@ const ComposedBlockSelector = struct {
 
     fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-        if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-icmp-form" };
-        const rhs = switch (icmp.rhs) {
-            .int => |int| int,
-            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-icmp-rhs" },
-        };
-        selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-        selector.current_eax_name = null;
-        try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = try i64Value(rhs) } });
-        try selector.machine.instructions.append(selector.allocator, .setb_eax);
+        if (icmp.predicate == .eq) {
+            const rhs = switch (icmp.rhs) {
+                .int => |int| int,
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-icmp-rhs" },
+            };
+            if (try i64Value(rhs) != 0) return .{ .no_emitter = "composed-block-icmp-eq-rhs" };
+            const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };
+            const loc = selector.resolveValue(icmp.lhs) orelse return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            switch (loc) {
+                .eax => try selector.machine.instructions.append(selector.allocator, .test_eax_eax),
+                .rax => {
+                    if (bits != 64) return .{ .no_emitter = "composed-block-icmp-lhs-width" };
+                    try selector.machine.instructions.append(selector.allocator, .test_rax_rax);
+                },
+                .arg32, .scratch32 => |reg| {
+                    if (bits > 32) return .{ .no_emitter = "composed-block-icmp-lhs-width" };
+                    try selector.machine.instructions.append(selector.allocator, .{ .test_arg32 = reg });
+                },
+                .arg64, .scratch64 => |reg| {
+                    if (bits != 64) return .{ .no_emitter = "composed-block-icmp-lhs-width" };
+                    try selector.machine.instructions.append(selector.allocator, .{ .test_arg64 = reg });
+                },
+                .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-icmp-lhs-loc" },
+            }
+            selector.current_eax_name = null;
+            try selector.machine.instructions.append(selector.allocator, .sete_eax);
+        } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 })) {
+            const rhs = switch (icmp.rhs) {
+                .int => |int| int,
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-icmp-rhs" },
+            };
+            selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            selector.current_eax_name = null;
+            try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = try i64Value(rhs) } });
+            try selector.machine.instructions.append(selector.allocator, .setb_eax);
+        } else return .{ .no_emitter = "composed-block-icmp-form" };
         try selector.bindEax(result_name);
         return null;
     }
@@ -1466,6 +1593,14 @@ const ComposedBlockSelector = struct {
 
     fn ownedEdgeLabel(selector: *ComposedBlockSelector) ![]const u8 {
         const label = try std.fmt.allocPrint(selector.allocator, "__zllvm_stage2_phi_edge_{d}", .{selector.edge_label_count});
+        errdefer selector.allocator.free(label);
+        selector.edge_label_count += 1;
+        try selector.machine.owned_labels.append(selector.allocator, label);
+        return label;
+    }
+
+    fn ownedSelectEndLabel(selector: *ComposedBlockSelector) ![]const u8 {
+        const label = try std.fmt.allocPrint(selector.allocator, "__zllvm_stage2_{d}_generic_cfg_select_end", .{selector.edge_label_count});
         errdefer selector.allocator.free(label);
         selector.edge_label_count += 1;
         try selector.machine.owned_labels.append(selector.allocator, label);
@@ -1829,6 +1964,34 @@ const ComposedBlockSelector = struct {
 
     fn emitValueIntoAccumulator(selector: *ComposedBlockSelector, value: ir.Value, bits: u16) !void {
         if (bits == 64) try selector.emitValueIntoRax(value) else try selector.emitValueIntoEax(value);
+    }
+
+    fn preserveCurrentEaxIntoScratch(selector: *ComposedBlockSelector) !?Diagnostic {
+        const name = selector.current_eax_name orelse return null;
+        if (!selector.scratchRegIsProvenFree(.rdx)) return null;
+        selector.invalidatePairContaining(.rdx);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdx });
+        try selector.values.put(name, .{ .scratch32 = .rdx });
+        selector.current_scratch_names[argRegIndex(.rdx)] = name;
+        selector.current_eax_name = null;
+        return null;
+    }
+
+    fn scratchRegIsProvenFree(selector: ComposedBlockSelector, reg: ArgReg) bool {
+        if (selector.current_scratch_names[argRegIndex(reg)] != null) return false;
+        if (pair_a.contains(reg) and selector.current_pair_a_name != null) return false;
+        if (pair_b.contains(reg) and selector.current_pair_b_name != null) return false;
+
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            switch (entry.value_ptr.*) {
+                .arg32, .arg64, .scratch32, .scratch64 => |value_reg| if (value_reg == reg) return false,
+                .arg128, .scratch128 => |pair| if (pair.contains(reg)) return false,
+                .stack_i32_ptr => |stack_ptr| if (stack_ptr.index) |index| if (index.reg == reg) return false,
+                .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .spill64, .spill128 => {},
+            }
+        }
+        return true;
     }
 
     fn emitValueIntoI128Return(selector: *ComposedBlockSelector, value: ir.Value) !void {

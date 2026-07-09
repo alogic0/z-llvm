@@ -617,6 +617,58 @@ test "generic cfg selector stage two materializes loop backedge phi moves" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector stage two composes i32 multiply loop" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @mul_loop_i32(i32 %a, i32 %b) {
+        \\entry:
+        \\  %zero = icmp eq i32 %a, 0
+        \\  br i1 %zero, label %exit, label %loop
+        \\loop:
+        \\  %multiplicand = phi i32 [ %next_multiplicand, %loop ], [ %a, %entry ]
+        \\  %multiplier = phi i32 [ %next_multiplier, %loop ], [ %b, %entry ]
+        \\  %acc = phi i32 [ %next_acc, %loop ], [ 0, %entry ]
+        \\  %low_bit = and i32 %multiplicand, 1
+        \\  %skip_add = icmp eq i32 %low_bit, 0
+        \\  %addend = select i1 %skip_add, i32 0, i32 %multiplier
+        \\  %next_acc = add i32 %addend, %acc
+        \\  %next_multiplicand = lshr i32 %multiplicand, 1
+        \\  %next_multiplier = shl i32 %multiplier, 1
+        \\  %done = icmp eq i32 %next_multiplicand, 0
+        \\  br i1 %done, label %exit, label %loop
+        \\exit:
+        \\  %result = phi i32 [ 0, %entry ], [ %next_acc, %loop ]
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    const summary = try selector.analyzeStageTwoNoSpillEnvelope(std.testing.allocator, module.functions.items[0]);
+    try std.testing.expectEqual(@as(usize, 3), summary.max_pressure);
+    try std.testing.expect(!summary.exceedsNoSpill());
+
+    var machine = codegen.x86_64.MachineFunction.init("mul_loop_i32", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .mov_eax_to_arg = .rdx });
+    try expectInstruction(machine.instructions.items, .{ .shl_eax_imm5 = 1 });
+    try expectNamedInstruction(machine.instructions.items, .label, "loop");
+    try expectNamedInstruction(machine.instructions.items, .label, "exit");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector stage two computes pressure above no-spill envelope" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

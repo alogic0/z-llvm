@@ -1254,6 +1254,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .cmp_rdx_rdi => try writer.writeAll("\tcmpq %rdi, %rdx\n"),
             .cmp_rax_rdx => try writer.writeAll("\tcmpq %rdx, %rax\n"),
             .setb_eax => try writer.writeAll("\txorl %eax, %eax\n\tsetb %al\n"),
+            .sete_eax => try writer.writeAll("\txorl %eax, %eax\n\tsete %al\n"),
             .test_eax_eax => try writer.writeAll("\ttestl %eax, %eax\n"),
             .test_rax_rax => try writer.writeAll("\ttestq %rax, %rax\n"),
             .test_rdx_rdx => try writer.writeAll("\ttestq %rdx, %rdx\n"),
