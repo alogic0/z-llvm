@@ -371,6 +371,8 @@ pub const Instruction = union(enum) {
     reload_rsp_rax: FrameIndex,
     load_stack_disp8_eax: u8,
     load_stack_disp32_eax: u32,
+    load_stack_rcx4_disp8_eax: u8,
+    load_stack_rcx4_disp32_eax: u32,
     load_stack_disp8_rax: u8,
     load_stack_disp32_rax: u32,
     load_stack_disp8_u8_eax: u8,
@@ -476,6 +478,8 @@ pub const Instruction = union(enum) {
     },
     store_eax_stack_disp8: u8,
     store_eax_stack_disp32: u32,
+    store_eax_stack_rcx4_disp8: u8,
+    store_eax_stack_rcx4_disp32: u32,
     store_al_arg_ptr_disp8: struct {
         reg: ArgReg,
         offset: u8,

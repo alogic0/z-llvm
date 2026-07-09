@@ -1274,6 +1274,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x8b, 0x84, 0x24 });
                 try appendU32(&bytes, allocator, disp);
             },
+            .load_stack_rcx4_disp8_eax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x8b, 0x44, 0x8c });
+                try bytes.append(allocator, disp);
+            },
+            .load_stack_rcx4_disp32_eax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x8b, 0x84, 0x8c });
+                try appendU32(&bytes, allocator, disp);
+            },
             .load_stack_disp8_rax => |disp| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x44, 0x24 });
                 try bytes.append(allocator, disp);
@@ -1375,6 +1383,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .store_eax_stack_disp8 => |disp| try bytes.appendSlice(allocator, &.{ 0x89, 0x44, 0x24, disp }),
             .store_eax_stack_disp32 => |disp| {
                 try bytes.appendSlice(allocator, &.{ 0x89, 0x84, 0x24 });
+                try appendU32(&bytes, allocator, disp);
+            },
+            .store_eax_stack_rcx4_disp8 => |disp| try bytes.appendSlice(allocator, &.{ 0x89, 0x44, 0x8c, disp }),
+            .store_eax_stack_rcx4_disp32 => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x89, 0x84, 0x8c });
                 try appendU32(&bytes, allocator, disp);
             },
             .store_al_arg_ptr_disp8 => |store| try encodeStoreAlToArgPtrDisp8(&bytes, allocator, store.reg, store.offset),
@@ -1762,6 +1775,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .spill_rax_rsp, .reload_rsp_rax => |frame_index| raxFrameSlotInstructionSize(frame_index),
         .load_stack_disp8_eax => 4,
         .load_stack_disp32_eax => 7,
+        .load_stack_rcx4_disp8_eax => 4,
+        .load_stack_rcx4_disp32_eax => 7,
         .load_stack_disp8_rax => 5,
         .load_stack_disp32_rax => 8,
         .load_stack_disp8_u8_eax, .load_stack_disp8_u16_eax => 5,
@@ -1802,6 +1817,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .store_eax_arg_ptr_disp32 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 6,
         .store_eax_stack_disp8 => 4,
         .store_eax_stack_disp32 => 7,
+        .store_eax_stack_rcx4_disp8 => 4,
+        .store_eax_stack_rcx4_disp32 => 7,
         .store_al_arg_ptr_disp8 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 2 + if (store.offset == 0) @as(u32, 0) else 1,
         .store_al_arg_ptr_disp32 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 6,
         .store_ax_arg_ptr_disp8 => |store| 1 + (if (store.reg.rexB()) @as(u32, 1) else 0) + 2 + if (store.offset == 0) @as(u32, 0) else 1,

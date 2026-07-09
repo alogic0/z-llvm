@@ -504,6 +504,12 @@ const StackArrayLoc = struct {
 
 const StackPtrLoc = struct {
     disp: u32,
+    index: ?StackIndexLoc = null,
+};
+
+const StackIndexLoc = struct {
+    reg: ArgReg,
+    name: []const u8,
 };
 
 const ComposedBlockSelector = struct {
@@ -948,7 +954,7 @@ const ComposedBlockSelector = struct {
             },
             .stack_i32_ptr => |stack_ptr| {
                 if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-stack-array-width" };
-                try selector.appendLoadStackI32(stack_ptr.disp);
+                try selector.appendLoadStackI32(stack_ptr);
                 try selector.bindEax(result_name);
             },
             .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack_i32_array, .spill64 => return .{ .no_emitter = "composed-block-load-ptr" },
@@ -963,7 +969,7 @@ const ComposedBlockSelector = struct {
         try selector.emitValueIntoEax(store.value);
         switch (ptr) {
             .arg64, .scratch64 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = reg }),
-            .stack_i32_ptr => |stack_ptr| try selector.appendStoreStackI32(stack_ptr.disp),
+            .stack_i32_ptr => |stack_ptr| try selector.appendStoreStackI32(stack_ptr),
             .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack64, .stack_i32_array, .spill64 => return .{ .no_emitter = "composed-block-store-ptr" },
         }
         return null;
@@ -984,13 +990,21 @@ const ComposedBlockSelector = struct {
         if (!first_index.ty.eql(.{ .int = 64 }) or !first_index.value.eql(.{ .int = 0 })) return .{ .no_emitter = "composed-block-gep-base-index" };
         const elem_index = gep.indices.items[1];
         if (!elem_index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
-        const index = switch (elem_index.value) {
-            .int => |int| std.math.cast(u32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" },
-            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
+        const stack_ptr = switch (elem_index.value) {
+            .int => |int| blk: {
+                const index = std.math.cast(u32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
+                if (index >= stack_array.len) return .{ .no_emitter = "composed-block-gep-index-range" };
+                const byte_offset = std.math.mul(u32, index, 4) catch return .{ .no_spill_envelope = "composed-block-gep-offset" };
+                break :blk StackPtrLoc{ .disp = stack_array.base_disp + byte_offset };
+            },
+            .named => |name| blk: {
+                try selector.emitValueIntoScratch(elem_index.value, .rcx, 64);
+                try selector.bindScratch(name, .rcx, 64);
+                break :blk StackPtrLoc{ .disp = stack_array.base_disp, .index = .{ .reg = .rcx, .name = name } };
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
         };
-        if (index >= stack_array.len) return .{ .no_emitter = "composed-block-gep-index-range" };
-        const byte_offset = std.math.mul(u32, index, 4) catch return .{ .no_spill_envelope = "composed-block-gep-offset" };
-        try selector.values.put(result_name, .{ .stack_i32_ptr = .{ .disp = stack_array.base_disp + byte_offset } });
+        try selector.values.put(result_name, .{ .stack_i32_ptr = stack_ptr });
         return null;
     }
 
@@ -1096,19 +1110,31 @@ const ComposedBlockSelector = struct {
         }
     }
 
-    fn appendLoadStackI32(selector: *ComposedBlockSelector, disp: u32) !void {
-        if (disp <= std.math.maxInt(u8)) {
-            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_eax = @intCast(disp) });
+    fn appendLoadStackI32(selector: *ComposedBlockSelector, stack_ptr: StackPtrLoc) !void {
+        if (stack_ptr.index != null) {
+            if (stack_ptr.disp <= std.math.maxInt(u8)) {
+                try selector.machine.instructions.append(selector.allocator, .{ .load_stack_rcx4_disp8_eax = @intCast(stack_ptr.disp) });
+            } else {
+                try selector.machine.instructions.append(selector.allocator, .{ .load_stack_rcx4_disp32_eax = stack_ptr.disp });
+            }
+        } else if (stack_ptr.disp <= std.math.maxInt(u8)) {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_eax = @intCast(stack_ptr.disp) });
         } else {
-            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_eax = disp });
+            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_eax = stack_ptr.disp });
         }
     }
 
-    fn appendStoreStackI32(selector: *ComposedBlockSelector, disp: u32) !void {
-        if (disp <= std.math.maxInt(u8)) {
-            try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_disp8 = @intCast(disp) });
+    fn appendStoreStackI32(selector: *ComposedBlockSelector, stack_ptr: StackPtrLoc) !void {
+        if (stack_ptr.index != null) {
+            if (stack_ptr.disp <= std.math.maxInt(u8)) {
+                try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_rcx4_disp8 = @intCast(stack_ptr.disp) });
+            } else {
+                try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_rcx4_disp32 = stack_ptr.disp });
+            }
+        } else if (stack_ptr.disp <= std.math.maxInt(u8)) {
+            try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_disp8 = @intCast(stack_ptr.disp) });
         } else {
-            try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_disp32 = disp });
+            try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_disp32 = stack_ptr.disp });
         }
     }
 
@@ -1714,7 +1740,13 @@ const ComposedBlockSelector = struct {
                         }
                         return null;
                     },
-                    .stack64, .stack_i32_array, .stack_i32_ptr, .spill64 => loc,
+                    .stack64, .stack_i32_array, .spill64 => loc,
+                    .stack_i32_ptr => |stack_ptr| if (stack_ptr.index) |index| blk: {
+                        if (selector.current_scratch_names[argRegIndex(index.reg)]) |current| {
+                            if (std.mem.eql(u8, current, index.name)) break :blk loc;
+                        }
+                        return null;
+                    } else loc,
                 };
             },
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
