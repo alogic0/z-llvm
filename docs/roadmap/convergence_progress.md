@@ -1834,6 +1834,23 @@ One line per completed cycle, append-only, newest last. This is the
   stage-two-boundary rows 2, open integer-helper fallback candidates 33, and
   one allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
+- 2026-07-09 (this commit; acknowledges INBOX-1) Item 15
+  allocator-consumption slice: composed selector result binding now consults
+  the deterministic allocation plan for no-spill planned locations and records
+  the binding through the virtual-register value model. This first consumption
+  slice only accepts planned locations that match the current proven producer
+  location; mismatched planned registers and planned spills remain deferred so
+  hardcoded temporaries do not silently clobber live values before the
+  allocator owns reload/spill insertion. The nine composed rows remain the
+  regression set, and Debug std-hello compiler_rt report-all stayed at
+  443 selected, 129 emitted, and 314 failed; `compiler_rt.mulXi3.__multi3`
+  remains the allocator acceptance row. Item-15 accounting remains
+  composed-selection rows 9, terminal-template rows 17, stage-two-boundary rows
+  2, open integer-helper fallback candidates 33, and one allocator acceptance
+  row pending. Recognizer count still 1 (no new recognizer reorder or
+  pre-pass); `shape_recognizer_functions` is unchanged. Evidence
+  `tmp/std_debug_hello_debug_allocator_plan_consumption.log`; distribution-all
+  proof `tmp/distribution_all_after_allocator_plan_consumption.log`.
 
 ## Ratchet State
 
