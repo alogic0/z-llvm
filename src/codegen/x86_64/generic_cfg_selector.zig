@@ -168,6 +168,7 @@ fn tryLowerComposedCfg(
 
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
     if (try composed.bindPhiResults(function)) |diagnostic| return unsupported(diagnostic);
+    if (try composed.prepareStackFrame(function)) |diagnostic| return unsupported(diagnostic);
 
     for (function.blocks.items, 0..) |block, block_index| {
         if (block_index != 0) try machine.instructions.append(allocator, .{ .label = block.name });
@@ -517,6 +518,7 @@ const ComposedBlockSelector = struct {
     current_pair_b_name: ?[]const u8 = null,
     stack_slot_allocated: bool = false,
     stack_array_allocated: bool = false,
+    stack_array_count: usize = 0,
     stack_frame_bytes: u32 = 0,
     spill_slot_names: [2]?[]const u8 = .{null} ** 2,
     call_clobbered_regs: bool = false,
@@ -618,6 +620,10 @@ const ComposedBlockSelector = struct {
 
     fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca: ir.AllocaInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        if (selector.values.get(result_name)) |loc| switch (loc) {
+            .stack64, .stack_i32_array => return null,
+            .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack_i32_ptr, .spill64 => {},
+        };
         if (alloca.allocated_ty_addrspace != null) return .{ .no_emitter = "composed-block-alloca-addrspace" };
         if (alloca.allocated_ty.eql(.{ .int = 64 })) {
             if (selector.stack_slot_allocated or selector.stack_array_allocated) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
@@ -638,6 +644,47 @@ const ComposedBlockSelector = struct {
             return null;
         }
         return .{ .no_emitter = "composed-block-alloca-form" };
+    }
+
+    fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+        var payload_bytes: u32 = 0;
+        var scalar_slot_count: usize = 0;
+        var array_count: usize = 0;
+
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                if (instruction.removed or instruction.kind != .alloca) continue;
+                const result_name = instruction.result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+                const alloca = instruction.kind.alloca;
+                if (alloca.allocated_ty_addrspace != null) return .{ .no_emitter = "composed-block-alloca-addrspace" };
+                if (alloca.allocated_ty.eql(.{ .int = 64 })) {
+                    if (payload_bytes != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
+                    scalar_slot_count += 1;
+                    if (scalar_slot_count > 1) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
+                    payload_bytes = 8;
+                    try selector.values.put(result_name, .{ .stack64 = 0 });
+                } else if (parseI32ArrayType(alloca.allocated_ty)) |len| {
+                    if (scalar_slot_count != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
+                    array_count += 1;
+                    if (array_count > 4) return .{ .no_spill_envelope = "composed-block-stack-array-count" };
+                    const array_bytes = std.math.mul(u32, len, 4) catch return .{ .no_spill_envelope = "composed-block-stack-array-size" };
+                    const base_disp = payload_bytes;
+                    payload_bytes = std.math.add(u32, payload_bytes, array_bytes) catch return .{ .no_spill_envelope = "composed-block-stack-array-size" };
+                    try selector.values.put(result_name, .{ .stack_i32_array = .{ .base_disp = base_disp, .len = len } });
+                } else {
+                    return .{ .no_emitter = "composed-block-alloca-form" };
+                }
+            }
+        }
+
+        if (payload_bytes == 0) return null;
+        const frame_bytes = alignedCallFrameBytes(payload_bytes) orelse return .{ .no_spill_envelope = "composed-block-stack-array-size" };
+        try selector.appendSubRsp(frame_bytes);
+        selector.stack_frame_bytes = frame_bytes;
+        selector.stack_slot_allocated = scalar_slot_count != 0;
+        selector.stack_array_allocated = array_count != 0;
+        selector.stack_array_count = array_count;
+        return null;
     }
 
     fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
@@ -1722,6 +1769,7 @@ fn tryLowerComposedBlock(
     defer composed.deinit();
 
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
+    if (try composed.prepareStackFrame(function)) |diagnostic| return unsupported(diagnostic);
 
     const block = function.blocks.items[0];
     for (block.instructions.items) |instruction| {

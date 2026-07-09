@@ -261,6 +261,39 @@ test "generic cfg selector rejects dynamic i32 stack array gep index" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "generic cfg selector composes multiple constant i32 stack arrays in one frame" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_array_pair_const_gep(i32 %x, i32 %y) {
+        \\entry:
+        \\  %left = alloca [4 x i32], align 4
+        \\  %right = alloca [2 x i32], align 4
+        \\  %left_slot = getelementptr inbounds [4 x i32], ptr %left, i64 0, i64 2
+        \\  %right_slot = getelementptr inbounds [2 x i32], ptr %right, i64 0, i64 1
+        \\  store i32 %x, ptr %left_slot, align 4
+        \\  store i32 %y, ptr %right_slot, align 4
+        \\  %value = load i32, ptr %right_slot, align 4
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_array_pair_const_gep", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectInstruction(machine.instructions.items, .sub_rsp_40);
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 8 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 20 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 20 });
+    try expectInstruction(machine.instructions.items, .add_rsp_40);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector stage two composes acyclic branch with labels" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
