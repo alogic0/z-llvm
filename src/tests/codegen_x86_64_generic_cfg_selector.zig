@@ -384,8 +384,8 @@ test "generic cfg selector composes constant i32 stack array gep load store" {
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
     try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 88 });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 64 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 64 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 72 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 72 });
     try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 88 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
@@ -414,8 +414,8 @@ test "generic cfg selector composes dynamic i32 stack array gep index" {
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
     try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 88 });
     try expectInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp8 = 56 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_rcx4_disp8_eax = 56 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp8 = 64 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_rcx4_disp8_eax = 64 });
     try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 88 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
@@ -445,11 +445,11 @@ test "generic cfg selector composes multiple constant i32 stack arrays in one fr
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
-    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 88 });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 64 });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 76 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 76 });
-    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 88 });
+    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 104 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 72 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 84 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 84 });
+    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 104 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -694,7 +694,7 @@ test "generic cfg selector stage two computes pressure above no-spill envelope" 
     try std.testing.expectEqual(@as(usize, 2), summary.blocks);
     try std.testing.expect(summary.max_pressure > summary.no_spill_limit);
     try std.testing.expect(summary.exceedsNoSpill());
-    try std.testing.expectEqual(@as(usize, 6), summary.spill_slot_count);
+    try std.testing.expectEqual(@as(usize, 7), summary.spill_slot_count);
     try std.testing.expectEqual(@as(usize, 1), summary.max_pressure_spill_slots_needed);
     try std.testing.expectEqual(@as(usize, 0), summary.max_pressure_spill_slots_over_envelope);
     try std.testing.expectEqualStrings("-", summary.first_exceeding_block);
@@ -780,8 +780,8 @@ test "generic cfg selector stage two rejects pressure above spill envelope" {
     try std.testing.expectEqual(summary.max_pressure - summary.no_spill_limit, summary.max_pressure_spill_slots_needed);
     try std.testing.expect(summary.max_pressure_spill_slots_over_envelope > 0);
     try std.testing.expectEqualStrings("entry", summary.first_exceeding_block);
-    try std.testing.expectEqualStrings("p8", summary.first_exceeding_boundary);
-    try std.testing.expectEqual(@as(usize, 13), summary.first_exceeding_live_values);
+    try std.testing.expectEqualStrings("terminator", summary.first_exceeding_boundary);
+    try std.testing.expectEqual(@as(usize, 14), summary.first_exceeding_live_values);
 
     var machine = codegen.x86_64.MachineFunction.init("pressure", module.functions.items[0].ret_ty);
     defer machine.deinit(std.testing.allocator);

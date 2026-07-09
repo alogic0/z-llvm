@@ -61,7 +61,7 @@ pub const StageTwoSummary = struct {
 };
 
 const no_spill_register_values = 6;
-const stage2_spill_slots = 6;
+const stage2_spill_slots = 7;
 const stage2_max_blocks = 64;
 const phi_regs = [_]ArgReg{ .r8, .r9, .rcx };
 
@@ -1364,6 +1364,12 @@ const ComposedBlockSelector = struct {
             }
         }
 
+        if (payload_bytes == 0) {
+            const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
+            if (pressure.exceedsSpillEnvelope()) return .{ .no_spill_envelope = "composed-block-register-pressure" };
+            if (pressure.exceedsNoSpill()) payload_bytes = stage2SpillReservedBytes();
+        }
+
         if (payload_bytes == 0) return null;
         const frame_bytes = alignedCallFrameBytes(payload_bytes) orelse return .{ .no_spill_envelope = "composed-block-stack-array-size" };
         try selector.appendSubRsp(frame_bytes);
@@ -2404,6 +2410,7 @@ const ComposedBlockSelector = struct {
             3 => .slot8,
             4 => .slot10,
             5 => .slot12,
+            6 => .slot14,
             else => unreachable,
         };
     }
@@ -3024,7 +3031,7 @@ fn stack128FrameBytes() u32 {
 }
 
 fn stage2SpillReservedBytes() u32 {
-    return 56;
+    return @as(u32, stage2_spill_slots + 1) * 8;
 }
 
 fn isComposedReturnType(ty: ir.Type) bool {

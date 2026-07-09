@@ -170,6 +170,8 @@ pub const FrameIndex = enum {
     slot10,
     slot11,
     slot12,
+    slot13,
+    slot14,
 };
 
 pub const CodegenPath = enum {

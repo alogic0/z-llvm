@@ -1533,5 +1533,7 @@ fn frameAddress(frame_index: x86_64.FrameIndex) []const u8 {
         .slot10 => "40(%rsp)",
         .slot11 => "44(%rsp)",
         .slot12 => "48(%rsp)",
+        .slot13 => "52(%rsp)",
+        .slot14 => "56(%rsp)",
     };
 }

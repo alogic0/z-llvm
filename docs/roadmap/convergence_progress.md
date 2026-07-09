@@ -1822,6 +1822,18 @@ One line per completed cycle, append-only, newest last. This is the
   fallback candidates 33, and one allocator acceptance row pending. Recognizer
   count still 1 (no new recognizer reorder or pre-pass);
   `shape_recognizer_functions` is unchanged.
+- 2026-07-09 (this commit) Item 15 register-allocator implementation slice:
+  the composed selector's stage-two frame now reserves seven qword spill slots
+  when liveness pressure exceeds the register-only envelope, and the x86_64
+  frame-index encoding/assembly tables cover the resulting `slot14` spill
+  address. This is the first frame-sized spill-capacity step after the
+  allocator plan; emission still uses current assignments, so the nine composed
+  rows remain the regression set and `compiler_rt.mulXi3.__multi3` remains the
+  allocator acceptance row for the next instruction/admission slice. Item-15
+  accounting remains composed-selection rows 9, terminal-template rows 17,
+  stage-two-boundary rows 2, open integer-helper fallback candidates 33, and
+  one allocator acceptance row pending. Recognizer count still 1 (no new
+  recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
 
 ## Ratchet State
 
