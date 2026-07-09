@@ -1241,6 +1241,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .add_rsp_40 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x28 }),
             .sub_rsp_56 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x38 }),
             .add_rsp_56 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x38 }),
+            .sub_rsp_imm8 => |value| try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, value }),
+            .sub_rsp_imm32 => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x81, 0xec });
+                try appendU32(&bytes, allocator, value);
+            },
             .add_rsp_imm8 => |value| try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, value }),
             .add_rsp_imm32 => |value| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0x81, 0xc4 });
@@ -1367,6 +1372,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .store_rax_arg_ptr_disp32 => |store| try encodeStoreRaxToArgPtrDisp32(&bytes, allocator, store.reg, store.offset),
             .store_eax_arg_ptr_disp8 => |store| try encodeStoreEaxToArgPtrDisp8(&bytes, allocator, store.reg, store.offset),
             .store_eax_arg_ptr_disp32 => |store| try encodeStoreEaxToArgPtrDisp32(&bytes, allocator, store.reg, store.offset),
+            .store_eax_stack_disp8 => |disp| try bytes.appendSlice(allocator, &.{ 0x89, 0x44, 0x24, disp }),
+            .store_eax_stack_disp32 => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x89, 0x84, 0x24 });
+                try appendU32(&bytes, allocator, disp);
+            },
             .store_al_arg_ptr_disp8 => |store| try encodeStoreAlToArgPtrDisp8(&bytes, allocator, store.reg, store.offset),
             .store_al_arg_ptr_disp32 => |store| try encodeStoreAlToArgPtrDisp32(&bytes, allocator, store.reg, store.offset),
             .store_ax_arg_ptr_disp8 => |store| try encodeStoreAxToArgPtrDisp8(&bytes, allocator, store.reg, store.offset),
@@ -1738,8 +1748,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .push_imm32 => 5,
         .push_stack_disp8 => 4,
         .push_stack_disp32 => 7,
-        .sub_rsp_24, .add_rsp_24, .sub_rsp_40, .add_rsp_40, .sub_rsp_56, .add_rsp_56, .add_rsp_imm8 => 4,
-        .add_rsp_imm32 => 7,
+        .sub_rsp_24, .add_rsp_24, .sub_rsp_40, .add_rsp_40, .sub_rsp_56, .add_rsp_56, .sub_rsp_imm8, .add_rsp_imm8 => 4,
+        .sub_rsp_imm32, .add_rsp_imm32 => 7,
         .spill_arg_rsp => |spill| frameSlotInstructionSize(spill.reg, spill.frame_index),
         .spill_arg64_rsp => |spill| frameSlotInstructionSize64(spill.reg, spill.frame_index),
         .reload_arg_rsp => |reload| frameSlotInstructionSize(reload.reg, reload.frame_index),
@@ -1790,6 +1800,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .store_rax_arg_ptr_disp32 => 7,
         .store_eax_arg_ptr_disp8 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 2 + if (store.offset == 0) @as(u32, 0) else 1,
         .store_eax_arg_ptr_disp32 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 6,
+        .store_eax_stack_disp8 => 4,
+        .store_eax_stack_disp32 => 7,
         .store_al_arg_ptr_disp8 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 2 + if (store.offset == 0) @as(u32, 0) else 1,
         .store_al_arg_ptr_disp32 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 6,
         .store_ax_arg_ptr_disp8 => |store| 1 + (if (store.reg.rexB()) @as(u32, 1) else 0) + 2 + if (store.offset == 0) @as(u32, 0) else 1,

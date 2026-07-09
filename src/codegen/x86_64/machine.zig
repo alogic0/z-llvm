@@ -326,6 +326,8 @@ pub const Instruction = union(enum) {
     add_rsp_40,
     sub_rsp_56,
     add_rsp_56,
+    sub_rsp_imm8: u8,
+    sub_rsp_imm32: u32,
     add_rsp_imm8: u8,
     add_rsp_imm32: u32,
     spill_arg_rsp: struct {
@@ -472,6 +474,8 @@ pub const Instruction = union(enum) {
         reg: ArgReg,
         offset: u32,
     },
+    store_eax_stack_disp8: u8,
+    store_eax_stack_disp32: u32,
     store_al_arg_ptr_disp8: struct {
         reg: ArgReg,
         offset: u8,

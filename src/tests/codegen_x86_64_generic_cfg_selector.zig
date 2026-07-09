@@ -203,6 +203,64 @@ test "generic cfg selector rejects value-bearing void return" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "generic cfg selector composes constant i32 stack array gep load store" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_array_const_gep(i32 %x) {
+        \\entry:
+        \\  %buf = alloca [4 x i32], align 4
+        \\  %slot = getelementptr inbounds [4 x i32], ptr %buf, i64 0, i64 2
+        \\  store i32 %x, ptr %slot, align 4
+        \\  %value = load i32, ptr %slot, align 4
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_array_const_gep", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectInstruction(machine.instructions.items, .sub_rsp_24);
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 8 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 8 });
+    try expectInstruction(machine.instructions.items, .add_rsp_24);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector rejects dynamic i32 stack array gep index" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_array_dynamic_gep(i64 %i) {
+        \\entry:
+        \\  %buf = alloca [4 x i32], align 4
+        \\  %slot = getelementptr inbounds [4 x i32], ptr %buf, i64 0, i64 %i
+        \\  %value = load i32, ptr %slot, align 4
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_array_dynamic_gep", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("unsupported_value", diagnostic.tagName());
+    try std.testing.expectEqualStrings("composed-block-gep-dynamic-index", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
 test "generic cfg selector stage two composes acyclic branch with labels" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
