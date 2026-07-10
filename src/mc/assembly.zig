@@ -52,7 +52,11 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .imul_arg64_arg64 => |imul| try writer.print("\timulq {s}, {s}\n", .{ imul.src.name64(), imul.dst.name64() }),
             .imul_arg64_rax => |dst| try writer.print("\timulq %rax, {s}\n", .{dst.name64()}),
             .imul_rax_arg64 => |src| try writer.print("\timulq {s}, %rax\n", .{src.name64()}),
-            .imul_rax_rsp => |frame_index| try writer.print("\timulq {s}, %rax\n", .{frameAddress(frame_index)}),
+            .imul_rax_rsp => |frame_index| {
+                try writer.writeAll("\timulq ");
+                try printFrameAddress(writer, frame_index);
+                try writer.writeAll(", %rax\n");
+            },
             .xor_edx_edx => try writer.writeAll("\txorl %edx, %edx\n"),
             .div_arg64 => |reg| try writer.print("\tdivq {s}\n", .{reg.name64()}),
             .add_arg64_rax => |reg| try writer.print("\taddq {s}, %rax\n", .{reg.name64()}),
@@ -1309,21 +1313,69 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .sub_rsp_imm32 => |value| try writer.print("\tsubq ${}, %rsp\n", .{value}),
             .add_rsp_imm8 => |value| try writer.print("\taddq ${}, %rsp\n", .{value}),
             .add_rsp_imm32 => |value| try writer.print("\taddq ${}, %rsp\n", .{value}),
-            .spill_arg_rsp => |spill| try writer.print("\tmovl {s}, {s}\n", .{ spill.reg.name32(), frameAddress(spill.frame_index) }),
-            .spill_arg64_rsp => |spill| try writer.print("\tmovq {s}, {s}\n", .{ spill.reg.name64(), frameAddress(spill.frame_index) }),
-            .reload_arg_rsp => |reload| try writer.print("\tmovl {s}, {s}\n", .{ frameAddress(reload.frame_index), reload.reg.name32() }),
-            .reload_arg64_rsp => |reload| try writer.print("\tmovq {s}, {s}\n", .{ frameAddress(reload.frame_index), reload.reg.name64() }),
-            .spill_xmm32_rsp => |spill| try writer.print("\tmovss {s}, {s}\n", .{ spill.reg.name(), frameAddress(spill.frame_index) }),
-            .reload_xmm32_rsp => |reload| try writer.print("\tmovss {s}, {s}\n", .{ frameAddress(reload.frame_index), reload.reg.name() }),
-            .spill_xmm64_rsp => |spill| try writer.print("\tmovsd {s}, {s}\n", .{ spill.reg.name(), frameAddress(spill.frame_index) }),
-            .reload_xmm64_rsp => |reload| try writer.print("\tmovsd {s}, {s}\n", .{ frameAddress(reload.frame_index), reload.reg.name() }),
+            .spill_arg_rsp => |spill| {
+                try writer.print("\tmovl {s}, ", .{spill.reg.name32()});
+                try printFrameAddress(writer, spill.frame_index);
+                try writer.writeByte('\n');
+            },
+            .spill_arg64_rsp => |spill| {
+                try writer.print("\tmovq {s}, ", .{spill.reg.name64()});
+                try printFrameAddress(writer, spill.frame_index);
+                try writer.writeByte('\n');
+            },
+            .reload_arg_rsp => |reload| {
+                try writer.writeAll("\tmovl ");
+                try printFrameAddress(writer, reload.frame_index);
+                try writer.print(", {s}\n", .{reload.reg.name32()});
+            },
+            .reload_arg64_rsp => |reload| {
+                try writer.writeAll("\tmovq ");
+                try printFrameAddress(writer, reload.frame_index);
+                try writer.print(", {s}\n", .{reload.reg.name64()});
+            },
+            .spill_xmm32_rsp => |spill| {
+                try writer.print("\tmovss {s}, ", .{spill.reg.name()});
+                try printFrameAddress(writer, spill.frame_index);
+                try writer.writeByte('\n');
+            },
+            .reload_xmm32_rsp => |reload| {
+                try writer.writeAll("\tmovss ");
+                try printFrameAddress(writer, reload.frame_index);
+                try writer.print(", {s}\n", .{reload.reg.name()});
+            },
+            .spill_xmm64_rsp => |spill| {
+                try writer.print("\tmovsd {s}, ", .{spill.reg.name()});
+                try printFrameAddress(writer, spill.frame_index);
+                try writer.writeByte('\n');
+            },
+            .reload_xmm64_rsp => |reload| {
+                try writer.writeAll("\tmovsd ");
+                try printFrameAddress(writer, reload.frame_index);
+                try writer.print(", {s}\n", .{reload.reg.name()});
+            },
             .spill_rdi_rsi_rsp24 => try writer.writeAll("\tmovq %rdi, 8(%rsp)\n\tmovq %rsi, 16(%rsp)\n"),
             .reload_rdi_rsp24 => try writer.writeAll("\tmovq 8(%rsp), %rdi\n"),
             .reload_rsi_rsp24 => try writer.writeAll("\tmovq 16(%rsp), %rsi\n"),
-            .spill_eax_rsp => |frame_index| try writer.print("\tmovl %eax, {s}\n", .{frameAddress(frame_index)}),
-            .reload_rsp_eax => try writer.writeAll("\tmovl (%rsp), %eax\n"),
-            .spill_rax_rsp => |frame_index| try writer.print("\tmovq %rax, {s}\n", .{frameAddress(frame_index)}),
-            .reload_rsp_rax => |frame_index| try writer.print("\tmovq {s}, %rax\n", .{frameAddress(frame_index)}),
+            .spill_eax_rsp => |frame_index| {
+                try writer.writeAll("\tmovl %eax, ");
+                try printFrameAddress(writer, frame_index);
+                try writer.writeByte('\n');
+            },
+            .reload_rsp_eax => |frame_index| {
+                try writer.writeAll("\tmovl ");
+                try printFrameAddress(writer, frame_index);
+                try writer.writeAll(", %eax\n");
+            },
+            .spill_rax_rsp => |frame_index| {
+                try writer.writeAll("\tmovq %rax, ");
+                try printFrameAddress(writer, frame_index);
+                try writer.writeByte('\n');
+            },
+            .reload_rsp_rax => |frame_index| {
+                try writer.writeAll("\tmovq ");
+                try printFrameAddress(writer, frame_index);
+                try writer.writeAll(", %rax\n");
+            },
             .load_stack_disp8_eax => |offset| try writer.print("\tmovl {}(%rsp), %eax\n", .{offset}),
             .load_stack_disp32_eax => |offset| try writer.print("\tmovl {}(%rsp), %eax\n", .{offset}),
             .load_stack_rcx4_disp8_eax => |offset| try writer.print("\tmovl {}(%rsp,%rcx,4), %eax\n", .{offset}),
@@ -1521,70 +1573,11 @@ fn printByteDirective(writer: anytype, bytes: []const u8) !void {
     try writer.writeByte('\n');
 }
 
-fn frameAddress(frame_index: x86_64.FrameIndex) []const u8 {
-    return switch (frame_index) {
-        .slot0 => "(%rsp)",
-        .slot1 => "4(%rsp)",
-        .slot2 => "8(%rsp)",
-        .slot3 => "12(%rsp)",
-        .slot4 => "16(%rsp)",
-        .slot5 => "20(%rsp)",
-        .slot6 => "24(%rsp)",
-        .slot7 => "28(%rsp)",
-        .slot8 => "32(%rsp)",
-        .slot9 => "36(%rsp)",
-        .slot10 => "40(%rsp)",
-        .slot11 => "44(%rsp)",
-        .slot12 => "48(%rsp)",
-        .slot13 => "52(%rsp)",
-        .slot14 => "56(%rsp)",
-        .slot15 => "60(%rsp)",
-        .slot16 => "64(%rsp)",
-        .slot17 => "68(%rsp)",
-        .slot18 => "72(%rsp)",
-        .slot19 => "76(%rsp)",
-        .slot20 => "80(%rsp)",
-        .slot21 => "84(%rsp)",
-        .slot22 => "88(%rsp)",
-        .slot23 => "92(%rsp)",
-        .slot24 => "96(%rsp)",
-        .slot25 => "100(%rsp)",
-        .slot26 => "104(%rsp)",
-        .slot27 => "108(%rsp)",
-        .slot28 => "112(%rsp)",
-        .slot29 => "116(%rsp)",
-        .slot30 => "120(%rsp)",
-        .slot31 => "124(%rsp)",
-        .slot32 => "128(%rsp)",
-        .slot33 => "132(%rsp)",
-        .slot34 => "136(%rsp)",
-        .slot35 => "140(%rsp)",
-        .slot36 => "144(%rsp)",
-        .slot37 => "148(%rsp)",
-        .slot38 => "152(%rsp)",
-        .slot39 => "156(%rsp)",
-        .slot40 => "160(%rsp)",
-        .slot41 => "164(%rsp)",
-        .slot42 => "168(%rsp)",
-        .slot43 => "172(%rsp)",
-        .slot44 => "176(%rsp)",
-        .slot45 => "180(%rsp)",
-        .slot46 => "184(%rsp)",
-        .slot47 => "188(%rsp)",
-        .slot48 => "192(%rsp)",
-        .slot49 => "196(%rsp)",
-        .slot50 => "200(%rsp)",
-        .slot51 => "204(%rsp)",
-        .slot52 => "208(%rsp)",
-        .slot53 => "212(%rsp)",
-        .slot54 => "216(%rsp)",
-        .slot55 => "220(%rsp)",
-        .slot56 => "224(%rsp)",
-        .slot57 => "228(%rsp)",
-        .slot58 => "232(%rsp)",
-        .slot59 => "236(%rsp)",
-        .slot60 => "240(%rsp)",
-        .slot61 => "244(%rsp)",
-        .slot62 => "248(%rsp)",
-    };
+fn printFrameAddress(writer: anytype, frame_index: x86_64.FrameIndex) !void {
+    const disp = frame_index.byteOffset() catch unreachable;
+    if (disp == 0) {
+        try writer.writeAll("(%rsp)");
+    } else {
+        try writer.print("{}(%rsp)", .{disp});
+    }
 }

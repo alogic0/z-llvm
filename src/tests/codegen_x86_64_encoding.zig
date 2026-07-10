@@ -175,40 +175,41 @@ test "x86_64 encoding sizes nonzero frame spill slots" {
 test "x86_64 encoding uses disp32 for high frame spill slots" {
     var machine = codegen.x86_64.MachineFunction.init("high_frame_slots", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
-    try machine.instructions.append(std.testing.allocator, .{ .sub_rsp_imm32 = 136 });
-    try machine.instructions.append(std.testing.allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot32, .reg = .rdi } });
-    try machine.instructions.append(std.testing.allocator, .{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot32 } });
-    try machine.instructions.append(std.testing.allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot32, .reg = .r9 } });
-    try machine.instructions.append(std.testing.allocator, .{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot32 } });
-    try machine.instructions.append(std.testing.allocator, .{ .reload_rsp_eax = .slot32 });
-    try machine.instructions.append(std.testing.allocator, .{ .reload_rsp_rax = .slot32 });
-    try machine.instructions.append(std.testing.allocator, .{ .add_rsp_imm32 = 136 });
+    const high_slot = try codegen.x86_64.FrameIndex.fromSlot(80);
+    try machine.instructions.append(std.testing.allocator, .{ .sub_rsp_imm32 = 328 });
+    try machine.instructions.append(std.testing.allocator, .{ .spill_arg64_rsp = .{ .frame_index = high_slot, .reg = .rdi } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = high_slot } });
+    try machine.instructions.append(std.testing.allocator, .{ .spill_arg_rsp = .{ .frame_index = high_slot, .reg = .r9 } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = high_slot } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_rsp_eax = high_slot });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_rsp_rax = high_slot });
+    try machine.instructions.append(std.testing.allocator, .{ .add_rsp_imm32 = 328 });
     try machine.instructions.append(std.testing.allocator, .ret);
 
-    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .spill_arg64_rsp = .{ .frame_index = .slot32, .reg = .rdi } }));
-    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot32 } }));
-    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .spill_arg_rsp = .{ .frame_index = .slot32, .reg = .r9 } }));
-    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot32 } }));
-    try std.testing.expectEqual(@as(u32, 7), mc.encoding.instructionSize(.{ .reload_rsp_eax = .slot32 }));
-    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_rsp_rax = .slot32 }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .spill_arg64_rsp = .{ .frame_index = high_slot, .reg = .rdi } }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = high_slot } }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .spill_arg_rsp = .{ .frame_index = high_slot, .reg = .r9 } }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = high_slot } }));
+    try std.testing.expectEqual(@as(u32, 7), mc.encoding.instructionSize(.{ .reload_rsp_eax = high_slot }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_rsp_rax = high_slot }));
     const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
     try std.testing.expectEqualSlices(u8, &.{
-        0x48, 0x81, 0xec, 0x88,
-        0x00, 0x00, 0x00, 0x48,
-        0x89, 0xbc, 0x24, 0x80,
-        0x00, 0x00, 0x00, 0x48,
-        0x8b, 0xb4, 0x24, 0x80,
-        0x00, 0x00, 0x00, 0x44,
-        0x89, 0x8c, 0x24, 0x80,
-        0x00, 0x00, 0x00, 0x44,
-        0x8b, 0x84, 0x24, 0x80,
-        0x00, 0x00, 0x00, 0x8b,
-        0x84, 0x24, 0x80, 0x00,
+        0x48, 0x81, 0xec, 0x48,
+        0x01, 0x00, 0x00, 0x48,
+        0x89, 0xbc, 0x24, 0x40,
+        0x01, 0x00, 0x00, 0x48,
+        0x8b, 0xb4, 0x24, 0x40,
+        0x01, 0x00, 0x00, 0x44,
+        0x89, 0x8c, 0x24, 0x40,
+        0x01, 0x00, 0x00, 0x44,
+        0x8b, 0x84, 0x24, 0x40,
+        0x01, 0x00, 0x00, 0x8b,
+        0x84, 0x24, 0x40, 0x01,
         0x00, 0x00, 0x48, 0x8b,
-        0x84, 0x24, 0x80, 0x00,
+        0x84, 0x24, 0x40, 0x01,
         0x00, 0x00, 0x48, 0x81,
-        0xc4, 0x88, 0x00, 0x00,
+        0xc4, 0x48, 0x01, 0x00,
         0x00, 0xc3,
     }, bytes);
 }

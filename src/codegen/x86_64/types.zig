@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const ArgReg = enum {
     rdi,
     rsi,
@@ -156,70 +158,85 @@ pub const MachineBinaryOp = enum {
     }
 };
 
-pub const FrameIndex = enum {
-    slot0,
-    slot1,
-    slot2,
-    slot3,
-    slot4,
-    slot5,
-    slot6,
-    slot7,
-    slot8,
-    slot9,
-    slot10,
-    slot11,
-    slot12,
-    slot13,
-    slot14,
-    slot15,
-    slot16,
-    slot17,
-    slot18,
-    slot19,
-    slot20,
-    slot21,
-    slot22,
-    slot23,
-    slot24,
-    slot25,
-    slot26,
-    slot27,
-    slot28,
-    slot29,
-    slot30,
-    slot31,
-    slot32,
-    slot33,
-    slot34,
-    slot35,
-    slot36,
-    slot37,
-    slot38,
-    slot39,
-    slot40,
-    slot41,
-    slot42,
-    slot43,
-    slot44,
-    slot45,
-    slot46,
-    slot47,
-    slot48,
-    slot49,
-    slot50,
-    slot51,
-    slot52,
-    slot53,
-    slot54,
-    slot55,
-    slot56,
-    slot57,
-    slot58,
-    slot59,
-    slot60,
-    slot61,
-    slot62,
+pub const FrameIndex = struct {
+    slot: u32,
+
+    pub fn fromSlot(slot: usize) !FrameIndex {
+        const narrowed = std.math.cast(u32, slot) orelse return error.UnsupportedCodegenAbi;
+        return .{ .slot = narrowed };
+    }
+
+    pub fn byteOffset(index: FrameIndex) !u32 {
+        return std.math.mul(u32, index.slot, 4) catch error.UnsupportedCodegenAbi;
+    }
+
+    pub fn eql(index: FrameIndex, other: FrameIndex) bool {
+        return index.slot == other.slot;
+    }
+
+    pub const slot0: FrameIndex = .{ .slot = 0 };
+    pub const slot1: FrameIndex = .{ .slot = 1 };
+    pub const slot2: FrameIndex = .{ .slot = 2 };
+    pub const slot3: FrameIndex = .{ .slot = 3 };
+    pub const slot4: FrameIndex = .{ .slot = 4 };
+    pub const slot5: FrameIndex = .{ .slot = 5 };
+    pub const slot6: FrameIndex = .{ .slot = 6 };
+    pub const slot7: FrameIndex = .{ .slot = 7 };
+    pub const slot8: FrameIndex = .{ .slot = 8 };
+    pub const slot9: FrameIndex = .{ .slot = 9 };
+    pub const slot10: FrameIndex = .{ .slot = 10 };
+    pub const slot11: FrameIndex = .{ .slot = 11 };
+    pub const slot12: FrameIndex = .{ .slot = 12 };
+    pub const slot13: FrameIndex = .{ .slot = 13 };
+    pub const slot14: FrameIndex = .{ .slot = 14 };
+    pub const slot15: FrameIndex = .{ .slot = 15 };
+    pub const slot16: FrameIndex = .{ .slot = 16 };
+    pub const slot17: FrameIndex = .{ .slot = 17 };
+    pub const slot18: FrameIndex = .{ .slot = 18 };
+    pub const slot19: FrameIndex = .{ .slot = 19 };
+    pub const slot20: FrameIndex = .{ .slot = 20 };
+    pub const slot21: FrameIndex = .{ .slot = 21 };
+    pub const slot22: FrameIndex = .{ .slot = 22 };
+    pub const slot23: FrameIndex = .{ .slot = 23 };
+    pub const slot24: FrameIndex = .{ .slot = 24 };
+    pub const slot25: FrameIndex = .{ .slot = 25 };
+    pub const slot26: FrameIndex = .{ .slot = 26 };
+    pub const slot27: FrameIndex = .{ .slot = 27 };
+    pub const slot28: FrameIndex = .{ .slot = 28 };
+    pub const slot29: FrameIndex = .{ .slot = 29 };
+    pub const slot30: FrameIndex = .{ .slot = 30 };
+    pub const slot31: FrameIndex = .{ .slot = 31 };
+    pub const slot32: FrameIndex = .{ .slot = 32 };
+    pub const slot33: FrameIndex = .{ .slot = 33 };
+    pub const slot34: FrameIndex = .{ .slot = 34 };
+    pub const slot35: FrameIndex = .{ .slot = 35 };
+    pub const slot36: FrameIndex = .{ .slot = 36 };
+    pub const slot37: FrameIndex = .{ .slot = 37 };
+    pub const slot38: FrameIndex = .{ .slot = 38 };
+    pub const slot39: FrameIndex = .{ .slot = 39 };
+    pub const slot40: FrameIndex = .{ .slot = 40 };
+    pub const slot41: FrameIndex = .{ .slot = 41 };
+    pub const slot42: FrameIndex = .{ .slot = 42 };
+    pub const slot43: FrameIndex = .{ .slot = 43 };
+    pub const slot44: FrameIndex = .{ .slot = 44 };
+    pub const slot45: FrameIndex = .{ .slot = 45 };
+    pub const slot46: FrameIndex = .{ .slot = 46 };
+    pub const slot47: FrameIndex = .{ .slot = 47 };
+    pub const slot48: FrameIndex = .{ .slot = 48 };
+    pub const slot49: FrameIndex = .{ .slot = 49 };
+    pub const slot50: FrameIndex = .{ .slot = 50 };
+    pub const slot51: FrameIndex = .{ .slot = 51 };
+    pub const slot52: FrameIndex = .{ .slot = 52 };
+    pub const slot53: FrameIndex = .{ .slot = 53 };
+    pub const slot54: FrameIndex = .{ .slot = 54 };
+    pub const slot55: FrameIndex = .{ .slot = 55 };
+    pub const slot56: FrameIndex = .{ .slot = 56 };
+    pub const slot57: FrameIndex = .{ .slot = 57 };
+    pub const slot58: FrameIndex = .{ .slot = 58 };
+    pub const slot59: FrameIndex = .{ .slot = 59 };
+    pub const slot60: FrameIndex = .{ .slot = 60 };
+    pub const slot61: FrameIndex = .{ .slot = 61 };
+    pub const slot62: FrameIndex = .{ .slot = 62 };
 };
 
 pub const CodegenPath = enum {

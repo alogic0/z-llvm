@@ -1384,8 +1384,8 @@ const ComposedBlockSelector = struct {
         }
 
         const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
-        if (pressure.exceedsSpillEnvelope()) return .{ .no_spill_envelope = "composed-block-register-pressure" };
         const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
+        const spill_reserved_bytes = selector.spillReservedBytes(reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" };
 
         for (function.blocks.items) |block| {
             for (block.instructions.items) |instruction| {
@@ -1398,12 +1398,12 @@ const ComposedBlockSelector = struct {
                     if (payload_bytes != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
                     scalar_slot_count += 1;
                     if (scalar_slot_count > 1) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
-                    const base_disp = if (reserve_spill_area) stage2SpillReservedBytes() else 0;
+                    const base_disp = spill_reserved_bytes;
                     payload_bytes = std.math.add(u32, base_disp, 8) catch return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
                     try selector.bindValueLoc(result_name, .{ .stack64 = base_disp });
                 } else if (parseI32ArrayType(alloca.allocated_ty)) |len| {
                     if (scalar_slot_count != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
-                    if (array_count == 0) payload_bytes = stage2SpillReservedBytes();
+                    if (array_count == 0) payload_bytes = if (reserve_spill_area) spill_reserved_bytes else stage2SpillReservedBytes();
                     array_count += 1;
                     if (array_count > 4) return .{ .no_spill_envelope = "composed-block-stack-array-count" };
                     const array_bytes = std.math.mul(u32, len, 4) catch return .{ .no_spill_envelope = "composed-block-stack-array-size" };
@@ -1414,7 +1414,7 @@ const ComposedBlockSelector = struct {
                     if (payload_bytes != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
                     scalar_slot_count += 1;
                     if (scalar_slot_count > 1) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
-                    const base_disp = if (reserve_spill_area) stage2SpillReservedBytes() else 0;
+                    const base_disp = spill_reserved_bytes;
                     payload_bytes = std.math.add(u32, base_disp, stack128FrameBytes() - 8) catch return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
                     try selector.bindValueLoc(result_name, .{ .stack128 = base_disp });
                 } else {
@@ -1424,7 +1424,7 @@ const ComposedBlockSelector = struct {
         }
 
         if (payload_bytes == 0) {
-            if (pressure.exceedsNoSpill() or saw_phi) payload_bytes = stage2SpillReservedBytes();
+            if (pressure.exceedsNoSpill() or saw_phi) payload_bytes = spill_reserved_bytes;
         }
 
         if (payload_bytes == 0) return null;
@@ -1435,6 +1435,13 @@ const ComposedBlockSelector = struct {
         selector.stack_array_allocated = array_count != 0;
         selector.stack_array_count = array_count;
         return null;
+    }
+
+    fn spillReservedBytes(selector: ComposedBlockSelector, reserve_spill_area: bool) ?u32 {
+        if (!reserve_spill_area) return 0;
+        const planned_slots = if (selector.allocation_plan) |plan| plan.spill_slots else selector.next_spill_slot;
+        const reserved_slots = @max(planned_slots, stage2_spill_slots);
+        return std.math.mul(u32, std.math.cast(u32, reserved_slots) orelse return null, 8) catch null;
     }
 
     fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
@@ -2538,7 +2545,7 @@ const ComposedBlockSelector = struct {
                 else => null,
             },
             .stack_object, .stack_pointer => actual,
-            .spill => |index| if (selector.stack_frame_bytes >= stage2SpillReservedBytes()) switch (actual) {
+            .spill => |index| if (selector.stack_frame_bytes >= (selector.spillReservedBytes(true) orelse return null)) switch (actual) {
                 .arg64, .scratch64, .rax, .spill64 => if (spillFrameIndexMaybe(index)) |frame_index| .{ .spill64 = frame_index } else null,
                 .arg128, .scratch128, .spill128 => if (pairSpillFrameIndexMaybe(index)) |spill| .{ .spill128 = spill } else null,
                 else => null,
@@ -2668,7 +2675,7 @@ const ComposedBlockSelector = struct {
                 .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
             },
             .spill64 => |frame_index| {
-                if (selector.stack_frame_bytes < stage2SpillReservedBytes()) return error.UnsupportedCodegenValue;
+                if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) return error.UnsupportedCodegenValue;
                 switch (actual) {
                     .arg64, .scratch64 => |src| {
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = src } });
@@ -2681,7 +2688,7 @@ const ComposedBlockSelector = struct {
                 }
             },
             .spill128 => |spill| {
-                if (selector.stack_frame_bytes < stage2SpillReservedBytes()) return error.UnsupportedCodegenValue;
+                if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) return error.UnsupportedCodegenValue;
                 switch (actual) {
                     .arg128, .scratch128 => |pair| {
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.lo, .reg = pair.lo } });
@@ -2834,72 +2841,7 @@ const ComposedBlockSelector = struct {
 
     fn frameIndexForByteOffset(byte_offset: usize) ?FrameIndex {
         if (byte_offset % 4 != 0) return null;
-        return switch (byte_offset / 4) {
-            0 => .slot0,
-            1 => .slot1,
-            2 => .slot2,
-            3 => .slot3,
-            4 => .slot4,
-            5 => .slot5,
-            6 => .slot6,
-            7 => .slot7,
-            8 => .slot8,
-            9 => .slot9,
-            10 => .slot10,
-            11 => .slot11,
-            12 => .slot12,
-            13 => .slot13,
-            14 => .slot14,
-            15 => .slot15,
-            16 => .slot16,
-            17 => .slot17,
-            18 => .slot18,
-            19 => .slot19,
-            20 => .slot20,
-            21 => .slot21,
-            22 => .slot22,
-            23 => .slot23,
-            24 => .slot24,
-            25 => .slot25,
-            26 => .slot26,
-            27 => .slot27,
-            28 => .slot28,
-            29 => .slot29,
-            30 => .slot30,
-            31 => .slot31,
-            32 => .slot32,
-            33 => .slot33,
-            34 => .slot34,
-            35 => .slot35,
-            36 => .slot36,
-            37 => .slot37,
-            38 => .slot38,
-            39 => .slot39,
-            40 => .slot40,
-            41 => .slot41,
-            42 => .slot42,
-            43 => .slot43,
-            44 => .slot44,
-            45 => .slot45,
-            46 => .slot46,
-            47 => .slot47,
-            48 => .slot48,
-            49 => .slot49,
-            50 => .slot50,
-            51 => .slot51,
-            52 => .slot52,
-            53 => .slot53,
-            54 => .slot54,
-            55 => .slot55,
-            56 => .slot56,
-            57 => .slot57,
-            58 => .slot58,
-            59 => .slot59,
-            60 => .slot60,
-            61 => .slot61,
-            62 => .slot62,
-            else => null,
-        };
+        return FrameIndex.fromSlot(byte_offset / 4) catch null;
     }
 
     fn pairSpillFrameIndexMaybe(index: usize) ?PairSpillLoc {
@@ -3294,7 +3236,7 @@ const ComposedBlockSelector = struct {
     }
 
     fn choosePairScratchForClobber(selector: ComposedBlockSelector, src: ?RegPair) ?RegPair {
-        if (selector.stack_frame_bytes < stage2SpillReservedBytes()) return selector.choosePairScratch(src);
+        if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return null)) return selector.choosePairScratch(src);
         for (selector_allocatable_pairs) |pair| {
             if (src) |source| if (source.eql(pair)) continue;
             if (selector.livePairNameContainingReg(pair.lo) != null) continue;
@@ -3314,7 +3256,7 @@ const ComposedBlockSelector = struct {
 
     fn clobberArgRegExcept(selector: *ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) !void {
         if (selector.pairNameContainingRegExcept(reg, ignore_name)) |name| {
-            if (selector.valueIsLiveAfterCurrent(name) or selector.stack_frame_bytes >= stage2SpillReservedBytes()) {
+            if (selector.valueIsLiveAfterCurrent(name) or selector.stack_frame_bytes >= (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) {
                 try selector.spillPairValueOrError(name);
             } else if (selector.phi_results.contains(name)) {
                 // Phi destinations are pre-bound before edge materialization.
@@ -4393,8 +4335,8 @@ fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .stack128_value => |disp| disp == rhs.stack128_value,
         .stack_i32_array => |array| array.base_disp == rhs.stack_i32_array.base_disp and array.len == rhs.stack_i32_array.len,
         .stack_i32_ptr => |ptr| ptr.disp == rhs.stack_i32_ptr.disp and ptr.index == null and rhs.stack_i32_ptr.index == null,
-        .spill64 => |frame_index| frame_index == rhs.spill64,
-        .spill128 => |spill| spill.lo == rhs.spill128.lo and spill.hi == rhs.spill128.hi,
+        .spill64 => |frame_index| frame_index.eql(rhs.spill64),
+        .spill128 => |spill| spill.lo.eql(rhs.spill128.lo) and spill.hi.eql(rhs.spill128.hi),
     };
 }
 

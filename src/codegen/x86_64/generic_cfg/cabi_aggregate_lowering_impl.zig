@@ -1168,13 +1168,8 @@ fn reloadF32AggregateTerm(
     term: AggregateFloatAddTerm,
     reg: XmmReg,
 ) !void {
-    const frame_index = switch (term.offset) {
-        0 => FrameIndex.slot0,
-        4 => FrameIndex.slot1,
-        8 => FrameIndex.slot2,
-        12 => FrameIndex.slot3,
-        else => return error.UnsupportedCodegenAbi,
-    };
+    if (term.offset % 4 != 0) return error.UnsupportedCodegenAbi;
+    const frame_index = FrameIndex.fromSlot(term.offset / 4) catch return error.UnsupportedCodegenAbi;
     try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = reg, .frame_index = frame_index } });
 }
 
