@@ -89,11 +89,12 @@ Current operating note recorded 2026-07-10:
   `max_spill_slots_needed=15`, `max_spill_slots_over_envelope=9`,
   `first_exceed_block=Then9.prol`, `first_exceed_boundary=live_out`,
   `first_exceed_live_values=13`, and `first_exceed_spill_slots_needed=7`.
-  This cycle retried the parked `__udivei5` row with the corrected 32-slot
-  frame envelope and pointer-phi support; Debug compiler_rt report-all moved
-  to 443 selected / 130 emitting / 313 failing, with first failure still
-  `compiler_rt.udivmodei4.__udivei5` but now at `no_emitter` /
-  `composed-block-call-form`.
+  This cycle retried the parked `__udivei5` row after adding no-op lowering
+  for well-formed `llvm.assume` and exact lowering for `tail fastcc i16
+  @zig.target.intByteSize(i16 ...)`; Debug compiler_rt report-all remains
+  443 selected / 130 emitting / 313 failing, with first failure still
+  `compiler_rt.udivmodei4.__udivei5` but now at `no_spill_envelope` /
+  `composed-block-spill-slots`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -117,7 +118,7 @@ Current operating note recorded 2026-07-10:
   `tmp/distribution_all_after_multi3_single_frame.log`. Current INBOX-5
   hardening logs are `tmp/zig_integrated_exe_i128_arithmetic_inbox5.log` and
   `tmp/distribution_all_after_inbox5.log`. The current parked-boundary retry
-  log is `tmp/std_debug_hello_debug_udivei5_retry4.log`.
+  log is `tmp/std_debug_hello_debug_udivei5_intbytesize_retry.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
@@ -132,8 +133,9 @@ Current operating note recorded 2026-07-10:
   parked-boundary retry evidence is
   `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary`.
 - Recommended next action: continue `compiler_rt.udivmodei4.__udivei5` at the
-  `composed-block-call-form` frontier exposed by the corrected frame envelope
-  and pointer-phi retry, then retry `compiler_rt.udivmodei4.__umodei4` under the
+  `composed-block-spill-slots` frontier exposed after the corrected frame
+  envelope, pointer-phi retry, assume no-op, and exact intByteSize helper-call
+  lowering, then retry `compiler_rt.udivmodei4.__umodei4` under the
   same frame model before resuming remaining integer-helper rows in rank order;
   keep the intervening `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and
   `__udivti3` `UnsupportedTailCallAbi` rows in the separate ABI family. Keep

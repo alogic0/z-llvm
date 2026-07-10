@@ -1,12 +1,12 @@
 # Gate Evidence Summary
 
 schema_version: 1
-log_path: `tmp/std_debug_hello_debug_udivei5_retry4.log`
-command: `ZLLVM_DEBUG_DUMP_IR_SOURCE=__udivei5 ZLLVM_GENERIC_CFG_SELECTOR=1 ZLLVM_CODEGEN_REPORT_ALL=1 ZIG_USE_ZLLVM_OBJECT=1 ZLLVM_PIPELINE=postopt ZLLVM_EXE=zig-out/bin/z_llvm ../ziglang/build/stage4/bin/zig build-exe -fllvm -flibllvm -fno-lld -O Debug -target x86_64-linux-gnu test/zig/integrated/std_debug_hello.zig -femit-bin=tmp/std_debug_hello_debug_udivei5_retry4 > tmp/std_debug_hello_debug_udivei5_retry4.log 2>&1`
+log_path: `tmp/std_debug_hello_debug_udivei5_intbytesize_retry.log`
+command: `ZLLVM_DEBUG_DUMP_IR_SOURCE=__udivei5 ZLLVM_GENERIC_CFG_SELECTOR=1 ZLLVM_CODEGEN_REPORT_ALL=1 ZIG_USE_ZLLVM_OBJECT=1 ZLLVM_PIPELINE=postopt ZLLVM_EXE=zig-out/bin/z_llvm ../ziglang/build/stage4/bin/zig build-exe -fllvm -flibllvm -fno-lld -O Debug -target x86_64-linux-gnu test/zig/integrated/std_debug_hello.zig -femit-bin=tmp/std_debug_hello_debug_udivei5_intbytesize_retry > tmp/std_debug_hello_debug_udivei5_intbytesize_retry.log 2>&1`
 z_llvm_commit: `this commit`
 ziglang_pin: `bdee02bc0c7f227c0f11bc9a449df673fe803540`
 process_exit_status: `1`
-first_failure_line: `summary line reports first_failing_function=compiler_rt.udivmodei4.__udivei5 first_failing_selector_detail=composed-block-call-form`
+first_failure_line: `summary line reports first_failing_function=compiler_rt.udivmodei4.__udivei5 first_failing_selector_detail=composed-block-spill-slots`
 
 ## Ratchet Metadata
 
@@ -14,14 +14,14 @@ candidate_file_hash: `n/a`
 selector_version: `n/a`
 mode: `Debug`
 limit: `compiler_rt`
-comparison_log_path: `tmp/std_debug_hello_debug_udivei5_retry.log`; `tmp/std_debug_hello_debug_udivei5_retry2.log`
+comparison_log_path: `tmp/std_debug_hello_debug_udivei5_retry.log`; `tmp/std_debug_hello_debug_udivei5_retry2.log`; `tmp/std_debug_hello_debug_udivei5_retry4.log`
 comparison_summary_lines_match: `false`
-ratchet_migration_note: `Debug compiler_rt report-all discovery moved from 129 emitting / 314 failing to 130 emitting / 313 failing after aligning the stage-two spill envelope with the 32-slot frame model and accepting pointer phis as 64-bit GPR phi values. The row remains fail-closed at the next unsupported form.`
+ratchet_migration_note: `Debug compiler_rt report-all discovery moved from 129 emitting / 314 failing to 130 emitting / 313 failing after aligning the stage-two spill envelope with the 32-slot frame model and accepting pointer phis as 64-bit GPR phi values. The row remains fail-closed. This cycle did not move report-all counts, but it advanced the first __udivei5 selector detail from composed-block-call-form to composed-block-spill-slots by ignoring well-formed llvm.assume and lowering the exact tail fastcc i16 zig.target.intByteSize helper call.`
 
 ## Summary Lines
 
 ```text
-summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=443 emitted_functions=130 failed_functions=313 first_failing_function=compiler_rt.udivmodei4.__udivei5 first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_emitter first_failing_selector_detail=composed-block-call-form local_fail=1
+summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=443 emitted_functions=130 failed_functions=313 first_failing_function=compiler_rt.udivmodei4.__udivei5 first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_spill_envelope first_failing_selector_detail=composed-block-spill-slots local_fail=1
 ```
 
 ## Frontier Movement
@@ -29,3 +29,4 @@ summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functi
 - Previous focused retry before rebuilding the patched binary: `compiler_rt.udivmodei4.__udivei5` stopped at `no_spill_envelope` / `stage2-register-pressure`.
 - After rebuilding with the 32-slot spill envelope, the same row advanced to `no_emitter` / `stage2-phi-type`.
 - After pointer phis were bound through selector scalar metadata as 64-bit GPR phi values, the same row advanced to `no_emitter` / `composed-block-call-form`.
+- After well-formed `llvm.assume` was ignored and the exact `tail fastcc i16 @zig.target.intByteSize(i16 ...)` helper call lowered through the composed selector, the same row advanced to `no_spill_envelope` / `composed-block-spill-slots`.

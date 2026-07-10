@@ -2073,6 +2073,8 @@ const ComposedBlockSelector = struct {
 
     fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
         if (call.isDebugVariableLocation()) return null;
+        if (std.mem.eql(u8, call.callee, "llvm.assume")) return selector.lowerAssume(result, call);
+        if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try selector.lowerIntByteSizeCall(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try selector.lowerAbsI64(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try selector.lowerAbsI128(result, call);
         if (call.inline_asm != null) return .{ .no_emitter = "composed-block-inline-asm-call" };
@@ -2100,6 +2102,35 @@ const ComposedBlockSelector = struct {
             128 => {},
             else => unreachable,
         };
+        return null;
+    }
+
+    fn lowerAssume(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) ?Diagnostic {
+        _ = selector;
+        if (result != null) return .{ .unsupported_value = "composed-block-assume-result" };
+        if (call.inline_asm != null or call.callee_value != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-assume-form" };
+        }
+        if (call.ret_ty != .void or call.args.items.len != 1) return .{ .no_emitter = "composed-block-assume-signature" };
+        return if (call.args.items[0].ty.eql(.{ .int = 1 })) null else .{ .no_emitter = "composed-block-assume-arg" };
+    }
+
+    fn lowerIntByteSizeCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-intbytesize-call-form" };
+        }
+        if (call.tail_kind) |tail_kind| {
+            if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-intbytesize-tail-kind" };
+        }
+        if (!call.ret_ty.eql(.{ .int = 16 }) or call.args.items.len != 1) return .{ .no_emitter = "composed-block-intbytesize-signature" };
+        const arg = call.args.items[0];
+        if (!arg.ty.eql(.{ .int = 16 })) return .{ .no_emitter = "composed-block-intbytesize-arg" };
+
+        if (try selector.spillLiveCallerClobbersForCall()) |diagnostic| return diagnostic;
+        selector.emitValueIntoScratch(arg.value, .rdi, 16) catch return .{ .unsupported_value = "composed-block-intbytesize-arg-value" };
+        try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+        try selector.bindEax(result_name);
         return null;
     }
 

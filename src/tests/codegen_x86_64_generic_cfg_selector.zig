@@ -609,6 +609,87 @@ test "generic cfg selector stage two materializes pointer phi edges" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector stage two ignores tail llvm assume" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @tail_assume(i32 %x) {
+        \\entry:
+        \\  %cond = icmp eq i32 %x, 0
+        \\  tail call void @llvm.assume(i1 %cond)
+        \\  %sum = add i32 %x, 1
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("tail_assume", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    for (machine.instructions.items) |instruction| {
+        switch (instruction) {
+            .direct_call => |call| try std.testing.expect(!std.mem.eql(u8, call.symbol, "llvm.assume")),
+            else => {},
+        }
+    }
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector stage two lowers tail int byte size helper" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @tail_int_byte_size(i32 %bits32) {
+        \\entry:
+        \\  %bits = trunc i32 %bits32 to i16
+        \\  %bytes = tail call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %wide = zext i16 %bytes to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("tail_int_byte_size", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    var saw_int_byte_size = false;
+    for (machine.instructions.items) |instruction| {
+        switch (instruction) {
+            .direct_call => |call| {
+                if (std.mem.eql(u8, call.symbol, "zig.target.intByteSize")) {
+                    saw_int_byte_size = true;
+                    try std.testing.expect(call.ret_ty.eql(.{ .int = 16 }));
+                }
+            },
+            else => {},
+        }
+    }
+    try std.testing.expect(saw_int_byte_size);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector stage two materializes conditional phi edge blocks" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
