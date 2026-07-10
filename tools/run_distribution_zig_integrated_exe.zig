@@ -2,30 +2,65 @@ const std = @import("std");
 const common = @import("tool_common.zig");
 
 const Case = struct {
+    id: []const u8,
     mode: []const u8,
     source: []const u8,
     expected_stdout: []const u8,
     expected_exit: u8,
+    proof: Proof,
+    compiler_rt: bool = false,
+    generic_cfg_selector: bool = false,
+    focused_compiler_rt_i128_objects: bool = false,
+    prebuild_start_object: bool = false,
+};
+
+const Proof = enum {
+    syscall_hello,
+    compiler_rt_i128_arithmetic,
+
+    fn outputStem(proof: Proof) []const u8 {
+        return switch (proof) {
+            .syscall_hello => ".syscall_hello",
+            .compiler_rt_i128_arithmetic => ".compiler_rt_i128_arithmetic",
+        };
+    }
 };
 
 const cases = [_]Case{
     .{
+        .id = "syscall_hello_releasefast",
         .mode = "ReleaseFast",
         .source = "test/zig/integrated/syscall_hello_start.zig",
         .expected_stdout = "hello\n",
         .expected_exit = 0,
+        .proof = .syscall_hello,
     },
     .{
+        .id = "syscall_hello_releasesafe",
         .mode = "ReleaseSafe",
         .source = "test/zig/integrated/syscall_hello_start.zig",
         .expected_stdout = "hello\n",
         .expected_exit = 0,
+        .proof = .syscall_hello,
     },
     .{
+        .id = "syscall_hello_releasesmall",
         .mode = "ReleaseSmall",
         .source = "test/zig/integrated/syscall_hello_start.zig",
         .expected_stdout = "hello\n",
         .expected_exit = 0,
+        .proof = .syscall_hello,
+    },
+    .{
+        .id = "compiler_rt_i128_arithmetic_releasefast",
+        .mode = "ReleaseFast",
+        .source = "test/zig/integrated/compiler_rt_i128_arithmetic_start.zig",
+        .expected_stdout = "",
+        .expected_exit = 0,
+        .proof = .compiler_rt_i128_arithmetic,
+        .generic_cfg_selector = true,
+        .focused_compiler_rt_i128_objects = true,
+        .prebuild_start_object = true,
     },
 };
 
@@ -90,18 +125,63 @@ pub fn main(init: std.process.Init) !void {
     var total: usize = 0;
     var build_ok: usize = 0;
     var run_ok: usize = 0;
+    var stdout_ok: usize = 0;
+    var exit_ok: usize = 0;
+    var minimal_inline_asm_syscall_rows: usize = 0;
+    var compiler_rt_i128_arithmetic_rows: usize = 0;
     for (cases) |case| {
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
         }
         total += 1;
-        const exe = try common.allocTempFile(allocator, temp, case.mode, ".syscall_hello");
+        const exe = try common.allocTempFile(allocator, temp, case.mode, case.proof.outputStem());
         defer allocator.free(exe);
-        try buildExecutable(allocator, io, zig_emitter, target, exe, case, &env_map);
+        var case_env = std.process.Environ.Map.init(allocator);
+        defer case_env.deinit();
+        try copyEnvironment(&case_env, &env_map);
+        var extra_objects: std.ArrayList([]const u8) = .empty;
+        defer {
+            for (extra_objects.items) |object_path| allocator.free(object_path);
+            extra_objects.deinit(allocator);
+        }
+        if (case.prebuild_start_object) {
+            const start_obj = try common.allocTempFile(allocator, temp, case.id, ".start.o");
+            errdefer allocator.free(start_obj);
+            try buildCaseSourceObject(allocator, io, zig_emitter, target, start_obj, case);
+            try extra_objects.append(allocator, start_obj);
+        }
+        if (case.focused_compiler_rt_i128_objects) {
+            var focused_env = std.process.Environ.Map.init(allocator);
+            defer focused_env.deinit();
+            try copyEnvironment(&focused_env, &case_env);
+            if (case.generic_cfg_selector) {
+                try focused_env.put("ZLLVM_GENERIC_CFG_SELECTOR", "1");
+            }
+            const builtins_obj = try common.allocTempFile(allocator, temp, case.id, ".builtins.o");
+            errdefer allocator.free(builtins_obj);
+            const helper_obj = try common.allocTempFile(allocator, temp, case.id, ".helper.o");
+            errdefer allocator.free(helper_obj);
+            try emitFocusedCompilerRtI128Builtins(allocator, io, zllvm_exe, target, builtins_obj, &focused_env);
+            try buildCompilerRtI128Helper(allocator, io, zig_emitter, target, helper_obj);
+            try extra_objects.appendSlice(allocator, &.{ builtins_obj, helper_obj });
+        } else if (case.generic_cfg_selector) {
+            try case_env.put("ZLLVM_GENERIC_CFG_SELECTOR", "1");
+        }
+        try buildExecutable(allocator, io, zig_emitter, target, exe, case, extra_objects.items, &case_env);
         build_ok += 1;
         try runExecutable(allocator, io, exe, case);
         run_ok += 1;
-        try stdout_writer.interface.print("ok zig-integrated-exe mode={s} stdout=hello exit=0\n", .{case.mode});
+        stdout_ok += 1;
+        exit_ok += 1;
+        switch (case.proof) {
+            .syscall_hello => minimal_inline_asm_syscall_rows += 1,
+            .compiler_rt_i128_arithmetic => compiler_rt_i128_arithmetic_rows += 1,
+        }
+        try stdout_writer.interface.print("ok zig-integrated-exe case={s} mode={s} proof={s} exit=0\n", .{
+            case.id,
+            case.mode,
+            @tagName(case.proof),
+        });
         try stdout_writer.interface.flush();
     }
 
@@ -109,8 +189,16 @@ pub fn main(init: std.process.Init) !void {
         try common.validationError(io, "integrated exe runner selected no cases\n", .{});
     }
     try stdout_writer.interface.print(
-        "summary zig-integrated-exe total={} build_ok={} run_ok={} stdout_ok={} exit_ok={} minimal_inline_asm_syscall_rows={} local_fail=0\n",
-        .{ total, build_ok, run_ok, run_ok, run_ok, run_ok },
+        "summary zig-integrated-exe total={} build_ok={} run_ok={} stdout_ok={} exit_ok={} minimal_inline_asm_syscall_rows={} compiler_rt_i128_arithmetic_rows={} local_fail=0\n",
+        .{
+            total,
+            build_ok,
+            run_ok,
+            stdout_ok,
+            exit_ok,
+            minimal_inline_asm_syscall_rows,
+            compiler_rt_i128_arithmetic_rows,
+        },
     );
     try stdout_writer.interface.flush();
 }
@@ -122,6 +210,7 @@ fn buildExecutable(
     target: []const u8,
     exe: []const u8,
     case: Case,
+    extra_objects: []const []const u8,
     env_map: *const std.process.Environ.Map,
 ) !void {
     const emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{exe});
@@ -134,7 +223,6 @@ fn buildExecutable(
         "-fllvm",
         "-flibllvm",
         "-fno-lld",
-        "-fno-compiler-rt",
         "-fno-stack-protector",
         "-fno-unwind-tables",
         "-fentry=_start",
@@ -142,12 +230,99 @@ fn buildExecutable(
         case.mode,
         "-target",
         target,
-        case.source,
         emit_arg,
     });
-    const label = try std.fmt.allocPrint(allocator, "patched Zig integrated z_llvm build-exe syscall hello {s}", .{case.mode});
+    if (!case.prebuild_start_object) {
+        try argv.insert(allocator, argv.items.len - 1, case.source);
+    }
+    try argv.insertSlice(allocator, argv.items.len - 1, extra_objects);
+    if (!case.compiler_rt) {
+        try argv.insert(allocator, 4, "-fno-compiler-rt");
+    }
+    const label = try std.fmt.allocPrint(allocator, "patched Zig integrated z_llvm build-exe {s} {s}", .{ case.id, case.mode });
     defer allocator.free(label);
     const result = try common.runCaptureEnv(allocator, io, argv.items, label, env_map);
+    common.freeRunResult(allocator, result);
+}
+
+fn buildCaseSourceObject(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zig_emitter: []const u8,
+    target: []const u8,
+    object_path: []const u8,
+    case: Case,
+) !void {
+    const emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{object_path});
+    defer allocator.free(emit_arg);
+    const argv = [_][]const u8{
+        zig_emitter,
+        "build-obj",
+        "-fllvm",
+        "-flibllvm",
+        "-fno-compiler-rt",
+        "-fno-stack-protector",
+        "-fno-unwind-tables",
+        "-O",
+        case.mode,
+        "-target",
+        target,
+        case.source,
+        emit_arg,
+    };
+    const label = try std.fmt.allocPrint(allocator, "patched Zig integrated start object {s} {s}", .{ case.id, case.mode });
+    defer allocator.free(label);
+    const result = try common.runCapture(allocator, io, &argv, label);
+    common.freeRunResult(allocator, result);
+}
+
+fn emitFocusedCompilerRtI128Builtins(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zllvm_exe: []const u8,
+    target: []const u8,
+    object_path: []const u8,
+    env_map: *const std.process.Environ.Map,
+) !void {
+    const target_arg = try std.fmt.allocPrint(allocator, "--target={s}", .{zllvmTarget(target)});
+    defer allocator.free(target_arg);
+    const argv = [_][]const u8{
+        zllvm_exe,
+        "--emit=obj",
+        target_arg,
+        "--input-limit=1048576",
+        "test/zig/integrated/compiler_rt_i128_builtins.ll",
+    };
+    const result = try common.runCaptureEnv(allocator, io, &argv, "z_llvm focused compiler_rt i128 builtins", env_map);
+    defer common.freeRunResult(allocator, result);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = result.stdout });
+}
+
+fn buildCompilerRtI128Helper(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zig_emitter: []const u8,
+    target: []const u8,
+    object_path: []const u8,
+) !void {
+    const emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{object_path});
+    defer allocator.free(emit_arg);
+    const argv = [_][]const u8{
+        zig_emitter,
+        "build-obj",
+        "-fllvm",
+        "-flibllvm",
+        "-fno-compiler-rt",
+        "-fno-stack-protector",
+        "-fno-unwind-tables",
+        "-O",
+        "ReleaseFast",
+        "-target",
+        target,
+        "test/zig/integrated/compiler_rt_i128_helper.zig",
+        emit_arg,
+    };
+    const result = try common.runCapture(allocator, io, &argv, "patched Zig compiler_rt i128 helper object");
     common.freeRunResult(allocator, result);
 }
 
@@ -167,16 +342,23 @@ fn runExecutable(
 
     switch (result.term) {
         .exited => |code| if (code == case.expected_exit) {},
-        else => try common.validationError(io, "integrated syscall hello {s} exited with {any}, expected exit code {}\n", .{ case.mode, result.term, case.expected_exit }),
+        else => try common.validationError(io, "integrated exe case={s} mode={s} exited with {any}, expected exit code {}\n", .{ case.id, case.mode, result.term, case.expected_exit }),
     }
     if (!std.mem.eql(u8, result.stdout, case.expected_stdout)) {
-        try common.validationError(io, "integrated syscall hello {s} stdout mismatch: expected {s}, got {s}\n", .{ case.mode, case.expected_stdout, result.stdout });
+        try common.validationError(io, "integrated exe case={s} mode={s} stdout mismatch: expected {s}, got {s}\n", .{ case.id, case.mode, case.expected_stdout, result.stdout });
     }
 }
 
 fn normalizeTargetQuery(target: []const u8) []const u8 {
     if (std.mem.eql(u8, target, "x86_64-unknown-linux-gnu")) {
         return "x86_64-linux-gnu";
+    }
+    return target;
+}
+
+fn zllvmTarget(target: []const u8) []const u8 {
+    if (std.mem.eql(u8, target, "x86_64-linux-gnu")) {
+        return "x86_64-unknown-linux-gnu";
     }
     return target;
 }

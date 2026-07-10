@@ -62,6 +62,7 @@ pub const StageTwoSummary = struct {
 
 const no_spill_register_values = 6;
 const stage2_spill_slots = 7;
+const stage2_frame_slots = 32;
 const stage2_max_blocks = 64;
 const phi_regs = [_]ArgReg{ .r8, .r9, .rcx };
 
@@ -613,6 +614,11 @@ const ActiveAllocation = struct {
     assignment: PlannedValueAssignment,
 };
 
+const SpillSlotAssignment = struct {
+    base: usize,
+    slots: usize,
+};
+
 fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Function) !SelectorAllocationPlan {
     var pressure_exempt_values = NameSet.init(allocator);
     defer pressure_exempt_values.deinit();
@@ -1146,9 +1152,9 @@ const ValueLoc = union(enum) {
     scratch32: ArgReg,
     scratch64: ArgReg,
     scratch128: RegPair,
-    stack64: u8,
-    stack128: u8,
-    stack128_value: u8,
+    stack64: u32,
+    stack128: u32,
+    stack128_value: u32,
     stack_i32_array: StackArrayLoc,
     stack_i32_ptr: StackPtrLoc,
     spill64: FrameIndex,
@@ -1204,12 +1210,9 @@ const ComposedBlockSelector = struct {
     machine: *MachineFunction,
     allocation_plan: ?*const SelectorAllocationPlan = null,
     values: std.StringHashMap(ValueBinding),
+    phi_results: NameSet,
     next_virtual_reg: usize = 0,
     edge_label_count: usize = 0,
-    current_eax_name: ?[]const u8 = null,
-    current_scratch_names: [6]?[]const u8 = .{null} ** 6,
-    current_pair_a_name: ?[]const u8 = null,
-    current_pair_b_name: ?[]const u8 = null,
     stack_slot_allocated: bool = false,
     stack_array_allocated: bool = false,
     stack_array_count: usize = 0,
@@ -1217,8 +1220,8 @@ const ComposedBlockSelector = struct {
     current_position: usize = 1,
     expired_binding_this_position: bool = false,
     enable_expired_plan_register_reuse: bool = false,
-    spill_slot_names: [stage2_spill_slots]?[]const u8 = .{null} ** stage2_spill_slots,
-    call_clobbered_regs: bool = false,
+    spill_slots: std.StringHashMap(SpillSlotAssignment),
+    next_spill_slot: usize = 0,
 
     fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
         return .{
@@ -1226,10 +1229,14 @@ const ComposedBlockSelector = struct {
             .machine = machine,
             .allocation_plan = null,
             .values = std.StringHashMap(ValueBinding).init(allocator),
+            .phi_results = NameSet.init(allocator),
+            .spill_slots = std.StringHashMap(SpillSlotAssignment).init(allocator),
         };
     }
 
     fn deinit(selector: *ComposedBlockSelector) void {
+        selector.spill_slots.deinit();
+        selector.phi_results.deinit();
         selector.values.deinit();
     }
 
@@ -1268,6 +1275,7 @@ const ComposedBlockSelector = struct {
                 const bits = intBits(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
                 if (bits != 32 and bits != 64) return .{ .no_emitter = "stage2-phi-width" };
                 const reg = nextPhiReg(&used_in_block) orelse return .{ .no_spill_envelope = "stage2-phi-registers" };
+                try selector.phi_results.put(result_name, {});
                 try selector.bindValueLoc(result_name, if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg });
             }
         }
@@ -1284,7 +1292,6 @@ const ComposedBlockSelector = struct {
     }
 
     fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnostic {
-        selector.clearVolatileRegisterCache();
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
             switch (instruction.kind) {
@@ -1294,8 +1301,7 @@ const ComposedBlockSelector = struct {
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
             const loc = selector.valueLoc(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
             switch (loc) {
-                .scratch32 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
-                .scratch64 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
+                .scratch32, .scratch64 => {},
                 .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
             }
         }
@@ -1363,10 +1369,24 @@ const ComposedBlockSelector = struct {
         var payload_bytes: u32 = 0;
         var scalar_slot_count: usize = 0;
         var array_count: usize = 0;
+        var saw_phi = false;
+        if (selector.allocation_plan) |plan| selector.next_spill_slot = plan.spill_slots;
 
         for (function.blocks.items) |block| {
             for (block.instructions.items) |instruction| {
-                if (instruction.removed or instruction.kind != .alloca) continue;
+                if (instruction.removed) continue;
+                if (instruction.kind == .phi) saw_phi = true;
+            }
+        }
+
+        const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
+        if (pressure.exceedsSpillEnvelope()) return .{ .no_spill_envelope = "composed-block-register-pressure" };
+        const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
+
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                if (instruction.removed) continue;
+                if (instruction.kind != .alloca) continue;
                 const result_name = instruction.result orelse return .{ .unsupported_value = "composed-block-missing-result" };
                 const alloca = instruction.kind.alloca;
                 if (alloca.allocated_ty_addrspace != null) return .{ .no_emitter = "composed-block-alloca-addrspace" };
@@ -1374,8 +1394,9 @@ const ComposedBlockSelector = struct {
                     if (payload_bytes != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
                     scalar_slot_count += 1;
                     if (scalar_slot_count > 1) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
-                    payload_bytes = 8;
-                    try selector.bindValueLoc(result_name, .{ .stack64 = 0 });
+                    const base_disp = if (reserve_spill_area) stage2SpillReservedBytes() else 0;
+                    payload_bytes = std.math.add(u32, base_disp, 8) catch return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
+                    try selector.bindValueLoc(result_name, .{ .stack64 = base_disp });
                 } else if (parseI32ArrayType(alloca.allocated_ty)) |len| {
                     if (scalar_slot_count != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
                     if (array_count == 0) payload_bytes = stage2SpillReservedBytes();
@@ -1389,8 +1410,9 @@ const ComposedBlockSelector = struct {
                     if (payload_bytes != 0) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
                     scalar_slot_count += 1;
                     if (scalar_slot_count > 1) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
-                    payload_bytes = stack128FrameBytes() - 8;
-                    try selector.bindValueLoc(result_name, .{ .stack128 = 0 });
+                    const base_disp = if (reserve_spill_area) stage2SpillReservedBytes() else 0;
+                    payload_bytes = std.math.add(u32, base_disp, stack128FrameBytes() - 8) catch return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
+                    try selector.bindValueLoc(result_name, .{ .stack128 = base_disp });
                 } else {
                     return .{ .no_emitter = "composed-block-alloca-form" };
                 }
@@ -1398,9 +1420,7 @@ const ComposedBlockSelector = struct {
         }
 
         if (payload_bytes == 0) {
-            const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
-            if (pressure.exceedsSpillEnvelope()) return .{ .no_spill_envelope = "composed-block-register-pressure" };
-            if (pressure.exceedsNoSpill()) payload_bytes = stage2SpillReservedBytes();
+            if (pressure.exceedsNoSpill() or saw_phi) payload_bytes = stage2SpillReservedBytes();
         }
 
         if (payload_bytes == 0) return null;
@@ -1527,7 +1547,6 @@ const ComposedBlockSelector = struct {
                     .scratch32 => |reg| {
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg });
                         try selector.bindScratch(result_name, reg, bits);
-                        selector.current_eax_name = null;
                     },
                     .arg32, .arg64, .scratch64, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => try selector.bindEax(result_name),
                 }
@@ -1551,11 +1570,7 @@ const ComposedBlockSelector = struct {
             },
             .@"and" => {
                 if (bits == 64 and rhs == std.math.maxInt(u32)) {
-                    const lhs_name = namedValue(binary.lhs);
-                    if (selector.current_eax_name) |current| {
-                        const same_as_lhs = if (lhs_name) |name| std.mem.eql(u8, current, name) else false;
-                        if (!same_as_lhs) if (try selector.spillCurrentRax()) |diagnostic| return diagnostic;
-                    }
+                    if (try selector.preserveRaxForDestructiveAccumulatorUse(binary.lhs)) |diagnostic| return diagnostic;
                     selector.emitValueIntoRax(binary.lhs) catch |err| switch (err) {
                         error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-and64-lhs" },
                         else => return err,
@@ -1633,6 +1648,14 @@ const ComposedBlockSelector = struct {
             },
             .@"or" => {
                 const lhs_existing = selector.resolvePairValue(binary.lhs);
+                const rhs_existing = selector.resolvePairValue(binary.rhs);
+                if (lhs_existing) |lhs_pair| {
+                    if (rhs_existing) |rhs_pair| {
+                        try selector.emitPairOrInPlace(lhs_pair, rhs_pair);
+                        try selector.bindPairScratch(result_name, lhs_pair);
+                        return null;
+                    }
+                }
                 var lhs: RegPair = undefined;
                 var rhs: RegPair = undefined;
                 if (lhs_existing) |existing| {
@@ -1694,9 +1717,8 @@ const ComposedBlockSelector = struct {
                     selector.emitValueIntoScratch(binary.rhs, src, 64) catch return .{ .unsupported_value = "composed-block-mul64-rhs" };
                     try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } });
                 } else {
-                    if (try selector.spillCurrentRax()) |diagnostic| return diagnostic;
+                    if (try selector.spillCurrentAccumulator()) |diagnostic| return diagnostic;
                     try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = frame_index });
-                    selector.current_eax_name = null;
                     try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_rax = dst });
                 }
             },
@@ -1707,9 +1729,8 @@ const ComposedBlockSelector = struct {
     }
 
     fn lowerMul64SpillLhsThroughRax(selector: *ComposedBlockSelector, result_name: []const u8, lhs_frame_index: FrameIndex, rhs_value: ir.Value) !?Diagnostic {
-        if (try selector.spillCurrentRax()) |diagnostic| return diagnostic;
+        if (try selector.spillCurrentAccumulator()) |diagnostic| return diagnostic;
         try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = lhs_frame_index });
-        selector.current_eax_name = null;
         const rhs = selector.resolveValue(rhs_value) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
         switch (rhs) {
             .arg64, .scratch64 => |src| try selector.machine.instructions.append(selector.allocator, .{ .imul_rax_arg64 = src }),
@@ -1793,9 +1814,8 @@ const ComposedBlockSelector = struct {
             .spill64 => |frame_index| frame_index,
             else => return .{ .no_spill_envelope = "composed-block-lshr64-dst" },
         };
-        if (try selector.spillCurrentRax()) |diagnostic| return diagnostic;
+        if (try selector.spillCurrentAccumulator()) |diagnostic| return diagnostic;
         try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = frame_index });
-        selector.current_eax_name = null;
         if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shr_rax_imm6 = amount });
         try selector.bindRax(result_name);
         return null;
@@ -1815,17 +1835,14 @@ const ComposedBlockSelector = struct {
             try selector.emitValueIntoRax(binary.lhs);
             try selector.emitValueIntoScratch(binary.rhs, .rcx, 64);
         }
-        selector.invalidateScratchContaining(.rdx);
-        selector.invalidatePairContaining(.rdx);
+        try selector.clobberArgReg(.rdx);
         try selector.machine.instructions.append(selector.allocator, .xor_edx_edx);
         try selector.machine.instructions.append(selector.allocator, .{ .div_arg64 = .rcx });
         switch (binary.op) {
             .udiv => {
                 try selector.bindRax(result_name);
-                selector.invalidateScratchContaining(.rdx);
             },
             .urem => {
-                selector.current_eax_name = null;
                 try selector.bindScratch(result_name, .rdx, 64);
             },
             else => unreachable,
@@ -1843,7 +1860,7 @@ const ComposedBlockSelector = struct {
         if (bits > 32) return .{ .no_emitter = "composed-block-variable-shift-width" };
 
         try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
-        selector.current_eax_name = null;
+        try selector.clobberAccumulator();
         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(lhs) });
         try selector.machine.instructions.append(selector.allocator, .shr_eax_cl);
         try selector.bindEax(result_name);
@@ -1873,19 +1890,17 @@ const ComposedBlockSelector = struct {
                     const loc = selector.resolveValue(cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
                     try selector.bindValueLoc(result_name, loc);
                     switch (loc) {
-                        .eax => selector.current_eax_name = result_name,
-                        .rax => selector.current_eax_name = result_name,
-                        .scratch32, .scratch64 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
-                        .arg32, .arg64 => {},
+                        .arg32, .arg64, .eax, .rax, .scratch32, .scratch64 => {},
                         .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-cast-width" },
                     }
                 }
             },
             .zext => {
                 if (from_bits == 64 and to_bits == 128) {
-                    try selector.emitValueIntoScratch(cast.value, pair_b.lo, 64);
-                    try selector.emitZeroArg64(pair_b.hi);
-                    try selector.bindPairScratch(result_name, pair_b);
+                    const dst = selector.choosePairScratchForClobber(null) orelse return .{ .no_spill_envelope = "composed-block-zext-pair" };
+                    try selector.emitValueIntoScratch(cast.value, dst.lo, 64);
+                    try selector.emitZeroArg64(dst.hi);
+                    try selector.bindPairScratch(result_name, dst);
                     return null;
                 }
                 if (to_bits > 32) return .{ .no_emitter = "composed-block-zext-width" };
@@ -1932,9 +1947,7 @@ const ComposedBlockSelector = struct {
         }
         try selector.bindValueLoc(result_name, loc);
         switch (loc) {
-            .eax, .rax => selector.current_eax_name = result_name,
-            .scratch32, .scratch64 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
-            .arg32, .arg64, .spill64 => {},
+            .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .spill64 => {},
             .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => unreachable,
         }
         return null;
@@ -1966,7 +1979,7 @@ const ComposedBlockSelector = struct {
                 },
                 .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-icmp-lhs-loc" },
             }
-            selector.current_eax_name = null;
+            try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .sete_eax);
         } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 })) {
             const rhs = switch (icmp.rhs) {
@@ -1974,7 +1987,7 @@ const ComposedBlockSelector = struct {
                 .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-icmp-rhs" },
             };
             selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-            selector.current_eax_name = null;
+            try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = try i64Value(rhs) } });
             try selector.machine.instructions.append(selector.allocator, .setb_eax);
         } else return .{ .no_emitter = "composed-block-icmp-form" };
@@ -1990,7 +2003,7 @@ const ComposedBlockSelector = struct {
         switch (ptr) {
             .stack64 => |disp| {
                 if (!load.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-load-stack-width" };
-                try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_rax = disp });
+                try selector.loadStackU64IntoRax(disp);
                 try selector.bindRax(result_name);
             },
             .stack128 => |disp| {
@@ -2066,6 +2079,7 @@ const ComposedBlockSelector = struct {
         if (ret_bits != 0 and ret_bits != 32 and ret_bits != 64 and ret_bits != 128) return .{ .no_emitter = "composed-block-call-ret-width" };
         var abi_index: usize = 0;
 
+        if (try selector.spillLiveCallerClobbersForCall()) |diagnostic| return diagnostic;
         for (call.args.items) |arg| {
             const target = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };
             if (try selector.lowerDirectCallArg(arg, target)) |diagnostic| return diagnostic;
@@ -2074,7 +2088,6 @@ const ComposedBlockSelector = struct {
         }
 
         try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-        selector.invalidateCallClobbers();
         if (result) |result_name| switch (ret_bits) {
             0 => return .{ .unsupported_value = "composed-block-void-call-result" },
             32 => try selector.bindEax(result_name),
@@ -2102,8 +2115,7 @@ const ComposedBlockSelector = struct {
         if (!poison_ok) return .{ .no_emitter = "composed-block-abs-poison-mode" };
 
         try selector.emitValueIntoScratch(value_arg.value, .rdi, 64);
-        if (try selector.spillCurrentRax()) |diagnostic| return diagnostic;
-        selector.current_eax_name = null;
+        if (try selector.spillCurrentAccumulator()) |diagnostic| return diagnostic;
         try selector.machine.instructions.append(selector.allocator, .abs_i64_rdi_rax);
         try selector.bindRax(result_name);
         return null;
@@ -2124,7 +2136,6 @@ const ComposedBlockSelector = struct {
         };
         if (!poison_ok) return .{ .no_emitter = "composed-block-abs-poison-mode" };
 
-        if (try selector.spillCurrentPairs()) |diagnostic| return diagnostic;
         try selector.emitPairSignMask("__zllvm_abs_i128_sign", value_arg.value, pair_a);
         _ = selector.materializePairValue(value_arg.value, pair_b) catch return .{ .unsupported_value = "composed-block-abs-value" };
         try selector.emitPairXorInPlace(pair_b, pair_a);
@@ -2204,10 +2215,20 @@ const ComposedBlockSelector = struct {
     }
 
     fn loadStackU64IntoArg(selector: *ComposedBlockSelector, reg: ArgReg, disp: u32) !void {
+        try selector.clobberArgReg(reg);
         if (disp <= std.math.maxInt(u8)) {
             try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_arg64 = .{ .reg = reg, .disp = @intCast(disp) } });
         } else {
             try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_arg64 = .{ .reg = reg, .disp = disp } });
+        }
+    }
+
+    fn loadStackU64IntoRax(selector: *ComposedBlockSelector, disp: u32) !void {
+        try selector.clobberAccumulator();
+        if (disp <= std.math.maxInt(u8)) {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_rax = @intCast(disp) });
+        } else {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_rax = disp });
         }
     }
 
@@ -2276,21 +2297,17 @@ const ComposedBlockSelector = struct {
         const predecessor = function.blocks.items[block_index].name;
         const then_target = function.blocks.items[then_index].name;
         const else_target = function.blocks.items[else_index].name;
-        const branch_cache = selector.saveRegisterCache();
         const then_edge_label = try selector.ownedEdgeLabel();
 
         try selector.machine.instructions.append(selector.allocator, .{ .jne = then_edge_label });
 
-        selector.restoreRegisterCache(branch_cache);
         if (try selector.emitPhiEdgeMoves(function.blocks.items[else_index], predecessor)) |diagnostic| return diagnostic;
         try selector.machine.instructions.append(selector.allocator, .{ .jmp = else_target });
 
         try selector.machine.instructions.append(selector.allocator, .{ .label = then_edge_label });
-        selector.restoreRegisterCache(branch_cache);
         if (try selector.emitPhiEdgeMoves(function.blocks.items[then_index], predecessor)) |diagnostic| return diagnostic;
         try selector.machine.instructions.append(selector.allocator, .{ .jmp = then_target });
 
-        selector.clearVolatileRegisterCache();
         return null;
     }
 
@@ -2320,29 +2337,27 @@ const ComposedBlockSelector = struct {
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
             const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
             const dst = selector.valueLoc(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
-            if (try selector.emitValueIntoLoc(incoming.value, dst)) |diagnostic| return diagnostic;
+            if (try selector.emitValueIntoLoc(incoming.value, dst, result_name)) |diagnostic| return diagnostic;
             switch (dst) {
-                .scratch32 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
-                .scratch64 => |reg| selector.current_scratch_names[argRegIndex(reg)] = result_name,
+                .scratch32, .scratch64 => {},
                 .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
             }
         }
         return null;
     }
 
-    fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: ValueLoc) !?Diagnostic {
+    fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: ValueLoc, ignore_name: []const u8) !?Diagnostic {
+        _ = ignore_name;
         switch (dst) {
             .scratch32 => |reg| {
                 switch (value) {
                     .int => |int| {
-                        selector.invalidateScratchContaining(reg);
-                        selector.invalidatePairContaining(reg);
-                        selector.current_eax_name = null;
+                        try selector.clobberAccumulator();
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) });
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg });
                     },
                     .named => {
-                        selector.emitValueIntoScratch(value, reg, 32) catch return .{ .unsupported_value = "stage2-phi-src" };
+                        selector.emitPhiValueIntoScratch(value, reg, 32) catch return .{ .unsupported_value = "stage2-phi-src" };
                     },
                     .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
                 }
@@ -2350,14 +2365,12 @@ const ComposedBlockSelector = struct {
             .scratch64 => |reg| {
                 switch (value) {
                     .int => |int| {
-                        selector.invalidateScratchContaining(reg);
-                        selector.invalidatePairContaining(reg);
-                        selector.current_eax_name = null;
+                        try selector.clobberAccumulator();
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(int) });
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = reg });
                     },
                     .named => {
-                        selector.emitValueIntoScratch(value, reg, 64) catch return .{ .unsupported_value = "stage2-phi-src" };
+                        selector.emitPhiValueIntoScratch(value, reg, 64) catch return .{ .unsupported_value = "stage2-phi-src" };
                     },
                     .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
                 }
@@ -2385,10 +2398,12 @@ const ComposedBlockSelector = struct {
                 .stack128 => |disp| disp,
                 .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-call-ptr-arg" },
             };
-            if (disp != 0) return .{ .no_emitter = "composed-block-call-stack-disp" };
-            selector.invalidateScratchContaining(target);
-            selector.invalidatePairContaining(target);
+            try selector.clobberArgReg(target);
             try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = target });
+            if (disp != 0) {
+                const addend: i32 = std.math.cast(i32, disp) orelse return .{ .no_spill_envelope = "composed-block-call-stack-disp" };
+                try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = target, .imm = addend } });
+            }
             return null;
         }
 
@@ -2404,10 +2419,8 @@ const ComposedBlockSelector = struct {
                     try selector.loadStackU64IntoArg(target_hi, disp + 8);
                 },
                 .spill128 => |spill| {
-                    selector.invalidateScratchContaining(target);
-                    selector.invalidateScratchContaining(target_hi);
-                    selector.invalidatePairContaining(target);
-                    selector.invalidatePairContaining(target_hi);
+                    try selector.clobberArgReg(target);
+                    try selector.clobberArgReg(target_hi);
                     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = target, .frame_index = spill.lo } });
                     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = target_hi, .frame_index = spill.hi } });
                 },
@@ -2419,35 +2432,30 @@ const ComposedBlockSelector = struct {
             .arg32, .scratch32 => |reg| {
                 if (bits != 32) return .{ .no_emitter = "composed-block-call-arg-width" };
                 if (reg != target) {
-                    selector.invalidateScratchContaining(target);
-                    selector.invalidatePairContaining(target);
+                    try selector.clobberArgReg(target);
                     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{ .dst = target, .src = reg } });
                 }
             },
             .arg64, .scratch64 => |reg| {
                 if (bits != 64) return .{ .no_emitter = "composed-block-call-arg-width" };
                 if (reg != target) {
-                    selector.invalidateScratchContaining(target);
-                    selector.invalidatePairContaining(target);
+                    try selector.clobberArgReg(target);
                     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = target, .src = reg } });
                 }
             },
             .eax => {
                 if (bits != 32) return .{ .no_emitter = "composed-block-call-arg-width" };
-                selector.invalidateScratchContaining(target);
-                selector.invalidatePairContaining(target);
+                try selector.clobberArgReg(target);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = target });
             },
             .rax => {
                 if (bits != 64) return .{ .no_emitter = "composed-block-call-arg-width" };
-                selector.invalidateScratchContaining(target);
-                selector.invalidatePairContaining(target);
+                try selector.clobberArgReg(target);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = target });
             },
             .spill64 => |frame_index| {
                 if (bits != 64) return .{ .no_emitter = "composed-block-call-arg-width" };
-                selector.invalidateScratchContaining(target);
-                selector.invalidatePairContaining(target);
+                try selector.clobberArgReg(target);
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = target, .frame_index = frame_index } });
             },
             .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-call-arg-loc" },
@@ -2475,7 +2483,6 @@ const ComposedBlockSelector = struct {
         const target = selector.plannedResultLoc(name, actual) orelse actual;
         if (!valueLocEql(actual, target)) try selector.materializeLocIntoLoc(actual, target);
         try selector.bindValueLoc(name, target);
-        selector.trackBoundLoc(name, target);
     }
 
     fn plannedResultLoc(selector: ComposedBlockSelector, name: []const u8, actual: ValueLoc) ?ValueLoc {
@@ -2569,41 +2576,42 @@ const ComposedBlockSelector = struct {
         switch (target) {
             .scratch32 => |dst| switch (actual) {
                 .arg32, .scratch32, .arg64, .scratch64 => |src| {
-                    selector.invalidateScratchContaining(dst);
-                    selector.invalidatePairContaining(dst);
-                    if (src != dst) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                    if (src != dst) {
+                        try selector.clobberArgReg(dst);
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
+                    }
                 },
                 .arg128, .scratch128 => |pair| {
-                    selector.invalidateScratchContaining(dst);
-                    selector.invalidatePairContaining(dst);
-                    if (pair.lo != dst) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = pair.lo } });
+                    if (pair.lo != dst) {
+                        try selector.clobberArgReg(dst);
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = pair.lo } });
+                    }
                 },
                 .eax, .rax => {
-                    selector.invalidateScratchContaining(dst);
-                    selector.invalidatePairContaining(dst);
+                    try selector.clobberArgReg(dst);
                     try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = dst });
                 },
                 .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return error.UnsupportedCodegenValue,
             },
             .scratch64 => |dst| switch (actual) {
                 .arg64, .scratch64 => |src| {
-                    selector.invalidateScratchContaining(dst);
-                    selector.invalidatePairContaining(dst);
-                    if (src != dst) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = src } });
+                    if (src != dst) {
+                        try selector.clobberArgReg(dst);
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = src } });
+                    }
                 },
                 .arg128, .scratch128 => |pair| {
-                    selector.invalidateScratchContaining(dst);
-                    selector.invalidatePairContaining(dst);
-                    if (pair.lo != dst) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = pair.lo } });
+                    if (pair.lo != dst) {
+                        try selector.clobberArgReg(dst);
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = pair.lo } });
+                    }
                 },
                 .rax => {
-                    selector.invalidateScratchContaining(dst);
-                    selector.invalidatePairContaining(dst);
+                    try selector.clobberArgReg(dst);
                     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst });
                 },
                 .spill64 => |frame_index| {
-                    selector.invalidateScratchContaining(dst);
-                    selector.invalidatePairContaining(dst);
+                    try selector.clobberArgReg(dst);
                     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst, .frame_index = frame_index } });
                 },
                 .arg32, .scratch32, .eax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return error.UnsupportedCodegenValue,
@@ -2611,10 +2619,9 @@ const ComposedBlockSelector = struct {
             .scratch128 => |dst| switch (actual) {
                 .arg128, .scratch128 => |src| try selector.emitPairIntoScratch(src, dst),
                 .spill128 => |spill| {
-                    selector.current_eax_name = null;
-                    selector.invalidateScratchContaining(dst.lo);
-                    selector.invalidateScratchContaining(dst.hi);
-                    selector.invalidatePair(dst);
+                    try selector.clobberAccumulator();
+                    try selector.clobberArgReg(dst.lo);
+                    try selector.clobberArgReg(dst.hi);
                     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst.lo, .frame_index = spill.lo } });
                     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst.hi, .frame_index = spill.hi } });
                 },
@@ -2629,14 +2636,9 @@ const ComposedBlockSelector = struct {
                 switch (actual) {
                     .arg64, .scratch64 => |src| {
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = src } });
-                        switch (actual) {
-                            .scratch64 => selector.invalidateScratchContaining(src),
-                            else => {},
-                        }
                     },
                     .rax => {
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = frame_index });
-                        selector.current_eax_name = null;
                     },
                     .spill64 => {},
                     .arg32, .scratch32, .arg128, .scratch128, .eax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return error.UnsupportedCodegenValue,
@@ -2648,25 +2650,12 @@ const ComposedBlockSelector = struct {
                     .arg128, .scratch128 => |pair| {
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.lo, .reg = pair.lo } });
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = pair.hi } });
-                        selector.invalidatePair(pair);
                     },
                     .spill128 => {},
                     .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
                 }
             },
             .arg32, .arg64, .arg128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return error.UnsupportedCodegenValue,
-        }
-    }
-
-    fn trackBoundLoc(selector: *ComposedBlockSelector, name: []const u8, loc: ValueLoc) void {
-        switch (loc) {
-            .eax, .rax => selector.current_eax_name = name,
-            .scratch32, .scratch64 => |reg| selector.current_scratch_names[argRegIndex(reg)] = name,
-            .scratch128 => |pair| {
-                if (pair.eql(pair_a)) selector.current_pair_a_name = name;
-                if (pair.eql(pair_b)) selector.current_pair_b_name = name;
-            },
-            .arg32, .arg64, .arg128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
         }
     }
 
@@ -2704,22 +2693,13 @@ const ComposedBlockSelector = struct {
 
     fn bindPairScratch(selector: *ComposedBlockSelector, name: []const u8, pair: RegPair) !void {
         try selector.bindResultLoc(name, .{ .scratch128 = pair });
-        const loc = selector.valueLoc(name) orelse return;
-        switch (loc) {
-            .scratch128 => |bound_pair| {
-                selector.invalidateScratchContaining(bound_pair.lo);
-                selector.invalidateScratchContaining(bound_pair.hi);
-            },
-            else => {},
-        }
     }
 
     fn emitPairIntoAbiRegs(selector: *ComposedBlockSelector, src: RegPair, dst: RegPair) !void {
         if (src.eql(dst)) return;
-        selector.current_eax_name = null;
-        selector.invalidateScratchContaining(dst.lo);
-        selector.invalidateScratchContaining(dst.hi);
-        selector.invalidatePair(dst);
+        try selector.clobberAccumulator();
+        try selector.clobberArgReg(dst.lo);
+        try selector.clobberArgReg(dst.hi);
         if (src.lo == dst.hi and src.hi == dst.lo) {
             try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = src.lo });
             try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst.lo, .src = src.hi } });
@@ -2736,27 +2716,14 @@ const ComposedBlockSelector = struct {
         }
     }
 
-    fn spillCurrentRax(selector: *ComposedBlockSelector) !?Diagnostic {
-        const name = selector.current_eax_name orelse return null;
-        const loc = selector.resolveValue(.{ .named = name }) orelse return null;
-        return switch (loc) {
-            .rax => try selector.spillValue(name),
-            .eax, .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => null,
-        };
+    fn spillCurrentAccumulator(selector: *ComposedBlockSelector) !?Diagnostic {
+        const name = selector.liveAccumulatorName() orelse return null;
+        return try selector.spillValue(name);
     }
 
     fn preserveRaxForDestructiveAccumulatorUse(selector: *ComposedBlockSelector, value: ir.Value) !?Diagnostic {
-        const current = selector.current_eax_name orelse return null;
-        const value_name = namedValue(value);
-        if (value_name) |name| {
-            if (std.mem.eql(u8, current, name)) {
-                const plan = selector.allocation_plan orelse return null;
-                const end = plan.intervalEnd(name) orelse return null;
-                if (end > selector.current_position) return try selector.spillValue(name);
-                return null;
-            }
-        }
-        return try selector.spillCurrentRax();
+        _ = value;
+        return try selector.spillCurrentAccumulator();
     }
 
     fn spillValue(selector: *ComposedBlockSelector, name: []const u8) !?Diagnostic {
@@ -2771,28 +2738,13 @@ const ComposedBlockSelector = struct {
         switch (loc) {
             .arg64, .scratch64 => |reg| {
                 try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = reg } });
-                switch (loc) {
-                    .scratch64 => selector.invalidateScratchContaining(reg),
-                    else => {},
-                }
             },
             .rax => {
                 try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = frame_index });
-                selector.current_eax_name = null;
             },
             .arg32, .scratch32, .arg128, .scratch128, .eax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-spill-loc" },
         }
         try selector.bindValueLoc(name, .{ .spill64 = frame_index });
-        return null;
-    }
-
-    fn spillCurrentPairs(selector: *ComposedBlockSelector) !?Diagnostic {
-        if (selector.current_pair_a_name) |name| {
-            if (try selector.spillPairValue(name)) |diagnostic| return diagnostic;
-        }
-        if (selector.current_pair_b_name) |name| {
-            if (try selector.spillPairValue(name)) |diagnostic| return diagnostic;
-        }
         return null;
     }
 
@@ -2810,57 +2762,29 @@ const ComposedBlockSelector = struct {
         const spill = selector.allocatePairSpillSlots(name) orelse return .{ .no_spill_envelope = "composed-block-pair-spill-slots" };
         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.lo, .reg = pair.lo } });
         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = pair.hi } });
-        selector.invalidatePair(pair);
         try selector.bindValueLoc(name, .{ .spill128 = spill });
         return null;
     }
 
     fn allocateSpillSlot(selector: *ComposedBlockSelector, name: []const u8) ?FrameIndex {
-        for (selector.spill_slot_names, 0..) |slot_name, index| {
-            if (slot_name) |existing| {
-                if (std.mem.eql(u8, existing, name)) return spillFrameIndex(index);
-            }
-        }
-        for (&selector.spill_slot_names, 0..) |*slot_name, index| {
-            if (slot_name.* == null) {
-                slot_name.* = name;
-                return spillFrameIndex(index);
-            }
-        }
-        for (&selector.spill_slot_names, 0..) |*slot_name, index| {
-            const existing = slot_name.* orelse continue;
-            if (!selector.spillSlotNameIsExpired(existing)) continue;
-            slot_name.* = name;
-            return spillFrameIndex(index);
-        }
-        return null;
-    }
-
-    fn spillSlotNameIsExpired(selector: ComposedBlockSelector, name: []const u8) bool {
-        const plan = selector.allocation_plan orelse return false;
-        const end = plan.intervalEnd(name) orelse return false;
-        return end < selector.current_position;
+        if (selector.spill_slots.get(name)) |assignment| return spillFrameIndexMaybe(assignment.base);
+        const base = selector.next_spill_slot;
+        const frame_index = spillFrameIndexMaybe(base) orelse return null;
+        selector.spill_slots.put(name, .{ .base = base, .slots = 1 }) catch return null;
+        selector.next_spill_slot = base + 1;
+        return frame_index;
     }
 
     fn allocatePairSpillSlots(selector: *ComposedBlockSelector, name: []const u8) ?PairSpillLoc {
-        var first: ?usize = null;
-        var second: ?usize = null;
-        const start_index: usize = if (selector.stack_slot_allocated) 1 else 0;
-        for (selector.spill_slot_names[start_index..], start_index..) |slot_name, index| {
-            if (slot_name == null) {
-                if (first == null) {
-                    first = index;
-                } else {
-                    second = index;
-                    break;
-                }
-            }
+        if (selector.spill_slots.get(name)) |assignment| {
+            if (assignment.slots < 2) return null;
+            return pairSpillFrameIndexMaybe(assignment.base);
         }
-        const lo_index = first orelse return null;
-        const hi_index = second orelse return null;
-        selector.spill_slot_names[lo_index] = name;
-        selector.spill_slot_names[hi_index] = name;
-        return .{ .lo = spillFrameIndex(lo_index), .hi = spillFrameIndex(hi_index) };
+        const base = selector.next_spill_slot;
+        const spill = pairSpillFrameIndexMaybe(base) orelse return null;
+        selector.spill_slots.put(name, .{ .base = base, .slots = 2 }) catch return null;
+        selector.next_spill_slot = base + 2;
+        return spill;
     }
 
     fn spillFrameIndex(index: usize) FrameIndex {
@@ -2868,14 +2792,76 @@ const ComposedBlockSelector = struct {
     }
 
     fn spillFrameIndexMaybe(index: usize) ?FrameIndex {
-        return switch (index) {
-            0 => .slot2,
-            1 => .slot4,
-            2 => .slot6,
-            3 => .slot8,
-            4 => .slot10,
-            5 => .slot12,
-            6 => .slot14,
+        const byte_offset = std.math.mul(usize, index, 8) catch return null;
+        return frameIndexForByteOffset(byte_offset);
+    }
+
+    fn frameIndexForByteOffset(byte_offset: usize) ?FrameIndex {
+        if (byte_offset % 4 != 0) return null;
+        return switch (byte_offset / 4) {
+            0 => .slot0,
+            1 => .slot1,
+            2 => .slot2,
+            3 => .slot3,
+            4 => .slot4,
+            5 => .slot5,
+            6 => .slot6,
+            7 => .slot7,
+            8 => .slot8,
+            9 => .slot9,
+            10 => .slot10,
+            11 => .slot11,
+            12 => .slot12,
+            13 => .slot13,
+            14 => .slot14,
+            15 => .slot15,
+            16 => .slot16,
+            17 => .slot17,
+            18 => .slot18,
+            19 => .slot19,
+            20 => .slot20,
+            21 => .slot21,
+            22 => .slot22,
+            23 => .slot23,
+            24 => .slot24,
+            25 => .slot25,
+            26 => .slot26,
+            27 => .slot27,
+            28 => .slot28,
+            29 => .slot29,
+            30 => .slot30,
+            31 => .slot31,
+            32 => .slot32,
+            33 => .slot33,
+            34 => .slot34,
+            35 => .slot35,
+            36 => .slot36,
+            37 => .slot37,
+            38 => .slot38,
+            39 => .slot39,
+            40 => .slot40,
+            41 => .slot41,
+            42 => .slot42,
+            43 => .slot43,
+            44 => .slot44,
+            45 => .slot45,
+            46 => .slot46,
+            47 => .slot47,
+            48 => .slot48,
+            49 => .slot49,
+            50 => .slot50,
+            51 => .slot51,
+            52 => .slot52,
+            53 => .slot53,
+            54 => .slot54,
+            55 => .slot55,
+            56 => .slot56,
+            57 => .slot57,
+            58 => .slot58,
+            59 => .slot59,
+            60 => .slot60,
+            61 => .slot61,
+            62 => .slot62,
             else => null,
         };
     }
@@ -2889,18 +2875,18 @@ const ComposedBlockSelector = struct {
     fn emitValueIntoEax(selector: *ComposedBlockSelector, value: ir.Value) !void {
         switch (value) {
             .int => |int| {
-                selector.current_eax_name = null;
+                try selector.clobberAccumulator();
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) });
             },
             .named => {
                 const loc = selector.resolveValue(value) orelse return error.UnsupportedCodegenValue;
                 switch (loc) {
                     .arg32, .scratch32, .arg64, .scratch64 => |reg| {
-                        selector.current_eax_name = null;
+                        try selector.clobberAccumulator();
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_eax = reg });
                     },
                     .arg128, .scratch128 => |pair| {
-                        selector.current_eax_name = null;
+                        try selector.clobberAccumulator();
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_eax = pair.lo });
                     },
                     .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return error.UnsupportedCodegenValue,
@@ -2918,15 +2904,15 @@ const ComposedBlockSelector = struct {
                 const loc = selector.resolveValue(value) orelse return error.UnsupportedCodegenValue;
                 switch (loc) {
                     .arg64, .scratch64 => |reg| {
-                        selector.current_eax_name = null;
+                        try selector.clobberAccumulator();
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = reg });
                     },
                     .spill64 => |frame_index| {
-                        selector.current_eax_name = null;
+                        try selector.clobberAccumulator();
                         try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = frame_index });
                     },
                     .arg128, .scratch128 => |pair| {
-                        selector.current_eax_name = null;
+                        try selector.clobberAccumulator();
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = pair.lo });
                     },
                     .rax => {},
@@ -2942,21 +2928,14 @@ const ComposedBlockSelector = struct {
     }
 
     fn preserveCurrentEaxIntoScratch(selector: *ComposedBlockSelector) !?Diagnostic {
-        const name = selector.current_eax_name orelse return null;
+        const name = selector.liveEaxName() orelse return null;
         if (!selector.scratchRegIsProvenFree(.rdx)) return null;
-        selector.invalidatePairContaining(.rdx);
         try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdx });
         try selector.bindValueLoc(name, .{ .scratch32 = .rdx });
-        selector.current_scratch_names[argRegIndex(.rdx)] = name;
-        selector.current_eax_name = null;
         return null;
     }
 
     fn scratchRegIsProvenFree(selector: ComposedBlockSelector, reg: ArgReg) bool {
-        if (selector.current_scratch_names[argRegIndex(reg)] != null) return false;
-        if (pair_a.contains(reg) and selector.current_pair_a_name != null) return false;
-        if (pair_b.contains(reg) and selector.current_pair_b_name != null) return false;
-
         var it = selector.values.iterator();
         while (it.next()) |entry| {
             switch (entry.value_ptr.loc) {
@@ -2974,27 +2953,53 @@ const ComposedBlockSelector = struct {
         switch (loc) {
             .stack128_value => |disp| {
                 try selector.loadStackU64IntoArg(.rdx, disp + 8);
-                try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_rax = disp });
-                selector.current_eax_name = null;
-                selector.invalidateScratchContaining(.rdx);
-                selector.invalidatePairContaining(.rdx);
+                try selector.loadStackU64IntoRax(disp);
+                try selector.clobberArgReg(.rdx);
             },
             .arg128, .scratch128 => |pair| {
                 try selector.emitPairIntoAbiRegs(pair, .{ .lo = .rdi, .hi = .rdx });
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .rdi });
             },
             .spill128 => |spill| {
+                try selector.clobberArgReg(.rdx);
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = spill.hi } });
+                try selector.clobberAccumulator();
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = spill.lo });
-                selector.current_eax_name = null;
-                selector.invalidateScratchContaining(.rdx);
-                selector.invalidatePairContaining(.rdx);
             },
             .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
         }
     }
 
     fn emitValueIntoScratch(selector: *ComposedBlockSelector, value: ir.Value, reg: ArgReg, bits: u16) !void {
+        try selector.emitValueIntoScratchExcept(value, reg, bits, null);
+    }
+
+    fn emitPhiValueIntoScratch(selector: *ComposedBlockSelector, value: ir.Value, reg: ArgReg, bits: u16) !void {
+        switch (value) {
+            .named => {
+                const loc = selector.resolveValue(value) orelse return error.UnsupportedCodegenValue;
+                if (bits == 64) {
+                    switch (loc) {
+                        .arg64, .scratch64 => |src| if (src != reg) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = reg, .src = src } }),
+                        .rax => try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = reg }),
+                        .spill64 => |frame_index| try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = frame_index } }),
+                        .arg128, .scratch128 => |pair| if (pair.lo != reg) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = reg, .src = pair.lo } }),
+                        .arg32, .scratch32, .eax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return error.UnsupportedCodegenValue,
+                    }
+                } else {
+                    switch (loc) {
+                        .arg32, .scratch32, .arg64, .scratch64 => |src| if (src != reg) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{ .dst = reg, .src = src } }),
+                        .arg128, .scratch128 => |pair| if (pair.lo != reg) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{ .dst = reg, .src = pair.lo } }),
+                        .eax, .rax => try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg }),
+                        .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return error.UnsupportedCodegenValue,
+                    }
+                }
+            },
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        }
+    }
+
+    fn emitValueIntoScratchExcept(selector: *ComposedBlockSelector, value: ir.Value, reg: ArgReg, bits: u16, ignore_name: ?[]const u8) !void {
         switch (value) {
             .int => return error.UnsupportedCodegenValue,
             .named => {
@@ -3003,8 +3008,7 @@ const ComposedBlockSelector = struct {
                     switch (loc) {
                         .arg64, .scratch64 => |src| {
                             if (src != reg) {
-                                selector.invalidateScratchContaining(reg);
-                                selector.invalidatePairContaining(reg);
+                                try selector.clobberArgRegExcept(reg, ignore_name);
                                 try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{
                                     .dst = reg,
                                     .src = src,
@@ -3012,19 +3016,16 @@ const ComposedBlockSelector = struct {
                             }
                         },
                         .rax => {
-                            selector.invalidateScratchContaining(reg);
-                            selector.invalidatePairContaining(reg);
+                            try selector.clobberArgRegExcept(reg, ignore_name);
                             try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = reg });
                         },
                         .spill64 => |frame_index| {
-                            selector.invalidateScratchContaining(reg);
-                            selector.invalidatePairContaining(reg);
+                            try selector.clobberArgRegExcept(reg, ignore_name);
                             try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = frame_index } });
                         },
                         .arg128, .scratch128 => |pair| {
                             if (pair.lo != reg) {
-                                selector.invalidateScratchContaining(reg);
-                                selector.invalidatePairContaining(reg);
+                                try selector.clobberArgRegExcept(reg, ignore_name);
                                 try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{
                                     .dst = reg,
                                     .src = pair.lo,
@@ -3037,8 +3038,7 @@ const ComposedBlockSelector = struct {
                     switch (loc) {
                         .arg32, .scratch32, .arg64, .scratch64 => |src| {
                             if (src != reg) {
-                                selector.invalidateScratchContaining(reg);
-                                selector.invalidatePairContaining(reg);
+                                try selector.clobberArgRegExcept(reg, ignore_name);
                                 try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{
                                     .dst = reg,
                                     .src = src,
@@ -3047,8 +3047,7 @@ const ComposedBlockSelector = struct {
                         },
                         .arg128, .scratch128 => |pair| {
                             if (pair.lo != reg) {
-                                selector.invalidateScratchContaining(reg);
-                                selector.invalidatePairContaining(reg);
+                                try selector.clobberArgRegExcept(reg, ignore_name);
                                 try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_arg = .{
                                     .dst = reg,
                                     .src = pair.lo,
@@ -3056,8 +3055,7 @@ const ComposedBlockSelector = struct {
                             }
                         },
                         .eax, .rax => {
-                            selector.invalidateScratchContaining(reg);
-                            selector.invalidatePairContaining(reg);
+                            try selector.clobberArgRegExcept(reg, ignore_name);
                             try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg });
                         },
                         .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return error.UnsupportedCodegenValue,
@@ -3087,6 +3085,7 @@ const ComposedBlockSelector = struct {
             .arg32, .scratch32 => |reg| if (bits <= 32) reg else return error.UnsupportedCodegenValue,
             .arg64, .scratch64 => |reg| if (bits == 64) reg else return error.UnsupportedCodegenValue,
             .spill64 => |frame_index| if (bits == 64) blk: {
+                try selector.clobberArgReg(.rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
                 break :blk .rcx;
             } else return error.UnsupportedCodegenValue,
@@ -3129,8 +3128,7 @@ const ComposedBlockSelector = struct {
         if (amount != 64) return error.UnsupportedCodegenValue;
         const existing = selector.resolvePairValue(value);
         const dst = if (existing) |src| src else try selector.materializePairValue(value, pair_a);
-        selector.invalidateScratchContaining(dst.hi);
-        selector.invalidatePairContaining(dst.hi);
+        try selector.clobberArgReg(dst.hi);
         if (dst.lo != dst.hi) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst.hi, .src = dst.lo } });
         try selector.emitZeroArg64(dst.lo);
         try selector.bindPairScratch(result_name, dst);
@@ -3138,10 +3136,9 @@ const ComposedBlockSelector = struct {
 
     fn emitPairIntoScratch(selector: *ComposedBlockSelector, src: RegPair, dst: RegPair) !void {
         if (src.eql(dst)) return;
-        selector.current_eax_name = null;
-        selector.invalidateScratchContaining(dst.lo);
-        selector.invalidateScratchContaining(dst.hi);
-        selector.invalidatePair(dst);
+        try selector.clobberAccumulator();
+        try selector.clobberArgReg(dst.lo);
+        try selector.clobberArgReg(dst.hi);
         if (src.lo != dst.lo) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst.lo, .src = src.lo } });
         if (src.hi != dst.hi) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst.hi, .src = src.hi } });
     }
@@ -3163,10 +3160,9 @@ const ComposedBlockSelector = struct {
                 return dst;
             },
             .spill128 => |spill| {
-                selector.current_eax_name = null;
-                selector.invalidateScratchContaining(dst.lo);
-                selector.invalidateScratchContaining(dst.hi);
-                selector.invalidatePair(dst);
+                try selector.clobberAccumulator();
+                try selector.clobberArgReg(dst.lo);
+                try selector.clobberArgReg(dst.hi);
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst.lo, .frame_index = spill.lo } });
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst.hi, .frame_index = spill.hi } });
                 return dst;
@@ -3181,14 +3177,21 @@ const ComposedBlockSelector = struct {
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         }
         const loc = selector.resolveValue(value) orelse return error.UnsupportedCodegenValue;
-        selector.invalidateScratchContaining(dst);
-        selector.invalidatePairContaining(dst);
         switch (loc) {
             .arg128, .scratch128 => |pair| {
-                if (pair.lo != dst) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = pair.lo } });
+                if (pair.lo != dst) {
+                    try selector.clobberArgReg(dst);
+                    try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = pair.lo } });
+                }
             },
-            .stack128_value => |disp| try selector.loadStackU64IntoArg(dst, disp),
-            .spill128 => |spill| try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst, .frame_index = spill.lo } }),
+            .stack128_value => |disp| {
+                try selector.clobberArgReg(dst);
+                try selector.loadStackU64IntoArg(dst, disp);
+            },
+            .spill128 => |spill| {
+                try selector.clobberArgReg(dst);
+                try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst, .frame_index = spill.lo } });
+            },
             .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
         }
     }
@@ -3212,22 +3215,20 @@ const ComposedBlockSelector = struct {
     }
 
     fn emitPairSubInPlace(selector: *ComposedBlockSelector, dst: RegPair, rhs: RegPair) !void {
-        selector.current_eax_name = null;
+        try selector.clobberAccumulator();
         try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = dst.lo });
         try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .sub, .reg = rhs.lo } });
+        try selector.clobberArgReg(dst.lo);
         try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst.lo });
         try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = dst.hi });
         try selector.machine.instructions.append(selector.allocator, .{ .sbb_arg64_rax = rhs.hi });
+        try selector.clobberArgReg(dst.hi);
         try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst.hi });
-        selector.invalidateScratchContaining(dst.lo);
-        selector.invalidateScratchContaining(dst.hi);
-        selector.invalidatePair(dst);
     }
 
     fn emitPairLaneBinaryInto(selector: *ComposedBlockSelector, dst: ArgReg, op: MachineBinaryOp, lhs: ArgReg, rhs: ArgReg) !void {
-        selector.current_eax_name = null;
-        selector.invalidateScratchContaining(dst);
-        selector.invalidatePairContaining(dst);
+        try selector.clobberAccumulator();
+        try selector.clobberArgReg(dst);
         try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = lhs });
         try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{
             .op = op,
@@ -3237,8 +3238,7 @@ const ComposedBlockSelector = struct {
     }
 
     fn emitZeroArg64(selector: *ComposedBlockSelector, reg: ArgReg) !void {
-        selector.invalidateScratchContaining(reg);
-        selector.invalidatePairContaining(reg);
+        try selector.clobberArgReg(reg);
         switch (reg) {
             .rdx => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rdx = 0 }),
             .rcx => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = 0 }),
@@ -3257,63 +3257,187 @@ const ComposedBlockSelector = struct {
         return null;
     }
 
+    fn choosePairScratchForClobber(selector: ComposedBlockSelector, src: ?RegPair) ?RegPair {
+        if (selector.stack_frame_bytes < stage2SpillReservedBytes()) return selector.choosePairScratch(src);
+        for (selector_allocatable_pairs) |pair| {
+            if (src) |source| if (source.eql(pair)) continue;
+            if (selector.livePairNameContainingReg(pair.lo) != null) continue;
+            if (selector.livePairNameContainingReg(pair.hi) != null) continue;
+            return pair;
+        }
+        return null;
+    }
+
     fn pairScratchIsAvailableForUse(selector: ComposedBlockSelector, pair: RegPair) bool {
         return selector.scratch64RegIsAvailableForUse(pair.lo) and selector.scratch64RegIsAvailableForUse(pair.hi);
     }
 
-    fn invalidatePair(selector: *ComposedBlockSelector, pair: RegPair) void {
-        if (pair.eql(pair_a)) selector.current_pair_a_name = null;
-        if (pair.eql(pair_b)) selector.current_pair_b_name = null;
+    fn clobberArgReg(selector: *ComposedBlockSelector, reg: ArgReg) !void {
+        try selector.clobberArgRegExcept(reg, null);
     }
 
-    fn invalidatePairContaining(selector: *ComposedBlockSelector, reg: ArgReg) void {
-        if (pair_a.contains(reg)) selector.current_pair_a_name = null;
-        if (pair_b.contains(reg)) selector.current_pair_b_name = null;
+    fn clobberArgRegExcept(selector: *ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) !void {
+        if (selector.pairNameContainingRegExcept(reg, ignore_name)) |name| {
+            if (selector.valueIsLiveAfterCurrent(name) or selector.stack_frame_bytes >= stage2SpillReservedBytes()) {
+                try selector.spillPairValueOrError(name);
+            } else if (selector.phi_results.contains(name)) {
+                // Phi destinations are pre-bound before edge materialization.
+            } else {
+                _ = selector.values.remove(name);
+            }
+        }
+        if (selector.scalarNameInRegExcept(reg, ignore_name)) |name| {
+            if (selector.valueIsLiveAfterCurrent(name)) {
+                try selector.spillValueOrError(name);
+            } else if (selector.phi_results.contains(name)) {
+                // Phi destinations are pre-bound before edge materialization.
+            } else {
+                _ = selector.values.remove(name);
+            }
+        }
     }
 
-    fn invalidateScratchContaining(selector: *ComposedBlockSelector, reg: ArgReg) void {
-        selector.current_scratch_names[argRegIndex(reg)] = null;
+    fn clobberAccumulator(selector: *ComposedBlockSelector) !void {
+        selector.dropExpiredAccumulatorBindings();
+        if (selector.liveAccumulatorName()) |name| try selector.spillValueOrError(name);
     }
 
-    fn invalidateCallClobbers(selector: *ComposedBlockSelector) void {
-        selector.current_eax_name = null;
-        selector.current_scratch_names = .{null} ** 6;
-        selector.current_pair_a_name = null;
-        selector.current_pair_b_name = null;
-        selector.call_clobbered_regs = true;
+    fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) void {
+        while (true) {
+            var expired_name: ?[]const u8 = null;
+            var it = selector.values.iterator();
+            while (it.next()) |entry| {
+                switch (entry.value_ptr.loc) {
+                    .eax, .rax => {},
+                    .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => continue,
+                }
+                if (selector.valueIsLiveAfterCurrent(entry.key_ptr.*)) continue;
+                expired_name = entry.key_ptr.*;
+                break;
+            }
+            if (expired_name) |name| {
+                _ = selector.values.remove(name);
+                continue;
+            }
+            break;
+        }
     }
 
-    const RegisterCache = struct {
-        current_eax_name: ?[]const u8,
-        current_scratch_names: [6]?[]const u8,
-        current_pair_a_name: ?[]const u8,
-        current_pair_b_name: ?[]const u8,
-        call_clobbered_regs: bool,
-    };
-
-    fn saveRegisterCache(selector: ComposedBlockSelector) RegisterCache {
-        return .{
-            .current_eax_name = selector.current_eax_name,
-            .current_scratch_names = selector.current_scratch_names,
-            .current_pair_a_name = selector.current_pair_a_name,
-            .current_pair_b_name = selector.current_pair_b_name,
-            .call_clobbered_regs = selector.call_clobbered_regs,
-        };
+    fn spillLiveCallerClobbersForCall(selector: *ComposedBlockSelector) !?Diagnostic {
+        if (try selector.spillCurrentAccumulator()) |diagnostic| return diagnostic;
+        for (selector_allocatable_regs) |reg| {
+            if (selector.livePairNameContainingReg(reg)) |name| {
+                if (try selector.spillPairValue(name)) |diagnostic| return diagnostic;
+            }
+            if (selector.liveScalarNameInReg(reg)) |name| {
+                if (try selector.spillValue(name)) |diagnostic| return diagnostic;
+            }
+        }
+        return null;
     }
 
-    fn restoreRegisterCache(selector: *ComposedBlockSelector, cache: RegisterCache) void {
-        selector.current_eax_name = cache.current_eax_name;
-        selector.current_scratch_names = cache.current_scratch_names;
-        selector.current_pair_a_name = cache.current_pair_a_name;
-        selector.current_pair_b_name = cache.current_pair_b_name;
-        selector.call_clobbered_regs = cache.call_clobbered_regs;
+    fn liveAccumulatorName(selector: ComposedBlockSelector) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (!selector.valueIsLiveAfterCurrent(entry.key_ptr.*)) continue;
+            switch (entry.value_ptr.loc) {
+                .eax, .rax => return entry.key_ptr.*,
+                .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
     }
 
-    fn clearVolatileRegisterCache(selector: *ComposedBlockSelector) void {
-        selector.current_eax_name = null;
-        selector.current_scratch_names = .{null} ** 6;
-        selector.current_pair_a_name = null;
-        selector.current_pair_b_name = null;
+    fn liveEaxName(selector: ComposedBlockSelector) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (!selector.valueIsLiveAfterCurrent(entry.key_ptr.*)) continue;
+            switch (entry.value_ptr.loc) {
+                .eax => return entry.key_ptr.*,
+                .arg32, .arg64, .arg128, .rax, .scratch32, .scratch64, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
+    }
+
+    fn liveScalarNameInReg(selector: ComposedBlockSelector, reg: ArgReg) ?[]const u8 {
+        return selector.liveScalarNameInRegExcept(reg, null);
+    }
+
+    fn scalarNameInRegExcept(selector: ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (ignore_name) |ignored| {
+                if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
+            }
+            switch (entry.value_ptr.loc) {
+                .arg32, .arg64, .scratch32, .scratch64 => |value_reg| if (value_reg == reg) return entry.key_ptr.*,
+                .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
+    }
+
+    fn liveScalarNameInRegExcept(selector: ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (ignore_name) |ignored| {
+                if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
+            }
+            if (!selector.valueIsLiveAfterCurrent(entry.key_ptr.*)) continue;
+            switch (entry.value_ptr.loc) {
+                .arg32, .arg64, .scratch32, .scratch64 => |value_reg| if (value_reg == reg) return entry.key_ptr.*,
+                .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
+    }
+
+    fn livePairNameContainingReg(selector: ComposedBlockSelector, reg: ArgReg) ?[]const u8 {
+        return selector.livePairNameContainingRegExcept(reg, null);
+    }
+
+    fn pairNameContainingRegExcept(selector: ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (ignore_name) |ignored| {
+                if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
+            }
+            switch (entry.value_ptr.loc) {
+                .arg128, .scratch128 => |pair| if (pair.contains(reg)) return entry.key_ptr.*,
+                .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
+    }
+
+    fn livePairNameContainingRegExcept(selector: ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (ignore_name) |ignored| {
+                if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
+            }
+            if (!selector.valueIsLiveAfterCurrent(entry.key_ptr.*)) continue;
+            switch (entry.value_ptr.loc) {
+                .arg128, .scratch128 => |pair| if (pair.contains(reg)) return entry.key_ptr.*,
+                .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
+    }
+
+    fn valueIsLiveAfterCurrent(selector: ComposedBlockSelector, name: []const u8) bool {
+        const plan = selector.allocation_plan orelse return false;
+        const end = plan.intervalEnd(name) orelse return true;
+        return end > selector.current_position;
+    }
+
+    fn spillValueOrError(selector: *ComposedBlockSelector, name: []const u8) !void {
+        if (try selector.spillValue(name)) |_| return error.UnsupportedCodegenValue;
+    }
+
+    fn spillPairValueOrError(selector: *ComposedBlockSelector, name: []const u8) !void {
+        if (try selector.spillPairValue(name)) |_| return error.UnsupportedCodegenValue;
     }
 
     fn resolvePairValue(selector: ComposedBlockSelector, value: ir.Value) ?RegPair {
@@ -3329,34 +3453,9 @@ const ComposedBlockSelector = struct {
             .named => |name| {
                 const loc = selector.valueLoc(name) orelse return null;
                 return switch (loc) {
-                    .arg32, .arg64, .arg128 => if (selector.call_clobbered_regs) null else loc,
-                    .eax, .rax => if (selector.current_eax_name) |current| blk: {
-                        if (std.mem.eql(u8, current, name)) break :blk loc;
-                        return null;
-                    } else null,
-                    .scratch32, .scratch64 => |reg| if (selector.current_scratch_names[argRegIndex(reg)]) |current| blk: {
-                        if (std.mem.eql(u8, current, name)) break :blk loc;
-                        return null;
-                    } else null,
-                    .scratch128 => |pair| {
-                        const current = if (pair.eql(pair_a))
-                            selector.current_pair_a_name
-                        else if (pair.eql(pair_b))
-                            selector.current_pair_b_name
-                        else
-                            null;
-                        if (current) |current_name| {
-                            if (std.mem.eql(u8, current_name, name)) return loc;
-                        }
-                        return null;
-                    },
+                    .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128 => loc,
                     .stack64, .stack128, .stack128_value, .stack_i32_array, .spill64, .spill128 => loc,
-                    .stack_i32_ptr => |stack_ptr| if (stack_ptr.index) |index| blk: {
-                        if (selector.current_scratch_names[argRegIndex(index.reg)]) |current| {
-                            if (std.mem.eql(u8, current, index.name)) break :blk loc;
-                        }
-                        return null;
-                    } else loc,
+                    .stack_i32_ptr => loc,
                 };
             },
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
@@ -3390,11 +3489,9 @@ test "generic cfg selector consumes matching no-spill planned result locations" 
 
     try selector.bindResultLoc("kept", .{ .scratch64 = .rcx });
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("kept").?);
-    try std.testing.expectEqualStrings("kept", selector.current_scratch_names[argRegIndex(.rcx)].?);
 
     try selector.bindResultLoc("deferred", .{ .scratch64 = .r8 });
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("deferred").?);
-    try std.testing.expectEqualStrings("deferred", selector.current_scratch_names[argRegIndex(.r8)].?);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
@@ -3417,7 +3514,6 @@ test "generic cfg selector expires planned intervals before register reuse" {
 
     try selector.bindValueLoc("old", .{ .arg64 = .rdi });
     try selector.bindValueLoc("source", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "source";
 
     try selector.expireExpiredBindings();
     try std.testing.expectEqual(ValueLoc{ .arg64 = .rdi }, selector.valueLoc("old").?);
@@ -3446,7 +3542,6 @@ test "generic cfg selector routes i128 trunc through planned expired register" {
     selector.current_position = 2;
 
     try selector.bindValueLoc("old", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "old";
     try selector.bindValueLoc("wide", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
 
     try selector.expireExpiredBindings();
@@ -3458,7 +3553,6 @@ test "generic cfg selector routes i128 trunc through planned expired register" {
     });
     try std.testing.expect(diagnostic == null);
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("lo").?);
-    try std.testing.expectEqualStrings("lo", selector.current_scratch_names[argRegIndex(.r8)].?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
 }
@@ -3481,7 +3575,6 @@ test "generic cfg selector materializes mul64 lhs into planned register" {
     selector.current_position = 2;
 
     try selector.bindValueLoc("old", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "old";
     try selector.bindValueLoc("lhs", .{ .arg64 = .rdi });
     try selector.bindValueLoc("rhs", .{ .arg64 = .rsi });
 
@@ -3494,7 +3587,6 @@ test "generic cfg selector materializes mul64 lhs into planned register" {
     });
     try std.testing.expect(diagnostic == null);
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("product").?);
-    try std.testing.expectEqualStrings("product", selector.current_scratch_names[argRegIndex(.r8)].?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .imul_arg64_arg64 = .{ .dst = .r8, .src = .rsi } }, machine.instructions.items[1]);
@@ -3521,17 +3613,11 @@ test "generic cfg selector reloads spilled mul64 rhs through rax when scratch re
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
     try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    selector.current_scratch_names[argRegIndex(.rdi)] = "live_rdi";
     try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    selector.current_scratch_names[argRegIndex(.rsi)] = "live_rsi";
     try selector.bindValueLoc("lhs", .{ .scratch64 = .rdx });
-    selector.current_scratch_names[argRegIndex(.rdx)] = "lhs";
     try selector.bindValueLoc("live_rcx", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "live_rcx";
     try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "live_r8";
     try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    selector.current_scratch_names[argRegIndex(.r9)] = "live_r9";
     try selector.bindValueLoc("rhs", .{ .spill64 = .slot2 });
 
     const diagnostic = try selector.lowerMul64("product", .{
@@ -3569,17 +3655,11 @@ test "generic cfg selector spills live mul64 lhs before reusing its scratch regi
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
     try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    selector.current_scratch_names[argRegIndex(.rdi)] = "live_rdi";
     try selector.bindValueLoc("rhs", .{ .scratch64 = .rsi });
-    selector.current_scratch_names[argRegIndex(.rsi)] = "rhs";
     try selector.bindValueLoc("lhs", .{ .scratch64 = .rdx });
-    selector.current_scratch_names[argRegIndex(.rdx)] = "lhs";
     try selector.bindValueLoc("live_rcx", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "live_rcx";
     try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "live_r8";
     try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    selector.current_scratch_names[argRegIndex(.r9)] = "live_r9";
 
     const diagnostic = try selector.lowerMul64("product", .{
         .op = .mul,
@@ -3589,11 +3669,11 @@ test "generic cfg selector spills live mul64 lhs before reusing its scratch regi
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot2 }, selector.valueLoc("lhs").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("lhs").?);
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdx }, selector.valueLoc("product").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rdx } }, machine.instructions.items[0]);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot2 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rdx } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot0 } }, machine.instructions.items[1]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .imul_arg64_arg64 = .{ .dst = .rdx, .src = .rsi } }, machine.instructions.items[2]);
 }
 
@@ -3619,19 +3699,12 @@ test "generic cfg selector reloads spilled mul64 lhs through rax when scratch re
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
     try selector.bindValueLoc("live_rax", .rax);
-    selector.current_eax_name = "live_rax";
     try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    selector.current_scratch_names[argRegIndex(.rdi)] = "live_rdi";
     try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    selector.current_scratch_names[argRegIndex(.rsi)] = "live_rsi";
     try selector.bindValueLoc("live_rdx", .{ .scratch64 = .rdx });
-    selector.current_scratch_names[argRegIndex(.rdx)] = "live_rdx";
     try selector.bindValueLoc("live_rcx", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "live_rcx";
     try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "live_r8";
     try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    selector.current_scratch_names[argRegIndex(.r9)] = "live_r9";
     try selector.bindValueLoc("lhs", .{ .spill64 = .slot10 });
     try selector.bindValueLoc("rhs", .{ .spill64 = .slot12 });
 
@@ -3643,27 +3716,20 @@ test "generic cfg selector reloads spilled mul64 lhs through rax when scratch re
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot2 }, selector.valueLoc("live_rax").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("live_rax").?);
     try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("product").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot2 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot10 }, machine.instructions.items[1]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .imul_rax_rsp = .slot12 }, machine.instructions.items[2]);
 }
 
-test "generic cfg selector reuses expired scalar spill slots" {
-    var machine = MachineFunction.init("spill-slot-reuse", .{ .int = 64 });
+test "generic cfg selector assigns deterministic spill slot per scalar value" {
+    var machine = MachineFunction.init("spill-slot-deterministic", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
 
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
-    try plan.interval_ends.put("old0", 1);
-    try plan.interval_ends.put("live1", 10);
-    try plan.interval_ends.put("live2", 10);
-    try plan.interval_ends.put("live3", 10);
-    try plan.interval_ends.put("live4", 10);
-    try plan.interval_ends.put("live5", 10);
-    try plan.interval_ends.put("live6", 10);
     try plan.interval_ends.put("value", 10);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
@@ -3671,18 +3737,16 @@ test "generic cfg selector reuses expired scalar spill slots" {
     selector.allocation_plan = &plan;
     selector.current_position = 4;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
-    selector.spill_slot_names = .{ "old0", "live1", "live2", "live3", "live4", "live5", "live6" };
 
     try selector.bindValueLoc("value", .rax);
-    selector.current_eax_name = "value";
 
     const diagnostic = try selector.spillValue("value");
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot2 }, selector.valueLoc("value").?);
-    try std.testing.expectEqualStrings("value", selector.spill_slot_names[0].?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("value").?);
+    try std.testing.expectEqual(SpillSlotAssignment{ .base = 0, .slots = 1 }, selector.spill_slots.get("value").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot2 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
 }
 
 test "generic cfg selector reloads spilled pair for i128 lshr immediate" {
@@ -3721,12 +3785,11 @@ test "generic cfg selector pair lshr avoids live scalar scratch values" {
     try selector.bindValueLoc("wide", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
     try selector.bindValueLoc("other_wide", .{ .arg128 = .{ .lo = .rdx, .hi = .rcx } });
     try selector.bindValueLoc("lo", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "lo";
 
     try selector.emitPairLshrImmediate("hi", .{ .named = "wide" }, 64);
 
     try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_b }, selector.valueLoc("hi").?);
-    try std.testing.expectEqualStrings("lo", selector.current_scratch_names[argRegIndex(.rcx)].?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("lo").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = pair_b.lo, .src = .rsi } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_imm_r9 = 0 }, machine.instructions.items[1]);
@@ -3786,9 +3849,7 @@ test "generic cfg selector i128 trunc reuses source low lane without clobbering 
     selector.enable_expired_plan_register_reuse = true;
 
     try selector.bindValueLoc("lo", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "lo";
-    try selector.bindValueLoc("shifted", .{ .scratch128 = pair_b });
-    selector.current_pair_b_name = "shifted";
+    try selector.bindValueLoc("shifted", .{ .scratch128 = .{ .lo = .rdi, .hi = .rsi } });
 
     const diagnostic = try selector.lowerCast("hi", .{
         .op = .trunc,
@@ -3798,8 +3859,8 @@ test "generic cfg selector i128 trunc reuses source low lane without clobbering 
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = pair_b.lo }, selector.valueLoc("hi").?);
-    try std.testing.expectEqualStrings("lo", selector.current_scratch_names[argRegIndex(.rcx)].?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.valueLoc("hi").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("lo").?);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
@@ -3829,14 +3890,18 @@ test "generic cfg selector preserves live rax before another i64 low-half mask" 
     var machine = MachineFunction.init("preserve-rax-mask", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
 
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("left_masked", 10);
+
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 4;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
     try selector.bindValueLoc("left_masked", .rax);
-    selector.current_eax_name = "left_masked";
     try selector.bindValueLoc("right", .{ .scratch64 = .rsi });
-    selector.current_scratch_names[argRegIndex(.rsi)] = "right";
 
     const diagnostic = try selector.lowerBinaryImmediateRhs("right_masked", .{
         .op = .@"and",
@@ -3846,10 +3911,10 @@ test "generic cfg selector preserves live rax before another i64 low-half mask" 
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot2 }, selector.valueLoc("left_masked").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("left_masked").?);
     try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("right_masked").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot2 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[1]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .and_eax_imm32 = -1 }, machine.instructions.items[2]);
 }
@@ -3869,9 +3934,7 @@ test "generic cfg selector lshr64 avoids live scalar scratch values" {
     selector.enable_expired_plan_register_reuse = true;
 
     try selector.bindValueLoc("live", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "live";
     try selector.bindValueLoc("source", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "source";
 
     const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
         .op = .lshr,
@@ -3881,7 +3944,7 @@ test "generic cfg selector lshr64 avoids live scalar scratch values" {
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqualStrings("live", selector.current_scratch_names[argRegIndex(.rcx)].?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("live").?);
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.valueLoc("shifted").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .r8 } }, machine.instructions.items[0]);
@@ -3908,17 +3971,11 @@ test "generic cfg selector lshr64 reuses dead source scratch register" {
     selector.enable_expired_plan_register_reuse = true;
 
     try selector.bindValueLoc("source", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "source";
     try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    selector.current_scratch_names[argRegIndex(.rdi)] = "live_rdi";
     try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    selector.current_scratch_names[argRegIndex(.rsi)] = "live_rsi";
     try selector.bindValueLoc("live_rdx", .{ .scratch64 = .rdx });
-    selector.current_scratch_names[argRegIndex(.rdx)] = "live_rdx";
     try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "live_r8";
     try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    selector.current_scratch_names[argRegIndex(.r9)] = "live_r9";
 
     const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
         .op = .lshr,
@@ -3949,7 +4006,6 @@ test "generic cfg selector shl64 spills live rax source before destructive shift
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
     try selector.bindValueLoc("source", .rax);
-    selector.current_eax_name = "source";
 
     const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
         .op = .shl,
@@ -3959,11 +4015,11 @@ test "generic cfg selector shl64 spills live rax source before destructive shift
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot2 }, selector.valueLoc("source").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("source").?);
     try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("shifted").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot2 }, machine.instructions.items[0]);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot2 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot0 }, machine.instructions.items[1]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .shl_rax_imm6 = 32 }, machine.instructions.items[2]);
 }
 
@@ -3988,17 +4044,11 @@ test "generic cfg selector lshr64 spills live source before reusing its scratch 
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
     try selector.bindValueLoc("source", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "source";
     try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    selector.current_scratch_names[argRegIndex(.rdi)] = "live_rdi";
     try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    selector.current_scratch_names[argRegIndex(.rsi)] = "live_rsi";
     try selector.bindValueLoc("live_rdx", .{ .scratch64 = .rdx });
-    selector.current_scratch_names[argRegIndex(.rdx)] = "live_rdx";
     try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "live_r8";
     try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    selector.current_scratch_names[argRegIndex(.r9)] = "live_r9";
 
     const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
         .op = .lshr,
@@ -4008,11 +4058,11 @@ test "generic cfg selector lshr64 spills live source before reusing its scratch 
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot2 }, selector.valueLoc("source").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("source").?);
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("shifted").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rcx } }, machine.instructions.items[0]);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot2 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rcx } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } }, machine.instructions.items[1]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .shr_arg64_imm6 = .{ .reg = .rcx, .amount = 32 } }, machine.instructions.items[2]);
 }
 
@@ -4038,19 +4088,12 @@ test "generic cfg selector lshr64 reloads spilled source through rax when scratc
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
     try selector.bindValueLoc("live_rax", .rax);
-    selector.current_eax_name = "live_rax";
     try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    selector.current_scratch_names[argRegIndex(.rdi)] = "live_rdi";
     try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    selector.current_scratch_names[argRegIndex(.rsi)] = "live_rsi";
     try selector.bindValueLoc("live_rdx", .{ .scratch64 = .rdx });
-    selector.current_scratch_names[argRegIndex(.rdx)] = "live_rdx";
     try selector.bindValueLoc("live_rcx", .{ .scratch64 = .rcx });
-    selector.current_scratch_names[argRegIndex(.rcx)] = "live_rcx";
     try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    selector.current_scratch_names[argRegIndex(.r8)] = "live_r8";
     try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    selector.current_scratch_names[argRegIndex(.r9)] = "live_r9";
     try selector.bindValueLoc("source", .{ .spill64 = .slot10 });
 
     const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
@@ -4061,10 +4104,10 @@ test "generic cfg selector lshr64 reloads spilled source through rax when scratc
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot2 }, selector.valueLoc("live_rax").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("live_rax").?);
     try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("shifted").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot2 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot10 }, machine.instructions.items[1]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .shr_rax_imm6 = 32 }, machine.instructions.items[2]);
 }
@@ -4092,7 +4135,6 @@ test "generic cfg selector returns overlapping i128 pair without scratch envelop
     defer selector.deinit();
 
     try selector.bindValueLoc("wide", .{ .scratch128 = pair_a });
-    selector.current_pair_a_name = "wide";
     try selector.emitValueIntoI128Return(.{ .named = "wide" });
 
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
@@ -4114,10 +4156,9 @@ test "generic cfg selector stores scalar planned spills in deterministic frame s
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
     try selector.bindResultLoc("spilled", .{ .scratch64 = .rcx });
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot6 }, selector.valueLoc("spilled").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot4 }, selector.valueLoc("spilled").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = .rcx } }, machine.instructions.items[0]);
-    try std.testing.expect(selector.current_scratch_names[argRegIndex(.rcx)] == null);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot4, .reg = .rcx } }, machine.instructions.items[0]);
 }
 
 test "generic cfg selector stores planned pair spills in deterministic frame slots" {
@@ -4132,14 +4173,12 @@ test "generic cfg selector stores planned pair spills in deterministic frame slo
     defer selector.deinit();
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
-    selector.current_pair_a_name = "pair";
 
     try selector.bindResultLoc("pair", .{ .scratch128 = pair_a });
-    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot8, .hi = .slot10 } }, selector.valueLoc("pair").?);
+    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } }, selector.valueLoc("pair").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = pair_a.lo } }, machine.instructions.items[0]);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot10, .reg = pair_a.hi } }, machine.instructions.items[1]);
-    try std.testing.expect(selector.current_pair_a_name == null);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = pair_a.lo } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = pair_a.hi } }, machine.instructions.items[1]);
 }
 
 test "generic cfg selector allocation plan reuses expired registers deterministically" {
@@ -4383,7 +4422,7 @@ fn stack128FrameBytes() u32 {
 }
 
 fn stage2SpillReservedBytes() u32 {
-    return @as(u32, stage2_spill_slots + 1) * 8;
+    return @as(u32, stage2_frame_slots) * 8;
 }
 
 fn isComposedReturnType(ty: ir.Type) bool {

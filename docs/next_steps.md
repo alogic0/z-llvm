@@ -37,22 +37,19 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-Item 15 register-allocator slice is stopped at the `__multi3` acceptance row by
-the same-row three-attempt rule. Do not add another ad hoc `__multi3`
-preservation patch. The next cycle should make the allocation plan the source
-of truth for value locations and insert clobber-aware reload/spill code around
-selected instructions.
+None.
 
 Current operating note recorded 2026-07-10:
 
 - Active convergence-progress item: item 15 remains pulled forward as an
-  architectural migration under item 12's std-hello real-program track.
-  `compiler_rt.udivmodei4.__udivei5` and
-  `compiler_rt.udivmodei4.__umodei4` are recorded stage-two-boundary rows, not
-  next fix targets; do not attempt them again until the remaining
-  integer-helper rows have pressure data or the register-allocator slice is
-  selected by the decision rule. The real-row track remains closed through item
-  10 at strict `--limit=100`, but every stop report still states both tracks.
+  architectural migration under item 12's std-hello real-program track. INBOX-4
+  is acknowledged: the `__multi3` executable failure was a frame-layout
+  collision, and the correction follows LLVM `RegAllocFast.cpp`
+  `StackSlotForVirtReg` lines 481-500 / `MFI->CreateSpillStackObject(Size,
+  Alignment)` line 497 by treating spill slots as ordinary frame objects rather
+  than a parallel offset namespace. The real-row track remains closed through
+  item 10 at strict `--limit=100`, but every stop report still states both
+  tracks.
 - Real-row track status: strict `distribution-real-rows --strict --limit=100`
   is green in ReleaseFast, ReleaseSafe, and ReleaseSmall, and
   `distribution-all` enforces that strict limit. Selector-v2 ReleaseFast
@@ -68,27 +65,17 @@ Current operating note recorded 2026-07-10:
   `compiler_rt.udivmod.__umodti3` as an i128 stack out-param direct-call
   wrapper, `compiler_rt.udivmod.__modti3` as a signed i128 stack out-param
   direct-call wrapper with bounded pair spills, and
-  `compiler_rt.mulXi3.__mulsi3` as a composed i32 multiply loop. The allocator
-  slice has added deterministic allocation-plan expired-register reuse,
-  planned low-lane materialization, pair-spill reloads for i128 shifts, live-lhs
-  multiply preservation, RAX multiply fallbacks for spilled operands, and
-  expired scalar spill-slot reuse. Current item-15 accounting is
-  composed-selection rows 9, terminal-template rows 17, stage-two-boundary rows
-  2, open integer-helper fallback candidates 33, and one allocator acceptance
-  row pending.
-  `__mulsi3` fits the current envelope with `max_live_values=3`,
-  `max_spill_slots_needed=0`, and no six-slot-envelope exceedance. A focused
-  `__multi3` composed-selection attempt reached `%10` before exhausting the
-  six-slot local strategy while all six slots still held values needed later;
-  this row is now the real register allocator acceptance row. Pressure
-  diagnostics:
-  `compiler_rt.mulXi3.__multi3` records `max_live_values=10`,
+  `compiler_rt.mulXi3.__mulsi3` as a composed i32 multiply loop. This cycle
+  closes `compiler_rt.mulXi3.__multi3` as the first allocator acceptance row:
+  the focused proof z_llvm-emits a `__multi3`/`__modti3` object, links it into a
+  no-std executable-style harness, and verifies both computed results at
+  runtime. Current item-15 accounting is composed-selection rows 10,
+  terminal-template rows 17, recognizer fallback rows 32 in the open
+  integer-helper bucket, stage-two-boundary rows 2, and no allocator acceptance
+  row pending. Pressure diagnostics:
+  `compiler_rt.mulXi3.__multi3` recorded `max_live_values=10`,
   `max_spill_slots_needed=4`, `max_spill_slots_over_envelope=0`,
-  `first_exceed_block=-`, and no six-slot-envelope exceedance. The latest clean
-  focused probe fails at `composed-block-unknown-rhs`; the diagnostic probe
-  identifies `%23 = add i64 %22, %10` losing `%10` as the RHS at selector
-  position 29. This is the same-row three-attempt stop, not a hook-contract
-  blocker;
+  `first_exceed_block=-`, and no six-slot-envelope exceedance before closure;
   `compiler_rt.udivmodei4.__udivei5` records `max_live_values=16`,
   `max_spill_slots_needed=10`, `max_spill_slots_over_envelope=4`,
   `first_exceed_block=Then8.prol`, `first_exceed_boundary=live_out`,
@@ -115,26 +102,20 @@ Current operating note recorded 2026-07-10:
   `tmp/std_debug_hello_umodei4_pressure.log`,
   `tmp/std_debug_hello_debug_umodti3_composed.log`,
   `tmp/std_debug_hello_debug_modti3_composed.log`, and
-  `tmp/std_debug_hello_debug_mulsi3_composed.log`. Current allocator partial
-  logs are `tmp/multi3_only_after_allocator_partial.log`,
-  `tmp/multi3_only_unknown_rhs_probe.log`,
-  `tmp/std_debug_hello_debug_multi3_allocator_partial.log`, and
-  `tmp/distribution_all_after_multi3_allocator_partial.log`.
+  `tmp/std_debug_hello_debug_mulsi3_composed.log`. Current closure logs are
+  `tmp/zig_integrated_exe_i128_arithmetic.log` and
+  `tmp/distribution_all_after_multi3_single_frame.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
   `docs/evidence/std_debug_hello_modti3_composed.summary`;
-  `docs/evidence/std_debug_hello_mulsi3_composed.summary`; and
-  `docs/evidence/std_debug_hello_multi3_pressure.tsv`.
-- Recommended next action: stop patching individual `__multi3` clobbers and
-  finish allocator consumption structurally. The composed selector should
-  materialize operands from allocation-plan locations at use points, spill live
-  values before any selected instruction clobbers their physical location, and
-  reload from deterministic spill slots when a later use needs the value. Keep
-  the nine existing composed rows green as the regression set and use
-  `compiler_rt.mulXi3.__multi3` as the acceptance row. After `__multi3` is
-  green through composed selection, retry the parked `__udivei5` and
-  `__umodei4` pressure-boundary rows, then resume the remaining integer-helper
+  `docs/evidence/std_debug_hello_mulsi3_composed.summary`;
+  `docs/evidence/std_debug_hello_multi3_pressure.tsv`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic.summary`; and
+  `docs/evidence/distribution_all_after_multi3_single_frame.summary`.
+- Recommended next action: retry the parked `compiler_rt.udivmodei4.__udivei5`
+  and `compiler_rt.udivmodei4.__umodei4` pressure-boundary rows with the
+  corrected allocator frame model, then resume the remaining integer-helper
   rows in rank order; keep the intervening `compiler_rt.udivmod.__udivmodti4`,
   `__divti3`, and `__udivti3` `UnsupportedTailCallAbi` rows in the separate ABI
   family. Keep terminal routines frozen and keep the 44 `UnsupportedTailCallAbi`

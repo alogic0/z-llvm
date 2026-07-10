@@ -410,10 +410,10 @@ test "generic cfg selector composes constant i32 stack array gep load store" {
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
-    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 88 });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 72 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 72 });
-    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 88 });
+    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm32 = 280 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp32 = 264 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_eax = 264 });
+    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm32 = 280 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -439,11 +439,11 @@ test "generic cfg selector composes dynamic i32 stack array gep index" {
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
-    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 88 });
+    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm32 = 280 });
     try expectInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp8 = 64 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_rcx4_disp8_eax = 64 });
-    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 88 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp32 = 256 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_rcx4_disp32_eax = 256 });
+    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm32 = 280 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -472,11 +472,11 @@ test "generic cfg selector composes multiple constant i32 stack arrays in one fr
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     try std.testing.expectEqual(selector.SelectionResult.selected, result);
-    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm8 = 104 });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 72 });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp8 = 84 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_eax = 84 });
-    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm8 = 104 });
+    try expectInstruction(machine.instructions.items, .{ .sub_rsp_imm32 = 296 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp32 = 264 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp32 = 276 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_eax = 276 });
+    try expectInstruction(machine.instructions.items, .{ .add_rsp_imm32 = 296 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -1013,13 +1013,12 @@ test "generic cfg selector composes zext i64 to i128 through zero high lane" {
         },
     }
 
-    try std.testing.expectEqual(@as(usize, 6), machine.instructions.items.len);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r9 = 0 }, machine.instructions.items[1]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .r8 } }, machine.instructions.items[2]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdx, .src = .r9 } }, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[4]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+    try std.testing.expectEqual(@as(usize, 5), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdx = 0 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rcx } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
 }
 
 test "generic cfg selector composes i128 left shift by one lane" {
@@ -1049,15 +1048,14 @@ test "generic cfg selector composes i128 left shift by one lane" {
         },
     }
 
-    try std.testing.expectEqual(@as(usize, 8), machine.instructions.items.len);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r9 = 0 }, machine.instructions.items[1]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .r9, .src = .r8 } }, machine.instructions.items[2]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r8 = 0 }, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .r8 } }, machine.instructions.items[4]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdx, .src = .r9 } }, machine.instructions.items[5]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[7]);
+    try std.testing.expectEqual(@as(usize, 7), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdx = 0 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdx, .src = .rcx } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rcx = 0 }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rcx } }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
 }
 
 test "generic cfg selector composes i128 pair or" {
@@ -1086,21 +1084,16 @@ test "generic cfg selector composes i128 pair or" {
         },
     }
 
-    try std.testing.expectEqual(@as(usize, 14), machine.instructions.items.len);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdx } }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .r9, .src = .rcx } }, machine.instructions.items[1]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } }, machine.instructions.items[2]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdx, .src = .rsi } }, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .r8 }, machine.instructions.items[4]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } }, machine.instructions.items[5]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rax_to_arg = .r8 }, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .r9 }, machine.instructions.items[7]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .binary_arg_rax = .{ .op = .@"or", .reg = .rdx } }, machine.instructions.items[8]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rax_to_arg = .r9 }, machine.instructions.items[9]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .r8 } }, machine.instructions.items[10]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdx, .src = .r9 } }, machine.instructions.items[11]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[12]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[13]);
+    try std.testing.expectEqual(@as(usize, 9), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .binary_arg_rax = .{ .op = .@"or", .reg = .rdx } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rax_to_arg = .rdi }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rax_to_arg = .rsi }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdx, .src = .rsi } }, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[8]);
 }
 
 test "generic cfg selector composes i64 unsigned remainder through assigned registers" {
@@ -2650,15 +2643,13 @@ test "generic cfg selector composes i128 stack out-param direct call wrapper" {
         .unsupported => |diagnostic| return std.testing.expectEqualStrings("selected", diagnostic.tagName()),
     }
 
-    try std.testing.expectEqual(@as(usize, 7), machine.instructions.items.len);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_56, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rsp_arg64 = .r8 }, machine.instructions.items[1]);
-    try std.testing.expectEqualStrings("callee", machine.instructions.items[2].direct_call.symbol);
-    try std.testing.expect(machine.instructions.items[2].direct_call.ret_ty.eql(.{ .int = 128 }));
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_arg64 = .{ .reg = .rdx, .disp = 8 } }, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 0 }, machine.instructions.items[4]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_56, machine.instructions.items[5]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .sub_rsp_imm32 = 312 }, machine.instructions.items[0]);
+    try expectInstruction(machine.instructions.items, .{ .mov_rsp_arg64 = .r8 });
+    try expectInstruction(machine.instructions.items, .{ .add_arg64_imm32 = .{ .reg = .r8, .imm = 256 } });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_arg64 = .{ .reg = .rdx, .disp = 264 } });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_rax = 256 });
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_rsp_imm32 = 312 }, machine.instructions.items[machine.instructions.items.len - 2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
 test "generic cfg selector composes signed i128 remainder stack call with pair spills" {
@@ -2698,13 +2689,14 @@ test "generic cfg selector composes signed i128 remainder stack call with pair s
         },
     }
 
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_56, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .sub_rsp_imm32 = 312 }, machine.instructions.items[0]);
     try expectInstruction(machine.instructions.items, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } });
-    try expectInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot4, .reg = .rcx } });
-    try expectInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = .rdx } });
+    try expectInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rcx } });
+    try expectInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rdx } });
     try expectInstruction(machine.instructions.items, .{ .sbb_arg64_rax = .rdx });
     try expectInstruction(machine.instructions.items, .{ .mov_rsp_arg64 = .r8 });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_arg64 = .{ .reg = .rdx, .disp = 8 } });
+    try expectInstruction(machine.instructions.items, .{ .add_arg64_imm32 = .{ .reg = .r8, .imm = 256 } });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_arg64 = .{ .reg = .rdx, .disp = 264 } });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -2747,10 +2739,10 @@ test "generic cfg selector composes signed i64 remainder stack call with spills"
 
     try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_24, machine.instructions.items[0]);
     try expectInstruction(machine.instructions.items, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } });
-    try expectInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rcx } });
-    try expectInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot4 });
+    try expectInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rcx } });
+    try expectInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot2 });
     try expectInstruction(machine.instructions.items, .abs_i64_rdi_rax);
-    try expectInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot4 } });
+    try expectInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot2 } });
     try expectInstruction(machine.instructions.items, .{ .mov_rax_to_arg = .rsi });
     try expectInstruction(machine.instructions.items, .{ .mov_rsp_arg64 = .rdx });
     try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_rax = 0 });
