@@ -568,6 +568,47 @@ test "generic cfg selector stage two materializes unconditional phi edges" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector stage two materializes pointer phi edges" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @ptr_phi(ptr %a, ptr %b, i32 %value, i64 %choice) {
+        \\entry:
+        \\  %cond = icmp ult i64 %choice, 1
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %ptr = phi ptr [ %a, %left ], [ %b, %right ]
+        \\  store i32 %value, ptr %ptr, align 4
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("ptr_phi", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return std.testing.expectEqualStrings("selected", diagnostic.tagName());
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } });
+    try expectInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rsi } });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .r8 });
+    try expectNamedInstruction(machine.instructions.items, .label, "merge");
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector stage two materializes conditional phi edge blocks" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -721,7 +762,7 @@ test "generic cfg selector stage two computes pressure above no-spill envelope" 
     try std.testing.expectEqual(@as(usize, 2), summary.blocks);
     try std.testing.expect(summary.max_pressure > summary.no_spill_limit);
     try std.testing.expect(summary.exceedsNoSpill());
-    try std.testing.expectEqual(@as(usize, 7), summary.spill_slot_count);
+    try std.testing.expectEqual(@as(usize, 32), summary.spill_slot_count);
     try std.testing.expectEqual(@as(usize, 1), summary.max_pressure_spill_slots_needed);
     try std.testing.expectEqual(@as(usize, 0), summary.max_pressure_spill_slots_over_envelope);
     try std.testing.expectEqualStrings("-", summary.first_exceeding_block);
@@ -777,6 +818,31 @@ test "generic cfg selector stage two rejects pressure above spill envelope" {
         \\  %p6 = add i32 %c, %f
         \\  %p7 = add i32 %d, %e
         \\  %p8 = add i32 %a, %c
+        \\  %p9 = add i32 %a, %d
+        \\  %p10 = add i32 %a, %e
+        \\  %p11 = add i32 %a, %f
+        \\  %p12 = add i32 %b, %c
+        \\  %p13 = add i32 %b, %d
+        \\  %p14 = add i32 %b, %f
+        \\  %p15 = add i32 %c, %e
+        \\  %p16 = add i32 %d, %f
+        \\  %p17 = add i32 %a, %p1
+        \\  %p18 = add i32 %b, %p2
+        \\  %p19 = add i32 %c, %p3
+        \\  %p20 = add i32 %d, %p4
+        \\  %p21 = add i32 %e, %p5
+        \\  %p22 = add i32 %f, %p6
+        \\  %p23 = add i32 %p1, %p7
+        \\  %p24 = add i32 %p2, %p8
+        \\  %p25 = add i32 %p3, %p9
+        \\  %p26 = add i32 %p4, %p10
+        \\  %p27 = add i32 %p5, %p11
+        \\  %p28 = add i32 %p6, %p12
+        \\  %p29 = add i32 %p7, %p13
+        \\  %p30 = add i32 %p8, %p14
+        \\  %p31 = add i32 %p9, %p15
+        \\  %p32 = add i32 %p10, %p16
+        \\  %p33 = add i32 %p11, %p17
         \\  br label %body
         \\body:
         \\  %s1 = add i32 %a, %b
@@ -791,8 +857,33 @@ test "generic cfg selector stage two rejects pressure above spill envelope" {
         \\  %s10 = add i32 %s5, %s6
         \\  %s11 = add i32 %s7, %s8
         \\  %s12 = add i32 %s9, %s10
-        \\  %s13 = add i32 %s11, %s12
-        \\  ret i32 %s13
+        \\  %s13 = add i32 %p9, %p10
+        \\  %s14 = add i32 %p11, %p12
+        \\  %s15 = add i32 %p13, %p14
+        \\  %s16 = add i32 %p15, %p16
+        \\  %s17 = add i32 %p17, %p18
+        \\  %s18 = add i32 %p19, %p20
+        \\  %s19 = add i32 %p21, %p22
+        \\  %s20 = add i32 %p23, %p24
+        \\  %s21 = add i32 %p25, %p26
+        \\  %s22 = add i32 %p27, %p28
+        \\  %s23 = add i32 %p29, %p30
+        \\  %s24 = add i32 %p31, %p32
+        \\  %s25 = add i32 %p33, %s11
+        \\  %s26 = add i32 %s12, %s13
+        \\  %s27 = add i32 %s14, %s15
+        \\  %s28 = add i32 %s16, %s17
+        \\  %s29 = add i32 %s18, %s19
+        \\  %s30 = add i32 %s20, %s21
+        \\  %s31 = add i32 %s22, %s23
+        \\  %s32 = add i32 %s24, %s25
+        \\  %s33 = add i32 %s26, %s27
+        \\  %s34 = add i32 %s28, %s29
+        \\  %s35 = add i32 %s30, %s31
+        \\  %s36 = add i32 %s32, %s33
+        \\  %s37 = add i32 %s34, %s35
+        \\  %s38 = add i32 %s36, %s37
+        \\  ret i32 %s38
         \\}
         \\
     ;
@@ -808,7 +899,7 @@ test "generic cfg selector stage two rejects pressure above spill envelope" {
     try std.testing.expect(summary.max_pressure_spill_slots_over_envelope > 0);
     try std.testing.expectEqualStrings("entry", summary.first_exceeding_block);
     try std.testing.expectEqualStrings("terminator", summary.first_exceeding_boundary);
-    try std.testing.expectEqual(@as(usize, 14), summary.first_exceeding_live_values);
+    try std.testing.expect(summary.first_exceeding_live_values > summary.spill_envelope_limit);
 
     var machine = codegen.x86_64.MachineFunction.init("pressure", module.functions.items[0].ret_ty);
     defer machine.deinit(std.testing.allocator);

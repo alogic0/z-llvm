@@ -61,8 +61,8 @@ pub const StageTwoSummary = struct {
 };
 
 const no_spill_register_values = 6;
-const stage2_spill_slots = 7;
 const stage2_frame_slots = 32;
+const stage2_spill_slots = stage2_frame_slots;
 const stage2_max_blocks = 64;
 const phi_regs = [_]ArgReg{ .r8, .r9, .rcx };
 
@@ -1272,8 +1272,12 @@ const ComposedBlockSelector = struct {
                 if (instruction.removed or instruction.kind != .phi) continue;
                 const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
                 const phi = instruction.kind.phi;
-                const bits = intBits(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
-                if (bits != 32 and bits != 64) return .{ .no_emitter = "stage2-phi-width" };
+                const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
+                const bits = switch (metadata.class) {
+                    .gpr32 => @as(u16, 32),
+                    .gpr64 => @as(u16, 64),
+                    .gpr128, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
+                };
                 const reg = nextPhiReg(&used_in_block) orelse return .{ .no_spill_envelope = "stage2-phi-registers" };
                 try selector.phi_results.put(result_name, {});
                 try selector.bindValueLoc(result_name, if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg });

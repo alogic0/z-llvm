@@ -89,6 +89,11 @@ Current operating note recorded 2026-07-10:
   `max_spill_slots_needed=15`, `max_spill_slots_over_envelope=9`,
   `first_exceed_block=Then9.prol`, `first_exceed_boundary=live_out`,
   `first_exceed_live_values=13`, and `first_exceed_spill_slots_needed=7`.
+  This cycle retried the parked `__udivei5` row with the corrected 32-slot
+  frame envelope and pointer-phi support; Debug compiler_rt report-all moved
+  to 443 selected / 130 emitting / 313 failing, with first failure still
+  `compiler_rt.udivmodei4.__udivei5` but now at `no_emitter` /
+  `composed-block-call-form`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -111,7 +116,8 @@ Current operating note recorded 2026-07-10:
   `tmp/zig_integrated_exe_i128_arithmetic.log` and
   `tmp/distribution_all_after_multi3_single_frame.log`. Current INBOX-5
   hardening logs are `tmp/zig_integrated_exe_i128_arithmetic_inbox5.log` and
-  `tmp/distribution_all_after_inbox5.log`.
+  `tmp/distribution_all_after_inbox5.log`. The current parked-boundary retry
+  log is `tmp/std_debug_hello_debug_udivei5_retry4.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
@@ -122,14 +128,17 @@ Current operating note recorded 2026-07-10:
   `docs/evidence/distribution_all_after_multi3_single_frame.summary`. Current
   INBOX-5 hardening evidence is
   `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox5.summary` and
-  `docs/evidence/distribution_all_after_inbox5.summary`.
-- Recommended next action: retry the parked `compiler_rt.udivmodei4.__udivei5`
-  and `compiler_rt.udivmodei4.__umodei4` pressure-boundary rows with the
-  corrected allocator frame model, then resume the remaining integer-helper
-  rows in rank order; keep the intervening `compiler_rt.udivmod.__udivmodti4`,
-  `__divti3`, and `__udivti3` `UnsupportedTailCallAbi` rows in the separate ABI
-  family. Keep terminal routines frozen and keep the 44 `UnsupportedTailCallAbi`
-  rows as a separate ABI family.
+  `docs/evidence/distribution_all_after_inbox5.summary`. Current
+  parked-boundary retry evidence is
+  `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary`.
+- Recommended next action: continue `compiler_rt.udivmodei4.__udivei5` at the
+  `composed-block-call-form` frontier exposed by the corrected frame envelope
+  and pointer-phi retry, then retry `compiler_rt.udivmodei4.__umodei4` under the
+  same frame model before resuming remaining integer-helper rows in rank order;
+  keep the intervening `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and
+  `__udivti3` `UnsupportedTailCallAbi` rows in the separate ABI family. Keep
+  terminal routines frozen and keep the 44 `UnsupportedTailCallAbi` rows as a
+  separate ABI family.
 
 When the worker stops, record only:
 
