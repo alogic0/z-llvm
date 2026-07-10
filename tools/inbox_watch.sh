@@ -49,19 +49,21 @@ LAST_SUM=$(checksum)
 LAST_NUDGE=0
 
 handle_change() {
-  local now sum
+  local now sum remaining
   now=$(date +%s)
   sum=$(checksum)
   if [ "$sum" = "$LAST_SUM" ]; then
     return  # touched but content unchanged
   fi
-  if [ $((now - LAST_NUDGE)) -lt "$DEBOUNCE_SECONDS" ]; then
-    log "debounce: change within ${DEBOUNCE_SECONDS}s window, skipping"
-    LAST_SUM=$sum
-    return
+  remaining=$((DEBOUNCE_SECONDS - (now - LAST_NUDGE)))
+  if [ "$remaining" -gt 0 ]; then
+    # Defer, never swallow: wait out the window, then nudge once for
+    # whatever the file contains by then (collapses save bursts).
+    log "debounce: change within ${DEBOUNCE_SECONDS}s window, deferring ${remaining}s"
+    sleep "$remaining"
   fi
-  LAST_SUM=$sum
-  LAST_NUDGE=$now
+  LAST_SUM=$(checksum)  # re-read: include anything written during the wait
+  LAST_NUDGE=$(date +%s)
   nudge
 }
 
