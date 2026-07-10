@@ -80,7 +80,10 @@ if command -v inotifywait >/dev/null; then
   # Monitor mode: one long-lived watcher streaming events, so the second
   # event of an atomic save (close_write on the temp file, then moved_to on
   # the target) cannot land in a gap between single-shot invocations.
-  inotifywait -m -q -e close_write -e moved_to --format '%f' "$DIR" |
+  # stdbuf -oL: inotifywait block-buffers when piped (stdout not a TTY),
+  # which delays events by kilobytes; force line buffering so each event
+  # flushes immediately.
+  stdbuf -oL inotifywait -m -q -e close_write -e moved_to --format '%f' "$DIR" |
   while read -r EV; do
     [ "$EV" = "$BASE" ] || continue
     handle_change
