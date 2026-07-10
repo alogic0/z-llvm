@@ -1959,6 +1959,20 @@ One line per completed cycle, append-only, newest last. This is the
   `shape_recognizer_functions` is unchanged. Evidence
   `tmp/std_debug_hello_debug_i128_pair_or.log`; distribution-all proof
   `tmp/distribution_all_after_i128_pair_or.log`.
+- 2026-07-09 (this commit) Item 15 allocator-consumption slice: the
+  single-block composed selector now enables deterministic allocation-plan
+  expired-register reuse, and i128 trunc/bitcast results route through
+  `bindResultLoc` so planned registers and spills can own those low-lane
+  values instead of bypassing the allocator. This is an allocator-consumption
+  step, not a row closure: Debug std-hello compiler_rt report-all stayed at
+  443 selected, 129 emitted, and 314 failed; `compiler_rt.mulXi3.__multi3`
+  remains the allocator acceptance row. Item-15 accounting remains
+  composed-selection rows 9, terminal-template rows 17, stage-two-boundary rows
+  2, open integer-helper fallback candidates 33, and one allocator acceptance
+  row pending. Recognizer count still 1 (no new recognizer reorder or
+  pre-pass); `shape_recognizer_functions` is unchanged. Evidence
+  `tmp/std_debug_hello_debug_trunc_plan_reuse.log`; distribution-all proof
+  `tmp/distribution_all_after_trunc_plan_reuse.log`.
 
 ## Ratchet State
 

@@ -1703,8 +1703,7 @@ const ComposedBlockSelector = struct {
                         .arg128, .scratch128 => |pair| pair,
                         .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-cast-width" },
                     };
-                    try selector.bindValueLoc(result_name, .{ .scratch64 = pair.lo });
-                    selector.current_scratch_names[argRegIndex(pair.lo)] = result_name;
+                    try selector.bindScratch(result_name, pair.lo, 64);
                 } else {
                     try selector.bindValueLoc(result_name, loc);
                     switch (loc) {
@@ -3192,6 +3191,41 @@ test "generic cfg selector expires planned intervals before register reuse" {
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rcx } }, machine.instructions.items[0]);
 }
 
+test "generic cfg selector routes i128 trunc through planned expired register" {
+    var machine = MachineFunction.init("planned-trunc", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("old", .{ .gpr64 = .r8 });
+    try plan.interval_ends.put("old", 1);
+    try plan.assignments.put("lo", .{ .gpr64 = .r8 });
+    try plan.interval_ends.put("lo", 2);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.enable_expired_plan_register_reuse = true;
+    selector.current_position = 2;
+
+    try selector.bindValueLoc("old", .{ .scratch64 = .r8 });
+    selector.current_scratch_names[argRegIndex(.r8)] = "old";
+    try selector.bindValueLoc("wide", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
+
+    try selector.expireExpiredBindings();
+    const diagnostic = try selector.lowerCast("lo", .{
+        .op = .trunc,
+        .from_ty = .{ .int = 128 },
+        .value = .{ .named = "wide" },
+        .to_ty = .{ .int = 64 },
+    });
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("lo").?);
+    try std.testing.expectEqualStrings("lo", selector.current_scratch_names[argRegIndex(.r8)].?);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
+}
+
 test "generic cfg selector stores scalar planned spills in deterministic frame slots" {
     var machine = MachineFunction.init("planned-spill", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
@@ -3337,6 +3371,7 @@ fn tryLowerComposedBlock(
 
     var composed = ComposedBlockSelector.init(allocator, machine);
     composed.allocation_plan = &allocation_plan;
+    composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
     defer composed.deinit();
 
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
