@@ -85,6 +85,26 @@ test "x86_64 encoding sizes i64 add before direct call relocation" {
     }, bytes);
 }
 
+test "x86_64 encoding sizes high-register binary rax operands" {
+    var machine = codegen.x86_64.MachineFunction.init("high_reg_binary_rax", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+    try machine.instructions.append(std.testing.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } });
+    try machine.instructions.append(std.testing.allocator, .{ .sbb_arg64_rax = .r9 });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } }));
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .sbb_arg64_rax = .r9 }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x8b, 0xc7,
+        0x4c, 0x31, 0xc0,
+        0x4c, 0x19, 0xc8,
+        0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding emits imul arg64 by rax" {
     var machine = codegen.x86_64.MachineFunction.init("imul_rax", .void);
     defer machine.deinit(std.testing.allocator);
@@ -149,6 +169,71 @@ test "x86_64 encoding sizes nonzero frame spill slots" {
         0x00, 0x00, 0x00, 0x00,
         0x48, 0x83, 0xc4, 0x28,
         0xc3,
+    }, bytes);
+}
+
+test "x86_64 encoding uses disp32 for high frame spill slots" {
+    var machine = codegen.x86_64.MachineFunction.init("high_frame_slots", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .sub_rsp_imm32 = 136 });
+    try machine.instructions.append(std.testing.allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot32, .reg = .rdi } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot32 } });
+    try machine.instructions.append(std.testing.allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot32, .reg = .r9 } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot32 } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_rsp_eax = .slot32 });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_rsp_rax = .slot32 });
+    try machine.instructions.append(std.testing.allocator, .{ .add_rsp_imm32 = 136 });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .spill_arg64_rsp = .{ .frame_index = .slot32, .reg = .rdi } }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot32 } }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .spill_arg_rsp = .{ .frame_index = .slot32, .reg = .r9 } }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot32 } }));
+    try std.testing.expectEqual(@as(u32, 7), mc.encoding.instructionSize(.{ .reload_rsp_eax = .slot32 }));
+    try std.testing.expectEqual(@as(u32, 8), mc.encoding.instructionSize(.{ .reload_rsp_rax = .slot32 }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x81, 0xec, 0x88,
+        0x00, 0x00, 0x00, 0x48,
+        0x89, 0xbc, 0x24, 0x80,
+        0x00, 0x00, 0x00, 0x48,
+        0x8b, 0xb4, 0x24, 0x80,
+        0x00, 0x00, 0x00, 0x44,
+        0x89, 0x8c, 0x24, 0x80,
+        0x00, 0x00, 0x00, 0x44,
+        0x8b, 0x84, 0x24, 0x80,
+        0x00, 0x00, 0x00, 0x8b,
+        0x84, 0x24, 0x80, 0x00,
+        0x00, 0x00, 0x48, 0x8b,
+        0x84, 0x24, 0x80, 0x00,
+        0x00, 0x00, 0x48, 0x81,
+        0xc4, 0x88, 0x00, 0x00,
+        0x00, 0xc3,
+    }, bytes);
+}
+
+test "x86_64 encoding sizes high-register 64-bit frame slots" {
+    var machine = codegen.x86_64.MachineFunction.init("high_reg_frame_slots", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .sub_rsp_24);
+    try machine.instructions.append(std.testing.allocator, .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .r8 } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_arg64_rsp = .{ .reg = .r9, .frame_index = .slot2 } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_rsp_rax = .slot2 });
+    try machine.instructions.append(std.testing.allocator, .add_rsp_24);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .r8 } }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .reload_arg64_rsp = .{ .reg = .r9, .frame_index = .slot2 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x83, 0xec, 0x18,
+        0x4c, 0x89, 0x44, 0x24,
+        0x08, 0x4c, 0x8b, 0x4c,
+        0x24, 0x08, 0x48, 0x8b,
+        0x44, 0x24, 0x08, 0x48,
+        0x83, 0xc4, 0x18, 0xc3,
     }, bytes);
 }
 
@@ -306,17 +391,16 @@ test "x86_64 encoding spills and reloads xmm frame slots" {
     try machine.instructions.append(std.testing.allocator, .add_rsp_8);
     try machine.instructions.append(std.testing.allocator, .ret);
 
-    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot0 } }));
-    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot0 } }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }));
     const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
     try std.testing.expectEqualSlices(u8, &.{
         0x48, 0x83, 0xec, 0x08,
-        0xf2, 0x0f, 0x11, 0x4c,
-        0x24, 0x00, 0xf2, 0x0f,
-        0x10, 0x44, 0x24, 0x00,
-        0x48, 0x83, 0xc4, 0x08,
-        0xc3,
+        0xf2, 0x0f, 0x11, 0x0c,
+        0x24, 0xf2, 0x0f, 0x10,
+        0x04, 0x24, 0x48, 0x83,
+        0xc4, 0x08, 0xc3,
     }, bytes);
 }
 

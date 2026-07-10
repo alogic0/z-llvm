@@ -1464,6 +1464,7 @@ const ComposedBlockSelector = struct {
                 .arg64, .scratch64 => |reg| if (bits == 64) reg else return .{ .no_emitter = "composed-block-rhs-width" },
                 .arg128, .scratch128 => return .{ .no_emitter = "composed-block-rhs-width" },
                 .spill64 => |frame_index| if (bits == 64) blk: {
+                    try selector.clobberArgReg(.rcx);
                     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
                     break :blk .rcx;
                 } else return .{ .no_emitter = "composed-block-rhs-stack" },

@@ -47,9 +47,13 @@ Current operating note recorded 2026-07-10:
   collision, and the correction follows LLVM `RegAllocFast.cpp`
   `StackSlotForVirtReg` lines 481-500 / `MFI->CreateSpillStackObject(Size,
   Alignment)` line 497 by treating spill slots as ordinary frame objects rather
-  than a parallel offset namespace. The real-row track remains closed through
-  item 10 at strict `--limit=100`, but every stop report still states both
-  tracks.
+  than a parallel offset namespace. INBOX-5 is also acknowledged: the follow-up
+  hardening fixed disp32 frame-slot encodings for offsets past 127, stale
+  high-register instruction-size accounting that could misplace ELF
+  relocations, integrated-exe expected-exit mismatch handling, and the missing
+  `rcx` clobber before RHS spill64 reload. The real-row track remains closed
+  through item 10 at strict `--limit=100`, but every stop report still states
+  both tracks.
 - Real-row track status: strict `distribution-real-rows --strict --limit=100`
   is green in ReleaseFast, ReleaseSafe, and ReleaseSmall, and
   `distribution-all` enforces that strict limit. Selector-v2 ReleaseFast
@@ -68,8 +72,9 @@ Current operating note recorded 2026-07-10:
   `compiler_rt.mulXi3.__mulsi3` as a composed i32 multiply loop. This cycle
   closes `compiler_rt.mulXi3.__multi3` as the first allocator acceptance row:
   the focused proof z_llvm-emits a `__multi3`/`__modti3` object, links it into a
-  no-std executable-style harness, and verifies both computed results at
-  runtime. Current item-15 accounting is composed-selection rows 10,
+  no-std executable-style harness, verifies both computed results at runtime,
+  and now fails closed on wrong expected process exits. Current item-15
+  accounting is composed-selection rows 10,
   terminal-template rows 17, recognizer fallback rows 32 in the open
   integer-helper bucket, stage-two-boundary rows 2, and no allocator acceptance
   row pending. Pressure diagnostics:
@@ -104,7 +109,9 @@ Current operating note recorded 2026-07-10:
   `tmp/std_debug_hello_debug_modti3_composed.log`, and
   `tmp/std_debug_hello_debug_mulsi3_composed.log`. Current closure logs are
   `tmp/zig_integrated_exe_i128_arithmetic.log` and
-  `tmp/distribution_all_after_multi3_single_frame.log`.
+  `tmp/distribution_all_after_multi3_single_frame.log`. Current INBOX-5
+  hardening logs are `tmp/zig_integrated_exe_i128_arithmetic_inbox5.log` and
+  `tmp/distribution_all_after_inbox5.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
@@ -112,7 +119,10 @@ Current operating note recorded 2026-07-10:
   `docs/evidence/std_debug_hello_mulsi3_composed.summary`;
   `docs/evidence/std_debug_hello_multi3_pressure.tsv`;
   `docs/evidence/zig_integrated_exe_i128_arithmetic.summary`; and
-  `docs/evidence/distribution_all_after_multi3_single_frame.summary`.
+  `docs/evidence/distribution_all_after_multi3_single_frame.summary`. Current
+  INBOX-5 hardening evidence is
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox5.summary` and
+  `docs/evidence/distribution_all_after_inbox5.summary`.
 - Recommended next action: retry the parked `compiler_rt.udivmodei4.__udivei5`
   and `compiler_rt.udivmodei4.__umodei4` pressure-boundary rows with the
   corrected allocator frame model, then resume the remaining integer-helper

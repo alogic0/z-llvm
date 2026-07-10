@@ -341,7 +341,11 @@ fn runExecutable(
     defer common.freeRunResult(allocator, result);
 
     switch (result.term) {
-        .exited => |code| if (code == case.expected_exit) {},
+        .exited => |code| {
+            if (code != case.expected_exit) {
+                try common.validationError(io, "integrated exe case={s} mode={s} exited with code {}, expected exit code {}\n", .{ case.id, case.mode, code, case.expected_exit });
+            }
+        },
         else => try common.validationError(io, "integrated exe case={s} mode={s} exited with {any}, expected exit code {}\n", .{ case.id, case.mode, result.term, case.expected_exit }),
     }
     if (!std.mem.eql(u8, result.stdout, case.expected_stdout)) {
