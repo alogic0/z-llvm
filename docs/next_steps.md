@@ -54,8 +54,12 @@ Current operating note recorded 2026-07-10:
   `rcx` clobber before RHS spill64 reload. INBOX-6 is acknowledged: the fixed
   machine-layer frame-slot namespace cap is removed by making frame indexes
   data slots, while preserving the same single-frame authority invariant
-  named by INBOX-4. The real-row track remains closed through item 10 at
-  strict `--limit=100`, but every stop report still states both tracks.
+  named by INBOX-4. INBOX-7 is acknowledged: scalar spill locations now
+  materialize at operand use for 32-bit and 64-bit operands through the single
+  value-location map, moving the parked `__udivei5` retry to the next
+  fail-closed selector frontier. The real-row track remains closed through
+  item 10 at strict `--limit=100`, but every stop report still states both
+  tracks.
 - Real-row track status: strict `distribution-real-rows --strict --limit=100`
   is green in ReleaseFast, ReleaseSafe, and ReleaseSmall, and
   `distribution-all` enforces that strict limit. Selector-v2 ReleaseFast
@@ -91,12 +95,11 @@ Current operating note recorded 2026-07-10:
   `max_spill_slots_needed=15`, `max_spill_slots_over_envelope=9`,
   `first_exceed_block=Then9.prol`, `first_exceed_boundary=live_out`,
   `first_exceed_live_values=13`, and `first_exceed_spill_slots_needed=7`.
-  This cycle retried the parked `__udivei5` row after replacing the fixed
-  frame-slot enum namespace with data-backed frame indexes and sizing spill
-  reservation from the allocation plan; Debug compiler_rt report-all remains
-  443 selected / 130 emitting / 313 failing, with first failure still
+  This cycle retried the parked `__udivei5` row after scalar spill-location
+  consumption at operand use; Debug compiler_rt report-all remains 443
+  selected / 130 emitting / 313 failing, with first failure still
   `compiler_rt.udivmodei4.__udivei5` but now at `no_emitter` /
-  `composed-block-spill-loc`.
+  `composed-block-zext-width`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -119,8 +122,10 @@ Current operating note recorded 2026-07-10:
   `tmp/zig_integrated_exe_i128_arithmetic.log` and
   `tmp/distribution_all_after_multi3_single_frame.log`. Current INBOX-5
   hardening logs are `tmp/zig_integrated_exe_i128_arithmetic_inbox5.log` and
-  `tmp/distribution_all_after_inbox5.log`. The current parked-boundary retry
-  log is `tmp/std_debug_hello_debug_udivei5_frameindex_data_retry.log`.
+  `tmp/distribution_all_after_inbox5.log`. Current INBOX-7 validation logs are
+  `tmp/zig_integrated_exe_i128_arithmetic_inbox7.log` and
+  `tmp/distribution_all_after_inbox7.log`. The current parked-boundary retry
+  log is `tmp/std_debug_hello_debug_udivei5_spill_loc_retry3.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
@@ -134,10 +139,14 @@ Current operating note recorded 2026-07-10:
   `docs/evidence/distribution_all_after_inbox5.summary`. Current
   parked-boundary retry evidence is
   `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary`.
+  Current INBOX-7 gate evidence is
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox7.summary` and
+  `docs/evidence/distribution_all_after_inbox7.summary`.
 - Recommended next action: continue `compiler_rt.udivmodei4.__udivei5` at the
-  `composed-block-spill-loc` frontier exposed after the corrected frame
+  `composed-block-zext-width` frontier exposed after the corrected frame
   envelope, pointer-phi retry, assume no-op, exact intByteSize helper-call
-  lowering, and data-backed frame-slot retry, then retry
+  lowering, data-backed frame-slot retry, and scalar spill-location
+  consumption, then retry
   `compiler_rt.udivmodei4.__umodei4` under the same frame model before
   resuming remaining integer-helper rows in rank order; keep the intervening
   `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and `__udivti3`
