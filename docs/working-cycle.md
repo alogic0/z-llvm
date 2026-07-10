@@ -94,6 +94,29 @@ Prefer goals in this order:
 Do not choose docs-only work while clear implementation debt remains.
 Do not bundle unrelated goals into one commit.
 
+## Inbox Wait
+
+When you would otherwise stop to wait for a decision — a blocker recorded,
+an escalation raised, or no actionable goal — do not end immediately:
+
+1.  First record the full stop state in `docs/next_steps.md` as usual, so
+    nothing is lost if the session ends during the wait.
+2.  Then enter a bounded inbox wait: capture a checksum of
+    `docs/worker_inbox.md`, and poll it read-only with short shell sleeps
+    (30-60 seconds per check, each poll command well within your command
+    timeout — repeated short checks, never one long sleep) for up to 30
+    minutes total.
+3.  If the file changes, re-read it. A new or amended Active entry that
+    addresses your situation resumes the cycle loop immediately;
+    acknowledge it as usual. An entry that does not address it means keep
+    waiting out the remainder of the bound.
+4.  If the bound expires without a relevant entry, end normally — the stop
+    state is already recorded and the next session resumes from it.
+
+Polling is read-only; never edit the inbox. The wait bound exists because
+an idle session cannot be woken after its turn ends — a stop after a
+bounded wait is normal, not a failure.
+
 ## Reference Policy
 
 This file controls worker goal selection and cycle mechanics. For detailed
