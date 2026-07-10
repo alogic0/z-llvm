@@ -1,7 +1,7 @@
 const core = @import("zig_air_model_base.zig");
 const std = @import("std");
 const untyped = @import("zig_air_model_error_union_untyped.zig");
-const typed_recognizers = @import("zig_air_model_typed_recognizers.zig");
+const typed_recognizers_impl = @import("zig_air_model_typed_recognizers_impl.zig");
 const air_export = @import("zig_air_export.zig");
 const air_text = @import("zig_air_text.zig");
 
@@ -46,13 +46,13 @@ pub const errorSwitchSummary = untyped.errorSwitchSummary;
 pub const selectedErrorSwitchShape = untyped.selectedErrorSwitchShape;
 pub const errorClassifySummary = untyped.errorClassifySummary;
 pub const selectedErrorClassifyShape = untyped.selectedErrorClassifyShape;
-pub const typedErrorSwitchSummary = typed_recognizers.typedErrorSwitchSummary;
-pub const typedErrorClassifierSummary = typed_recognizers.typedErrorClassifierSummary;
-pub const typedErrorUnionPayloadSummary = typed_recognizers.typedErrorUnionPayloadSummary;
-pub const typedErrorUnionFlow = typed_recognizers.typedErrorUnionFlow;
-pub const typedErrorUnionFlowDiagnosticName = typed_recognizers.typedErrorUnionFlowDiagnosticName;
-pub const typedMaybeErrorSummary = typed_recognizers.typedMaybeErrorSummary;
-pub const typedLoopTrySummary = typed_recognizers.typedLoopTrySummary;
+pub const typedErrorSwitchSummary = typed_recognizers_impl.typedErrorSwitchSummary;
+pub const typedErrorClassifierSummary = typed_recognizers_impl.typedErrorClassifierSummary;
+pub const typedErrorUnionPayloadSummary = typed_recognizers_impl.typedErrorUnionPayloadSummary;
+pub const typedErrorUnionFlow = typed_recognizers_impl.typedErrorUnionFlow;
+pub const typedErrorUnionFlowDiagnosticName = typed_recognizers_impl.typedErrorUnionFlowDiagnosticName;
+pub const typedMaybeErrorSummary = typed_recognizers_impl.typedMaybeErrorSummary;
+pub const typedLoopTrySummary = typed_recognizers_impl.typedLoopTrySummary;
 
 pub fn typedErrorNameSummary(instruction: air_export.TypedInstruction) ?TypedErrorNameSummary {
     if (!std.mem.eql(u8, instruction.opcode, "error_name")) return null;
