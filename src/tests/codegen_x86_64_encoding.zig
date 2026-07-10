@@ -85,6 +85,33 @@ test "x86_64 encoding sizes i64 add before direct call relocation" {
     }, bytes);
 }
 
+test "x86_64 encoding emits imul arg64 by rax" {
+    var machine = codegen.x86_64.MachineFunction.init("imul_rax", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .imul_arg64_rax = .rdx });
+    try machine.instructions.append(std.testing.allocator, .{ .imul_arg64_rax = .r8 });
+    try machine.instructions.append(std.testing.allocator, .{ .imul_rax_arg64 = .rsi });
+    try machine.instructions.append(std.testing.allocator, .{ .imul_rax_arg64 = .r9 });
+    try machine.instructions.append(std.testing.allocator, .{ .imul_rax_rsp = .slot10 });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .imul_arg64_rax = .rdx }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .imul_arg64_rax = .r8 }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .imul_rax_arg64 = .rsi }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .imul_rax_arg64 = .r9 }));
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .imul_rax_rsp = .slot10 }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x0f, 0xaf, 0xd0,
+        0x4c, 0x0f, 0xaf, 0xc0,
+        0x48, 0x0f, 0xaf, 0xc6,
+        0x49, 0x0f, 0xaf, 0xc1,
+        0x48, 0x0f, 0xaf, 0x44,
+        0x24, 0x28, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding sizes nonzero frame spill slots" {
     var machine = codegen.x86_64.MachineFunction.init("frame_slots", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

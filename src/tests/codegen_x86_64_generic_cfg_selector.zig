@@ -1297,10 +1297,10 @@ test "generic cfg selector composes parity i64 through assigned scratch register
     }
 
     try std.testing.expectEqual(@as(usize, 20), machine.instructions.items.len);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shr_arg64_imm6 = .{ .reg = .rcx, .amount = 32 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rsi, .src = .rdi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shr_arg64_imm6 = .{ .reg = .rsi, .amount = 32 } }, machine.instructions.items[1]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .binary_arg_rax = .{ .op = .xor, .reg = .rdi } }, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rax_to_arg = .rcx }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rax_to_arg = .rdi }, machine.instructions.items[4]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.shr_eax_cl, machine.instructions.items[16]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[19]);
 }

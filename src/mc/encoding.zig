@@ -76,6 +76,9 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .binary_arg_rax => |binary| try encodeRegToRax64Binary(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .sbb_arg64_rax => |reg| try encodeRegToRax64Binary(&bytes, allocator, 0x19, reg),
             .imul_arg64_arg64 => |imul| try encodeImulReg64Reg64(&bytes, allocator, imul.dst, imul.src),
+            .imul_arg64_rax => |dst| try encodeImulReg64Rax(&bytes, allocator, dst),
+            .imul_rax_arg64 => |src| try encodeImulRaxReg64(&bytes, allocator, src),
+            .imul_rax_rsp => |frame_index| try encodeImulRaxFrameSlot(&bytes, allocator, frame_index),
             .xor_edx_edx => try bytes.appendSlice(allocator, &.{ 0x31, 0xd2 }),
             .div_arg64 => |reg| try encodeDivReg64(&bytes, allocator, reg),
             .add_arg64_rax => |reg| try encodeRegToRax64Binary(&bytes, allocator, 0x01, reg),
@@ -1549,6 +1552,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .binary_arg_rax => |binary| if (binary.reg.rexR()) 4 else 3,
         .sbb_arg64_rax => |reg| if (reg.rexR()) 4 else 3,
         .imul_arg64_arg64 => 4,
+        .imul_arg64_rax, .imul_rax_arg64 => 4,
+        .imul_rax_rsp => 6,
         .xor_edx_edx => 2,
         .div_arg64 => |reg| if (reg.rexB()) 4 else 3,
         .add_arg64_rax => 3,
@@ -2036,6 +2041,26 @@ fn encodeImulReg64Reg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator,
     try bytes.append(allocator, rex);
     try bytes.appendSlice(allocator, &.{ 0x0f, 0xaf });
     try bytes.append(allocator, 0xc0 | (@as(u8, dst.lowCode()) << 3) | @as(u8, src.lowCode()));
+}
+
+fn encodeImulReg64Rax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: x86_64.ArgReg) !void {
+    var rex: u8 = 0x48;
+    if (dst.rexR()) rex |= 0x04;
+    try bytes.append(allocator, rex);
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0xaf });
+    try bytes.append(allocator, 0xc0 | (@as(u8, dst.lowCode()) << 3));
+}
+
+fn encodeImulRaxReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, src: x86_64.ArgReg) !void {
+    var rex: u8 = 0x48;
+    if (src.rexB()) rex |= 0x01;
+    try bytes.append(allocator, rex);
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0xaf });
+    try bytes.append(allocator, 0xc0 | @as(u8, src.lowCode()));
+}
+
+fn encodeImulRaxFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, frame_index: x86_64.FrameIndex) !void {
+    try bytes.appendSlice(allocator, &.{ 0x48, 0x0f, 0xaf, 0x44, 0x24, frameSlotDisp(frame_index) });
 }
 
 fn encodeAddReg64Imm32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, imm: i32) !void {
