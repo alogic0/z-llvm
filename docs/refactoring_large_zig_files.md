@@ -33,6 +33,22 @@ extern declarations, and roadmap evidence refers to it as one corpus. Revisit
 this exception only if the frontier harness gains an explicit multi-file
 fixture boundary.
 
+## Capability-First Cadence
+
+Large-file refactoring is interlude work while the convergence roadmap has an
+active capability chain. Complete and commit a capability slice before taking
+a refactor interlude, then apply these limits:
+
+- At most one file split per completed capability slice.
+- Split only a file touched by that capability work.
+- Do not pause a failing real-row or real-program chain for a repository-wide
+  size pass.
+- Resume the capability queue immediately after the split is committed green.
+
+The working-cycle goal selector and active worker inbox take precedence over
+the size audit. The patterns in this guide still control how an allowed split
+is performed.
+
 ## Audit Command
 
 Use this command to find the largest Zig files:
