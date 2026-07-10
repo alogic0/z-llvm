@@ -82,3 +82,14 @@ pub const pair_a: RegPair = .{ .lo = .rcx, .hi = .rdx };
 pub const pair_b: RegPair = .{ .lo = .r8, .hi = .r9 };
 pub const selector_allocatable_regs = [_]ArgReg{ .rdi, .rsi, .rdx, .rcx, .r8, .r9 };
 pub const selector_allocatable_pairs = [_]RegPair{ pair_a, pair_b };
+
+pub fn argRegIndex(reg: ArgReg) usize {
+    return switch (reg) {
+        .rdi => 0,
+        .rsi => 1,
+        .rdx => 2,
+        .rcx => 3,
+        .r8 => 4,
+        .r9 => 5,
+    };
+}
