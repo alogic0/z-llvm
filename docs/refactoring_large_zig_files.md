@@ -26,6 +26,13 @@ Explicit exclusion: do not refactor
 generated Unicode property table, so ownership belongs to the generator and its
 consumer rather than to manual module splitting.
 
+Keep `test/zig/frontier/frontier_sysv_abi.zig` as one source fixture even when
+it exceeds the usual size target. The frontier harness compiles it as one
+translation unit, its exported cases intentionally share ABI type aliases and
+extern declarations, and roadmap evidence refers to it as one corpus. Revisit
+this exception only if the frontier harness gains an explicit multi-file
+fixture boundary.
+
 ## Audit Command
 
 Use this command to find the largest Zig files:
