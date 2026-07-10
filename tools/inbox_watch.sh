@@ -41,6 +41,7 @@ nudge() {
   # Target the exact window.pane, not the session: a bare session target
   # would type into whatever window is currently active.
   tmux send-keys -t "$TARGET" -l "$MESSAGE"
+  sleep 2
   tmux send-keys -t "$TARGET" Enter
   log "nudged tmux pane '$TARGET'"
 }
