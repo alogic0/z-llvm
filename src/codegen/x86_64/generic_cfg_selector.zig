@@ -2,36 +2,31 @@ const std = @import("std");
 const ir = @import("../../ir.zig");
 const x86_64_machine = @import("machine.zig");
 const x86_64_types = @import("types.zig");
+const inspection = @import("generic_cfg/inspection.zig");
 const legacy_lowering = @import("generic_cfg/legacy_lowering.zig");
+const selector_types = @import("generic_cfg/selector_types.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
 const FrameIndex = x86_64_types.FrameIndex;
 const MachineBinaryOp = x86_64_types.MachineBinaryOp;
+const PairSpillLoc = selector_types.PairSpillLoc;
+const RegPair = selector_types.RegPair;
+const StackArrayLoc = selector_types.StackArrayLoc;
+const StackPtrLoc = selector_types.StackPtrLoc;
+const ValueBinding = selector_types.ValueBinding;
+const ValueLoc = selector_types.ValueLoc;
+const VirtualReg = selector_types.VirtualReg;
+const VirtualRegClass = selector_types.VirtualRegClass;
+const VirtualRegMetadata = selector_types.VirtualRegMetadata;
+const pair_a = selector_types.pair_a;
+const pair_b = selector_types.pair_b;
+const selector_allocatable_pairs = selector_types.selector_allocatable_pairs;
+const selector_allocatable_regs = selector_types.selector_allocatable_regs;
 
-pub const Diagnostic = union(enum) {
-    unsupported_control_flow: []const u8,
-    unsupported_instruction: []const u8,
-    unsupported_type: []const u8,
-    unsupported_value: []const u8,
-    no_spill_envelope: []const u8,
-    no_emitter: []const u8,
-
-    pub fn tagName(diagnostic: Diagnostic) []const u8 {
-        return @tagName(diagnostic);
-    }
-
-    pub fn detail(diagnostic: Diagnostic) []const u8 {
-        return switch (diagnostic) {
-            inline else => |detail_text| detail_text,
-        };
-    }
-};
-
-pub const SelectionResult = union(enum) {
-    selected,
-    unsupported: Diagnostic,
-};
+pub const Diagnostic = inspection.Diagnostic;
+pub const SelectionResult = inspection.SelectionResult;
+pub const inspectFunction = inspection.inspectFunction;
 
 pub const StageTwoSummary = struct {
     blocks: usize,
@@ -1078,68 +1073,6 @@ fn successors(block: ir.BasicBlock) !BlockSuccessors {
     };
     return result;
 }
-
-const ValueLoc = union(enum) {
-    arg32: ArgReg,
-    arg64: ArgReg,
-    arg128: RegPair,
-    eax,
-    rax,
-    scratch32: ArgReg,
-    scratch64: ArgReg,
-    scratch128: RegPair,
-    stack64: u32,
-    stack128: u32,
-    stack128_value: u32,
-    stack_i32_array: StackArrayLoc,
-    stack_i32_ptr: StackPtrLoc,
-    spill64: FrameIndex,
-    spill128: PairSpillLoc,
-};
-
-const VirtualRegClass = enum {
-    gpr32,
-    gpr64,
-    gpr128,
-    stack_object,
-    stack_pointer,
-};
-
-const VirtualReg = struct {
-    index: usize,
-    class: VirtualRegClass,
-    bits: u16,
-};
-
-const ValueBinding = struct {
-    vreg: VirtualReg,
-    loc: ValueLoc,
-};
-
-const VirtualRegMetadata = struct {
-    class: VirtualRegClass,
-    bits: u16,
-};
-
-const PairSpillLoc = struct {
-    lo: FrameIndex,
-    hi: FrameIndex,
-};
-
-const StackArrayLoc = struct {
-    base_disp: u32,
-    len: u32,
-};
-
-const StackPtrLoc = struct {
-    disp: u32,
-    index: ?StackIndexLoc = null,
-};
-
-const StackIndexLoc = struct {
-    reg: ArgReg,
-    name: []const u8,
-};
 
 const ComposedBlockSelector = struct {
     allocator: std.mem.Allocator,
@@ -4315,24 +4248,6 @@ fn phiIncomingFrom(phi: ir.PhiInst, predecessor: []const u8) ?ir.PhiIncoming {
     return null;
 }
 
-const RegPair = struct {
-    lo: ArgReg,
-    hi: ArgReg,
-
-    fn eql(pair: RegPair, other: RegPair) bool {
-        return pair.lo == other.lo and pair.hi == other.hi;
-    }
-
-    fn contains(pair: RegPair, reg: ArgReg) bool {
-        return pair.lo == reg or pair.hi == reg;
-    }
-};
-
-const pair_a: RegPair = .{ .lo = .rcx, .hi = .rdx };
-const pair_b: RegPair = .{ .lo = .r8, .hi = .r9 };
-const selector_allocatable_regs = [_]ArgReg{ .rdi, .rsi, .rdx, .rcx, .r8, .r9 };
-const selector_allocatable_pairs = [_]RegPair{ pair_a, pair_b };
-
 fn tryLowerComposedBlock(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -4533,164 +4448,6 @@ fn argRegIndex(reg: ArgReg) usize {
         .r8 => 4,
         .r9 => 5,
     };
-}
-
-pub fn inspectFunction(function: ir.Function) SelectionResult {
-    if (function.calling_conv != null) {
-        return unsupported(.{ .unsupported_control_flow = "non-default-calling-convention" });
-    }
-    if (!isScalarReturnType(function.ret_ty)) {
-        return unsupported(.{ .unsupported_type = "unsupported-return-type" });
-    }
-    for (function.params.items) |param| {
-        if (!isSelectorScalarType(param.ty)) {
-            return unsupported(.{ .unsupported_type = "unsupported-param-type" });
-        }
-    }
-
-    for (function.blocks.items) |block| {
-        for (block.instructions.items) |instruction| {
-            if (instruction.removed) continue;
-            if (inspectInstruction(instruction)) |diagnostic| {
-                return unsupported(diagnostic);
-            }
-        }
-        const terminator = block.terminator orelse {
-            return unsupported(.{ .unsupported_control_flow = "missing-terminator" });
-        };
-        if (inspectTerminator(terminator)) |diagnostic| {
-            return unsupported(diagnostic);
-        }
-    }
-
-    return unsupported(.{ .no_emitter = "selector-skeleton-has-no-emitters" });
-}
-
-fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
-    return switch (instruction.kind) {
-        .binary => |binary| inspectBinary(binary),
-        .cast => |cast| inspectCast(cast),
-        .icmp => |icmp| inspectIcmp(icmp),
-        .select => |select| inspectSelect(select),
-        .alloca => |alloca| if (isSelectorScalarType(alloca.allocated_ty) or parseI32ArrayType(alloca.allocated_ty) != null) null else .{ .unsupported_type = "alloca" },
-        .load => |load| if (isSelectorScalarType(load.ty)) null else .{ .unsupported_type = "load" },
-        .store => |store| if (isSelectorScalarType(store.ty)) null else .{ .unsupported_type = "store" },
-        .gep => null,
-        .call => |call| inspectCall(call),
-        .phi => |phi| if (isSelectorScalarType(phi.ty)) null else .{ .unsupported_type = "phi" },
-        .freeze => |freeze| if (isSelectorScalarType(freeze.ty)) null else .{ .unsupported_type = "freeze" },
-        .fcmp => .{ .unsupported_instruction = "fcmp" },
-        .atomicrmw => .{ .unsupported_instruction = "atomicrmw" },
-        .cmpxchg => .{ .unsupported_instruction = "cmpxchg" },
-        .fence => .{ .unsupported_instruction = "fence" },
-        .extractelement => .{ .unsupported_instruction = "extractelement" },
-        .insertelement => .{ .unsupported_instruction = "insertelement" },
-        .shufflevector => .{ .unsupported_instruction = "shufflevector" },
-        .extractvalue => |extract| inspectExtractValue(extract),
-        .insertvalue => .{ .unsupported_instruction = "insertvalue" },
-    };
-}
-
-fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
-    if (!isSelectorScalarType(binary.ty)) return .{ .unsupported_type = "binary" };
-    return switch (binary.op) {
-        .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
-        .udiv, .sdiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
-        .fadd, .fsub, .fmul, .fdiv, .frem => .{ .unsupported_instruction = @tagName(binary.op) },
-    };
-}
-
-fn inspectCast(cast: ir.CastInst) ?Diagnostic {
-    if (!isSelectorScalarType(cast.from_ty) or !isSelectorScalarType(cast.to_ty)) {
-        return .{ .unsupported_type = "cast" };
-    }
-    return switch (cast.op) {
-        .trunc, .zext, .sext, .bitcast, .ptrtoint, .inttoptr => null,
-        .fpext, .fptrunc, .fptosi, .fptoui, .sitofp, .uitofp => .{ .unsupported_instruction = @tagName(cast.op) },
-    };
-}
-
-fn inspectIcmp(icmp: ir.IcmpInst) ?Diagnostic {
-    if (!isSelectorScalarType(icmp.operand_ty)) return .{ .unsupported_type = "icmp" };
-    return null;
-}
-
-fn inspectSelect(select: ir.SelectInst) ?Diagnostic {
-    if (!isSelectorScalarType(select.ty)) return .{ .unsupported_type = "select" };
-    return switch (select.cond_ty) {
-        .int => |bits| if (bits == 1) null else .{ .unsupported_type = "select-cond" },
-        else => .{ .unsupported_type = "select-cond" },
-    };
-}
-
-fn inspectCall(call: ir.CallInst) ?Diagnostic {
-    if (call.inline_asm != null) return .{ .unsupported_instruction = "inline-asm-call" };
-    if (call.callee_value != null) return .{ .unsupported_value = "indirect-call" };
-    if (call.raw_args != null) return .{ .unsupported_instruction = "raw-call-args" };
-    if (call.operand_bundle != null) return .{ .unsupported_instruction = "operand-bundle-call" };
-    if (call.isDebugVariableLocation()) return null;
-    if (std.mem.eql(u8, call.callee, "llvm.assume")) {
-        if (call.ret_ty != .void or call.args.items.len != 1) return .{ .unsupported_instruction = "llvm.assume" };
-        return if (call.args.items[0].ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "llvm.assume" };
-    }
-    if (isOverflowIntrinsic(call.callee)) {
-        if (!call.ret_ty.eql(.{ .aggregate = "{ i64, i1 }" }) or call.args.items.len != 2) {
-            return .{ .unsupported_type = "overflow-intrinsic" };
-        }
-        for (call.args.items) |arg| {
-            if (!arg.ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "overflow-intrinsic-arg" };
-        }
-        return null;
-    }
-    if (!isScalarReturnType(call.ret_ty)) return .{ .unsupported_type = "call-ret" };
-    for (call.args.items) |arg| {
-        if (!isSelectorScalarType(arg.ty)) return .{ .unsupported_type = "call-arg" };
-    }
-    return null;
-}
-
-fn inspectExtractValue(extract: ir.ExtractValueInst) ?Diagnostic {
-    if (!extract.aggregate_ty.eql(.{ .aggregate = "{ i64, i1 }" })) {
-        return .{ .unsupported_type = "extractvalue-aggregate" };
-    }
-    if (std.mem.eql(u8, extract.indices, "0")) {
-        return if (extract.result_ty.eql(.{ .int = 64 })) null else .{ .unsupported_type = "extractvalue-result" };
-    }
-    if (std.mem.eql(u8, extract.indices, "1")) {
-        return if (extract.result_ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "extractvalue-result" };
-    }
-    return .{ .unsupported_value = "extractvalue-index" };
-}
-
-fn inspectTerminator(terminator: ir.Terminator) ?Diagnostic {
-    return switch (terminator) {
-        .ret => |ret| if (isScalarReturnType(ret.ty)) null else .{ .unsupported_type = "ret" },
-        .br => null,
-        .condbr => |condbr| switch (condbr.cond_ty) {
-            .int => |bits| if (bits == 1) null else .{ .unsupported_type = "condbr" },
-            else => .{ .unsupported_type = "condbr" },
-        },
-        .@"switch" => .{ .unsupported_control_flow = "switch" },
-        .indirectbr => .{ .unsupported_control_flow = "indirectbr" },
-        .@"unreachable" => .{ .unsupported_control_flow = "unreachable" },
-    };
-}
-
-fn isScalarReturnType(ty: ir.Type) bool {
-    return ty == .void or isSelectorScalarType(ty);
-}
-
-fn isSelectorScalarType(ty: ir.Type) bool {
-    return switch (ty) {
-        .int => |bits| bits > 0 and bits <= 128,
-        .ptr => true,
-        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
-    };
-}
-
-fn isOverflowIntrinsic(callee: []const u8) bool {
-    return std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i64") or
-        std.mem.eql(u8, callee, "llvm.usub.with.overflow.i64");
 }
 
 fn unsupported(diagnostic: Diagnostic) SelectionResult {
