@@ -896,6 +896,70 @@ test "generic cfg selector composes i64 unsigned quotient through assigned regis
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
 }
 
+test "generic cfg selector composes i64 low32 mask through zero-extending eax" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @mask64(i64 %x) {
+        \\entry:
+        \\  %masked = and i64 %x, 4294967295
+        \\  ret i64 %masked
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("mask64", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .and_eax_imm32 = -1 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}
+
+test "generic cfg selector composes i64 immediate left shift through rax" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @shift64(i64 %x) {
+        \\entry:
+        \\  %shifted = shl i64 %x, 32
+        \\  ret i64 %shifted
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("shift64", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shl_rax_imm6 = 32 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}
+
 test "generic cfg selector composes i64 unsigned remainder through assigned registers" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

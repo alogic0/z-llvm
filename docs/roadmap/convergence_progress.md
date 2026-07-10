@@ -1898,6 +1898,21 @@ One line per completed cycle, append-only, newest last. This is the
   `shape_recognizer_functions` is unchanged. Evidence
   `tmp/std_debug_hello_debug_expired_plan_reuse.log`; distribution-all proof
   `tmp/distribution_all_after_expired_plan_reuse.log`.
+- 2026-07-09 (this commit) Item 15 composed i64 immediate bit-assembly slice:
+  the block-local selector now lowers the model-owned i64 low-32 mask form
+  `and i64 x, 0xffffffff` through the zero-extending `and eax, imm32`
+  encoding, and the adjacent `shl i64 x, imm6` form through the existing
+  `shl rax, imm6` machine instruction. Other i64 immediate bitwise masks and
+  unsupported shift amounts remain fail-closed. The nine composed rows remain
+  the regression set, and Debug std-hello compiler_rt report-all stayed at
+  443 selected, 129 emitted, and 314 failed; `compiler_rt.mulXi3.__multi3`
+  remains the allocator acceptance row. Item-15 accounting remains
+  composed-selection rows 9, terminal-template rows 17, stage-two-boundary rows
+  2, open integer-helper fallback candidates 33, and one allocator acceptance
+  row pending. Recognizer count still 1 (no new recognizer reorder or
+  pre-pass); `shape_recognizer_functions` is unchanged. Evidence
+  `tmp/std_debug_hello_debug_i64_immediate_bit_assembly.log`; distribution-all
+  proof `tmp/distribution_all_after_i64_immediate_bit_assembly.log`.
 
 ## Ratchet State
 

@@ -1479,6 +1479,13 @@ const ComposedBlockSelector = struct {
                 }
             },
             .shl => {
+                if (bits == 64) {
+                    const amount = try shiftAmount6(rhs);
+                    try selector.emitValueIntoRax(binary.lhs);
+                    if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shl_rax_imm6 = amount });
+                    try selector.bindRax(result_name);
+                    return null;
+                }
                 if (bits > 32) return .{ .no_emitter = "composed-block-shl-imm-width" };
                 const amount = try shiftAmount5(rhs);
                 const lhs_loc = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
@@ -1512,6 +1519,12 @@ const ComposedBlockSelector = struct {
                 if (try selector.spillValue(result_name)) |diagnostic| return diagnostic;
             },
             .@"and" => {
+                if (bits == 64 and rhs == std.math.maxInt(u32)) {
+                    try selector.emitValueIntoRax(binary.lhs);
+                    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = try i32BitPattern(rhs) });
+                    try selector.bindRax(result_name);
+                    return null;
+                }
                 if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
                 try selector.emitValueIntoEax(binary.lhs);
                 try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = try i32Value(rhs) });
@@ -3439,6 +3452,12 @@ fn shiftAmount7(value: i128) !u7 {
 fn i32Value(value: i128) !i32 {
     if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
     return @intCast(value);
+}
+
+fn i32BitPattern(value: i128) !i32 {
+    if (value < std.math.minInt(i32) or value > std.math.maxInt(u32)) return error.UnsupportedCodegenValue;
+    if (value < 0) return @intCast(value);
+    return @bitCast(@as(u32, @intCast(value)));
 }
 
 fn i64Value(value: i128) !i64 {
