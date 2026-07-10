@@ -1666,7 +1666,10 @@ const ComposedBlockSelector = struct {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         const from_bits = intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-block-cast-from-not-int" };
         const to_bits = intBits(cast.to_ty) orelse return .{ .no_emitter = "composed-block-cast-to-not-int" };
-        if (from_bits > 128 or to_bits > 64) return .{ .no_emitter = "composed-block-cast-width" };
+        if (from_bits > 128) return .{ .no_emitter = "composed-block-cast-width" };
+        if (to_bits > 64 and !(cast.op == .zext and from_bits == 64 and to_bits == 128)) {
+            return .{ .no_emitter = "composed-block-cast-width" };
+        }
 
         switch (cast.op) {
             .trunc, .bitcast => {
@@ -1690,6 +1693,12 @@ const ComposedBlockSelector = struct {
                 }
             },
             .zext => {
+                if (from_bits == 64 and to_bits == 128) {
+                    try selector.emitValueIntoScratch(cast.value, pair_b.lo, 64);
+                    try selector.emitZeroArg64(pair_b.hi);
+                    try selector.bindPairScratch(result_name, pair_b);
+                    return null;
+                }
                 if (to_bits > 32) return .{ .no_emitter = "composed-block-zext-width" };
                 try selector.emitValueIntoEax(cast.value);
                 if (from_bits < 32) {
@@ -2959,6 +2968,7 @@ const ComposedBlockSelector = struct {
     }
 
     fn emitZeroArg64(selector: *ComposedBlockSelector, reg: ArgReg) !void {
+        selector.invalidateScratchContaining(reg);
         selector.invalidatePairContaining(reg);
         switch (reg) {
             .rdx => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rdx = 0 }),
