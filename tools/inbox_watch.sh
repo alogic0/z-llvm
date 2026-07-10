@@ -76,12 +76,16 @@ if command -v inotifywait >/dev/null; then
   # replace the inode and would silently kill a file-level watch.
   DIR=$(dirname "$INBOX")
   BASE=$(basename "$INBOX")
-  log "watching $INBOX via inotifywait, target tmux session '$SESSION'"
-  while EV=$(inotifywait -q -e close_write -e moved_to --format '%f' "$DIR"); do
+  log "watching $INBOX via inotifywait -m, target tmux session '$SESSION'"
+  # Monitor mode: one long-lived watcher streaming events, so the second
+  # event of an atomic save (close_write on the temp file, then moved_to on
+  # the target) cannot land in a gap between single-shot invocations.
+  inotifywait -m -q -e close_write -e moved_to --format '%f' "$DIR" |
+  while read -r EV; do
     [ "$EV" = "$BASE" ] || continue
     handle_change
   done
-  log "fatal: inotifywait exited"
+  log "fatal: inotifywait stream ended"
   exit 1
 else
   log "inotifywait not found; polling every ${POLL_SECONDS}s"
