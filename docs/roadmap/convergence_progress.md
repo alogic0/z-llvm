@@ -1928,6 +1928,21 @@ One line per completed cycle, append-only, newest last. This is the
   pre-pass); `shape_recognizer_functions` is unchanged. Evidence
   `tmp/std_debug_hello_debug_zext64_to_i128_pair.log`; distribution-all proof
   `tmp/distribution_all_after_zext64_to_i128_pair.log`.
+- 2026-07-09 (this commit) Item 15 composed i128 lane-shift slice: the
+  block-local selector now lowers the model-owned `shl i128 x, 64` form by
+  moving the low lane into the high lane and zeroing the low lane in the
+  existing register pair; other i128 left-shift amounts remain fail-closed.
+  This composes with the prior `zext i64 -> i128` materialization for the
+  high-half construction used by `compiler_rt.mulXi3.__multi3`. The nine
+  composed rows remain the regression set, and Debug std-hello compiler_rt
+  report-all stayed at 443 selected, 129 emitted, and 314 failed;
+  `compiler_rt.mulXi3.__multi3` remains the allocator acceptance row. Item-15
+  accounting remains composed-selection rows 9, terminal-template rows 17,
+  stage-two-boundary rows 2, open integer-helper fallback candidates 33, and
+  one allocator acceptance row pending. Recognizer count still 1 (no new
+  recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
+  Evidence `tmp/std_debug_hello_debug_i128_shl64_pair.log`; distribution-all
+  proof `tmp/distribution_all_after_i128_shl64_pair.log`.
 
 ## Ratchet State
 

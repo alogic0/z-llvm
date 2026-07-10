@@ -1479,6 +1479,11 @@ const ComposedBlockSelector = struct {
                 }
             },
             .shl => {
+                if (bits == 128) {
+                    const amount = try shiftAmount7(rhs);
+                    try selector.emitPairShlImmediate(result_name, binary.lhs, amount);
+                    return null;
+                }
                 if (bits == 64) {
                     const amount = try shiftAmount6(rhs);
                     try selector.emitValueIntoRax(binary.lhs);
@@ -2887,6 +2892,16 @@ const ComposedBlockSelector = struct {
             },
             65...127 => return error.UnsupportedCodegenValue,
         }
+        try selector.bindPairScratch(result_name, dst);
+    }
+
+    fn emitPairShlImmediate(selector: *ComposedBlockSelector, result_name: []const u8, value: ir.Value, amount: u7) !void {
+        if (amount != 64) return error.UnsupportedCodegenValue;
+        const dst = selector.resolvePairValue(value) orelse return error.UnsupportedCodegenValue;
+        selector.invalidateScratchContaining(dst.hi);
+        selector.invalidatePairContaining(dst.hi);
+        if (dst.lo != dst.hi) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst.hi, .src = dst.lo } });
+        try selector.emitZeroArg64(dst.lo);
         try selector.bindPairScratch(result_name, dst);
     }
 
