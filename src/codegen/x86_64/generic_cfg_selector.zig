@@ -1628,18 +1628,50 @@ const ComposedBlockSelector = struct {
 
     fn lowerMul64(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
         const lhs = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
-        const rhs = selector.resolveValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
         const dst = switch (lhs) {
             .scratch64 => |reg| reg,
-            .arg32, .arg64, .scratch32, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-mul64-lhs" },
+            .arg64, .rax, .spill64 => selector.plannedScratch64RegForResult(result_name) orelse
+                (selector.scratch64RegForUseAvoiding(null) orelse return .{ .no_spill_envelope = "composed-block-mul64-dst" }),
+            .arg32, .scratch32, .arg128, .scratch128, .eax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-mul64-lhs" },
         };
+        selector.emitValueIntoScratch(binary.lhs, dst, 64) catch return .{ .unsupported_value = "composed-block-mul64-lhs" };
+
+        const rhs = selector.resolveValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
         const src = switch (rhs) {
             .scratch64, .arg64 => |reg| reg,
-            .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-mul64-rhs" },
+            .spill64 => blk: {
+                const reg = selector.scratch64RegForUseAvoiding(dst) orelse return .{ .no_spill_envelope = "composed-block-mul64-rhs" };
+                selector.emitValueIntoScratch(binary.rhs, reg, 64) catch return .{ .unsupported_value = "composed-block-mul64-rhs" };
+                break :blk reg;
+            },
+            .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-mul64-rhs" },
         };
         try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } });
         try selector.bindScratch(result_name, dst, 64);
         return null;
+    }
+
+    fn plannedScratch64RegForResult(selector: ComposedBlockSelector, name: []const u8) ?ArgReg {
+        const plan = selector.allocation_plan orelse return null;
+        const assignment = plan.assignment(name) orelse return null;
+        const reg = switch (assignment) {
+            .gpr64 => |reg| reg,
+            .gpr32, .gpr128, .stack_object, .stack_pointer, .spill => return null,
+        };
+        return if (selector.scratch64RegIsAvailableForUse(reg)) reg else null;
+    }
+
+    fn scratch64RegForUseAvoiding(selector: ComposedBlockSelector, avoid: ?ArgReg) ?ArgReg {
+        for (selector_allocatable_regs) |reg| {
+            if (avoid != null and reg == avoid.?) continue;
+            if (selector.scratch64RegIsAvailableForUse(reg)) return reg;
+        }
+        return null;
+    }
+
+    fn scratch64RegIsAvailableForUse(selector: ComposedBlockSelector, reg: ArgReg) bool {
+        const status = selector.regConflictStatus(reg) orelse return true;
+        return status;
     }
 
     fn lowerUnsignedDivRem64(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
@@ -3224,6 +3256,43 @@ test "generic cfg selector routes i128 trunc through planned expired register" {
     try std.testing.expectEqualStrings("lo", selector.current_scratch_names[argRegIndex(.r8)].?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
+}
+
+test "generic cfg selector materializes mul64 lhs into planned register" {
+    var machine = MachineFunction.init("planned-mul64", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("old", .{ .gpr64 = .r8 });
+    try plan.interval_ends.put("old", 1);
+    try plan.assignments.put("product", .{ .gpr64 = .r8 });
+    try plan.interval_ends.put("product", 2);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.enable_expired_plan_register_reuse = true;
+    selector.current_position = 2;
+
+    try selector.bindValueLoc("old", .{ .scratch64 = .r8 });
+    selector.current_scratch_names[argRegIndex(.r8)] = "old";
+    try selector.bindValueLoc("lhs", .{ .arg64 = .rdi });
+    try selector.bindValueLoc("rhs", .{ .arg64 = .rsi });
+
+    try selector.expireExpiredBindings();
+    const diagnostic = try selector.lowerMul64("product", .{
+        .op = .mul,
+        .ty = .{ .int = 64 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    });
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("product").?);
+    try std.testing.expectEqualStrings("product", selector.current_scratch_names[argRegIndex(.r8)].?);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .imul_arg64_arg64 = .{ .dst = .r8, .src = .rsi } }, machine.instructions.items[1]);
 }
 
 test "generic cfg selector stores scalar planned spills in deterministic frame slots" {
