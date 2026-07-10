@@ -1596,6 +1596,25 @@ const ComposedBlockSelector = struct {
                 try selector.emitPairXorInPlace(rhs, lhs);
                 try selector.bindPairScratch(result_name, rhs);
             },
+            .@"or" => {
+                const lhs_existing = selector.resolvePairValue(binary.lhs);
+                var lhs: RegPair = undefined;
+                var rhs: RegPair = undefined;
+                if (lhs_existing) |existing| {
+                    if (existing.eql(pair_b)) {
+                        lhs = selector.materializePairValue(binary.lhs, pair_a) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
+                        rhs = selector.materializePairValue(binary.rhs, pair_b) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
+                    } else {
+                        rhs = selector.materializePairValue(binary.rhs, pair_b) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
+                        lhs = selector.materializePairValue(binary.lhs, pair_a) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
+                    }
+                } else {
+                    rhs = selector.materializePairValue(binary.rhs, pair_b) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
+                    lhs = selector.materializePairValue(binary.lhs, pair_a) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
+                }
+                try selector.emitPairOrInPlace(rhs, lhs);
+                try selector.bindPairScratch(result_name, rhs);
+            },
             .sub => {
                 const lhs = selector.materializePairValue(binary.lhs, pair_b) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
                 const rhs = selector.materializePairValue(binary.rhs, pair_a) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
@@ -2955,6 +2974,11 @@ const ComposedBlockSelector = struct {
     fn emitPairXorInPlace(selector: *ComposedBlockSelector, dst: RegPair, rhs: RegPair) !void {
         try selector.emitPairLaneBinaryInto(dst.lo, .xor, dst.lo, rhs.lo);
         try selector.emitPairLaneBinaryInto(dst.hi, .xor, dst.hi, rhs.hi);
+    }
+
+    fn emitPairOrInPlace(selector: *ComposedBlockSelector, dst: RegPair, rhs: RegPair) !void {
+        try selector.emitPairLaneBinaryInto(dst.lo, .@"or", dst.lo, rhs.lo);
+        try selector.emitPairLaneBinaryInto(dst.hi, .@"or", dst.hi, rhs.hi);
     }
 
     fn emitPairSubInPlace(selector: *ComposedBlockSelector, dst: RegPair, rhs: RegPair) !void {

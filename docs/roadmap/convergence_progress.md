@@ -1943,6 +1943,22 @@ One line per completed cycle, append-only, newest last. This is the
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
   Evidence `tmp/std_debug_hello_debug_i128_shl64_pair.log`; distribution-all
   proof `tmp/distribution_all_after_i128_shl64_pair.log`.
+- 2026-07-09 (this commit) Item 15 composed i128 pair-OR slice: the
+  block-local selector now lowers the model-owned `or i128` pair form through
+  lane-wise `or` emission, with operand materialization ordered to avoid
+  clobbering overlapping SysV i128 argument registers or an already-owned
+  `pair_b` value. This covers the final high/low lane join shape in
+  `compiler_rt.mulXi3.__multi3` while unsupported pair binary operations
+  remain fail-closed. The nine composed rows remain the regression set, and
+  Debug std-hello compiler_rt report-all stayed at 443 selected, 129 emitted,
+  and 314 failed; `compiler_rt.mulXi3.__multi3` remains the allocator
+  acceptance row. Item-15 accounting remains composed-selection rows 9,
+  terminal-template rows 17, stage-two-boundary rows 2, open integer-helper
+  fallback candidates 33, and one allocator acceptance row pending. Recognizer
+  count still 1 (no new recognizer reorder or pre-pass);
+  `shape_recognizer_functions` is unchanged. Evidence
+  `tmp/std_debug_hello_debug_i128_pair_or.log`; distribution-all proof
+  `tmp/distribution_all_after_i128_pair_or.log`.
 
 ## Ratchet State
 
