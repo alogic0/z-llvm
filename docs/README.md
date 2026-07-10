@@ -200,6 +200,11 @@ Do not implement these as one giant milestone. Select one cycle, extract a
 day-sized slice into `next_steps.md` or the active next-steps file,
 then close that slice with fixtures, docs, and comparison notes.
 
+For code-layout-only work, use
+[Refactoring Large Zig Files](refactoring_large_zig_files.md) as the local
+guide for reducing oversized `.zig` files without mixing behavior changes into
+mechanical splits.
+
 ## Optimizer Parity Rule
 
 Optimizer cycles use `roadmap/llvm_algorithm_parity_gap_closure_plan.md` as a
