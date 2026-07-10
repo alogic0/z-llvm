@@ -2001,6 +2001,23 @@ One line per completed cycle, append-only, newest last. This is the
   `shape_recognizer_functions` is unchanged. Evidence
   `tmp/std_debug_hello_debug_pair_shift_spill_reload.log`; distribution-all
   proof `tmp/distribution_all_after_pair_shift_spill_reload.log`.
+- 2026-07-10 (this commit) Item 15 allocator-consumption diagnostic slice: the
+  selector now reports composed `.no_emitter` diagnostics when the only
+  alternative was the generic skeleton fallback, making report-all expose the
+  actual composed boundary for skeleton rows. The same slice teaches i128
+  trunc/bitcast lowering to materialize only the low lane of planned pair
+  locations, including `spill128`, into the planned scalar destination instead
+  of rejecting allocator-assigned pair spills. This is an
+  allocator-consumption/diagnostic step, not a row closure: Debug std-hello
+  compiler_rt report-all stayed at 443 selected, 129 emitted, and 314 failed;
+  `compiler_rt.mulXi3.__multi3` moved from `composed-block-cast-width` to
+  `composed-block-unsupported-value` and remains the allocator acceptance row.
+  Item-15 accounting remains composed-selection rows 9, terminal-template rows
+  17, stage-two-boundary rows 2, open integer-helper fallback candidates 33,
+  and one allocator acceptance row pending. Recognizer count still 1 (no new
+  recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
+  Evidence `tmp/std_debug_hello_debug_i128_trunc_spill_reload.log`;
+  distribution-all proof `tmp/distribution_all_after_i128_trunc_spill_reload.log`.
 
 ## Ratchet State
 

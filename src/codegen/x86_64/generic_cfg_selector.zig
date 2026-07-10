@@ -168,7 +168,10 @@ pub fn tryLower(
     switch (try tryLowerComposedBlockFailClosed(allocator, machine, function)) {
         .selected => return .selected,
         .unsupported => |diagnostic| switch (diagnostic) {
-            .no_emitter => machine.instructions.items.len = composed_start_len,
+            .no_emitter => {
+                machine.instructions.items.len = composed_start_len;
+                if (shouldReportComposedNoEmitter(inspected)) return .{ .unsupported = diagnostic };
+            },
             else => {
                 machine.instructions.items.len = composed_start_len;
                 return .{ .unsupported = diagnostic };
@@ -176,6 +179,16 @@ pub fn tryLower(
         },
     }
     return inspected;
+}
+
+fn shouldReportComposedNoEmitter(inspected: SelectionResult) bool {
+    return switch (inspected) {
+        .selected => false,
+        .unsupported => |diagnostic| switch (diagnostic) {
+            .no_emitter => |detail| std.mem.eql(u8, detail, "selector-skeleton-has-no-emitters"),
+            .unsupported_control_flow, .unsupported_instruction, .unsupported_type, .unsupported_value, .no_spill_envelope => false,
+        },
+    };
 }
 
 fn tryLowerComposedBlockFailClosed(
@@ -1729,14 +1742,12 @@ const ComposedBlockSelector = struct {
 
         switch (cast.op) {
             .trunc, .bitcast => {
-                const loc = selector.resolveValue(cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
                 if (from_bits == 128) {
-                    const pair = switch (loc) {
-                        .arg128, .scratch128 => |pair| pair,
-                        .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-cast-width" },
-                    };
-                    try selector.bindScratch(result_name, pair.lo, 64);
+                    const dst = selector.plannedScratch64RegForResult(result_name) orelse pair_a.lo;
+                    selector.emitPairLowLaneIntoScratch(cast.value, dst) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+                    try selector.bindScratch(result_name, dst, 64);
                 } else {
+                    const loc = selector.resolveValue(cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
                     try selector.bindValueLoc(result_name, loc);
                     switch (loc) {
                         .eax => selector.current_eax_name = result_name,
@@ -2996,6 +3007,24 @@ const ComposedBlockSelector = struct {
         }
     }
 
+    fn emitPairLowLaneIntoScratch(selector: *ComposedBlockSelector, value: ir.Value, dst: ArgReg) !void {
+        switch (value) {
+            .named => {},
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        }
+        const loc = selector.resolveValue(value) orelse return error.UnsupportedCodegenValue;
+        selector.invalidateScratchContaining(dst);
+        selector.invalidatePairContaining(dst);
+        switch (loc) {
+            .arg128, .scratch128 => |pair| {
+                if (pair.lo != dst) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst, .src = pair.lo } });
+            },
+            .stack128_value => |disp| try selector.loadStackU64IntoArg(dst, disp),
+            .spill128 => |spill| try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst, .frame_index = spill.lo } }),
+            .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack64, .stack128, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
+        }
+    }
+
     fn emitPairSignMask(selector: *ComposedBlockSelector, result_name: []const u8, value: ir.Value, dst: RegPair) !void {
         const src = try selector.materializePairValue(value, dst);
         if (src.hi != dst.lo) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst.lo, .src = src.hi } });
@@ -3331,6 +3360,27 @@ test "generic cfg selector reloads spilled pair for i128 shl immediate" {
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = pair_a.hi, .frame_index = .slot8 } }, machine.instructions.items[1]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = pair_a.hi, .src = pair_a.lo } }, machine.instructions.items[2]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_imm_rcx = 0 }, machine.instructions.items[3]);
+}
+
+test "generic cfg selector reloads spilled pair for i128 trunc" {
+    var machine = MachineFunction.init("spill-pair-trunc", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+
+    try selector.bindValueLoc("wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
+    const diagnostic = try selector.lowerCast("lo", .{
+        .op = .trunc,
+        .value = .{ .named = "wide" },
+        .from_ty = .{ .int = 128 },
+        .to_ty = .{ .int = 64 },
+    });
+
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("lo").?);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = pair_a.lo, .frame_index = .slot6 } }, machine.instructions.items[0]);
 }
 
 test "generic cfg selector stores scalar planned spills in deterministic frame slots" {

@@ -103,6 +103,33 @@ test "generic cfg selector skeleton preserves recognizer fallback while opt-in" 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "generic cfg selector reports composed diagnostic over skeleton fallback" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i128 @mul128(i128 %a, i128 %b) {
+        \\entry:
+        \\  %product = mul i128 %a, %b
+        \\  ret i128 %product
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("mul128", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    const diagnostic = switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqualStrings("composed-block-pair-binary-op", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
 test "generic cfg selector stage two computes cross-block liveness" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
