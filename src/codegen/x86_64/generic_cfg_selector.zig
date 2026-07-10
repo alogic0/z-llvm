@@ -2921,8 +2921,9 @@ const ComposedBlockSelector = struct {
 
     fn emitPairLshrImmediate(selector: *ComposedBlockSelector, result_name: []const u8, value: ir.Value, amount: u7) !void {
         if (amount > 127) return error.UnsupportedCodegenValue;
-        const src = selector.resolvePairValue(value) orelse return error.UnsupportedCodegenValue;
-        const dst = selector.choosePairScratch(src);
+        const existing = selector.resolvePairValue(value);
+        const dst = if (existing) |src| selector.choosePairScratch(src) else pair_a;
+        const src = if (existing) |src| src else try selector.materializePairValue(value, dst);
         switch (amount) {
             0 => {
                 try selector.emitPairIntoScratch(src, dst);
@@ -2947,7 +2948,8 @@ const ComposedBlockSelector = struct {
 
     fn emitPairShlImmediate(selector: *ComposedBlockSelector, result_name: []const u8, value: ir.Value, amount: u7) !void {
         if (amount != 64) return error.UnsupportedCodegenValue;
-        const dst = selector.resolvePairValue(value) orelse return error.UnsupportedCodegenValue;
+        const existing = selector.resolvePairValue(value);
+        const dst = if (existing) |src| src else try selector.materializePairValue(value, pair_a);
         selector.invalidateScratchContaining(dst.hi);
         selector.invalidatePairContaining(dst.hi);
         if (dst.lo != dst.hi) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst.hi, .src = dst.lo } });
@@ -3293,6 +3295,42 @@ test "generic cfg selector materializes mul64 lhs into planned register" {
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .imul_arg64_arg64 = .{ .dst = .r8, .src = .rsi } }, machine.instructions.items[1]);
+}
+
+test "generic cfg selector reloads spilled pair for i128 lshr immediate" {
+    var machine = MachineFunction.init("spill-pair-lshr", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+
+    try selector.bindValueLoc("wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
+    try selector.emitPairLshrImmediate("shifted", .{ .named = "wide" }, 64);
+
+    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_a }, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = pair_a.lo, .frame_index = .slot6 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = pair_a.hi, .frame_index = .slot8 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = pair_a.lo, .src = pair_a.hi } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_imm_rdx = 0 }, machine.instructions.items[3]);
+}
+
+test "generic cfg selector reloads spilled pair for i128 shl immediate" {
+    var machine = MachineFunction.init("spill-pair-shl", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+
+    try selector.bindValueLoc("wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
+    try selector.emitPairShlImmediate("shifted", .{ .named = "wide" }, 64);
+
+    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_a }, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = pair_a.lo, .frame_index = .slot6 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = pair_a.hi, .frame_index = .slot8 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = pair_a.hi, .src = pair_a.lo } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_imm_rcx = 0 }, machine.instructions.items[3]);
 }
 
 test "generic cfg selector stores scalar planned spills in deterministic frame slots" {

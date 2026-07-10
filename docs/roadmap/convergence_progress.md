@@ -1987,6 +1987,20 @@ One line per completed cycle, append-only, newest last. This is the
   `shape_recognizer_functions` is unchanged. Evidence
   `tmp/std_debug_hello_debug_mul64_plan_materialize.log`; distribution-all proof
   `tmp/distribution_all_after_mul64_plan_materialize.log`.
+- 2026-07-09 (this commit) Item 15 allocator-consumption slice: 128-bit
+  immediate shift lowering now reloads planned `spill128` values through the
+  existing pair materializer before `lshr i128 ..., 64` and `shl i128 ..., 64`,
+  so allocator-assigned pair spills are consumed by composed selection instead
+  of failing at pair resolution. This is an allocator-consumption step, not a
+  row closure: Debug std-hello compiler_rt report-all stayed at 443 selected,
+  129 emitted, and 314 failed; `compiler_rt.mulXi3.__multi3` remains the
+  allocator acceptance row. Item-15 accounting remains composed-selection rows
+  9, terminal-template rows 17, stage-two-boundary rows 2, open integer-helper
+  fallback candidates 33, and one allocator acceptance row pending. Recognizer
+  count still 1 (no new recognizer reorder or pre-pass);
+  `shape_recognizer_functions` is unchanged. Evidence
+  `tmp/std_debug_hello_debug_pair_shift_spill_reload.log`; distribution-all
+  proof `tmp/distribution_all_after_pair_shift_spill_reload.log`.
 
 ## Ratchet State
 
