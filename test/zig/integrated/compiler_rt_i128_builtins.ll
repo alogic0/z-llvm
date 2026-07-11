@@ -438,6 +438,12 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_xor_i32_ones(i32 %value) {
+Entry:
+  %result = xor i32 %value, -1
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_ne_zero_i64(i64 %value) {
 Entry:
   %not_zero = icmp ne i64 %value, 0

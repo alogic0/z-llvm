@@ -2681,6 +2681,17 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_stack_i1.summary`, and
   `docs/evidence/selector_tier2_divei4_stack_i1.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
+  retry: i32 XOR with an immediate now lowers through the existing register
+  XOR operation after materializing the constant in scratch. An executable
+  all-ones inversion check proves the arithmetic result. The focused
+  `__divei4` retry advances from `composed-block-binary-imm-rhs` to
+  `composed-block-binary-width`; report-all remains 443 selected, 132 emitted,
+  and 311 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_divei4_xor_i32.summary`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_xor_i32.summary`, and
+  `docs/evidence/selector_tier2_divei4_xor_i32.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

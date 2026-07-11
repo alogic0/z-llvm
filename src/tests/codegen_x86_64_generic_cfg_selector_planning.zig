@@ -2309,6 +2309,36 @@ test "generic cfg selector composes i64 immediate or" {
     try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } });
 }
 
+test "generic cfg selector composes i32 immediate xor" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @xor_i32_imm(i32 %value) {
+        \\entry:
+        \\  %result = xor i32 %value, -1
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("xor_i32_imm", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_rcx = -1 });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .xor, .reg = .rcx } });
+}
+
 test "generic cfg selector keeps stack pointer index dependencies live" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

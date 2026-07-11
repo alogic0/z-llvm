@@ -642,6 +642,14 @@ pub const ComposedBlockSelector = struct {
                     try selector.bindEax(result_name);
                 }
             },
+            .xor => {
+                if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
+                try selector.emitValueIntoEax(binary.lhs);
+                try selector.clobberArgReg(.rcx);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i32Value(rhs) });
+                try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .xor, .reg = .rcx } });
+                try selector.bindEax(result_name);
+            },
             else => return .{ .no_emitter = "composed-block-binary-imm-rhs" },
         }
         return null;
