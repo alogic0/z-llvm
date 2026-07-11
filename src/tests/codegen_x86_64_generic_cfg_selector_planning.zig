@@ -1353,6 +1353,111 @@ test "generic cfg selector composes constant byte pointer gep" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector folds constant byte gep into stack array pointer" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_byte_gep(i64 %index, i32 %value) {
+        \\entry:
+        \\  %slot = alloca [3 x i32], align 4
+        \\  %base = getelementptr inbounds [3 x i32], ptr %slot, i64 0, i64 %index
+        \\  store i32 11, ptr %base, align 4
+        \\  %next = getelementptr i8, ptr %base, i64 4
+        \\  store i32 %value, ptr %next, align 4
+        \\  %base_value = load i32, ptr %base, align 4
+        \\  ret i32 %base_value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_byte_gep", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp32 = 256 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp32 = 260 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_rcx4_disp32_eax = 256 });
+}
+
+test "generic cfg selector composes direct local i32 element gep" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_element_gep(i64 %index, i32 %value) {
+        \\entry:
+        \\  %slot = alloca [4 x i32], align 4
+        \\  %base = getelementptr [4 x i32], ptr %slot, i64 0, i64 0
+        \\  store i32 11, ptr %base, align 4
+        \\  %element = getelementptr [4 x i8], ptr %slot, i64 %index
+        \\  store i32 %value, ptr %element, align 4
+        \\  %base_value = load i32, ptr %base, align 4
+        \\  ret i32 %base_value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_element_gep", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp32 = 256 });
+}
+
+test "generic cfg selector combines chained stack array indices" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_chained_gep(i64 %base_index, i64 %offset, i32 %value) {
+        \\entry:
+        \\  %slot = alloca [4 x i32], align 4
+        \\  %base = getelementptr inbounds [4 x i32], ptr %slot, i64 0, i64 %base_index
+        \\  store i32 11, ptr %base, align 4
+        \\  %next = getelementptr [4 x i8], ptr %base, i64 %offset
+        \\  store i32 %value, ptr %next, align 4
+        \\  %base_value = load i32, ptr %base, align 4
+        \\  ret i32 %base_value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_chained_gep", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .add_r8_rcx);
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_rcx4_disp32 = 256 });
+}
+
 test "generic cfg selector composes i64 immediate mask" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

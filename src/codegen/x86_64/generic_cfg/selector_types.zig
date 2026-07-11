@@ -76,6 +76,7 @@ pub const StackPtrLoc = struct {
 pub const StackIndexLoc = struct {
     reg: ArgReg,
     name: []const u8,
+    addend_name: ?[]const u8 = null,
 };
 
 pub const pair_a: RegPair = .{ .lo = .rcx, .hi = .rdx };

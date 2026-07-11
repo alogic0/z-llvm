@@ -165,6 +165,39 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_stack_byte_gep(i64 %index, i32 %value) {
+Entry:
+  %slot = alloca [3 x i32], align 4
+  %base = getelementptr inbounds [3 x i32], ptr %slot, i64 0, i64 %index
+  store i32 11, ptr %base, align 4
+  %next = getelementptr i8, ptr %base, i64 4
+  store i32 %value, ptr %next, align 4
+  %base_value = load i32, ptr %base, align 4
+  ret i32 %base_value
+}
+
+define dso_local i32 @zllvm_stack_chained_gep(i64 %base_index, i64 %offset, i32 %value) {
+Entry:
+  %slot = alloca [4 x i32], align 4
+  %base = getelementptr inbounds [4 x i32], ptr %slot, i64 0, i64 %base_index
+  store i32 11, ptr %base, align 4
+  %next = getelementptr [4 x i8], ptr %base, i64 %offset
+  store i32 %value, ptr %next, align 4
+  %base_value = load i32, ptr %base, align 4
+  ret i32 %base_value
+}
+
+define dso_local i32 @zllvm_stack_element_gep(i64 %index, i32 %value) {
+Entry:
+  %slot = alloca [4 x i32], align 4
+  %base = getelementptr [4 x i32], ptr %slot, i64 0, i64 0
+  store i32 11, ptr %base, align 4
+  %element = getelementptr [4 x i8], ptr %slot, i64 %index
+  store i32 %value, ptr %element, align 4
+  %base_value = load i32, ptr %base, align 4
+  ret i32 %base_value
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16

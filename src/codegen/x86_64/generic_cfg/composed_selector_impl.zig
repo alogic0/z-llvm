@@ -1088,7 +1088,7 @@ pub const ComposedBlockSelector = struct {
         if (gep.source_ty.eql(.{ .int = 8 })) return try selector.lowerBytePointerGep(result_name, gep);
         if (isI32ElementPointerSource(gep.source_ty)) return try selector.lowerI32ElementPointerGep(result_name, gep);
         const len = parseI32ArrayType(gep.source_ty) orelse return .{ .no_emitter = "composed-block-gep-source" };
-        const base = selector.resolveValue(gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
+        const base = selector.resolveValue(gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
         const stack_array = switch (base) {
             .stack_i32_array => |stack_array| stack_array,
             .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-gep-ptr" },
@@ -1109,7 +1109,6 @@ pub const ComposedBlockSelector = struct {
             },
             .named => |name| blk: {
                 try selector.emitValueIntoScratch(elem_index.value, .rcx, 64);
-                try selector.bindScratch(name, .rcx, 64);
                 break :blk StackPtrLoc{ .disp = stack_array.base_disp, .index = .{ .reg = .rcx, .name = name } };
             },
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
@@ -1125,7 +1124,37 @@ pub const ComposedBlockSelector = struct {
         if (!index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
         if (index.value != .named) return .{ .no_emitter = "composed-block-gep-index-form" };
 
-        selector.emitValueIntoScratch(gep.ptr, .rcx, 64) catch return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
+        if (selector.resolveValue(gep.ptr)) |base| switch (base) {
+            .stack_i32_array => |stack_array| {
+                selector.emitValueIntoScratch(index.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+                const index_name = switch (index.value) {
+                    .named => |name| name,
+                    else => unreachable,
+                };
+                try selector.bindValueLoc(result_name, .{ .stack_i32_ptr = .{
+                    .disp = stack_array.base_disp,
+                    .index = .{ .reg = .rcx, .name = index_name },
+                } });
+                return null;
+            },
+            .stack_i32_ptr => |stack_ptr| {
+                const stack_index = stack_ptr.index orelse return .{ .no_emitter = "composed-block-gep-ptr" };
+                if (stack_index.reg != .rcx) return .{ .no_emitter = "composed-block-gep-ptr" };
+                if (stack_index.addend_name != null) return .{ .no_emitter = "composed-block-gep-index-depth" };
+                const addend_name = switch (index.value) {
+                    .named => |name| name,
+                    else => unreachable,
+                };
+                try selector.bindValueLoc(result_name, .{ .stack_i32_ptr = .{
+                    .disp = stack_ptr.disp,
+                    .index = .{ .reg = .rcx, .name = stack_index.name, .addend_name = addend_name },
+                } });
+                return null;
+            },
+            else => {},
+        };
+
+        selector.emitValueIntoScratch(gep.ptr, .rcx, 64) catch return .{ .unsupported_value = "composed-block-unknown-i32-element-gep-ptr" };
         selector.emitValueIntoScratch(index.value, .r8, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
         try selector.machine.instructions.append(selector.allocator, .{ .shl_r8_imm6 = 2 });
         try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
@@ -1142,12 +1171,21 @@ pub const ComposedBlockSelector = struct {
         switch (index.value) {
             .int => |int| {
                 const offset = std.math.cast(i32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
-                selector.emitValueIntoScratch(gep.ptr, .rcx, 64) catch return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
+                if (selector.resolveValue(gep.ptr)) |base| switch (base) {
+                    .stack_i32_ptr => |stack_ptr| {
+                        const adjusted = std.math.add(i64, stack_ptr.disp, offset) catch return .{ .no_emitter = "composed-block-gep-index-range" };
+                        const disp = std.math.cast(u32, adjusted) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
+                        try selector.bindValueLoc(result_name, .{ .stack_i32_ptr = .{ .disp = disp, .index = stack_ptr.index } });
+                        return null;
+                    },
+                    else => {},
+                };
+                selector.emitValueIntoScratch(gep.ptr, .rcx, 64) catch return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
                 if (offset != 0) try selector.machine.instructions.append(selector.allocator, .{ .add_rcx_imm32 = offset });
                 try selector.bindScratch(result_name, .rcx, 64);
             },
             .named => {
-                selector.emitValueIntoScratch(gep.ptr, .r8, 64) catch return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
+                selector.emitValueIntoScratch(gep.ptr, .r8, 64) catch return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
                 selector.emitValueIntoScratch(index.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
                 try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
                 try selector.bindScratch(result_name, .r8, 64);
@@ -1349,6 +1387,7 @@ pub const ComposedBlockSelector = struct {
     }
 
     fn appendLoadStackI32(selector: *ComposedBlockSelector, stack_ptr: StackPtrLoc) !void {
+        try selector.materializeStackIndex(stack_ptr);
         if (stack_ptr.index != null) {
             if (stack_ptr.disp <= std.math.maxInt(u8)) {
                 try selector.machine.instructions.append(selector.allocator, .{ .load_stack_rcx4_disp8_eax = @intCast(stack_ptr.disp) });
@@ -1381,6 +1420,7 @@ pub const ComposedBlockSelector = struct {
     }
 
     fn appendStoreStackI32(selector: *ComposedBlockSelector, stack_ptr: StackPtrLoc) !void {
+        try selector.materializeStackIndex(stack_ptr);
         if (stack_ptr.index != null) {
             if (stack_ptr.disp <= std.math.maxInt(u8)) {
                 try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_rcx4_disp8 = @intCast(stack_ptr.disp) });
@@ -1391,6 +1431,15 @@ pub const ComposedBlockSelector = struct {
             try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_disp8 = @intCast(stack_ptr.disp) });
         } else {
             try selector.machine.instructions.append(selector.allocator, .{ .store_eax_stack_disp32 = stack_ptr.disp });
+        }
+    }
+
+    fn materializeStackIndex(selector: *ComposedBlockSelector, stack_ptr: StackPtrLoc) !void {
+        const index = stack_ptr.index orelse return;
+        try selector.emitValueIntoScratch(.{ .named = index.name }, .rcx, 64);
+        if (index.addend_name) |addend_name| {
+            try selector.emitValueIntoScratch(.{ .named = addend_name }, .r8, 64);
+            try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
         }
     }
 

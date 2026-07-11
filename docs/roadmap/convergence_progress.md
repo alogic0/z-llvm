@@ -2459,6 +2459,19 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_variable_i32_shifts.summary`;
   Tier 2 record `docs/evidence/selector_tier2_variable_i32_shifts.summary`.
 
+- 2026-07-11 (this commit) Item 15 parked-boundary retry: local i32 stack
+  pointers now compose constant byte offsets, direct optimized `[4 x i8]`
+  element indices, and one chained dynamic index. Stack index expressions
+  retain their SSA source names and rematerialize at each load/store; this
+  fixes the stale-map runtime defect exposed when an older pointer reused a
+  mutated `%rcx`. Executable cases prove all three forms. The focused
+  `__udivei5` retry advances from the GEP cluster to `no_emitter` /
+  `stage2-phi-dst-loc`; report-all remains 443 selected, 130 emitted, and 313
+  failed. Tier 2 is green; no ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_udivei5_local_stack_gep.summary`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_local_stack_gep.summary`;
+  Tier 2 record `docs/evidence/selector_tier2_local_stack_gep.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
