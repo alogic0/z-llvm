@@ -2465,6 +2465,36 @@ test "generic cfg selector composes pointer select" {
     try expectInstruction(machine.instructions.items, .sete_eax);
 }
 
+test "generic cfg selector reports i128 signed multiply overflow planning frontier" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i128, i1 } @llvm.smul.with.overflow.i128(i128, i128)
+        \\
+        \\define i128 @smul_overflow_i128(i128 %lhs, i128 %rhs) {
+        \\entry:
+        \\  %pair = call { i128, i1 } @llvm.smul.with.overflow.i128(i128 %lhs, i128 %rhs)
+        \\  %value = extractvalue { i128, i1 } %pair, 0
+        \\  ret i128 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("smul_overflow_i128", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| {
+            try std.testing.expectEqualStrings("unsupported_value", diagnostic.tagName());
+            try std.testing.expectEqualStrings("composed-block-unsupported-value", diagnostic.detail());
+        },
+    }
+}
+
 test "generic cfg selector keeps stack pointer index dependencies live" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

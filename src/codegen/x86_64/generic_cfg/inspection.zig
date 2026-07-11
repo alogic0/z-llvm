@@ -124,8 +124,18 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
         return if (call.args.items[0].ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "llvm.assume" };
     }
     if (isOverflowIntrinsic(call.callee)) {
-        const bits: u16 = if (std.mem.endsWith(u8, call.callee, ".i32")) 32 else 64;
-        const aggregate_ty = if (bits == 32) "{ i32, i1 }" else "{ i64, i1 }";
+        const bits: u16 = if (std.mem.endsWith(u8, call.callee, ".i32"))
+            32
+        else if (std.mem.endsWith(u8, call.callee, ".i64"))
+            64
+        else
+            128;
+        const aggregate_ty = switch (bits) {
+            32 => "{ i32, i1 }",
+            64 => "{ i64, i1 }",
+            128 => "{ i128, i1 }",
+            else => unreachable,
+        };
         if (!call.ret_ty.eql(.{ .aggregate = aggregate_ty }) or call.args.items.len != 2) {
             return .{ .unsupported_type = "overflow-intrinsic" };
         }
@@ -146,6 +156,8 @@ fn inspectExtractValue(extract: ir.ExtractValueInst) ?Diagnostic {
         32
     else if (extract.aggregate_ty.eql(.{ .aggregate = "{ i64, i1 }" }))
         64
+    else if (extract.aggregate_ty.eql(.{ .aggregate = "{ i128, i1 }" }))
+        128
     else
         return .{ .unsupported_type = "extractvalue-aggregate" };
     if (std.mem.eql(u8, extract.indices, "0")) {
@@ -186,7 +198,8 @@ fn isSelectorScalarType(ty: ir.Type) bool {
 fn isOverflowIntrinsic(callee: []const u8) bool {
     return std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i32") or
         std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i64") or
-        std.mem.eql(u8, callee, "llvm.usub.with.overflow.i64");
+        std.mem.eql(u8, callee, "llvm.usub.with.overflow.i64") or
+        std.mem.eql(u8, callee, "llvm.smul.with.overflow.i128");
 }
 
 fn parseI32ArrayType(ty: ir.Type) ?u32 {

@@ -2753,6 +2753,15 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_modei5_divei5_acceptance.summary`, and
   `docs/evidence/distribution_all_after_modei5_divei5_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
+  retry: generic CFG inspection now recognizes the exact i128 signed-multiply
+  overflow aggregate signature and its extractvalue result types. Arithmetic
+  lowering remains fail-closed. The focused `__muloti4` row advances from
+  `unsupported_type/call-ret` to `unsupported_value/stage2-unsupported-value`;
+  report-all remains 443 selected, 136 emitted, and 307 failed. Tier 1 unit
+  validation is green; no capability, tracker, or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_muloti4_overflow_inspection.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
