@@ -467,6 +467,15 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_select_ptr_eq(i32 %selector, ptr %expected, ptr %left, ptr %right) {
+Entry:
+  %cond = icmp eq i32 %selector, 0
+  %selected = select i1 %cond, ptr %left, ptr %right
+  %equal = icmp eq ptr %selected, %expected
+  %result = zext i1 %equal to i32
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_ne_zero_i64(i64 %value) {
 Entry:
   %not_zero = icmp ne i64 %value, 0

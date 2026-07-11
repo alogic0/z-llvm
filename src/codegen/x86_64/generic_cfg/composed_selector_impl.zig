@@ -662,7 +662,7 @@ pub const ComposedBlockSelector = struct {
     fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select: ir.SelectInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         if (!select.cond_ty.eql(.{ .int = 1 })) return .{ .no_emitter = "composed-block-select-cond" };
-        const bits = intBits(select.ty) orelse return .{ .no_emitter = "composed-block-select-type" };
+        const bits: u16 = if (select.ty.eql(.ptr)) 64 else intBits(select.ty) orelse return .{ .no_emitter = "composed-block-select-type" };
         if (bits != 32 and bits != 64) return .{ .no_emitter = "composed-block-select-width" };
 
         if (try selector.emitBranchCondition(select.cond)) |diagnostic| return diagnostic;

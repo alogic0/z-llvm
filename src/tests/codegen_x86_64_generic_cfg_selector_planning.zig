@@ -2432,6 +2432,39 @@ test "generic cfg selector composes signed i32 nonnegative comparison" {
     try expectInstruction(machine.instructions.items, .sete_eax);
 }
 
+test "generic cfg selector composes pointer select" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @select_ptr_eq(i32 %selector, ptr %expected, ptr %left, ptr %right) {
+        \\entry:
+        \\  %cond = icmp eq i32 %selector, 0
+        \\  %selected = select i1 %cond, ptr %left, ptr %right
+        \\  %equal = icmp eq ptr %selected, %expected
+        \\  %result = zext i1 %equal to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("select_ptr_eq", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstructionTag(machine.instructions.items, .je);
+    try expectInstruction(machine.instructions.items, .sete_eax);
+}
+
 test "generic cfg selector keeps stack pointer index dependencies live" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
