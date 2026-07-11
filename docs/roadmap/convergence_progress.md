@@ -2498,6 +2498,19 @@ One line per completed cycle, append-only, newest last. This is the
   proof `docs/evidence/zig_integrated_exe_i128_arithmetic_store_ptr_forms.summary`;
   Tier 2 record `docs/evidence/selector_tier2_store_ptr_forms.summary`.
 
+- 2026-07-11 (this commit) Item 15 parked-boundary retry: composed selects now
+  preserve accumulator-resident true operands before materializing the false
+  arm, using scratch when available and the planned frame spill otherwise.
+  Executable true/false cases prove the exact `select cond, shifted, 0` shape.
+  Escaped value errors are also reported by instruction family so the selector
+  remains fail-closed with an actionable frontier. The focused `__udivei5`
+  retry advances from opaque `stage2-unsupported-value` to `no_emitter` /
+  `composed-block-binary-imm-rhs-width`; report-all remains 443 selected, 130
+  emitted, and 313 failed. Tier 2 is green; no ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_udivei5_select_preserve.summary`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_select_preserve.summary`;
+  Tier 2 record `docs/evidence/selector_tier2_select_preserve.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

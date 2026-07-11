@@ -234,17 +234,25 @@ pub const ComposedBlockSelector = struct {
         defer selector.current_position += 1;
         return switch (instruction.kind) {
             .phi => null,
-            .binary => |binary| try selector.lowerBinary(instruction.result, binary),
-            .alloca => |alloca| try selector.lowerAlloca(instruction.result, alloca),
-            .cast => |cast| try selector.lowerCast(instruction.result, cast),
-            .freeze => |freeze| try selector.lowerFreeze(instruction.result, freeze),
-            .icmp => |icmp| try selector.lowerIcmp(instruction.result, icmp),
-            .load => |load| try selector.lowerLoad(instruction.result, load),
-            .store => |store| try selector.lowerStore(store),
-            .gep => |gep| try selector.lowerGep(instruction.result, gep),
-            .call => |call| try selector.lowerCall(instruction.result, call),
-            .select => |select| try selector.lowerSelect(instruction.result, select),
+            .binary => |binary| selector.lowerBinary(instruction.result, binary) catch |err| return selector.instructionValueError(err, "stage2-binary-value"),
+            .alloca => |alloca| selector.lowerAlloca(instruction.result, alloca) catch |err| return selector.instructionValueError(err, "stage2-alloca-value"),
+            .cast => |cast| selector.lowerCast(instruction.result, cast) catch |err| return selector.instructionValueError(err, "stage2-cast-value"),
+            .freeze => |freeze| selector.lowerFreeze(instruction.result, freeze) catch |err| return selector.instructionValueError(err, "stage2-freeze-value"),
+            .icmp => |icmp| selector.lowerIcmp(instruction.result, icmp) catch |err| return selector.instructionValueError(err, "stage2-icmp-value"),
+            .load => |load| selector.lowerLoad(instruction.result, load) catch |err| return selector.instructionValueError(err, "stage2-load-value"),
+            .store => |store| selector.lowerStore(store) catch |err| return selector.instructionValueError(err, "stage2-store-value"),
+            .gep => |gep| selector.lowerGep(instruction.result, gep) catch |err| return selector.instructionValueError(err, "stage2-gep-value"),
+            .call => |call| selector.lowerCall(instruction.result, call) catch |err| return selector.instructionValueError(err, "stage2-call-value"),
+            .select => |select| selector.lowerSelect(instruction.result, select) catch |err| return selector.instructionValueError(err, "stage2-select-value"),
             else => .{ .no_emitter = "composed-block-instruction-not-owned" },
+        };
+    }
+
+    fn instructionValueError(selector: *ComposedBlockSelector, err: anyerror, detail: []const u8) anyerror!?Diagnostic {
+        _ = selector;
+        return switch (err) {
+            error.UnsupportedCodegenValue => .{ .unsupported_value = detail },
+            else => err,
         };
     }
 
@@ -583,10 +591,24 @@ pub const ComposedBlockSelector = struct {
         if (bits != 32 and bits != 64) return .{ .no_emitter = "composed-block-select-width" };
 
         if (try selector.emitBranchCondition(select.cond)) |diagnostic| return diagnostic;
-        try selector.emitValueIntoAccumulator(select.false_value, bits);
+        if (select.true_value == .named) {
+            const true_name = select.true_value.named;
+            switch (selector.resolveValue(select.true_value) orelse return .{ .unsupported_value = "composed-block-select-true-value" }) {
+                .eax => {
+                    _ = try selector.preserveCurrentEaxIntoScratch();
+                    if (selector.resolveValue(select.true_value)) |preserved| switch (preserved) {
+                        .eax => try selector.spillValueOrError(true_name),
+                        else => {},
+                    };
+                },
+                .rax => try selector.spillValueOrError(true_name),
+                else => {},
+            }
+        }
+        selector.emitValueIntoAccumulator(select.false_value, bits) catch return .{ .unsupported_value = "composed-block-select-false-value" };
         const end_label = try selector.ownedSelectEndLabel();
         try selector.machine.instructions.append(selector.allocator, .{ .je = end_label });
-        try selector.emitValueIntoAccumulator(select.true_value, bits);
+        selector.emitValueIntoAccumulator(select.true_value, bits) catch return .{ .unsupported_value = "composed-block-select-true-value" };
         try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
         try selector.bindAccumulator(result_name, bits);
         return null;

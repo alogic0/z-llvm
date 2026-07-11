@@ -107,6 +107,16 @@ Entry:
   ret i32 %loaded
 }
 
+define dso_local i32 @zllvm_select_shifted(i32 %value, i32 %amount, i32 %flag) {
+Entry:
+  %slot = alloca [1 x i32], align 4
+  %cond = icmp eq i32 %flag, 0
+  %shifted = shl i32 %value, %amount
+  %result = select i1 %cond, i32 %shifted, i32 0
+  store i32 %result, ptr %slot, align 4
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_backward_layout_phi(i32 %value) {
 Entry:
   br label %Later

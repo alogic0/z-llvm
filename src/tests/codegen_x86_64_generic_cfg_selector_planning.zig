@@ -2157,6 +2157,41 @@ test "generic cfg selector stores i32 through local array base" {
     try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_eax = 256 });
 }
 
+test "generic cfg selector preserves accumulator select true value" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @select_shifted(i32 %value, i32 %amount, i32 %flag) {
+        \\entry:
+        \\  %slot = alloca [1 x i32], align 4
+        \\  %cond = icmp eq i32 %flag, 0
+        \\  %shifted = shl i32 %value, %amount
+        \\  %result = select i1 %cond, i32 %shifted, i32 0
+        \\  store i32 %result, ptr %slot, align 4
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("select_shifted", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .shl_eax_cl);
+    try expectInstructionTag(machine.instructions.items, .spill_eax_rsp);
+    try expectInstructionTag(machine.instructions.items, .reload_rsp_eax);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
