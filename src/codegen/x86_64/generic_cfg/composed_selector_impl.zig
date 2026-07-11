@@ -1522,7 +1522,12 @@ pub const ComposedBlockSelector = struct {
         switch (loc) {
             .eax => try selector.machine.instructions.append(selector.allocator, .test_eax_eax),
             .arg32, .scratch32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .test_arg8 = reg }),
-            .arg64, .scratch64, .arg128, .scratch128, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "stage2-cond-loc" },
+            .spill64 => |frame_index| {
+                try selector.clobberArgReg(.rcx);
+                try selector.machine.instructions.append(selector.allocator, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
+                try selector.machine.instructions.append(selector.allocator, .{ .test_arg8 = .rcx });
+            },
+            .arg64, .scratch64, .arg128, .scratch128, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "stage2-cond-loc" },
         }
         return null;
     }

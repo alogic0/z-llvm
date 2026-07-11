@@ -129,6 +129,30 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_spilled_cond(i32 %value) {
+Entry:
+  %v1 = add i32 %value, 1
+  %v2 = add i32 %value, 2
+  %v3 = add i32 %value, 3
+  %v4 = add i32 %value, 4
+  %v5 = add i32 %value, 5
+  %v6 = add i32 %value, 6
+  %cond = icmp eq i32 %value, 0
+  %extra = add i32 %v1, %v2
+  br i1 %cond, label %Done, label %Then
+Then:
+  %s2 = add i32 %extra, %v3
+  %s3 = add i32 %s2, %v4
+  %s4 = add i32 %s3, %v5
+  %s5 = add i32 %s4, %v6
+  br label %Merge
+Done:
+  br label %Merge
+Merge:
+  %result = phi i32 [ %s5, %Then ], [ 0, %Done ]
+  ret i32 %result
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16

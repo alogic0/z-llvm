@@ -1700,6 +1700,53 @@ test "generic cfg selector composes wrapping i6 immediate lhs subtraction" {
     try expectInstruction(machine.instructions.items, .{ .and_eax_imm32 = 63 });
 }
 
+test "generic cfg selector branches on spilled condition" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @spilled_cond(i32 %value) {
+        \\entry:
+        \\  %v1 = add i32 %value, 1
+        \\  %v2 = add i32 %value, 2
+        \\  %v3 = add i32 %value, 3
+        \\  %v4 = add i32 %value, 4
+        \\  %v5 = add i32 %value, 5
+        \\  %v6 = add i32 %value, 6
+        \\  %cond = icmp eq i32 %value, 0
+        \\  %extra = add i32 %v1, %v2
+        \\  br i1 %cond, label %done, label %then
+        \\then:
+        \\  %s2 = add i32 %extra, %v3
+        \\  %s3 = add i32 %s2, %v4
+        \\  %s4 = add i32 %s3, %v5
+        \\  %s5 = add i32 %s4, %v6
+        \\  br label %merge
+        \\done:
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi i32 [ %s5, %then ], [ 0, %done ]
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("spilled_cond", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .test_arg8 = .rcx });
+}
+
 test "generic cfg selector composes dynamic i32 element pointer" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
