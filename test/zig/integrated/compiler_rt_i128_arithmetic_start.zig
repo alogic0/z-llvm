@@ -14,6 +14,8 @@ extern fn zllvm_ne_zero_i64(i64) callconv(.c) u32;
 extern fn zllvm_ctlz_i32(u32) callconv(.c) u32;
 extern fn zllvm_sub_i6(u32) callconv(.c) u32;
 extern fn zllvm_spilled_cond(u32) callconv(.c) u32;
+extern fn zllvm_variable_shl_i32(u32, u32) callconv(.c) u32;
+extern fn zllvm_variable_lshr_i32(u32, u32) callconv(.c) u32;
 
 var multi_lhs: i128 = 4294967299;
 var multi_rhs: i128 = -8589934597;
@@ -63,7 +65,9 @@ pub export fn _start() callconv(.c) noreturn {
     const sub_i6_wrap_bad: usize = @intFromBool(zllvm_sub_i6(32) != 0);
     const spilled_cond_true_bad: usize = @intFromBool(zllvm_spilled_cond(1) != 27);
     const spilled_cond_false_bad: usize = @intFromBool(zllvm_spilled_cond(0) != 0);
-    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19 + ugt_true_bad * 20 + ugt_false_bad * 21 + i6_positive_bad * 22 + i6_negative_bad * 23 + ugt_imm_true_bad * 24 + ugt_imm_false_bad * 25 + negative_true_bad * 26 + negative_false_bad * 27 + ne64_true_bad * 28 + ne64_false_bad * 29 + ctlz_one_bad * 30 + ctlz_sixteen_bad * 31 + sub_i6_zero_bad * 32 + sub_i6_one_bad * 33 + sub_i6_wrap_bad * 34 + spilled_cond_true_bad * 35 + spilled_cond_false_bad * 36);
+    const variable_shl_bad: usize = @intFromBool(zllvm_variable_shl_i32(8, 2) != 32);
+    const variable_lshr_bad: usize = @intFromBool(zllvm_variable_lshr_i32(0x80000000, 31) != 1);
+    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19 + ugt_true_bad * 20 + ugt_false_bad * 21 + i6_positive_bad * 22 + i6_negative_bad * 23 + ugt_imm_true_bad * 24 + ugt_imm_false_bad * 25 + negative_true_bad * 26 + negative_false_bad * 27 + ne64_true_bad * 28 + ne64_false_bad * 29 + ctlz_one_bad * 30 + ctlz_sixteen_bad * 31 + sub_i6_zero_bad * 32 + sub_i6_one_bad * 33 + sub_i6_wrap_bad * 34 + spilled_cond_true_bad * 35 + spilled_cond_false_bad * 36 + variable_shl_bad * 37 + variable_lshr_bad * 38);
 }
 
 fn loadI128(ptr: *i128) i128 {

@@ -2447,6 +2447,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_spill_cond.summary`; Tier 2
   record `docs/evidence/selector_tier2_spill_cond.summary`.
 
+- 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
+  selector now lowers variable i32 left and logical-right shifts through the
+  x86_64 CL-count forms, including new assembly, encoding, size, and verifier
+  coverage for `shll %cl, %eax`. Executable cases prove both directions. The
+  focused `__udivei5` retry clears `composed-block-binary-op` and advances to
+  `unsupported_value` / `composed-block-unknown-gep-ptr`; report-all remains
+  443 selected, 130 emitted, and 313 failed. Tier 2 is green; no ratchet moves.
+  Evidence `docs/evidence/std_debug_hello_udivei5_variable_i32_shifts.summary`;
+  executable proof
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_variable_i32_shifts.summary`;
+  Tier 2 record `docs/evidence/selector_tier2_variable_i32_shifts.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

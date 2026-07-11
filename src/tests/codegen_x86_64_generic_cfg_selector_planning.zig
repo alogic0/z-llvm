@@ -844,6 +844,43 @@ test "generic cfg selector stage two composes i32 multiply loop" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector stage two composes variable i32 shifts" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @variable_shl(i32 %value, i32 %amount) {
+        \\entry:
+        \\  %result = shl i32 %value, %amount
+        \\  ret i32 %result
+        \\}
+        \\
+        \\define i32 @variable_lshr(i32 %value, i32 %amount) {
+        \\entry:
+        \\  %result = lshr i32 %value, %amount
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    for (module.functions.items, 0..) |function, index| {
+        var machine = codegen.x86_64.MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+
+        const result = try selector.tryLower(std.testing.allocator, &machine, function);
+        switch (result) {
+            .selected => {},
+            .unsupported => |diagnostic| {
+                std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+                return error.TestExpectedSelected;
+            },
+        }
+
+        try expectInstruction(machine.instructions.items, if (index == 0) .shl_eax_cl else .shr_eax_cl);
+    }
+}
+
 test "generic cfg selector stage two computes pressure above no-spill envelope" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

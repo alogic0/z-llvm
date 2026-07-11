@@ -70,6 +70,27 @@ test "x86_64 codegen lowers add args to assembly" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "x86_64 assembly prints variable eax shifts" {
+    var machine = codegen.x86_64.MachineFunction.init("variable_eax_shifts", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .shl_eax_cl);
+    try machine.instructions.append(std.testing.allocator, .shr_eax_cl);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl variable_eax_shifts\n" ++
+            "variable_eax_shifts:\n" ++
+            "\tshll %cl, %eax\n" ++
+            "\tshrl %cl, %eax\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 codegen lowers return constant and argument" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

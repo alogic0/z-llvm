@@ -105,6 +105,20 @@ test "x86_64 encoding sizes high-register binary rax operands" {
     }, bytes);
 }
 
+test "x86_64 encoding emits variable eax shifts" {
+    var machine = codegen.x86_64.MachineFunction.init("variable_eax_shifts", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .shl_eax_cl);
+    try machine.instructions.append(std.testing.allocator, .shr_eax_cl);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 2), mc.encoding.instructionSize(.shl_eax_cl));
+    try std.testing.expectEqual(@as(u32, 2), mc.encoding.instructionSize(.shr_eax_cl));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{ 0xd3, 0xe0, 0xd3, 0xe8, 0xc3 }, bytes);
+}
+
 test "x86_64 encoding emits imul arg64 by rax" {
     var machine = codegen.x86_64.MachineFunction.init("imul_rax", .void);
     defer machine.deinit(std.testing.allocator);

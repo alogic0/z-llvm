@@ -371,6 +371,17 @@ pub const ComposedBlockSelector = struct {
         if ((binary.op == .udiv or binary.op == .urem) and bits == 64) {
             return try selector.lowerUnsignedDivRem64(result_name, binary);
         }
+        if ((binary.op == .shl or binary.op == .lshr) and bits == 32) {
+            try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
+            try selector.emitValueIntoEax(binary.lhs);
+            try selector.machine.instructions.append(selector.allocator, switch (binary.op) {
+                .shl => .shl_eax_cl,
+                .lshr => .shr_eax_cl,
+                else => unreachable,
+            });
+            try selector.bindEax(result_name);
+            return null;
+        }
 
         const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
         const lhs = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };

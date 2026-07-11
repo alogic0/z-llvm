@@ -153,6 +153,18 @@ Merge:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_variable_shl_i32(i32 %value, i32 %amount) {
+Entry:
+  %result = shl i32 %value, %amount
+  ret i32 %result
+}
+
+define dso_local i32 @zllvm_variable_lshr_i32(i32 %value, i32 %amount) {
+Entry:
+  %result = lshr i32 %value, %amount
+  ret i32 %result
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16
