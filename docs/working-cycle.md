@@ -16,7 +16,10 @@ One cycle means:
 1.  Choose the next goal through the Goal Selection rules below (driven by
     `docs/roadmap/convergence_progress.md`).
 2.  Implement only that checklist item.
-3.  Run focused validation.
+3.  Run validation per [`docs/validation_tiers.md`](validation_tiers.md):
+    focused commits pass their change-impact gate; capability-closing,
+    ratchet-moving, ABI-affecting, and milestone commits pass
+    `distribution-all`.
 4.  Save important logs under `tmp/`.
 5.  Update docs, counters, or readiness notes when ownership or evidence
     changes.
