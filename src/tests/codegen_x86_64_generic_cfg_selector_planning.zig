@@ -1477,6 +1477,38 @@ test "generic cfg selector composes unsigned greater i64 values" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector composes unsigned greater i64 immediate" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @ugt64_imm(i64 %value) {
+        \\entry:
+        \\  %greater = icmp ugt i64 %value, 4294967295
+        \\  %result = zext i1 %greater to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("ugt64_imm", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_r8 = 4294967295 });
+    try expectInstruction(machine.instructions.items, .{ .cmp_rcx_arg64 = .r8 });
+    try expectInstruction(machine.instructions.items, .setb_eax);
+}
+
 test "generic cfg selector composes signed i6 nonnegative test" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

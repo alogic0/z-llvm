@@ -85,6 +85,13 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_ugt_i64_imm(i64 %value) {
+Entry:
+  %greater = icmp ugt i64 %value, 4294967295
+  %result = zext i1 %greater to i32
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_nonnegative_i6(i32 %value) {
 Entry:
   %narrow = trunc i32 %value to i6

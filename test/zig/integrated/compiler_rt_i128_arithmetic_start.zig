@@ -7,6 +7,7 @@ extern fn zllvm_ptr_eq([*]u32, [*]u32) callconv(.c) u32;
 extern fn zllvm_load_i32_spilled_ptr([*]u32) callconv(.c) u32;
 extern fn zllvm_backward_layout_phi(u32) callconv(.c) u32;
 extern fn zllvm_ugt_i64(u64, u64) callconv(.c) u32;
+extern fn zllvm_ugt_i64_imm(u64) callconv(.c) u32;
 extern fn zllvm_nonnegative_i6(u32) callconv(.c) u32;
 
 var multi_lhs: i128 = 4294967299;
@@ -44,7 +45,9 @@ pub export fn _start() callconv(.c) noreturn {
     const ugt_false_bad: usize = @intFromBool(zllvm_ugt_i64(4, 9) != 0);
     const i6_positive_bad: usize = @intFromBool(zllvm_nonnegative_i6(31) != 1);
     const i6_negative_bad: usize = @intFromBool(zllvm_nonnegative_i6(32) != 0);
-    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19 + ugt_true_bad * 20 + ugt_false_bad * 21 + i6_positive_bad * 22 + i6_negative_bad * 23);
+    const ugt_imm_true_bad: usize = @intFromBool(zllvm_ugt_i64_imm(4294967296) != 1);
+    const ugt_imm_false_bad: usize = @intFromBool(zllvm_ugt_i64_imm(4294967295) != 0);
+    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19 + ugt_true_bad * 20 + ugt_false_bad * 21 + i6_positive_bad * 22 + i6_negative_bad * 23 + ugt_imm_true_bad * 24 + ugt_imm_false_bad * 25);
 }
 
 fn loadI128(ptr: *i128) i128 {
