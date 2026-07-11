@@ -126,6 +126,15 @@ pub fn encodeDivReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, r
     try bytes.append(allocator, 0xf0 | @as(u8, reg.lowCode()));
 }
 
+pub fn encodeFullMulReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, signed: bool) !void {
+    var rex: u8 = 0x48;
+    if (reg.rexB()) rex |= 0x01;
+    try bytes.append(allocator, rex);
+    try bytes.append(allocator, 0xf7);
+    const extension: u8 = if (signed) 5 else 4;
+    try bytes.append(allocator, 0xc0 | (extension << 3) | @as(u8, reg.lowCode()));
+}
+
 pub fn encodeAddHigh32ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
     try encodeReg64ToReg64(bytes, allocator, .rcx, reg);
     try bytes.appendSlice(allocator, &.{ 0x48, 0xc1, 0xe9, 0x20, 0x01, 0xc8 });

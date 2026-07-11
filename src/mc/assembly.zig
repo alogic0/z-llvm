@@ -57,6 +57,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                 try printFrameAddress(writer, frame_index);
                 try writer.writeAll(", %rax\n");
             },
+            .mul_rax_arg64_full => |src| try writer.print("\tmulq {s}\n", .{src.name64()}),
+            .imul_rax_arg64_full => |src| try writer.print("\timulq {s}\n", .{src.name64()}),
             .xor_edx_edx => try writer.writeAll("\txorl %edx, %edx\n"),
             .div_arg64 => |reg| try writer.print("\tdivq {s}\n", .{reg.name64()}),
             .add_arg64_rax => |reg| try writer.print("\taddq {s}, %rax\n", .{reg.name64()}),

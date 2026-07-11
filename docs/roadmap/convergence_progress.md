@@ -2783,6 +2783,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_freeze_i128.summary`, and
   `docs/evidence/selector_tier2_muloti4_freeze_i128.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  foundation: the machine and encoder layers now provide general one-operand
+  unsigned and signed 64-by-64 full-product operations, with low and high
+  definitions in RAX and RDX. Exact assembly and byte checks cover ordinary
+  and extended registers; executable generated-code checks prove both result
+  halves for unsigned and negative signed products. Tier 2 is green across
+  unit, structural, captured-object, permanent-canary, and boundary gates.
+  The focused `__muloti4` row remains at `no_emitter/composed-block-call-form`;
+  report-all remains 443 selected, 136 emitted, and 307 failed. No tracker or
+  ratchet moves. Evidence
+  `docs/evidence/x86_64_full_product_machine_ops.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

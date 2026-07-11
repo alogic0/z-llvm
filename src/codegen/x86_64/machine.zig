@@ -68,6 +68,8 @@ pub const Instruction = union(enum) {
     imul_arg64_rax: ArgReg,
     imul_rax_arg64: ArgReg,
     imul_rax_rsp: FrameIndex,
+    mul_rax_arg64_full: ArgReg,
+    imul_rax_arg64_full: ArgReg,
     xor_edx_edx,
     div_arg64: ArgReg,
     add_arg64_rax: ArgReg,

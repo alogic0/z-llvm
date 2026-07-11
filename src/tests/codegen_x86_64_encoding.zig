@@ -164,6 +164,74 @@ test "x86_64 encoding emits imul arg64 by rax" {
     }, bytes);
 }
 
+test "x86_64 encoding emits and executes full-width multiply" {
+    var encoding_machine = codegen.x86_64.MachineFunction.init("full_mul_encoding", .void);
+    defer encoding_machine.deinit(std.testing.allocator);
+    try encoding_machine.instructions.append(std.testing.allocator, .{ .mul_rax_arg64_full = .rsi });
+    try encoding_machine.instructions.append(std.testing.allocator, .{ .mul_rax_arg64_full = .r9 });
+    try encoding_machine.instructions.append(std.testing.allocator, .{ .imul_rax_arg64_full = .rdx });
+    try encoding_machine.instructions.append(std.testing.allocator, .{ .imul_rax_arg64_full = .r8 });
+    try encoding_machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .mul_rax_arg64_full = .rsi }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .mul_rax_arg64_full = .r9 }));
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .imul_rax_arg64_full = .rdx }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .imul_rax_arg64_full = .r8 }));
+    const encoding_bytes = try mc.encoding.encodeFunction(std.testing.allocator, encoding_machine);
+    defer std.testing.allocator.free(encoding_bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0xf7, 0xe6,
+        0x49, 0xf7, 0xe1,
+        0x48, 0xf7, 0xea,
+        0x49, 0xf7, 0xe8,
+        0xc3,
+    }, encoding_bytes);
+
+    const FullUnsignedProduct = *const fn (u64, u64) callconv(.c) u128;
+    var unsigned_machine = codegen.x86_64.MachineFunction.init("full_unsigned_product", .{ .int = 128 });
+    defer unsigned_machine.deinit(std.testing.allocator);
+    try unsigned_machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+    try unsigned_machine.instructions.append(std.testing.allocator, .{ .mul_rax_arg64_full = .rsi });
+    try unsigned_machine.instructions.append(std.testing.allocator, .ret);
+    const unsigned_bytes = try mc.encoding.encodeFunction(std.testing.allocator, unsigned_machine);
+    defer std.testing.allocator.free(unsigned_bytes);
+    const unsigned_mapping = try std.posix.mmap(
+        null,
+        unsigned_bytes.len,
+        .{ .READ = true, .WRITE = true, .EXEC = true },
+        .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+        -1,
+        0,
+    );
+    defer std.posix.munmap(unsigned_mapping);
+    @memcpy(unsigned_mapping, unsigned_bytes);
+    const fullUnsignedProduct: FullUnsignedProduct = @ptrCast(unsigned_mapping.ptr);
+    const unsigned_lhs = std.math.maxInt(u64);
+    const unsigned_rhs: u64 = 2;
+    try std.testing.expectEqual(@as(u128, unsigned_lhs) * unsigned_rhs, fullUnsignedProduct(unsigned_lhs, unsigned_rhs));
+
+    const FullSignedProduct = *const fn (i64, i64) callconv(.c) i128;
+    var signed_machine = codegen.x86_64.MachineFunction.init("full_signed_product", .{ .int = 128 });
+    defer signed_machine.deinit(std.testing.allocator);
+    try signed_machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+    try signed_machine.instructions.append(std.testing.allocator, .{ .imul_rax_arg64_full = .rsi });
+    try signed_machine.instructions.append(std.testing.allocator, .ret);
+    const signed_bytes = try mc.encoding.encodeFunction(std.testing.allocator, signed_machine);
+    defer std.testing.allocator.free(signed_bytes);
+    const signed_mapping = try std.posix.mmap(
+        null,
+        signed_bytes.len,
+        .{ .READ = true, .WRITE = true, .EXEC = true },
+        .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+        -1,
+        0,
+    );
+    defer std.posix.munmap(signed_mapping);
+    @memcpy(signed_mapping, signed_bytes);
+    const fullSignedProduct: FullSignedProduct = @ptrCast(signed_mapping.ptr);
+    try std.testing.expectEqual(@as(i128, -3) * 7, fullSignedProduct(-3, 7));
+}
+
 test "x86_64 encoding sizes nonzero frame spill slots" {
     var machine = codegen.x86_64.MachineFunction.init("frame_slots", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

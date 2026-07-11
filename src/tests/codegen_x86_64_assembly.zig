@@ -91,6 +91,27 @@ test "x86_64 assembly prints variable eax shifts" {
     );
 }
 
+test "x86_64 assembly prints full-width multiply forms" {
+    var machine = codegen.x86_64.MachineFunction.init("full_width_multiply", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .mul_rax_arg64_full = .rsi });
+    try machine.instructions.append(std.testing.allocator, .{ .imul_rax_arg64_full = .r8 });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl full_width_multiply\n" ++
+            "full_width_multiply:\n" ++
+            "\tmulq %rsi\n" ++
+            "\timulq %r8\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 codegen lowers return constant and argument" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
