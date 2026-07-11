@@ -2861,6 +2861,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_muloti4_acceptance.summary`, and
   `docs/evidence/distribution_all_after_muloti4_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  retry: generic CFG inspection now recognizes the exact i64 signed-multiply
+  overflow aggregate signature while rejecting mismatched argument widths.
+  Arithmetic lowering remains fail-closed. The focused `__mulodi4` row advances
+  from `unsupported_type/call-ret` to
+  `unsupported_value/stage2-unsupported-value`; report-all remains 443
+  selected, 137 emitted, and 306 failed. Tier 1 unit validation is green; no
+  capability, tracker, or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_mulodi4_overflow_inspection.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

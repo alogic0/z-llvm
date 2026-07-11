@@ -112,6 +112,45 @@ test "generic cfg selector skeleton reports no emitter for supported straight-li
     try std.testing.expectEqualStrings("selector-skeleton-has-no-emitters", diagnostic.detail());
 }
 
+test "generic cfg selector inspection admits only typed i64 signed multiply overflow" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
+        \\
+        \\define i64 @accepted(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %pair = call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %lhs, i64 %rhs)
+        \\  %value = extractvalue { i64, i1 } %pair, 0
+        \\  ret i64 %value
+        \\}
+        \\
+        \\define i64 @rejected(i32 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %pair = call { i64, i1 } @llvm.smul.with.overflow.i64(i32 %lhs, i64 %rhs)
+        \\  %value = extractvalue { i64, i1 } %pair, 0
+        \\  ret i64 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    const accepted = switch (selector.inspectFunction(module.functions.items[0])) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", accepted.tagName());
+    try std.testing.expectEqualStrings("selector-skeleton-has-no-emitters", accepted.detail());
+
+    const rejected = switch (selector.inspectFunction(module.functions.items[1])) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("unsupported_type", rejected.tagName());
+    try std.testing.expectEqualStrings("overflow-intrinsic-arg", rejected.detail());
+}
+
 test "generic cfg selector skeleton preserves recognizer fallback while opt-in" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

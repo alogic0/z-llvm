@@ -199,6 +199,7 @@ fn isOverflowIntrinsic(callee: []const u8) bool {
     return std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i32") or
         std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i64") or
         std.mem.eql(u8, callee, "llvm.usub.with.overflow.i64") or
+        std.mem.eql(u8, callee, "llvm.smul.with.overflow.i64") or
         std.mem.eql(u8, callee, "llvm.smul.with.overflow.i128");
 }
 
