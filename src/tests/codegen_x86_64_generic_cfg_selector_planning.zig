@@ -3,6 +3,7 @@ const common = @import("codegen_x86_64_common.zig");
 const std = common.std;
 const codegen = common.codegen;
 const ir = common.ir;
+const mc = common.mc;
 const selector = @import("../codegen/x86_64/generic_cfg_selector.zig");
 const stage2_planning = @import("../codegen/x86_64/generic_cfg/stage2_planning.zig");
 
@@ -2465,7 +2466,7 @@ test "generic cfg selector composes pointer select" {
     try expectInstruction(machine.instructions.items, .sete_eax);
 }
 
-test "generic cfg selector reports i128 signed multiply overflow planning frontier" {
+test "generic cfg selector lowers i128 signed multiply overflow product" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -2487,12 +2488,15 @@ test "generic cfg selector reports i128 signed multiply overflow planning fronti
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     switch (result) {
-        .selected => return error.TestExpectedUnsupported,
+        .selected => {},
         .unsupported => |diagnostic| {
-            try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
-            try std.testing.expectEqualStrings("composed-block-call-ret", diagnostic.detail());
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
         },
     }
+    try expectInstruction(machine.instructions.items, .{ .mul_rax_arg64_full = .rcx });
+    try expectInstruction(machine.instructions.items, .adc_rax_imm0);
+    try expectInstruction(machine.instructions.items, .setne_eax);
 }
 
 test "generic cfg selector pressure-exempts i128 signed multiply overflow tuple" {
@@ -2523,11 +2527,96 @@ test "generic cfg selector pressure-exempts i128 signed multiply overflow tuple"
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
     switch (result) {
-        .selected => return error.TestExpectedUnsupported,
+        .selected => {},
         .unsupported => |diagnostic| {
-            try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
-            try std.testing.expectEqualStrings("composed-block-call-ret", diagnostic.detail());
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
         },
+    }
+    try expectInstruction(machine.instructions.items, .{ .mul_rax_arg64_full = .rcx });
+    try expectInstruction(machine.instructions.items, .setne_eax);
+}
+
+test "generic cfg selector executes i128 signed multiply overflow semantics" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i128, i1 } @llvm.smul.with.overflow.i128(i128, i128)
+        \\
+        \\define i128 @smul_value(i128 %lhs, i128 %rhs) {
+        \\entry:
+        \\  %pair = call { i128, i1 } @llvm.smul.with.overflow.i128(i128 %lhs, i128 %rhs)
+        \\  %value = extractvalue { i128, i1 } %pair, 0
+        \\  ret i128 %value
+        \\}
+        \\
+        \\define i32 @smul_overflow(i128 %lhs, i128 %rhs) {
+        \\entry:
+        \\  %pair = call { i128, i1 } @llvm.smul.with.overflow.i128(i128 %lhs, i128 %rhs)
+        \\  %overflow = extractvalue { i128, i1 } %pair, 1
+        \\  %wide = zext i1 %overflow to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var value_machine = codegen.x86_64.MachineFunction.init("smul_value", module.functions.items[0].ret_ty);
+    defer value_machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &value_machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected value selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    const value_bytes = try mc.encoding.encodeFunction(std.testing.allocator, value_machine);
+    defer std.testing.allocator.free(value_bytes);
+    const value_mapping = try std.posix.mmap(
+        null,
+        value_bytes.len,
+        .{ .READ = true, .WRITE = true, .EXEC = true },
+        .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+        -1,
+        0,
+    );
+    defer std.posix.munmap(value_mapping);
+    @memcpy(value_mapping, value_bytes);
+    const smulValue: *const fn (i128, i128) callconv(.c) i128 = @ptrCast(value_mapping.ptr);
+
+    var overflow_machine = codegen.x86_64.MachineFunction.init("smul_overflow", module.functions.items[1].ret_ty);
+    defer overflow_machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &overflow_machine, module.functions.items[1])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected overflow selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    const overflow_bytes = try mc.encoding.encodeFunction(std.testing.allocator, overflow_machine);
+    defer std.testing.allocator.free(overflow_bytes);
+    const overflow_mapping = try std.posix.mmap(
+        null,
+        overflow_bytes.len,
+        .{ .READ = true, .WRITE = true, .EXEC = true },
+        .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+        -1,
+        0,
+    );
+    defer std.posix.munmap(overflow_mapping);
+    @memcpy(overflow_mapping, overflow_bytes);
+    const smulOverflow: *const fn (i128, i128) callconv(.c) i32 = @ptrCast(overflow_mapping.ptr);
+
+    const cases = [_]struct { lhs: i128, rhs: i128, value: i128, overflow: i32 }{
+        .{ .lhs = 12, .rhs = 11, .value = 132, .overflow = 0 },
+        .{ .lhs = -12, .rhs = 11, .value = -132, .overflow = 0 },
+        .{ .lhs = std.math.maxInt(i128), .rhs = 2, .value = -2, .overflow = 1 },
+        .{ .lhs = std.math.minInt(i128), .rhs = 2, .value = 0, .overflow = 1 },
+    };
+    for (cases) |case| {
+        try std.testing.expectEqual(case.value, smulValue(case.lhs, case.rhs));
+        try std.testing.expectEqual(case.overflow, smulOverflow(case.lhs, case.rhs));
     }
 }
 

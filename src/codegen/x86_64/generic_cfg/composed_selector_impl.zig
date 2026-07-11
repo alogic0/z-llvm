@@ -47,6 +47,7 @@ const phi_regs = [_]ArgReg{ .r8, .r9, .rcx };
 const OverflowResultLoc = struct {
     value: ValueLoc,
     overflow: ValueLoc,
+    require_value_first: bool = true,
     value_extracted: bool = false,
     overflow_extracted: bool = false,
 };
@@ -332,6 +333,7 @@ pub const ComposedBlockSelector = struct {
         var array_count: usize = 0;
         var saw_phi = false;
         var saw_array_alloca = false;
+        var saw_wide_smul_overflow = false;
         if (selector.allocation_plan) |plan| selector.next_spill_slot = plan.spill_slots;
 
         for (function.blocks.items) |block| {
@@ -339,11 +341,12 @@ pub const ComposedBlockSelector = struct {
                 if (instruction.removed) continue;
                 if (instruction.kind == .phi) saw_phi = true;
                 if (instruction.kind == .alloca and parseI32ArrayType(instruction.kind.alloca.allocated_ty) != null) saw_array_alloca = true;
+                if (instruction.kind == .call and std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128")) saw_wide_smul_overflow = true;
             }
         }
 
         const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
-        const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
+        const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or saw_wide_smul_overflow or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
         const spill_reserved_bytes = selector.spillReservedBytes(reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" };
         payload_bytes = if (saw_array_alloca) @max(spill_reserved_bytes, stage2SpillReservedBytes()) else 0;
 
@@ -384,7 +387,7 @@ pub const ComposedBlockSelector = struct {
         }
 
         if (payload_bytes == 0) {
-            if (pressure.exceedsNoSpill() or saw_phi) payload_bytes = spill_reserved_bytes;
+            if (pressure.exceedsNoSpill() or saw_phi or saw_wide_smul_overflow) payload_bytes = spill_reserved_bytes;
         }
 
         if (payload_bytes == 0) return null;
@@ -1400,6 +1403,7 @@ pub const ComposedBlockSelector = struct {
         if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try selector.lowerCtlzI32(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try selector.lowerInlineMemcpy(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try selector.lowerUaddOverflowI32(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try selector.lowerSmulOverflowI128(result, call);
         if (call.inline_asm != null) return .{ .no_emitter = "composed-block-inline-asm-call" };
         if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
         if (!isDefaultOrFastcc(call.calling_conv) or call.tail_kind != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
@@ -1471,6 +1475,69 @@ pub const ComposedBlockSelector = struct {
         return null;
     }
 
+    fn lowerSmulOverflowI128(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-smulo-i128-missing-result" };
+        if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-smulo-i128-call-form" };
+        }
+        if (call.tail_kind) |tail_kind| {
+            if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-smulo-i128-tail-kind" };
+        }
+        if (!call.ret_ty.eql(.{ .aggregate = "{ i128, i1 }" }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-smulo-i128-signature" };
+        const lhs = call.args.items[0];
+        const rhs = call.args.items[1];
+        if (!lhs.ty.eql(.{ .int = 128 }) or !rhs.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-smulo-i128-args" };
+
+        const lhs_spill = selector.ensurePairSpill(lhs.value) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-lhs" };
+        const rhs_spill = selector.ensurePairSpill(rhs.value) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-rhs" };
+        selector.clobberArgReg(.rcx) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-scratch" };
+        selector.clobberArgReg(.r8) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-scratch" };
+        selector.clobberArgReg(.r9) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-scratch" };
+
+        const p00_name = try selector.ownedInternalValueName(result_name, "p00");
+        const p01_name = try selector.ownedInternalValueName(result_name, "p01");
+        const p10_name = try selector.ownedInternalValueName(result_name, "p10");
+        const p11_name = try selector.ownedInternalValueName(result_name, "p11");
+        const overflow_name = try selector.ownedInternalValueName(result_name, "overflow");
+        const p00 = selector.emitUnsignedLimbProduct(lhs_spill.lo, rhs_spill.lo, p00_name) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-p00" };
+        const p01 = selector.emitUnsignedLimbProduct(lhs_spill.lo, rhs_spill.hi, p01_name) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-p01" };
+        const p10 = selector.emitUnsignedLimbProduct(lhs_spill.hi, rhs_spill.lo, p10_name) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-p10" };
+        const p11 = selector.emitUnsignedLimbProduct(lhs_spill.hi, rhs_spill.hi, p11_name) catch return .{ .no_spill_envelope = "composed-block-smulo-i128-p11" };
+
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .r9, .frame_index = p01.hi } });
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = p11.hi } });
+
+        try selector.accumulateLimbWithCarry(p00.hi, p01.lo, .r8, .r9);
+        try selector.accumulateRegWithCarry(.r8, p10.lo, .r8, .r9);
+        try selector.accumulateRegWithCarry(.r9, p10.hi, .r9, .rdx);
+        try selector.accumulateRegWithCarry(.r9, p11.lo, .r9, .rdx);
+
+        try selector.emitSignedUpperCorrection(lhs_spill.hi, rhs_spill);
+        try selector.emitSignedUpperCorrection(rhs_spill.hi, lhs_spill);
+
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = p00.hi, .reg = .r8 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .r8 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .r9 });
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .r8 });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .rdx });
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } });
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = .r8 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .rcx });
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 0 } });
+        try selector.machine.instructions.append(selector.allocator, .setne_eax);
+
+        const overflow_spill = selector.allocateSpillSlot(overflow_name) orelse return .{ .no_spill_envelope = "composed-block-smulo-i128-overflow-spill" };
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_eax_rsp = overflow_spill });
+        try selector.overflow_results.put(result_name, .{
+            .value = .{ .spill128 = p00 },
+            .overflow = .{ .spill64 = overflow_spill },
+            .require_value_first = false,
+        });
+        return null;
+    }
+
     fn lowerExtractValue(selector: *ComposedBlockSelector, result: ?[]const u8, extract: ir.ExtractValueInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-extractvalue-missing-result" };
         const aggregate_name = switch (extract.aggregate) {
@@ -1483,7 +1550,7 @@ pub const ComposedBlockSelector = struct {
             overflow.value_extracted = true;
             break :blk overflow.value;
         } else if (std.mem.eql(u8, extract.indices, "1")) blk: {
-            if (!overflow.value_extracted) return .{ .no_emitter = "composed-block-extractvalue-order" };
+            if (overflow.require_value_first and !overflow.value_extracted) return .{ .no_emitter = "composed-block-extractvalue-order" };
             if (overflow.overflow_extracted) return .{ .no_emitter = "composed-block-extractvalue-duplicate" };
             overflow.overflow_extracted = true;
             break :blk overflow.overflow;
@@ -1840,6 +1907,13 @@ pub const ComposedBlockSelector = struct {
         return label;
     }
 
+    fn ownedInternalValueName(selector: *ComposedBlockSelector, result_name: []const u8, suffix: []const u8) ![]const u8 {
+        const name = try std.fmt.allocPrint(selector.allocator, "__zllvm_{s}_{s}", .{ result_name, suffix });
+        errdefer selector.allocator.free(name);
+        try selector.machine.owned_labels.append(selector.allocator, name);
+        return name;
+    }
+
     fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock, predecessor: []const u8) !?Diagnostic {
         for (target.instructions.items) |instruction| {
             if (instruction.removed) continue;
@@ -2014,7 +2088,14 @@ pub const ComposedBlockSelector = struct {
 
     pub fn bindFixedProductResult(selector: *ComposedBlockSelector, name: []const u8) !void {
         const plan = selector.allocation_plan orelse return error.UnsupportedCodegenValue;
-        const assignment = plan.assignment(name) orelse return error.UnsupportedCodegenValue;
+        const assignment = plan.assignment(name) orelse {
+            if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) return error.UnsupportedCodegenValue;
+            const spill = selector.allocatePairSpillSlots(name) orelse return error.UnsupportedCodegenValue;
+            try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.lo });
+            try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = .rdx } });
+            try selector.bindValueLoc(name, .{ .spill128 = spill });
+            return;
+        };
         switch (assignment) {
             .gpr128 => |pair| {
                 try selector.clobberArgReg(pair.lo);
@@ -2345,6 +2426,70 @@ pub const ComposedBlockSelector = struct {
         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = pair.hi } });
         try selector.bindValueLoc(name, .{ .spill128 = spill });
         return null;
+    }
+
+    fn ensurePairSpill(selector: *ComposedBlockSelector, value: ir.Value) !PairSpillLoc {
+        const name = namedValue(value) orelse return error.UnsupportedCodegenValue;
+        if (selector.resolveValue(value)) |loc| switch (loc) {
+            .spill128 => |spill| return spill,
+            else => {},
+        } else return error.UnsupportedCodegenValue;
+        if (try selector.spillPairValue(name)) |_| return error.UnsupportedCodegenValue;
+        return switch (selector.resolveValue(value) orelse return error.UnsupportedCodegenValue) {
+            .spill128 => |spill| spill,
+            else => error.UnsupportedCodegenValue,
+        };
+    }
+
+    fn emitUnsignedLimbProduct(selector: *ComposedBlockSelector, lhs: FrameIndex, rhs: FrameIndex, name: []const u8) !PairSpillLoc {
+        try selector.prepareFixedProductDefs();
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = lhs });
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = rhs } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mul_rax_arg64_full = .rcx });
+        try selector.bindFixedProductResult(name);
+        return switch (selector.valueLoc(name) orelse return error.UnsupportedCodegenValue) {
+            .spill128 => |spill| spill,
+            else => error.UnsupportedCodegenValue,
+        };
+    }
+
+    fn accumulateLimbWithCarry(selector: *ComposedBlockSelector, lhs: FrameIndex, rhs: FrameIndex, sum: ArgReg, carry: ArgReg) !void {
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = lhs });
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = rhs } });
+        try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_rax = .rcx });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = sum });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = carry });
+        try selector.machine.instructions.append(selector.allocator, .adc_rax_imm0);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = carry });
+    }
+
+    fn accumulateRegWithCarry(selector: *ComposedBlockSelector, lhs: ArgReg, rhs: FrameIndex, sum: ArgReg, carry: ArgReg) !void {
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = lhs });
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = rhs } });
+        try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_rax = .rcx });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = sum });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = carry });
+        try selector.machine.instructions.append(selector.allocator, .adc_rax_imm0);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = carry });
+    }
+
+    fn emitSignedUpperCorrection(selector: *ComposedBlockSelector, sign_limb: FrameIndex, subtract: PairSpillLoc) !void {
+        const correction_label = try selector.ownedEdgeLabel();
+        const end_label = try selector.ownedEdgeLabel();
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = sign_limb } });
+        try selector.machine.instructions.append(selector.allocator, .{ .test_arg64 = .rcx });
+        try selector.machine.instructions.append(selector.allocator, .{ .js = correction_label });
+        try selector.machine.instructions.append(selector.allocator, .{ .jmp = end_label });
+        try selector.machine.instructions.append(selector.allocator, .{ .label = correction_label });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .r9 });
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = subtract.lo } });
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .r9 });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .rdx });
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = subtract.hi } });
+        try selector.machine.instructions.append(selector.allocator, .{ .sbb_arg64_rax = .rcx });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .rdx });
+        try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
     }
 
     fn allocateSpillSlot(selector: *ComposedBlockSelector, name: []const u8) ?FrameIndex {

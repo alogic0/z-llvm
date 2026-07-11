@@ -5,6 +5,7 @@ target triple = "x86_64-unknown-linux-gnu"
 declare i128 @llvm.abs.i128(i128, i1)
 declare i32 @llvm.ctlz.i32(i32, i1 immarg)
 declare { i32, i1 } @llvm.uadd.with.overflow.i32(i32, i32)
+declare { i128, i1 } @llvm.smul.with.overflow.i128(i128, i128)
 declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
 declare i128 @compiler_rt.udivmod.udivmod__anon_15304(i128, i128, ptr)
 
@@ -36,6 +37,21 @@ Entry:
   %sum = extractvalue { i32, i1 } %pair, 0
   %carry = extractvalue { i32, i1 } %pair, 1
   %wide = zext i1 %carry to i32
+  ret i32 %wide
+}
+
+define dso_local i128 @zllvm_smul_i128_value(i128 %lhs, i128 %rhs) {
+Entry:
+  %pair = tail call { i128, i1 } @llvm.smul.with.overflow.i128(i128 %lhs, i128 %rhs)
+  %value = extractvalue { i128, i1 } %pair, 0
+  ret i128 %value
+}
+
+define dso_local i32 @zllvm_smul_i128_overflow(i128 %lhs, i128 %rhs) {
+Entry:
+  %pair = tail call { i128, i1 } @llvm.smul.with.overflow.i128(i128 %lhs, i128 %rhs)
+  %overflow = extractvalue { i128, i1 } %pair, 1
+  %wide = zext i1 %overflow to i32
   ret i32 %wide
 }
 

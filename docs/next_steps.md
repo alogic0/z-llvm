@@ -40,11 +40,11 @@ Stay on the selected goal until:
 None. INBOX-14 approved the `__muloti4` architecture: general full-product
 machine operations define the low and high halves in RAX and RDX, then both
 definitions enter the ordinary displace/clobber/value-map protocol. The
-machine/encoder forms and selector-visible two-definition relocation are
-implemented and executable. The next slice is to expand the signed i128
-overflow intrinsic using the invariants of LLVM
-`DAGTypeLegalizer::ExpandIntRes_XMULO`, with overflow and non-overflow runtime
-checks in both sign directions.
+machine/encoder forms, selector-visible two-definition relocation, and the
+signed i128 overflow expansion are implemented and executable. The exact
+`__muloti4` row now stops at `no_emitter/composed-block-icmp-form`; continue
+with its i128 signed-negative and minimum-value comparisons, preserving the
+generic typed-form boundary.
 
 Current operating note recorded 2026-07-10:
 

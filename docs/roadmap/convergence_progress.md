@@ -2817,6 +2817,18 @@ One line per completed cycle, append-only, newest last. This is the
   emitted, and 307 failed. No tracker or ratchet moves. Evidence
   `docs/evidence/x86_64_adc_rax_imm0.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  retry: the exact `llvm.smul.with.overflow.i128` intrinsic now expands into
+  four allocator-visible 64-bit full products, carry-propagated schoolbook
+  limbs, signed upper-half corrections, and LLVM's upper-half/sign-extension
+  overflow invariant. Unit and permanent executable cases cover overflowing
+  and non-overflowing products in both sign directions. The focused
+  `__muloti4` row advances from `composed-block-call-form` to
+  `composed-block-icmp-form`; report-all remains 443 selected, 136 emitted,
+  and 307 failed. Tier 3 is green across 17 subgates and all three strict
+  100-row modes. No tracker or ratchet moves. Evidence
+  `docs/evidence/x86_64_smul_i128_overflow_expansion.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
