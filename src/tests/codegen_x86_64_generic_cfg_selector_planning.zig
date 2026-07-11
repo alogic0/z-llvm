@@ -1226,6 +1226,70 @@ test "generic cfg selector composes narrow zext to i64 through eax" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
+test "generic cfg selector composes dynamic byte pointer gep" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @byte_gep(ptr %dst, i64 %offset, i32 %value) {
+        \\entry:
+        \\  %ptr = getelementptr inbounds i8, ptr %dst, i64 %offset
+        \\  store i32 %value, ptr %ptr, align 4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("byte_gep", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .add_r8_rcx);
+    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .r8 });
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector composes constant byte pointer gep" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @byte_gep_const(ptr %dst, i32 %value) {
+        \\entry:
+        \\  %ptr = getelementptr inbounds i8, ptr %dst, i64 4
+        \\  store i32 %value, ptr %ptr, align 4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("byte_gep_const", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .add_rcx_imm32 = 4 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .rcx });
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

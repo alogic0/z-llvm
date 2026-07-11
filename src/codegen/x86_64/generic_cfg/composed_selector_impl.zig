@@ -972,6 +972,7 @@ pub const ComposedBlockSelector = struct {
 
     fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.GepInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        if (gep.source_ty.eql(.{ .int = 8 })) return try selector.lowerBytePointerGep(result_name, gep);
         const len = parseI32ArrayType(gep.source_ty) orelse return .{ .no_emitter = "composed-block-gep-source" };
         const base = selector.resolveValue(gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
         const stack_array = switch (base) {
@@ -1000,6 +1001,30 @@ pub const ComposedBlockSelector = struct {
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
         };
         try selector.bindValueLoc(result_name, .{ .stack_i32_ptr = stack_ptr });
+        return null;
+    }
+
+    fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []const u8, gep: ir.GepInst) !?Diagnostic {
+        if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
+        if (gep.indices.items.len != 1) return .{ .no_emitter = "composed-block-gep-index-count" };
+        const index = gep.indices.items[0];
+        if (!index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
+
+        switch (index.value) {
+            .int => |int| {
+                const offset = std.math.cast(i32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
+                selector.emitValueIntoScratch(gep.ptr, .rcx, 64) catch return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
+                if (offset != 0) try selector.machine.instructions.append(selector.allocator, .{ .add_rcx_imm32 = offset });
+                try selector.bindScratch(result_name, .rcx, 64);
+            },
+            .named => {
+                selector.emitValueIntoScratch(gep.ptr, .r8, 64) catch return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
+                selector.emitValueIntoScratch(index.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+                try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
+                try selector.bindScratch(result_name, .r8, 64);
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
+        }
         return null;
     }
 
