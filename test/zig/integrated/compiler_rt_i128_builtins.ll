@@ -13,6 +13,13 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_store_i32_index(ptr %base, i64 %index, i32 %value) {
+Entry:
+  %element = getelementptr [4 x i8], ptr %base, i64 %index
+  store i32 %value, ptr %element, align 4
+  ret i32 %value
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16

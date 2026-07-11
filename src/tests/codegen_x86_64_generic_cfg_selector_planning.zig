@@ -1418,6 +1418,39 @@ test "generic cfg selector composes narrow integer inequality with zero" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector composes dynamic i32 element pointer" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @store_i32_index(ptr %base, i64 %index, i32 %value) {
+        \\entry:
+        \\  %element = getelementptr [4 x i8], ptr %base, i64 %index
+        \\  store i32 %value, ptr %element, align 4
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("store_i32_index", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .shl_r8_imm6 = 2 });
+    try expectInstruction(machine.instructions.items, .add_r8_rcx);
+    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .rcx });
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

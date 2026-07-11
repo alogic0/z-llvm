@@ -1013,6 +1013,7 @@ pub const ComposedBlockSelector = struct {
     fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.GepInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         if (gep.source_ty.eql(.{ .int = 8 })) return try selector.lowerBytePointerGep(result_name, gep);
+        if (isI32ElementPointerSource(gep.source_ty)) return try selector.lowerI32ElementPointerGep(result_name, gep);
         const len = parseI32ArrayType(gep.source_ty) orelse return .{ .no_emitter = "composed-block-gep-source" };
         const base = selector.resolveValue(gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
         const stack_array = switch (base) {
@@ -1044,6 +1045,21 @@ pub const ComposedBlockSelector = struct {
         return null;
     }
 
+    fn lowerI32ElementPointerGep(selector: *ComposedBlockSelector, result_name: []const u8, gep: ir.GepInst) !?Diagnostic {
+        if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
+        if (gep.indices.items.len != 1) return .{ .no_emitter = "composed-block-gep-index-count" };
+        const index = gep.indices.items[0];
+        if (!index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
+        if (index.value != .named) return .{ .no_emitter = "composed-block-gep-index-form" };
+
+        selector.emitValueIntoScratch(gep.ptr, .rcx, 64) catch return .{ .unsupported_value = "composed-block-unknown-gep-ptr" };
+        selector.emitValueIntoScratch(index.value, .r8, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+        try selector.machine.instructions.append(selector.allocator, .{ .shl_r8_imm6 = 2 });
+        try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
+        try selector.bindScratch(result_name, .rcx, 64);
+        return null;
+    }
+
     fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []const u8, gep: ir.GepInst) !?Diagnostic {
         if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
         if (gep.indices.items.len != 1) return .{ .no_emitter = "composed-block-gep-index-count" };
@@ -1066,6 +1082,13 @@ pub const ComposedBlockSelector = struct {
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
         }
         return null;
+    }
+
+    fn isI32ElementPointerSource(ty: ir.Type) bool {
+        return switch (ty) {
+            .aggregate => |text| std.mem.eql(u8, std.mem.trim(u8, text, " "), "[4 x i8]"),
+            .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+        };
     }
 
     fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {

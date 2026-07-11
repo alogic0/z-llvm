@@ -1,6 +1,7 @@
 extern fn __multi3(i128, i128) callconv(.c) i128;
 extern fn __modti3(i128, i128) callconv(.c) i128;
 extern fn zllvm_ne_zero_i16(u32) callconv(.c) u32;
+extern fn zllvm_store_i32_index([*]u32, u64, u32) callconv(.c) u32;
 
 var multi_lhs: i128 = 4294967299;
 var multi_rhs: i128 = -8589934597;
@@ -8,6 +9,7 @@ var mod_lhs: i128 = 123456789;
 var mod_rhs: i128 = 4294967299;
 var predicate_zero: u32 = 65536;
 var predicate_nonzero: u32 = 65537;
+var element_values = [3]u32{ 11, 22, 33 };
 
 const expected_product: i128 = -36893488194663743503;
 const expected_remainder: i128 = 123456789;
@@ -22,7 +24,9 @@ pub export fn _start() callconv(.c) noreturn {
     const remainder_bad: usize = @intFromBool(remainder != expected_remainder);
     const ne_zero_bad: usize = @intFromBool(zllvm_ne_zero_i16(loadU32(&predicate_zero)) != 0);
     const ne_nonzero_bad: usize = @intFromBool(zllvm_ne_zero_i16(loadU32(&predicate_nonzero)) != 1);
-    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14);
+    const stored = zllvm_store_i32_index(&element_values, 1, 99);
+    const gep_bad: usize = @intFromBool(stored != 99 or element_values[0] != 11 or element_values[1] != 99 or element_values[2] != 33);
+    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15);
 }
 
 fn loadI128(ptr: *i128) i128 {
