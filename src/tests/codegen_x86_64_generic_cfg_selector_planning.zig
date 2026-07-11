@@ -552,6 +552,54 @@ test "generic cfg selector stage two composes acyclic branch with labels" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector stage two shares framed return epilogue" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @framed_early_return(i64 %flag, i32 %value) {
+        \\entry:
+        \\  %buf = alloca [1 x i32], align 4
+        \\  %cond = icmp ult i64 %flag, 1
+        \\  br i1 %cond, label %early, label %later
+        \\early:
+        \\  ret i32 1
+        \\later:
+        \\  %slot = getelementptr inbounds [1 x i32], ptr %buf, i64 0, i64 0
+        \\  store i32 %value, ptr %slot, align 4
+        \\  %loaded = load i32, ptr %slot, align 4
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("framed_early_return", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try codegen.x86_64.verifyFunction(machine);
+
+    var restore_count: usize = 0;
+    var return_count: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .add_rsp_imm32 => restore_count += 1,
+        .ret => return_count += 1,
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), restore_count);
+    try std.testing.expectEqual(@as(usize, 1), return_count);
+    try expectNamedInstruction(machine.instructions.items, .jmp, "__zllvm_stage2_return_generic_cfg_select_end");
+    try expectNamedInstruction(machine.instructions.items, .label, "__zllvm_stage2_return_generic_cfg_select_end");
+}
+
 test "generic cfg selector stage two materializes unconditional phi edges" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -2328,6 +2376,36 @@ test "generic cfg selector spills every live accumulator binding" {
 
     try expectInstructionTag(machine.instructions.items, .spill_rax_rsp);
     try expectInstructionTag(machine.instructions.items, .reload_arg64_rsp);
+}
+
+test "generic cfg selector narrows trunc result location class" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @add_truncated_rhs(i32 %lhs, i64 %value) {
+        \\entry:
+        \\  %narrow = trunc i64 %value to i32
+        \\  %result = add i32 %lhs, %narrow
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("add_truncated_rhs", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .add, .reg = .rsi } });
 }
 
 test "generic cfg selector composes i128 left shift by one lane" {

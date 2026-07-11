@@ -158,6 +158,27 @@ Entry:
   ret i64 %sum2
 }
 
+define dso_local i32 @zllvm_add_truncated_rhs(i32 %lhs, i64 %value) {
+Entry:
+  %narrow = trunc i64 %value to i32
+  %result = add i32 %lhs, %narrow
+  ret i32 %result
+}
+
+define dso_local i32 @zllvm_framed_early_return(i64 %flag, i32 %value) {
+Entry:
+  %buf = alloca [1 x i32], align 4
+  %cond = icmp ult i64 %flag, 1
+  br i1 %cond, label %Early, label %Later
+Early:
+  ret i32 1
+Later:
+  %slot = getelementptr inbounds [1 x i32], ptr %buf, i64 0, i64 0
+  store i32 %value, ptr %slot, align 4
+  %loaded = load i32, ptr %slot, align 4
+  ret i32 %loaded
+}
+
 define dso_local i32 @zllvm_backward_layout_phi(i32 %value) {
 Entry:
   br label %Later

@@ -88,6 +88,9 @@ pub fn tryLowerComposedCfg(
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
     if (try composed.bindPhiResults(function)) |diagnostic| return unsupported(diagnostic);
     if (try composed.prepareStackFrame(function)) |diagnostic| return unsupported(diagnostic);
+    if (composed.stack_frame_bytes != 0) {
+        composed.return_epilogue_label = try composed.ownedReturnEpilogueLabel();
+    }
 
     for (function.blocks.items, 0..) |block, block_index| {
         if (block_index != 0) try machine.instructions.append(allocator, .{ .label = block.name });
@@ -112,6 +115,11 @@ pub fn tryLowerComposedCfg(
         }
         composed.current_position += 1;
     }
+    if (composed.return_epilogue_label) |label| {
+        try machine.instructions.append(allocator, .{ .label = label });
+        try composed.appendAddRsp(composed.stack_frame_bytes);
+        try machine.instructions.append(allocator, .ret);
+    }
     return .selected;
 }
 
@@ -128,6 +136,7 @@ pub const ComposedBlockSelector = struct {
     stack_array_allocated: bool = false,
     stack_array_count: usize = 0,
     stack_frame_bytes: u32 = 0,
+    return_epilogue_label: ?[]const u8 = null,
     current_position: usize = 1,
     expired_binding_this_position: bool = false,
     enable_expired_plan_register_reuse: bool = false,
@@ -420,8 +429,8 @@ pub const ComposedBlockSelector = struct {
             if (locIsAccumulator(lhs)) try selector.spillAccumulatorAliasesExcept(binary.lhs);
             try selector.emitValueIntoAccumulator(binary.lhs, bits);
             const rhs_reg: ArgReg = switch (rhs) {
-                .arg32, .scratch32 => |reg| if (bits <= 32) reg else return .{ .no_emitter = "composed-block-rhs-width" },
-                .arg64, .scratch64 => |reg| if (bits == 64) reg else return .{ .no_emitter = "composed-block-rhs-width" },
+                .arg32, .scratch32 => |reg| if (bits <= 32) reg else return .{ .no_emitter = "composed-block-rhs-i32-for-i64" },
+                .arg64, .scratch64 => |reg| if (bits == 64) reg else return .{ .no_emitter = "composed-block-rhs-i64-for-i32" },
                 .arg128, .scratch128 => return .{ .no_emitter = "composed-block-rhs-width" },
                 .spill64 => |frame_index| if (bits == 64) blk: {
                     try selector.clobberArgReg(.rcx);
@@ -896,7 +905,14 @@ pub const ComposedBlockSelector = struct {
                     try selector.bindScratch(result_name, dst, 64);
                 } else {
                     const loc = selector.resolveValue(cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
-                    try selector.bindValueLoc(result_name, loc);
+                    const result_loc: ValueLoc = if (from_bits > 32 and to_bits <= 32) switch (loc) {
+                        .arg64, .scratch64 => |reg| .{ .scratch32 = reg },
+                        .rax => .eax,
+                        .spill64 => |frame_index| .{ .spill64 = frame_index },
+                        .arg32, .scratch32, .eax => loc,
+                        .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-cast-width" },
+                    } else loc;
+                    try selector.bindValueLoc(result_name, result_loc);
                     switch (loc) {
                         .arg32, .arg64, .eax, .rax, .scratch32, .scratch64 => {},
                         .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-cast-width" },
@@ -1520,6 +1536,10 @@ pub const ComposedBlockSelector = struct {
     }
 
     fn emitReturnEpilogue(selector: *ComposedBlockSelector) !void {
+        if (selector.return_epilogue_label) |label| {
+            try selector.machine.instructions.append(selector.allocator, .{ .jmp = label });
+            return;
+        }
         if (selector.stack_frame_bytes != 0) try selector.appendAddRsp(selector.stack_frame_bytes);
         try selector.machine.instructions.append(selector.allocator, .ret);
     }
@@ -1618,6 +1638,13 @@ pub const ComposedBlockSelector = struct {
         const label = try std.fmt.allocPrint(selector.allocator, "__zllvm_stage2_{d}_generic_cfg_select_end", .{selector.edge_label_count});
         errdefer selector.allocator.free(label);
         selector.edge_label_count += 1;
+        try selector.machine.owned_labels.append(selector.allocator, label);
+        return label;
+    }
+
+    fn ownedReturnEpilogueLabel(selector: *ComposedBlockSelector) ![]const u8 {
+        const label = try selector.allocator.dupe(u8, "__zllvm_stage2_return_generic_cfg_select_end");
+        errdefer selector.allocator.free(label);
         try selector.machine.owned_labels.append(selector.allocator, label);
         return label;
     }
