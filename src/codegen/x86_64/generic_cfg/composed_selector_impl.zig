@@ -401,9 +401,23 @@ pub const ComposedBlockSelector = struct {
         const lhs = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
         const rhs = selector.resolveValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
 
-        if (locIsAccumulator(rhs) and !locIsAccumulator(lhs) and isCommutative(op)) {
-            try selector.emitBinaryLocIntoAccumulator(op, lhs, bits);
+        if (locIsAccumulator(rhs) and !locIsAccumulator(lhs)) {
+            if (isCommutative(op)) {
+                try selector.spillAccumulatorAliasesExcept(binary.rhs);
+                try selector.emitBinaryLocIntoAccumulator(op, lhs, bits);
+            } else {
+                const rhs_scratch: ArgReg = switch (lhs) {
+                    .arg32, .arg64, .scratch32, .scratch64 => |reg| if (reg == .rcx) .rdx else .rcx,
+                    .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => .rcx,
+                    .eax, .rax => unreachable,
+                };
+                try selector.emitValueIntoScratch(binary.rhs, rhs_scratch, bits);
+                if (locIsAccumulator(lhs)) try selector.spillAccumulatorAliasesExcept(binary.lhs);
+                try selector.emitValueIntoAccumulator(binary.lhs, bits);
+                try selector.emitBinaryArgAccumulator(op, rhs_scratch, bits);
+            }
         } else {
+            if (locIsAccumulator(lhs)) try selector.spillAccumulatorAliasesExcept(binary.lhs);
             try selector.emitValueIntoAccumulator(binary.lhs, bits);
             const rhs_reg: ArgReg = switch (rhs) {
                 .arg32, .scratch32 => |reg| if (bits <= 32) reg else return .{ .no_emitter = "composed-block-rhs-width" },
@@ -2588,7 +2602,32 @@ pub const ComposedBlockSelector = struct {
 
     fn clobberAccumulator(selector: *ComposedBlockSelector) !void {
         selector.dropExpiredAccumulatorBindings();
-        if (selector.liveAccumulatorName()) |name| try selector.spillValueOrError(name);
+        while (selector.liveAccumulatorName()) |name| {
+            try selector.spillValueOrError(name);
+        }
+    }
+
+    fn spillAccumulatorAliasesExcept(selector: *ComposedBlockSelector, value: ir.Value) !void {
+        const ignored = switch (value) {
+            .named => |name| name,
+            else => return,
+        };
+        while (selector.liveAccumulatorNameExcept(ignored)) |name| {
+            try selector.spillValueOrError(name);
+        }
+    }
+
+    fn liveAccumulatorNameExcept(selector: ComposedBlockSelector, ignored: []const u8) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
+            if (!selector.valueIsLiveAtOrAfterCurrent(entry.key_ptr.*)) continue;
+            switch (entry.value_ptr.loc) {
+                .eax, .rax => return entry.key_ptr.*,
+                .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
     }
 
     fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) void {
@@ -2628,13 +2667,19 @@ pub const ComposedBlockSelector = struct {
     fn liveAccumulatorName(selector: ComposedBlockSelector) ?[]const u8 {
         var it = selector.values.iterator();
         while (it.next()) |entry| {
-            if (!selector.valueIsLiveAfterCurrent(entry.key_ptr.*)) continue;
+            if (!selector.valueIsLiveAtOrAfterCurrent(entry.key_ptr.*)) continue;
             switch (entry.value_ptr.loc) {
                 .eax, .rax => return entry.key_ptr.*,
                 .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
             }
         }
         return null;
+    }
+
+    fn valueIsLiveAtOrAfterCurrent(selector: ComposedBlockSelector, name: []const u8) bool {
+        const plan = selector.allocation_plan orelse return false;
+        const end = plan.intervalEnd(name) orelse return true;
+        return end >= selector.current_position;
     }
 
     fn liveEaxName(selector: ComposedBlockSelector) ?[]const u8 {

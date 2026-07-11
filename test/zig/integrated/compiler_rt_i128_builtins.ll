@@ -136,6 +136,28 @@ Entry:
   ret i32 %loaded
 }
 
+define dso_local i64 @zllvm_sub_rhs_accumulator(i64 %lhs, i64 %a, i64 %b) {
+Entry:
+  %rhs = add i64 %a, %b
+  %result = sub i64 %lhs, %rhs
+  ret i64 %result
+}
+
+define dso_local i64 @zllvm_sum_loaded_i32(ptr %values, i64 %base) {
+Entry:
+  %slot = alloca [1 x i32], align 4
+  %first32 = load i32, ptr %values, align 4
+  %first64 = zext i32 %first32 to i64
+  %second_ptr = getelementptr i8, ptr %values, i64 4
+  %second32 = load i32, ptr %second_ptr, align 4
+  %second64 = zext i32 %second32 to i64
+  %sum1 = add i64 %base, %first64
+  %sum2 = add i64 %sum1, %second64
+  %low = trunc i64 %sum2 to i32
+  store i32 %low, ptr %slot, align 4
+  ret i64 %sum2
+}
+
 define dso_local i32 @zllvm_backward_layout_phi(i32 %value) {
 Entry:
   br label %Later

@@ -2536,6 +2536,20 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_stack_index_liveness.summary`;
   Tier 2 record `docs/evidence/selector_tier2_stack_index_liveness.summary`.
 
+- 2026-07-11 (this commit) Item 15 parked-boundary retry: noncommutative
+  binaries now preserve an accumulator RHS in a nonconflicting scratch before
+  materializing the LHS, and every live accumulator alias is spilled before a
+  destructive overwrite, including aliases retained through an in-place
+  operand. Executable subtraction and load/zext/add cases prove operand order
+  and alias survival. The focused `__udivei5` retry advances from
+  `composed-block-two-address-rhs-accumulator` through repeated unrolled alias
+  conflicts to `no_emitter` / `composed-block-rhs-width`; report-all remains
+  443 selected, 130 emitted, and 313 failed. Tier 2 is green; no ratchet moves.
+  Evidence `docs/evidence/std_debug_hello_udivei5_accumulator_aliases.summary`;
+  executable proof
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_accumulator_aliases.summary`;
+  Tier 2 record `docs/evidence/selector_tier2_accumulator_aliases.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

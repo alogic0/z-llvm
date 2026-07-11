@@ -2260,6 +2260,76 @@ test "generic cfg selector keeps stack pointer index dependencies live" {
     try expectInstructionTag(machine.instructions.items, .reload_arg64_rsp);
 }
 
+test "generic cfg selector preserves accumulator binary rhs order" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @sub_rhs_accumulator(i64 %lhs, i64 %a, i64 %b) {
+        \\entry:
+        \\  %rhs = add i64 %a, %b
+        \\  %result = sub i64 %lhs, %rhs
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("sub_rhs_accumulator", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .mov_rax_to_arg = .rcx });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+}
+
+test "generic cfg selector spills every live accumulator binding" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @sum_loaded_i32(ptr %values, i64 %base) {
+        \\entry:
+        \\  %slot = alloca [1 x i32], align 4
+        \\  %first32 = load i32, ptr %values, align 4
+        \\  %first64 = zext i32 %first32 to i64
+        \\  %second_ptr = getelementptr i8, ptr %values, i64 4
+        \\  %second32 = load i32, ptr %second_ptr, align 4
+        \\  %second64 = zext i32 %second32 to i64
+        \\  %sum1 = add i64 %base, %first64
+        \\  %sum2 = add i64 %sum1, %second64
+        \\  %low = trunc i64 %sum2 to i32
+        \\  store i32 %low, ptr %slot, align 4
+        \\  ret i64 %sum2
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("sum_loaded_i32", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstructionTag(machine.instructions.items, .spill_rax_rsp);
+    try expectInstructionTag(machine.instructions.items, .reload_arg64_rsp);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

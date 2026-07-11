@@ -1451,7 +1451,17 @@ test "generic cfg selector composes signed i64 remainder stack call with spills"
     try expectInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot2 });
     try expectInstruction(machine.instructions.items, .abs_i64_rdi_rax);
     try expectInstruction(machine.instructions.items, .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot2 } });
-    try expectInstruction(machine.instructions.items, .{ .mov_rax_to_arg = .rsi });
+    var saw_rsi_materialization = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .mov_rax_to_arg => |reg| if (reg == .rsi) {
+            saw_rsi_materialization = true;
+        },
+        .reload_arg64_rsp => |reload| if (reload.reg == .rsi) {
+            saw_rsi_materialization = true;
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_rsi_materialization);
     try expectInstruction(machine.instructions.items, .{ .mov_rsp_arg64 = .rdx });
     try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_rax = 0 });
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[machine.instructions.items.len - 2]);
