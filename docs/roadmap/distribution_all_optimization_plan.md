@@ -21,8 +21,8 @@ a cached run materially faster. Optimize measured bottlenecks in this order:
 4. opaque orchestration and duplicated gate definitions;
 5. excessive artifact I/O and retention.
 
-Initial performance targets, measured against the accepted baseline on the
-same machine and source state:
+Initial cumulative performance targets, measured against the accepted Phase 0
+baseline on the same machine:
 
 - reduce cached wall time by at least 40%;
 - reduce forced-fresh wall time by at least 20%;
@@ -33,6 +33,12 @@ same machine and source state:
 If measurements show that these percentages are unrealistic, record the
 measured constraint and replace them with a source-backed target before
 claiming completion.
+
+Every phase also compares against the immediately previous accepted state.
+The previous-state comparison attributes the phase's incremental effect; the
+original Phase 0 comparison measures cumulative progress. Evidence records
+both and never presents results from different source states as a same-state
+comparison.
 
 ## Non-Goals
 
@@ -59,6 +65,29 @@ The current timing patch is the correct prerequisite: it records each
 subgate's duration and cache status, ranks the slowest gates, and supports one
 forced-fresh real-row run for comparison with one cached run.
 
+## Scheduling And Capability Priority
+
+This plan does not replace the active convergence queue. Item 12 (`std hello`)
+and its `__udivei5` selector chain remain the primary capability track.
+
+- Finish Phase 0 now because its implementation and long-running evidence are
+  already in progress.
+- After Phase 0, return to the capability track by default.
+- Take Phase 1 only as a bounded infrastructure interlude when the baseline
+  shows repeated tool compilation/startup is at least 10% of cached wall time
+  or another explicitly approved material absolute cost.
+- Keep the existing cadence of at most one measured refactor interlude per
+  completed capability slice.
+- Defer Phases 2-6 until item 12 closes unless a measured orchestration cost is
+  blocking productive capability work.
+- Starting Phase 2 or later before item 12 closes requires an explicit Active
+  inbox directive that cites the measurement and the reason capability work
+  cannot remain primary.
+
+A completed measurement is allowed to conclude that no infrastructure phase
+is currently worth doing. In that case, record the result and resume
+convergence work rather than searching for a reason to continue this plan.
+
 ## Phase 0 — Accept The Baseline
 
 Finish the current measurement capability before changing orchestration.
@@ -80,6 +109,28 @@ Do not repeat either full run unless the measurement implementation or another
 relevant input changes. Do not start Phase 1 until the baseline identifies the
 dominant costs.
 
+### Canonical Equivalence Contract
+
+Before migrating orchestration, define one canonical output comparison used by
+Phases 1, 4, and 6. Prefer a small checked tool over review-time judgment. It
+must:
+
+- compare child exit status and the presence of every expected gate record;
+- preserve gate id, arguments, counters, ownership classifications, expected
+  failures, diagnostics, and `local_fail` fields;
+- remove only declared volatile fields such as durations, process ids, cache
+  observations, and run-specific temporary paths;
+- normalize absolute repository and scratch paths to stable logical ids;
+- sort only record families whose order is explicitly non-semantic, using a
+  documented stable key;
+- report missing, extra, or changed semantic fields;
+- fail on a new volatile-looking field until the normalization specification
+  explicitly classifies it.
+
+Raw byte comparison remains valid for outputs without volatile fields. The
+canonical comparison output, normalization schema version, and both source log
+paths are part of the evidence.
+
 ## Phase 1 — Reuse Compiled Tools
 
 Goal: stop treating every subgate as an independent `zig run` compilation.
@@ -100,8 +151,8 @@ Implementation direction:
 Commit slices:
 
 - add one reusable child executable without changing gate behavior;
-- migrate one gate family and compare its output byte-for-byte or by canonical
-  summary lines;
+- migrate one gate family and compare its output byte-for-byte or with the
+  canonical equivalence contract above;
 - migrate the remaining measured high-cost families;
 - delete the superseded nested invocation path only after all callers move.
 
@@ -110,7 +161,12 @@ Acceptance:
 - no changed gate summaries;
 - direct focused commands still work;
 - timing evidence shows reduced compilation/startup overhead;
-- a failed child still reports its command, exit status, and captured output.
+- a failed child still reports its command, exit status, and captured output;
+- the phase records incremental timing against the previous accepted state and
+  cumulative timing against Phase 0.
+
+If the measured threshold in Scheduling And Capability Priority is not met,
+close Phase 1 as deferred and return to item 12 without implementation work.
 
 ## Phase 2 — One Authoritative Gate Manifest
 
@@ -125,7 +181,7 @@ Define one `DistributionGate` record containing at least:
 - target and mode requirements;
 - dependency ids;
 - output-directory ownership;
-- cacheability and cache-key inputs;
+- cache domain and the shared cache-key contract id;
 - whether the gate is a correctness, boundary, inspection, native-link, or
   executable proof;
 - whether it may run concurrently.
@@ -134,13 +190,21 @@ Generate or consume both the `build.zig` steps and the full-suite order from
 this definition. The manifest must not encode implementation-specific case
 admission; it describes orchestration only.
 
+The manifest and a child tool must not independently encode cache-key inputs.
+One shared cache-key definition owns the normalized key material and its hash.
+Each cacheable tool reports the cache contract id, schema version, and input
+category names it actually consumed. A coherence test compares that report
+with the manifest declaration and fails on missing, extra, or renamed input
+categories.
+
 Acceptance:
 
 - one authoritative gate inventory;
 - duplicate ids and missing dependencies fail during build configuration;
 - `distribution-all` retains deterministic summary ordering even if execution
   becomes parallel later;
-- focused build-step names remain stable.
+- focused build-step names remain stable;
+- cache-contract coherence tests cover every cacheable manifest entry.
 
 ## Phase 3 — Stage-Level Content Caching
 
@@ -152,9 +216,12 @@ Candidate cached stages, in measured priority order:
 - parsed/typed descriptor or lowered project IR;
 - emitted object;
 - object-inspection result;
-- native-linked executable;
-- deterministic executable result where reuse is explicitly allowed for
-  diagnostics, never as the only milestone execution proof.
+- native-linked executable.
+
+Executable *results* are never cached. Every selected canary, boundary
+executable, and milestone executable actually runs when its gate is selected,
+even when its input object or linked binary came from cache. A stale execution
+result can hide a miscompile and is not worth the small time saving.
 
 Every cache key must include the relevant subset of:
 
@@ -171,6 +238,7 @@ Cache design rules:
 - a miss recomputes; it never falls back to stale data;
 - metadata explains every hit and miss;
 - outputs are written atomically;
+- published cache entries are immutable;
 - partial or corrupt entries are rejected and cleaned safely;
 - documentation-only changes do not invalidate compiler artifacts;
 - encoder changes invalidate objects but should not force AIR export;
@@ -183,7 +251,8 @@ Acceptance:
 - a deliberate change to every key category demonstrates the expected
   invalidation boundary;
 - cache size and cleanup policy are documented;
-- no cache is required for correctness.
+- no cache is required for correctness;
+- executable gates prove that cached binaries are still executed.
 
 ## Phase 4 — Explicit DAG And Bounded Parallelism
 
@@ -204,9 +273,15 @@ Implementation order:
 3. Give every concurrent task a unique scratch/output directory.
 4. Make shared cache metadata read-only during consumers, or protect atomic
    publication explicitly.
-5. Enable bounded concurrency behind a flag.
-6. Measure concurrency levels 1, 2, and a machine-appropriate upper bound.
-7. Select the default from wall time, peak memory, and disk pressure rather
+5. Disable cache pruning while a parallel distribution graph has active
+   readers. Run pruning before or after the graph, never concurrently with it.
+   If concurrent pruning is later required, publish immutable generation
+   directories atomically and prove that a reader can open every member while
+   an old generation is retired; independent companion-file deletion is not
+   sufficient.
+6. Enable bounded concurrency behind a flag.
+7. Measure concurrency levels 1, 2, and a machine-appropriate upper bound.
+8. Select the default from wall time, peak memory, and disk pressure rather
    than CPU count alone.
 
 Preserve deterministic reporting by buffering child summaries and emitting
@@ -217,6 +292,8 @@ Acceptance:
 - concurrency 1 is a supported diagnostic mode;
 - repeated parallel runs produce the same summaries and artifacts;
 - no shared-path races or intermittent cache corruption;
+- a targeted prune/read test proves an active generation cannot disappear
+  during a parallel run;
 - peak memory and temporary disk usage remain within documented bounds.
 
 ## Phase 5 — Remove Duplicated Work Inside Slow Gates
@@ -267,6 +344,15 @@ Each implementation commit must:
 5. preserve fail-closed and expected-failure gates;
 6. avoid mixing performance refactoring with compiler semantic changes.
 
+Each accepted phase records:
+
+- original Phase 0 baseline commit and timing;
+- immediately previous accepted commit and timing;
+- current commit and timing;
+- incremental percentage and absolute change;
+- cumulative percentage and absolute change;
+- canonical equivalence schema and result.
+
 Run full Tier 3 only when required by `docs/validation_tiers.md`: the baseline,
 the fresh/cached comparison, a shared orchestration/cache boundary close, or
 final milestone confirmation. Do not run it after every internal edit.
@@ -279,9 +365,9 @@ next optimization on top.
 
 Maintain a compact table here or in a linked evidence summary:
 
-| State | Fresh wall time | Cached wall time | Slowest gate | Cache result | Notes |
-| --- | ---: | ---: | --- | --- | --- |
-| Baseline | pending | pending | pending | pending | Phase 0 |
+| State | Commit | Fresh wall | Cached wall | Incremental | Cumulative | Slowest gate | Notes |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| Phase 0 baseline | pending | pending | pending | n/a | n/a | pending | original baseline |
 
 Record only materially changed states. Do not turn routine worker cycles into
 repeated full-suite benchmarks.
@@ -299,6 +385,12 @@ The supervisor may nudge the worker to continue only when all are true:
 - the current phase's result has been inspected and recorded;
 - the next checklist slice is explicit in this plan or the active tracker;
 - no unresolved blocker requires user or architectural review.
+
+After Phase 0, the normal continuation is the active item-12 capability slice,
+not Phase 1. The supervisor may direct Phase 1 only when its measured threshold
+and bounded-interlude rule are satisfied. It may not direct Phase 2 or later
+before item 12 closes without the explicit Active inbox authorization required
+by Scheduling And Capability Priority.
 
 The supervisor must not:
 
@@ -319,13 +411,17 @@ directive: instruct the worker to resume the next documented slice.
 This plan is complete when:
 
 - the accepted baseline and final fresh/cached measurements are tracked;
+- every phase records incremental and cumulative comparisons;
 - the performance targets are met or replaced by an approved measured limit;
-- gate semantics and deterministic summaries are unchanged;
+- gate semantics and deterministic summaries are unchanged under the canonical
+  equivalence contract;
 - compiled tools and shared stages are reused at their correct ownership
   boundaries;
 - independent gates use safe bounded parallelism where it helps;
 - one manifest owns the distribution graph;
 - obsolete nested orchestration is removed;
+- executable results are never served from cache;
+- cache pruning cannot race active parallel readers;
 - focused gates remain independently usable;
 - the worker documentation no longer encourages full-suite execution as an
   inner loop.
