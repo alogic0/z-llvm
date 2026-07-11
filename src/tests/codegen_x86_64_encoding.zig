@@ -232,6 +232,38 @@ test "x86_64 encoding emits and executes full-width multiply" {
     try std.testing.expectEqual(@as(i128, -3) * 7, fullSignedProduct(-3, 7));
 }
 
+test "x86_64 encoding executes add-carry immediate zero" {
+    var machine = codegen.x86_64.MachineFunction.init("add_carry_zero", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .mov_imm_rax = -1 });
+    try machine.instructions.append(std.testing.allocator, .{ .mov_imm_rcx = 1 });
+    try machine.instructions.append(std.testing.allocator, .{ .add_arg64_rax = .rcx });
+    try machine.instructions.append(std.testing.allocator, .adc_rax_imm0);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.adc_rax_imm0));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0xb8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0x48, 0xb9, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x48, 0x01, 0xc8, 0x48, 0x83, 0xd0, 0x00, 0xc3,
+    }, bytes);
+
+    const mapping = try std.posix.mmap(
+        null,
+        bytes.len,
+        .{ .READ = true, .WRITE = true, .EXEC = true },
+        .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+        -1,
+        0,
+    );
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const addCarry: *const fn () callconv(.c) u64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u64, 1), addCarry());
+}
+
 test "x86_64 encoding sizes nonzero frame spill slots" {
     var machine = codegen.x86_64.MachineFunction.init("frame_slots", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

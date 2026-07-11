@@ -112,6 +112,25 @@ test "x86_64 assembly prints full-width multiply forms" {
     );
 }
 
+test "x86_64 assembly prints add-carry immediate zero" {
+    var machine = codegen.x86_64.MachineFunction.init("add_carry_zero", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .adc_rax_imm0);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl add_carry_zero\n" ++
+            "add_carry_zero:\n" ++
+            "\tadcq $0, %rax\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 codegen lowers return constant and argument" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -2807,6 +2807,16 @@ One line per completed cycle, append-only, newest last. This is the
   ratchet moves. Evidence
   `docs/evidence/x86_64_full_product_binding.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  arithmetic foundation: the machine and encoder layers now provide
+  `adcq $0, %rax` for limb carry propagation. Exact assembly/byte checks and
+  an executable wrapped-add case prove that CF survives into the increment.
+  Tier 2 is green across unit, structural, captured-object, permanent-canary,
+  and boundary gates. The focused `__muloti4` row remains at
+  `no_emitter/composed-block-call-form`; report-all remains 443 selected, 136
+  emitted, and 307 failed. No tracker or ratchet moves. Evidence
+  `docs/evidence/x86_64_adc_rax_imm0.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
