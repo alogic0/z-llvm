@@ -97,12 +97,12 @@ Current operating note recorded 2026-07-10:
   `max_spill_slots_needed=15`, `max_spill_slots_over_envelope=9`,
   `first_exceed_block=Then9.prol`, `first_exceed_boundary=live_out`,
   `first_exceed_live_values=13`, and `first_exceed_spill_slots_needed=7`.
-  This cycle closes i64 immediate AND forms by materializing the mask in RCX
-  and applying the existing register-to-RAX binary emitter. Debug compiler_rt
-  report-all remains 443
+  This cycle closes nonzero i64 equality-immediate forms with the existing
+  64-bit compare emitter while preserving zero comparisons on the test path.
+  Debug compiler_rt report-all remains 443
   selected / 130 emitting / 313 failing, with first failure still
   `compiler_rt.udivmodei4.__udivei5` but now at `no_emitter` /
-  `composed-block-icmp-eq-rhs`.
+  `composed-block-icmp-rhs`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -128,9 +128,9 @@ Current operating note recorded 2026-07-10:
   `tmp/distribution_all_after_inbox5.log`. Current INBOX-7 validation logs are
   `tmp/zig_integrated_exe_i128_arithmetic_inbox7.log` and
   `tmp/distribution_all_after_inbox7.log`. The current parked-boundary retry
-  log is `tmp/std_debug_hello_debug_udivei5_and64_imm.log`; current acceptance
-  logs are `tmp/zig_integrated_exe_i128_arithmetic_and64_imm.log` and
-  `tmp/distribution_all_after_and64_imm.log`.
+  log is `tmp/std_debug_hello_debug_udivei5_icmp_eq_imm.log`; current
+  acceptance logs are `tmp/zig_integrated_exe_i128_arithmetic_icmp_eq_imm.log`
+  and `tmp/distribution_all_after_icmp_eq_imm.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
@@ -146,12 +146,12 @@ Current operating note recorded 2026-07-10:
   `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary`.
   Current INBOX-7 gate evidence is
   `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox7.summary` and
-  `docs/evidence/distribution_all_after_inbox7.summary`. Current i64-immediate
-  evidence is `docs/evidence/std_debug_hello_udivei5_and64_imm.summary`,
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_and64_imm.summary`, and
-  `docs/evidence/distribution_all_after_and64_imm.summary`.
+  `docs/evidence/distribution_all_after_inbox7.summary`. Current equality
+  evidence is `docs/evidence/std_debug_hello_udivei5_icmp_eq_imm.summary`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_imm.summary`, and
+  `docs/evidence/distribution_all_after_icmp_eq_imm.summary`.
 - Recommended next action: continue `compiler_rt.udivmodei4.__udivei5` at the
-  `composed-block-icmp-eq-rhs` frontier exposed after i64 immediate-mask
+  `composed-block-icmp-rhs` frontier exposed after nonzero i64 equality
   lowering, then retry
   `compiler_rt.udivmodei4.__umodei4` under the same frame model before
   resuming remaining integer-helper rows in rank order; keep the intervening

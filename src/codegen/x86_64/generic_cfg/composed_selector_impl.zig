@@ -899,8 +899,17 @@ pub const ComposedBlockSelector = struct {
                 .int => |int| int,
                 .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-icmp-rhs" },
             };
-            if (try i64Value(rhs) != 0) return .{ .no_emitter = "composed-block-icmp-eq-rhs" };
             const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };
+            const imm = try i64Value(rhs);
+            if (imm != 0) {
+                if (bits != 64) return .{ .no_emitter = "composed-block-icmp-eq-rhs" };
+                selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+                try selector.clobberAccumulator();
+                try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = imm } });
+                try selector.machine.instructions.append(selector.allocator, .sete_eax);
+                try selector.bindEax(result_name);
+                return null;
+            }
             const loc = selector.resolveValue(icmp.lhs) orelse return .{ .unsupported_value = "composed-block-icmp-lhs" };
             switch (loc) {
                 .eax => try selector.machine.instructions.append(selector.allocator, .test_eax_eax),
