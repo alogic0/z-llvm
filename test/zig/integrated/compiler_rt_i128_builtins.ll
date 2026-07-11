@@ -66,6 +66,47 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_store_i32_spilled_ptr(ptr %base, i32 %value) {
+Entry:
+  %p1 = getelementptr i8, ptr %base, i64 0
+  %p2 = getelementptr i8, ptr %base, i64 4
+  %p3 = getelementptr i8, ptr %base, i64 8
+  %p4 = getelementptr i8, ptr %base, i64 12
+  %p5 = getelementptr i8, ptr %base, i64 16
+  %p6 = getelementptr i8, ptr %base, i64 20
+  %spilled = getelementptr i8, ptr %base, i64 24
+  store i32 %value, ptr %spilled, align 4
+  %eq1 = icmp eq ptr %p1, %p1
+  %eq2 = icmp eq ptr %p2, %p2
+  %eq3 = icmp eq ptr %p3, %p3
+  %eq4 = icmp eq ptr %p4, %p4
+  %eq5 = icmp eq ptr %p5, %p5
+  %eq6 = icmp eq ptr %p6, %p6
+  %loaded = load i32, ptr %spilled, align 4
+  %v1 = zext i1 %eq1 to i32
+  %v2 = zext i1 %eq2 to i32
+  %v3 = zext i1 %eq3 to i32
+  %v4 = zext i1 %eq4 to i32
+  %v5 = zext i1 %eq5 to i32
+  %v6 = zext i1 %eq6 to i32
+  %sum1 = add i32 %loaded, %v1
+  %sum2 = add i32 %sum1, %v2
+  %sum3 = add i32 %sum2, %v3
+  %sum4 = add i32 %sum3, %v4
+  %sum5 = add i32 %sum4, %v5
+  %result = add i32 %sum5, %v6
+  ret i32 %result
+}
+
+define dso_local i32 @zllvm_store_array_base(i32 %value) {
+Entry:
+  %slot = alloca [3 x i32], align 4
+  store i32 %value, ptr %slot, align 4
+  %base = getelementptr [3 x i32], ptr %slot, i64 0, i64 0
+  %loaded = load i32, ptr %base, align 4
+  ret i32 %loaded
+}
+
 define dso_local i32 @zllvm_backward_layout_phi(i32 %value) {
 Entry:
   br label %Later

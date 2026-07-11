@@ -1084,7 +1084,12 @@ pub const ComposedBlockSelector = struct {
         switch (ptr) {
             .arg64, .scratch64 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = reg }),
             .stack_i32_ptr => |stack_ptr| try selector.appendStoreStackI32(stack_ptr),
-            .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .spill64, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
+            .stack_i32_array => |stack_array| try selector.appendStoreStackI32(.{ .disp = stack_array.base_disp }),
+            .spill64 => |frame_index| {
+                try selector.materializeLocIntoLoc(.{ .spill64 = frame_index }, .{ .scratch64 = .rcx });
+                try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = .rcx });
+            },
+            .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
         }
         return null;
     }

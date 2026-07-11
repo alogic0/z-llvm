@@ -2068,6 +2068,95 @@ test "generic cfg selector loads i32 through spilled pointer" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector stores i32 through spilled pointer" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @store_spilled_ptr(ptr %base, i32 %value) {
+        \\entry:
+        \\  %p1 = getelementptr i8, ptr %base, i64 0
+        \\  %p2 = getelementptr i8, ptr %base, i64 4
+        \\  %p3 = getelementptr i8, ptr %base, i64 8
+        \\  %p4 = getelementptr i8, ptr %base, i64 12
+        \\  %p5 = getelementptr i8, ptr %base, i64 16
+        \\  %p6 = getelementptr i8, ptr %base, i64 20
+        \\  %spilled = getelementptr i8, ptr %base, i64 24
+        \\  store i32 %value, ptr %spilled, align 4
+        \\  %eq1 = icmp eq ptr %p1, %p1
+        \\  %eq2 = icmp eq ptr %p2, %p2
+        \\  %eq3 = icmp eq ptr %p3, %p3
+        \\  %eq4 = icmp eq ptr %p4, %p4
+        \\  %eq5 = icmp eq ptr %p5, %p5
+        \\  %eq6 = icmp eq ptr %p6, %p6
+        \\  %loaded = load i32, ptr %spilled, align 4
+        \\  %v1 = zext i1 %eq1 to i32
+        \\  %v2 = zext i1 %eq2 to i32
+        \\  %v3 = zext i1 %eq3 to i32
+        \\  %v4 = zext i1 %eq4 to i32
+        \\  %v5 = zext i1 %eq5 to i32
+        \\  %v6 = zext i1 %eq6 to i32
+        \\  %sum1 = add i32 %loaded, %v1
+        \\  %sum2 = add i32 %sum1, %v2
+        \\  %sum3 = add i32 %sum2, %v3
+        \\  %sum4 = add i32 %sum3, %v4
+        \\  %sum5 = add i32 %sum4, %v5
+        \\  %result = add i32 %sum5, %v6
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("store_spilled_ptr", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstructionTag(machine.instructions.items, .reload_arg64_rsp);
+    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .rcx });
+}
+
+test "generic cfg selector stores i32 through local array base" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @store_array_base(i32 %value) {
+        \\entry:
+        \\  %slot = alloca [3 x i32], align 4
+        \\  store i32 %value, ptr %slot, align 4
+        \\  %base = getelementptr [3 x i32], ptr %slot, i64 0, i64 0
+        \\  %loaded = load i32, ptr %base, align 4
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("store_array_base", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp32 = 256 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_eax = 256 });
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

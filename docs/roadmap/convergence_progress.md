@@ -2486,6 +2486,18 @@ One line per completed cycle, append-only, newest last. This is the
   proof `docs/evidence/zig_integrated_exe_i128_arithmetic_phi_stable_dest.summary`;
   Tier 2 record `docs/evidence/selector_tier2_phi_stable_dest.summary`.
 
+- 2026-07-11 (this commit) Item 15 parked-boundary retry: composed i32 stores
+  now consume spilled external pointers through the clobber-aware `%rcx`
+  reload path and write directly to local i32 array base displacements.
+  Executable cases verify the stored value and neighboring memory for both
+  forms. The focused `__udivei5` retry advances from
+  `composed-block-store-ptr` to `unsupported_value` /
+  `stage2-unsupported-value`; report-all remains 443 selected, 130 emitted,
+  and 313 failed. Tier 2 is green; no ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_udivei5_store_ptr_forms.summary`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_store_ptr_forms.summary`;
+  Tier 2 record `docs/evidence/selector_tier2_store_ptr_forms.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
