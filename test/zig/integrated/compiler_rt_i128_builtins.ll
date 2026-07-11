@@ -117,6 +117,12 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i64 @zllvm_or_i64_imm(i64 %value) {
+Entry:
+  %result = or i64 %value, 1
+  ret i64 %result
+}
+
 define dso_local i32 @zllvm_backward_layout_phi(i32 %value) {
 Entry:
   br label %Later

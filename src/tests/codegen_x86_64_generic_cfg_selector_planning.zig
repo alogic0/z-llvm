@@ -2192,6 +2192,36 @@ test "generic cfg selector preserves accumulator select true value" {
     try expectInstructionTag(machine.instructions.items, .reload_rsp_eax);
 }
 
+test "generic cfg selector composes i64 immediate or" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @or_i64_imm(i64 %value) {
+        \\entry:
+        \\  %result = or i64 %value, 1
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("or_i64_imm", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_rcx = 1 });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } });
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

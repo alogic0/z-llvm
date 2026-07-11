@@ -2511,6 +2511,17 @@ One line per completed cycle, append-only, newest last. This is the
   proof `docs/evidence/zig_integrated_exe_i128_arithmetic_select_preserve.summary`;
   Tier 2 record `docs/evidence/selector_tier2_select_preserve.summary`.
 
+- 2026-07-11 (this commit) Item 15 parked-boundary retry: composed i64
+  immediate OR now preserves destructive `%rax`, materializes the full
+  constant in `%rcx`, and emits register OR. Executable low-bit-clear and
+  low-bit-set cases prove the operation. The focused `__udivei5` retry
+  advances from `composed-block-binary-imm-rhs-width` to
+  `unsupported_value` / `stage2-store-value`; report-all remains 443 selected,
+  130 emitted, and 313 failed. Tier 2 is green; no ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_udivei5_or64_imm.summary`; executable proof
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_or64_imm.summary`; Tier 2
+  record `docs/evidence/selector_tier2_or64_imm.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
