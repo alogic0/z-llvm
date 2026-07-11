@@ -2603,6 +2603,19 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_umodei4_spilled_trunc.summary`, and
   `docs/evidence/selector_tier2_umodei4_spilled_trunc.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
+  retry: i32 loads may now address element zero directly through a local
+  stack-array alloca's frame-object base displacement, matching the existing
+  direct store path. The executable stack-array-base case proves the stored
+  value is read back correctly. The focused `__umodei4` retry advances from
+  `composed-block-load-ptr` to `no_spill_envelope` /
+  `composed-block-two-address-rhs-accumulator`; report-all remains 443
+  selected, 131 emitted, and 312 failed. Tier 2 is green; no tracker or
+  ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_umodei4_stack_array_load.summary`,
+  `docs/evidence/zig_integrated_exe_umodei4_stack_array_load.summary`, and
+  `docs/evidence/selector_tier2_umodei4_stack_array_load.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

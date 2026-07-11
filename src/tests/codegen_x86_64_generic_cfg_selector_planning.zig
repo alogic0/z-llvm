@@ -464,6 +464,31 @@ test "generic cfg selector composes constant i32 stack array gep load store" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector loads element zero directly from stack array" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_array_base_load(i32 %value) {
+        \\entry:
+        \\  %buf = alloca [4 x i32], align 4
+        \\  store i32 %value, ptr %buf, align 4
+        \\  %loaded = load i32, ptr %buf, align 4
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_array_base_load", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectInstruction(machine.instructions.items, .{ .store_eax_stack_disp32 = 256 });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_eax = 256 });
+}
+
 test "generic cfg selector composes dynamic i32 stack array gep index" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

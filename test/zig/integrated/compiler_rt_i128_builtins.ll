@@ -103,8 +103,7 @@ define dso_local i32 @zllvm_store_array_base(i32 %value) {
 Entry:
   %slot = alloca [3 x i32], align 4
   store i32 %value, ptr %slot, align 4
-  %base = getelementptr [3 x i32], ptr %slot, i64 0, i64 0
-  %loaded = load i32, ptr %base, align 4
+  %loaded = load i32, ptr %slot, align 4
   ret i32 %loaded
 }
 
