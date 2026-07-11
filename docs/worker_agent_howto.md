@@ -28,7 +28,7 @@ first and acknowledge any unacknowledged Active inbox entries by id. Work
 cycles automatically until blocked or complete.
 ```
 
-Model note: the session has run on `gpt-5.5 high`. If the pane shows
+Model note: the session has run on `gpt-5.6-sol high`. If the pane shows
 model errors (HTTP 400 "model not supported"), switch back with `/model`
 inside the Codex TUI — no nudge can land while requests error.
 
