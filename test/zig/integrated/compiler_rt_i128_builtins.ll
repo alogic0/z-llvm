@@ -123,6 +123,19 @@ Entry:
   ret i64 %result
 }
 
+define dso_local i32 @zllvm_stack_index_dependency(i64 %base_index, i32 %value, i32 %amount) {
+Entry:
+  %slot = alloca [3 x i32], align 4
+  store i32 11, ptr %slot, align 4
+  %index = add i64 %base_index, 1
+  %ptr = getelementptr [4 x i8], ptr %slot, i64 %index
+  %shifted = shl i32 %value, %amount
+  store i32 %shifted, ptr %ptr, align 4
+  %base = getelementptr [3 x i32], ptr %slot, i64 0, i64 0
+  %loaded = load i32, ptr %base, align 4
+  ret i32 %loaded
+}
+
 define dso_local i32 @zllvm_backward_layout_phi(i32 %value) {
 Entry:
   br label %Later

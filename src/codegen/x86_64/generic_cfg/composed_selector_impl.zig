@@ -1111,13 +1111,33 @@ pub const ComposedBlockSelector = struct {
         if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
         if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-width" };
         const ptr = selector.resolveValue(store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
-        try selector.emitValueIntoEax(store.value);
+        const value_loc = switch (store.value) {
+            .named => selector.resolveValue(store.value) orelse return .{ .unsupported_value = "composed-block-unknown-store-value" },
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+        };
+        const value_detail = if (value_loc) |loc| switch (loc) {
+            .arg32, .arg64 => "composed-block-store-value-arg",
+            .scratch32, .scratch64 => "composed-block-store-value-scratch",
+            .eax, .rax => "composed-block-store-value-accumulator",
+            .spill64 => "composed-block-store-value-spill",
+            .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => "composed-block-store-value-other",
+        } else "composed-block-store-value-other";
+        selector.emitValueIntoEax(store.value) catch return .{ .unsupported_value = value_detail };
         switch (ptr) {
             .arg64, .scratch64 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = reg }),
-            .stack_i32_ptr => |stack_ptr| try selector.appendStoreStackI32(stack_ptr),
-            .stack_i32_array => |stack_array| try selector.appendStoreStackI32(.{ .disp = stack_array.base_disp }),
+            .stack_i32_ptr => |stack_ptr| selector.appendStoreStackI32(stack_ptr) catch |err| switch (err) {
+                error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-stack-index" },
+                else => return err,
+            },
+            .stack_i32_array => |stack_array| selector.appendStoreStackI32(.{ .disp = stack_array.base_disp }) catch |err| switch (err) {
+                error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-array-index" },
+                else => return err,
+            },
             .spill64 => |frame_index| {
-                try selector.materializeLocIntoLoc(.{ .spill64 = frame_index }, .{ .scratch64 = .rcx });
+                selector.materializeLocIntoLoc(.{ .spill64 = frame_index }, .{ .scratch64 = .rcx }) catch |err| switch (err) {
+                    error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-spill-ptr" },
+                    else => return err,
+                };
                 try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = .rcx });
             },
             .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
@@ -2697,6 +2717,18 @@ pub const ComposedBlockSelector = struct {
 
     fn valueIsLiveAfterCurrent(selector: ComposedBlockSelector, name: []const u8) bool {
         const plan = selector.allocation_plan orelse return false;
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            const stack_ptr = switch (entry.value_ptr.loc) {
+                .stack_i32_ptr => |stack_ptr| stack_ptr,
+                else => continue,
+            };
+            const index = stack_ptr.index orelse continue;
+            if (!std.mem.eql(u8, index.name, name) and
+                (index.addend_name == null or !std.mem.eql(u8, index.addend_name.?, name))) continue;
+            const pointer_end = plan.intervalEnd(entry.key_ptr.*) orelse return true;
+            if (pointer_end > selector.current_position) return true;
+        }
         const end = plan.intervalEnd(name) orelse return true;
         return end > selector.current_position;
     }

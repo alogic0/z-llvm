@@ -2222,6 +2222,44 @@ test "generic cfg selector composes i64 immediate or" {
     try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } });
 }
 
+test "generic cfg selector keeps stack pointer index dependencies live" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_index_dependency(i64 %base_index, i32 %value, i32 %amount) {
+        \\entry:
+        \\  %slot = alloca [3 x i32], align 4
+        \\  store i32 11, ptr %slot, align 4
+        \\  %index = add i64 %base_index, 1
+        \\  %ptr = getelementptr [4 x i8], ptr %slot, i64 %index
+        \\  %shifted = shl i32 %value, %amount
+        \\  store i32 %shifted, ptr %ptr, align 4
+        \\  %base = getelementptr [3 x i32], ptr %slot, i64 0, i64 0
+        \\  %loaded = load i32, ptr %base, align 4
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("stack_index_dependency", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .shl_eax_cl);
+    try expectInstructionTag(machine.instructions.items, .spill_arg64_rsp);
+    try expectInstructionTag(machine.instructions.items, .reload_arg64_rsp);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
