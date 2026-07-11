@@ -642,8 +642,17 @@ pub const ComposedBlockSelector = struct {
             },
             .add => {
                 if (bits == 64) {
+                    const imm = i32Value(rhs) catch {
+                        if (try selector.preserveRaxForDestructiveAccumulatorUse(binary.lhs)) |diagnostic| return diagnostic;
+                        selector.emitValueIntoRax(binary.lhs) catch return .{ .unsupported_value = "composed-block-add64-lhs" };
+                        try selector.clobberArgReg(.rcx);
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
+                        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .add, .reg = .rcx } });
+                        try selector.bindRax(result_name);
+                        return null;
+                    };
                     try selector.emitValueIntoScratch(binary.lhs, .rcx, bits);
-                    try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = try i32Value(rhs) } });
+                    try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = imm } });
                     try selector.bindScratch(result_name, .rcx, bits);
                 } else {
                     if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };

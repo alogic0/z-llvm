@@ -2905,6 +2905,15 @@ One line per completed cycle, append-only, newest last. This is the
   capability, tracker, or ratchet moves. Evidence
   `docs/evidence/std_debug_hello_mulvsi3_cold_assume.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  retry: large i64 immediate adds now materialize constants outside signed
+  imm32 range in a scratch register while retaining the compact encoding for
+  smaller constants. A permanent executable canary verifies the arithmetic.
+  The focused `__mulvsi3` row advances from `stage2-binary-value` to
+  `no_emitter/composed-block-call-form`; report-all remains 443 selected, 138
+  emitted, and 305 failed. Tier 2 is green; no tracker or ratchet moves.
+  Evidence `docs/evidence/std_debug_hello_mulvsi3_add_i64_large.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

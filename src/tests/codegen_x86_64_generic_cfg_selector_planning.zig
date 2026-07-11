@@ -2675,6 +2675,33 @@ test "generic cfg selector lowers i64 signed multiply overflow components" {
     try expectInstruction(machine.instructions.items, .setne_eax);
 }
 
+test "generic cfg selector lowers large i64 immediate add through scratch" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @add_large_i64(i64 %value) {
+        \\entry:
+        \\  %sum = add i64 %value, 2147483648
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("add_large_i64", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_rcx = 2147483648 });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .add, .reg = .rcx } });
+}
+
 test "generic cfg selector executes i128 signed multiply overflow semantics" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -71,6 +71,12 @@ Entry:
   ret i32 %wide
 }
 
+define dso_local i64 @zllvm_add_i64_large_imm(i64 %value) {
+Entry:
+  %sum = add i64 %value, 2147483648
+  ret i64 %sum
+}
+
 define dso_local i32 @zllvm_negative_i128(i128 %value) {
 Entry:
   %negative = icmp slt i128 %value, 0
