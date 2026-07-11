@@ -444,6 +444,14 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_and_i8_one(i32 %value) {
+Entry:
+  %narrow = trunc i32 %value to i8
+  %masked = and i8 %narrow, 1
+  %result = zext i8 %masked to i32
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_ne_zero_i64(i64 %value) {
 Entry:
   %not_zero = icmp ne i64 %value, 0

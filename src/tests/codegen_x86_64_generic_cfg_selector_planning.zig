@@ -2339,6 +2339,37 @@ test "generic cfg selector composes i32 immediate xor" {
     try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .xor, .reg = .rcx } });
 }
 
+test "generic cfg selector composes i8 immediate and" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @and_i8_imm(i32 %value) {
+        \\entry:
+        \\  %narrow = trunc i32 %value to i8
+        \\  %masked = and i8 %narrow, 1
+        \\  %result = zext i8 %masked to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("and_i8_imm", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .and_eax_imm32 = 1 });
+}
+
 test "generic cfg selector keeps stack pointer index dependencies live" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

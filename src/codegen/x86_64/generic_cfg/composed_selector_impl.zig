@@ -407,6 +407,10 @@ pub const ComposedBlockSelector = struct {
     pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+        if (bits == 8) {
+            if (binary.op != .@"and" or !valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
+            return try selector.lowerBinaryImmediateRhs(result_name, binary);
+        }
         if (bits != 6 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-binary-width" };
 
         if (valueIsInt(binary.rhs)) {
