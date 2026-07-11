@@ -971,6 +971,13 @@ pub const ComposedBlockSelector = struct {
             try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .r8 });
             try selector.machine.instructions.append(selector.allocator, .setb_eax);
+        } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 6 }) and switch (icmp.rhs) {
+            .int => |int| try i64Value(int) == -1,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        }) {
+            try selector.emitValueIntoEax(icmp.lhs);
+            try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 1 << 5 });
+            try selector.machine.instructions.append(selector.allocator, .sete_eax);
         } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 })) {
             const rhs = switch (icmp.rhs) {
                 .int => |int| int,
