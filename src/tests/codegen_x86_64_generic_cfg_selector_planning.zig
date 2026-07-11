@@ -2576,6 +2576,34 @@ test "generic cfg selector pressure-exempts i128 signed multiply overflow tuple"
     try expectInstruction(machine.instructions.items, .setne_eax);
 }
 
+test "generic cfg selector pressure-exempts i64 signed multiply overflow tuple" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
+        \\
+        \\define i64 @smul_overflow_i64(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %pair = call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %lhs, i64 %rhs)
+        \\  %overflow = extractvalue { i64, i1 } %pair, 1
+        \\  %value = extractvalue { i64, i1 } %pair, 0
+        \\  br i1 %overflow, label %done, label %done
+        \\done:
+        \\  ret i64 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var plan = try stage2_planning.buildSelectorAllocationPlan(std.testing.allocator, module.functions.items[0]);
+    defer plan.deinit();
+
+    try std.testing.expectEqual(@as(?stage2_planning.PlannedValueAssignment, null), plan.assignment("pair"));
+    try std.testing.expect(plan.assignment("overflow") != null);
+    try std.testing.expect(plan.assignment("value") != null);
+}
+
 test "generic cfg selector executes i128 signed multiply overflow semantics" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -2871,6 +2871,15 @@ One line per completed cycle, append-only, newest last. This is the
   capability, tracker, or ratchet moves. Evidence
   `docs/evidence/std_debug_hello_mulodi4_overflow_inspection.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  retry: stage-two planning now pressure-exempts the exact i64 signed-multiply
+  overflow tuple, assigning locations only to extracted components. The
+  focused `__mulodi4` row advances from `stage2-unsupported-value` to
+  `no_emitter/composed-block-call-form`; report-all remains 443 selected, 137
+  emitted, and 306 failed. Tier 1 unit validation is green; no arithmetic
+  capability, tracker, or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_mulodi4_overflow_planning.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

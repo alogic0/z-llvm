@@ -44,10 +44,11 @@ the global first failure crosses into the soft-float cluster at
 `compiler_rt.trunc.__trunch`. Per the standing INBOX-9 sequence, continue the
 separately ranked integer-helper bucket with `compiler_rt.mulo.__mulodi4`
 before crossing into soft-float implementation work. Its typed i64 signed-
-multiply-overflow signature is now admitted and fails closed at
-`unsupported_value/stage2-unsupported-value`; next pressure-exempt the tuple
-result without admitting arithmetic. Current item-15 accounting is 17 composed
-rows, 17 terminal-template rows, zero stage-two boundary rows, and 27 open
+multiply-overflow signature and component-only tuple planning are now admitted;
+the row fails closed at `no_emitter/composed-block-call-form`. Next lower the
+generic i64 signed-multiply-overflow operation through the existing fixed
+RDX:RAX full-product protocol. Current item-15 accounting is 17 composed rows,
+17 terminal-template rows, zero stage-two boundary rows, and 27 open
 integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
