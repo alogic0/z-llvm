@@ -5,6 +5,7 @@ extern fn zllvm_store_i32_index([*]u32, u64, u32) callconv(.c) u32;
 extern fn zllvm_load_i32_index([*]u32, u64) callconv(.c) u32;
 extern fn zllvm_ptr_eq([*]u32, [*]u32) callconv(.c) u32;
 extern fn zllvm_load_i32_spilled_ptr([*]u32) callconv(.c) u32;
+extern fn zllvm_backward_layout_phi(u32) callconv(.c) u32;
 
 var multi_lhs: i128 = 4294967299;
 var multi_rhs: i128 = -8589934597;
@@ -36,7 +37,8 @@ pub export fn _start() callconv(.c) noreturn {
     const ptr_ne_bad: usize = @intFromBool(zllvm_ptr_eq(element_ptr, element_ptr + 1) != 0);
     const spilled_loaded = zllvm_load_i32_spilled_ptr(&spill_values);
     const spill_load_bad: usize = @intFromBool(spilled_loaded != 76 or spill_values[0] != 10 or spill_values[1] != 20 or spill_values[2] != 30 or spill_values[3] != 40 or spill_values[4] != 50 or spill_values[5] != 60 or spill_values[6] != 70);
-    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18);
+    const phi_bad: usize = @intFromBool(zllvm_backward_layout_phi(41) != 42);
+    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19);
 }
 
 fn loadI128(ptr: *i128) i128 {

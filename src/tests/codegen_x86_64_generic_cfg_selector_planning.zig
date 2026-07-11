@@ -4,6 +4,7 @@ const std = common.std;
 const codegen = common.codegen;
 const ir = common.ir;
 const selector = @import("../codegen/x86_64/generic_cfg_selector.zig");
+const stage2_planning = @import("../codegen/x86_64/generic_cfg/stage2_planning.zig");
 
 fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected: codegen.x86_64.Instruction) !void {
     for (instructions) |instruction| {
@@ -53,6 +54,31 @@ fn makeBranchChainIr(allocator: std.mem.Allocator, block_count: usize) ![]u8 {
     }
     try text.appendSlice(allocator, "}\n");
     return try text.toOwnedSlice(allocator);
+}
+
+test "generic cfg allocation places phi uses on predecessor edges" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @backward_layout_phi(i32 %value) {
+        \\entry:
+        \\  br label %later
+        \\merge:
+        \\  %merged = phi i32 [ %next, %later ]
+        \\  ret i32 %merged
+        \\later:
+        \\  %next = add i32 %value, 1
+        \\  br label %merge
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var plan = try stage2_planning.buildSelectorAllocationPlan(std.testing.allocator, module.functions.items[0]);
+    defer plan.deinit();
+
+    try std.testing.expectEqual(@as(?usize, 5), plan.intervalEnd("next"));
 }
 
 test "generic cfg selector skeleton reports no emitter for supported straight-line integer shape" {

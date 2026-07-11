@@ -396,6 +396,9 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
     var interval_indexes = std.StringHashMap(usize).init(allocator);
     defer interval_indexes.deinit();
 
+    var terminator_positions: std.ArrayList(usize) = .empty;
+    defer terminator_positions.deinit(allocator);
+
     var position: usize = 0;
     for (function.params.items) |param| {
         const metadata = selectorValueMetadata(param.ty) orelse return error.UnsupportedCodegenValue;
@@ -414,6 +417,7 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             }
             position += 1;
         }
+        try terminator_positions.append(allocator, position);
         if (block.terminator != null) position += 1;
     }
 
@@ -425,12 +429,16 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             defer uses.deinit();
             if (instruction.kind == .phi) {
                 for (instruction.kind.phi.incoming.items) |incoming| {
-                    try addNamedPressureUse(&uses, incoming.value, pressure_exempt_values);
+                    var incoming_use = NameSet.init(allocator);
+                    defer incoming_use.deinit();
+                    try addNamedPressureUse(&incoming_use, incoming.value, pressure_exempt_values);
+                    const predecessor_index = function.blockIndex(incoming.block) orelse return error.UnsupportedCodegenControlFlow;
+                    try recordSelectorIntervalUses(intervals.items, interval_indexes, incoming_use, terminator_positions.items[predecessor_index]);
                 }
             } else {
                 try collectInstructionNamedUses(&uses, instruction, pressure_exempt_values);
+                try recordSelectorIntervalUses(intervals.items, interval_indexes, uses, position);
             }
-            try recordSelectorIntervalUses(intervals.items, interval_indexes, uses, position);
             position += 1;
         }
         if (block.terminator) |terminator| {

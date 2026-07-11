@@ -1433,7 +1433,7 @@ pub const ComposedBlockSelector = struct {
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg });
                     },
                     .named => {
-                        selector.emitPhiValueIntoScratch(value, reg, 32) catch return .{ .unsupported_value = "stage2-phi-src" };
+                        selector.emitPhiValueIntoScratch(value, reg, 32) catch return .{ .unsupported_value = selector.phiSourceDiagnostic(value) };
                     },
                     .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
                 }
@@ -1446,7 +1446,7 @@ pub const ComposedBlockSelector = struct {
                         try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = reg });
                     },
                     .named => {
-                        selector.emitPhiValueIntoScratch(value, reg, 64) catch return .{ .unsupported_value = "stage2-phi-src" };
+                        selector.emitPhiValueIntoScratch(value, reg, 64) catch return .{ .unsupported_value = selector.phiSourceDiagnostic(value) };
                     },
                     .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
                 }
@@ -2046,6 +2046,27 @@ pub const ComposedBlockSelector = struct {
             },
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         }
+    }
+
+    fn phiSourceDiagnostic(selector: ComposedBlockSelector, value: ir.Value) []const u8 {
+        const loc = selector.resolveValue(value) orelse return "stage2-phi-src-unknown";
+        return switch (loc) {
+            .arg32 => "stage2-phi-src-arg32",
+            .arg64 => "stage2-phi-src-arg64",
+            .arg128 => "stage2-phi-src-arg128",
+            .eax => "stage2-phi-src-eax",
+            .rax => "stage2-phi-src-rax",
+            .scratch32 => "stage2-phi-src-scratch32",
+            .scratch64 => "stage2-phi-src-scratch64",
+            .scratch128 => "stage2-phi-src-scratch128",
+            .stack64 => "stage2-phi-src-stack64",
+            .stack128 => "stage2-phi-src-stack128",
+            .stack128_value => "stage2-phi-src-stack128-value",
+            .stack_i32_array => "stage2-phi-src-stack-i32-array",
+            .stack_i32_ptr => "stage2-phi-src-stack-i32-ptr",
+            .spill64 => "stage2-phi-src-spill64",
+            .spill128 => "stage2-phi-src-spill128",
+        };
     }
 
     fn emitValueIntoScratchExcept(selector: *ComposedBlockSelector, value: ir.Value, reg: ArgReg, bits: u16, ignore_name: ?[]const u8) !void {

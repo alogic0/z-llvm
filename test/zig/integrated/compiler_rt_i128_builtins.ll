@@ -65,6 +65,19 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_backward_layout_phi(i32 %value) {
+Entry:
+  br label %Later
+
+Merge:
+  %merged = phi i32 [ %next, %Later ]
+  ret i32 %merged
+
+Later:
+  %next = add i32 %value, 1
+  br label %Merge
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16
