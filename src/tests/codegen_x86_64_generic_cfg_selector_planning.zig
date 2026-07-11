@@ -2401,6 +2401,37 @@ test "generic cfg selector treats one-byte array GEP as byte pointer arithmetic"
     try expectInstruction(machine.instructions.items, .sete_eax);
 }
 
+test "generic cfg selector composes signed i32 nonnegative comparison" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @nonnegative_i32(i32 %value) {
+        \\entry:
+        \\  %nonnegative = icmp sgt i32 %value, -1
+        \\  %result = zext i1 %nonnegative to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("nonnegative_i32", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .and_eax_imm32 = std.math.minInt(i32) });
+    try expectInstruction(machine.instructions.items, .sete_eax);
+}
+
 test "generic cfg selector keeps stack pointer index dependencies live" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

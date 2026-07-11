@@ -1122,6 +1122,13 @@ pub const ComposedBlockSelector = struct {
             try selector.emitValueIntoEax(icmp.lhs);
             try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 1 << 5 });
             try selector.machine.instructions.append(selector.allocator, .sete_eax);
+        } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 32 }) and switch (icmp.rhs) {
+            .int => |int| try i64Value(int) == -1,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        }) {
+            try selector.emitValueIntoEax(icmp.lhs);
+            try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = std.math.minInt(i32) });
+            try selector.machine.instructions.append(selector.allocator, .sete_eax);
         } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 64 }) and switch (icmp.rhs) {
             .int => |int| try i64Value(int) == 0,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,

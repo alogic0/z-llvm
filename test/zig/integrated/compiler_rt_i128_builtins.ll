@@ -427,6 +427,13 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_nonnegative_i32(i32 %value) {
+Entry:
+  %nonnegative = icmp sgt i32 %value, -1
+  %result = zext i1 %nonnegative to i32
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_stack_i1_roundtrip(i32 %value) {
 Entry:
   %slot = alloca i8, align 4
