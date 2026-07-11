@@ -657,7 +657,9 @@ fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !
                         }
                     },
                     .call => |call| {
-                        if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32") and !exempt_values.contains(result)) {
+                        const is_overflow_tuple = std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32") or
+                            std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128");
+                        if (is_overflow_tuple and !exempt_values.contains(result)) {
                             try exemptValuesPut(exempt_values, result);
                             changed = true;
                         }

@@ -2489,8 +2489,44 @@ test "generic cfg selector reports i128 signed multiply overflow planning fronti
     switch (result) {
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| {
-            try std.testing.expectEqualStrings("unsupported_value", diagnostic.tagName());
-            try std.testing.expectEqualStrings("composed-block-unsupported-value", diagnostic.detail());
+            try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+            try std.testing.expectEqualStrings("composed-block-call-ret", diagnostic.detail());
+        },
+    }
+}
+
+test "generic cfg selector pressure-exempts i128 signed multiply overflow tuple" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i128, i1 } @llvm.smul.with.overflow.i128(i128, i128)
+        \\
+        \\define i128 @smul_overflow_i128_cfg(i128 %lhs, i128 %rhs, i32 %selector) {
+        \\entry:
+        \\  %pair = call { i128, i1 } @llvm.smul.with.overflow.i128(i128 %lhs, i128 %rhs)
+        \\  %cond = icmp eq i32 %selector, 0
+        \\  br i1 %cond, label %value_block, label %overflow_block
+        \\value_block:
+        \\  %value = extractvalue { i128, i1 } %pair, 0
+        \\  ret i128 %value
+        \\overflow_block:
+        \\  %overflow = extractvalue { i128, i1 } %pair, 1
+        \\  br i1 %overflow, label %value_block, label %value_block
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("smul_overflow_i128_cfg", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| {
+            try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+            try std.testing.expectEqualStrings("composed-block-call-ret", diagnostic.detail());
         },
     }
 }
