@@ -2620,6 +2620,34 @@ test "generic cfg selector executes i128 signed multiply overflow semantics" {
     }
 }
 
+test "generic cfg selector lowers i128 signed negative comparison" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @negative_i128(i128 %value) {
+        \\entry:
+        \\  %negative = icmp slt i128 %value, 0
+        \\  %wide = zext i1 %negative to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("negative_i128", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .{ .mov_arg_rax = .rsi });
+    try expectInstruction(machine.instructions.items, .{ .shr_rax_imm6 = 63 });
+}
+
 test "generic cfg selector preserves i128 freeze location" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

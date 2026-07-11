@@ -1133,6 +1133,12 @@ pub const ComposedBlockSelector = struct {
             try selector.emitValueIntoEax(icmp.lhs);
             try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = std.math.minInt(i32) });
             try selector.machine.instructions.append(selector.allocator, .sete_eax);
+        } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 128 }) and switch (icmp.rhs) {
+            .int => |int| int == 0,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        }) {
+            selector.emitPairHighLaneIntoRax(icmp.lhs) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            try selector.machine.instructions.append(selector.allocator, .{ .shr_rax_imm6 = 63 });
         } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 64 }) and switch (icmp.rhs) {
             .int => |int| try i64Value(int) == 0,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
@@ -2887,6 +2893,20 @@ pub const ComposedBlockSelector = struct {
                 try selector.clobberArgReg(dst);
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = dst, .frame_index = spill.lo } });
             },
+            .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack_scalar, .stack128, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
+        }
+    }
+
+    fn emitPairHighLaneIntoRax(selector: *ComposedBlockSelector, value: ir.Value) !void {
+        const loc = selector.resolveValue(value) orelse return error.UnsupportedCodegenValue;
+        try selector.clobberAccumulator();
+        switch (loc) {
+            .arg128, .scratch128 => |pair| try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = pair.hi }),
+            .stack128_value => |disp| if (disp + 8 <= std.math.maxInt(u8))
+                try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_rax = @intCast(disp + 8) })
+            else
+                try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_rax = disp + 8 }),
+            .spill128 => |spill| try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = spill.hi }),
             .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack_scalar, .stack128, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
         }
     }

@@ -55,6 +55,13 @@ Entry:
   ret i32 %wide
 }
 
+define dso_local i32 @zllvm_negative_i128(i128 %value) {
+Entry:
+  %negative = icmp slt i128 %value, 0
+  %wide = zext i1 %negative to i32
+  ret i32 %wide
+}
+
 define dso_local i32 @zllvm_mixed_frame_first(i32 %value) {
 Entry:
   %flag4 = alloca i8, align 4

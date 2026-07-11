@@ -2829,6 +2829,15 @@ One line per completed cycle, append-only, newest last. This is the
   100-row modes. No tracker or ratchet moves. Evidence
   `docs/evidence/x86_64_smul_i128_overflow_expansion.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  retry: signed i128 less-than-zero comparisons now read the high-limb sign
+  bit for pair, stack-value, and spill locations. Unit and permanent
+  executable negative/zero cases are green. The focused `__muloti4` row
+  advances from `composed-block-icmp-form` to
+  `unsupported_value/stage2-icmp-value`; report-all remains 443 selected, 136
+  emitted, and 307 failed. Tier 2 is green; no tracker or ratchet moves.
+  Evidence `docs/evidence/x86_64_icmp_slt_i128_zero.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

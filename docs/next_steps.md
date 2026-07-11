@@ -42,9 +42,9 @@ machine operations define the low and high halves in RAX and RDX, then both
 definitions enter the ordinary displace/clobber/value-map protocol. The
 machine/encoder forms, selector-visible two-definition relocation, and the
 signed i128 overflow expansion are implemented and executable. The exact
-`__muloti4` row now stops at `no_emitter/composed-block-icmp-form`; continue
-with its i128 signed-negative and minimum-value comparisons, preserving the
-generic typed-form boundary.
+`__muloti4` row now stops at `unsupported_value/stage2-icmp-value` after the
+i128 signed-negative comparison; continue by admitting and lowering its i128
+minimum-value equality constant, preserving the generic typed-form boundary.
 
 Current operating note recorded 2026-07-10:
 
