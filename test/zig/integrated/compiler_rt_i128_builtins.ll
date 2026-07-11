@@ -78,6 +78,13 @@ Later:
   br label %Merge
 }
 
+define dso_local i32 @zllvm_ugt_i64(i64 %lhs, i64 %rhs) {
+Entry:
+  %greater = icmp ugt i64 %lhs, %rhs
+  %result = zext i1 %greater to i32
+  ret i32 %result
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16

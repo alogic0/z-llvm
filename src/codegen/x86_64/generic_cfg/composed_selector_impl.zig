@@ -965,6 +965,12 @@ pub const ComposedBlockSelector = struct {
             }
             try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .sete_eax);
+        } else if (icmp.predicate == .ugt and icmp.operand_ty.eql(.{ .int = 64 }) and icmp.rhs == .named) {
+            selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            selector.emitValueIntoScratch(icmp.rhs, .r8, 64) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
+            try selector.clobberAccumulator();
+            try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .r8 });
+            try selector.machine.instructions.append(selector.allocator, .setb_eax);
         } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 })) {
             const rhs = switch (icmp.rhs) {
                 .int => |int| int,

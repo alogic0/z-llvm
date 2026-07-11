@@ -1443,6 +1443,40 @@ test "generic cfg selector composes pointer equality values" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector composes unsigned greater i64 values" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @ugt64_values(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %greater = icmp ugt i64 %lhs, %rhs
+        \\  %result = zext i1 %greater to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("ugt64_values", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .cmp_rcx_arg64 = .r8 });
+    try expectInstruction(machine.instructions.items, .setb_eax);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rsi } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector composes narrow integer inequality with zero" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
