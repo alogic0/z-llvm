@@ -11,6 +11,12 @@ replacement.
 For every future step that reproduces LLVM behavior, completion requires an
 upstream mapping before the step is committed.
 
+For every new arithmetic, comparison, branch, call, or spill capability,
+completion also requires an executable semantic check in the same commit.
+Structural instruction or byte checks remain useful, but they do not prove
+runtime behavior and cannot substitute for a fail-closed executable whose
+exit status changes when the new capability computes the wrong result.
+
 `docs/working-cycle.md` may narrow this general policy for the active worker
 milestone. Use that file for worker cycle mechanics and active goal selection.
 

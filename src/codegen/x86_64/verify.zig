@@ -216,6 +216,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .cmp_rax_rdx,
         .setb_eax,
         .sete_eax,
+        .setne_eax,
         .test_eax_eax,
         .test_rax_rax,
         .test_rdx_rdx,
@@ -396,6 +397,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm64_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
+        .setne_eax => eax_defined = true,
         .mov_imm32_xmm => |load| {
             if (load.reg == .xmm0) eax_defined = true;
         },
@@ -785,6 +787,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .cmp_rax_rdx,
         .setb_eax,
         .sete_eax,
+        .setne_eax,
         .test_eax_eax,
         .test_rax_rax,
         .test_rdx_rdx,

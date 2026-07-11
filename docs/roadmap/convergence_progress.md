@@ -2233,6 +2233,19 @@ One line per completed cycle, append-only, newest last. This is the
   distribution-all proof
   `docs/evidence/distribution_all_after_icmp_eq_values.summary`.
 
+- 2026-07-11 (this commit; acknowledges INBOX-10) P0 x86_64 MC correctness:
+  fused `setb_eax`, `sete_eax`, and `setne_eax` now execute setcc before
+  zero-extending AL into EAX, preserving the flags produced by the preceding
+  compare. The MC audit found no other fused xor-between-compare-and-setcc
+  sequence. A new integrated executable row builds an ELF object directly
+  through the MC encoder and checks true and false outcomes for equality,
+  inequality, unsigned-less, and unsigned-greater predicates; any wrong
+  result changes the process exit status. The integrated executable gate now
+  passes 5/5 rows, and strict all-mode distribution remains green. No selector
+  form, report count, or ratchet counter changes in this correction slice.
+  Evidence `docs/evidence/zig_integrated_exe_setcc_correctness.summary`;
+  `docs/evidence/distribution_all_after_setcc_correctness.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

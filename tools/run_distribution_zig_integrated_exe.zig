@@ -12,16 +12,19 @@ const Case = struct {
     generic_cfg_selector: bool = false,
     focused_compiler_rt_i128_objects: bool = false,
     prebuild_start_object: bool = false,
+    setcc_semantic_object: bool = false,
 };
 
 const Proof = enum {
     syscall_hello,
     compiler_rt_i128_arithmetic,
+    setcc_predicates,
 
     fn outputStem(proof: Proof) []const u8 {
         return switch (proof) {
             .syscall_hello => ".syscall_hello",
             .compiler_rt_i128_arithmetic => ".compiler_rt_i128_arithmetic",
+            .setcc_predicates => ".setcc_predicates",
         };
     }
 };
@@ -61,6 +64,16 @@ const cases = [_]Case{
         .generic_cfg_selector = true,
         .focused_compiler_rt_i128_objects = true,
         .prebuild_start_object = true,
+    },
+    .{
+        .id = "setcc_predicates_releasefast",
+        .mode = "ReleaseFast",
+        .source = "test/zig/integrated/setcc_predicates_start.zig",
+        .expected_stdout = "",
+        .expected_exit = 0,
+        .proof = .setcc_predicates,
+        .prebuild_start_object = true,
+        .setcc_semantic_object = true,
     },
 };
 
@@ -129,6 +142,7 @@ pub fn main(init: std.process.Init) !void {
     var exit_ok: usize = 0;
     var minimal_inline_asm_syscall_rows: usize = 0;
     var compiler_rt_i128_arithmetic_rows: usize = 0;
+    var setcc_predicate_rows: usize = 0;
     for (cases) |case| {
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
@@ -164,6 +178,11 @@ pub fn main(init: std.process.Init) !void {
             try emitFocusedCompilerRtI128Builtins(allocator, io, zllvm_exe, target, builtins_obj, &focused_env);
             try buildCompilerRtI128Helper(allocator, io, zig_emitter, target, helper_obj);
             try extra_objects.appendSlice(allocator, &.{ builtins_obj, helper_obj });
+        } else if (case.setcc_semantic_object) {
+            const predicate_obj = try common.allocTempFile(allocator, temp, case.id, ".predicates.o");
+            errdefer allocator.free(predicate_obj);
+            try emitSetccSemanticObject(allocator, io, predicate_obj);
+            try extra_objects.append(allocator, predicate_obj);
         } else if (case.generic_cfg_selector) {
             try case_env.put("ZLLVM_GENERIC_CFG_SELECTOR", "1");
         }
@@ -176,6 +195,7 @@ pub fn main(init: std.process.Init) !void {
         switch (case.proof) {
             .syscall_hello => minimal_inline_asm_syscall_rows += 1,
             .compiler_rt_i128_arithmetic => compiler_rt_i128_arithmetic_rows += 1,
+            .setcc_predicates => setcc_predicate_rows += 1,
         }
         try stdout_writer.interface.print("ok zig-integrated-exe case={s} mode={s} proof={s} exit=0\n", .{
             case.id,
@@ -189,7 +209,7 @@ pub fn main(init: std.process.Init) !void {
         try common.validationError(io, "integrated exe runner selected no cases\n", .{});
     }
     try stdout_writer.interface.print(
-        "summary zig-integrated-exe total={} build_ok={} run_ok={} stdout_ok={} exit_ok={} minimal_inline_asm_syscall_rows={} compiler_rt_i128_arithmetic_rows={} local_fail=0\n",
+        "summary zig-integrated-exe total={} build_ok={} run_ok={} stdout_ok={} exit_ok={} minimal_inline_asm_syscall_rows={} compiler_rt_i128_arithmetic_rows={} setcc_predicate_rows={} local_fail=0\n",
         .{
             total,
             build_ok,
@@ -198,9 +218,26 @@ pub fn main(init: std.process.Init) !void {
             exit_ok,
             minimal_inline_asm_syscall_rows,
             compiler_rt_i128_arithmetic_rows,
+            setcc_predicate_rows,
         },
     );
     try stdout_writer.interface.flush();
+}
+
+fn emitSetccSemanticObject(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    object_path: []const u8,
+) !void {
+    const argv = [_][]const u8{
+        "zig",
+        "run",
+        "src/setcc_semantic_object.zig",
+        "--",
+        object_path,
+    };
+    const result = try common.runCapture(allocator, io, &argv, "z_llvm setcc semantic object");
+    common.freeRunResult(allocator, result);
 }
 
 fn buildExecutable(
