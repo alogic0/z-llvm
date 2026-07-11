@@ -1005,18 +1005,19 @@ pub const ComposedBlockSelector = struct {
     fn lowerFreeze(selector: *ComposedBlockSelector, result: ?[]const u8, freeze: ir.FreezeInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         const bits = intBits(freeze.ty) orelse return .{ .no_emitter = "composed-block-freeze-type" };
-        if (bits != 32 and bits != 64) return .{ .no_emitter = "composed-block-freeze-width" };
+        if (bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-freeze-width" };
         const loc = selector.resolveValue(freeze.value) orelse return .{ .unsupported_value = "composed-block-unknown-freeze" };
         switch (loc) {
             .arg32, .scratch32, .eax => if (bits != 32) return .{ .no_emitter = "composed-block-freeze-width" },
             .arg64, .scratch64, .rax => if (bits != 64) return .{ .no_emitter = "composed-block-freeze-width" },
             .spill64 => if (bits != 64 and bits > 32) return .{ .no_emitter = "composed-block-freeze-width" },
-            .arg128, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-freeze-loc" },
+            .arg128, .scratch128, .stack128_value, .spill128 => if (bits != 128) return .{ .no_emitter = "composed-block-freeze-width" },
+            .stack_scalar, .stack128, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "composed-block-freeze-loc" },
         }
         try selector.bindValueLoc(result_name, loc);
         switch (loc) {
-            .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .spill64 => {},
-            .arg128, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => unreachable,
+            .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack128_value, .spill64, .spill128 => {},
+            .stack_scalar, .stack128, .stack_i32_array, .stack_i32_ptr => unreachable,
         }
         return null;
     }

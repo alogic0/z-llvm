@@ -8,6 +8,12 @@ declare { i32, i1 } @llvm.uadd.with.overflow.i32(i32, i32)
 declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
 declare i128 @compiler_rt.udivmod.udivmod__anon_15304(i128, i128, ptr)
 
+define dso_local i128 @zllvm_freeze_i128(i128 %value) {
+Entry:
+  %frozen = freeze i128 %value
+  ret i128 %frozen
+}
+
 define dso_local i32 @zllvm_ne_zero_i16(i32 %value) {
 Entry:
   %narrow = trunc i32 %value to i16

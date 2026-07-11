@@ -2772,6 +2772,17 @@ One line per completed cycle, append-only, newest last. This is the
   capability, tracker, or ratchet moves. Evidence
   `docs/evidence/std_debug_hello_muloti4_overflow_planning.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
+  retry: i128 freeze now preserves proven pair-valued register, stack-value,
+  and spill locations while rejecting frame-object pointer classes. An
+  executable negative i128 roundtrip proves both lanes. The focused
+  `__muloti4` row advances from `composed-block-freeze-width` to
+  `composed-block-call-form`; report-all remains 443 selected, 136 emitted, and
+  307 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_muloti4_freeze_i128.summary`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_freeze_i128.summary`, and
+  `docs/evidence/selector_tier2_muloti4_freeze_i128.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

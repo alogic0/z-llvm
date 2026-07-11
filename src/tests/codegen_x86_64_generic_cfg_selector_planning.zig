@@ -2531,6 +2531,35 @@ test "generic cfg selector pressure-exempts i128 signed multiply overflow tuple"
     }
 }
 
+test "generic cfg selector preserves i128 freeze location" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i128 @freeze_i128(i128 %value) {
+        \\entry:
+        \\  %frozen = freeze i128 %value
+        \\  ret i128 %frozen
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("freeze_i128", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector keeps stack pointer index dependencies live" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
