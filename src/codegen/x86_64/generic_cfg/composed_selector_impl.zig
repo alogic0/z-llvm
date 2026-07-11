@@ -903,6 +903,13 @@ pub const ComposedBlockSelector = struct {
             try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = 0 } });
             try selector.machine.instructions.append(selector.allocator, .setne_eax);
+        } else if (icmp.predicate == .eq and icmp.operand_ty.eql(.ptr)) {
+            if (icmp.rhs != .named) return .{ .no_emitter = "composed-block-icmp-rhs" };
+            selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            selector.emitValueIntoScratch(icmp.rhs, .r8, 64) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
+            try selector.clobberAccumulator();
+            try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .r8 });
+            try selector.machine.instructions.append(selector.allocator, .sete_eax);
         } else if (icmp.predicate == .eq) {
             const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };
             if (icmp.rhs == .named) {

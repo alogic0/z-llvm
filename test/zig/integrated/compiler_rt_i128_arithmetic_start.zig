@@ -3,6 +3,7 @@ extern fn __modti3(i128, i128) callconv(.c) i128;
 extern fn zllvm_ne_zero_i16(u32) callconv(.c) u32;
 extern fn zllvm_store_i32_index([*]u32, u64, u32) callconv(.c) u32;
 extern fn zllvm_load_i32_index([*]u32, u64) callconv(.c) u32;
+extern fn zllvm_ptr_eq([*]u32, [*]u32) callconv(.c) u32;
 
 var multi_lhs: i128 = 4294967299;
 var multi_rhs: i128 = -8589934597;
@@ -28,7 +29,10 @@ pub export fn _start() callconv(.c) noreturn {
     const stored = zllvm_store_i32_index(&element_values, 1, 99);
     const loaded = zllvm_load_i32_index(&element_values, 1);
     const gep_bad: usize = @intFromBool(stored != 99 or loaded != 99 or element_values[0] != 11 or element_values[1] != 99 or element_values[2] != 33);
-    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15);
+    const element_ptr: [*]u32 = &element_values;
+    const ptr_eq_bad: usize = @intFromBool(zllvm_ptr_eq(element_ptr, element_ptr) != 1);
+    const ptr_ne_bad: usize = @intFromBool(zllvm_ptr_eq(element_ptr, element_ptr + 1) != 0);
+    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17);
 }
 
 fn loadI128(ptr: *i128) i128 {
