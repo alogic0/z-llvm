@@ -334,6 +334,7 @@ pub const ComposedBlockSelector = struct {
         var saw_phi = false;
         var saw_array_alloca = false;
         var saw_wide_smul_overflow = false;
+        var saw_wide_icmp = false;
         if (selector.allocation_plan) |plan| selector.next_spill_slot = plan.spill_slots;
 
         for (function.blocks.items) |block| {
@@ -342,11 +343,12 @@ pub const ComposedBlockSelector = struct {
                 if (instruction.kind == .phi) saw_phi = true;
                 if (instruction.kind == .alloca and parseI32ArrayType(instruction.kind.alloca.allocated_ty) != null) saw_array_alloca = true;
                 if (instruction.kind == .call and std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128")) saw_wide_smul_overflow = true;
+                if (instruction.kind == .icmp and instruction.kind.icmp.operand_ty.eql(.{ .int = 128 })) saw_wide_icmp = true;
             }
         }
 
         const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
-        const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or saw_wide_smul_overflow or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
+        const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or saw_wide_smul_overflow or saw_wide_icmp or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
         const spill_reserved_bytes = selector.spillReservedBytes(reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" };
         payload_bytes = if (saw_array_alloca) @max(spill_reserved_bytes, stage2SpillReservedBytes()) else 0;
 
@@ -387,7 +389,7 @@ pub const ComposedBlockSelector = struct {
         }
 
         if (payload_bytes == 0) {
-            if (pressure.exceedsNoSpill() or saw_phi or saw_wide_smul_overflow) payload_bytes = spill_reserved_bytes;
+            if (pressure.exceedsNoSpill() or saw_phi or saw_wide_smul_overflow or saw_wide_icmp) payload_bytes = spill_reserved_bytes;
         }
 
         if (payload_bytes == 0) return null;
@@ -410,6 +412,14 @@ pub const ComposedBlockSelector = struct {
     pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+        if (bits == 1) {
+            if (binary.op != .@"and" or valueIsInt(binary.lhs) or valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
+            selector.emitValueIntoScratch(binary.rhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
+            selector.emitValueIntoEax(binary.lhs) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
+            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .@"and", .reg = .rcx } });
+            try selector.bindEax(result_name);
+            return null;
+        }
         if (bits == 8) {
             if (binary.op != .@"and" or !valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
             return try selector.lowerBinaryImmediateRhs(result_name, binary);
@@ -1055,15 +1065,25 @@ pub const ComposedBlockSelector = struct {
             .int => |int| int == std.math.minInt(i128),
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         }) {
-            _ = selector.materializePairValue(icmp.lhs, pair_a) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            const existing = selector.resolvePairValue(icmp.lhs);
+            const pair = if (existing) |source|
+                if (source.contains(pair_a.lo) or source.contains(pair_a.hi)) pair_b else pair_a
+            else
+                pair_a;
+            _ = selector.materializePairValue(icmp.lhs, pair) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            const temp: ArgReg = if (pair.contains(.r8)) .rcx else .r8;
             try selector.clobberAccumulator();
-            try selector.clobberArgReg(.r8);
-            try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = pair_a.hi });
-            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_r8 = std.math.minInt(i64) });
-            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } });
-            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = pair_a.lo } });
-            try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .r8 });
-            try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .r8, .imm = 0 } });
+            try selector.clobberArgReg(temp);
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = pair.hi });
+            try selector.machine.instructions.append(selector.allocator, switch (temp) {
+                .rcx => .{ .mov_imm_rcx = std.math.minInt(i64) },
+                .r8 => .{ .mov_imm_r8 = std.math.minInt(i64) },
+                else => unreachable,
+            });
+            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = temp } });
+            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = pair.lo } });
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = temp });
+            try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = temp, .imm = 0 } });
             try selector.machine.instructions.append(selector.allocator, .sete_eax);
         } else if (icmp.predicate == .eq) {
             const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };

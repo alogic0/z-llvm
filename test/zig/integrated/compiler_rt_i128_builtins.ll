@@ -69,6 +69,15 @@ Entry:
   ret i32 %wide
 }
 
+define dso_local i32 @zllvm_i128_guard_and(i128 %lhs, i128 %rhs) {
+Entry:
+  %negative = icmp slt i128 %lhs, 0
+  %minimum = icmp eq i128 %rhs, -170141183460469231731687303715884105728
+  %both = and i1 %negative, %minimum
+  %wide = zext i1 %both to i32
+  ret i32 %wide
+}
+
 define dso_local i32 @zllvm_mixed_frame_first(i32 %value) {
 Entry:
   %flag4 = alloca i8, align 4

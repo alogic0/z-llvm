@@ -37,14 +37,15 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None. INBOX-14 approved the `__muloti4` architecture: general full-product
-machine operations define the low and high halves in RAX and RDX, then both
-definitions enter the ordinary displace/clobber/value-map protocol. The
-machine/encoder forms, selector-visible two-definition relocation, and the
-signed i128 overflow expansion are implemented and executable. The exact
-`__muloti4` row now stops at `no_emitter/composed-block-binary-width` after
-the i128 minimum-value equality comparison; continue with its generic `and i1`
-guard, preserving the typed-form boundary.
+None. `compiler_rt.mulo.__muloti4` is closed through exact object emission,
+native link, executable signed-overflow checks, and its pressure diagnostic.
+Debug compiler_rt report-all is now 443 selected / 137 emitting / 306 failing;
+the global first failure crosses into the soft-float cluster at
+`compiler_rt.trunc.__trunch`. Per the standing INBOX-9 sequence, continue the
+separately ranked integer-helper bucket with `compiler_rt.mulo.__mulodi4`
+before crossing into soft-float implementation work. Current item-15 accounting
+is 17 composed rows, 17 terminal-template rows, zero stage-two boundary rows,
+and 27 open integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
 

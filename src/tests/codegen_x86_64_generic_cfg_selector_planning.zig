@@ -2676,6 +2676,35 @@ test "generic cfg selector lowers i128 minimum equality comparison" {
     try expectInstruction(machine.instructions.items, .sete_eax);
 }
 
+test "generic cfg selector lowers boolean and of i128 predicates" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @i128_guard_and(i128 %lhs, i128 %rhs) {
+        \\entry:
+        \\  %negative = icmp slt i128 %lhs, 0
+        \\  %minimum = icmp eq i128 %rhs, -170141183460469231731687303715884105728
+        \\  %both = and i1 %negative, %minimum
+        \\  %wide = zext i1 %both to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("i128_guard_and", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .@"and", .reg = .rcx } });
+}
+
 test "generic cfg selector preserves i128 freeze location" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
