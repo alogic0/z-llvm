@@ -1193,6 +1193,39 @@ test "generic cfg selector composes zext i64 to i128 through zero high lane" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
 }
 
+test "generic cfg selector composes narrow zext to i64 through eax" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @widen16(i32 %x) {
+        \\entry:
+        \\  %narrow = trunc i32 %x to i16
+        \\  %wide = zext i16 %narrow to i64
+        \\  ret i64 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("widen16", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .and_eax_imm32 = 0xffff }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -829,14 +829,14 @@ pub const ComposedBlockSelector = struct {
                     try selector.bindPairScratch(result_name, dst);
                     return null;
                 }
-                if (to_bits > 32) return .{ .no_emitter = "composed-block-zext-width" };
+                if (from_bits > 32 or (to_bits > 32 and to_bits != 64)) return .{ .no_emitter = "composed-block-zext-width" };
                 try selector.emitValueIntoEax(cast.value);
                 if (from_bits < 32) {
                     const shift: u5 = @intCast(from_bits);
                     const mask = (@as(i32, 1) << shift) - 1;
                     try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = mask });
                 }
-                try selector.bindEax(result_name);
+                try selector.bindAccumulator(result_name, to_bits);
             },
             .sext => {
                 if (from_bits != 32 or to_bits != 64) return .{ .no_emitter = "composed-block-sext-width" };
