@@ -2646,6 +2646,19 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_uadd_overflow.summary`,
   and `docs/evidence/selector_tier2_divei4_uadd_overflow.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 integer-helper
+  retry: the single composed frame authority now lays out multiple typed
+  scalar and i32-array allocas with per-object alignment, replacing the old
+  one-scalar-or-few-arrays restriction. Executable near/far array checks prove
+  non-overlap and disp32 access with interleaved aligned byte objects. The
+  focused `__divei4` retry advances from `composed-block-alloca-form` to a
+  later `composed-block-icmp-form`; report-all remains 443 selected, 132
+  emitted, and 311 failed. Tier 3 is green across 17 subgates; no tracker or
+  ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_divei4_mixed_frame.summary`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_mixed_frame.summary`, and
+  `docs/evidence/distribution_all_after_divei4_mixed_frame.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

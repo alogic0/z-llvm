@@ -924,3 +924,41 @@ test "generic cfg selector lowers i32 unsigned-add overflow components" {
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_eax_to_arg = .rdx }, machine.instructions.items[3]);
     try std.testing.expectEqual(x86_64_machine.Instruction.setb_eax, machine.instructions.items[4]);
 }
+
+test "generic cfg selector lays out mixed scalar and array frame objects" {
+    var function = ir.Function.init("mixed-frame", .void);
+    defer function.deinit(std.testing.allocator);
+    var entry = ir.BasicBlock.init("Entry");
+    try entry.instructions.append(std.testing.allocator, .{
+        .result = "flag4",
+        .kind = .{ .alloca = .{ .allocated_ty = .{ .int = 8 }, .attrs = "align 4" } },
+    });
+    try entry.instructions.append(std.testing.allocator, .{
+        .result = "words3",
+        .kind = .{ .alloca = .{ .allocated_ty = .{ .aggregate = "[3 x i32]" }, .attrs = "align 4" } },
+    });
+    try entry.instructions.append(std.testing.allocator, .{
+        .result = "flag1",
+        .kind = .{ .alloca = .{ .allocated_ty = .{ .int = 8 }, .attrs = "align 1" } },
+    });
+    try entry.instructions.append(std.testing.allocator, .{
+        .result = "words2",
+        .kind = .{ .alloca = .{ .allocated_ty = .{ .aggregate = "[2 x i32]" }, .attrs = "align 4" } },
+    });
+    entry.terminator = .{ .ret = .{ .ty = .void, .value = null } };
+    try function.blocks.append(std.testing.allocator, entry);
+
+    var machine = MachineFunction.init("mixed-frame", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+
+    try std.testing.expect((try selector.prepareStackFrame(function)) == null);
+    try std.testing.expectEqual(ValueLoc{ .stack_scalar = .{ .base_disp = 256, .bits = 8 } }, selector.valueLoc("flag4").?);
+    try std.testing.expectEqual(ValueLoc{ .stack_i32_array = .{ .base_disp = 260, .len = 3 } }, selector.valueLoc("words3").?);
+    try std.testing.expectEqual(ValueLoc{ .stack_scalar = .{ .base_disp = 272, .bits = 8 } }, selector.valueLoc("flag1").?);
+    try std.testing.expectEqual(ValueLoc{ .stack_i32_array = .{ .base_disp = 276, .len = 2 } }, selector.valueLoc("words2").?);
+    try std.testing.expectEqual(@as(u32, 296), selector.stack_frame_bytes);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .sub_rsp_imm32 = 296 }, machine.instructions.items[0]);
+}

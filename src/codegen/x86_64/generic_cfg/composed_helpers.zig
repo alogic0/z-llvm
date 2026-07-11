@@ -58,7 +58,7 @@ pub fn isCommutative(op: MachineBinaryOp) bool {
 pub fn locIsAccumulator(loc: ValueLoc) bool {
     return switch (loc) {
         .eax, .rax => true,
-        .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => false,
+        .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => false,
     };
 }
 
@@ -72,7 +72,7 @@ pub fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .scratch32 => |reg| reg == rhs.scratch32,
         .scratch64 => |reg| reg == rhs.scratch64,
         .scratch128 => |pair| pair.eql(rhs.scratch128),
-        .stack64 => |disp| disp == rhs.stack64,
+        .stack_scalar => |stack| stack.base_disp == rhs.stack_scalar.base_disp and stack.bits == rhs.stack_scalar.bits,
         .stack128 => |disp| disp == rhs.stack128,
         .stack128_value => |disp| disp == rhs.stack128_value,
         .stack_i32_array => |array| array.base_disp == rhs.stack_i32_array.base_disp and array.len == rhs.stack_i32_array.len,
@@ -86,7 +86,7 @@ pub fn locContainsReg(loc: ValueLoc, reg: ArgReg) bool {
     return switch (loc) {
         .arg32, .arg64, .scratch32, .scratch64 => |value_reg| value_reg == reg,
         .arg128, .scratch128 => |pair| pair.contains(reg),
-        .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => false,
+        .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => false,
     };
 }
 

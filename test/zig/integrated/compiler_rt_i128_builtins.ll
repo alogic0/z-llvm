@@ -33,6 +33,30 @@ Entry:
   ret i32 %wide
 }
 
+define dso_local i32 @zllvm_mixed_frame_first(i32 %value) {
+Entry:
+  %flag4 = alloca i8, align 4
+  %words65 = alloca [65 x i32], align 4
+  %flag1 = alloca i8, align 1
+  %words2 = alloca [2 x i32], align 4
+  store i32 11, ptr %words65, align 4
+  store i32 %value, ptr %words2, align 4
+  %first = load i32, ptr %words65, align 4
+  ret i32 %first
+}
+
+define dso_local i32 @zllvm_mixed_frame_second(i32 %value) {
+Entry:
+  %flag4 = alloca i8, align 4
+  %words65 = alloca [65 x i32], align 4
+  %flag1 = alloca i8, align 1
+  %words2 = alloca [2 x i32], align 4
+  store i32 11, ptr %words65, align 4
+  store i32 %value, ptr %words2, align 4
+  %second = load i32, ptr %words2, align 4
+  ret i32 %second
+}
+
 define dso_local i32 @zllvm_store_i32_index(ptr %base, i64 %index, i32 %value) {
 Entry:
   %element = getelementptr [4 x i8], ptr %base, i64 %index

@@ -25,7 +25,7 @@ pub const ValueLoc = union(enum) {
     scratch32: ArgReg,
     scratch64: ArgReg,
     scratch128: RegPair,
-    stack64: u32,
+    stack_scalar: StackScalarLoc,
     stack128: u32,
     stack128_value: u32,
     stack_i32_array: StackArrayLoc,
@@ -66,6 +66,11 @@ pub const PairSpillLoc = struct {
 pub const StackArrayLoc = struct {
     base_disp: u32,
     len: u32,
+};
+
+pub const StackScalarLoc = struct {
+    base_disp: u32,
+    bits: u16,
 };
 
 pub const StackPtrLoc = struct {
