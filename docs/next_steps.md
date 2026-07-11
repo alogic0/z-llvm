@@ -37,7 +37,28 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None.
+Item 15 integer-helper bucket is stopped at
+`compiler_rt.mulo.__muloti4` after commit `bee5fe31`.
+
+- Exact failure: `no_emitter/composed-block-call-form` on
+  `{ i128, i1 } @llvm.smul.with.overflow.i128`.
+- Missing machine capability: general 64x64-to-128 multiplication and a
+  register-allocator-visible multi-result contract for the low i128 product
+  plus overflow flag. Existing `imulq` forms retain only the low 64 bits.
+- Correctness constraint: the product, overflow flag, both original i128
+  operands, and overflow-output pointer overlap in liveness. A fixed-register
+  opaque pseudo-op would bypass the single value-location map established by
+  INBOX-3 through INBOX-7 and is not acceptable without review.
+- Latest report: 443 selected / 136 emitted / 307 failed; the global first
+  failure is outside the integer bucket at `compiler_rt.trunc.__trunch`.
+- Evidence/logs: `tmp/muloti4_freeze_i128_retry.log`,
+  `docs/evidence/std_debug_hello_muloti4_freeze_i128.summary`, and
+  `docs/evidence/selector_tier2_muloti4_freeze_i128.summary`.
+- Recommended next action: add general x86_64 full-product machine operations,
+  represent the intrinsic's product pair and flag as allocator-visible
+  component locations, then implement the signed 256-bit sign-extension
+  overflow check with executable boundary cases. Do not route through a
+  nominal `__muloti4` template or an opaque fixed-register byte sequence.
 
 Current operating note recorded 2026-07-10:
 
