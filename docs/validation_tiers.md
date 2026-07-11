@@ -115,7 +115,9 @@ runs at tier 3 when a ratchet moves or an item closes.
 Gate-runner infrastructure work (subgate timing report first, then
 tool/artifact reuse, mode parallelism, stage caching, build-graph
 restructuring) proceeds in the order the measured numbers justify —
-the timing report is the prerequisite for all the others.
+the timing report is the prerequisite for all the others. Implementation order,
+acceptance criteria, and supervisor continuation rules are defined in
+[`roadmap/distribution_all_optimization_plan.md`](roadmap/distribution_all_optimization_plan.md).
 
 For gate/cache infrastructure measurement, the required comparison is exactly:
 
