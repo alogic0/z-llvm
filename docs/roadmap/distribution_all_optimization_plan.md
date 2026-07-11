@@ -367,7 +367,7 @@ Maintain a compact table here or in a linked evidence summary:
 
 | State | Commit | Fresh wall | Cached wall | Incremental | Cumulative | Slowest gate | Notes |
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
-| Phase 0 baseline | pending | pending | pending | n/a | n/a | pending | original baseline |
+| Phase 0 baseline | this commit | 3,764.620 s | 2,289.680 s | n/a | n/a | integrated object preopt (cached: 565.374 s) | Phase 1 no-go; startup cost not proven >=10%; [evidence](../evidence/distribution_all_phase0_timing_baseline.summary) |
 
 Record only materially changed states. Do not turn routine worker cycles into
 repeated full-suite benchmarks.

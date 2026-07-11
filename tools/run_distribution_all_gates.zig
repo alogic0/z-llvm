@@ -6,6 +6,19 @@ const Tool = struct {
     args: []const []const u8 = &.{},
 };
 
+const CacheStatus = enum {
+    none,
+    hit,
+    miss,
+    mixed,
+};
+
+const Measurement = struct {
+    tool_index: usize,
+    duration_ms: i96,
+    cache_status: CacheStatus,
+};
+
 const tools = [_]Tool{
     .{ .path = "tools/run_distribution_no_llvm_codegen_subset.zig" },
     .{ .path = "tools/run_native_link_object_inspection.zig" },
@@ -29,6 +42,7 @@ const tools = [_]Tool{
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
+    const fresh_real_rows = try parseArgs(allocator, init);
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
@@ -41,7 +55,14 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.print("distribution all gates target={s}\n", .{target});
     try stdout_writer.interface.flush();
 
-    for (tools) |tool| {
+    var measurements: [tools.len]Measurement = undefined;
+    var total_duration_ms: i96 = 0;
+    var cache_hits: usize = 0;
+    var cache_misses: usize = 0;
+    var cache_mixed: usize = 0;
+    var cache_none: usize = 0;
+
+    for (tools, 0..) |tool, tool_index| {
         var argv: std.ArrayList([]const u8) = .empty;
         defer argv.deinit(allocator);
         try argv.appendSlice(allocator, &.{ "env", target_assignment, "zig", "run", tool.path });
@@ -49,16 +70,124 @@ pub fn main(init: std.process.Init) !void {
             try argv.append(allocator, "--");
             try argv.appendSlice(allocator, tool.args);
         }
+        if (fresh_real_rows and std.mem.eql(u8, tool.path, "src/distribution_real_rows_gate.zig")) {
+            if (tool.args.len == 0) try argv.append(allocator, "--");
+            try argv.append(allocator, "--fresh-export");
+        }
         try stdout_writer.interface.print("gate-start tool={s}", .{tool.path});
         for (tool.args) |arg| try stdout_writer.interface.print(" {s}", .{arg});
         try stdout_writer.interface.writeAll("\n");
         try stdout_writer.interface.flush();
+        const start = std.Io.Timestamp.now(io, .awake);
         const result = try common.runCapture(allocator, io, argv.items, tool.path);
         defer common.freeRunResult(allocator, result);
+        const duration_ms = elapsedMs(io, start);
+        const cache_status = cacheStatus(result.stdout);
+        measurements[tool_index] = .{
+            .tool_index = tool_index,
+            .duration_ms = duration_ms,
+            .cache_status = cache_status,
+        };
+        total_duration_ms += duration_ms;
+        switch (cache_status) {
+            .hit => cache_hits += 1,
+            .miss => cache_misses += 1,
+            .mixed => cache_mixed += 1,
+            .none => cache_none += 1,
+        }
         try stdout_writer.interface.writeAll(result.stdout);
+        try stdout_writer.interface.print("gate-end tool={s}", .{tool.path});
+        for (tool.args) |arg| try stdout_writer.interface.print(" {s}", .{arg});
+        try stdout_writer.interface.print(" duration_ms={} cache_status={s}\n", .{ duration_ms, @tagName(cache_status) });
         try stdout_writer.interface.flush();
     }
 
+    var ranked_indices: [tools.len]usize = undefined;
+    for (&ranked_indices, 0..) |*index, value| index.* = value;
+    sortSlowestFirst(&ranked_indices, &measurements);
+    const slowest_count = @min(@as(usize, 5), tools.len);
+    for (ranked_indices[0..slowest_count], 1..) |measurement_index, rank| {
+        const measurement = measurements[measurement_index];
+        const tool = tools[measurement.tool_index];
+        try stdout_writer.interface.print("summary distribution-all-slowest rank={} tool={s}", .{ rank, tool.path });
+        for (tool.args) |arg| try stdout_writer.interface.print(" {s}", .{arg});
+        try stdout_writer.interface.print(" duration_ms={} cache_status={s}\n", .{ measurement.duration_ms, @tagName(measurement.cache_status) });
+    }
+    try stdout_writer.interface.print(
+        "summary distribution-all-timing subgates={} total_duration_ms={} cache_hit_subgates={} cache_miss_subgates={} cache_mixed_subgates={} cache_none_subgates={} slowest_reported={} fresh_real_rows={} local_fail=0\n",
+        .{ tools.len, total_duration_ms, cache_hits, cache_misses, cache_mixed, cache_none, slowest_count, fresh_real_rows },
+    );
+
     try stdout_writer.interface.writeAll("ok distribution all gates\n");
     try stdout_writer.interface.flush();
+}
+
+fn parseArgs(allocator: std.mem.Allocator, init: std.process.Init) !bool {
+    var fresh_real_rows = false;
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+    _ = args.skip();
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--fresh-real-rows")) {
+            fresh_real_rows = true;
+        } else {
+            return error.UnexpectedArgument;
+        }
+    }
+    return fresh_real_rows;
+}
+
+fn elapsedMs(io: std.Io, start: std.Io.Timestamp) i96 {
+    return @divTrunc(start.durationTo(std.Io.Timestamp.now(io, .awake)).nanoseconds, std.time.ns_per_ms);
+}
+
+fn cacheStatus(output: []const u8) CacheStatus {
+    var saw_hit = false;
+    var saw_miss = false;
+    var lines = std.mem.splitScalar(u8, output, '\n');
+    while (lines.next()) |line| {
+        if (std.mem.indexOf(u8, line, "cache") == null) continue;
+        if (std.mem.indexOf(u8, line, "status=hit") != null) saw_hit = true;
+        if (std.mem.indexOf(u8, line, "status=miss") != null or
+            std.mem.indexOf(u8, line, "status=fresh") != null)
+        {
+            saw_miss = true;
+        }
+    }
+    if (saw_hit and saw_miss) return .mixed;
+    if (saw_hit) return .hit;
+    if (saw_miss) return .miss;
+    return .none;
+}
+
+fn sortSlowestFirst(indices: []usize, measurements: []const Measurement) void {
+    var index: usize = 1;
+    while (index < indices.len) : (index += 1) {
+        const candidate = indices[index];
+        var insert_at = index;
+        while (insert_at > 0 and measurements[indices[insert_at - 1]].duration_ms < measurements[candidate].duration_ms) {
+            indices[insert_at] = indices[insert_at - 1];
+            insert_at -= 1;
+        }
+        indices[insert_at] = candidate;
+    }
+}
+
+test "cache status classifies hit miss mixed and absent output" {
+    try std.testing.expectEqual(CacheStatus.hit, cacheStatus("air-export-cache status=hit\n"));
+    try std.testing.expectEqual(CacheStatus.miss, cacheStatus("air-export-cache status=miss-export\n"));
+    try std.testing.expectEqual(CacheStatus.miss, cacheStatus("air-export-cache status=fresh-export\n"));
+    try std.testing.expectEqual(CacheStatus.mixed, cacheStatus("cache status=hit\ncache status=miss-export\n"));
+    try std.testing.expectEqual(CacheStatus.none, cacheStatus("summary local_fail=0\n"));
+}
+
+test "slowest measurements sort by descending duration" {
+    const measurements = [_]Measurement{
+        .{ .tool_index = 0, .duration_ms = 10, .cache_status = .none },
+        .{ .tool_index = 1, .duration_ms = 30, .cache_status = .hit },
+        .{ .tool_index = 2, .duration_ms = 20, .cache_status = .miss },
+    };
+    var indices = [_]usize{ 0, 1, 2 };
+    sortSlowestFirst(&indices, &measurements);
+    try std.testing.expectEqualSlices(usize, &.{ 1, 2, 0 }, &indices);
 }

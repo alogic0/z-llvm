@@ -75,7 +75,7 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "distribution-debug-unwind", "Run selected Debug unwind/DWARF boundary gate", "tools/run_distribution_debug_unwind_boundary.zig");
     addToolStep(b, "distribution-linker-boundary", "Run linker/CRT ownership boundary gate", "tools/run_distribution_linker_boundary.zig");
     addToolStep(b, "distribution-aarch64-boundary", "Run AArch64 object target boundary gate", "tools/run_distribution_aarch64_object_boundary.zig");
-    addToolStep(b, "distribution-all", "Run selected distribution gates, native-link proof/probe, and boundary gates", "tools/run_distribution_all_gates.zig");
+    addToolStepWithArgs(b, "distribution-all", "Run selected distribution gates, native-link proof/probe, and boundary gates", "tools/run_distribution_all_gates.zig");
     addToolStepWithArgs(b, "distribution-real-rows", "Run ranked real compiler-core rows through staged replacement gate", "tools/run_distribution_real_rows.zig");
     addToolStepWithArgs(b, "clean-tmp", "Dry-run or delete stale tmp export-cache entries and scratch directories", "tools/clean_tmp.zig");
     addToolStepWithArgs(b, "stage2-pressure-diagnostic", "Write generic-CFG stage-two pressure diagnostics for one IR function", "src/stage2_pressure_diagnostic.zig");

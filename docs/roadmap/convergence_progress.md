@@ -2303,6 +2303,19 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_ptr.summary`;
   Tier 2 record `docs/evidence/selector_tier2_load_i32_ptr.summary`.
 
+- 2026-07-11 (this commit; acknowledges INBOX-12) Tier 3 gate
+  infrastructure Phase 0: `distribution-all` now reports per-subgate duration
+  and cache status, ranks the five slowest gates, and accepts an explicit
+  forced-fresh real-row baseline option. Identical-state fresh and cached runs
+  remain semantically equivalent and green. Fresh wall time is 3,764.620 s
+  with 3,764.298 s summed child time and 0.322 s orchestration overhead;
+  cached wall time is 2,289.680 s with 2,289.633 s summed child time and
+  0.047 s overhead. Phase 1 is a no-go: the evidence does not establish
+  repeated tool compilation/startup at the required ten percent of cached
+  wall time. No ratchet moves; capability work resumes at the `__udivei5`
+  `composed-block-icmp-type` frontier. Evidence
+  `docs/evidence/distribution_all_phase0_timing_baseline.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
