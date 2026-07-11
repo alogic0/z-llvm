@@ -3,6 +3,7 @@ target datalayout = "e-m:e-p270:32:32-p271:32-p272:64:64-i64:64-i128:128-f80:128
 target triple = "x86_64-unknown-linux-gnu"
 
 declare i128 @llvm.abs.i128(i128, i1)
+declare i32 @llvm.ctlz.i32(i32, i1 immarg)
 declare i128 @compiler_rt.udivmod.udivmod__anon_15304(i128, i128, ptr)
 
 define dso_local i32 @zllvm_ne_zero_i16(i32 %value) {
@@ -112,6 +113,12 @@ Entry:
   %not_zero = icmp ne i64 %value, 0
   %result = zext i1 %not_zero to i32
   ret i32 %result
+}
+
+define dso_local i32 @zllvm_ctlz_i32(i32 %value) {
+Entry:
+  %count = tail call range(i32 0, 33) i32 @llvm.ctlz.i32(i32 %value, i1 true)
+  ret i32 %count
 }
 
 define dso_local i128 @__modti3(i128 %0, i128 %1) {

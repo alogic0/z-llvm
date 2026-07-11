@@ -1151,6 +1151,7 @@ pub const ComposedBlockSelector = struct {
         if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try selector.lowerIntByteSizeCall(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try selector.lowerAbsI64(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try selector.lowerAbsI128(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try selector.lowerCtlzI32(result, call);
         if (call.inline_asm != null) return .{ .no_emitter = "composed-block-inline-asm-call" };
         if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
         if (!isDefaultOrFastcc(call.calling_conv) or call.tail_kind != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
@@ -1176,6 +1177,24 @@ pub const ComposedBlockSelector = struct {
             128 => {},
             else => unreachable,
         };
+        return null;
+    }
+
+    fn lowerCtlzI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        if (call.inline_asm != null or call.callee_value != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-ctlz-call-form" };
+        }
+        if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-ctlz-signature" };
+        const value_arg = call.args.items[0];
+        const undef_arg = call.args.items[1];
+        if (!value_arg.ty.eql(.{ .int = 32 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !undef_arg.value.eql(.{ .int = 1 })) {
+            return .{ .no_emitter = "composed-block-ctlz-args" };
+        }
+        selector.emitValueIntoScratch(value_arg.value, .rdi, 32) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+        try selector.clobberAccumulator();
+        try selector.machine.instructions.append(selector.allocator, .clz_i32_edi_eax);
+        try selector.bindEax(result_name);
         return null;
     }
 
