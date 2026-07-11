@@ -2007,6 +2007,35 @@ pub const ComposedBlockSelector = struct {
         try selector.bindValueLoc(name, target);
     }
 
+    pub fn prepareFixedProductDefs(selector: *ComposedBlockSelector) !void {
+        try selector.clobberAccumulator();
+        try selector.clobberArgReg(.rdx);
+    }
+
+    pub fn bindFixedProductResult(selector: *ComposedBlockSelector, name: []const u8) !void {
+        const plan = selector.allocation_plan orelse return error.UnsupportedCodegenValue;
+        const assignment = plan.assignment(name) orelse return error.UnsupportedCodegenValue;
+        switch (assignment) {
+            .gpr128 => |pair| {
+                try selector.clobberArgReg(pair.lo);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.lo });
+                if (pair.hi != .rdx) {
+                    try selector.clobberArgReg(pair.hi);
+                    try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = pair.hi, .src = .rdx } });
+                }
+                try selector.bindValueLoc(name, .{ .scratch128 = pair });
+            },
+            .spill => |index| {
+                if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) return error.UnsupportedCodegenValue;
+                const spill = pairSpillFrameIndexMaybe(index) orelse return error.UnsupportedCodegenValue;
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.lo });
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = .rdx } });
+                try selector.bindValueLoc(name, .{ .spill128 = spill });
+            },
+            .gpr32, .gpr64, .stack_object, .stack_pointer => return error.UnsupportedCodegenValue,
+        }
+    }
+
     fn plannedResultLoc(selector: ComposedBlockSelector, name: []const u8, actual: ValueLoc) ?ValueLoc {
         const plan = selector.allocation_plan orelse return null;
         const assignment = plan.assignment(name) orelse return null;

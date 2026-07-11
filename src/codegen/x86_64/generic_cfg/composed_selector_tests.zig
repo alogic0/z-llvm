@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
+const encoding = @import("../../../mc/encoding.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const impl = @import("composed_selector_impl.zig");
@@ -821,6 +822,95 @@ test "generic cfg selector stores planned pair spills in deterministic frame slo
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = pair_a.lo } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = pair_a.hi } }, machine.instructions.items[1]);
+}
+
+test "generic cfg selector relocates fixed full-product definitions" {
+    var machine = MachineFunction.init("relocate-full-product", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("product", .{ .gpr128 = pair_b });
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+
+    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+    try selector.prepareFixedProductDefs();
+    try machine.instructions.append(std.testing.allocator, .{ .mul_rax_arg64_full = .rsi });
+    try selector.bindFixedProductResult("product");
+    try selector.emitValueIntoI128Return(.{ .named = "product" });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_b }, selector.valueLoc("product").?);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_rax_to_arg = pair_b.lo }, machine.instructions.items[2]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = pair_b.hi, .src = .rdx } }, machine.instructions.items[3]);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(
+        null,
+        bytes.len,
+        .{ .READ = true, .WRITE = true, .EXEC = true },
+        .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+        -1,
+        0,
+    );
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const fullProduct: *const fn (u64, u64) callconv(.c) u128 = @ptrCast(mapping.ptr);
+    const lhs = std.math.maxInt(u64);
+    const rhs: u64 = 3;
+    try std.testing.expectEqual(@as(u128, lhs) * rhs, fullProduct(lhs, rhs));
+}
+
+test "generic cfg selector displaces live fixed full-product register owners" {
+    var machine = MachineFunction.init("prepare-full-product", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("accumulator", 2);
+    try plan.interval_ends.put("rdx_pair", 2);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector.bindValueLoc("accumulator", .rax);
+    try selector.bindValueLoc("rdx_pair", .{ .scratch128 = pair_a });
+
+    try selector.prepareFixedProductDefs();
+
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("accumulator").?);
+    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot2, .hi = .slot4 } }, selector.valueLoc("rdx_pair").?);
+    try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = pair_a.lo } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot4, .reg = pair_a.hi } }, machine.instructions.items[2]);
+}
+
+test "generic cfg selector spills fixed full-product definitions" {
+    var machine = MachineFunction.init("spill-full-product", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("product", .{ .spill = 3 });
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+
+    try selector.prepareFixedProductDefs();
+    try selector.bindFixedProductResult("product");
+
+    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } }, selector.valueLoc("product").?);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot6 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = .rdx } }, machine.instructions.items[1]);
 }
 
 test "generic cfg selector allocation plan reuses expired registers deterministically" {

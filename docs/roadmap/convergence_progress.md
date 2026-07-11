@@ -2795,6 +2795,18 @@ One line per completed cycle, append-only, newest last. This is the
   ratchet moves. Evidence
   `docs/evidence/x86_64_full_product_machine_ops.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  allocation foundation: the composed selector now displaces live RAX/RDX
+  owners before full-product definitions and relocates the resulting RDX:RAX
+  pair into the allocation plan's ordinary register-pair or pair-spill
+  location. Focused tests cover both destinations and live-owner preservation;
+  selector-produced relocation code executes and returns both product halves.
+  Tier 3 is green across 17 subgates and all three strict 100-row modes. The
+  focused `__muloti4` row remains at `no_emitter/composed-block-call-form`;
+  report-all remains 443 selected, 136 emitted, and 307 failed. No tracker or
+  ratchet moves. Evidence
+  `docs/evidence/x86_64_full_product_binding.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
