@@ -166,7 +166,7 @@ was mid-turn, later evidence in the turn narration or the commit body
 
 ## History / retired pieces
 
-`tools/inbox_watch.sh` (a daemon that watched the inbox and auto-nudged
+`scripts/inbox_watch.sh` (a daemon that watched the inbox and auto-nudged
 via tmux) is retired: the supervisor now performs detection and nudging
 directly, which proved more reliable — the daemon accumulated two
 watch-mechanics bugs (inotify single-shot event gap; pipe block

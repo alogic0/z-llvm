@@ -9,11 +9,11 @@
 #
 # Start the daemon (from the repo root):
 #
-#   nohup tools/inbox_watch.sh >> tmp/inbox_watch.log 2>&1 &
+#   nohup scripts/inbox_watch.sh >> tmp/inbox_watch.log 2>&1 &
 #
 # Stop it:
 #
-#   pkill -f tools/inbox_watch.sh
+#   pkill -f scripts/inbox_watch.sh
 #
 # Requires tmux. Uses inotifywait (package inotify-tools) when available,
 # otherwise falls back to mtime/checksum polling.
