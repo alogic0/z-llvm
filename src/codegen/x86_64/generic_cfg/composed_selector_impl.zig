@@ -333,7 +333,7 @@ pub const ComposedBlockSelector = struct {
         var array_count: usize = 0;
         var saw_phi = false;
         var saw_array_alloca = false;
-        var saw_wide_smul_overflow = false;
+        var saw_fixed_smul_overflow = false;
         var saw_wide_icmp = false;
         if (selector.allocation_plan) |plan| selector.next_spill_slot = plan.spill_slots;
 
@@ -342,13 +342,15 @@ pub const ComposedBlockSelector = struct {
                 if (instruction.removed) continue;
                 if (instruction.kind == .phi) saw_phi = true;
                 if (instruction.kind == .alloca and parseI32ArrayType(instruction.kind.alloca.allocated_ty) != null) saw_array_alloca = true;
-                if (instruction.kind == .call and std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128")) saw_wide_smul_overflow = true;
+                if (instruction.kind == .call and
+                    (std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i64") or
+                        std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128"))) saw_fixed_smul_overflow = true;
                 if (instruction.kind == .icmp and instruction.kind.icmp.operand_ty.eql(.{ .int = 128 })) saw_wide_icmp = true;
             }
         }
 
         const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
-        const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or saw_wide_smul_overflow or saw_wide_icmp or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
+        const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
         const spill_reserved_bytes = selector.spillReservedBytes(reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" };
         payload_bytes = if (saw_array_alloca) @max(spill_reserved_bytes, stage2SpillReservedBytes()) else 0;
 
@@ -389,7 +391,7 @@ pub const ComposedBlockSelector = struct {
         }
 
         if (payload_bytes == 0) {
-            if (pressure.exceedsNoSpill() or saw_phi or saw_wide_smul_overflow or saw_wide_icmp) payload_bytes = spill_reserved_bytes;
+            if (pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp) payload_bytes = spill_reserved_bytes;
         }
 
         if (payload_bytes == 0) return null;
@@ -1443,6 +1445,7 @@ pub const ComposedBlockSelector = struct {
         if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try selector.lowerCtlzI32(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try selector.lowerInlineMemcpy(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try selector.lowerUaddOverflowI32(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try selector.lowerSmulOverflowI64(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try selector.lowerSmulOverflowI128(result, call);
         if (call.inline_asm != null) return .{ .no_emitter = "composed-block-inline-asm-call" };
         if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
@@ -1572,6 +1575,44 @@ pub const ComposedBlockSelector = struct {
         try selector.machine.instructions.append(selector.allocator, .{ .spill_eax_rsp = overflow_spill });
         try selector.overflow_results.put(result_name, .{
             .value = .{ .spill128 = p00 },
+            .overflow = .{ .spill64 = overflow_spill },
+            .require_value_first = false,
+        });
+        return null;
+    }
+
+    fn lowerSmulOverflowI64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-smulo-i64-missing-result" };
+        if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-smulo-i64-call-form" };
+        }
+        if (call.tail_kind) |tail_kind| {
+            if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-smulo-i64-tail-kind" };
+        }
+        if (!call.ret_ty.eql(.{ .aggregate = "{ i64, i1 }" }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-smulo-i64-signature" };
+        const lhs = call.args.items[0];
+        const rhs = call.args.items[1];
+        if (!lhs.ty.eql(.{ .int = 64 }) or !rhs.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-smulo-i64-args" };
+
+        selector.prepareFixedProductDefs() catch return .{ .no_spill_envelope = "composed-block-smulo-i64-fixed-defs" };
+        selector.emitValueIntoScratch(rhs.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-smulo-i64-rhs" };
+        selector.emitValueIntoAccumulator(lhs.value, 64) catch return .{ .unsupported_value = "composed-block-smulo-i64-lhs" };
+        try selector.machine.instructions.append(selector.allocator, .{ .imul_rax_arg64_full = .rcx });
+
+        const value_name = try selector.ownedInternalValueName(result_name, "value");
+        const value_spill = selector.allocateSpillSlot(value_name) orelse return .{ .no_spill_envelope = "composed-block-smulo-i64-value" };
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = value_spill });
+        selector.clobberArgReg(.rcx) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-sign" };
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .rcx });
+        try selector.machine.instructions.append(selector.allocator, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .rdx });
+        selector.clobberAccumulator() catch return .{ .no_spill_envelope = "composed-block-smulo-i64-overflow" };
+        try selector.machine.instructions.append(selector.allocator, .setne_eax);
+        const overflow_name = try selector.ownedInternalValueName(result_name, "overflow");
+        const overflow_spill = selector.allocateSpillSlot(overflow_name) orelse return .{ .no_spill_envelope = "composed-block-smulo-i64-overflow" };
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_eax_rsp = overflow_spill });
+        try selector.overflow_results.put(result_name, .{
+            .value = .{ .spill64 = value_spill },
             .overflow = .{ .spill64 = overflow_spill },
             .require_value_first = false,
         });

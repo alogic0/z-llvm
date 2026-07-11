@@ -6,6 +6,7 @@ declare i128 @llvm.abs.i128(i128, i1)
 declare i32 @llvm.ctlz.i32(i32, i1 immarg)
 declare { i32, i1 } @llvm.uadd.with.overflow.i32(i32, i32)
 declare { i128, i1 } @llvm.smul.with.overflow.i128(i128, i128)
+declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
 declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
 declare i128 @compiler_rt.udivmod.udivmod__anon_15304(i128, i128, ptr)
 
@@ -51,6 +52,21 @@ define dso_local i32 @zllvm_smul_i128_overflow(i128 %lhs, i128 %rhs) {
 Entry:
   %pair = tail call { i128, i1 } @llvm.smul.with.overflow.i128(i128 %lhs, i128 %rhs)
   %overflow = extractvalue { i128, i1 } %pair, 1
+  %wide = zext i1 %overflow to i32
+  ret i32 %wide
+}
+
+define dso_local i64 @zllvm_smul_i64_value(i64 %lhs, i64 %rhs) {
+Entry:
+  %pair = call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %lhs, i64 %rhs)
+  %value = extractvalue { i64, i1 } %pair, 0
+  ret i64 %value
+}
+
+define dso_local i32 @zllvm_smul_i64_overflow(i64 %lhs, i64 %rhs) {
+Entry:
+  %pair = call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %lhs, i64 %rhs)
+  %overflow = extractvalue { i64, i1 } %pair, 1
   %wide = zext i1 %overflow to i32
   ret i32 %wide
 }
