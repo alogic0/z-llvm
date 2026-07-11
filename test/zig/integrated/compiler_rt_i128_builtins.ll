@@ -165,6 +165,13 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_double_use(i32 %a, i32 %b) {
+Entry:
+  %sum = add i32 %a, %b
+  %double = add i32 %sum, %sum
+  ret i32 %double
+}
+
 define dso_local void @zllvm_inline_memcpy(ptr %dst, ptr %src, i64 %len) {
 Entry:
   tail call void @llvm.memcpy.inline.p0.p0.i64(ptr %dst, ptr %src, i64 %len, i1 false)

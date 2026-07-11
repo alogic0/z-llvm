@@ -2417,6 +2417,31 @@ test "generic cfg selector spills every live accumulator binding" {
     try expectInstructionTag(machine.instructions.items, .reload_arg64_rsp);
 }
 
+test "generic cfg selector preserves aliased accumulator binary operands" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @double_low_bits(i32 %value) {
+        \\entry:
+        \\  %narrow = trunc i32 %value to i16
+        \\  %wide = zext i16 %narrow to i32
+        \\  %alias = freeze i32 %wide
+        \\  %result = add i32 %wide, %alias
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("double_low_bits", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .add, .reg = .rcx } });
+}
+
 test "generic cfg selector narrows trunc result location class" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -2616,7 +2641,7 @@ test "generic cfg selector composes i64 unsigned remainder through assigned regi
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
 }
 
-test "generic cfg selector rejects composed row that needs another live accumulator copy" {
+test "generic cfg selector copies aliased accumulator operand" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -2635,13 +2660,9 @@ test "generic cfg selector rejects composed row that needs another live accumula
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_spill_envelope", diagnostic.tagName());
-    try std.testing.expectEqualStrings("composed-block-two-address-rhs-accumulator", diagnostic.detail());
-    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectInstruction(machine.instructions.items, .{ .mov_eax_to_arg = .rcx });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .add, .reg = .rcx } });
 }
 
 test "generic cfg selector composes mulo i32 overflow flag through assigned registers" {

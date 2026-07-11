@@ -410,7 +410,11 @@ pub const ComposedBlockSelector = struct {
         const lhs = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
         const rhs = selector.resolveValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
 
-        if (locIsAccumulator(rhs) and !locIsAccumulator(lhs)) {
+        if (locIsAccumulator(rhs) and locIsAccumulator(lhs)) {
+            try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
+            try selector.emitValueIntoAccumulator(binary.lhs, bits);
+            try selector.emitBinaryArgAccumulator(op, .rcx, bits);
+        } else if (locIsAccumulator(rhs)) {
             if (isCommutative(op)) {
                 try selector.spillAccumulatorAliasesExcept(binary.rhs);
                 try selector.emitBinaryLocIntoAccumulator(op, lhs, bits);
@@ -442,7 +446,7 @@ pub const ComposedBlockSelector = struct {
                     break :blk .rcx;
                 } else return .{ .no_emitter = "composed-block-rhs-stack" },
                 .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-rhs-stack" },
-                .eax, .rax => return .{ .no_spill_envelope = "composed-block-two-address-rhs-accumulator" },
+                .eax, .rax => unreachable,
             };
             try selector.emitBinaryArgAccumulator(op, rhs_reg, bits);
         }

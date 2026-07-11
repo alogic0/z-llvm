@@ -82,9 +82,9 @@ Current operating note recorded 2026-07-10:
   the focused proof z_llvm-emits a `__multi3`/`__modti3` object, links it into a
   no-std executable-style harness, verifies both computed results at runtime,
   and now fails closed on wrong expected process exits. Current item-15
-  accounting is composed-selection rows 11,
+  accounting is composed-selection rows 12,
   terminal-template rows 17, recognizer fallback rows 32 in the open
-  integer-helper bucket, stage-two-boundary rows 1, and no allocator acceptance
+  integer-helper bucket, stage-two-boundary rows 0, and no allocator acceptance
   row pending. Pressure diagnostics:
   `compiler_rt.mulXi3.__multi3` recorded `max_live_values=10`,
   `max_spill_slots_needed=4`, `max_spill_slots_over_envelope=0`,
@@ -93,17 +93,14 @@ Current operating note recorded 2026-07-10:
   `max_live_values=19`, `max_spill_slots_needed=13`,
   `max_spill_slots_over_envelope=0`, and no first exceedance under the
   32-slot frame;
-  `compiler_rt.udivmodei4.__umodei4` records `max_live_values=21`,
-  `max_spill_slots_needed=15`, `max_spill_slots_over_envelope=9`,
-  `first_exceed_block=Then9.prol`, `first_exceed_boundary=live_out`,
-  `first_exceed_live_values=13`, and `first_exceed_spill_slots_needed=7`.
-  This cycle closes `compiler_rt.udivmodei4.__udivei5`: narrowed trunc
-  locations feed 32-bit consumers correctly, and framed multi-block returns
-  use one shared epilogue. The exact captured body emits, native-links with
-  `-fno-lld`, and the executable canary covers both return paths. Debug
-  compiler_rt report-all is now 443 selected / 131 emitting / 312 failing,
-  with first failure `compiler_rt.udivmodei4.__umodei4` at
-  `no_spill_envelope` / `stage2-block-count`.
+  closed `compiler_rt.udivmodei4.__umodei4` now records
+  `max_live_values=24`, `max_spill_slots_needed=18`,
+  `max_spill_slots_over_envelope=0`, and no first exceedance under the
+  32-slot frame. Both parked stage-two pressure rows are closed. The exact
+  `__umodei4` body emits, native-links with `-fno-lld`, and the executable
+  canary covers aliased accumulator operands. Debug compiler_rt report-all is
+  now 443 selected / 132 emitting / 311 failing, with first failure
+  `compiler_rt.divmodei4.__divei4` at `unsupported_type` / `call-ret`.
 - First failing real row/stage beyond the enforced prefix: none known after
   the strict `--limit=100` close.
 - Strict ratchet `real_*` counters:
@@ -129,9 +126,9 @@ Current operating note recorded 2026-07-10:
   `tmp/distribution_all_after_inbox5.log`. Current INBOX-7 validation logs are
   `tmp/zig_integrated_exe_i128_arithmetic_inbox7.log` and
   `tmp/distribution_all_after_inbox7.log`. The current parked-boundary retry
-  acceptance logs are `tmp/std_debug_hello_debug_udivei5_shared_epilogue.log`,
-  `tmp/udivei5_acceptance_pressure.log`, `tmp/udivei5_native_link.log`, and
-  `tmp/distribution_all_after_udivei5_acceptance.log`.
+  acceptance logs are `tmp/umodei4_accumulator_alias_retry.log`,
+  `tmp/umodei4_acceptance_pressure.log`, `tmp/umodei4_native_link.log`, and
+  `tmp/distribution_all_after_umodei4_acceptance.log`.
 - Tracked evidence: `docs/evidence/std_debug_hello_udivei5_pressure.tsv` and
   `docs/evidence/std_debug_hello_umodei4_pressure.tsv`;
   `docs/evidence/std_debug_hello_umodti3_composed.summary`;
@@ -148,13 +145,13 @@ Current operating note recorded 2026-07-10:
   Current INBOX-7 gate evidence is
   `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox7.summary` and
   `docs/evidence/distribution_all_after_inbox7.summary`. Current boundary
-  acceptance evidence is `docs/evidence/std_debug_hello_udivei5_acceptance.summary`,
-  `docs/evidence/std_debug_hello_udivei5_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_udivei5_acceptance.summary`, and
-  `docs/evidence/distribution_all_after_udivei5_acceptance.summary`.
-- Recommended next action: retry
-  `compiler_rt.udivmodei4.__umodei4` under the same frame model before
-  resuming remaining integer-helper rows in rank order; keep the intervening
+  acceptance evidence is `docs/evidence/std_debug_hello_umodei4_acceptance.summary`,
+  `docs/evidence/std_debug_hello_umodei4_acceptance_pressure.tsv`,
+  `docs/evidence/zig_integrated_exe_umodei4_acceptance.summary`, and
+  `docs/evidence/distribution_all_after_umodei4_acceptance.summary`.
+- Recommended next action: resume remaining integer-helper rows in rank order,
+  beginning with `compiler_rt.divmodei4.__divei4` at `unsupported_type` /
+  `call-ret`; keep the intervening
   `compiler_rt.udivmod.__udivmodti4`, `__divti3`, and `__udivti3`
   `UnsupportedTailCallAbi` rows in the separate ABI family. Keep terminal
   routines frozen and keep the 44 `UnsupportedTailCallAbi` rows as a separate
