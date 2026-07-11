@@ -11,6 +11,26 @@ During sensitive multi-commit work, intermediate commits may be marked
 before moving to another capability family, closing a tracker item, or
 advancing any ratchet.
 
+## Authority And Precedence
+
+This file is the authoritative validation policy. `docs/working-cycle.md`
+applies it to worker mechanics, and roadmap/checklist documents record goals
+and historical evidence. If an older roadmap entry says that
+`distribution-all` must run before every commit, that wording is historical
+and does not override this file.
+
+Before starting a tier-3 run, record in the worker log or cycle notes:
+
+- the changed subsystem;
+- the tier-3 trigger from this file;
+- the exact command and intended evidence output;
+- why an existing result cannot be reused.
+
+Do not rerun a gate against unchanged relevant inputs when an existing log
+already proves the required result. Reuse requires the same relevant source
+state, Zig pin, target, mode, corpus, pipeline arguments, and expected-result
+contract.
+
 ## Tier 1 — inner loop (seconds to a few minutes)
 
 Run after each small implementation change:
@@ -48,6 +68,10 @@ Run:
   relocation, AIR export, or linker boundaries;
 - before claiming any evidence-backed milestone;
 - periodically after a series of low-risk commits.
+
+Tier 3 is not the default end of every worker cycle. After a tier-3 run,
+inspect and record its result before starting another cycle or another full
+run. A failed run is investigated with the narrowest reproducing subgate.
 
 ## Change-impact routing
 
@@ -92,3 +116,12 @@ Gate-runner infrastructure work (subgate timing report first, then
 tool/artifact reuse, mode parallelism, stage caching, build-graph
 restructuring) proceeds in the order the measured numbers justify —
 the timing report is the prerequisite for all the others.
+
+For gate/cache infrastructure measurement, the required comparison is exactly:
+
+1. one fresh run for the current implementation state;
+2. one cached run against that same state;
+3. a comparison of summary lines, cache status, and subgate timings.
+
+Do not repeat either full run unless the gate/cache implementation or another
+relevant input changes after the measurement.

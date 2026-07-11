@@ -17,8 +17,10 @@ Structural instruction or byte checks remain useful, but they do not prove
 runtime behavior and cannot substitute for a fail-closed executable whose
 exit status changes when the new capability computes the wrong result.
 
-`docs/working-cycle.md` may narrow this general policy for the active worker
-milestone. Use that file for worker cycle mechanics and active goal selection.
+`docs/validation_tiers.md` is authoritative for validation scope and gate
+reuse. `docs/working-cycle.md` applies that policy to worker mechanics and
+active goal selection. Historical roadmap wording does not override either
+file.
 
 ## Work Selection Priority
 

@@ -16,7 +16,8 @@ One cycle means:
 1.  Choose the next goal through the Goal Selection rules below (driven by
     `docs/roadmap/convergence_progress.md`).
 2.  Implement only that checklist item.
-3.  Run validation per [`docs/validation_tiers.md`](validation_tiers.md):
+3.  Select and record the validation tier per the authoritative
+    [`docs/validation_tiers.md`](validation_tiers.md), then run it:
     focused commits pass their change-impact gate; capability-closing,
     ratchet-moving, ABI-affecting, and milestone commits pass
     `distribution-all`.
@@ -27,6 +28,10 @@ One cycle means:
 7.  Confirm `git status --short` is clean.
 8.  Report the cycle result.
 9.  Start the next cycle automatically unless a stop condition applies.
+
+After a tier-3 run, inspect and record the result before starting another
+cycle. Do not launch another full run merely because the previous command
+finished.
 
 A dirty worktree is allowed while actively implementing a cycle. A dirty
 worktree is not allowed when reporting a cycle as complete or starting the next
@@ -368,6 +373,12 @@ Use this order:
     proving that a targeted inventory bucket dropped or was reclassified.
 6.  Run `distribution-all` only for milestone confirmation, shared build
     orchestration changes, or an explicitly documented reason.
+
+Before step 6, record the changed subsystem, the matching tier-3 trigger, the
+exact command/log path, and why existing evidence cannot be reused. For
+gate/cache measurement, follow the one-fresh/one-cached protocol in
+`docs/validation_tiers.md`; do not repeat the pair without a relevant input
+change.
 
 For a normal implementation cycle that does not change documented counters, the
 minimum validation is:

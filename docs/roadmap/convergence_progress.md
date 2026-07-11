@@ -122,11 +122,14 @@ list and the visible record of progress. Evidence summaries under
   (item 11) after the strict close (single-worker mode: the tracks run
   sequentially, but every stop report still states both). Fix-cycle rules
   carry over from item 8 unchanged: one fix per commit, no
-  source/function-name admission, `distribution-all` green before every
-  commit, no weakening captured rows or golden files without behavioral
-  verification, recognizer three-strikes escalation per the item 15 note
-  (count stands at 1), and `real_executed=0` remains correct until a
-  selector version lifts determinism marks via a ratchet-migration note.
+  source/function-name admission, no weakening captured rows or golden files
+  without behavioral verification, recognizer three-strikes escalation per
+  the item 15 note (count stands at 1), and `real_executed=0` remains correct
+  until a selector version lifts determinism marks via a ratchet-migration
+  note.
+  Historical validation note: this item originally required
+  `distribution-all` before every commit. That rule was superseded on
+  2026-07-11 by `docs/validation_tiers.md` and is not current worker policy.
   Finish the two open item-9 issues (ReleaseSafe native-link for
   `debug.SafetyLock.assertUnlocked`; ReleaseSmall rank-1 `air-export`
   recheck — reproduce it once with the cache bypassed to rule the cache
@@ -348,9 +351,11 @@ list and the visible record of progress. Evidence summaries under
   `UnsupportedTailCallAbi` rows across compiler_rt are tracked as a separate
   ordinary ABI family rather than a selector concern. Only after limb64 and
   integer selector rows are green should the migration attempt the 236-row
-  soft-float/libm/conversion selector bucket. `distribution-all` must stay
-  green before every commit; if captured rows regress, use the loop-sum bisect
-  discipline before proceeding.
+  soft-float/libm/conversion selector bucket. Validation follows
+  `docs/validation_tiers.md`: focused commits use the selector/allocator route,
+  while capability-closing, ratchet-moving, ABI-affecting, and milestone
+  commits require `distribution-all`. If captured rows regress, use the
+  loop-sum bisect discipline before proceeding.
 
   Stage-two allocator design note (2026-07-09): the composed selector's value
   model is virtual registers, not opportunistic physical-register ownership.
