@@ -1456,7 +1456,7 @@ test "generic cfg selector composes dynamic byte pointer gep" {
     }
 
     try expectInstruction(machine.instructions.items, .add_r8_rcx);
-    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .r8 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .rcx });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -2368,6 +2368,37 @@ test "generic cfg selector composes i8 immediate and" {
     }
 
     try expectInstruction(machine.instructions.items, .{ .and_eax_imm32 = 1 });
+}
+
+test "generic cfg selector treats one-byte array GEP as byte pointer arithmetic" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @byte_array_gep_eq(ptr %base, ptr %expected, i64 %index) {
+        \\entry:
+        \\  %array_ptr = getelementptr [1 x i8], ptr %base, i64 %index
+        \\  %equal = icmp eq ptr %array_ptr, %expected
+        \\  %result = zext i1 %equal to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("byte_array_gep_eq", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .sete_eax);
 }
 
 test "generic cfg selector keeps stack pointer index dependencies live" {

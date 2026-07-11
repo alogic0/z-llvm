@@ -1258,7 +1258,7 @@ pub const ComposedBlockSelector = struct {
 
     fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.GepInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-        if (gep.source_ty.eql(.{ .int = 8 })) return try selector.lowerBytePointerGep(result_name, gep);
+        if (isBytePointerSource(gep.source_ty)) return try selector.lowerBytePointerGep(result_name, gep);
         if (isI32ElementPointerSource(gep.source_ty)) return try selector.lowerI32ElementPointerGep(result_name, gep);
         const len = parseI32ArrayType(gep.source_ty) orelse return .{ .no_emitter = "composed-block-gep-source" };
         const base = selector.resolveValue(gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
@@ -1361,7 +1361,7 @@ pub const ComposedBlockSelector = struct {
                 selector.emitValueIntoScratch(gep.ptr, .r8, 64) catch return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
                 selector.emitValueIntoScratch(index.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
                 try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
-                try selector.bindScratch(result_name, .r8, 64);
+                try selector.bindScratch(result_name, .rcx, 64);
             },
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
         }
@@ -1371,6 +1371,14 @@ pub const ComposedBlockSelector = struct {
     fn isI32ElementPointerSource(ty: ir.Type) bool {
         return switch (ty) {
             .aggregate => |text| std.mem.eql(u8, std.mem.trim(u8, text, " "), "[4 x i8]"),
+            .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+        };
+    }
+
+    fn isBytePointerSource(ty: ir.Type) bool {
+        if (ty.eql(.{ .int = 8 })) return true;
+        return switch (ty) {
+            .aggregate => |text| std.mem.eql(u8, std.mem.trim(u8, text, " "), "[1 x i8]"),
             .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
         };
     }

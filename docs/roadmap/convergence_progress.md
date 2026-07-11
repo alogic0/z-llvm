@@ -2708,6 +2708,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_divei4_acceptance.summary`, and
   `docs/evidence/distribution_all_after_divei4_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
+  retry: one-index `[1 x i8]` GEPs now reuse byte-pointer arithmetic. The
+  executable address check exposed and repaired a pre-existing value-map bug:
+  dynamic byte GEP recorded `%r8` even though `add_r8_rcx` writes `%rcx`.
+  Correcting that binding makes the address check pass. The focused `__modei5`
+  retry advances from `composed-block-gep-source` to
+  `composed-block-icmp-form`; report-all remains 443 selected, 133 emitted, and
+  310 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_modei5_gep_source.summary`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_modei5_gep_source.summary`,
+  and `docs/evidence/selector_tier2_modei5_gep_source.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

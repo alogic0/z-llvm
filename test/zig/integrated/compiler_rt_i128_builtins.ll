@@ -452,6 +452,14 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_byte_array_gep_eq(ptr %base, ptr %expected, i64 %index) {
+Entry:
+  %array_ptr = getelementptr [1 x i8], ptr %base, i64 %index
+  %equal = icmp eq ptr %array_ptr, %expected
+  %result = zext i1 %equal to i32
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_ne_zero_i64(i64 %value) {
 Entry:
   %not_zero = icmp ne i64 %value, 0
