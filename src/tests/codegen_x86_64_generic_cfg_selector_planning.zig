@@ -1606,6 +1606,37 @@ test "generic cfg selector composes narrow integer inequality with zero" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector composes i64 inequality with zero" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @ne64_zero(i64 %value) {
+        \\entry:
+        \\  %not_zero = icmp ne i64 %value, 0
+        \\  %result = zext i1 %not_zero to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("ne64_zero", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 0 } });
+    try expectInstruction(machine.instructions.items, .setne_eax);
+}
+
 test "generic cfg selector composes dynamic i32 element pointer" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
