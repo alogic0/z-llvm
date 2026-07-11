@@ -4,6 +4,7 @@ target triple = "x86_64-unknown-linux-gnu"
 
 declare i128 @llvm.abs.i128(i128, i1)
 declare i32 @llvm.ctlz.i32(i32, i1 immarg)
+declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
 declare i128 @compiler_rt.udivmod.udivmod__anon_15304(i128, i128, ptr)
 
 define dso_local i32 @zllvm_ne_zero_i16(i32 %value) {
@@ -163,6 +164,12 @@ Entry:
   %narrow = trunc i64 %value to i32
   %result = add i32 %lhs, %narrow
   ret i32 %result
+}
+
+define dso_local void @zllvm_inline_memcpy(ptr %dst, ptr %src, i64 %len) {
+Entry:
+  tail call void @llvm.memcpy.inline.p0.p0.i64(ptr %dst, ptr %src, i64 %len, i1 false)
+  ret void
 }
 
 define dso_local i32 @zllvm_framed_early_return(i64 %flag, i32 %value) {

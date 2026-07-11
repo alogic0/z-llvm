@@ -2422,6 +2422,30 @@ test "generic cfg selector narrows trunc result location class" {
     try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .add, .reg = .rsi } });
 }
 
+test "generic cfg selector composes tail inline memcpy" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
+        \\
+        \\define void @copy_bytes(ptr %dst, ptr %src, i64 %len) {
+        \\entry:
+        \\  tail call void @llvm.memcpy.inline.p0.p0.i64(ptr %dst, ptr %src, i64 %len, i1 false)
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("copy_bytes", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectInstruction(machine.instructions.items, .memcpy_rdi_rsi_rdx_rax);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -1301,6 +1301,7 @@ pub const ComposedBlockSelector = struct {
         if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try selector.lowerAbsI64(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try selector.lowerAbsI128(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try selector.lowerCtlzI32(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try selector.lowerInlineMemcpy(result, call);
         if (call.inline_asm != null) return .{ .no_emitter = "composed-block-inline-asm-call" };
         if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
         if (!isDefaultOrFastcc(call.calling_conv) or call.tail_kind != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
@@ -1326,6 +1327,33 @@ pub const ComposedBlockSelector = struct {
             128 => {},
             else => unreachable,
         };
+        return null;
+    }
+
+    fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        if (result != null) return .{ .unsupported_value = "composed-block-memcpy-result" };
+        if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-memcpy-call-form" };
+        }
+        if (call.tail_kind) |tail_kind| {
+            if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-memcpy-tail-kind" };
+        }
+        if (call.ret_ty != .void or call.args.items.len != 4) return .{ .no_emitter = "composed-block-memcpy-signature" };
+        const dst = call.args.items[0];
+        const src = call.args.items[1];
+        const len = call.args.items[2];
+        const is_volatile = call.args.items[3];
+        if (dst.ty != .ptr or src.ty != .ptr or !len.ty.eql(.{ .int = 64 }) or
+            !is_volatile.ty.eql(.{ .int = 1 }) or !is_volatile.value.eql(.{ .int = 0 }))
+        {
+            return .{ .no_emitter = "composed-block-memcpy-args" };
+        }
+
+        if (try selector.spillLiveCallerClobbersForCall()) |diagnostic| return diagnostic;
+        selector.emitValueIntoScratch(dst.value, .rdi, 64) catch return .{ .unsupported_value = "composed-block-memcpy-dst" };
+        selector.emitValueIntoScratch(src.value, .rsi, 64) catch return .{ .unsupported_value = "composed-block-memcpy-src" };
+        selector.emitValueIntoScratch(len.value, .rdx, 64) catch return .{ .unsupported_value = "composed-block-memcpy-len" };
+        try selector.machine.instructions.append(selector.allocator, .memcpy_rdi_rsi_rdx_rax);
         return null;
     }
 

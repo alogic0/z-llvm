@@ -2579,6 +2579,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_umodei4_block_count.summary`, and
   `docs/evidence/selector_tier2_umodei4_block_count.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
+  retry: the composed selector now lowers the nonvolatile tail
+  `llvm.memcpy.inline.p0.p0.i64` form through the existing x86_64 memcpy
+  primitive after spilling live caller-clobbered values. An executable
+  four-word copy proves the memory effect. The focused `__umodei4` retry
+  advances from `composed-block-call-form` to `no_emitter` /
+  `composed-block-cast-width`; report-all remains 443 selected, 131 emitted,
+  and 312 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_umodei4_inline_memcpy.summary`,
+  `docs/evidence/zig_integrated_exe_umodei4_inline_memcpy.summary`, and
+  `docs/evidence/selector_tier2_umodei4_inline_memcpy.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
