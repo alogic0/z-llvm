@@ -992,7 +992,13 @@ pub const ComposedBlockSelector = struct {
                 try selector.appendLoadStackI32(stack_ptr);
                 try selector.bindEax(result_name);
             },
-            .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack128_value, .stack_i32_array, .spill64, .spill128 => return .{ .no_emitter = "composed-block-load-ptr" },
+            .arg64, .scratch64 => |reg| {
+                if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-ptr-width" };
+                try selector.clobberAccumulator();
+                try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_eax = reg });
+                try selector.bindEax(result_name);
+            },
+            .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .stack128_value, .stack_i32_array, .spill64, .spill128 => return .{ .no_emitter = "composed-block-load-ptr" },
         }
         return null;
     }
