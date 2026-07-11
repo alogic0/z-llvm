@@ -506,6 +506,18 @@ pub const ComposedBlockSelector = struct {
                     try selector.bindRax(result_name);
                     return null;
                 }
+                if (bits == 64) {
+                    if (try selector.preserveRaxForDestructiveAccumulatorUse(binary.lhs)) |diagnostic| return diagnostic;
+                    selector.emitValueIntoRax(binary.lhs) catch |err| switch (err) {
+                        error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-and64-lhs" },
+                        else => return err,
+                    };
+                    try selector.clobberArgReg(.rcx);
+                    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
+                    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
+                    try selector.bindRax(result_name);
+                    return null;
+                }
                 if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
                 try selector.emitValueIntoEax(binary.lhs);
                 try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = try i32Value(rhs) });

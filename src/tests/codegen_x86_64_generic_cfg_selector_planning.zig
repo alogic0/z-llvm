@@ -1290,6 +1290,37 @@ test "generic cfg selector composes constant byte pointer gep" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector composes i64 immediate mask" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @mask64(i64 %value) {
+        \\entry:
+        \\  %masked = and i64 %value, 7
+        \\  ret i64 %masked
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("mask64", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_rcx = 7 });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
