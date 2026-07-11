@@ -481,6 +481,7 @@ fn selectorInstructionResultMetadata(instruction: ir.Instruction) ?VirtualRegMet
         .call => |call| if (call.ret_ty == .void) null else selectorValueMetadata(call.ret_ty),
         .select => |select| selectorValueMetadata(select.ty),
         .phi => |phi| selectorValueMetadata(phi.ty),
+        .extractvalue => |extract| selectorValueMetadata(extract.result_ty),
         .gep => .{ .class = .stack_pointer, .bits = 64 },
         .alloca => .{ .class = .stack_object, .bits = 0 },
         .store,
@@ -489,7 +490,6 @@ fn selectorInstructionResultMetadata(instruction: ir.Instruction) ?VirtualRegMet
         .extractelement,
         .insertelement,
         .shufflevector,
-        .extractvalue,
         .insertvalue,
         .fcmp,
         .fence,
@@ -652,6 +652,12 @@ fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !
                     .gep => |gep| {
                         const ptr_name = namedValue(gep.ptr) orelse continue;
                         if (exempt_values.contains(ptr_name) and !exempt_values.contains(result)) {
+                            try exemptValuesPut(exempt_values, result);
+                            changed = true;
+                        }
+                    },
+                    .call => |call| {
+                        if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32") and !exempt_values.contains(result)) {
                             try exemptValuesPut(exempt_values, result);
                             changed = true;
                         }

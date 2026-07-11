@@ -1,4 +1,5 @@
 const std = @import("std");
+const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
@@ -873,4 +874,53 @@ test "generic cfg selector allocation plan reserves two slots for pair spills" {
     try std.testing.expectEqual(@as(usize, 3), plan.spill_slots);
     try std.testing.expectEqual(PlannedValueAssignment{ .spill = 0 }, plan.assignment("zwide").?);
     try std.testing.expectEqual(PlannedValueAssignment{ .spill = 2 }, plan.assignment("zzscalar").?);
+}
+
+test "generic cfg selector lowers i32 unsigned-add overflow components" {
+    var machine = MachineFunction.init("uadd-overflow-i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector.bindValueLoc("lhs", .{ .arg32 = .rdi });
+    try selector.bindValueLoc("rhs", .{ .arg32 = .rsi });
+
+    var call = ir.CallInst{
+        .ret_ty = .{ .aggregate = "{ i32, i1 }" },
+        .callee = "llvm.uadd.with.overflow.i32",
+        .tail_kind = "tail",
+        .args = .empty,
+    };
+    defer call.deinit(std.testing.allocator);
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "lhs" } });
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "rhs" } });
+
+    try std.testing.expect((try selector.lowerInstruction(.{ .result = "pair", .kind = .{ .call = call } })) == null);
+    try std.testing.expect((try selector.lowerInstruction(.{
+        .result = "sum",
+        .kind = .{ .extractvalue = .{
+            .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+            .aggregate = .{ .named = "pair" },
+            .indices = "0",
+            .result_ty = .{ .int = 32 },
+        } },
+    })) == null);
+    try std.testing.expect((try selector.lowerInstruction(.{
+        .result = "carry",
+        .kind = .{ .extractvalue = .{
+            .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+            .aggregate = .{ .named = "pair" },
+            .indices = "1",
+            .result_ty = .{ .int = 1 },
+        } },
+    })) == null);
+
+    try std.testing.expectEqual(ValueLoc{ .scratch32 = .rdx }, selector.valueLoc("sum").?);
+    try std.testing.expectEqual(ValueLoc.eax, selector.valueLoc("carry").?);
+    try std.testing.expectEqual(@as(usize, 5), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .binary_arg_eax = .{ .op = .add, .reg = .rcx } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_eax_to_arg = .rdx }, machine.instructions.items[3]);
+    try std.testing.expectEqual(x86_64_machine.Instruction.setb_eax, machine.instructions.items[4]);
 }

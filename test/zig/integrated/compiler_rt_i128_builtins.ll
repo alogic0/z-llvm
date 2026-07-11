@@ -4,6 +4,7 @@ target triple = "x86_64-unknown-linux-gnu"
 
 declare i128 @llvm.abs.i128(i128, i1)
 declare i32 @llvm.ctlz.i32(i32, i1 immarg)
+declare { i32, i1 } @llvm.uadd.with.overflow.i32(i32, i32)
 declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
 declare i128 @compiler_rt.udivmod.udivmod__anon_15304(i128, i128, ptr)
 
@@ -13,6 +14,23 @@ Entry:
   %not_zero = icmp ne i16 %narrow, 0
   %result = zext i1 %not_zero to i32
   ret i32 %result
+}
+
+define dso_local i32 @zllvm_uadd_i32_sum(i32 %lhs, i32 %rhs) {
+Entry:
+  %pair = tail call { i32, i1 } @llvm.uadd.with.overflow.i32(i32 %lhs, i32 %rhs)
+  %sum = extractvalue { i32, i1 } %pair, 0
+  %carry = extractvalue { i32, i1 } %pair, 1
+  ret i32 %sum
+}
+
+define dso_local i32 @zllvm_uadd_i32_carry(i32 %lhs, i32 %rhs) {
+Entry:
+  %pair = tail call { i32, i1 } @llvm.uadd.with.overflow.i32(i32 %lhs, i32 %rhs)
+  %sum = extractvalue { i32, i1 } %pair, 0
+  %carry = extractvalue { i32, i1 } %pair, 1
+  %wide = zext i1 %carry to i32
+  ret i32 %wide
 }
 
 define dso_local i32 @zllvm_store_i32_index(ptr %base, i64 %index, i32 %value) {

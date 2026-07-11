@@ -2632,6 +2632,20 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_umodei4_acceptance.summary`, and
   `docs/evidence/distribution_all_after_umodei4_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 integer-helper
+  retry: the composed selector now lowers the exact
+  `llvm.uadd.with.overflow.i32` form into independently extractable wrapped
+  value and carry locations while preserving live accumulator aliases and
+  rejecting duplicate or reordered extraction fail closed. Executable cases
+  prove both components for plain and wrapping additions. The focused
+  `__divei4` retry advances from `unsupported_type` / `call-ret` to
+  `no_emitter` / `composed-block-alloca-form`; report-all remains 443
+  selected, 132 emitted, and 311 failed. Tier 2 is green; no tracker or
+  ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_divei4_uadd_overflow.summary`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_uadd_overflow.summary`,
+  and `docs/evidence/selector_tier2_divei4_uadd_overflow.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

@@ -44,6 +44,13 @@ const stage2_max_blocks = stage2_planning.stage2_max_blocks;
 const stage2_spill_slots = stage2_planning.stage2_spill_slots;
 const phi_regs = [_]ArgReg{ .r8, .r9, .rcx };
 
+const OverflowResultLoc = struct {
+    value: ValueLoc,
+    overflow: ValueLoc,
+    value_extracted: bool = false,
+    overflow_extracted: bool = false,
+};
+
 const blockHasPhiIncomingFrom = composed_helpers.blockHasPhiIncomingFrom;
 const phiIncomingFrom = composed_helpers.phiIncomingFrom;
 const canUseExpiredPlanRegisterReuse = composed_helpers.canUseExpiredPlanRegisterReuse;
@@ -130,6 +137,7 @@ pub const ComposedBlockSelector = struct {
     values: std.StringHashMap(ValueBinding),
     phi_results: NameSet,
     phi_destinations: std.StringHashMap(ValueLoc),
+    overflow_results: std.StringHashMap(OverflowResultLoc),
     next_virtual_reg: usize = 0,
     edge_label_count: usize = 0,
     stack_slot_allocated: bool = false,
@@ -151,11 +159,13 @@ pub const ComposedBlockSelector = struct {
             .values = std.StringHashMap(ValueBinding).init(allocator),
             .phi_results = NameSet.init(allocator),
             .phi_destinations = std.StringHashMap(ValueLoc).init(allocator),
+            .overflow_results = std.StringHashMap(OverflowResultLoc).init(allocator),
             .spill_slots = std.StringHashMap(SpillSlotAssignment).init(allocator),
         };
     }
 
     pub fn deinit(selector: *ComposedBlockSelector) void {
+        selector.overflow_results.deinit();
         selector.spill_slots.deinit();
         selector.phi_destinations.deinit();
         selector.phi_results.deinit();
@@ -237,7 +247,7 @@ pub const ComposedBlockSelector = struct {
         return null;
     }
 
-    fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
+    pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
         if (instruction.removed) return null;
         try selector.expireExpiredBindings();
         defer selector.current_position += 1;
@@ -252,6 +262,7 @@ pub const ComposedBlockSelector = struct {
             .store => |store| selector.lowerStore(store) catch |err| return selector.instructionValueError(err, "stage2-store-value"),
             .gep => |gep| selector.lowerGep(instruction.result, gep) catch |err| return selector.instructionValueError(err, "stage2-gep-value"),
             .call => |call| selector.lowerCall(instruction.result, call) catch |err| return selector.instructionValueError(err, "stage2-call-value"),
+            .extractvalue => |extract| selector.lowerExtractValue(instruction.result, extract) catch |err| return selector.instructionValueError(err, "stage2-extractvalue-value"),
             .select => |select| selector.lowerSelect(instruction.result, select) catch |err| return selector.instructionValueError(err, "stage2-select-value"),
             else => .{ .no_emitter = "composed-block-instruction-not-owned" },
         };
@@ -1311,6 +1322,7 @@ pub const ComposedBlockSelector = struct {
         if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try selector.lowerAbsI128(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try selector.lowerCtlzI32(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try selector.lowerInlineMemcpy(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try selector.lowerUaddOverflowI32(result, call);
         if (call.inline_asm != null) return .{ .no_emitter = "composed-block-inline-asm-call" };
         if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
         if (!isDefaultOrFastcc(call.calling_conv) or call.tail_kind != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
@@ -1336,6 +1348,71 @@ pub const ComposedBlockSelector = struct {
             128 => {},
             else => unreachable,
         };
+        return null;
+    }
+
+    fn lowerUaddOverflowI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-overflow-missing-result" };
+        if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-overflow-call-form" };
+        }
+        if (call.tail_kind) |tail_kind| {
+            if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-overflow-tail-kind" };
+        }
+        if (!call.ret_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-overflow-signature" };
+        const lhs = call.args.items[0];
+        const rhs = call.args.items[1];
+        if (!lhs.ty.eql(.{ .int = 32 }) or !rhs.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-overflow-args" };
+
+        const lhs_loc = selector.resolveValue(lhs.value) orelse return .{ .unsupported_value = "composed-block-overflow-lhs" };
+        const rhs_scratch: ArgReg = switch (lhs_loc) {
+            .arg32, .arg64, .scratch32, .scratch64 => |reg| if (reg == .rcx) .rdx else .rcx,
+            .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => .rcx,
+        };
+        selector.emitValueIntoScratch(rhs.value, rhs_scratch, 32) catch return .{ .unsupported_value = "composed-block-overflow-rhs" };
+        switch (lhs_loc) {
+            .eax, .rax => {
+                selector.spillAccumulatorAliasesExcept(lhs.value) catch return .{ .no_spill_envelope = "composed-block-overflow-lhs-alias" };
+                if (namedValue(lhs.value)) |lhs_name| {
+                    if (selector.valueIsLiveAfterCurrent(lhs_name)) {
+                        selector.spillValueOrError(lhs_name) catch return .{ .no_spill_envelope = "composed-block-overflow-live-lhs" };
+                    }
+                }
+            },
+            else => {},
+        }
+        selector.emitValueIntoEax(lhs.value) catch return .{ .unsupported_value = "composed-block-overflow-lhs" };
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = rhs_scratch } });
+        try selector.clobberArgReg(.rdx);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdx });
+        try selector.clobberAccumulator();
+        try selector.machine.instructions.append(selector.allocator, .setb_eax);
+        try selector.overflow_results.put(result_name, .{
+            .value = .{ .scratch32 = .rdx },
+            .overflow = .eax,
+        });
+        return null;
+    }
+
+    fn lowerExtractValue(selector: *ComposedBlockSelector, result: ?[]const u8, extract: ir.ExtractValueInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-extractvalue-missing-result" };
+        const aggregate_name = switch (extract.aggregate) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-extractvalue-aggregate" },
+        };
+        const overflow = selector.overflow_results.getPtr(aggregate_name) orelse return .{ .unsupported_value = "composed-block-extractvalue-aggregate" };
+        const loc = if (std.mem.eql(u8, extract.indices, "0")) blk: {
+            if (overflow.value_extracted) return .{ .no_emitter = "composed-block-extractvalue-duplicate" };
+            overflow.value_extracted = true;
+            break :blk overflow.value;
+        } else if (std.mem.eql(u8, extract.indices, "1")) blk: {
+            if (!overflow.value_extracted) return .{ .no_emitter = "composed-block-extractvalue-order" };
+            if (overflow.overflow_extracted) return .{ .no_emitter = "composed-block-extractvalue-duplicate" };
+            overflow.overflow_extracted = true;
+            break :blk overflow.overflow;
+        } else return .{ .unsupported_value = "composed-block-extractvalue-index" };
+        try selector.bindResultLoc(result_name, loc);
+        if (overflow.value_extracted and overflow.overflow_extracted) _ = selector.overflow_results.remove(aggregate_name);
         return null;
     }
 

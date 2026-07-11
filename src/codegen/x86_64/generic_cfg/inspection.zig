@@ -124,11 +124,13 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
         return if (call.args.items[0].ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "llvm.assume" };
     }
     if (isOverflowIntrinsic(call.callee)) {
-        if (!call.ret_ty.eql(.{ .aggregate = "{ i64, i1 }" }) or call.args.items.len != 2) {
+        const bits: u16 = if (std.mem.endsWith(u8, call.callee, ".i32")) 32 else 64;
+        const aggregate_ty = if (bits == 32) "{ i32, i1 }" else "{ i64, i1 }";
+        if (!call.ret_ty.eql(.{ .aggregate = aggregate_ty }) or call.args.items.len != 2) {
             return .{ .unsupported_type = "overflow-intrinsic" };
         }
         for (call.args.items) |arg| {
-            if (!arg.ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "overflow-intrinsic-arg" };
+            if (!arg.ty.eql(.{ .int = bits })) return .{ .unsupported_type = "overflow-intrinsic-arg" };
         }
         return null;
     }
@@ -140,11 +142,14 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
 }
 
 fn inspectExtractValue(extract: ir.ExtractValueInst) ?Diagnostic {
-    if (!extract.aggregate_ty.eql(.{ .aggregate = "{ i64, i1 }" })) {
+    const value_bits: u16 = if (extract.aggregate_ty.eql(.{ .aggregate = "{ i32, i1 }" }))
+        32
+    else if (extract.aggregate_ty.eql(.{ .aggregate = "{ i64, i1 }" }))
+        64
+    else
         return .{ .unsupported_type = "extractvalue-aggregate" };
-    }
     if (std.mem.eql(u8, extract.indices, "0")) {
-        return if (extract.result_ty.eql(.{ .int = 64 })) null else .{ .unsupported_type = "extractvalue-result" };
+        return if (extract.result_ty.eql(.{ .int = value_bits })) null else .{ .unsupported_type = "extractvalue-result" };
     }
     if (std.mem.eql(u8, extract.indices, "1")) {
         return if (extract.result_ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "extractvalue-result" };
@@ -179,7 +184,8 @@ fn isSelectorScalarType(ty: ir.Type) bool {
 }
 
 fn isOverflowIntrinsic(callee: []const u8) bool {
-    return std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i64") or
+    return std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i32") or
+        std.mem.eql(u8, callee, "llvm.uadd.with.overflow.i64") or
         std.mem.eql(u8, callee, "llvm.usub.with.overflow.i64");
 }
 
