@@ -117,12 +117,15 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (call.inline_asm != null) return .{ .unsupported_instruction = "inline-asm-call" };
     if (call.callee_value != null) return .{ .unsupported_value = "indirect-call" };
     if (call.raw_args != null) return .{ .unsupported_instruction = "raw-call-args" };
-    if (call.operand_bundle != null) return .{ .unsupported_instruction = "operand-bundle-call" };
     if (call.isDebugVariableLocation()) return null;
     if (std.mem.eql(u8, call.callee, "llvm.assume")) {
         if (call.ret_ty != .void or call.args.items.len != 1) return .{ .unsupported_instruction = "llvm.assume" };
+        if (call.operand_bundle) |bundle| {
+            if (!isColdAssumeBundle(bundle)) return .{ .unsupported_instruction = "operand-bundle-call" };
+        }
         return if (call.args.items[0].ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "llvm.assume" };
     }
+    if (call.operand_bundle != null) return .{ .unsupported_instruction = "operand-bundle-call" };
     if (isOverflowIntrinsic(call.callee)) {
         const bits: u16 = if (std.mem.endsWith(u8, call.callee, ".i32"))
             32
@@ -201,6 +204,10 @@ fn isOverflowIntrinsic(callee: []const u8) bool {
         std.mem.eql(u8, callee, "llvm.usub.with.overflow.i64") or
         std.mem.eql(u8, callee, "llvm.smul.with.overflow.i64") or
         std.mem.eql(u8, callee, "llvm.smul.with.overflow.i128");
+}
+
+fn isColdAssumeBundle(bundle: []const u8) bool {
+    return std.mem.eql(u8, std.mem.trim(u8, bundle, " \t"), "[ \"cold\"() ]");
 }
 
 fn parseI32ArrayType(ty: ir.Type) ?u32 {

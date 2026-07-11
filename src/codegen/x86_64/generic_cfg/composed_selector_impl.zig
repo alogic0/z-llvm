@@ -75,6 +75,10 @@ const i32Value = composed_helpers.i32Value;
 const i32BitPattern = composed_helpers.i32BitPattern;
 const i64Value = composed_helpers.i64Value;
 
+fn isColdAssumeBundle(bundle: []const u8) bool {
+    return std.mem.eql(u8, std.mem.trim(u8, bundle, " \t"), "[ \"cold\"() ]");
+}
+
 pub fn tryLowerComposedCfg(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -1689,7 +1693,9 @@ pub const ComposedBlockSelector = struct {
     fn lowerAssume(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) ?Diagnostic {
         _ = selector;
         if (result != null) return .{ .unsupported_value = "composed-block-assume-result" };
-        if (call.inline_asm != null or call.callee_value != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+        if (call.inline_asm != null or call.callee_value != null or call.ret_attrs != null or call.raw_args != null or
+            (call.operand_bundle != null and !isColdAssumeBundle(call.operand_bundle.?)))
+        {
             return .{ .no_emitter = "composed-block-assume-form" };
         }
         if (call.ret_ty != .void or call.args.items.len != 1) return .{ .no_emitter = "composed-block-assume-signature" };

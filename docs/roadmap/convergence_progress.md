@@ -2895,6 +2895,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_mulodi4_acceptance.summary`, and
   `docs/evidence/distribution_all_after_mulodi4_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  retry: inspection and composed assume lowering now admit only the empty cold
+  operand bundle attached to `llvm.assume`; ordinary bundled calls remain
+  fail-closed. The focused `__mulvsi3` row advances from
+  `unsupported_instruction/operand-bundle-call` to
+  `unsupported_value/stage2-binary-value`; report-all remains 443 selected,
+  138 emitted, and 305 failed. Tier 1 unit validation is green; no arithmetic
+  capability, tracker, or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_mulvsi3_cold_assume.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

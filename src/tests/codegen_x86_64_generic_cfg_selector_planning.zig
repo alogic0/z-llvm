@@ -151,6 +151,44 @@ test "generic cfg selector inspection admits only typed i64 signed multiply over
     try std.testing.expectEqualStrings("overflow-intrinsic-arg", rejected.detail());
 }
 
+test "generic cfg selector inspection admits only empty cold assume bundle" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.assume(i1)
+        \\declare void @other()
+        \\
+        \\define void @accepted() {
+        \\entry:
+        \\  call void @llvm.assume(i1 true) [ "cold"() ]
+        \\  ret void
+        \\}
+        \\
+        \\define void @rejected() {
+        \\entry:
+        \\  call void @other() [ "cold"() ]
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    const accepted = switch (selector.inspectFunction(module.functions.items[0])) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("no_emitter", accepted.tagName());
+    try std.testing.expectEqualStrings("selector-skeleton-has-no-emitters", accepted.detail());
+
+    const rejected = switch (selector.inspectFunction(module.functions.items[1])) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("unsupported_instruction", rejected.tagName());
+    try std.testing.expectEqualStrings("operand-bundle-call", rejected.detail());
+}
+
 test "generic cfg selector skeleton preserves recognizer fallback while opt-in" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
