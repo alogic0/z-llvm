@@ -1116,6 +1116,12 @@ pub const ComposedBlockSelector = struct {
         }) {
             try selector.emitValueIntoRax(icmp.lhs);
             try selector.machine.instructions.append(selector.allocator, .{ .shr_rax_imm6 = 63 });
+        } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 32 }) and switch (icmp.rhs) {
+            .int => |int| try i64Value(int) == 0,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        }) {
+            try selector.emitValueIntoEax(icmp.lhs);
+            try selector.machine.instructions.append(selector.allocator, .{ .shr_eax_imm5 = 31 });
         } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 })) {
             const rhs = switch (icmp.rhs) {
                 .int => |int| int,

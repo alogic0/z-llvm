@@ -2659,6 +2659,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_mixed_frame.summary`, and
   `docs/evidence/distribution_all_after_divei4_mixed_frame.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
+  retry: signed i32 less-than-zero comparisons now lower through a bit-31
+  extraction, with executable negative and zero cases. The focused `__divei4`
+  retry advances from `composed-block-icmp-form` to
+  `composed-block-store-width`; report-all remains 443 selected, 132 emitted,
+  and 311 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_divei4_slt_i32.summary`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_slt_i32.summary`, and
+  `docs/evidence/selector_tier2_divei4_slt_i32.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
