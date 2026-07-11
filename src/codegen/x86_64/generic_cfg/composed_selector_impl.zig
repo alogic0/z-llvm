@@ -894,7 +894,16 @@ pub const ComposedBlockSelector = struct {
 
     fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-        if (icmp.predicate == .eq) {
+        const is_ne_zero_i16 = icmp.predicate == .ne and icmp.operand_ty.eql(.{ .int = 16 }) and switch (icmp.rhs) {
+            .int => |int| try i64Value(int) == 0,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        };
+        if (is_ne_zero_i16) {
+            selector.emitValueIntoScratch(icmp.lhs, .rcx, 16) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            try selector.clobberAccumulator();
+            try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = 0 } });
+            try selector.machine.instructions.append(selector.allocator, .setne_eax);
+        } else if (icmp.predicate == .eq) {
             const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };
             if (icmp.rhs == .named) {
                 if (bits != 64) return .{ .no_emitter = "composed-block-icmp-rhs" };

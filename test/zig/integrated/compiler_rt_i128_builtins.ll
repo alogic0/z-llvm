@@ -5,6 +5,14 @@ target triple = "x86_64-unknown-linux-gnu"
 declare i128 @llvm.abs.i128(i128, i1)
 declare i128 @compiler_rt.udivmod.udivmod__anon_15304(i128, i128, ptr)
 
+define dso_local i32 @zllvm_ne_zero_i16(i32 %value) {
+Entry:
+  %narrow = trunc i32 %value to i16
+  %not_zero = icmp ne i16 %narrow, 0
+  %result = zext i1 %not_zero to i32
+  ret i32 %result
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16
