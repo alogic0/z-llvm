@@ -427,6 +427,17 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_stack_i1_roundtrip(i32 %value) {
+Entry:
+  %slot = alloca i8, align 4
+  %narrow = trunc i32 %value to i16
+  %flag = icmp ne i16 %narrow, 0
+  store i1 %flag, ptr %slot, align 4
+  %byte = load i8, ptr %slot, align 4
+  %result = zext i8 %byte to i32
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_ne_zero_i64(i64 %value) {
 Entry:
   %not_zero = icmp ne i64 %value, 0

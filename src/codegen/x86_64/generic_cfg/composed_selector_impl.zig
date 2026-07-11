@@ -1139,13 +1139,22 @@ pub const ComposedBlockSelector = struct {
     fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir.LoadInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         if (load.attrs.isBarrier()) return .{ .no_emitter = "composed-block-load-barrier" };
-        if (!load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
+        if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
         const ptr = selector.resolveValue(load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
         switch (ptr) {
             .stack_scalar => |stack| {
-                if (stack.bits != 64 or !load.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-load-stack-width" };
-                try selector.loadStackU64IntoRax(stack.base_disp);
-                try selector.bindRax(result_name);
+                if (stack.bits == 64 and load.ty.eql(.{ .int = 64 })) {
+                    try selector.loadStackU64IntoRax(stack.base_disp);
+                    try selector.bindRax(result_name);
+                } else if (stack.bits == 8 and load.ty.eql(.{ .int = 8 })) {
+                    try selector.clobberAccumulator();
+                    if (stack.base_disp <= std.math.maxInt(u8)) {
+                        try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_u8_eax = @intCast(stack.base_disp) });
+                    } else {
+                        try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_u8_eax = stack.base_disp });
+                    }
+                    try selector.bindEax(result_name);
+                } else return .{ .no_emitter = "composed-block-load-stack-width" };
             },
             .stack128 => |disp| {
                 if (!load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-stack-width" };
@@ -1181,7 +1190,7 @@ pub const ComposedBlockSelector = struct {
 
     fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
         if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
-        if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-width" };
+        if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-width" };
         const ptr = selector.resolveValue(store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
         const value_loc = switch (store.value) {
             .named => selector.resolveValue(store.value) orelse return .{ .unsupported_value = "composed-block-unknown-store-value" },
@@ -1196,23 +1205,41 @@ pub const ComposedBlockSelector = struct {
         } else "composed-block-store-value-other";
         selector.emitValueIntoEax(store.value) catch return .{ .unsupported_value = value_detail };
         switch (ptr) {
-            .arg64, .scratch64 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = reg }),
-            .stack_i32_ptr => |stack_ptr| selector.appendStoreStackI32(stack_ptr) catch |err| switch (err) {
-                error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-stack-index" },
-                else => return err,
+            .stack_scalar => |stack| {
+                if (stack.bits != 8 or !store.ty.eql(.{ .int = 1 })) return .{ .no_emitter = "composed-block-store-stack-width" };
+                if (stack.base_disp <= std.math.maxInt(u8)) {
+                    try selector.machine.instructions.append(selector.allocator, .{ .store_al_stack_disp8 = @intCast(stack.base_disp) });
+                } else {
+                    try selector.machine.instructions.append(selector.allocator, .{ .store_al_stack_disp32 = stack.base_disp });
+                }
             },
-            .stack_i32_array => |stack_array| selector.appendStoreStackI32(.{ .disp = stack_array.base_disp }) catch |err| switch (err) {
-                error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-array-index" },
-                else => return err,
+            .arg64, .scratch64 => |reg| {
+                if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-ptr-width" };
+                try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = reg });
+            },
+            .stack_i32_ptr => |stack_ptr| {
+                if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-ptr-width" };
+                selector.appendStoreStackI32(stack_ptr) catch |err| switch (err) {
+                    error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-stack-index" },
+                    else => return err,
+                };
+            },
+            .stack_i32_array => |stack_array| {
+                if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-ptr-width" };
+                selector.appendStoreStackI32(.{ .disp = stack_array.base_disp }) catch |err| switch (err) {
+                    error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-array-index" },
+                    else => return err,
+                };
             },
             .spill64 => |frame_index| {
+                if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-ptr-width" };
                 selector.materializeLocIntoLoc(.{ .spill64 = frame_index }, .{ .scratch64 = .rcx }) catch |err| switch (err) {
                     error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-spill-ptr" },
                     else => return err,
                 };
                 try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = .rcx });
             },
-            .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
+            .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack128, .stack128_value, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
         }
         return null;
     }

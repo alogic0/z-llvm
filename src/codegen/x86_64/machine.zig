@@ -487,6 +487,8 @@ pub const Instruction = union(enum) {
     },
     store_eax_stack_disp8: u8,
     store_eax_stack_disp32: u32,
+    store_al_stack_disp8: u8,
+    store_al_stack_disp32: u32,
     store_eax_stack_rcx4_disp8: u8,
     store_eax_stack_rcx4_disp32: u32,
     store_al_arg_ptr_disp8: struct {

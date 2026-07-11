@@ -1486,6 +1486,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x89, 0x84, 0x24 });
                 try appendU32(&bytes, allocator, disp);
             },
+            .store_al_stack_disp8 => |disp| try bytes.appendSlice(allocator, &.{ 0x88, 0x44, 0x24, disp }),
+            .store_al_stack_disp32 => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x88, 0x84, 0x24 });
+                try appendU32(&bytes, allocator, disp);
+            },
             .store_eax_stack_rcx4_disp8 => |disp| try bytes.appendSlice(allocator, &.{ 0x89, 0x44, 0x8c, disp }),
             .store_eax_stack_rcx4_disp32 => |disp| {
                 try bytes.appendSlice(allocator, &.{ 0x89, 0x84, 0x8c });
@@ -1926,6 +1931,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .store_eax_arg_ptr_disp32 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 6,
         .store_eax_stack_disp8 => 4,
         .store_eax_stack_disp32 => 7,
+        .store_al_stack_disp8 => 4,
+        .store_al_stack_disp32 => 7,
         .store_eax_stack_rcx4_disp8 => 4,
         .store_eax_stack_rcx4_disp32 => 7,
         .store_al_arg_ptr_disp8 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 2 + if (store.offset == 0) @as(u32, 0) else 1,

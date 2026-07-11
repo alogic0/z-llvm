@@ -334,6 +334,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .store_eax_arg_ptr_disp32,
         .store_eax_stack_disp8,
         .store_eax_stack_disp32,
+        .store_al_stack_disp8,
+        .store_al_stack_disp32,
         .store_eax_stack_rcx4_disp8,
         .store_eax_stack_rcx4_disp32,
         .store_al_arg_ptr_disp8,
@@ -437,7 +439,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
         .spill_eax_rsp, .spill_rax_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
-        .store_eax_stack_disp8, .store_eax_stack_disp32, .store_eax_stack_rcx4_disp8, .store_eax_stack_rcx4_disp32 => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+        .store_eax_stack_disp8, .store_eax_stack_disp32, .store_al_stack_disp8, .store_al_stack_disp32, .store_eax_stack_rcx4_disp8, .store_eax_stack_rcx4_disp32 => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .and_rsp_neg16 => rsp_mod16 = 0,
         .noreturn_direct_call => {
             if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
@@ -909,6 +911,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .store_eax_arg_ptr_disp32,
         .store_eax_stack_disp8,
         .store_eax_stack_disp32,
+        .store_al_stack_disp8,
+        .store_al_stack_disp32,
         .store_eax_stack_rcx4_disp8,
         .store_eax_stack_rcx4_disp32,
         .store_al_arg_ptr_disp8,

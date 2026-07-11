@@ -2669,6 +2669,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_i128_arithmetic_slt_i32.summary`, and
   `docs/evidence/selector_tier2_divei4_slt_i32.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
+  retry: typed 8-bit frame objects now support byte-precise i1 stores and
+  zero-extending i8 loads through disp8 and disp32 machine forms. Non-stack i1
+  pointer stores remain fail-closed, and executable true/false roundtrips prove
+  the memory effect. The focused `__divei4` retry advances from
+  `composed-block-store-width` to `composed-block-binary-imm-rhs`; report-all
+  remains 443 selected, 132 emitted, and 311 failed. Tier 2 is green; no
+  tracker or ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_divei4_stack_i1.summary`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_stack_i1.summary`, and
+  `docs/evidence/selector_tier2_divei4_stack_i1.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

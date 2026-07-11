@@ -1424,6 +1424,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .store_eax_arg_ptr_disp32 => |store| try writer.print("\tmovl %eax, {}({s})\n", .{ store.offset, store.reg.name64() }),
             .store_eax_stack_disp8 => |offset| try writer.print("\tmovl %eax, {}(%rsp)\n", .{offset}),
             .store_eax_stack_disp32 => |offset| try writer.print("\tmovl %eax, {}(%rsp)\n", .{offset}),
+            .store_al_stack_disp8 => |offset| try writer.print("\tmovb %al, {}(%rsp)\n", .{offset}),
+            .store_al_stack_disp32 => |offset| try writer.print("\tmovb %al, {}(%rsp)\n", .{offset}),
             .store_eax_stack_rcx4_disp8 => |offset| try writer.print("\tmovl %eax, {}(%rsp,%rcx,4)\n", .{offset}),
             .store_eax_stack_rcx4_disp32 => |offset| try writer.print("\tmovl %eax, {}(%rsp,%rcx,4)\n", .{offset}),
             .store_al_arg_ptr_disp8 => |store| try writer.print("\tmovb %al, {}({s})\n", .{ store.offset, store.reg.name64() }),

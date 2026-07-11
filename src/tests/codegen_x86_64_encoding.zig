@@ -294,6 +294,27 @@ test "x86_64 encoding stores eax through argument pointer displacement" {
     try std.testing.expectEqualSlices(u8, &.{ 0x89, 0x47, 0x0c, 0xc3 }, bytes);
 }
 
+test "x86_64 encoding stores al through stack displacements" {
+    var machine = codegen.x86_64.MachineFunction.init("store_al_stack", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .sub_rsp_imm32 = 264 });
+    try machine.instructions.append(std.testing.allocator, .{ .store_al_stack_disp8 = 12 });
+    try machine.instructions.append(std.testing.allocator, .{ .store_al_stack_disp32 = 260 });
+    try machine.instructions.append(std.testing.allocator, .{ .add_rsp_imm32 = 264 });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .store_al_stack_disp8 = 12 }));
+    try std.testing.expectEqual(@as(u32, 7), mc.encoding.instructionSize(.{ .store_al_stack_disp32 = 260 }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x81, 0xec, 0x08, 0x01, 0x00, 0x00,
+        0x88, 0x44, 0x24, 0x0c, 0x88, 0x84, 0x24,
+        0x04, 0x01, 0x00, 0x00, 0x48, 0x81, 0xc4,
+        0x08, 0x01, 0x00, 0x00, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding copies narrow stack integers through argument pointer displacement" {
     var machine = codegen.x86_64.MachineFunction.init("copy_narrow_stack_ptr", .void);
     defer machine.deinit(std.testing.allocator);
