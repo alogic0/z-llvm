@@ -2472,6 +2472,20 @@ One line per completed cycle, append-only, newest last. This is the
   proof `docs/evidence/zig_integrated_exe_i128_arithmetic_local_stack_gep.summary`;
   Tier 2 record `docs/evidence/selector_tier2_local_stack_gep.summary`.
 
+- 2026-07-11 (this commit) Item 15 parked-boundary retry: stage-two PHIs now
+  retain stable register destinations across loop iterations while temporary
+  block-local clobbers spill/reload through the value map; non-PHI outgoing
+  edges restore displaced destinations before condition testing or return.
+  Executable pressure coverage also exposed and fixed a one-byte
+  `cmp_rcx_arg64` high-register size overcount that previously misdirected a
+  backedge into an instruction. The focused `__udivei5` retry advances from
+  `stage2-phi-dst-loc` to `no_emitter` / `composed-block-store-ptr`;
+  report-all remains 443 selected, 130 emitted, and 313 failed. Tier 2 is
+  green; no ratchet moves. Evidence
+  `docs/evidence/std_debug_hello_udivei5_phi_stable_dest.summary`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_phi_stable_dest.summary`;
+  Tier 2 record `docs/evidence/selector_tier2_phi_stable_dest.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

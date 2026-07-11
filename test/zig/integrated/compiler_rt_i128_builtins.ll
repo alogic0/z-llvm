@@ -198,6 +198,26 @@ Entry:
   ret i32 %base_value
 }
 
+define dso_local i64 @zllvm_spilled_phi(i64 %limit, i32 %value, i32 %amount) {
+Entry:
+  br label %Loop
+Loop:
+  %acc = phi i64 [ 1, %Entry ], [ %next_acc, %Body ]
+  %carry = phi i64 [ 2, %Entry ], [ %next_carry, %Body ]
+  %index = phi i64 [ 0, %Entry ], [ %next_index, %Body ]
+  %done = icmp eq i64 %index, %limit
+  br i1 %done, label %Exit, label %Body
+Body:
+  %shifted = shl i32 %value, %amount
+  %wide = zext i32 %shifted to i64
+  %next_acc = add i64 %acc, %wide
+  %next_carry = add i64 %carry, 1
+  %next_index = add i64 %index, 1
+  br label %Loop
+Exit:
+  ret i64 %acc
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16

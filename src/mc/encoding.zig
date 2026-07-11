@@ -1820,7 +1820,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .ult_i8_dil_imm8_al => 9,
         .store_imm8_abs => 8,
         .cmp_ecx_arg32 => |reg| if (reg.rexB()) 3 else 2,
-        .cmp_rcx_arg64 => |reg| if (reg.rexB()) 4 else 3,
+        .cmp_rcx_arg64 => 3,
         .cmp_ecx_imm32 => 6,
         .cmp_eax_imm32 => 5,
         .cmp_arg64_imm64 => |cmp| if (cmp.reg.rexB()) 14 else 13,

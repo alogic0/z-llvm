@@ -119,6 +119,24 @@ test "x86_64 encoding emits variable eax shifts" {
     try std.testing.expectEqualSlices(u8, &.{ 0xd3, 0xe0, 0xd3, 0xe8, 0xc3 }, bytes);
 }
 
+test "x86_64 encoding sizes high-register rcx compare before backedge" {
+    var machine = codegen.x86_64.MachineFunction.init("high_reg_compare_backedge", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .label = "loop" });
+    try machine.instructions.append(std.testing.allocator, .{ .cmp_rcx_arg64 = .r8 });
+    try machine.instructions.append(std.testing.allocator, .{ .jmp = "loop" });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .cmp_rcx_arg64 = .r8 }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x49, 0x39, 0xc8,
+        0xe9, 0xf8, 0xff,
+        0xff, 0xff, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding emits imul arg64 by rax" {
     var machine = codegen.x86_64.MachineFunction.init("imul_rax", .void);
     defer machine.deinit(std.testing.allocator);

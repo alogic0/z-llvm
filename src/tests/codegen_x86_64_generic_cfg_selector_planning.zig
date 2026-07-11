@@ -13,6 +13,13 @@ fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected:
     return error.ExpectedInstructionNotFound;
 }
 
+fn expectInstructionTag(instructions: []const codegen.x86_64.Instruction, comptime tag: std.meta.Tag(codegen.x86_64.Instruction)) !void {
+    for (instructions) |instruction| {
+        if (std.meta.activeTag(instruction) == tag) return;
+    }
+    return error.ExpectedInstructionNotFound;
+}
+
 fn expectNamedInstruction(instructions: []const codegen.x86_64.Instruction, comptime tag: std.meta.Tag(codegen.x86_64.Instruction), expected: []const u8) !void {
     for (instructions) |instruction| {
         switch (instruction) {
@@ -790,6 +797,51 @@ test "generic cfg selector stage two materializes loop backedge phi moves" {
     try expectNamedInstruction(machine.instructions.items, .jmp, "loop");
     try expectNamedInstruction(machine.instructions.items, .label, "exit");
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector materializes displaced phi destinations" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @spilled_phi(i64 %limit, i32 %value, i32 %amount) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %acc = phi i64 [ 1, %entry ], [ %next_acc, %body ]
+        \\  %carry = phi i64 [ 2, %entry ], [ %next_carry, %body ]
+        \\  %index = phi i64 [ 0, %entry ], [ %next_index, %body ]
+        \\  %done = icmp eq i64 %index, %limit
+        \\  br i1 %done, label %exit, label %body
+        \\body:
+        \\  %shifted = shl i32 %value, %amount
+        \\  %wide = zext i32 %shifted to i64
+        \\  %next_acc = add i64 %acc, %wide
+        \\  %next_carry = add i64 %carry, 1
+        \\  %next_index = add i64 %index, 1
+        \\  br label %loop
+        \\exit:
+        \\  ret i64 %acc
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("spilled_phi", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .shl_eax_cl);
+    try expectInstructionTag(machine.instructions.items, .spill_arg64_rsp);
+    try expectInstructionTag(machine.instructions.items, .reload_arg64_rsp);
 }
 
 test "generic cfg selector stage two composes i32 multiply loop" {

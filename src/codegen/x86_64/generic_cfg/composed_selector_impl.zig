@@ -121,6 +121,7 @@ pub const ComposedBlockSelector = struct {
     allocation_plan: ?*const SelectorAllocationPlan = null,
     values: std.StringHashMap(ValueBinding),
     phi_results: NameSet,
+    phi_destinations: std.StringHashMap(ValueLoc),
     next_virtual_reg: usize = 0,
     edge_label_count: usize = 0,
     stack_slot_allocated: bool = false,
@@ -140,12 +141,14 @@ pub const ComposedBlockSelector = struct {
             .allocation_plan = null,
             .values = std.StringHashMap(ValueBinding).init(allocator),
             .phi_results = NameSet.init(allocator),
+            .phi_destinations = std.StringHashMap(ValueLoc).init(allocator),
             .spill_slots = std.StringHashMap(SpillSlotAssignment).init(allocator),
         };
     }
 
     pub fn deinit(selector: *ComposedBlockSelector) void {
         selector.spill_slots.deinit();
+        selector.phi_destinations.deinit();
         selector.phi_results.deinit();
         selector.values.deinit();
     }
@@ -189,8 +192,10 @@ pub const ComposedBlockSelector = struct {
                     .gpr128, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
                 };
                 const reg = nextPhiReg(&used_in_block) orelse return .{ .no_spill_envelope = "stage2-phi-registers" };
+                const destination: ValueLoc = if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg };
                 try selector.phi_results.put(result_name, {});
-                try selector.bindValueLoc(result_name, if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg });
+                try selector.phi_destinations.put(result_name, destination);
+                try selector.bindValueLoc(result_name, destination);
             }
         }
         return null;
@@ -213,7 +218,8 @@ pub const ComposedBlockSelector = struct {
                 else => break,
             }
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
-            const loc = selector.valueLoc(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
+            const loc = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
+            try selector.bindValueLoc(result_name, loc);
             switch (loc) {
                 .scratch32, .scratch64 => {},
                 .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
@@ -1455,9 +1461,15 @@ pub const ComposedBlockSelector = struct {
         terminator: ir.Terminator,
     ) !?Diagnostic {
         return switch (terminator) {
-            .ret => |ret| try selector.lowerReturn(ret),
+            .ret => |ret| blk: {
+                if (try selector.restoreDisplacedPhiDestinations()) |diagnostic| break :blk diagnostic;
+                break :blk try selector.lowerReturn(ret);
+            },
             .br => |br| {
                 const target_index = function.blockIndex(br.target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+                if (!blockHasPhiIncomingFrom(function.blocks.items[target_index], function.blocks.items[block_index].name)) {
+                    if (try selector.restoreDisplacedPhiDestinations()) |diagnostic| return diagnostic;
+                }
                 if (try selector.emitPhiEdgeMoves(function.blocks.items[target_index], function.blocks.items[block_index].name)) |diagnostic| return diagnostic;
                 if (target_index != block_index + 1) {
                     try selector.machine.instructions.append(selector.allocator, .{ .jmp = br.target });
@@ -1470,6 +1482,9 @@ pub const ComposedBlockSelector = struct {
                 const else_index = function.blockIndex(condbr.else_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
                 const then_has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[then_index], function.blocks.items[block_index].name);
                 const else_has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[else_index], function.blocks.items[block_index].name);
+                if (!then_has_phi_edge and !else_has_phi_edge) {
+                    if (try selector.restoreDisplacedPhiDestinations()) |diagnostic| return diagnostic;
+                }
                 if (try selector.emitBranchCondition(condbr.cond)) |diagnostic| return diagnostic;
                 if (then_has_phi_edge or else_has_phi_edge) {
                     return try selector.lowerConditionalPhiEdges(function, block_index, then_index, else_index);
@@ -1482,6 +1497,19 @@ pub const ComposedBlockSelector = struct {
             },
             .@"switch", .indirectbr, .@"unreachable" => .{ .no_emitter = "stage2-terminator-not-owned" },
         };
+    }
+
+    fn restoreDisplacedPhiDestinations(selector: *ComposedBlockSelector) !?Diagnostic {
+        var it = selector.phi_destinations.iterator();
+        while (it.next()) |entry| {
+            const name = entry.key_ptr.*;
+            const destination = entry.value_ptr.*;
+            const actual = selector.valueLoc(name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
+            if (valueLocEql(actual, destination)) continue;
+            selector.materializeLocIntoLoc(actual, destination) catch return .{ .no_emitter = "stage2-phi-restore-loc" };
+            try selector.bindValueLoc(name, destination);
+        }
+        return null;
     }
 
     fn lowerConditionalPhiEdges(
@@ -1533,8 +1561,9 @@ pub const ComposedBlockSelector = struct {
             };
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
             const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
-            const dst = selector.valueLoc(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
+            const dst = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
             if (try selector.emitValueIntoLoc(incoming.value, dst, result_name)) |diagnostic| return diagnostic;
+            try selector.bindValueLoc(result_name, dst);
             switch (dst) {
                 .scratch32, .scratch64 => {},
                 .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
