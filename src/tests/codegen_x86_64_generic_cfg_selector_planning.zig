@@ -2446,6 +2446,41 @@ test "generic cfg selector composes tail inline memcpy" {
     try expectInstruction(machine.instructions.items, .memcpy_rdi_rsi_rdx_rax);
 }
 
+test "generic cfg selector aliases trunc through a call spill" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
+        \\
+        \\define i32 @spilled_trunc(ptr %dst, ptr %src, i64 %len, i32 %value) {
+        \\entry:
+        \\  %slot = alloca [1 x i32], align 4
+        \\  store i32 %value, ptr %slot, align 4
+        \\  tail call void @llvm.memcpy.inline.p0.p0.i64(ptr %dst, ptr %src, i64 %len, i1 false)
+        \\  %narrow = trunc i32 %value to i6
+        \\  %wide = zext i6 %narrow to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("spilled_trunc", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstructionTag(machine.instructions.items, .spill_arg_rsp);
+    try expectInstructionTag(machine.instructions.items, .reload_rsp_eax);
+}
+
 test "generic cfg selector composes i128 left shift by one lane" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -913,9 +913,9 @@ pub const ComposedBlockSelector = struct {
                         .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-cast-width" },
                     } else loc;
                     try selector.bindValueLoc(result_name, result_loc);
-                    switch (loc) {
-                        .arg32, .arg64, .eax, .rax, .scratch32, .scratch64 => {},
-                        .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-cast-width" },
+                    switch (result_loc) {
+                        .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .spill64 => {},
+                        .arg128, .scratch128, .stack64, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-cast-width" },
                     }
                 }
             },

@@ -172,6 +172,16 @@ Entry:
   ret void
 }
 
+define dso_local i32 @zllvm_spilled_trunc_after_memcpy(ptr %dst, ptr %src, i64 %len, i32 %value) {
+Entry:
+  %slot = alloca [1 x i32], align 4
+  store i32 %value, ptr %slot, align 4
+  tail call void @llvm.memcpy.inline.p0.p0.i64(ptr %dst, ptr %src, i64 %len, i1 false)
+  %narrow = trunc i32 %value to i6
+  %wide = zext i6 %narrow to i32
+  ret i32 %wide
+}
+
 define dso_local i32 @zllvm_framed_early_return(i64 %flag, i32 %value) {
 Entry:
   %buf = alloca [1 x i32], align 4

@@ -2591,6 +2591,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_umodei4_inline_memcpy.summary`, and
   `docs/evidence/selector_tier2_umodei4_inline_memcpy.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
+  retry: no-op trunc and integer bitcast operations now preserve spill-backed
+  locations, leaving downstream consumers responsible for width-correct
+  reloads from the single frame authority. An executable value survives
+  inline memcpy, truncates from i32 to i6, and returns the expected low bits.
+  The focused `__umodei4` retry advances from `composed-block-cast-width` to
+  `no_emitter` / `composed-block-load-ptr`; report-all remains 443 selected,
+  131 emitted, and 312 failed. Tier 2 is green; no tracker or ratchet moves.
+  Evidence `docs/evidence/std_debug_hello_umodei4_spilled_trunc.summary`,
+  `docs/evidence/zig_integrated_exe_umodei4_spilled_trunc.summary`, and
+  `docs/evidence/selector_tier2_umodei4_spilled_trunc.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
