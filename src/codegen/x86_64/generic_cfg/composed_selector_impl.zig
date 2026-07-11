@@ -357,7 +357,7 @@ pub const ComposedBlockSelector = struct {
     pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
-        if (bits != 16 and bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-binary-width" };
+        if (bits != 6 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-binary-width" };
 
         if (valueIsInt(binary.rhs)) {
             return try selector.lowerBinaryImmediateRhs(result_name, binary);
@@ -793,8 +793,16 @@ pub const ComposedBlockSelector = struct {
             .int => |int| int,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
         };
-        if (binary.op != .lshr) return .{ .no_emitter = "composed-block-binary-imm-lhs" };
         const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+        if (binary.op == .sub and bits == 6) {
+            try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
+            try selector.clobberAccumulator();
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(lhs) });
+            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } });
+            try selector.bindEax(result_name);
+            return null;
+        }
+        if (binary.op != .lshr) return .{ .no_emitter = "composed-block-binary-imm-lhs" };
         if (bits > 32) return .{ .no_emitter = "composed-block-variable-shift-width" };
 
         try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);

@@ -1667,6 +1667,39 @@ test "generic cfg selector composes ctlz i32 intrinsic" {
     try expectInstruction(machine.instructions.items, .clz_i32_edi_eax);
 }
 
+test "generic cfg selector composes wrapping i6 immediate lhs subtraction" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @sub_i6(i32 %value) {
+        \\entry:
+        \\  %narrow = trunc i32 %value to i6
+        \\  %difference = sub i6 -32, %narrow
+        \\  %result = zext i6 %difference to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("sub_i6", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_eax = -32 });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } });
+    try expectInstruction(machine.instructions.items, .{ .and_eax_imm32 = 63 });
+}
+
 test "generic cfg selector composes dynamic i32 element pointer" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
