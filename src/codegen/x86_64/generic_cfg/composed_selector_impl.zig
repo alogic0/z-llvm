@@ -1051,6 +1051,20 @@ pub const ComposedBlockSelector = struct {
             try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .r8 });
             try selector.machine.instructions.append(selector.allocator, .sete_eax);
+        } else if (icmp.predicate == .eq and icmp.operand_ty.eql(.{ .int = 128 }) and switch (icmp.rhs) {
+            .int => |int| int == std.math.minInt(i128),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        }) {
+            _ = selector.materializePairValue(icmp.lhs, pair_a) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            try selector.clobberAccumulator();
+            try selector.clobberArgReg(.r8);
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = pair_a.hi });
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_r8 = std.math.minInt(i64) });
+            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } });
+            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = pair_a.lo } });
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .r8 });
+            try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .r8, .imm = 0 } });
+            try selector.machine.instructions.append(selector.allocator, .sete_eax);
         } else if (icmp.predicate == .eq) {
             const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };
             if (icmp.rhs == .named) {

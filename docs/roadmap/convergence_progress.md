@@ -2838,6 +2838,14 @@ One line per completed cycle, append-only, newest last. This is the
   emitted, and 307 failed. Tier 2 is green; no tracker or ratchet moves.
   Evidence `docs/evidence/x86_64_icmp_slt_i128_zero.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  retry: i128 minimum-value equality now compares both limbs through a
+  combined XOR/OR zero test. Unit and permanent executable equal/adjacent
+  cases are green. The focused `__muloti4` row advances from
+  `stage2-icmp-value` to `composed-block-binary-width`; report-all remains 443
+  selected, 136 emitted, and 307 failed. Tier 2 is green; no tracker or
+  ratchet moves. Evidence `docs/evidence/x86_64_icmp_eq_min_i128.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
