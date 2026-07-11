@@ -210,8 +210,22 @@ test "generic cfg selector stage two composes CFG above initial block envelope" 
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
-test "generic cfg selector stage two rejects beyond block envelope" {
+test "generic cfg selector stage two composes 65-block CFG" {
     const text = try makeBranchChainIr(std.testing.allocator, 65);
+    defer std.testing.allocator.free(text);
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("branch_chain", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectNamedInstruction(machine.instructions.items, .label, "b64");
+}
+
+test "generic cfg selector stage two rejects beyond block envelope" {
+    const text = try makeBranchChainIr(std.testing.allocator, 129);
     defer std.testing.allocator.free(text);
     var module = try ir.Module.parse(std.testing.allocator, text);
     defer module.deinit();
@@ -230,7 +244,7 @@ test "generic cfg selector stage two rejects beyond block envelope" {
 }
 
 test "generic cfg selector reports structured fallback diagnostic through codegen options" {
-    const text = try makeBranchChainIr(std.testing.allocator, 65);
+    const text = try makeBranchChainIr(std.testing.allocator, 129);
     defer std.testing.allocator.free(text);
 
     var module = try ir.Module.parse(std.testing.allocator, text);

@@ -14,6 +14,7 @@ extern fn zllvm_sub_rhs_accumulator(u64, u64, u64) callconv(.c) u64;
 extern fn zllvm_sum_loaded_i32([*]u32, u64) callconv(.c) u64;
 extern fn zllvm_add_truncated_rhs(u32, u64) callconv(.c) u32;
 extern fn zllvm_framed_early_return(u64, u32) callconv(.c) u32;
+extern fn zllvm_branch_chain_65(u32) callconv(.c) u32;
 extern fn zllvm_backward_layout_phi(u32) callconv(.c) u32;
 extern fn zllvm_ugt_i64(u64, u64) callconv(.c) u32;
 extern fn zllvm_ugt_i64_imm(u64) callconv(.c) u32;
@@ -74,6 +75,7 @@ pub export fn _start() callconv(.c) noreturn {
     const add_truncated_rhs_bad: usize = @intFromBool(zllvm_add_truncated_rhs(5, 0x100000002) != 7);
     const framed_early_return_bad: usize = @intFromBool(zllvm_framed_early_return(0, 77) != 1);
     const framed_later_return_bad: usize = @intFromBool(zllvm_framed_early_return(2, 77) != 77);
+    const branch_chain_65_bad: usize = @intFromBool(zllvm_branch_chain_65(91) != 91);
     const phi_bad: usize = @intFromBool(zllvm_backward_layout_phi(41) != 42);
     const ugt_true_bad: usize = @intFromBool(zllvm_ugt_i64(9, 4) != 1);
     const ugt_false_bad: usize = @intFromBool(zllvm_ugt_i64(4, 9) != 0);
@@ -98,7 +100,7 @@ pub export fn _start() callconv(.c) noreturn {
     const stack_chained_gep_bad: usize = @intFromBool(zllvm_stack_chained_gep(0, 1, 77) != 11);
     const stack_element_gep_bad: usize = @intFromBool(zllvm_stack_element_gep(1, 77) != 11);
     const spilled_phi_bad: usize = @intFromBool(zllvm_spilled_phi(2, 3, 1) != 13);
-    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19 + ugt_true_bad * 20 + ugt_false_bad * 21 + i6_positive_bad * 22 + i6_negative_bad * 23 + ugt_imm_true_bad * 24 + ugt_imm_false_bad * 25 + negative_true_bad * 26 + negative_false_bad * 27 + ne64_true_bad * 28 + ne64_false_bad * 29 + ctlz_one_bad * 30 + ctlz_sixteen_bad * 31 + sub_i6_zero_bad * 32 + sub_i6_one_bad * 33 + sub_i6_wrap_bad * 34 + spilled_cond_true_bad * 35 + spilled_cond_false_bad * 36 + variable_shl_bad * 37 + variable_lshr_bad * 38 + stack_byte_gep_bad * 39 + stack_chained_gep_bad * 40 + stack_element_gep_bad * 41 + spilled_phi_bad * 42 + spill_store_bad * 43 + store_array_base_bad * 44 + select_shifted_true_bad * 45 + select_shifted_false_bad * 46 + or_i64_clear_bad * 47 + or_i64_set_bad * 48 + stack_index_dependency_bad * 49 + sub_rhs_accumulator_bad * 50 + sum_loaded_i32_bad * 51 + add_truncated_rhs_bad * 52 + framed_early_return_bad * 53 + framed_later_return_bad * 54);
+    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19 + ugt_true_bad * 20 + ugt_false_bad * 21 + i6_positive_bad * 22 + i6_negative_bad * 23 + ugt_imm_true_bad * 24 + ugt_imm_false_bad * 25 + negative_true_bad * 26 + negative_false_bad * 27 + ne64_true_bad * 28 + ne64_false_bad * 29 + ctlz_one_bad * 30 + ctlz_sixteen_bad * 31 + sub_i6_zero_bad * 32 + sub_i6_one_bad * 33 + sub_i6_wrap_bad * 34 + spilled_cond_true_bad * 35 + spilled_cond_false_bad * 36 + variable_shl_bad * 37 + variable_lshr_bad * 38 + stack_byte_gep_bad * 39 + stack_chained_gep_bad * 40 + stack_element_gep_bad * 41 + spilled_phi_bad * 42 + spill_store_bad * 43 + store_array_base_bad * 44 + select_shifted_true_bad * 45 + select_shifted_false_bad * 46 + or_i64_clear_bad * 47 + or_i64_set_bad * 48 + stack_index_dependency_bad * 49 + sub_rhs_accumulator_bad * 50 + sum_loaded_i32_bad * 51 + add_truncated_rhs_bad * 52 + framed_early_return_bad * 53 + framed_later_return_bad * 54 + branch_chain_65_bad * 55);
 }
 
 fn loadI128(ptr: *i128) i128 {

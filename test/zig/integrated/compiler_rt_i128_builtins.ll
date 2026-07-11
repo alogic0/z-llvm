@@ -179,6 +179,140 @@ Later:
   ret i32 %loaded
 }
 
+define dso_local i32 @zllvm_branch_chain_65(i32 %value) {
+Entry:
+  br label %B1
+B1:
+  br label %B2
+B2:
+  br label %B3
+B3:
+  br label %B4
+B4:
+  br label %B5
+B5:
+  br label %B6
+B6:
+  br label %B7
+B7:
+  br label %B8
+B8:
+  br label %B9
+B9:
+  br label %B10
+B10:
+  br label %B11
+B11:
+  br label %B12
+B12:
+  br label %B13
+B13:
+  br label %B14
+B14:
+  br label %B15
+B15:
+  br label %B16
+B16:
+  br label %B17
+B17:
+  br label %B18
+B18:
+  br label %B19
+B19:
+  br label %B20
+B20:
+  br label %B21
+B21:
+  br label %B22
+B22:
+  br label %B23
+B23:
+  br label %B24
+B24:
+  br label %B25
+B25:
+  br label %B26
+B26:
+  br label %B27
+B27:
+  br label %B28
+B28:
+  br label %B29
+B29:
+  br label %B30
+B30:
+  br label %B31
+B31:
+  br label %B32
+B32:
+  br label %B33
+B33:
+  br label %B34
+B34:
+  br label %B35
+B35:
+  br label %B36
+B36:
+  br label %B37
+B37:
+  br label %B38
+B38:
+  br label %B39
+B39:
+  br label %B40
+B40:
+  br label %B41
+B41:
+  br label %B42
+B42:
+  br label %B43
+B43:
+  br label %B44
+B44:
+  br label %B45
+B45:
+  br label %B46
+B46:
+  br label %B47
+B47:
+  br label %B48
+B48:
+  br label %B49
+B49:
+  br label %B50
+B50:
+  br label %B51
+B51:
+  br label %B52
+B52:
+  br label %B53
+B53:
+  br label %B54
+B54:
+  br label %B55
+B55:
+  br label %B56
+B56:
+  br label %B57
+B57:
+  br label %B58
+B58:
+  br label %B59
+B59:
+  br label %B60
+B60:
+  br label %B61
+B61:
+  br label %B62
+B62:
+  br label %B63
+B63:
+  br label %B64
+B64:
+  ret i32 %value
+}
+
+
 define dso_local i32 @zllvm_backward_layout_phi(i32 %value) {
 Entry:
   br label %Later

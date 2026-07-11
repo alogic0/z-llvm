@@ -2567,6 +2567,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_udivei5_acceptance.summary`, and
   `docs/evidence/distribution_all_after_udivei5_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
+  retry: the bounded stage-two CFG tier now admits up to 128 blocks while
+  preserving fail-closed rejection at 129. The real `__umodei4` body has 65
+  blocks and fits the existing 32-slot frame (`max_live_values=24`,
+  `max_spill_slots_needed=18`, no exceedance). A 65-block executable canary
+  passes. The focused retry advances from `stage2-block-count` to
+  `no_emitter` / `composed-block-call-form`; report-all remains 443 selected,
+  131 emitted, and 312 failed. Tier 2 is green; no tracker or ratchet moves.
+  Evidence `docs/evidence/std_debug_hello_umodei4_block_count.summary`,
+  `docs/evidence/zig_integrated_exe_umodei4_block_count.summary`, and
+  `docs/evidence/selector_tier2_umodei4_block_count.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
