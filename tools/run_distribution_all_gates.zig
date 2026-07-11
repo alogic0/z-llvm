@@ -19,6 +19,11 @@ const Measurement = struct {
     cache_status: CacheStatus,
 };
 
+const CompletedTool = struct {
+    result: std.process.RunResult,
+    duration_ms: i96,
+};
+
 const tools = [_]Tool{
     .{ .path = "tools/run_distribution_no_llvm_codegen_subset.zig" },
     .{ .path = "tools/run_native_link_object_inspection.zig" },
@@ -62,44 +67,48 @@ pub fn main(init: std.process.Init) !void {
     var cache_mixed: usize = 0;
     var cache_none: usize = 0;
 
-    for (tools, 0..) |tool, tool_index| {
-        var argv: std.ArrayList([]const u8) = .empty;
-        defer argv.deinit(allocator);
-        try argv.appendSlice(allocator, &.{ "env", target_assignment, "zig", "run", tool.path });
-        if (tool.args.len != 0) {
-            try argv.append(allocator, "--");
-            try argv.appendSlice(allocator, tool.args);
+    var tool_index: usize = 0;
+    while (tool_index < tools.len) {
+        if (tool_index == 9) {
+            var first = try io.concurrent(runTool, .{ allocator, io, target_assignment, tool_index, fresh_real_rows });
+            var second = try io.concurrent(runTool, .{ allocator, io, target_assignment, tool_index + 1, fresh_real_rows });
+            var third = try io.concurrent(runTool, .{ allocator, io, target_assignment, tool_index + 2, fresh_real_rows });
+            var completed = [_]CompletedTool{
+                try first.await(io),
+                try second.await(io),
+                try third.await(io),
+            };
+            for (&completed, tool_index..) |*item, completed_index| {
+                try recordTool(
+                    &stdout_writer.interface,
+                    completed_index,
+                    item.*,
+                    &measurements,
+                    &total_duration_ms,
+                    &cache_hits,
+                    &cache_misses,
+                    &cache_mixed,
+                    &cache_none,
+                );
+                common.freeRunResult(allocator, item.result);
+            }
+            tool_index += completed.len;
+            continue;
         }
-        if (fresh_real_rows and std.mem.eql(u8, tool.path, "src/distribution_real_rows_gate.zig")) {
-            if (tool.args.len == 0) try argv.append(allocator, "--");
-            try argv.append(allocator, "--fresh-export");
-        }
-        try stdout_writer.interface.print("gate-start tool={s}", .{tool.path});
-        for (tool.args) |arg| try stdout_writer.interface.print(" {s}", .{arg});
-        try stdout_writer.interface.writeAll("\n");
-        try stdout_writer.interface.flush();
-        const start = std.Io.Timestamp.now(io, .awake);
-        const result = try common.runCapture(allocator, io, argv.items, tool.path);
-        defer common.freeRunResult(allocator, result);
-        const duration_ms = elapsedMs(io, start);
-        const cache_status = cacheStatus(result.stdout);
-        measurements[tool_index] = .{
-            .tool_index = tool_index,
-            .duration_ms = duration_ms,
-            .cache_status = cache_status,
-        };
-        total_duration_ms += duration_ms;
-        switch (cache_status) {
-            .hit => cache_hits += 1,
-            .miss => cache_misses += 1,
-            .mixed => cache_mixed += 1,
-            .none => cache_none += 1,
-        }
-        try stdout_writer.interface.writeAll(result.stdout);
-        try stdout_writer.interface.print("gate-end tool={s}", .{tool.path});
-        for (tool.args) |arg| try stdout_writer.interface.print(" {s}", .{arg});
-        try stdout_writer.interface.print(" duration_ms={} cache_status={s}\n", .{ duration_ms, @tagName(cache_status) });
-        try stdout_writer.interface.flush();
+        const completed = try runTool(allocator, io, target_assignment, tool_index, fresh_real_rows);
+        try recordTool(
+            &stdout_writer.interface,
+            tool_index,
+            completed,
+            &measurements,
+            &total_duration_ms,
+            &cache_hits,
+            &cache_misses,
+            &cache_mixed,
+            &cache_none,
+        );
+        common.freeRunResult(allocator, completed.result);
+        tool_index += 1;
     }
 
     var ranked_indices: [tools.len]usize = undefined;
@@ -120,6 +129,61 @@ pub fn main(init: std.process.Init) !void {
 
     try stdout_writer.interface.writeAll("ok distribution all gates\n");
     try stdout_writer.interface.flush();
+}
+
+fn recordTool(
+    writer: *std.Io.Writer,
+    tool_index: usize,
+    completed: CompletedTool,
+    measurements: *[tools.len]Measurement,
+    total_duration_ms: *i96,
+    cache_hits: *usize,
+    cache_misses: *usize,
+    cache_mixed: *usize,
+    cache_none: *usize,
+) !void {
+    const tool = tools[tool_index];
+    try writer.print("gate-start tool={s}", .{tool.path});
+    for (tool.args) |arg| try writer.print(" {s}", .{arg});
+    try writer.writeAll("\n");
+    const cache_status = cacheStatus(completed.result.stdout);
+    measurements[tool_index] = .{
+        .tool_index = tool_index,
+        .duration_ms = completed.duration_ms,
+        .cache_status = cache_status,
+    };
+    total_duration_ms.* += completed.duration_ms;
+    switch (cache_status) {
+        .hit => cache_hits.* += 1,
+        .miss => cache_misses.* += 1,
+        .mixed => cache_mixed.* += 1,
+        .none => cache_none.* += 1,
+    }
+    try writer.writeAll(completed.result.stdout);
+    try writer.print("gate-end tool={s}", .{tool.path});
+    for (tool.args) |arg| try writer.print(" {s}", .{arg});
+    try writer.print(" duration_ms={} cache_status={s}\n", .{ completed.duration_ms, @tagName(cache_status) });
+    try writer.flush();
+}
+
+fn runTool(allocator: std.mem.Allocator, io: std.Io, target_assignment: []const u8, tool_index: usize, fresh_real_rows: bool) !CompletedTool {
+    const tool = tools[tool_index];
+    var argv: std.ArrayList([]const u8) = .empty;
+    defer argv.deinit(allocator);
+    try argv.appendSlice(allocator, &.{ "env", target_assignment, "zig", "run", tool.path });
+    if (tool.args.len != 0) {
+        try argv.append(allocator, "--");
+        try argv.appendSlice(allocator, tool.args);
+    }
+    if (fresh_real_rows and std.mem.eql(u8, tool.path, "src/distribution_real_rows_gate.zig")) {
+        if (tool.args.len == 0) try argv.append(allocator, "--");
+        try argv.append(allocator, "--fresh-export");
+    }
+    const start = std.Io.Timestamp.now(io, .awake);
+    return .{
+        .result = try common.runCapture(allocator, io, argv.items, tool.path),
+        .duration_ms = elapsedMs(io, start),
+    };
 }
 
 fn parseArgs(allocator: std.mem.Allocator, init: std.process.Init) !bool {
