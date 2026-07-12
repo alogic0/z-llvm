@@ -212,11 +212,16 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0xc1, 0xe8 });
                 try bytes.append(allocator, amount);
             },
+            .sar_eax_imm5 => |amount| {
+                try bytes.appendSlice(allocator, &.{ 0xc1, 0xf8 });
+                try bytes.append(allocator, amount);
+            },
             .shr_arg_imm5 => |shift| try encodeShiftReg32Imm5(&bytes, allocator, 5, shift.reg, shift.amount),
             .shr_arg64_imm6 => |shift| try encodeShiftReg64Imm6(&bytes, allocator, 5, shift.reg, shift.amount),
             .sar_arg64_imm6 => |shift| try encodeShiftReg64Imm6(&bytes, allocator, 7, shift.reg, shift.amount),
             .shl_eax_cl => try bytes.appendSlice(allocator, &.{ 0xd3, 0xe0 }),
             .shr_eax_cl => try bytes.appendSlice(allocator, &.{ 0xd3, 0xe8 }),
+            .sar_eax_cl => try bytes.appendSlice(allocator, &.{ 0xd3, 0xf8 }),
             .fshl_eax_arg32_imm5 => |shift| {
                 if (shift.reg.rexR()) try bytes.append(allocator, 0x44);
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0xa4, 0xc0 | (@as(u8, shift.reg.lowCode()) << 3), shift.amount });
@@ -1681,11 +1686,10 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .add_stack_disp32_eax => 7,
         .add_stack_disp32_rax => 8,
         .add_eax_imm32 => 5,
-        .shl_eax_imm5 => 3,
-        .shr_eax_imm5 => 3,
+        .shl_eax_imm5, .shr_eax_imm5, .sar_eax_imm5 => 3,
         .shr_arg_imm5 => |shift| if (shift.reg.rexB()) 4 else 3,
         .shr_arg64_imm6, .sar_arg64_imm6 => 4,
-        .shl_eax_cl, .shr_eax_cl => 2,
+        .shl_eax_cl, .shr_eax_cl, .sar_eax_cl => 2,
         .fshl_eax_arg32_imm5 => |shift| if (shift.reg.rexR()) 5 else 4,
         .or_eax_imm32 => 5,
         .imul_eax_imm32 => 6,

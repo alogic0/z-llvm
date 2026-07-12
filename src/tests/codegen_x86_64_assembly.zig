@@ -75,6 +75,8 @@ test "x86_64 assembly prints variable eax shifts" {
     defer machine.deinit(std.testing.allocator);
     try machine.instructions.append(std.testing.allocator, .shl_eax_cl);
     try machine.instructions.append(std.testing.allocator, .shr_eax_cl);
+    try machine.instructions.append(std.testing.allocator, .sar_eax_cl);
+    try machine.instructions.append(std.testing.allocator, .{ .sar_eax_imm5 = 7 });
     try machine.instructions.append(std.testing.allocator, .ret);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -86,6 +88,8 @@ test "x86_64 assembly prints variable eax shifts" {
             "variable_eax_shifts:\n" ++
             "\tshll %cl, %eax\n" ++
             "\tshrl %cl, %eax\n" ++
+            "\tsarl %cl, %eax\n" ++
+            "\tsarl $7, %eax\n" ++
             "\tretq\n",
         output.writer.buffered(),
     );

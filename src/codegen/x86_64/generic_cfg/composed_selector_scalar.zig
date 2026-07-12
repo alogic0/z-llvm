@@ -109,12 +109,13 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         try selector_state.bindEax(selector, result_name);
         return null;
     }
-    if ((binary.op == .shl or binary.op == .lshr) and (bits == 16 or bits == 32)) {
+    if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and (bits == 16 or bits == 32)) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
         try selector_state.emitValueIntoEax(selector, binary.lhs);
         try selector.machine.instructions.append(selector.allocator, switch (binary.op) {
             .shl => .shl_eax_cl,
             .lshr => .shr_eax_cl,
+            .ashr => .sar_eax_cl,
             else => unreachable,
         });
         try selector_state.bindEax(selector, result_name);
@@ -257,6 +258,13 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
                 const amount = try shiftAmount7(rhs);
                 if (amount != 127) return .{ .no_emitter = "composed-block-ashr-i128-amount" };
                 try selector_state.emitPairSignMask(selector, result_name, binary.lhs, pair_a);
+                return null;
+            }
+            if (bits <= 32) {
+                const amount = try shiftAmount5(rhs);
+                try selector_state.emitValueIntoEax(selector, binary.lhs);
+                if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .sar_eax_imm5 = amount });
+                try selector_state.bindEax(selector, result_name);
                 return null;
             }
             if (bits != 64) return .{ .no_emitter = "composed-block-ashr-width" };

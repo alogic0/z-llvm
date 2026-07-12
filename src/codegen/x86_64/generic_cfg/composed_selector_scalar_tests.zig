@@ -932,3 +932,28 @@ test "generic cfg selector lowers variable i16 shifts" {
         }, machine.instructions.items);
     }
 }
+
+test "generic cfg selector lowers i32 arithmetic-right shifts" {
+    inline for (.{ ir.Value{ .int = 7 }, ir.Value{ .named = "amount" } }) |rhs| {
+        var machine = MachineFunction.init("i32-ashr", .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+        try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rsi });
+
+        try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+            .op = .ashr,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "value" },
+            .rhs = rhs,
+        })) == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+        const expected: x86_64_machine.Instruction = switch (rhs) {
+            .int => .{ .sar_eax_imm5 = 7 },
+            .named => .sar_eax_cl,
+            else => unreachable,
+        };
+        try std.testing.expectEqual(expected, machine.instructions.items[machine.instructions.items.len - 1]);
+    }
+}

@@ -777,6 +777,18 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_i32_ashr_variable(i32 %value, i32 %amount) {
+Entry:
+  %result = ashr i32 %value, %amount
+  ret i32 %result
+}
+
+define dso_local i32 @zllvm_i32_ashr_immediate(i32 %value) {
+Entry:
+  %result = ashr i32 %value, 31
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_eq_i32_values(i32 %lhs, i32 %rhs) {
 Entry:
   %cmp = icmp eq i32 %lhs, %rhs

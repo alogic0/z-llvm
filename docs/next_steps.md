@@ -92,10 +92,12 @@ drives CFG live-out intervals and stable frame-backed branch and phi state;
 17 live values and 11 required spill slots. After the INBOX-16 test split,
 `__ashlsi3`, `__lshrsi3`, `__lshrdi3`, and `__ashldi3` now close after
 current-position accumulator preservation repairs parallel phi-edge copies.
-Continue in rank order at `compiler_rt.shift.__ashrdi3`.
+`__ashrdi3` and `__ashrsi3` now close through immediate and variable i32 SAR
+forms plus exact native signed execution. Continue in rank order at
+`compiler_rt.shift.__lshrti3`.
 Current item-15
-accounting is 38 composed rows, 17 terminal-template rows, zero stage-two
-boundary rows, and 6 open integer-helper fallback candidates.
+accounting is 40 composed rows, 17 terminal-template rows, zero stage-two
+boundary rows, and 4 open integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
 
