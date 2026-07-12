@@ -110,6 +110,7 @@ pub fn tryLowerComposedCfg(
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
     composed.allocation_plan = &allocation_plan;
+    composed.next_spill_slot = allocation_plan.spill_slots;
     composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
     defer composed.deinit();
 
@@ -231,8 +232,10 @@ pub const ComposedBlockSelector = struct {
                     .gpr64 => @as(u16, 64),
                     .gpr128, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
                 };
-                const reg = nextPhiReg(&used_in_block) orelse return .{ .no_spill_envelope = "stage2-phi-registers" };
-                const destination: ValueLoc = if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg };
+                const destination: ValueLoc = if (nextPhiReg(&used_in_block)) |reg|
+                    if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg }
+                else
+                    .{ .spill64 = selector.allocateSpillSlot(result_name) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" } };
                 try selector.phi_results.put(result_name, {});
                 try selector.phi_destinations.put(result_name, destination);
                 try selector.bindValueLoc(result_name, destination);
@@ -261,8 +264,8 @@ pub const ComposedBlockSelector = struct {
             const loc = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
             try selector.bindValueLoc(result_name, loc);
             switch (loc) {
-                .scratch32, .scratch64 => {},
-                .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+                .scratch32, .scratch64, .spill64 => {},
+                .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
             }
         }
         return null;
@@ -355,7 +358,7 @@ pub const ComposedBlockSelector = struct {
         var saw_array_alloca = false;
         var saw_fixed_smul_overflow = false;
         var saw_wide_icmp = false;
-        if (selector.allocation_plan) |plan| selector.next_spill_slot = plan.spill_slots;
+        if (selector.allocation_plan) |plan| selector.next_spill_slot = @max(selector.next_spill_slot, plan.spill_slots);
 
         for (function.blocks.items) |block| {
             for (block.instructions.items) |instruction| {
@@ -426,7 +429,7 @@ pub const ComposedBlockSelector = struct {
 
     fn spillReservedBytes(selector: ComposedBlockSelector, reserve_spill_area: bool) ?u32 {
         if (!reserve_spill_area) return 0;
-        const planned_slots = if (selector.allocation_plan) |plan| plan.spill_slots else selector.next_spill_slot;
+        const planned_slots = if (selector.allocation_plan) |plan| @max(plan.spill_slots, selector.next_spill_slot) else selector.next_spill_slot;
         const reserved_slots = @max(planned_slots, stage2_spill_slots);
         return std.math.mul(u32, std.math.cast(u32, reserved_slots) orelse return null, 8) catch null;
     }
@@ -2119,17 +2122,18 @@ pub const ComposedBlockSelector = struct {
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
             const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
             const dst = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
-            if (try selector.emitValueIntoLoc(incoming.value, dst, result_name)) |diagnostic| return diagnostic;
+            const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
+            if (try selector.emitValueIntoLoc(incoming.value, dst, result_name, metadata.bits)) |diagnostic| return diagnostic;
             try selector.bindValueLoc(result_name, dst);
             switch (dst) {
-                .scratch32, .scratch64 => {},
-                .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+                .scratch32, .scratch64, .spill64 => {},
+                .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
             }
         }
         return null;
     }
 
-    fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: ValueLoc, ignore_name: []const u8) !?Diagnostic {
+    fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: ValueLoc, ignore_name: []const u8, bits: u16) !?Diagnostic {
         _ = ignore_name;
         switch (dst) {
             .scratch32 => |reg| {
@@ -2158,7 +2162,24 @@ pub const ComposedBlockSelector = struct {
                     .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
                 }
             },
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .spill64 => |frame_index| switch (value) {
+                .int => |int| {
+                    try selector.clobberAccumulator();
+                    if (bits == 64) {
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(int) });
+                        try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = frame_index });
+                    } else {
+                        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) });
+                        try selector.machine.instructions.append(selector.allocator, .{ .spill_eax_rsp = frame_index });
+                    }
+                },
+                .named => {
+                    const actual = selector.resolveValue(value) orelse return .{ .unsupported_value = selector.phiSourceDiagnostic(value) };
+                    selector.materializeLocIntoLoc(actual, dst) catch return .{ .unsupported_value = selector.phiSourceDiagnostic(value) };
+                },
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
+            },
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
         return null;
     }
@@ -2477,7 +2498,10 @@ pub const ComposedBlockSelector = struct {
                     .rax => {
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = frame_index });
                     },
-                    .spill64 => {},
+                    .spill64 => |source| if (!source.eql(frame_index)) {
+                        try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source });
+                        try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = frame_index });
+                    },
                     .arg128, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return error.UnsupportedCodegenValue,
                 }
             },

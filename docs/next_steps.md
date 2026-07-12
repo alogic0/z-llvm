@@ -65,8 +65,10 @@ acceptance. Excluding intervening tail-call ABI rows, continue at
 `compiler_rt.mulXi3.__muldi3` at `composed-block-binary-op`. Named i32
 multiplication and fail-closed EAX preservation now close that row through
 exact decomposed native execution and pressure acceptance. Excluding
-intervening tail-call ABI rows, continue at
-`compiler_rt.int.__udivmodsi4` at `stage2-phi-registers`. Current item-15
+intervening tail-call ABI rows, continue at `compiler_rt.int.__udivmodsi4`.
+Frame-backed phi destinations now extend its three-register phi pool through
+the single spill authority, with executable four-phi loop coverage. The row
+advances to `composed-block-select-width`. Current item-15
 accounting is 30 composed rows, 17 terminal-template rows, zero stage-two
 boundary rows, and 14 open integer-helper fallback candidates.
 

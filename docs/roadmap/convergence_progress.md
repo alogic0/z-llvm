@@ -3035,6 +3035,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_muldi3_acceptance.summary`, and
   `docs/evidence/distribution_all_after_muldi3_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: phi blocks with more than three scalar results now place excess
+  destinations in frame-backed slots owned by the same allocation and spill
+  authority. Spill-to-spill restoration performs a real copy, and a permanent
+  four-phi executable loop checks the edge semantics. The exact
+  `compiler_rt.int.__udivmodsi4` row fits its pressure envelope and advances
+  from `stage2-phi-registers` to `composed-block-select-width`; report-all
+  remains 150 emitted and 293 failed, so item-15 accounting remains 30
+  composed rows and 14 open integer-helper candidates. Evidence
+  `docs/evidence/std_debug_hello_udivmodsi4_phi_spill.summary` and
+  `docs/evidence/selector_tier2_udivmodsi4_phi_spill.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

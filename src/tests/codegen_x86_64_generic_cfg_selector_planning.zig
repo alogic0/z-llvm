@@ -1009,6 +1009,58 @@ test "generic cfg selector materializes displaced phi destinations" {
     try expectInstructionTag(machine.instructions.items, .reload_arg64_rsp);
 }
 
+test "generic cfg selector spills phi destinations beyond register pool" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @four_phi_loop() {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %a = phi i32 [ 1, %entry ], [ %next_a, %body ]
+        \\  %b = phi i32 [ 2, %entry ], [ %next_b, %body ]
+        \\  %c = phi i32 [ 3, %entry ], [ %next_c, %body ]
+        \\  %d = phi i32 [ 4, %entry ], [ %next_d, %body ]
+        \\  %done = icmp eq i32 %a, 5
+        \\  br i1 %done, label %exit, label %body
+        \\body:
+        \\  %next_a = add i32 %a, 1
+        \\  %next_b = add i32 %b, 1
+        \\  %next_c = add i32 %c, 1
+        \\  %next_d = add i32 %d, 1
+        \\  br label %loop
+        \\exit:
+        \\  %sum_ab = add i32 %a, %b
+        \\  %sum_cd = add i32 %c, %d
+        \\  %result = add i32 %sum_ab, %sum_cd
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("four_phi_loop", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try codegen.x86_64.verifyFunction(machine);
+    var phi_spills: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_eax_rsp, .spill_arg_rsp => phi_spills += 1,
+        else => {},
+    };
+    try std.testing.expect(phi_spills >= 2);
+}
+
 test "generic cfg selector stage two composes i32 multiply loop" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

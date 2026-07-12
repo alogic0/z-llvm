@@ -707,6 +707,29 @@ Exit:
   ret i64 %acc
 }
 
+define dso_local i32 @zllvm_four_phi_loop() {
+Entry:
+  br label %Loop
+Loop:
+  %a = phi i32 [ 1, %Entry ], [ %next_a, %Body ]
+  %b = phi i32 [ 2, %Entry ], [ %next_b, %Body ]
+  %c = phi i32 [ 3, %Entry ], [ %next_c, %Body ]
+  %d = phi i32 [ 4, %Entry ], [ %next_d, %Body ]
+  %done = icmp eq i32 %a, 5
+  br i1 %done, label %Exit, label %Body
+Body:
+  %next_a = add i32 %a, 1
+  %next_b = add i32 %b, 1
+  %next_c = add i32 %c, 1
+  %next_d = add i32 %d, 1
+  br label %Loop
+Exit:
+  %sum_ab = add i32 %a, %b
+  %sum_cd = add i32 %c, %d
+  %result = add i32 %sum_ab, %sum_cd
+  ret i32 %result
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16
