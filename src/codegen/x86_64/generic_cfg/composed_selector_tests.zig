@@ -966,6 +966,19 @@ test "generic cfg selector allocation plan reserves two slots for pair spills" {
     try std.testing.expectEqual(PlannedValueAssignment{ .spill = 2 }, plan.assignment("zzscalar").?);
 }
 
+test "spill materialization validates the concrete frame index" {
+    var machine = MachineFunction.init("spill_frame_index", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+    selector.next_spill_slot = 64;
+
+    try selector.materializeLocIntoLoc(.{ .scratch64 = .rdi }, .{ .spill64 = .slot0 });
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rdi } }, machine.instructions.items[0]);
+}
+
 test "generic cfg selector lowers i32 unsigned-add overflow components" {
     var machine = MachineFunction.init("uadd-overflow-i32", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

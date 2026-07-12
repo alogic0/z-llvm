@@ -3095,6 +3095,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmodsi4_fshl_i32.summary` and
   `docs/evidence/selector_tier2_udivmodsi4_fshl_i32.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: spill materialization now validates each concrete frame index
+  against the finalized frame size, so unrelated later spill allocation
+  cannot invalidate an existing phi-edge slot. A focused regression fixes the
+  frame at 16 bytes, advances the allocation cursor to slot 64, and verifies a
+  write to slot 0. The exact `compiler_rt.int.__udivmodsi4` row advances from
+  `stage2-phi-src-spill64` to `composed-block-icmp-form`; report-all and
+  item-15 counts remain unchanged. Tier 3 is green across 17 subgates because
+  this changes spill/frame acceptance. Evidence
+  `docs/evidence/std_debug_hello_udivmodsi4_phi_spill_frame.summary` and
+  `docs/evidence/distribution_all_after_udivmodsi4_phi_spill_frame.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

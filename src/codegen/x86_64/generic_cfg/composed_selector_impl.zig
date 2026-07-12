@@ -2518,7 +2518,7 @@ pub const ComposedBlockSelector = struct {
                 .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack_scalar, .stack128, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
             },
             .spill64 => |frame_index| {
-                if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) return error.UnsupportedCodegenValue;
+                if (!selector.frameIndexFitsFrame(frame_index)) return error.UnsupportedCodegenValue;
                 switch (actual) {
                     .arg32, .scratch32 => |src| {
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg_rsp = .{ .frame_index = frame_index, .reg = src } });
@@ -2540,7 +2540,7 @@ pub const ComposedBlockSelector = struct {
                 }
             },
             .spill128 => |spill| {
-                if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) return error.UnsupportedCodegenValue;
+                if (!selector.frameIndexFitsFrame(spill.lo) or !selector.frameIndexFitsFrame(spill.hi)) return error.UnsupportedCodegenValue;
                 switch (actual) {
                     .arg128, .scratch128 => |pair| {
                         try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.lo, .reg = pair.lo } });
@@ -2552,6 +2552,12 @@ pub const ComposedBlockSelector = struct {
             },
             .arg32, .arg64, .arg128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return error.UnsupportedCodegenValue,
         }
+    }
+
+    fn frameIndexFitsFrame(selector: ComposedBlockSelector, frame_index: FrameIndex) bool {
+        const offset = frame_index.byteOffset() catch return false;
+        const end = std.math.add(u32, offset, 8) catch return false;
+        return end <= selector.stack_frame_bytes;
     }
 
     pub fn valueLoc(selector: ComposedBlockSelector, name: []const u8) ?ValueLoc {
