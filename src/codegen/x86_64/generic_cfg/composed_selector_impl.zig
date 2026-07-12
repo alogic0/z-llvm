@@ -960,6 +960,15 @@ pub const ComposedBlockSelector = struct {
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
         };
         const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+        if (binary.op == .sub and bits == 128 and lhs == 0) {
+            const rhs = selector.materializePairValue(binary.rhs, pair_a) catch
+                return .{ .unsupported_value = "composed-block-unknown-rhs" };
+            try selector.emitZeroArg64(pair_b.lo);
+            try selector.emitZeroArg64(pair_b.hi);
+            try selector.emitPairSubInPlace(pair_b, rhs);
+            try selector.bindPairScratch(result_name, pair_b);
+            return null;
+        }
         if (binary.op == .sub and bits <= 32) {
             try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
             try selector.clobberAccumulator();

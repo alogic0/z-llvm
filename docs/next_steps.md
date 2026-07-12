@@ -52,10 +52,13 @@ pressure acceptance. The generic multi-use binary lifetime fix then closes
 `__subvdi3`, `__subvsi3`, `__addvdi3`, and `__addvsi3`; continue in rank order
 at `compiler_rt.negv.__negvsi2`. Its i32 minimum equality and immediate-left
 subtraction are now closed through exact object emission, native link,
-executable positive/negative checks, and pressure acceptance. Continue in
-rank order at `compiler_rt.negv.__negvti2`. Current item-15 accounting is 24
-composed rows, 17 terminal-template rows, zero stage-two boundary rows, and 20
-open integer-helper fallback candidates.
+executable positive/negative checks, and pressure acceptance. Zero-left i128
+subtraction and framed terminal traps then close
+`compiler_rt.negv.__negvti2` and `compiler_rt.absvti2.__absvti2`, with
+exact native and executable SIGILL evidence. Continue in rank order at
+`compiler_rt.negv.__negvdi2`. Current item-15 accounting is 26 composed rows,
+17 terminal-template rows, zero stage-two boundary rows, and 18 open
+integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
 

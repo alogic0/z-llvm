@@ -2843,6 +2843,96 @@ test "generic cfg selector lowers i32 immediate lhs subtraction" {
     try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } });
 }
 
+test "generic cfg selector lowers i128 immediate lhs subtraction" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i128 @neg_i128(i128 %value) {
+        \\entry:
+        \\  %negated = sub i128 0, %value
+        \\  ret i128 %negated
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("neg_i128", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_r8 = 0 });
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_r9 = 0 });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+    try expectInstruction(machine.instructions.items, .{ .sbb_arg64_rax = .rdx });
+}
+
+test "generic cfg selector executes framed i128 negation trap" {
+    if (@import("builtin").os.tag != .linux) return error.SkipZigTest;
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.assume(i1)
+        \\declare void @llvm.trap()
+        \\
+        \\define i128 @negv_i128(i128 %value) {
+        \\entry:
+        \\  %overflow = icmp eq i128 %value, -170141183460469231731687303715884105728
+        \\  br i1 %overflow, label %trap, label %done
+        \\trap:
+        \\  call void @llvm.assume(i1 true) [ "cold"() ]
+        \\  tail call void @llvm.trap()
+        \\  unreachable
+        \\done:
+        \\  %negated = sub nsw i128 0, %value
+        \\  ret i128 %negated
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("negv_i128", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try codegen.x86_64.verifyFunction(machine);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const negvI128: *const fn (i128) callconv(.c) i128 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(i128, -12), negvI128(12));
+    try std.testing.expectEqual(@as(i128, 12), negvI128(-12));
+
+    const pid = std.os.linux.fork();
+    if (pid == 0) {
+        const sigact: std.posix.Sigaction = .{
+            .handler = .{ .handler = std.posix.SIG.DFL },
+            .mask = std.posix.sigemptyset(),
+            .flags = 0,
+        };
+        std.posix.sigaction(.ILL, &sigact, null);
+        _ = negvI128(std.math.minInt(i128));
+        std.os.linux.exit_group(127);
+    }
+    var status: u32 = 0;
+    _ = std.os.linux.waitpid(@intCast(pid), &status, 0);
+    try std.testing.expectEqual(@as(u32, 4), status & 0x7f);
+}
+
 test "generic cfg selector executes i128 signed multiply overflow semantics" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

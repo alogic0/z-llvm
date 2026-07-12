@@ -313,3 +313,11 @@ test "x86_64 machine verifier checks call stack alignment and frame balance" {
     try unbalanced.instructions.append(std.testing.allocator, .ret);
     try std.testing.expectError(error.UnbalancedStackFrame, codegen.x86_64.verifyFunction(unbalanced));
 }
+
+test "x86_64 machine verifier allows a live frame at terminal trap" {
+    var framed_trap = codegen.x86_64.MachineFunction.init("framed_trap", .{ .int = 128 });
+    defer framed_trap.deinit(std.testing.allocator);
+    try framed_trap.instructions.append(std.testing.allocator, .sub_rsp_8);
+    try framed_trap.instructions.append(std.testing.allocator, .ud2);
+    try codegen.x86_64.verifyFunction(framed_trap);
+}

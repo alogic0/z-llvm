@@ -578,7 +578,6 @@ pub fn verifyFunction(function: MachineFunction) !void {
             eax_defined = function.ret_ty == .void;
         },
         .ud2 => {
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
             saw_terminator = true;
             eax_defined = function.ret_ty == .void;
         },
