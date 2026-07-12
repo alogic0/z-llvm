@@ -3166,6 +3166,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmoddi4_store_i64.summary` and
   `docs/evidence/selector_tier2_udivmoddi4_store_i64.summary`.
 
+- 2026-07-12 (this commit, INBOX-15) Generic-selector architecture closure:
+  `composed_selector_impl.zig` is now a 297-line dispatch facade over explicit
+  state, frame, scalar, memory, call, and CFG ownership modules. The split
+  preserves the single authoritative value-location map and frame authority.
+  Closing Tier 3 at current HEAD is green across 17 subgates, including all
+  three 146-row captured-object pipelines, 100 source-owned objects, strict
+  100-row ReleaseFast/ReleaseSafe/ReleaseSmall prefixes, and five executable
+  canaries. No capability or ratchet counter moves. Evidence
+  `docs/evidence/distribution_all_after_inbox15_selector_split.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
