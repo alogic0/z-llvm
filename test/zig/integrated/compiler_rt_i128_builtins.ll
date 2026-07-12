@@ -753,6 +753,13 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_sgt_i32_imm(i32 %value) {
+Entry:
+  %greater = icmp sgt i32 %value, 15
+  %result = select i1 %greater, i32 1, i32 0
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_eq_i32_values(i32 %lhs, i32 %rhs) {
 Entry:
   %cmp = icmp eq i32 %lhs, %rhs

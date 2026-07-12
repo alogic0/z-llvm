@@ -91,6 +91,29 @@ test "x86_64 assembly prints variable eax shifts" {
     );
 }
 
+test "x86_64 assembly prints flag-preserving signed greater setcc" {
+    var machine = codegen.x86_64.MachineFunction.init("setg", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .cmp_eax_imm32 = 15 });
+    try machine.instructions.append(std.testing.allocator, .setg_eax);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl setg\n" ++
+            "setg:\n" ++
+            "\tcmpl $15, %eax\n" ++
+            "\tsetg %al\n" ++
+            "\tmovzbl %al, %eax\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 assembly prints unsigned i32 division" {
     var machine = codegen.x86_64.MachineFunction.init("unsigned_div_i32", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

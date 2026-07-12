@@ -881,6 +881,10 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector_state.emitValueIntoEax(selector, icmp.lhs);
         try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = std.math.minInt(i32) });
         try selector.machine.instructions.append(selector.allocator, .sete_eax);
+    } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 32 }) and icmp.rhs == .int) {
+        try selector_state.emitValueIntoEax(selector, icmp.lhs);
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = try i32Value(icmp.rhs.int) });
+        try selector.machine.instructions.append(selector.allocator, .setg_eax);
     } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 128 }) and switch (icmp.rhs) {
         .int => |int| int == 0,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,

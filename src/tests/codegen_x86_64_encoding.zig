@@ -214,6 +214,23 @@ test "x86_64 encoding sizes high-register rcx compare before backedge" {
     }, bytes);
 }
 
+test "x86_64 encoding emits flag-preserving signed greater setcc" {
+    var machine = codegen.x86_64.MachineFunction.init("setg", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .cmp_eax_imm32 = 15 });
+    try machine.instructions.append(std.testing.allocator, .setg_eax);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.setg_eax));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x3d, 0x0f, 0x00, 0x00, 0x00,
+        0x0f, 0x9f, 0xc0, 0x0f, 0xb6,
+        0xc0, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding emits imul arg64 by rax" {
     var machine = codegen.x86_64.MachineFunction.init("imul_rax", .void);
     defer machine.deinit(std.testing.allocator);

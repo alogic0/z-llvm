@@ -3231,6 +3231,15 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_udivmoddi4_acceptance.summary`, and
   `docs/evidence/distribution_all_after_udivmoddi4_acceptance.summary`.
 
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: signed
+  i32 greater-than against an immediate now uses `cmpl` plus flag-preserving
+  `setg` materialization, with encoding, assembly, and executable checks for
+  negative, equal-boundary, and greater values. The exact
+  `compiler_rt.shift.__ashlsi3` row advances to a later
+  `composed-block-icmp-form`; report-all and item-15 counts remain unchanged.
+  Evidence `docs/evidence/std_debug_hello_ashlsi3_sgt_i32_imm.summary` and
+  `docs/evidence/selector_tier2_ashlsi3_sgt_i32_imm.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
