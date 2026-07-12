@@ -3155,6 +3155,17 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmoddi4_ptr_null.summary` and
   `docs/evidence/selector_tier2_udivmoddi4_ptr_null.summary`.
 
+- 2026-07-12 (this commit, INBOX-9 and INBOX-15) Item 15 integer-helper
+  capability: composed memory lowering now stores named i64 values through
+  register or spilled pointers by materializing the pointer in RCX and the
+  value in RAX through the single authoritative value-location map. The exact
+  `compiler_rt.int.__udivmoddi4` row advances from
+  `composed-block-store-width` to `composed-block-icmp-form`; report-all and
+  item-15 counts remain unchanged. Tier 2 is green at 820 unit tests, 146
+  integrated objects, and five executable canaries. Evidence
+  `docs/evidence/std_debug_hello_udivmoddi4_store_i64.summary` and
+  `docs/evidence/selector_tier2_udivmoddi4_store_i64.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

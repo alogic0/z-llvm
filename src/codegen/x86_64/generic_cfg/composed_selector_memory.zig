@@ -163,7 +163,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
-    if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-width" };
+    if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
     const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     const value_loc = switch (store.value) {
         .named => selector_state.resolveValue(selector, store.value) orelse return .{ .unsupported_value = "composed-block-unknown-store-value" },
@@ -176,6 +176,7 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
         .spill64 => "composed-block-store-value-spill",
         .arg128, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => "composed-block-store-value-other",
     } else "composed-block-store-value-other";
+    if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64(selector, ptr, store.value, value_detail);
     selector_state.emitValueIntoEax(selector, store.value) catch return .{ .unsupported_value = value_detail };
     switch (ptr) {
         .stack_scalar => |stack| {
@@ -214,6 +215,20 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
         },
         .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack128, .stack128_value, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
     }
+    return null;
+}
+
+fn lowerStoreI64(selector: *ComposedBlockSelector, ptr: ValueLoc, value: ir.Value, value_detail: []const u8) !?Diagnostic {
+    switch (ptr) {
+        .arg64, .scratch64 => |reg| try selector_state.materializeLocIntoLoc(selector, .{ .scratch64 = reg }, .{ .scratch64 = .rcx }),
+        .spill64 => |frame_index| selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx }) catch |err| switch (err) {
+            error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-spill-ptr" },
+            else => return err,
+        },
+        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
+    }
+    selector_state.emitValueIntoRax(selector, value) catch return .{ .unsupported_value = value_detail };
+    try selector.machine.instructions.append(selector.allocator, .store_rax_rcx_ptr);
     return null;
 }
 

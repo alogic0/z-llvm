@@ -1054,6 +1054,29 @@ test "i32 spill relocation preserves its width" {
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_eax_rsp = .slot2 }, machine.instructions.items[1]);
 }
 
+test "generic cfg selector stores i64 through a spilled pointer" {
+    var machine = MachineFunction.init("store-i64-spilled-ptr", .void);
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+    try selector_state.bindValueLoc(&selector, "out", .{ .spill64 = .slot0 });
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rdi });
+
+    const diagnostic = try selector_memory.lowerStore(&selector, .{
+        .ty = .{ .int = 64 },
+        .value = .{ .named = "value" },
+        .ptr = .{ .named = "out" },
+    });
+
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction.store_rax_rcx_ptr, machine.instructions.items[2]);
+}
+
 test "generic cfg selector lowers i32 unsigned-add overflow components" {
     var machine = MachineFunction.init("uadd-overflow-i32", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

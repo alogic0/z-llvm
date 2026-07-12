@@ -84,7 +84,8 @@ pressure acceptance. Excluding intervening tail-call ABI rows, continue at
 `compiler_rt.int.__udivmoddi4`. Its unsigned-subtract overflow tuples are now
 pressure-exempt, advancing the row from `stage2-unsupported-value` to
 `stage2-phi-restore-loc`. Conservative per-planned-value frame homes then
-advance it through pointer equality with null to `composed-block-store-width`.
+advance it through pointer equality with null and i64 stores through spilled
+pointers to `composed-block-icmp-form`.
 Current item-15
 accounting is 33 composed rows, 17 terminal-template rows, zero stage-two
 boundary rows, and 11 open integer-helper fallback candidates.
