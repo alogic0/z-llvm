@@ -7,6 +7,7 @@ const stage2_planning = @import("stage2_planning.zig");
 const impl = @import("composed_selector_impl.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
+const selector_frame = @import("composed_selector_frame.zig");
 
 const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
@@ -1035,7 +1036,7 @@ test "spill reservation covers secondary homes for planned values" {
     defer selector.deinit();
     selector.allocation_plan = &plan;
 
-    try std.testing.expectEqual(@as(u32, 320), impl.spillReservedBytes(&selector, true).?);
+    try std.testing.expectEqual(@as(u32, 320), selector_frame.spillReservedBytes(&selector, true).?);
 }
 
 test "i32 spill relocation preserves its width" {
@@ -1129,7 +1130,7 @@ test "generic cfg selector lays out mixed scalar and array frame objects" {
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try std.testing.expect((try impl.prepareStackFrame(&selector, function)) == null);
+    try std.testing.expect((try selector_frame.prepareStackFrame(&selector, function)) == null);
     try std.testing.expectEqual(ValueLoc{ .stack_scalar = .{ .base_disp = 256, .bits = 8 } }, selector_state.valueLoc(&selector, "flag4").?);
     try std.testing.expectEqual(ValueLoc{ .stack_i32_array = .{ .base_disp = 260, .len = 3 } }, selector_state.valueLoc(&selector, "words3").?);
     try std.testing.expectEqual(ValueLoc{ .stack_scalar = .{ .base_disp = 272, .bits = 8 } }, selector_state.valueLoc(&selector, "flag1").?);
