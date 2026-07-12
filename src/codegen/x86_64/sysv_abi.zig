@@ -230,7 +230,7 @@ pub fn advanceParamCursors(
         if (gpr_index.* < 6) gpr_index.* += 1 else stack_eightbytes.* += 1;
         return;
     }
-    if (ty.eql(.float) or ty.eql(.double)) {
+    if (isScalarSseAbiType(ty)) {
         if (sse_index.* < 8) sse_index.* += 1 else stack_eightbytes.* += 1;
         return;
     }
@@ -384,9 +384,10 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
             plan.counts.gpr_args += 1;
             continue;
         }
-        if (arg.ty.eql(.float) or arg.ty.eql(.double)) {
+        if (isScalarSseAbiType(arg.ty)) {
             plan.has_non_i32_arg = true;
             if (fp_arg_index >= 8) {
+                if (arg.ty == .half) return error.UnsupportedCodegenType;
                 const assignment: CallArgAssignment = switch (arg.value) {
                     .fp => |text| if (arg.ty.eql(.float))
                         .{ .stack_f32_const = text }
@@ -435,7 +436,7 @@ pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
     if (isScalarGprAbiType(ret_ty)) {
         return .{ .gpr_returns = 1 };
     }
-    if (ret_ty == .float or ret_ty == .double) {
+    if (isScalarSseAbiType(ret_ty)) {
         return .{ .sse_returns = 1 };
     }
     if (isAggregateType(ret_ty)) {
@@ -445,6 +446,10 @@ pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
         return .{ .gpr_returns = needs.gpr, .sse_returns = needs.sse };
     }
     return error.UnsupportedCodegenType;
+}
+
+pub fn isScalarSseAbiType(ty: ir.Type) bool {
+    return ty == .half or ty == .float or ty == .double;
 }
 
 pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {

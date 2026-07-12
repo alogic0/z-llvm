@@ -2,6 +2,7 @@ const x86_64_types = @import("../types.zig");
 
 pub const ArgReg = x86_64_types.ArgReg;
 pub const FrameIndex = x86_64_types.FrameIndex;
+pub const XmmReg = x86_64_types.XmmReg;
 
 pub const RegPair = struct {
     lo: ArgReg,
@@ -25,6 +26,7 @@ pub const ValueLoc = union(enum) {
     scratch32: ArgReg,
     scratch64: ArgReg,
     scratch128: RegPair,
+    xmm: FpRegLoc,
     stack_scalar: StackScalarLoc,
     stack128: u32,
     stack128_value: u32,
@@ -32,12 +34,16 @@ pub const ValueLoc = union(enum) {
     stack_i32_ptr: StackPtrLoc,
     spill64: FrameIndex,
     spill128: PairSpillLoc,
+    spill_fp: FpSpillLoc,
 };
 
 pub const VirtualRegClass = enum {
     gpr32,
     gpr64,
     gpr128,
+    fp16,
+    fp32,
+    fp64,
     stack_object,
     stack_pointer,
 };
@@ -61,6 +67,16 @@ pub const VirtualRegMetadata = struct {
 pub const PairSpillLoc = struct {
     lo: FrameIndex,
     hi: FrameIndex,
+};
+
+pub const FpRegLoc = struct {
+    reg: XmmReg,
+    bits: u16,
+};
+
+pub const FpSpillLoc = struct {
+    frame_index: FrameIndex,
+    bits: u16,
 };
 
 pub const StackArrayLoc = struct {
@@ -88,6 +104,7 @@ pub const pair_a: RegPair = .{ .lo = .rcx, .hi = .rdx };
 pub const pair_b: RegPair = .{ .lo = .r8, .hi = .r9 };
 pub const selector_allocatable_regs = [_]ArgReg{ .rdi, .rsi, .rdx, .rcx, .r8, .r9 };
 pub const selector_allocatable_pairs = [_]RegPair{ pair_a, pair_b };
+pub const selector_allocatable_xmm_regs = [_]XmmReg{ .xmm0, .xmm1, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 };
 
 pub fn argRegIndex(reg: ArgReg) usize {
     return switch (reg) {
@@ -98,4 +115,8 @@ pub fn argRegIndex(reg: ArgReg) usize {
         .r8 => 4,
         .r9 => 5,
     };
+}
+
+pub fn xmmRegIndex(reg: XmmReg) usize {
+    return @intFromEnum(reg);
 }

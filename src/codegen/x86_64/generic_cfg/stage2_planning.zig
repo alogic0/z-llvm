@@ -4,11 +4,14 @@ const selector_types = @import("selector_types.zig");
 
 const ArgReg = selector_types.ArgReg;
 const RegPair = selector_types.RegPair;
+const XmmReg = selector_types.XmmReg;
 const VirtualRegClass = selector_types.VirtualRegClass;
 const VirtualRegMetadata = selector_types.VirtualRegMetadata;
 const argRegIndex = selector_types.argRegIndex;
 const selector_allocatable_pairs = selector_types.selector_allocatable_pairs;
 const selector_allocatable_regs = selector_types.selector_allocatable_regs;
+const selector_allocatable_xmm_regs = selector_types.selector_allocatable_xmm_regs;
+const xmmRegIndex = selector_types.xmmRegIndex;
 
 pub const StageTwoSummary = struct {
     blocks: usize,
@@ -341,6 +344,9 @@ pub const PlannedValueAssignment = union(enum) {
     gpr32: ArgReg,
     gpr64: ArgReg,
     gpr128: RegPair,
+    fp16: XmmReg,
+    fp32: XmmReg,
+    fp64: XmmReg,
     stack_object,
     stack_pointer: ArgReg,
     spill: usize,
@@ -461,6 +467,15 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
 
 pub fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {
     if (ty == .ptr) return .{ .class = .gpr64, .bits = 64 };
+    return switch (ty) {
+        .half => .{ .class = .fp16, .bits = 16 },
+        .float => .{ .class = .fp32, .bits = 32 },
+        .double => .{ .class = .fp64, .bits = 64 },
+        else => selectorIntegerMetadata(ty),
+    };
+}
+
+fn selectorIntegerMetadata(ty: ir.Type) ?VirtualRegMetadata {
     const bits = intBits(ty) orelse return null;
     return switch (bits) {
         1...32 => .{ .class = .gpr32, .bits = 32 },
@@ -552,7 +567,7 @@ pub fn allocateSelectorIntervals(allocator: std.mem.Allocator, intervals: []cons
     var active: std.ArrayList(ActiveAllocation) = .empty;
     defer active.deinit(allocator);
 
-    var occupied = [_]bool{false} ** 6;
+    var occupied = SelectorRegisterOccupancy{};
     for (ordered.items) |interval| {
         expireSelectorIntervals(&active, &occupied, interval.start);
         const assignment = allocateSelectorInterval(&occupied, interval, plan.spill_slots);
@@ -576,7 +591,12 @@ fn selectorIntervalLessThan(_: void, lhs: SelectorValueInterval, rhs: SelectorVa
     return std.mem.lessThan(u8, lhs.name, rhs.name);
 }
 
-fn expireSelectorIntervals(active: *std.ArrayList(ActiveAllocation), occupied: *[6]bool, position: usize) void {
+const SelectorRegisterOccupancy = struct {
+    gpr: [6]bool = [_]bool{false} ** 6,
+    xmm: [8]bool = [_]bool{false} ** 8,
+};
+
+fn expireSelectorIntervals(active: *std.ArrayList(ActiveAllocation), occupied: *SelectorRegisterOccupancy, position: usize) void {
     var index: usize = 0;
     while (index < active.items.len) {
         if (active.items[index].end < position) {
@@ -588,54 +608,69 @@ fn expireSelectorIntervals(active: *std.ArrayList(ActiveAllocation), occupied: *
     }
 }
 
-fn allocateSelectorInterval(occupied: *[6]bool, interval: SelectorValueInterval, next_spill_slot: usize) PlannedValueAssignment {
+fn allocateSelectorInterval(occupied: *SelectorRegisterOccupancy, interval: SelectorValueInterval, next_spill_slot: usize) PlannedValueAssignment {
     return switch (interval.class) {
         .gpr32 => if (allocateSelectorReg(occupied)) |reg| .{ .gpr32 = reg } else .{ .spill = next_spill_slot },
         .gpr64 => if (allocateSelectorReg(occupied)) |reg| .{ .gpr64 = reg } else .{ .spill = next_spill_slot },
         .gpr128 => if (allocateSelectorPair(occupied)) |pair| .{ .gpr128 = pair } else .{ .spill = next_spill_slot },
+        .fp16 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp16 = reg } else .{ .spill = next_spill_slot },
+        .fp32 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp32 = reg } else .{ .spill = next_spill_slot },
+        .fp64 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp64 = reg } else .{ .spill = next_spill_slot },
         .stack_object => .stack_object,
         .stack_pointer => if (allocateSelectorReg(occupied)) |reg| .{ .stack_pointer = reg } else .{ .spill = next_spill_slot },
     };
 }
 
-fn allocateSelectorReg(occupied: *[6]bool) ?ArgReg {
+fn allocateSelectorReg(occupied: *SelectorRegisterOccupancy) ?ArgReg {
     for (selector_allocatable_regs) |reg| {
         const index = argRegIndex(reg);
-        if (!occupied[index]) {
-            occupied[index] = true;
+        if (!occupied.gpr[index]) {
+            occupied.gpr[index] = true;
             return reg;
         }
     }
     return null;
 }
 
-fn allocateSelectorPair(occupied: *[6]bool) ?RegPair {
+fn allocateSelectorPair(occupied: *SelectorRegisterOccupancy) ?RegPair {
     for (selector_allocatable_pairs) |pair| {
         const lo = argRegIndex(pair.lo);
         const hi = argRegIndex(pair.hi);
-        if (!occupied[lo] and !occupied[hi]) {
-            occupied[lo] = true;
-            occupied[hi] = true;
+        if (!occupied.gpr[lo] and !occupied.gpr[hi]) {
+            occupied.gpr[lo] = true;
+            occupied.gpr[hi] = true;
             return pair;
         }
     }
     return null;
 }
 
-fn releaseSelectorAssignment(occupied: *[6]bool, assignment: PlannedValueAssignment) void {
+fn allocateSelectorXmm(occupied: *SelectorRegisterOccupancy) ?XmmReg {
+    for (selector_allocatable_xmm_regs) |reg| {
+        const index = xmmRegIndex(reg);
+        if (!occupied.xmm[index]) {
+            occupied.xmm[index] = true;
+            return reg;
+        }
+    }
+    return null;
+}
+
+fn releaseSelectorAssignment(occupied: *SelectorRegisterOccupancy, assignment: PlannedValueAssignment) void {
     switch (assignment) {
-        .gpr32, .gpr64, .stack_pointer => |reg| occupied[argRegIndex(reg)] = false,
+        .gpr32, .gpr64, .stack_pointer => |reg| occupied.gpr[argRegIndex(reg)] = false,
         .gpr128 => |pair| {
-            occupied[argRegIndex(pair.lo)] = false;
-            occupied[argRegIndex(pair.hi)] = false;
+            occupied.gpr[argRegIndex(pair.lo)] = false;
+            occupied.gpr[argRegIndex(pair.hi)] = false;
         },
+        .fp16, .fp32, .fp64 => |reg| occupied.xmm[xmmRegIndex(reg)] = false,
         .stack_object, .spill => {},
     }
 }
 
 fn assignmentUsesRegisters(assignment: PlannedValueAssignment) bool {
     return switch (assignment) {
-        .gpr32, .gpr64, .gpr128, .stack_pointer => true,
+        .gpr32, .gpr64, .gpr128, .fp16, .fp32, .fp64, .stack_pointer => true,
         .stack_object, .spill => false,
     };
 }

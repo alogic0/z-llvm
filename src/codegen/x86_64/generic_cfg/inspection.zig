@@ -215,8 +215,8 @@ fn isScalarReturnType(ty: ir.Type) bool {
 fn isSelectorScalarType(ty: ir.Type) bool {
     return switch (ty) {
         .int => |bits| bits > 0 and bits <= 128,
-        .ptr => true,
-        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+        .half, .float, .double, .ptr => true,
+        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
     };
 }
 

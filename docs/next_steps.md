@@ -37,7 +37,18 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None. `compiler_rt.mulo.__muloti4` is closed through exact object emission,
+None. INBOX-17 establishes the composed selector's scalar FP ABI/register
+foundation: `half`, `float`, and `double` have explicit width-tagged XMM
+locations and independent `fp16`/`fp32`/`fp64` allocation classes; FP spills,
+reloads, caller clobbers, and XMM0 returns use the existing value map and frame
+authority. `x86_fp80` and `fp128` remain explicit ABI boundaries. A bit-exact
+executable half identity check covers the first supported ABI case, and the
+real `compiler_rt.trunc.__trunch` canary now advances from
+`unsupported-return-type` to the type-driven `fpext` semantic form. Continue
+there only after review of the bounded INBOX-17 foundation commit; do not add a
+symbol-specific `__trunch` path.
+
+`compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
 Debug compiler_rt report-all is now 443 selected / 137 emitting / 306 failing;
 the global first failure crosses into the soft-float cluster at

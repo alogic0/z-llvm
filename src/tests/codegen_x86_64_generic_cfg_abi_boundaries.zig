@@ -673,6 +673,15 @@ test "x86_64 SysV return planner rejects explicit ABI boundaries" {
     );
 }
 
+test "x86_64 SysV scalar FP returns use the SSE class" {
+    inline for (.{ ir.Type.half, ir.Type.float, ir.Type.double }) |ty| {
+        const counts = try codegen.x86_64.sysvReturnPlanCountsForTest(ty);
+        try std.testing.expectEqual(@as(usize, 0), counts.gpr_returns);
+        try std.testing.expectEqual(@as(usize, 1), counts.sse_returns);
+        try std.testing.expect(!counts.memory_return);
+    }
+}
+
 test "x86_64 codegen rejects vector call ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

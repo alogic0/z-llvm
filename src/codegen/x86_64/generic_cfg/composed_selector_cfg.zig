@@ -126,6 +126,13 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
         try emitReturnEpilogue(selector);
         return null;
     }
+    if (ret.ty == .half or ret.ty == .float or ret.ty == .double) {
+        const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
+        const bits: u16 = if (ret.ty == .half) 16 else if (ret.ty == .float) 32 else 64;
+        selector_state.emitValueIntoFpReturn(selector, value, bits) catch return .{ .unsupported_value = "composed-block-fp-ret-value" };
+        try emitReturnEpilogue(selector);
+        return null;
+    }
     const bits = intBits(ret.ty) orelse return .{ .no_emitter = "composed-block-ret-type" };
     if (bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-ret-width" };
     const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
@@ -295,7 +302,7 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         try selector_state.bindValueLoc(selector, result_name, dst);
         switch (dst) {
             .scratch32, .scratch64, .spill64, .spill128 => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .arg32, .arg64, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill_fp => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;
@@ -317,8 +324,8 @@ fn stabilizePhiEdgeSources(selector: *ComposedBlockSelector, target: ir.BasicBlo
         switch (loc) {
             .arg32, .arg64, .scratch32, .scratch64, .eax, .rax => if (try selector_state.spillValue(selector, name)) |diagnostic| return diagnostic,
             .arg128, .scratch128 => if (try selector_state.spillPairValue(selector, name)) |diagnostic| return diagnostic,
-            .spill64, .spill128 => {},
-            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) },
+            .spill64, .spill128, .spill_fp => {},
+            .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) },
         }
     }
     return null;
@@ -377,7 +384,7 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
             },
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
         },
-        .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
+        .arg32, .arg64, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill_fp => return .{ .no_emitter = "stage2-phi-dst-loc" },
     }
     return null;
 }
@@ -392,7 +399,7 @@ pub fn emitBranchCondition(selector: *ComposedBlockSelector, value: ir.Value) !?
             try selector.machine.instructions.append(selector.allocator, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
             try selector.machine.instructions.append(selector.allocator, .{ .test_arg8 = .rcx });
         },
-        .arg64, .scratch64, .arg128, .scratch128, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "stage2-cond-loc" },
+        .arg64, .scratch64, .arg128, .scratch128, .xmm, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128, .spill_fp => return .{ .no_emitter = "stage2-cond-loc" },
     }
     return null;
 }

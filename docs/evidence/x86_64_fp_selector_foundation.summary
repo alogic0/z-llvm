@@ -1,0 +1,40 @@
+# x86_64 FP Selector Foundation Evidence
+
+schema_version: 1
+directive: `INBOX-17`
+target: `x86_64-linux-gnu`
+validation_tier: 3
+result: pass
+
+The composed selector now models `half`, `float`, and `double` with independent
+FP virtual classes and width-tagged XMM/spill locations. GPR and XMM occupancy
+are separate; FP values retain the existing authoritative value map and frame
+indexes. Live XMM values spill before calls, low-width values use the existing
+32-bit XMM frame operations, doubles use the 64-bit operations, and supported
+returns materialize in XMM0. `x86_fp80` and `fp128` remain fail-closed.
+
+Focused evidence:
+
+- `zig build test`: green, including a bit-exact executable half ABI round trip
+  over zero, finite signed values, infinity, and a NaN payload.
+- `zig build distribution-debug-object`: green.
+- compiler-rt report-all: 443 selected / 163 emitted / 280 failed; first
+  failure remains `compiler_rt.trunc.__trunch` and advances from
+  `unsupported_type / unsupported-return-type` to
+  `unsupported_instruction / fpext`.
+- report log: `tmp/inbox17_foundation_report.log`.
+
+Tier-3 trigger: shared SysV ABI classification, composed register allocation,
+call clobbering, and frame spill behavior changed. Existing Tier-3 logs predate
+these relevant inputs and cannot be reused.
+
+Tier-3 command and intended output:
+
+```text
+zig build distribution-all
+docs/evidence/distribution_all_after_fp_selector_foundation.summary
+```
+
+Tier 3 passed with 17 subgates and `local_fail=0`. The strict ReleaseFast,
+ReleaseSafe, and ReleaseSmall 100-row gates passed, as did the integrated
+object, executable, native-link, and boundary gates.

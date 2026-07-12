@@ -23,6 +23,7 @@ const SelectorValueInterval = stage2_planning.SelectorValueInterval;
 const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
+const selectorValueMetadata = stage2_planning.selectorValueMetadata;
 
 test "generic cfg selector virtual register metadata follows assignment class" {
     try std.testing.expectEqual(VirtualRegMetadata{ .class = .gpr32, .bits = 32 }, selector_state.virtualRegMetadata(.eax));
@@ -33,6 +34,86 @@ test "generic cfg selector virtual register metadata follows assignment class" {
         .len = 4,
     } }));
     try std.testing.expectEqual(VirtualRegMetadata{ .class = .stack_pointer, .bits = 64 }, selector_state.virtualRegMetadata(.{ .stack_i32_ptr = .{ .disp = 16 } }));
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp16, .bits = 16 }, selector_state.virtualRegMetadata(.{ .xmm = .{ .reg = .xmm0, .bits = 16 } }));
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp32, .bits = 32 }, selector_state.virtualRegMetadata(.{ .xmm = .{ .reg = .xmm1, .bits = 32 } }));
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp64, .bits = 64 }, selector_state.virtualRegMetadata(.{ .spill_fp = .{ .frame_index = .slot0, .bits = 64 } }));
+}
+
+test "generic cfg selector derives supported FP classes from types" {
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp16, .bits = 16 }, selectorValueMetadata(.half).?);
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp32, .bits = 32 }, selectorValueMetadata(.float).?);
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp64, .bits = 64 }, selectorValueMetadata(.double).?);
+    try std.testing.expect(selectorValueMetadata(.x86_fp80) == null);
+    try std.testing.expect(selectorValueMetadata(.fp128) == null);
+}
+
+test "generic cfg selector allocates GPR and XMM classes independently" {
+    const intervals = [_]SelectorValueInterval{
+        .{ .name = "g0", .class = .gpr64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "f0", .class = .fp16, .bits = 16, .start = 0, .end = 10 },
+        .{ .name = "f1", .class = .fp32, .bits = 32, .start = 0, .end = 10 },
+        .{ .name = "f2", .class = .fp64, .bits = 64, .start = 0, .end = 10 },
+        .{ .name = "f3", .class = .fp32, .bits = 32, .start = 0, .end = 10 },
+        .{ .name = "f4", .class = .fp32, .bits = 32, .start = 0, .end = 10 },
+        .{ .name = "f5", .class = .fp32, .bits = 32, .start = 0, .end = 10 },
+        .{ .name = "f6", .class = .fp32, .bits = 32, .start = 0, .end = 10 },
+        .{ .name = "f7", .class = .fp32, .bits = 32, .start = 0, .end = 10 },
+        .{ .name = "f8", .class = .fp32, .bits = 32, .start = 0, .end = 10 },
+    };
+    var plan = try allocateSelectorIntervals(std.testing.allocator, intervals[0..]);
+    defer plan.deinit();
+
+    try std.testing.expectEqual(PlannedValueAssignment{ .gpr64 = .rdi }, plan.assignment("g0").?);
+    try std.testing.expectEqual(PlannedValueAssignment{ .fp16 = .xmm0 }, plan.assignment("f0").?);
+    try std.testing.expectEqual(PlannedValueAssignment{ .fp32 = .xmm7 }, plan.assignment("f7").?);
+    try std.testing.expectEqual(PlannedValueAssignment{ .spill = 0 }, plan.assignment("f8").?);
+    try std.testing.expectEqual(@as(usize, 1), plan.spill_slots);
+}
+
+test "generic cfg selector spills half values through the shared frame" {
+    var machine = MachineFunction.init("spill-half", .half);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 24;
+    try selector_state.bindValueLoc(&selector, "value", .{ .xmm = .{ .reg = .xmm2, .bits = 16 } });
+
+    try std.testing.expect((try selector_state.spillValue(&selector, "value")) == null);
+    try std.testing.expectEqual(ValueLoc{ .spill_fp = .{ .frame_index = .slot0, .bits = 16 } }, selector_state.valueLoc(&selector, "value").?);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_xmm32_rsp = .{ .frame_index = .slot0, .reg = .xmm2 } }, machine.instructions.items[0]);
+}
+
+test "generic cfg selector preserves live XMM values across calls" {
+    var machine = MachineFunction.init("call-spill-fp", .float);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("live", 3);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 24;
+    try selector_state.bindValueLoc(&selector, "live", .{ .xmm = .{ .reg = .xmm3, .bits = 32 } });
+
+    try std.testing.expect((try selector_state.spillLiveCallerClobbersForCall(&selector)) == null);
+    try std.testing.expectEqual(ValueLoc{ .spill_fp = .{ .frame_index = .slot0, .bits = 32 } }, selector_state.valueLoc(&selector, "live").?);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_xmm32_rsp = .{ .frame_index = .slot0, .reg = .xmm3 } }, machine.instructions.items[0]);
+}
+
+test "generic cfg selector materializes planned FP registers and spills" {
+    var machine = MachineFunction.init("move-fp", .double);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 24;
+
+    try selector_state.materializeLocIntoLoc(&selector, .{ .xmm = .{ .reg = .xmm2, .bits = 64 } }, .{ .spill_fp = .{ .frame_index = .slot0, .bits = 64 } });
+    try selector_state.materializeLocIntoLoc(&selector, .{ .spill_fp = .{ .frame_index = .slot0, .bits = 64 } }, .{ .xmm = .{ .reg = .xmm4, .bits = 64 } });
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .spill_xmm64_rsp = .{ .frame_index = .slot0, .reg = .xmm2 } },
+        .{ .reload_xmm64_rsp = .{ .frame_index = .slot0, .reg = .xmm4 } },
+    }, machine.instructions.items);
 }
 
 test "generic cfg selector consumes matching no-spill planned result locations" {

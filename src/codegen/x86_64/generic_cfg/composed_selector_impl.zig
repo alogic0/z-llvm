@@ -15,6 +15,7 @@ const selector_cfg = @import("composed_selector_cfg.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
+const XmmReg = x86_64_types.XmmReg;
 const FrameIndex = x86_64_types.FrameIndex;
 const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 const PairSpillLoc = selector_types.PairSpillLoc;
@@ -134,10 +135,17 @@ pub fn tryLowerComposedCfg(
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
 
 fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
-    if (function.params.items.len > 6) return .{ .unsupported_value = "composed-block-too-many-params" };
-    var abi_index: usize = 0;
+    var gpr_index: usize = 0;
+    var xmm_index: usize = 0;
     for (function.params.items) |param| {
-        const reg = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-param-reg" };
+        if (param.ty == .half or param.ty == .float or param.ty == .double) {
+            const reg = XmmReg.fromIndex(xmm_index) catch return .{ .unsupported_value = "composed-block-param-xmm-reg" };
+            const bits: u16 = if (param.ty == .half) 16 else if (param.ty == .float) 32 else 64;
+            try selector_state.bindValueLoc(selector, param.name, .{ .xmm = .{ .reg = reg, .bits = bits } });
+            xmm_index += 1;
+            continue;
+        }
+        const reg = ArgReg.fromIndex(gpr_index) catch return .{ .unsupported_value = "composed-block-param-reg" };
         if (param.ty == .ptr) {
             try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg });
         } else {
@@ -146,14 +154,14 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
                 32 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 64 => try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg }),
                 128 => {
-                    const high = ArgReg.fromIndex(abi_index + 1) catch return .{ .unsupported_value = "composed-block-param-reg" };
+                    const high = ArgReg.fromIndex(gpr_index + 1) catch return .{ .unsupported_value = "composed-block-param-reg" };
                     try selector_state.bindValueLoc(selector, param.name, .{ .arg128 = .{ .lo = reg, .hi = high } });
-                    abi_index += 1;
+                    gpr_index += 1;
                 },
                 else => return .{ .no_emitter = "composed-block-param-width" },
             }
         }
-        abi_index += 1;
+        gpr_index += 1;
     }
     return null;
 }
@@ -170,11 +178,11 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
                 .gpr32 => @as(u16, 32),
                 .gpr64 => @as(u16, 64),
                 .gpr128 => @as(u16, 128),
-                .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
+                .fp16, .fp32, .fp64, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
             };
             const planned_spill = if (bits != 128 and selector.allocation_plan != null) switch (selector.allocation_plan.?.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" }) {
                 .spill => |index| selector_state.spillFrameIndexMaybe(index) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
-                .gpr32, .gpr64, .gpr128, .stack_object, .stack_pointer => null,
+                .gpr32, .gpr64, .gpr128, .fp16, .fp32, .fp64, .stack_object, .stack_pointer => null,
             } else null;
             const destination: ValueLoc = if (bits == 128)
                 .{ .spill128 = selector_state.allocatePairSpillSlots(selector, result_name) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" } }
@@ -197,13 +205,14 @@ fn stabilizeFramedParams(selector: *ComposedBlockSelector, function: ir.Function
     for (function.params.items) |param| {
         const loc = selector_state.valueLoc(selector, param.name) orelse return .{ .unsupported_value = "stage2-param-home" };
         switch (loc) {
-            .spill64, .spill128 => {},
+            .spill64, .spill128, .spill_fp => {},
             .arg32, .arg64, .scratch32, .scratch64, .eax, .rax => {
                 if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic;
             },
             .arg128, .scratch128 => {
                 if (try selector_state.spillPairValue(selector, param.name)) |diagnostic| return diagnostic;
             },
+            .xmm => if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic,
             .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .unsupported_value = "stage2-param-home" },
         }
     }
@@ -231,7 +240,7 @@ fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnost
         try selector_state.bindValueLoc(selector, result_name, loc);
         switch (loc) {
             .scratch32, .scratch64, .spill64, .spill128 => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .arg32, .arg64, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill_fp => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;

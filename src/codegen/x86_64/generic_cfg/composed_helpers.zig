@@ -58,7 +58,7 @@ pub fn isCommutative(op: MachineBinaryOp) bool {
 pub fn locIsAccumulator(loc: ValueLoc) bool {
     return switch (loc) {
         .eax, .rax => true,
-        .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => false,
+        .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128, .spill_fp => false,
     };
 }
 
@@ -72,6 +72,7 @@ pub fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .scratch32 => |reg| reg == rhs.scratch32,
         .scratch64 => |reg| reg == rhs.scratch64,
         .scratch128 => |pair| pair.eql(rhs.scratch128),
+        .xmm => |fp| fp.reg == rhs.xmm.reg and fp.bits == rhs.xmm.bits,
         .stack_scalar => |stack| stack.base_disp == rhs.stack_scalar.base_disp and stack.bits == rhs.stack_scalar.bits,
         .stack128 => |disp| disp == rhs.stack128,
         .stack128_value => |disp| disp == rhs.stack128_value,
@@ -79,6 +80,7 @@ pub fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .stack_i32_ptr => |ptr| ptr.disp == rhs.stack_i32_ptr.disp and ptr.index == null and rhs.stack_i32_ptr.index == null,
         .spill64 => |frame_index| frame_index.eql(rhs.spill64),
         .spill128 => |spill| spill.lo.eql(rhs.spill128.lo) and spill.hi.eql(rhs.spill128.hi),
+        .spill_fp => |fp| fp.frame_index.eql(rhs.spill_fp.frame_index) and fp.bits == rhs.spill_fp.bits,
     };
 }
 
@@ -86,7 +88,7 @@ pub fn locContainsReg(loc: ValueLoc, reg: ArgReg) bool {
     return switch (loc) {
         .arg32, .arg64, .scratch32, .scratch64 => |value_reg| value_reg == reg,
         .arg128, .scratch128 => |pair| pair.contains(reg),
-        .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => false,
+        .eax, .rax, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128, .spill_fp => false,
     };
 }
 
@@ -142,7 +144,7 @@ pub fn stack128FrameBytes() u32 {
 }
 
 pub fn isComposedReturnType(ty: ir.Type) bool {
-    if (ty == .void) return true;
+    if (ty == .void or ty == .half or ty == .float or ty == .double) return true;
     const bits = intBits(ty) orelse return false;
     return bits == 32 or bits == 64 or bits == 128;
 }

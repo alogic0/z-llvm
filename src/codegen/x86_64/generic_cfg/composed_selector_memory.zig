@@ -76,7 +76,7 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (selector_state.valueLoc(selector, result_name)) |loc| switch (loc) {
         .stack_scalar, .stack128, .stack_i32_array => return null,
-        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack128_value, .stack_i32_ptr, .spill64, .spill128 => {},
+        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack128_value, .stack_i32_ptr, .spill64, .spill128, .spill_fp => {},
     };
     if (alloca.allocated_ty_addrspace != null) return .{ .no_emitter = "composed-block-alloca-addrspace" };
     if (alloca.allocated_ty.eql(.{ .int = 64 })) {
@@ -156,7 +156,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
             try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_eax = .rcx });
             try selector_state.bindEax(selector, result_name);
         },
-        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .stack128_value, .spill128 => return .{ .no_emitter = "composed-block-load-ptr" },
+        .arg32, .arg128, .xmm, .eax, .rax, .scratch32, .scratch128, .stack128_value, .spill128, .spill_fp => return .{ .no_emitter = "composed-block-load-ptr" },
     }
     return null;
 }
@@ -174,7 +174,7 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
         .scratch32, .scratch64 => "composed-block-store-value-scratch",
         .eax, .rax => "composed-block-store-value-accumulator",
         .spill64 => "composed-block-store-value-spill",
-        .arg128, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => "composed-block-store-value-other",
+        .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128, .spill_fp => "composed-block-store-value-other",
     } else "composed-block-store-value-other";
     if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64(selector, ptr, store.value, value_detail);
     selector_state.emitValueIntoEax(selector, store.value) catch return .{ .unsupported_value = value_detail };
@@ -213,7 +213,7 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
             };
             try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = .rcx });
         },
-        .arg32, .scratch32, .arg128, .scratch128, .eax, .rax, .stack128, .stack128_value, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
+        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack128, .stack128_value, .spill128, .spill_fp => return .{ .no_emitter = "composed-block-store-ptr" },
     }
     return null;
 }
@@ -225,7 +225,7 @@ fn lowerStoreI64(selector: *ComposedBlockSelector, ptr: ValueLoc, value: ir.Valu
             error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-spill-ptr" },
             else => return err,
         },
-        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "composed-block-store-ptr" },
+        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128, .spill_fp => return .{ .no_emitter = "composed-block-store-ptr" },
     }
     selector_state.emitValueIntoRax(selector, value) catch return .{ .unsupported_value = value_detail };
     try selector.machine.instructions.append(selector.allocator, .store_rax_rcx_ptr);
@@ -240,7 +240,7 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
     const base = selector_state.resolveValue(selector, gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
     const stack_array = switch (base) {
         .stack_i32_array => |stack_array| stack_array,
-        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_ptr, .spill64, .spill128 => return .{ .no_emitter = "composed-block-gep-ptr" },
+        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_ptr, .spill64, .spill128, .spill_fp => return .{ .no_emitter = "composed-block-gep-ptr" },
     };
     if (stack_array.len != len) return .{ .no_emitter = "composed-block-gep-len" };
     if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };

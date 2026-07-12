@@ -1487,8 +1487,8 @@ test "generic cfg selector skeleton fails closed with first unsupported instruct
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| diagnostic,
     };
-    try std.testing.expectEqualStrings("unsupported_type", diagnostic.tagName());
-    try std.testing.expectEqualStrings("unsupported-return-type", diagnostic.detail());
+    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
+    try std.testing.expectEqualStrings("fadd", diagnostic.detail());
 }
 
 test "generic cfg selector planning accepts scalar phi and overflow extracts" {

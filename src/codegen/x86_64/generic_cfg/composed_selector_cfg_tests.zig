@@ -24,6 +24,33 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+test "generic cfg selector preserves scalar half ABI values exactly" {
+    const input =
+        \\define half @identity(half %value) {
+        \\entry:
+        \\  ret half %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("identity", .half);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const identity: *const fn (f16) callconv(.c) f16 = @ptrCast(mapping.ptr);
+
+    inline for (.{ @as(u16, 0x0000), @as(u16, 0x3e00), @as(u16, 0xc000), @as(u16, 0x7c00), @as(u16, 0x7e01) }) |bits| {
+        try std.testing.expectEqual(bits, @as(u16, @bitCast(identity(@as(f16, @bitCast(bits))))));
+    }
+}
+
 test "generic cfg selector returns spilled i128 pair" {
     var machine = MachineFunction.init("spill-pair-return", .{ .int = 128 });
     defer machine.deinit(std.testing.allocator);
