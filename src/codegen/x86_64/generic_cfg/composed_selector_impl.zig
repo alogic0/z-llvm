@@ -1249,6 +1249,7 @@ pub const ComposedBlockSelector = struct {
             .int => |int| try i64Value(int) == 0,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         }) {
+            if (try selector.preserveCurrentEaxIntoScratch()) |diagnostic| return diagnostic;
             try selector.emitValueIntoEax(icmp.lhs);
             try selector.machine.instructions.append(selector.allocator, .{ .shr_eax_imm5 = 31 });
         } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 })) {
@@ -1505,6 +1506,7 @@ pub const ComposedBlockSelector = struct {
         if (std.mem.eql(u8, call.callee, "llvm.assume")) return selector.lowerAssume(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.trap")) return try selector.lowerTrap(result, call);
         if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try selector.lowerIntByteSizeCall(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.abs.i32")) return try selector.lowerAbsI32(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try selector.lowerAbsI64(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try selector.lowerAbsI128(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try selector.lowerCtlzI32(result, call);
@@ -1790,6 +1792,28 @@ pub const ComposedBlockSelector = struct {
         if (try selector.spillLiveCallerClobbersForCall()) |diagnostic| return diagnostic;
         selector.emitValueIntoScratch(arg.value, .rdi, 16) catch return .{ .unsupported_value = "composed-block-intbytesize-arg-value" };
         try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+        try selector.bindEax(result_name);
+        return null;
+    }
+
+    fn lowerAbsI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-abs-call-form" };
+        }
+        if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-abs-signature" };
+        const value_arg = call.args.items[0];
+        const poison_arg = call.args.items[1];
+        if (!value_arg.ty.eql(.{ .int = 32 }) or !poison_arg.ty.eql(.{ .int = 1 })) return .{ .no_emitter = "composed-block-abs-args" };
+        const poison_ok = switch (poison_arg.value) {
+            .int => |int| int == 0,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        };
+        if (!poison_ok) return .{ .no_emitter = "composed-block-abs-poison-mode" };
+
+        try selector.emitValueIntoScratch(value_arg.value, .rdi, 32);
+        if (try selector.spillCurrentAccumulator()) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .abs_i32_edi_eax);
         try selector.bindEax(result_name);
         return null;
     }

@@ -105,6 +105,25 @@ test "x86_64 encoding sizes high-register binary rax operands" {
     }, bytes);
 }
 
+test "x86_64 encoding emits i32 absolute value" {
+    var machine = codegen.x86_64.MachineFunction.init("abs_i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .abs_i32_edi_eax);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 11), mc.encoding.instructionSize(.abs_i32_edi_eax));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x89, 0xf8,
+        0x89, 0xfa,
+        0xf7, 0xda,
+        0x85, 0xff,
+        0x0f, 0x48,
+        0xc2, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding emits variable eax shifts" {
     var machine = codegen.x86_64.MachineFunction.init("variable_eax_shifts", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

@@ -59,9 +59,12 @@ exact native and executable SIGILL evidence. Immediate-left i64 subtraction and
 live-RAX preservation then close `compiler_rt.negv.__negvdi2` and
 `compiler_rt.absvdi2.__absvdi2`; the exact native harness caught the stale
 absolute-value binding before acceptance. Continue in rank order at
-`compiler_rt.absvsi2.__absvsi2`. Current item-15 accounting is 28 composed
-rows, 17 terminal-template rows, zero stage-two boundary rows, and 16 open
-integer-helper fallback candidates.
+`compiler_rt.absvsi2.__absvsi2`. Width-correct i32 absolute value and live-EAX
+preservation now close that row through exact native execution and pressure
+acceptance. Excluding intervening tail-call ABI rows, continue at
+`compiler_rt.mulXi3.__muldi3` at `composed-block-binary-op`. Current item-15
+accounting is 29 composed rows, 17 terminal-template rows, zero stage-two
+boundary rows, and 15 open integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
 

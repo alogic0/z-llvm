@@ -80,6 +80,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),
             .and_eax_imm32 => |value| try writer.print("\tandl ${}, %eax\n", .{value}),
+            .abs_i32_edi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tmovl %edi, %edx\n\tnegl %edx\n\ttestl %edi, %edi\n\tcmovsl %edx, %eax\n"),
             .abs_i64_rdi_rax => try writer.writeAll("\tmovq %rdi, %rax\n\tmovq %rdi, %rdx\n\tnegq %rdx\n\ttestq %rdi, %rdi\n\tcmovsq %rdx, %rax\n"),
             .clz_i128_rdi_rsi_eax => try writer.writeAll(
                 "\ttestq %rsi, %rsi\n" ++

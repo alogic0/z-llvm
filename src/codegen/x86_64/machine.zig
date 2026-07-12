@@ -103,6 +103,7 @@ pub const Instruction = union(enum) {
     or_eax_imm32: i32,
     imul_eax_imm32: i32,
     and_eax_imm32: i32,
+    abs_i32_edi_eax,
     abs_i64_rdi_rax,
     clz_i128_rdi_rsi_eax,
     clz_i64_rdi_eax,

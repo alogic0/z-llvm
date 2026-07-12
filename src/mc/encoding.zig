@@ -225,6 +225,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{0x25});
                 try appendI32(&bytes, allocator, value);
             },
+            .abs_i32_edi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x89, 0xfa, 0xf7, 0xda, 0x85, 0xff, 0x0f, 0x48, 0xc2 }),
             .abs_i64_rdi_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0xf8, 0x48, 0x89, 0xfa, 0x48, 0xf7, 0xda, 0x48, 0x85, 0xff, 0x48, 0x0f, 0x48, 0xc2 }),
             .clz_i128_rdi_rsi_eax => try bytes.appendSlice(allocator, &.{
                 0x48, 0x85, 0xf6, 0x74, 0x09, 0x48, 0x0f, 0xbd, 0xc6, 0x83, 0xf0, 0x3f, 0xeb, 0x14,
@@ -1677,6 +1678,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .or_eax_imm32 => 5,
         .imul_eax_imm32 => 6,
         .and_eax_imm32 => 5,
+        .abs_i32_edi_eax => 11,
         .abs_i64_rdi_rax => 16,
         .clz_i128_rdi_rsi_eax => 34,
         .clz_i64_rdi_eax => 17,
