@@ -960,11 +960,16 @@ pub const ComposedBlockSelector = struct {
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
         };
         const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
-        if (binary.op == .sub and bits == 6) {
+        if (binary.op == .sub and bits <= 32) {
             try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
             try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(lhs) });
             try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } });
+            if (bits < 32) {
+                const shift: u5 = @intCast(bits);
+                const mask = (@as(i32, 1) << shift) - 1;
+                try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = mask });
+            }
             try selector.bindEax(result_name);
             return null;
         }

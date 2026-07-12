@@ -2816,6 +2816,33 @@ test "generic cfg selector lowers i32 minimum equality" {
     try expectInstruction(machine.instructions.items, .sete_eax);
 }
 
+test "generic cfg selector lowers i32 immediate lhs subtraction" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @neg_i32(i32 %value) {
+        \\entry:
+        \\  %negated = sub i32 0, %value
+        \\  ret i32 %negated
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("neg_i32", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_eax = 0 });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } });
+}
+
 test "generic cfg selector executes i128 signed multiply overflow semantics" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

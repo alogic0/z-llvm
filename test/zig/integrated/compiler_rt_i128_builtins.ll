@@ -93,6 +93,12 @@ Entry:
   ret i32 %wide
 }
 
+define dso_local i32 @zllvm_neg_i32(i32 %value) {
+Entry:
+  %negated = sub i32 0, %value
+  ret i32 %negated
+}
+
 define dso_local i32 @zllvm_negative_i128(i128 %value) {
 Entry:
   %negative = icmp slt i128 %value, 0
