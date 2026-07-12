@@ -2113,6 +2113,38 @@ test "generic cfg selector composes zero-defined ctlz i32 intrinsic" {
     try expectInstruction(machine.instructions.items, .clz_i32_edi_eax);
 }
 
+test "generic cfg selector composes i32 unsigned greater immediate" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @ugt_i32_imm(i32 %value) {
+        \\entry:
+        \\  %cmp = icmp ugt i32 %value, 31
+        \\  %wide = zext i1 %cmp to i32
+        \\  %result = add i32 %value, %wide
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("ugt_i32_imm", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .cmp_r8d_arg32 = .rcx });
+    try expectInstruction(machine.instructions.items, .setb_eax);
+}
+
 test "generic cfg selector composes wrapping i6 immediate lhs subtraction" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

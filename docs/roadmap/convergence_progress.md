@@ -3065,6 +3065,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmodsi4_ctlz_defined.summary` and
   `docs/evidence/selector_tier2_udivmodsi4_ctlz_defined.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: i32 unsigned-greater comparisons against immediates now use the
+  carry direction established by `immediate - lhs`. The executable canary
+  rejected the initially reversed predicate before acceptance and also checks
+  reuse of the compared value. The exact `compiler_rt.int.__udivmodsi4` row
+  advances from `composed-block-icmp-form` to `composed-block-icmp-rhs`;
+  report-all and item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmodsi4_ugt_i32.summary` and
+  `docs/evidence/selector_tier2_udivmodsi4_ugt_i32.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

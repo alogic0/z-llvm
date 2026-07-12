@@ -744,6 +744,14 @@ Entry:
   ret i32 %count
 }
 
+define dso_local i32 @zllvm_ugt_i32_imm(i32 %value) {
+Entry:
+  %cmp = icmp ugt i32 %value, 31
+  %wide = zext i1 %cmp to i32
+  %result = add i32 %value, %wide
+  ret i32 %result
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16

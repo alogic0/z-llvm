@@ -70,7 +70,9 @@ Frame-backed phi destinations now extend its three-register phi pool through
 the single spill authority, with executable four-phi loop coverage. The row
 then advances through narrow scalar select lowering, with executable true and
 false boolean outcomes. Zero-defined `llvm.ctlz.i32` lowering then advances
-the row to `composed-block-icmp-form`, with executable zero and nonzero checks.
+the row through i32 unsigned-greater immediate lowering to
+`composed-block-icmp-rhs`, with executable predicate-direction and live-value
+checks.
 Current item-15
 accounting is 30 composed rows, 17 terminal-template rows, zero stage-two
 boundary rows, and 14 open integer-helper fallback candidates.

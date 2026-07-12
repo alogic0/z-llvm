@@ -1231,6 +1231,13 @@ pub const ComposedBlockSelector = struct {
             try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .r8 });
             try selector.machine.instructions.append(selector.allocator, .setb_eax);
+        } else if (icmp.predicate == .ugt and icmp.operand_ty.eql(.{ .int = 32 }) and icmp.rhs == .int) {
+            selector.emitValueIntoScratch(icmp.lhs, .rcx, 32) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            try selector.clobberArgReg(.r8);
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_r8 = try i64Value(icmp.rhs.int) });
+            try selector.clobberAccumulator();
+            try selector.machine.instructions.append(selector.allocator, .{ .cmp_r8d_arg32 = .rcx });
+            try selector.machine.instructions.append(selector.allocator, .setb_eax);
         } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 6 }) and switch (icmp.rhs) {
             .int => |int| try i64Value(int) == -1,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
