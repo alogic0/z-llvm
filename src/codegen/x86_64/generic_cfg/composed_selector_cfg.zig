@@ -280,6 +280,7 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
     const previous_preserve_current = selector.preserve_current_position_values;
     selector.preserve_current_position_values = true;
     defer selector.preserve_current_position_values = previous_preserve_current;
+    if (try stabilizePhiEdgeSources(selector, target, predecessor)) |diagnostic| return diagnostic;
     for (target.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const phi = switch (instruction.kind) {
@@ -295,6 +296,29 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         switch (dst) {
             .scratch32, .scratch64, .spill64, .spill128 => {},
             .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
+        }
+    }
+    return null;
+}
+
+fn stabilizePhiEdgeSources(selector: *ComposedBlockSelector, target: ir.BasicBlock, predecessor: []const u8) !?Diagnostic {
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
+        const name = switch (incoming.value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => continue,
+        };
+        const loc = selector_state.valueLoc(selector, name) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) };
+        switch (loc) {
+            .arg32, .arg64, .scratch32, .scratch64, .eax, .rax => if (try selector_state.spillValue(selector, name)) |diagnostic| return diagnostic,
+            .arg128, .scratch128 => if (try selector_state.spillPairValue(selector, name)) |diagnostic| return diagnostic,
+            .spill64, .spill128 => {},
+            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) },
         }
     }
     return null;

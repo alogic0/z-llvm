@@ -93,11 +93,12 @@ drives CFG live-out intervals and stable frame-backed branch and phi state;
 `__ashlsi3`, `__lshrsi3`, `__lshrdi3`, and `__ashldi3` now close after
 current-position accumulator preservation repairs parallel phi-edge copies.
 `__ashrdi3` and `__ashrsi3` now close through immediate and variable i32 SAR
-forms plus exact native signed execution. Continue in rank order at
-`compiler_rt.shift.__lshrti3`.
+forms plus exact native signed execution. Frame-stabilized parallel phi sources
+then close `__lshrti3`, `__ashrti3`, and `__ashlti3` through 18 exact native
+boundary cases. Continue with the final ranked integer-helper candidate.
 Current item-15
-accounting is 40 composed rows, 17 terminal-template rows, zero stage-two
-boundary rows, and 4 open integer-helper fallback candidates.
+accounting is 43 composed rows, 17 terminal-template rows, zero stage-two
+boundary rows, and 1 open integer-helper fallback candidate.
 
 Current operating note recorded 2026-07-10:
 

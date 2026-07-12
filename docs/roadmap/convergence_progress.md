@@ -3318,6 +3318,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_ashrti3_variable_ashr_i64.summary` and
   `docs/evidence/selector_tier2_ashrti3_variable_ashr_i64.summary`.
 
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper acceptance:
+  parallel phi-edge moves now stabilize all named incoming sources before
+  copying destinations, fixing the native count-1 `__lshrti3` miscompile.
+  Exact native execution passes 18 logical-right, arithmetic-right, and left
+  shift cases at five, five, and six live values respectively, with no spill
+  demand. `__lshrti3`, `__ashrti3`, and `__ashlti3` close; report-all remains
+  163 emitted / 280 failed, while item-15 accounting advances to 43 composed
+  rows and one open integer-helper fallback candidate. Tier 3 is green across
+  17 subgates. Evidence
+  `docs/evidence/std_debug_hello_i128_shift_acceptance.summary` and
+  `docs/evidence/distribution_all_after_i128_shift_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
