@@ -20,14 +20,14 @@ const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
 test "generic cfg selector virtual register metadata follows assignment class" {
-    try std.testing.expectEqual(VirtualRegMetadata{ .class = .gpr32, .bits = 32 }, ComposedBlockSelector.virtualRegMetadata(.eax));
-    try std.testing.expectEqual(VirtualRegMetadata{ .class = .gpr64, .bits = 64 }, ComposedBlockSelector.virtualRegMetadata(.rax));
-    try std.testing.expectEqual(VirtualRegMetadata{ .class = .gpr128, .bits = 128 }, ComposedBlockSelector.virtualRegMetadata(.{ .scratch128 = pair_a }));
-    try std.testing.expectEqual(VirtualRegMetadata{ .class = .stack_object, .bits = 0 }, ComposedBlockSelector.virtualRegMetadata(.{ .stack_i32_array = .{
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .gpr32, .bits = 32 }, impl.virtualRegMetadata(.eax));
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .gpr64, .bits = 64 }, impl.virtualRegMetadata(.rax));
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .gpr128, .bits = 128 }, impl.virtualRegMetadata(.{ .scratch128 = pair_a }));
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .stack_object, .bits = 0 }, impl.virtualRegMetadata(.{ .stack_i32_array = .{
         .base_disp = 16,
         .len = 4,
     } }));
-    try std.testing.expectEqual(VirtualRegMetadata{ .class = .stack_pointer, .bits = 64 }, ComposedBlockSelector.virtualRegMetadata(.{ .stack_i32_ptr = .{ .disp = 16 } }));
+    try std.testing.expectEqual(VirtualRegMetadata{ .class = .stack_pointer, .bits = 64 }, impl.virtualRegMetadata(.{ .stack_i32_ptr = .{ .disp = 16 } }));
 }
 
 test "generic cfg selector consumes matching no-spill planned result locations" {
@@ -43,11 +43,11 @@ test "generic cfg selector consumes matching no-spill planned result locations" 
     defer selector.deinit();
     selector.allocation_plan = &plan;
 
-    try selector.bindResultLoc("kept", .{ .scratch64 = .rcx });
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("kept").?);
+    try impl.bindResultLoc(&selector, "kept", .{ .scratch64 = .rcx });
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, impl.valueLoc(&selector, "kept").?);
 
-    try selector.bindResultLoc("deferred", .{ .scratch64 = .r8 });
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("deferred").?);
+    try impl.bindResultLoc(&selector, "deferred", .{ .scratch64 = .r8 });
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, impl.valueLoc(&selector, "deferred").?);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
@@ -68,14 +68,14 @@ test "generic cfg selector expires planned intervals before register reuse" {
     selector.enable_expired_plan_register_reuse = true;
     selector.current_position = 2;
 
-    try selector.bindValueLoc("old", .{ .arg64 = .rdi });
-    try selector.bindValueLoc("source", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "old", .{ .arg64 = .rdi });
+    try impl.bindValueLoc(&selector, "source", .{ .scratch64 = .rcx });
 
-    try selector.expireExpiredBindings();
-    try std.testing.expectEqual(ValueLoc{ .arg64 = .rdi }, selector.valueLoc("old").?);
+    try impl.expireExpiredBindings(&selector);
+    try std.testing.expectEqual(ValueLoc{ .arg64 = .rdi }, impl.valueLoc(&selector, "old").?);
 
-    try selector.bindResultLoc("new", .{ .scratch64 = .rcx });
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.valueLoc("new").?);
+    try impl.bindResultLoc(&selector, "new", .{ .scratch64 = .rcx });
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, impl.valueLoc(&selector, "new").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rcx } }, machine.instructions.items[0]);
 }
@@ -97,18 +97,18 @@ test "generic cfg selector routes i128 trunc through planned expired register" {
     selector.enable_expired_plan_register_reuse = true;
     selector.current_position = 2;
 
-    try selector.bindValueLoc("old", .{ .scratch64 = .r8 });
-    try selector.bindValueLoc("wide", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
+    try impl.bindValueLoc(&selector, "old", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "wide", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
 
-    try selector.expireExpiredBindings();
-    const diagnostic = try selector.lowerCast("lo", .{
+    try impl.expireExpiredBindings(&selector);
+    const diagnostic = try impl.lowerCast(&selector, "lo", .{
         .op = .trunc,
         .from_ty = .{ .int = 128 },
         .value = .{ .named = "wide" },
         .to_ty = .{ .int = 64 },
     });
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("lo").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, impl.valueLoc(&selector, "lo").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
 }
@@ -130,19 +130,19 @@ test "generic cfg selector materializes mul64 lhs into planned register" {
     selector.enable_expired_plan_register_reuse = true;
     selector.current_position = 2;
 
-    try selector.bindValueLoc("old", .{ .scratch64 = .r8 });
-    try selector.bindValueLoc("lhs", .{ .arg64 = .rdi });
-    try selector.bindValueLoc("rhs", .{ .arg64 = .rsi });
+    try impl.bindValueLoc(&selector, "old", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+    try impl.bindValueLoc(&selector, "rhs", .{ .arg64 = .rsi });
 
-    try selector.expireExpiredBindings();
-    const diagnostic = try selector.lowerMul64("product", .{
+    try impl.expireExpiredBindings(&selector);
+    const diagnostic = try impl.lowerMul64(&selector, "product", .{
         .op = .mul,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
         .rhs = .{ .named = "rhs" },
     });
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector.valueLoc("product").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, impl.valueLoc(&selector, "product").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .imul_arg64_arg64 = .{ .dst = .r8, .src = .rsi } }, machine.instructions.items[1]);
@@ -168,15 +168,15 @@ test "generic cfg selector reloads spilled mul64 rhs through rax when scratch re
     selector.enable_expired_plan_register_reuse = true;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    try selector.bindValueLoc("lhs", .{ .scratch64 = .rdx });
-    try selector.bindValueLoc("live_rcx", .{ .scratch64 = .rcx });
-    try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    try selector.bindValueLoc("rhs", .{ .spill64 = .slot2 });
+    try impl.bindValueLoc(&selector, "live_rdi", .{ .scratch64 = .rdi });
+    try impl.bindValueLoc(&selector, "live_rsi", .{ .scratch64 = .rsi });
+    try impl.bindValueLoc(&selector, "lhs", .{ .scratch64 = .rdx });
+    try impl.bindValueLoc(&selector, "live_rcx", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
+    try impl.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot2 });
 
-    const diagnostic = try selector.lowerMul64("product", .{
+    const diagnostic = try impl.lowerMul64(&selector, "product", .{
         .op = .mul,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
@@ -184,7 +184,7 @@ test "generic cfg selector reloads spilled mul64 rhs through rax when scratch re
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdx }, selector.valueLoc("product").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdx }, impl.valueLoc(&selector, "product").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot2 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .imul_arg64_rax = .rdx }, machine.instructions.items[1]);
@@ -210,14 +210,14 @@ test "generic cfg selector spills live mul64 lhs before reusing its scratch regi
     selector.enable_expired_plan_register_reuse = true;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    try selector.bindValueLoc("rhs", .{ .scratch64 = .rsi });
-    try selector.bindValueLoc("lhs", .{ .scratch64 = .rdx });
-    try selector.bindValueLoc("live_rcx", .{ .scratch64 = .rcx });
-    try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
+    try impl.bindValueLoc(&selector, "live_rdi", .{ .scratch64 = .rdi });
+    try impl.bindValueLoc(&selector, "rhs", .{ .scratch64 = .rsi });
+    try impl.bindValueLoc(&selector, "lhs", .{ .scratch64 = .rdx });
+    try impl.bindValueLoc(&selector, "live_rcx", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
 
-    const diagnostic = try selector.lowerMul64("product", .{
+    const diagnostic = try impl.lowerMul64(&selector, "product", .{
         .op = .mul,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
@@ -225,8 +225,8 @@ test "generic cfg selector spills live mul64 lhs before reusing its scratch regi
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("lhs").?);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdx }, selector.valueLoc("product").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "lhs").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdx }, impl.valueLoc(&selector, "product").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rdx } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot0 } }, machine.instructions.items[1]);
@@ -254,17 +254,17 @@ test "generic cfg selector reloads spilled mul64 lhs through rax when scratch re
     selector.enable_expired_plan_register_reuse = true;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("live_rax", .rax);
-    try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    try selector.bindValueLoc("live_rdx", .{ .scratch64 = .rdx });
-    try selector.bindValueLoc("live_rcx", .{ .scratch64 = .rcx });
-    try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    try selector.bindValueLoc("lhs", .{ .spill64 = .slot10 });
-    try selector.bindValueLoc("rhs", .{ .spill64 = .slot12 });
+    try impl.bindValueLoc(&selector, "live_rax", .rax);
+    try impl.bindValueLoc(&selector, "live_rdi", .{ .scratch64 = .rdi });
+    try impl.bindValueLoc(&selector, "live_rsi", .{ .scratch64 = .rsi });
+    try impl.bindValueLoc(&selector, "live_rdx", .{ .scratch64 = .rdx });
+    try impl.bindValueLoc(&selector, "live_rcx", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
+    try impl.bindValueLoc(&selector, "lhs", .{ .spill64 = .slot10 });
+    try impl.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot12 });
 
-    const diagnostic = try selector.lowerMul64("product", .{
+    const diagnostic = try impl.lowerMul64(&selector, "product", .{
         .op = .mul,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
@@ -272,8 +272,8 @@ test "generic cfg selector reloads spilled mul64 lhs through rax when scratch re
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("live_rax").?);
-    try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("product").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "live_rax").?);
+    try std.testing.expectEqual(ValueLoc.rax, impl.valueLoc(&selector, "product").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot10 }, machine.instructions.items[1]);
@@ -294,12 +294,12 @@ test "generic cfg selector assigns deterministic spill slot per scalar value" {
     selector.current_position = 4;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("value", .rax);
+    try impl.bindValueLoc(&selector, "value", .rax);
 
-    const diagnostic = try selector.spillValue("value");
+    const diagnostic = try impl.spillValue(&selector, "value");
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("value").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "value").?);
     try std.testing.expectEqual(SpillSlotAssignment{ .base = 0, .slots = 1 }, selector.spill_slots.get("value").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
@@ -319,14 +319,14 @@ test "generic cfg selector spills and reloads 32-bit accumulator scalar values" 
     selector.current_position = 4;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("value", .eax);
+    try impl.bindValueLoc(&selector, "value", .eax);
 
-    const diagnostic = try selector.spillValue("value");
+    const diagnostic = try impl.spillValue(&selector, "value");
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("value").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "value").?);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_eax_rsp = .slot0 }, machine.instructions.items[0]);
 
-    try selector.emitValueIntoEax(.{ .named = "value" });
+    try impl.emitValueIntoEax(&selector, .{ .named = "value" });
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_eax = .slot0 }, machine.instructions.items[1]);
 }
@@ -345,11 +345,11 @@ test "generic cfg selector spills 32-bit scratch values into scalar spill slots"
     selector.current_position = 4;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("value", .{ .scratch32 = .rcx });
+    try impl.bindValueLoc(&selector, "value", .{ .scratch32 = .rcx });
 
-    const diagnostic = try selector.spillValue("value");
+    const diagnostic = try impl.spillValue(&selector, "value");
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("value").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "value").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rcx } }, machine.instructions.items[0]);
 }
@@ -361,7 +361,7 @@ test "generic cfg selector materializes 32-bit spill slot into scratch register"
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try selector.materializeLocIntoLoc(.{ .spill64 = .slot2 }, .{ .scratch32 = .rcx });
+    try impl.materializeLocIntoLoc(&selector, .{ .spill64 = .slot2 }, .{ .scratch32 = .rcx });
 
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot2 } }, machine.instructions.items[0]);
@@ -374,10 +374,10 @@ test "generic cfg selector reloads 32-bit spill rhs for binary accumulator op" {
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try selector.bindValueLoc("lhs", .{ .scratch32 = .rdi });
-    try selector.bindValueLoc("rhs", .{ .spill64 = .slot4 });
+    try impl.bindValueLoc(&selector, "lhs", .{ .scratch32 = .rdi });
+    try impl.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot4 });
 
-    const diagnostic = try selector.lowerBinary("sum", .{
+    const diagnostic = try impl.lowerBinary(&selector, "sum", .{
         .op = .add,
         .ty = .{ .int = 32 },
         .lhs = .{ .named = "lhs" },
@@ -385,7 +385,7 @@ test "generic cfg selector reloads 32-bit spill rhs for binary accumulator op" {
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc.eax, selector.valueLoc("sum").?);
+    try std.testing.expectEqual(ValueLoc.eax, impl.valueLoc(&selector, "sum").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot4 } }, machine.instructions.items[1]);
@@ -399,11 +399,11 @@ test "generic cfg selector reloads spilled pair for i128 lshr immediate" {
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try selector.bindValueLoc("wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
-    try selector.emitPairLshrImmediate("shifted", .{ .named = "wide" }, 64);
+    try impl.bindValueLoc(&selector, "wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
+    try impl.emitPairLshrImmediate(&selector, "shifted", .{ .named = "wide" }, 64);
 
     const dst = pair_a;
-    try std.testing.expectEqual(ValueLoc{ .scratch128 = dst }, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch128 = dst }, impl.valueLoc(&selector, "shifted").?);
     try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = dst.lo, .frame_index = .slot6 } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = dst.hi, .frame_index = .slot8 } }, machine.instructions.items[1]);
@@ -425,14 +425,14 @@ test "generic cfg selector pair lshr avoids live scalar scratch values" {
     selector.current_position = 2;
     selector.enable_expired_plan_register_reuse = true;
 
-    try selector.bindValueLoc("wide", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
-    try selector.bindValueLoc("other_wide", .{ .arg128 = .{ .lo = .rdx, .hi = .rcx } });
-    try selector.bindValueLoc("lo", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "wide", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
+    try impl.bindValueLoc(&selector, "other_wide", .{ .arg128 = .{ .lo = .rdx, .hi = .rcx } });
+    try impl.bindValueLoc(&selector, "lo", .{ .scratch64 = .rcx });
 
-    try selector.emitPairLshrImmediate("hi", .{ .named = "wide" }, 64);
+    try impl.emitPairLshrImmediate(&selector, "hi", .{ .named = "wide" }, 64);
 
-    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_b }, selector.valueLoc("hi").?);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("lo").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_b }, impl.valueLoc(&selector, "hi").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, impl.valueLoc(&selector, "lo").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = pair_b.lo, .src = .rsi } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_imm_r9 = 0 }, machine.instructions.items[1]);
@@ -445,10 +445,10 @@ test "generic cfg selector reloads spilled pair for i128 shl immediate" {
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try selector.bindValueLoc("wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
-    try selector.emitPairShlImmediate("shifted", .{ .named = "wide" }, 64);
+    try impl.bindValueLoc(&selector, "wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
+    try impl.emitPairShlImmediate(&selector, "shifted", .{ .named = "wide" }, 64);
 
-    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_a }, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_a }, impl.valueLoc(&selector, "shifted").?);
     try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = pair_a.lo, .frame_index = .slot6 } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = pair_a.hi, .frame_index = .slot8 } }, machine.instructions.items[1]);
@@ -463,8 +463,8 @@ test "generic cfg selector reloads spilled pair for i128 trunc" {
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try selector.bindValueLoc("wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
-    const diagnostic = try selector.lowerCast("lo", .{
+    try impl.bindValueLoc(&selector, "wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
+    const diagnostic = try impl.lowerCast(&selector, "lo", .{
         .op = .trunc,
         .value = .{ .named = "wide" },
         .from_ty = .{ .int = 128 },
@@ -472,7 +472,7 @@ test "generic cfg selector reloads spilled pair for i128 trunc" {
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.valueLoc("lo").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, impl.valueLoc(&selector, "lo").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot6 } }, machine.instructions.items[0]);
 }
@@ -491,10 +491,10 @@ test "generic cfg selector i128 trunc reuses source low lane without clobbering 
     selector.current_position = 3;
     selector.enable_expired_plan_register_reuse = true;
 
-    try selector.bindValueLoc("lo", .{ .scratch64 = .rcx });
-    try selector.bindValueLoc("shifted", .{ .scratch128 = .{ .lo = .rdi, .hi = .rsi } });
+    try impl.bindValueLoc(&selector, "lo", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "shifted", .{ .scratch128 = .{ .lo = .rdi, .hi = .rsi } });
 
-    const diagnostic = try selector.lowerCast("hi", .{
+    const diagnostic = try impl.lowerCast(&selector, "hi", .{
         .op = .trunc,
         .value = .{ .named = "shifted" },
         .from_ty = .{ .int = 128 },
@@ -502,8 +502,8 @@ test "generic cfg selector i128 trunc reuses source low lane without clobbering 
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.valueLoc("hi").?);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("lo").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, impl.valueLoc(&selector, "hi").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, impl.valueLoc(&selector, "lo").?);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
@@ -514,8 +514,8 @@ test "generic cfg selector masks reloaded i64 spill low half" {
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try selector.bindValueLoc("wide_lo", .{ .spill64 = .slot6 });
-    const diagnostic = try selector.lowerBinaryImmediateRhs("masked", .{
+    try impl.bindValueLoc(&selector, "wide_lo", .{ .spill64 = .slot6 });
+    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "masked", .{
         .op = .@"and",
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "wide_lo" },
@@ -523,7 +523,7 @@ test "generic cfg selector masks reloaded i64 spill low half" {
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("masked").?);
+    try std.testing.expectEqual(ValueLoc.rax, impl.valueLoc(&selector, "masked").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot6 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .and_eax_imm32 = -1 }, machine.instructions.items[1]);
@@ -543,10 +543,10 @@ test "generic cfg selector preserves live rax before another i64 low-half mask" 
     selector.current_position = 4;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("left_masked", .rax);
-    try selector.bindValueLoc("right", .{ .scratch64 = .rsi });
+    try impl.bindValueLoc(&selector, "left_masked", .rax);
+    try impl.bindValueLoc(&selector, "right", .{ .scratch64 = .rsi });
 
-    const diagnostic = try selector.lowerBinaryImmediateRhs("right_masked", .{
+    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "right_masked", .{
         .op = .@"and",
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "right" },
@@ -554,8 +554,8 @@ test "generic cfg selector preserves live rax before another i64 low-half mask" 
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("left_masked").?);
-    try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("right_masked").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "left_masked").?);
+    try std.testing.expectEqual(ValueLoc.rax, impl.valueLoc(&selector, "right_masked").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[1]);
@@ -576,10 +576,10 @@ test "generic cfg selector lshr64 avoids live scalar scratch values" {
     selector.current_position = 4;
     selector.enable_expired_plan_register_reuse = true;
 
-    try selector.bindValueLoc("live", .{ .scratch64 = .rcx });
-    try selector.bindValueLoc("source", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "live", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "source", .{ .scratch64 = .r8 });
 
-    const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
+    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .lshr,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -587,8 +587,8 @@ test "generic cfg selector lshr64 avoids live scalar scratch values" {
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("live").?);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, impl.valueLoc(&selector, "live").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, impl.valueLoc(&selector, "shifted").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .r8 } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .shr_arg64_imm6 = .{ .reg = .rdi, .amount = 32 } }, machine.instructions.items[1]);
@@ -613,14 +613,14 @@ test "generic cfg selector lshr64 reuses dead source scratch register" {
     selector.current_position = 4;
     selector.enable_expired_plan_register_reuse = true;
 
-    try selector.bindValueLoc("source", .{ .scratch64 = .rcx });
-    try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    try selector.bindValueLoc("live_rdx", .{ .scratch64 = .rdx });
-    try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
+    try impl.bindValueLoc(&selector, "source", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "live_rdi", .{ .scratch64 = .rdi });
+    try impl.bindValueLoc(&selector, "live_rsi", .{ .scratch64 = .rsi });
+    try impl.bindValueLoc(&selector, "live_rdx", .{ .scratch64 = .rdx });
+    try impl.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
 
-    const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
+    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .lshr,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -628,7 +628,7 @@ test "generic cfg selector lshr64 reuses dead source scratch register" {
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, impl.valueLoc(&selector, "shifted").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .shr_arg64_imm6 = .{ .reg = .rcx, .amount = 32 } }, machine.instructions.items[0]);
 }
@@ -648,9 +648,9 @@ test "generic cfg selector shl64 spills live rax source before destructive shift
     selector.enable_expired_plan_register_reuse = true;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("source", .rax);
+    try impl.bindValueLoc(&selector, "source", .rax);
 
-    const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
+    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .shl,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -658,8 +658,8 @@ test "generic cfg selector shl64 spills live rax source before destructive shift
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("source").?);
-    try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "source").?);
+    try std.testing.expectEqual(ValueLoc.rax, impl.valueLoc(&selector, "shifted").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot0 }, machine.instructions.items[1]);
@@ -686,14 +686,14 @@ test "generic cfg selector lshr64 spills live source before reusing its scratch 
     selector.enable_expired_plan_register_reuse = true;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("source", .{ .scratch64 = .rcx });
-    try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    try selector.bindValueLoc("live_rdx", .{ .scratch64 = .rdx });
-    try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
+    try impl.bindValueLoc(&selector, "source", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "live_rdi", .{ .scratch64 = .rdi });
+    try impl.bindValueLoc(&selector, "live_rsi", .{ .scratch64 = .rsi });
+    try impl.bindValueLoc(&selector, "live_rdx", .{ .scratch64 = .rdx });
+    try impl.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
 
-    const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
+    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .lshr,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -701,8 +701,8 @@ test "generic cfg selector lshr64 spills live source before reusing its scratch 
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("source").?);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "source").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, impl.valueLoc(&selector, "shifted").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rcx } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } }, machine.instructions.items[1]);
@@ -730,16 +730,16 @@ test "generic cfg selector lshr64 reloads spilled source through rax when scratc
     selector.enable_expired_plan_register_reuse = true;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindValueLoc("live_rax", .rax);
-    try selector.bindValueLoc("live_rdi", .{ .scratch64 = .rdi });
-    try selector.bindValueLoc("live_rsi", .{ .scratch64 = .rsi });
-    try selector.bindValueLoc("live_rdx", .{ .scratch64 = .rdx });
-    try selector.bindValueLoc("live_rcx", .{ .scratch64 = .rcx });
-    try selector.bindValueLoc("live_r8", .{ .scratch64 = .r8 });
-    try selector.bindValueLoc("live_r9", .{ .scratch64 = .r9 });
-    try selector.bindValueLoc("source", .{ .spill64 = .slot10 });
+    try impl.bindValueLoc(&selector, "live_rax", .rax);
+    try impl.bindValueLoc(&selector, "live_rdi", .{ .scratch64 = .rdi });
+    try impl.bindValueLoc(&selector, "live_rsi", .{ .scratch64 = .rsi });
+    try impl.bindValueLoc(&selector, "live_rdx", .{ .scratch64 = .rdx });
+    try impl.bindValueLoc(&selector, "live_rcx", .{ .scratch64 = .rcx });
+    try impl.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
+    try impl.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
+    try impl.bindValueLoc(&selector, "source", .{ .spill64 = .slot10 });
 
-    const diagnostic = try selector.lowerBinaryImmediateRhs("shifted", .{
+    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .lshr,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -747,8 +747,8 @@ test "generic cfg selector lshr64 reloads spilled source through rax when scratc
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("live_rax").?);
-    try std.testing.expectEqual(ValueLoc.rax, selector.valueLoc("shifted").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "live_rax").?);
+    try std.testing.expectEqual(ValueLoc.rax, impl.valueLoc(&selector, "shifted").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_rax = .slot10 }, machine.instructions.items[1]);
@@ -762,8 +762,8 @@ test "generic cfg selector returns spilled i128 pair" {
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try selector.bindValueLoc("wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
-    try selector.emitValueIntoI128Return(.{ .named = "wide" });
+    try impl.bindValueLoc(&selector, "wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
+    try impl.emitValueIntoI128Return(&selector, .{ .named = "wide" });
 
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot8 } }, machine.instructions.items[0]);
@@ -777,8 +777,8 @@ test "generic cfg selector returns overlapping i128 pair without scratch envelop
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try selector.bindValueLoc("wide", .{ .scratch128 = pair_a });
-    try selector.emitValueIntoI128Return(.{ .named = "wide" });
+    try impl.bindValueLoc(&selector, "wide", .{ .scratch128 = pair_a });
+    try impl.emitValueIntoI128Return(&selector, .{ .named = "wide" });
 
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rcx } }, machine.instructions.items[0]);
@@ -798,8 +798,8 @@ test "generic cfg selector stores scalar planned spills in deterministic frame s
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindResultLoc("spilled", .{ .scratch64 = .rcx });
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot4 }, selector.valueLoc("spilled").?);
+    try impl.bindResultLoc(&selector, "spilled", .{ .scratch64 = .rcx });
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot4 }, impl.valueLoc(&selector, "spilled").?);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot4, .reg = .rcx } }, machine.instructions.items[0]);
 }
@@ -817,8 +817,8 @@ test "generic cfg selector stores i32 planned spills in deterministic frame slot
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindResultLoc("spilled", .{ .scratch32 = .rcx });
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot4 }, selector.valueLoc("spilled").?);
+    try impl.bindResultLoc(&selector, "spilled", .{ .scratch32 = .rcx });
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot4 }, impl.valueLoc(&selector, "spilled").?);
     try std.testing.expectEqual(@as(u16, 32), selector.values.get("spilled").?.vreg.bits);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg_rsp = .{ .frame_index = .slot4, .reg = .rcx } }, machine.instructions.items[0]);
@@ -837,8 +837,8 @@ test "generic cfg selector stores planned pair spills in deterministic frame slo
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.bindResultLoc("pair", .{ .scratch128 = pair_a });
-    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } }, selector.valueLoc("pair").?);
+    try impl.bindResultLoc(&selector, "pair", .{ .scratch128 = pair_a });
+    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } }, impl.valueLoc(&selector, "pair").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot6, .reg = pair_a.lo } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = pair_a.hi } }, machine.instructions.items[1]);
@@ -857,13 +857,13 @@ test "generic cfg selector relocates fixed full-product definitions" {
     selector.allocation_plan = &plan;
 
     try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
-    try selector.prepareFixedProductDefs();
+    try impl.prepareFixedProductDefs(&selector);
     try machine.instructions.append(std.testing.allocator, .{ .mul_rax_arg64_full = .rsi });
-    try selector.bindFixedProductResult("product");
-    try selector.emitValueIntoI128Return(.{ .named = "product" });
+    try impl.bindFixedProductResult(&selector, "product");
+    try impl.emitValueIntoI128Return(&selector, .{ .named = "product" });
     try machine.instructions.append(std.testing.allocator, .ret);
 
-    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_b }, selector.valueLoc("product").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_b }, impl.valueLoc(&selector, "product").?);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_rax_to_arg = pair_b.lo }, machine.instructions.items[2]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = pair_b.hi, .src = .rdx } }, machine.instructions.items[3]);
 
@@ -898,13 +898,13 @@ test "generic cfg selector displaces live fixed full-product register owners" {
     defer selector.deinit();
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
-    try selector.bindValueLoc("accumulator", .rax);
-    try selector.bindValueLoc("rdx_pair", .{ .scratch128 = pair_a });
+    try impl.bindValueLoc(&selector, "accumulator", .rax);
+    try impl.bindValueLoc(&selector, "rdx_pair", .{ .scratch128 = pair_a });
 
-    try selector.prepareFixedProductDefs();
+    try impl.prepareFixedProductDefs(&selector);
 
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.valueLoc("accumulator").?);
-    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot2, .hi = .slot4 } }, selector.valueLoc("rdx_pair").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, impl.valueLoc(&selector, "accumulator").?);
+    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot2, .hi = .slot4 } }, impl.valueLoc(&selector, "rdx_pair").?);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = pair_a.lo } }, machine.instructions.items[1]);
@@ -924,10 +924,10 @@ test "generic cfg selector spills fixed full-product definitions" {
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
 
-    try selector.prepareFixedProductDefs();
-    try selector.bindFixedProductResult("product");
+    try impl.prepareFixedProductDefs(&selector);
+    try impl.bindFixedProductResult(&selector, "product");
 
-    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } }, selector.valueLoc("product").?);
+    try std.testing.expectEqual(ValueLoc{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } }, impl.valueLoc(&selector, "product").?);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_rax_rsp = .slot6 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot8, .reg = .rdx } }, machine.instructions.items[1]);
@@ -995,7 +995,7 @@ test "spill materialization validates the concrete frame index" {
     selector.stack_frame_bytes = 16;
     selector.next_spill_slot = 64;
 
-    try selector.materializeLocIntoLoc(.{ .scratch64 = .rdi }, .{ .spill64 = .slot0 });
+    try impl.materializeLocIntoLoc(&selector, .{ .scratch64 = .rdi }, .{ .spill64 = .slot0 });
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rdi } }, machine.instructions.items[0]);
 }
 
@@ -1007,9 +1007,9 @@ test "dynamic spill allocation rejects a frame index beyond the frame" {
     defer selector.deinit();
     selector.stack_frame_bytes = 16;
     selector.next_spill_slot = 2;
-    try selector.bindValueLoc("live", .{ .scratch64 = .rdi });
+    try impl.bindValueLoc(&selector, "live", .{ .scratch64 = .rdi });
 
-    try std.testing.expect((try selector.spillValue("live")) != null);
+    try std.testing.expect((try impl.spillValue(&selector, "live")) != null);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
@@ -1033,7 +1033,7 @@ test "spill reservation covers secondary homes for planned values" {
     defer selector.deinit();
     selector.allocation_plan = &plan;
 
-    try std.testing.expectEqual(@as(u32, 320), selector.spillReservedBytes(true).?);
+    try std.testing.expectEqual(@as(u32, 320), impl.spillReservedBytes(&selector, true).?);
 }
 
 test "i32 spill relocation preserves its width" {
@@ -1044,7 +1044,7 @@ test "i32 spill relocation preserves its width" {
     defer selector.deinit();
     selector.stack_frame_bytes = 16;
 
-    try selector.materializeLocIntoLocWithBits(.{ .spill64 = .slot0 }, .{ .spill64 = .slot2 }, 32);
+    try impl.materializeLocIntoLocWithBits(&selector, .{ .spill64 = .slot0 }, .{ .spill64 = .slot2 }, 32);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_eax = .slot0 }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_eax_rsp = .slot2 }, machine.instructions.items[1]);
@@ -1056,8 +1056,8 @@ test "generic cfg selector lowers i32 unsigned-add overflow components" {
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
-    try selector.bindValueLoc("lhs", .{ .arg32 = .rdi });
-    try selector.bindValueLoc("rhs", .{ .arg32 = .rsi });
+    try impl.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+    try impl.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
 
     var call = ir.CallInst{
         .ret_ty = .{ .aggregate = "{ i32, i1 }" },
@@ -1069,8 +1069,8 @@ test "generic cfg selector lowers i32 unsigned-add overflow components" {
     try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "lhs" } });
     try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "rhs" } });
 
-    try std.testing.expect((try selector.lowerInstruction(.{ .result = "pair", .kind = .{ .call = call } })) == null);
-    try std.testing.expect((try selector.lowerInstruction(.{
+    try std.testing.expect((try impl.lowerInstruction(&selector, .{ .result = "pair", .kind = .{ .call = call } })) == null);
+    try std.testing.expect((try impl.lowerInstruction(&selector, .{
         .result = "sum",
         .kind = .{ .extractvalue = .{
             .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
@@ -1079,7 +1079,7 @@ test "generic cfg selector lowers i32 unsigned-add overflow components" {
             .result_ty = .{ .int = 32 },
         } },
     })) == null);
-    try std.testing.expect((try selector.lowerInstruction(.{
+    try std.testing.expect((try impl.lowerInstruction(&selector, .{
         .result = "carry",
         .kind = .{ .extractvalue = .{
             .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
@@ -1089,8 +1089,8 @@ test "generic cfg selector lowers i32 unsigned-add overflow components" {
         } },
     })) == null);
 
-    try std.testing.expectEqual(ValueLoc{ .scratch32 = .rdx }, selector.valueLoc("sum").?);
-    try std.testing.expectEqual(ValueLoc.eax, selector.valueLoc("carry").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch32 = .rdx }, impl.valueLoc(&selector, "sum").?);
+    try std.testing.expectEqual(ValueLoc.eax, impl.valueLoc(&selector, "carry").?);
     try std.testing.expectEqual(@as(usize, 5), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[1]);
@@ -1127,11 +1127,11 @@ test "generic cfg selector lays out mixed scalar and array frame objects" {
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
 
-    try std.testing.expect((try selector.prepareStackFrame(function)) == null);
-    try std.testing.expectEqual(ValueLoc{ .stack_scalar = .{ .base_disp = 256, .bits = 8 } }, selector.valueLoc("flag4").?);
-    try std.testing.expectEqual(ValueLoc{ .stack_i32_array = .{ .base_disp = 260, .len = 3 } }, selector.valueLoc("words3").?);
-    try std.testing.expectEqual(ValueLoc{ .stack_scalar = .{ .base_disp = 272, .bits = 8 } }, selector.valueLoc("flag1").?);
-    try std.testing.expectEqual(ValueLoc{ .stack_i32_array = .{ .base_disp = 276, .len = 2 } }, selector.valueLoc("words2").?);
+    try std.testing.expect((try impl.prepareStackFrame(&selector, function)) == null);
+    try std.testing.expectEqual(ValueLoc{ .stack_scalar = .{ .base_disp = 256, .bits = 8 } }, impl.valueLoc(&selector, "flag4").?);
+    try std.testing.expectEqual(ValueLoc{ .stack_i32_array = .{ .base_disp = 260, .len = 3 } }, impl.valueLoc(&selector, "words3").?);
+    try std.testing.expectEqual(ValueLoc{ .stack_scalar = .{ .base_disp = 272, .bits = 8 } }, impl.valueLoc(&selector, "flag1").?);
+    try std.testing.expectEqual(ValueLoc{ .stack_i32_array = .{ .base_disp = 276, .len = 2 } }, impl.valueLoc(&selector, "words2").?);
     try std.testing.expectEqual(@as(u32, 296), selector.stack_frame_bytes);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .sub_rsp_imm32 = 296 }, machine.instructions.items[0]);
