@@ -47,10 +47,10 @@ implementation work. `compiler_rt.mulo.__mulodi4` is now closed through exact
 object emission, native link, executable signed-overflow checks, and pressure
 acceptance. Continue in rank order at `compiler_rt.mulvsi3.__mulvsi3`; its
 exact empty cold bundle on `llvm.assume` is admitted and the row now fails
-closed at `no_emitter/composed-block-call-form` after adding the generic large
-i64 immediate-add fallback. Handle the exact `llvm.trap` call next without
-weakening ordinary call admission. Current item-15 accounting is 18 composed
-rows, 17 terminal-template rows, zero stage-two boundary rows, and 26 open
+closed through exact trap-block ownership, native link, executable SIGILL, and
+pressure acceptance. Continue in rank order at
+`compiler_rt.subvdi3.__subvdi3`. Current item-15 accounting is 19 composed
+rows, 17 terminal-template rows, zero stage-two boundary rows, and 25 open
 integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:

@@ -79,6 +79,22 @@ fn isColdAssumeBundle(bundle: []const u8) bool {
     return std.mem.eql(u8, std.mem.trim(u8, bundle, " \t"), "[ \"cold\"() ]");
 }
 
+fn blockEndsInTrap(block: ir.BasicBlock) bool {
+    var index = block.instructions.items.len;
+    while (index > 0) {
+        index -= 1;
+        const instruction = block.instructions.items[index];
+        if (instruction.removed) continue;
+        const call = switch (instruction.kind) {
+            .call => |call| call,
+            else => return false,
+        };
+        if (call.isDebugVariableLocation()) continue;
+        return std.mem.eql(u8, call.callee, "llvm.trap") and call.ret_ty == .void and call.args.items.len == 0;
+    }
+    return false;
+}
+
 pub fn tryLowerComposedCfg(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -1452,6 +1468,7 @@ pub const ComposedBlockSelector = struct {
     fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
         if (call.isDebugVariableLocation()) return null;
         if (std.mem.eql(u8, call.callee, "llvm.assume")) return selector.lowerAssume(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.trap")) return try selector.lowerTrap(result, call);
         if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try selector.lowerIntByteSizeCall(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try selector.lowerAbsI64(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try selector.lowerAbsI128(result, call);
@@ -1711,6 +1728,18 @@ pub const ComposedBlockSelector = struct {
         return if (call.args.items[0].ty.eql(.{ .int = 1 })) null else .{ .no_emitter = "composed-block-assume-arg" };
     }
 
+    fn lowerTrap(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        if (result != null) return .{ .unsupported_value = "composed-block-trap-result" };
+        if (call.inline_asm != null or call.callee_value != null or call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null or call.ret_ty != .void or call.args.items.len != 0) {
+            return .{ .no_emitter = "composed-block-trap-form" };
+        }
+        if (call.tail_kind) |tail_kind| {
+            if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-trap-tail-kind" };
+        }
+        try selector.machine.instructions.append(selector.allocator, .ud2);
+        return null;
+    }
+
     fn lowerIntByteSizeCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
         const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
         if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
@@ -1939,7 +1968,8 @@ pub const ComposedBlockSelector = struct {
                 }
                 return null;
             },
-            .@"switch", .indirectbr, .@"unreachable" => .{ .no_emitter = "stage2-terminator-not-owned" },
+            .@"unreachable" => if (blockEndsInTrap(function.blocks.items[block_index])) null else .{ .no_emitter = "stage2-terminator-not-owned" },
+            .@"switch", .indirectbr => .{ .no_emitter = "stage2-terminator-not-owned" },
         };
     }
 

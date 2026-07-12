@@ -48,7 +48,7 @@ pub fn inspectFunction(function: ir.Function) SelectionResult {
         const terminator = block.terminator orelse {
             return unsupported(.{ .unsupported_control_flow = "missing-terminator" });
         };
-        if (inspectTerminator(terminator)) |diagnostic| {
+        if (inspectTerminator(block, terminator)) |diagnostic| {
             return unsupported(diagnostic);
         }
     }
@@ -125,6 +125,12 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
         }
         return if (call.args.items[0].ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "llvm.assume" };
     }
+    if (std.mem.eql(u8, call.callee, "llvm.trap")) {
+        if (call.ret_ty != .void or call.args.items.len != 0 or call.calling_conv != null or call.ret_attrs != null or call.operand_bundle != null) {
+            return .{ .unsupported_instruction = "llvm.trap" };
+        }
+        return null;
+    }
     if (call.operand_bundle != null) return .{ .unsupported_instruction = "operand-bundle-call" };
     if (isOverflowIntrinsic(call.callee)) {
         const bits: u16 = if (std.mem.endsWith(u8, call.callee, ".i32"))
@@ -172,7 +178,7 @@ fn inspectExtractValue(extract: ir.ExtractValueInst) ?Diagnostic {
     return .{ .unsupported_value = "extractvalue-index" };
 }
 
-fn inspectTerminator(terminator: ir.Terminator) ?Diagnostic {
+fn inspectTerminator(block: ir.BasicBlock, terminator: ir.Terminator) ?Diagnostic {
     return switch (terminator) {
         .ret => |ret| if (isScalarReturnType(ret.ty)) null else .{ .unsupported_type = "ret" },
         .br => null,
@@ -182,8 +188,24 @@ fn inspectTerminator(terminator: ir.Terminator) ?Diagnostic {
         },
         .@"switch" => .{ .unsupported_control_flow = "switch" },
         .indirectbr => .{ .unsupported_control_flow = "indirectbr" },
-        .@"unreachable" => .{ .unsupported_control_flow = "unreachable" },
+        .@"unreachable" => if (blockEndsInTrap(block)) null else .{ .unsupported_control_flow = "unreachable" },
     };
+}
+
+fn blockEndsInTrap(block: ir.BasicBlock) bool {
+    var index = block.instructions.items.len;
+    while (index > 0) {
+        index -= 1;
+        const instruction = block.instructions.items[index];
+        if (instruction.removed) continue;
+        const call = switch (instruction.kind) {
+            .call => |call| call,
+            else => return false,
+        };
+        if (call.isDebugVariableLocation()) continue;
+        return std.mem.eql(u8, call.callee, "llvm.trap") and call.ret_ty == .void and call.args.items.len == 0;
+    }
+    return false;
 }
 
 fn isScalarReturnType(ty: ir.Type) bool {

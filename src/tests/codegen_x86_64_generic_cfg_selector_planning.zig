@@ -2702,6 +2702,63 @@ test "generic cfg selector lowers large i64 immediate add through scratch" {
     try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .add, .reg = .rcx } });
 }
 
+test "generic cfg selector executes owned llvm trap block" {
+    if (@import("builtin").os.tag != .linux) return error.SkipZigTest;
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.trap()
+        \\
+        \\define i32 @trap_if_negative(i32 %value) {
+        \\entry:
+        \\  %bad = icmp slt i32 %value, 0
+        \\  br i1 %bad, label %trap, label %done
+        \\trap:
+        \\  tail call void @llvm.trap()
+        \\  unreachable
+        \\done:
+        \\  ret i32 7
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("trap_if_negative", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .ud2);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const trapIfNegative: *const fn (i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(i32, 7), trapIfNegative(0));
+
+    const pid = std.os.linux.fork();
+    if (pid == 0) {
+        const sigact: std.posix.Sigaction = .{
+            .handler = .{ .handler = std.posix.SIG.DFL },
+            .mask = std.posix.sigemptyset(),
+            .flags = 0,
+        };
+        std.posix.sigaction(.ILL, &sigact, null);
+        _ = trapIfNegative(-1);
+        std.os.linux.exit_group(127);
+    }
+    var status: u32 = 0;
+    _ = std.os.linux.waitpid(@intCast(pid), &status, 0);
+    try std.testing.expectEqual(@as(u32, 4), status & 0x7f);
+}
+
 test "generic cfg selector executes i128 signed multiply overflow semantics" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
