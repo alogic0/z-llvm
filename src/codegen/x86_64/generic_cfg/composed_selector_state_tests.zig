@@ -170,3 +170,27 @@ test "generic cfg selector allocation plan reserves two slots for pair spills" {
     try std.testing.expectEqual(PlannedValueAssignment{ .spill = 0 }, plan.assignment("zwide").?);
     try std.testing.expectEqual(PlannedValueAssignment{ .spill = 2 }, plan.assignment("zzscalar").?);
 }
+
+test "generic cfg selector preserves current-position accumulator on phi edges" {
+    var machine = MachineFunction.init("current-position-phi-source", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("incoming", 3);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 3;
+    selector.stack_frame_bytes = 24;
+    selector.preserve_current_position_values = true;
+    try selector_state.bindValueLoc(&selector, "incoming", .eax);
+
+    try selector_state.clobberAccumulator(&selector);
+
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.valueLoc(&selector, "incoming").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .spill_eax_rsp = .slot0 },
+    }, machine.instructions.items);
+}

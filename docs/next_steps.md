@@ -90,10 +90,12 @@ and unsigned overflow arithmetic then make the row emit. Exact native execution
 drives CFG live-out intervals and stable frame-backed branch and phi state;
 `__udivmoddi4` now closes through five executable quotient/remainder paths at
 17 live values and 11 required spill slots. After the INBOX-16 test split,
-continue in rank order at `compiler_rt.shift.__ashlsi3`.
+`__ashlsi3`, `__lshrsi3`, `__lshrdi3`, and `__ashldi3` now close after
+current-position accumulator preservation repairs parallel phi-edge copies.
+Continue in rank order at `compiler_rt.shift.__ashrdi3`.
 Current item-15
-accounting is 34 composed rows, 17 terminal-template rows, zero stage-two
-boundary rows, and 10 open integer-helper fallback candidates.
+accounting is 38 composed rows, 17 terminal-template rows, zero stage-two
+boundary rows, and 6 open integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
 

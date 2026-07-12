@@ -1177,7 +1177,7 @@ pub fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) void {
                 .eax, .rax => {},
                 .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => continue,
             }
-            if (valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+            if (valueMustSurviveClobber(selector, entry.key_ptr.*)) continue;
             expired_name = entry.key_ptr.*;
             break;
         }
