@@ -447,10 +447,15 @@ pub const ComposedBlockSelector = struct {
         return null;
     }
 
-    fn spillReservedBytes(selector: ComposedBlockSelector, reserve_spill_area: bool) ?u32 {
+    pub fn spillReservedBytes(selector: ComposedBlockSelector, reserve_spill_area: bool) ?u32 {
         if (!reserve_spill_area) return 0;
         const preallocated_slots = if (selector.allocation_plan) |plan| @max(plan.spill_slots, selector.next_spill_slot) else selector.next_spill_slot;
-        const reserved_slots = std.math.add(usize, preallocated_slots, stage2_spill_slots) catch return null;
+        var emergency_slots: usize = stage2_spill_slots;
+        if (selector.allocation_plan) |plan| {
+            const value_slots = std.math.mul(usize, plan.assignments.count(), 2) catch return null;
+            emergency_slots = @max(emergency_slots, value_slots);
+        }
+        const reserved_slots = std.math.add(usize, preallocated_slots, emergency_slots) catch return null;
         return std.math.mul(u32, std.math.cast(u32, reserved_slots) orelse return null, 8) catch null;
     }
 

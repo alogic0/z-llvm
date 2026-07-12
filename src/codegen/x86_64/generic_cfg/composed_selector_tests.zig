@@ -1013,6 +1013,29 @@ test "dynamic spill allocation rejects a frame index beyond the frame" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "spill reservation covers secondary homes for planned values" {
+    var machine = MachineFunction.init("planned-value-homes", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    for (0..20) |index| {
+        var name_buffer: [16]u8 = undefined;
+        const name = try std.fmt.bufPrint(&name_buffer, "value{}", .{index});
+        try plan.assignments.put(try std.testing.allocator.dupe(u8, name), .{ .gpr64 = .rdi });
+    }
+    defer {
+        var names = plan.assignments.keyIterator();
+        while (names.next()) |name| std.testing.allocator.free(name.*);
+    }
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+
+    try std.testing.expectEqual(@as(u32, 320), selector.spillReservedBytes(true).?);
+}
+
 test "i32 spill relocation preserves its width" {
     var machine = MachineFunction.init("spill_i32_copy", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

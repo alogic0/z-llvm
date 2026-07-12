@@ -3135,6 +3135,17 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmoddi4_usub_tuple.summary` and
   `docs/evidence/selector_tier2_udivmoddi4_usub_tuple.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: framed composed functions now reserve the 32-slot emergency
+  minimum or two possible home slots per planned value, whichever is larger.
+  This bounds the current non-reusing spill-object model while concrete frame
+  checks remain fail-closed. The exact `compiler_rt.int.__udivmoddi4` row
+  advances from exhausted `stage2-phi-restore-loc` to
+  `composed-block-icmp-rhs`; report-all and item-15 counts remain unchanged.
+  Tier 3 is green across 17 subgates because frame behavior changed. Evidence
+  `docs/evidence/std_debug_hello_udivmoddi4_frame_homes.summary` and
+  `docs/evidence/distribution_all_after_udivmoddi4_frame_homes.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
