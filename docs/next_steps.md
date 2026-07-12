@@ -76,9 +76,14 @@ named i32 equality and then `composed-block-call-form` at its first
 the row through funnel shifts. Concrete frame-index validation then removes
 the false `stage2-phi-src-spill64` rejection caused by unrelated later spill
 allocation; the row now fails closed at `composed-block-icmp-form`.
-Current item-15
-accounting is 30 composed rows, 17 terminal-template rows, zero stage-two
-boundary rows, and 14 open integer-helper fallback candidates.
+i32 inequality against zero then clears the body, while exact native execution
+drives frame sizing, width-correct spill copies, stable framed parameter homes,
+and parallel phi-edge alias preservation to correctness. `__udivmodsi4`,
+`__udivsi3`, and `__umodsi3` now close through exact native execution and
+pressure acceptance. Excluding intervening tail-call ABI rows, continue at
+`compiler_rt.int.__udivmoddi4` at `stage2-unsupported-value`. Current item-15
+accounting is 33 composed rows, 17 terminal-template rows, zero stage-two
+boundary rows, and 11 open integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
 

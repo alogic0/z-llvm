@@ -117,6 +117,7 @@ pub fn tryLowerComposedCfg(
     if (try composed.bindParams(function)) |diagnostic| return unsupported(diagnostic);
     if (try composed.bindPhiResults(function)) |diagnostic| return unsupported(diagnostic);
     if (try composed.prepareStackFrame(function)) |diagnostic| return unsupported(diagnostic);
+    if (try composed.stabilizeFramedParams(function)) |diagnostic| return unsupported(diagnostic);
     if (composed.stack_frame_bytes != 0) {
         composed.return_epilogue_label = try composed.ownedReturnEpilogueLabel();
     }
@@ -170,6 +171,7 @@ pub const ComposedBlockSelector = struct {
     current_position: usize = 1,
     expired_binding_this_position: bool = false,
     enable_expired_plan_register_reuse: bool = false,
+    preserve_current_position_values: bool = false,
     spill_slots: std.StringHashMap(SpillSlotAssignment),
     next_spill_slot: usize = 0,
 
@@ -239,6 +241,24 @@ pub const ComposedBlockSelector = struct {
                 try selector.phi_results.put(result_name, {});
                 try selector.phi_destinations.put(result_name, destination);
                 try selector.bindValueLoc(result_name, destination);
+            }
+        }
+        return null;
+    }
+
+    fn stabilizeFramedParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+        if (function.blocks.items.len <= 1 or selector.stack_frame_bytes == 0) return null;
+        for (function.params.items) |param| {
+            const loc = selector.valueLoc(param.name) orelse return .{ .unsupported_value = "stage2-param-home" };
+            switch (loc) {
+                .spill64, .spill128 => {},
+                .arg32, .arg64, .scratch32, .scratch64, .eax, .rax => {
+                    if (try selector.spillValue(param.name)) |diagnostic| return diagnostic;
+                },
+                .arg128, .scratch128 => {
+                    if (try selector.spillPairValue(param.name)) |diagnostic| return diagnostic;
+                },
+                .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .unsupported_value = "stage2-param-home" },
             }
         }
         return null;
@@ -429,8 +449,8 @@ pub const ComposedBlockSelector = struct {
 
     fn spillReservedBytes(selector: ComposedBlockSelector, reserve_spill_area: bool) ?u32 {
         if (!reserve_spill_area) return 0;
-        const planned_slots = if (selector.allocation_plan) |plan| @max(plan.spill_slots, selector.next_spill_slot) else selector.next_spill_slot;
-        const reserved_slots = @max(planned_slots, stage2_spill_slots);
+        const preallocated_slots = if (selector.allocation_plan) |plan| @max(plan.spill_slots, selector.next_spill_slot) else selector.next_spill_slot;
+        const reserved_slots = std.math.add(usize, preallocated_slots, stage2_spill_slots) catch return null;
         return std.math.mul(u32, std.math.cast(u32, reserved_slots) orelse return null, 8) catch null;
     }
 
@@ -1119,6 +1139,14 @@ pub const ComposedBlockSelector = struct {
             selector.emitValueIntoScratch(icmp.lhs, .rcx, 16) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
             try selector.clobberAccumulator();
             try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = 0 } });
+            try selector.machine.instructions.append(selector.allocator, .setne_eax);
+        } else if (icmp.predicate == .ne and icmp.operand_ty.eql(.{ .int = 32 }) and switch (icmp.rhs) {
+            .int => |int| try i64Value(int) == 0,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        }) {
+            selector.emitValueIntoScratch(icmp.lhs, .rcx, 32) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            try selector.clobberAccumulator();
+            try selector.machine.instructions.append(selector.allocator, .{ .test_arg32 = .rcx });
             try selector.machine.instructions.append(selector.allocator, .setne_eax);
         } else if (icmp.predicate == .ne and icmp.operand_ty.eql(.{ .int = 64 }) and switch (icmp.rhs) {
             .int => |int| try i64Value(int) == 0,
@@ -2064,6 +2092,9 @@ pub const ComposedBlockSelector = struct {
                 if (!then_has_phi_edge and !else_has_phi_edge) {
                     if (try selector.restoreDisplacedPhiDestinations()) |diagnostic| return diagnostic;
                 }
+                const previous_preserve_current = selector.preserve_current_position_values;
+                if (then_has_phi_edge or else_has_phi_edge) selector.preserve_current_position_values = true;
+                defer selector.preserve_current_position_values = previous_preserve_current;
                 if (try selector.emitBranchCondition(condbr.cond)) |diagnostic| return diagnostic;
                 if (then_has_phi_edge or else_has_phi_edge) {
                     return try selector.lowerConditionalPhiEdges(function, block_index, then_index, else_index);
@@ -2086,7 +2117,8 @@ pub const ComposedBlockSelector = struct {
             const destination = entry.value_ptr.*;
             const actual = selector.valueLoc(name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
             if (valueLocEql(actual, destination)) continue;
-            selector.materializeLocIntoLoc(actual, destination) catch return .{ .no_emitter = "stage2-phi-restore-loc" };
+            const bits = selector.values.get(name).?.vreg.bits;
+            selector.materializeLocIntoLocWithBits(actual, destination, bits) catch return .{ .no_emitter = "stage2-phi-restore-loc" };
             try selector.bindValueLoc(name, destination);
         }
         return null;
@@ -2147,6 +2179,9 @@ pub const ComposedBlockSelector = struct {
     }
 
     fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock, predecessor: []const u8) !?Diagnostic {
+        const previous_preserve_current = selector.preserve_current_position_values;
+        selector.preserve_current_position_values = true;
+        defer selector.preserve_current_position_values = previous_preserve_current;
         for (target.instructions.items) |instruction| {
             if (instruction.removed) continue;
             const phi = switch (instruction.kind) {
@@ -2209,7 +2244,7 @@ pub const ComposedBlockSelector = struct {
                 },
                 .named => {
                     const actual = selector.resolveValue(value) orelse return .{ .unsupported_value = selector.phiSourceDiagnostic(value) };
-                    selector.materializeLocIntoLoc(actual, dst) catch return .{ .unsupported_value = selector.phiSourceDiagnostic(value) };
+                    selector.materializeLocIntoLocWithBits(actual, dst, bits) catch return .{ .unsupported_value = selector.phiSourceDiagnostic(value) };
                 },
                 .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
             },
@@ -2327,8 +2362,20 @@ pub const ComposedBlockSelector = struct {
 
     pub fn bindResultLoc(selector: *ComposedBlockSelector, name: []const u8, actual: ValueLoc) !void {
         const target = selector.plannedResultLoc(name, actual) orelse actual;
-        if (!valueLocEql(actual, target)) try selector.materializeLocIntoLoc(actual, target);
-        try selector.bindValueLoc(name, target);
+        const vreg = if (selector.values.get(name)) |binding|
+            binding.vreg
+        else blk: {
+            const metadata = virtualRegMetadata(actual);
+            const created: VirtualReg = .{
+                .index = selector.next_virtual_reg,
+                .class = metadata.class,
+                .bits = metadata.bits,
+            };
+            selector.next_virtual_reg += 1;
+            break :blk created;
+        };
+        if (!valueLocEql(actual, target)) try selector.materializeLocIntoLocWithBits(actual, target, vreg.bits);
+        try selector.values.put(name, .{ .vreg = vreg, .loc = target });
     }
 
     pub fn prepareFixedProductDefs(selector: *ComposedBlockSelector) !void {
@@ -2339,7 +2386,6 @@ pub const ComposedBlockSelector = struct {
     pub fn bindFixedProductResult(selector: *ComposedBlockSelector, name: []const u8) !void {
         const plan = selector.allocation_plan orelse return error.UnsupportedCodegenValue;
         const assignment = plan.assignment(name) orelse {
-            if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) return error.UnsupportedCodegenValue;
             const spill = selector.allocatePairSpillSlots(name) orelse return error.UnsupportedCodegenValue;
             try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.lo });
             try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = .rdx } });
@@ -2357,8 +2403,8 @@ pub const ComposedBlockSelector = struct {
                 try selector.bindValueLoc(name, .{ .scratch128 = pair });
             },
             .spill => |index| {
-                if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) return error.UnsupportedCodegenValue;
                 const spill = pairSpillFrameIndexMaybe(index) orelse return error.UnsupportedCodegenValue;
+                if (!selector.frameIndexFitsFrame(spill.lo) or !selector.frameIndexFitsFrame(spill.hi)) return error.UnsupportedCodegenValue;
                 try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.lo });
                 try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = .rdx } });
                 try selector.bindValueLoc(name, .{ .spill128 = spill });
@@ -2384,11 +2430,12 @@ pub const ComposedBlockSelector = struct {
                 else => null,
             },
             .stack_object, .stack_pointer => actual,
-            .spill => |index| if (selector.stack_frame_bytes >= (selector.spillReservedBytes(true) orelse return null)) switch (actual) {
-                .arg64, .scratch64, .rax, .spill64 => if (spillFrameIndexMaybe(index)) |frame_index| .{ .spill64 = frame_index } else null,
-                .arg128, .scratch128, .spill128 => if (pairSpillFrameIndexMaybe(index)) |spill| .{ .spill128 = spill } else null,
+            .spill => |index| switch (actual) {
+                .arg32, .scratch32, .eax => if (spillFrameIndexMaybe(index)) |frame_index| if (selector.frameIndexFitsFrame(frame_index)) .{ .spill64 = frame_index } else null else null,
+                .arg64, .scratch64, .rax, .spill64 => if (spillFrameIndexMaybe(index)) |frame_index| if (selector.frameIndexFitsFrame(frame_index)) .{ .spill64 = frame_index } else null else null,
+                .arg128, .scratch128, .spill128 => if (pairSpillFrameIndexMaybe(index)) |spill| if (selector.frameIndexFitsFrame(spill.lo) and selector.frameIndexFitsFrame(spill.hi)) .{ .spill128 = spill } else null else null,
                 else => null,
-            } else null,
+            },
         };
         const target = planned orelse return null;
         if (std.meta.activeTag(target) == .spill64 or std.meta.activeTag(target) == .spill128) return target;
@@ -2552,6 +2599,22 @@ pub const ComposedBlockSelector = struct {
             },
             .arg32, .arg64, .arg128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return error.UnsupportedCodegenValue,
         }
+    }
+
+    pub fn materializeLocIntoLocWithBits(selector: *ComposedBlockSelector, actual: ValueLoc, target: ValueLoc, bits: u16) !void {
+        const target_frame = switch (target) {
+            .spill64 => |frame_index| frame_index,
+            else => return selector.materializeLocIntoLoc(actual, target),
+        };
+        const actual_frame = switch (actual) {
+            .spill64 => |frame_index| frame_index,
+            else => return selector.materializeLocIntoLoc(actual, target),
+        };
+        if (bits > 32 or actual_frame.eql(target_frame)) return selector.materializeLocIntoLoc(actual, target);
+        if (!selector.frameIndexFitsFrame(target_frame)) return error.UnsupportedCodegenValue;
+        try selector.clobberAccumulator();
+        try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_eax = actual_frame });
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_eax_rsp = target_frame });
     }
 
     fn frameIndexFitsFrame(selector: ComposedBlockSelector, frame_index: FrameIndex) bool {
@@ -2775,6 +2838,7 @@ pub const ComposedBlockSelector = struct {
         if (selector.spill_slots.get(name)) |assignment| return spillFrameIndexMaybe(assignment.base);
         const base = selector.next_spill_slot;
         const frame_index = spillFrameIndexMaybe(base) orelse return null;
+        if (selector.stack_frame_bytes != 0 and !selector.frameIndexFitsFrame(frame_index)) return null;
         selector.spill_slots.put(name, .{ .base = base, .slots = 1 }) catch return null;
         selector.next_spill_slot = base + 1;
         return frame_index;
@@ -2787,6 +2851,7 @@ pub const ComposedBlockSelector = struct {
         }
         const base = selector.next_spill_slot;
         const spill = pairSpillFrameIndexMaybe(base) orelse return null;
+        if (selector.stack_frame_bytes != 0 and (!selector.frameIndexFitsFrame(spill.lo) or !selector.frameIndexFitsFrame(spill.hi))) return null;
         selector.spill_slots.put(name, .{ .base = base, .slots = 2 }) catch return null;
         selector.next_spill_slot = base + 2;
         return spill;
@@ -3258,7 +3323,7 @@ pub const ComposedBlockSelector = struct {
     }
 
     fn choosePairScratchForClobber(selector: ComposedBlockSelector, src: ?RegPair) ?RegPair {
-        if (selector.stack_frame_bytes < (selector.spillReservedBytes(true) orelse return null)) return selector.choosePairScratch(src);
+        if (!selector.nextSpillSlotsFit(2)) return selector.choosePairScratch(src);
         for (selector_allocatable_pairs) |pair| {
             if (src) |source| if (source.eql(pair)) continue;
             if (selector.livePairNameContainingReg(pair.lo) != null) continue;
@@ -3266,6 +3331,13 @@ pub const ComposedBlockSelector = struct {
             return pair;
         }
         return null;
+    }
+
+    fn nextSpillSlotsFit(selector: ComposedBlockSelector, slots: usize) bool {
+        if (slots == 0) return true;
+        const last = std.math.add(usize, selector.next_spill_slot, slots - 1) catch return false;
+        const frame_index = spillFrameIndexMaybe(last) orelse return false;
+        return selector.frameIndexFitsFrame(frame_index);
     }
 
     fn pairScratchIsAvailableForUse(selector: ComposedBlockSelector, pair: RegPair) bool {
@@ -3277,24 +3349,28 @@ pub const ComposedBlockSelector = struct {
     }
 
     fn clobberArgRegExcept(selector: *ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) !void {
-        if (selector.pairNameContainingRegExcept(reg, ignore_name)) |name| {
-            if (selector.valueIsLiveAfterCurrent(name) or selector.stack_frame_bytes >= (selector.spillReservedBytes(true) orelse return error.UnsupportedCodegenValue)) {
+        while (selector.pairNameContainingRegExcept(reg, ignore_name)) |name| {
+            if (selector.valueMustSurviveClobber(name)) {
                 try selector.spillPairValueOrError(name);
-            } else if (selector.phi_results.contains(name)) {
-                // Phi destinations are pre-bound before edge materialization.
             } else {
                 _ = selector.values.remove(name);
             }
         }
-        if (selector.scalarNameInRegExcept(reg, ignore_name)) |name| {
-            if (selector.valueIsLiveAfterCurrent(name)) {
+        while (selector.scalarNameInRegExcept(reg, ignore_name)) |name| {
+            if (selector.valueMustSurviveClobber(name)) {
                 try selector.spillValueOrError(name);
-            } else if (selector.phi_results.contains(name)) {
-                // Phi destinations are pre-bound before edge materialization.
             } else {
                 _ = selector.values.remove(name);
             }
         }
+    }
+
+    fn valueMustSurviveClobber(selector: ComposedBlockSelector, name: []const u8) bool {
+        if (selector.phi_results.contains(name)) return true;
+        return if (selector.preserve_current_position_values)
+            selector.valueIsLiveAtOrAfterCurrent(name)
+        else
+            selector.valueIsLiveAfterCurrent(name);
     }
 
     fn clobberAccumulator(selector: *ComposedBlockSelector) !void {

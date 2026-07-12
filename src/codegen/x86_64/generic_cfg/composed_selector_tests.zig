@@ -804,6 +804,26 @@ test "generic cfg selector stores scalar planned spills in deterministic frame s
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot4, .reg = .rcx } }, machine.instructions.items[0]);
 }
 
+test "generic cfg selector stores i32 planned spills in deterministic frame slots" {
+    var machine = MachineFunction.init("planned-spill-i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("spilled", .{ .spill = 2 });
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+
+    try selector.bindResultLoc("spilled", .{ .scratch32 = .rcx });
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot4 }, selector.valueLoc("spilled").?);
+    try std.testing.expectEqual(@as(u16, 32), selector.values.get("spilled").?.vreg.bits);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg_rsp = .{ .frame_index = .slot4, .reg = .rcx } }, machine.instructions.items[0]);
+}
+
 test "generic cfg selector stores planned pair spills in deterministic frame slots" {
     var machine = MachineFunction.init("planned-pair-spill", .{ .int = 128 });
     defer machine.deinit(std.testing.allocator);
@@ -977,6 +997,34 @@ test "spill materialization validates the concrete frame index" {
 
     try selector.materializeLocIntoLoc(.{ .scratch64 = .rdi }, .{ .spill64 = .slot0 });
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rdi } }, machine.instructions.items[0]);
+}
+
+test "dynamic spill allocation rejects a frame index beyond the frame" {
+    var machine = MachineFunction.init("spill_frame_limit", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+    selector.next_spill_slot = 2;
+    try selector.bindValueLoc("live", .{ .scratch64 = .rdi });
+
+    try std.testing.expect((try selector.spillValue("live")) != null);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "i32 spill relocation preserves its width" {
+    var machine = MachineFunction.init("spill_i32_copy", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+
+    try selector.materializeLocIntoLocWithBits(.{ .spill64 = .slot0 }, .{ .spill64 = .slot2 }, 32);
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_rsp_eax = .slot0 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_eax_rsp = .slot2 }, machine.instructions.items[1]);
 }
 
 test "generic cfg selector lowers i32 unsigned-add overflow components" {

@@ -800,8 +800,14 @@ test "generic cfg selector stage two materializes pointer phi edges" {
         },
     }
 
-    try expectInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } });
-    try expectInstruction(machine.instructions.items, .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rsi } });
+    var phi_reloads: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .reload_arg64_rsp => |reload| if (reload.reg == .r8) {
+            phi_reloads += 1;
+        },
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 2), phi_reloads);
     try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .r8 });
     try expectNamedInstruction(machine.instructions.items, .label, "merge");
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
@@ -2050,6 +2056,38 @@ test "generic cfg selector composes i64 inequality with zero" {
     }
 
     try expectInstruction(machine.instructions.items, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 0 } });
+    try expectInstruction(machine.instructions.items, .setne_eax);
+}
+
+test "generic cfg selector composes i32 inequality with zero" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @ne32_zero(i32 %value) {
+        \\entry:
+        \\  %not_zero = icmp ne i32 %value, 0
+        \\  %wide = zext i1 %not_zero to i32
+        \\  %result = add i32 %value, %wide
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("ne32_zero", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .test_arg32 = .rcx });
     try expectInstruction(machine.instructions.items, .setne_eax);
 }
 
