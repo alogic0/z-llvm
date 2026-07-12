@@ -96,8 +96,8 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
     if (bits == 128) return try lowerPairBinary(selector, result_name, binary);
 
     if (binary.op == .mul and bits == 64) return try lowerMul64(selector, result_name, binary);
-    if ((binary.op == .udiv or binary.op == .urem) and bits == 64) {
-        return try lowerUnsignedDivRem64(selector, result_name, binary);
+    if ((binary.op == .udiv or binary.op == .urem) and (bits == 32 or bits == 64)) {
+        return try lowerUnsignedDivRem(selector, result_name, binary, bits);
     }
     if (binary.op == .mul and bits <= 32) {
         while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
@@ -549,24 +549,29 @@ pub fn scratch64RegIsAvailableForUse(selector: *const ComposedBlockSelector, reg
     return status;
 }
 
-pub fn lowerUnsignedDivRem64(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
+pub fn lowerUnsignedDivRem(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
     const rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
-    if (rhs == .rax) {
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64);
-        try selector_state.emitValueIntoRax(selector, binary.lhs);
+    const rhs_is_accumulator = switch (rhs) {
+        .eax => bits == 32,
+        .rax => bits == 64,
+        else => false,
+    };
+    if (rhs_is_accumulator) {
+        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+        try selector_state.emitValueIntoAccumulator(selector, binary.lhs, bits);
     } else {
-        try selector_state.emitValueIntoRax(selector, binary.lhs);
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64);
+        try selector_state.emitValueIntoAccumulator(selector, binary.lhs, bits);
+        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
     }
     try selector_state.clobberArgReg(selector, .rdx);
     try selector.machine.instructions.append(selector.allocator, .xor_edx_edx);
-    try selector.machine.instructions.append(selector.allocator, .{ .div_arg64 = .rcx });
+    try selector.machine.instructions.append(selector.allocator, if (bits == 32) .{ .div_arg32 = .rcx } else .{ .div_arg64 = .rcx });
     switch (binary.op) {
         .udiv => {
-            try selector_state.bindRax(selector, result_name);
+            try selector_state.bindAccumulator(selector, result_name, bits);
         },
         .urem => {
-            try selector_state.bindScratch(selector, result_name, .rdx, 64);
+            try selector_state.bindScratch(selector, result_name, .rdx, bits);
         },
         else => unreachable,
     }

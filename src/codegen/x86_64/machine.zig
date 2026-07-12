@@ -73,6 +73,7 @@ pub const Instruction = union(enum) {
     mul_rax_arg64_full: ArgReg,
     imul_rax_arg64_full: ArgReg,
     xor_edx_edx,
+    div_arg32: ArgReg,
     div_arg64: ArgReg,
     add_arg64_rax: ArgReg,
     add_arg64_imm32: struct {

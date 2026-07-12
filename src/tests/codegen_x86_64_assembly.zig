@@ -91,6 +91,27 @@ test "x86_64 assembly prints variable eax shifts" {
     );
 }
 
+test "x86_64 assembly prints unsigned i32 division" {
+    var machine = codegen.x86_64.MachineFunction.init("unsigned_div_i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .xor_edx_edx);
+    try machine.instructions.append(std.testing.allocator, .{ .div_arg32 = .rcx });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl unsigned_div_i32\n" ++
+            "unsigned_div_i32:\n" ++
+            "\txorl %edx, %edx\n" ++
+            "\tdivl %ecx\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 assembly prints full-width multiply forms" {
     var machine = codegen.x86_64.MachineFunction.init("full_width_multiply", .{ .int = 128 });
     defer machine.deinit(std.testing.allocator);

@@ -123,6 +123,28 @@ test "x86_64 encoding emits named i32 multiply operands" {
     }, bytes);
 }
 
+test "x86_64 encoding emits unsigned i32 division operands" {
+    var machine = codegen.x86_64.MachineFunction.init("div_i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_eax = .rdi });
+    try machine.instructions.append(std.testing.allocator, .xor_edx_edx);
+    try machine.instructions.append(std.testing.allocator, .{ .div_arg32 = .rcx });
+    try machine.instructions.append(std.testing.allocator, .{ .div_arg32 = .r8 });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 2), mc.encoding.instructionSize(.{ .div_arg32 = .rcx }));
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .div_arg32 = .r8 }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x89, 0xf8,
+        0x31, 0xd2,
+        0xf7, 0xf1,
+        0x41, 0xf7,
+        0xf0, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding emits i32 funnel shift operands" {
     var machine = codegen.x86_64.MachineFunction.init("fshl_i32", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

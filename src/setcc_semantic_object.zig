@@ -18,6 +18,8 @@ pub fn main(init: std.process.Init) !void {
         x86_64.MachineFunction.init("zllvm_setb_u64", .{ .int = 32 }),
         x86_64.MachineFunction.init("zllvm_ugt_u64", .{ .int = 32 }),
         x86_64.MachineFunction.init("zllvm_ult_u32", .{ .int = 32 }),
+        x86_64.MachineFunction.init("zllvm_udiv_u32", .{ .int = 32 }),
+        x86_64.MachineFunction.init("zllvm_urem_u32", .{ .int = 32 }),
     };
     defer for (&functions) |*function| function.deinit(allocator);
 
@@ -26,10 +28,23 @@ pub fn main(init: std.process.Init) !void {
     try appendPredicate(allocator, &functions[2], .setb_eax, true);
     try appendPredicate(allocator, &functions[3], .setb_eax, false);
     try appendUltU32(allocator, &functions[4]);
+    try appendUnsignedDivU32(allocator, &functions[5], false);
+    try appendUnsignedDivU32(allocator, &functions[6], true);
 
     const object = try elf.buildObject(allocator, &functions);
     defer allocator.free(object);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = object });
+}
+
+fn appendUnsignedDivU32(allocator: std.mem.Allocator, function: *x86_64.MachineFunction, remainder: bool) !void {
+    try function.instructions.appendSlice(allocator, &.{
+        .{ .mov_arg_eax = .rdi },
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .xor_edx_edx,
+        .{ .div_arg32 = .rcx },
+    });
+    if (remainder) try function.instructions.append(allocator, .{ .mov_arg_eax = .rdx });
+    try function.instructions.append(allocator, .ret);
 }
 
 fn appendUltU32(allocator: std.mem.Allocator, function: *x86_64.MachineFunction) !void {

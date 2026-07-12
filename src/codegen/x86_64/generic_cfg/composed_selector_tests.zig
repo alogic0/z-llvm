@@ -1152,6 +1152,50 @@ test "generic cfg selector lowers named i32 unsigned less-than" {
     }, machine.instructions.items);
 }
 
+test "generic cfg selector lowers named i32 unsigned division and remainder" {
+    var quotient_machine = MachineFunction.init("udiv-i32-named", .{ .int = 32 });
+    defer quotient_machine.deinit(std.testing.allocator);
+    var quotient_selector = ComposedBlockSelector.init(std.testing.allocator, &quotient_machine);
+    defer quotient_selector.deinit();
+    try selector_state.bindValueLoc(&quotient_selector, "lhs", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&quotient_selector, "rhs", .{ .arg32 = .rsi });
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&quotient_selector, "quotient", .{
+        .op = .udiv,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })) == null);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&quotient_selector, "quotient").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_eax = .rdi },
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .xor_edx_edx,
+        .{ .div_arg32 = .rcx },
+    }, quotient_machine.instructions.items);
+
+    var remainder_machine = MachineFunction.init("urem-i32-named", .{ .int = 32 });
+    defer remainder_machine.deinit(std.testing.allocator);
+    var remainder_selector = ComposedBlockSelector.init(std.testing.allocator, &remainder_machine);
+    defer remainder_selector.deinit();
+    try selector_state.bindValueLoc(&remainder_selector, "lhs", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&remainder_selector, "rhs", .{ .arg32 = .rsi });
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&remainder_selector, "remainder", .{
+        .op = .urem,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })) == null);
+    try std.testing.expectEqual(ValueLoc{ .scratch32 = .rdx }, selector_state.valueLoc(&remainder_selector, "remainder").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_eax = .rdi },
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .xor_edx_edx,
+        .{ .div_arg32 = .rcx },
+    }, remainder_machine.instructions.items);
+}
+
 test "generic cfg selector lays out mixed scalar and array frame objects" {
     var function = ir.Function.init("mixed-frame", .void);
     defer function.deinit(std.testing.allocator);
