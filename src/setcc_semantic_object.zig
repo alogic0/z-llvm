@@ -21,6 +21,8 @@ pub fn main(init: std.process.Init) !void {
         x86_64.MachineFunction.init("zllvm_udiv_u32", .{ .int = 32 }),
         x86_64.MachineFunction.init("zllvm_urem_u32", .{ .int = 32 }),
         x86_64.MachineFunction.init("zllvm_ugt_u32", .{ .int = 32 }),
+        x86_64.MachineFunction.init("zllvm_usub_value_u32", .{ .int = 32 }),
+        x86_64.MachineFunction.init("zllvm_usub_borrow_u32", .{ .int = 32 }),
     };
     defer for (&functions) |*function| function.deinit(allocator);
 
@@ -32,10 +34,24 @@ pub fn main(init: std.process.Init) !void {
     try appendUnsignedDivU32(allocator, &functions[5], false);
     try appendUnsignedDivU32(allocator, &functions[6], true);
     try appendUgtU32(allocator, &functions[7]);
+    try appendUsubOverflowU32(allocator, &functions[8], false);
+    try appendUsubOverflowU32(allocator, &functions[9], true);
 
     const object = try elf.buildObject(allocator, &functions);
     defer allocator.free(object);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = object });
+}
+
+fn appendUsubOverflowU32(allocator: std.mem.Allocator, function: *x86_64.MachineFunction, borrow: bool) !void {
+    try function.instructions.appendSlice(allocator, &.{
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .{ .mov_arg_eax = .rdi },
+        .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } },
+        .{ .mov_eax_to_arg = .rdx },
+        .setb_eax,
+    });
+    if (!borrow) try function.instructions.append(allocator, .{ .mov_arg_eax = .rdx });
+    try function.instructions.append(allocator, .ret);
 }
 
 fn appendUgtU32(allocator: std.mem.Allocator, function: *x86_64.MachineFunction) !void {

@@ -88,7 +88,8 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try lowerCtlzI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUaddOverflowI32(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
+    if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
     if (call.inline_asm != null) return .{ .no_emitter = "composed-block-inline-asm-call" };
@@ -119,7 +120,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     return null;
 }
 
-pub fn lowerUaddOverflowI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+pub fn lowerUnsignedOverflowI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, op: MachineBinaryOp) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-overflow-missing-result" };
     if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
         return .{ .no_emitter = "composed-block-overflow-call-form" };
@@ -150,7 +151,7 @@ pub fn lowerUaddOverflowI32(selector: *ComposedBlockSelector, result: ?[]const u
         else => {},
     }
     selector_state.emitValueIntoEax(selector, lhs.value) catch return .{ .unsupported_value = "composed-block-overflow-lhs" };
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = rhs_scratch } });
+    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs_scratch } });
     try selector_state.clobberArgReg(selector, .rdx);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdx });
     try selector_state.clobberAccumulator(selector);

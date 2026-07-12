@@ -1126,6 +1126,51 @@ test "generic cfg selector lowers i32 unsigned-add overflow components" {
     try std.testing.expectEqual(x86_64_machine.Instruction.setb_eax, machine.instructions.items[4]);
 }
 
+test "generic cfg selector lowers i32 unsigned-subtract overflow components" {
+    var machine = MachineFunction.init("usub-overflow-i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+    var call = ir.CallInst{
+        .ret_ty = .{ .aggregate = "{ i32, i1 }" },
+        .callee = "llvm.usub.with.overflow.i32",
+        .tail_kind = "tail",
+        .args = .empty,
+    };
+    defer call.deinit(std.testing.allocator);
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "lhs" } });
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "rhs" } });
+
+    try std.testing.expect((try impl.lowerInstruction(&selector, .{ .result = "pair", .kind = .{ .call = call } })) == null);
+    try std.testing.expect((try impl.lowerInstruction(&selector, .{
+        .result = "value",
+        .kind = .{ .extractvalue = .{
+            .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+            .aggregate = .{ .named = "pair" },
+            .indices = "0",
+            .result_ty = .{ .int = 32 },
+        } },
+    })) == null);
+    try std.testing.expect((try impl.lowerInstruction(&selector, .{
+        .result = "borrow",
+        .kind = .{ .extractvalue = .{
+            .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+            .aggregate = .{ .named = "pair" },
+            .indices = "1",
+            .result_ty = .{ .int = 1 },
+        } },
+    })) == null);
+
+    try std.testing.expectEqual(ValueLoc{ .scratch32 = .rdx }, selector_state.valueLoc(&selector, "value").?);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "borrow").?);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(x86_64_machine.Instruction.setb_eax, machine.instructions.items[4]);
+}
+
 test "generic cfg selector lowers named i32 unsigned less-than" {
     var machine = MachineFunction.init("ult-i32-named", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);
