@@ -3,6 +3,7 @@ target datalayout = "e-m:e-p270:32:32-p271:32-p272:64:64-i64:64-i128:128-f80:128
 target triple = "x86_64-unknown-linux-gnu"
 
 declare i128 @llvm.abs.i128(i128, i1)
+declare i64 @llvm.abs.i64(i64, i1)
 declare i32 @llvm.ctlz.i32(i32, i1 immarg)
 declare { i32, i1 } @llvm.uadd.with.overflow.i32(i32, i32)
 declare { i128, i1 } @llvm.smul.with.overflow.i128(i128, i128)
@@ -103,6 +104,18 @@ define dso_local i128 @zllvm_neg_i128(i128 %value) {
 Entry:
   %negated = sub i128 0, %value
   ret i128 %negated
+}
+
+define dso_local i64 @zllvm_neg_i64(i64 %value) {
+Entry:
+  %negated = sub i64 0, %value
+  ret i64 %negated
+}
+
+define dso_local i64 @zllvm_abs_i64(i64 %value) {
+Entry:
+  %absolute = tail call i64 @llvm.abs.i64(i64 %value, i1 false)
+  ret i64 %absolute
 }
 
 define dso_local i32 @zllvm_negative_i128(i128 %value) {

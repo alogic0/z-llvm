@@ -388,11 +388,16 @@ pub fn verifyFunction(function: MachineFunction) !void {
 
     var eax_defined = function.ret_ty == .void or function.ret_ty.eql(.float) or function.ret_ty.eql(.double) or
         sysv_abi.aggregateReturnHasNoGpr(function.ret_ty);
+    var eax_defined_before_label = eax_defined;
     var saw_terminator = false;
+    var preserve_eax_at_next_label = false;
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => |label| {
-            if (!std.mem.endsWith(u8, label, "generic_cfg_select_end") and
+            eax_defined_before_label = eax_defined;
+            if (preserve_eax_at_next_label) {
+                preserve_eax_at_next_label = false;
+            } else if (!std.mem.endsWith(u8, label, "generic_cfg_select_end") and
                 !std.mem.endsWith(u8, label, "generic_cfg_pointer_select_end") and
                 !std.mem.endsWith(u8, label, "conditional_slice_sum_skip"))
             {
@@ -579,7 +584,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         },
         .ud2 => {
             saw_terminator = true;
-            eax_defined = function.ret_ty == .void;
+            eax_defined = eax_defined_before_label;
+            preserve_eax_at_next_label = true;
         },
     };
     if (!saw_terminator) return error.MissingMachineReturn;

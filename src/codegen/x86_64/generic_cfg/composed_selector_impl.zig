@@ -969,6 +969,14 @@ pub const ComposedBlockSelector = struct {
             try selector.bindPairScratch(result_name, pair_b);
             return null;
         }
+        if (binary.op == .sub and bits == 64) {
+            try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
+            try selector.clobberAccumulator();
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(lhs) });
+            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+            try selector.bindRax(result_name);
+            return null;
+        }
         if (binary.op == .sub and bits <= 32) {
             try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
             try selector.clobberAccumulator();
@@ -1234,6 +1242,7 @@ pub const ComposedBlockSelector = struct {
             .int => |int| try i64Value(int) == 0,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         }) {
+            if (try selector.preserveCurrentRaxIntoScratch()) |diagnostic| return diagnostic;
             try selector.emitValueIntoRax(icmp.lhs);
             try selector.machine.instructions.append(selector.allocator, .{ .shr_rax_imm6 = 63 });
         } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 32 }) and switch (icmp.rhs) {
@@ -2772,6 +2781,15 @@ pub const ComposedBlockSelector = struct {
         return null;
     }
 
+    fn preserveCurrentRaxIntoScratch(selector: *ComposedBlockSelector) !?Diagnostic {
+        const name = selector.liveRaxName() orelse return null;
+        const dst = selector.scratch64RegForUseAvoiding(null) orelse
+            return .{ .no_spill_envelope = "composed-block-preserve-rax" };
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst });
+        try selector.bindValueLoc(name, .{ .scratch64 = dst });
+        return null;
+    }
+
     fn scratchRegIsProvenFree(selector: ComposedBlockSelector, reg: ArgReg) bool {
         var it = selector.values.iterator();
         while (it.next()) |entry| {
@@ -3279,6 +3297,18 @@ pub const ComposedBlockSelector = struct {
             switch (entry.value_ptr.loc) {
                 .eax => return entry.key_ptr.*,
                 .arg32, .arg64, .arg128, .rax, .scratch32, .scratch64, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
+    }
+
+    fn liveRaxName(selector: ComposedBlockSelector) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (!selector.valueIsLiveAfterCurrent(entry.key_ptr.*)) continue;
+            switch (entry.value_ptr.loc) {
+                .rax => return entry.key_ptr.*,
+                .arg32, .arg64, .arg128, .eax, .scratch32, .scratch64, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
             }
         }
         return null;

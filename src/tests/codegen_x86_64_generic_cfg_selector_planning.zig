@@ -2872,6 +2872,33 @@ test "generic cfg selector lowers i128 immediate lhs subtraction" {
     try expectInstruction(machine.instructions.items, .{ .sbb_arg64_rax = .rdx });
 }
 
+test "generic cfg selector lowers i64 immediate lhs subtraction" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @neg_i64(i64 %value) {
+        \\entry:
+        \\  %negated = sub i64 0, %value
+        \\  ret i64 %negated
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("neg_i64", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .{ .mov_imm_rax = 0 });
+    try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+}
+
 test "generic cfg selector executes framed i128 negation trap" {
     if (@import("builtin").os.tag != .linux) return error.SkipZigTest;
     const text =

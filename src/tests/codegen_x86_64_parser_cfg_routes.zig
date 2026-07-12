@@ -321,3 +321,14 @@ test "x86_64 machine verifier allows a live frame at terminal trap" {
     try framed_trap.instructions.append(std.testing.allocator, .ud2);
     try codegen.x86_64.verifyFunction(framed_trap);
 }
+
+test "x86_64 machine verifier preserves return state across terminal trap layout" {
+    var trap_sibling = codegen.x86_64.MachineFunction.init("trap_sibling", .{ .int = 64 });
+    defer trap_sibling.deinit(std.testing.allocator);
+    try trap_sibling.instructions.append(std.testing.allocator, .{ .mov_imm_rax = 12 });
+    try trap_sibling.instructions.append(std.testing.allocator, .{ .label = "trap_path" });
+    try trap_sibling.instructions.append(std.testing.allocator, .ud2);
+    try trap_sibling.instructions.append(std.testing.allocator, .{ .label = "return_path" });
+    try trap_sibling.instructions.append(std.testing.allocator, .ret);
+    try codegen.x86_64.verifyFunction(trap_sibling);
+}

@@ -55,9 +55,12 @@ subtraction are now closed through exact object emission, native link,
 executable positive/negative checks, and pressure acceptance. Zero-left i128
 subtraction and framed terminal traps then close
 `compiler_rt.negv.__negvti2` and `compiler_rt.absvti2.__absvti2`, with
-exact native and executable SIGILL evidence. Continue in rank order at
-`compiler_rt.negv.__negvdi2`. Current item-15 accounting is 26 composed rows,
-17 terminal-template rows, zero stage-two boundary rows, and 18 open
+exact native and executable SIGILL evidence. Immediate-left i64 subtraction and
+live-RAX preservation then close `compiler_rt.negv.__negvdi2` and
+`compiler_rt.absvdi2.__absvdi2`; the exact native harness caught the stale
+absolute-value binding before acceptance. Continue in rank order at
+`compiler_rt.absvsi2.__absvsi2`. Current item-15 accounting is 28 composed
+rows, 17 terminal-template rows, zero stage-two boundary rows, and 16 open
 integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
