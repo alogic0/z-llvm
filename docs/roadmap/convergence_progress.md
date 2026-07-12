@@ -3047,6 +3047,15 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmodsi4_phi_spill.summary` and
   `docs/evidence/selector_tier2_udivmodsi4_phi_spill.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: scalar selects from i1 through i32 now use the existing EAX
+  value path, with permanent executable checks for true and false boolean
+  outcomes. The exact `compiler_rt.int.__udivmodsi4` row advances from
+  `composed-block-select-width` to `composed-block-ctlz-args`; report-all and
+  item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmodsi4_select_i1.summary` and
+  `docs/evidence/selector_tier2_udivmodsi4_select_i1.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

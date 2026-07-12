@@ -730,6 +730,14 @@ Exit:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_select_i1(i32 %a) {
+Entry:
+  %left = icmp eq i32 %a, 0
+  %selected = select i1 %left, i1 true, i1 %left
+  %result = zext i1 %selected to i32
+  ret i32 %result
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16

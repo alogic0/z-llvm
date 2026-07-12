@@ -2414,6 +2414,36 @@ test "generic cfg selector preserves accumulator select true value" {
     try expectInstructionTag(machine.instructions.items, .reload_rsp_eax);
 }
 
+test "generic cfg selector composes boolean select" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @select_i1(i32 %a) {
+        \\entry:
+        \\  %left = icmp eq i32 %a, 0
+        \\  %selected = select i1 %left, i1 true, i1 %left
+        \\  %result = zext i1 %selected to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("select_i1", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try codegen.x86_64.verifyFunction(machine);
+}
+
 test "generic cfg selector composes i64 immediate or" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
