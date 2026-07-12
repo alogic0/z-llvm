@@ -1756,7 +1756,8 @@ pub const ComposedBlockSelector = struct {
         if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-ctlz-signature" };
         const value_arg = call.args.items[0];
         const undef_arg = call.args.items[1];
-        if (!value_arg.ty.eql(.{ .int = 32 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !undef_arg.value.eql(.{ .int = 1 })) {
+        const valid_zero_flag = undef_arg.value.eql(.{ .int = 0 }) or undef_arg.value.eql(.{ .int = 1 });
+        if (!value_arg.ty.eql(.{ .int = 32 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
             return .{ .no_emitter = "composed-block-ctlz-args" };
         }
         selector.emitValueIntoScratch(value_arg.value, .rdi, 32) catch return .{ .unsupported_value = "composed-block-ctlz-value" };

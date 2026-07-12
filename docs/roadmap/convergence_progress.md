@@ -3056,6 +3056,15 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmodsi4_select_i1.summary` and
   `docs/evidence/selector_tier2_udivmodsi4_select_i1.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: `llvm.ctlz.i32` now accepts both legal zero flags, backed by the
+  existing machine form that returns 32 for zero. Permanent executable checks
+  cover zero and nonzero inputs. The exact `compiler_rt.int.__udivmodsi4` row
+  advances from `composed-block-ctlz-args` to `composed-block-icmp-form`;
+  report-all and item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmodsi4_ctlz_defined.summary` and
+  `docs/evidence/selector_tier2_udivmodsi4_ctlz_defined.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

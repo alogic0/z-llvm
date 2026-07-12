@@ -738,6 +738,12 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_ctlz_i32_defined(i32 %value) {
+Entry:
+  %count = tail call range(i32 0, 33) i32 @llvm.ctlz.i32(i32 %value, i1 false)
+  ret i32 %count
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16
