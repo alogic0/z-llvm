@@ -3240,6 +3240,15 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence `docs/evidence/std_debug_hello_ashlsi3_sgt_i32_imm.summary` and
   `docs/evidence/selector_tier2_ashlsi3_sgt_i32_imm.summary`.
 
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability:
+  unsigned i32 less-than against an immediate now uses width-correct `cmpl`
+  plus flag-preserving `setb`, with executable below/equal/high-bit checks.
+  The exact `compiler_rt.shift.__ashlsi3` row advances from
+  `composed-block-icmp-form` to `composed-block-binary-op`; report-all and
+  item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_ashlsi3_ult_i32_imm.summary` and
+  `docs/evidence/selector_tier2_ashlsi3_ult_i32_imm.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

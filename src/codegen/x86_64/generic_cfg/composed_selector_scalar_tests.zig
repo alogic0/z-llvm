@@ -881,3 +881,27 @@ test "generic cfg selector lowers signed i32 greater-than immediate" {
         .setg_eax,
     }, machine.instructions.items);
 }
+
+test "generic cfg selector lowers unsigned i32 less-than immediate" {
+    var machine = MachineFunction.init("ult-i32-imm", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+
+    const diagnostic = try selector_scalar.lowerIcmp(&selector, "cmp", .{
+        .predicate = .ult,
+        .operand_ty = .{ .int = 32 },
+        .lhs = .{ .named = "value" },
+        .rhs = .{ .int = 32 },
+    });
+
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_eax = .rdi },
+        .{ .cmp_eax_imm32 = 32 },
+        .setb_eax,
+    }, machine.instructions.items);
+}

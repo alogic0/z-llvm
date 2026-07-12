@@ -911,6 +911,10 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector_state.clobberAccumulator(selector);
         try selector.machine.instructions.append(selector.allocator, .{ .cmp_ecx_arg32 = .r8 });
         try selector.machine.instructions.append(selector.allocator, .setb_eax);
+    } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 32 }) and icmp.rhs == .int) {
+        try selector_state.emitValueIntoEax(selector, icmp.lhs);
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = try i32Value(icmp.rhs.int) });
+        try selector.machine.instructions.append(selector.allocator, .setb_eax);
     } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 })) {
         const rhs = switch (icmp.rhs) {
             .int => |int| int,
