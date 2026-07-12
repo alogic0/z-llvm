@@ -2145,6 +2145,38 @@ test "generic cfg selector composes i32 unsigned greater immediate" {
     try expectInstruction(machine.instructions.items, .setb_eax);
 }
 
+test "generic cfg selector composes named i32 equality" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @eq_i32_values(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %cmp = icmp eq i32 %lhs, %rhs
+        \\  %wide = zext i1 %cmp to i32
+        \\  %result = add i32 %lhs, %wide
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("eq_i32_values", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .cmp_ecx_arg32 = .r8 });
+    try expectInstruction(machine.instructions.items, .sete_eax);
+}
+
 test "generic cfg selector composes wrapping i6 immediate lhs subtraction" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -1162,11 +1162,15 @@ pub const ComposedBlockSelector = struct {
         } else if (icmp.predicate == .eq) {
             const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };
             if (icmp.rhs == .named) {
-                if (bits != 64) return .{ .no_emitter = "composed-block-icmp-rhs" };
-                selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-                selector.emitValueIntoScratch(icmp.rhs, .r8, 64) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
+                if (bits == 64) {
+                    selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+                    selector.emitValueIntoScratch(icmp.rhs, .r8, 64) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
+                } else if (bits <= 32) {
+                    selector.emitValueIntoScratch(icmp.lhs, .rcx, 32) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+                    selector.emitValueIntoScratch(icmp.rhs, .r8, 32) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
+                } else return .{ .no_emitter = "composed-block-icmp-rhs" };
                 try selector.clobberAccumulator();
-                try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .r8 });
+                try selector.machine.instructions.append(selector.allocator, if (bits == 64) .{ .cmp_rcx_arg64 = .r8 } else .{ .cmp_ecx_arg32 = .r8 });
                 try selector.machine.instructions.append(selector.allocator, .sete_eax);
                 try selector.bindEax(result_name);
                 return null;

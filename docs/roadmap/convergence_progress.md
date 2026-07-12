@@ -3075,6 +3075,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmodsi4_ugt_i32.summary` and
   `docs/evidence/selector_tier2_udivmodsi4_ugt_i32.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: named scalar equality now supports widths through i32 using the
+  existing ECX/R8D compare form, with executable equal, unequal, and
+  post-compare operand reuse checks. The exact
+  `compiler_rt.int.__udivmodsi4` row advances from `composed-block-icmp-rhs`
+  to `composed-block-call-form` at `llvm.fshl.i32`; report-all and item-15
+  counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmodsi4_eq_i32.summary` and
+  `docs/evidence/selector_tier2_udivmodsi4_eq_i32.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
