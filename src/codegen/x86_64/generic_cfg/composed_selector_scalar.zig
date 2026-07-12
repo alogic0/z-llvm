@@ -109,7 +109,7 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         try selector_state.bindEax(selector, result_name);
         return null;
     }
-    if ((binary.op == .shl or binary.op == .lshr) and bits == 32) {
+    if ((binary.op == .shl or binary.op == .lshr) and (bits == 16 or bits == 32)) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
         try selector_state.emitValueIntoEax(selector, binary.lhs);
         try selector.machine.instructions.append(selector.allocator, switch (binary.op) {

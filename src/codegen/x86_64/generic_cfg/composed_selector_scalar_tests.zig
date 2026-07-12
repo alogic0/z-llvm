@@ -905,3 +905,30 @@ test "generic cfg selector lowers unsigned i32 less-than immediate" {
         .setb_eax,
     }, machine.instructions.items);
 }
+
+test "generic cfg selector lowers variable i16 shifts" {
+    inline for (.{ .shl, .lshr }) |op| {
+        var machine = MachineFunction.init("variable-i16-shift", .{ .int = 16 });
+        defer machine.deinit(std.testing.allocator);
+
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+        try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rsi });
+
+        const diagnostic = try selector_scalar.lowerBinary(&selector, "result", .{
+            .op = op,
+            .ty = .{ .int = 16 },
+            .lhs = .{ .named = "value" },
+            .rhs = .{ .named = "amount" },
+        });
+
+        try std.testing.expect(diagnostic == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+            .{ .mov_arg_eax = .rdi },
+            if (op == .shl) .shl_eax_cl else .shr_eax_cl,
+        }, machine.instructions.items);
+    }
+}

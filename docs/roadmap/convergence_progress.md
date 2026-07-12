@@ -3249,6 +3249,15 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_ashlsi3_ult_i32_imm.summary` and
   `docs/evidence/selector_tier2_ashlsi3_ult_i32_imm.summary`.
 
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: the
+  EAX/CL variable-shift path now lowers i16 `shl` and `lshr` in addition to
+  i32, with an executable truncate/left/right/zext roundtrip. The exact
+  `compiler_rt.shift.__ashlsi3` row advances from `composed-block-binary-op`
+  to `unsupported_value/stage2-phi-src-unknown`; report-all and item-15 counts
+  remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_ashlsi3_variable_i16_shifts.summary` and
+  `docs/evidence/selector_tier2_ashlsi3_variable_i16_shifts.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

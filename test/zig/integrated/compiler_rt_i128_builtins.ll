@@ -767,6 +767,16 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_variable_i16_shifts(i32 %value, i32 %amount) {
+Entry:
+  %narrow_value = trunc i32 %value to i16
+  %narrow_amount = trunc i32 %amount to i16
+  %left = shl i16 %narrow_value, %narrow_amount
+  %right = lshr i16 %left, %narrow_amount
+  %result = zext i16 %right to i32
+  ret i32 %result
+}
+
 define dso_local i32 @zllvm_eq_i32_values(i32 %lhs, i32 %rhs) {
 Entry:
   %cmp = icmp eq i32 %lhs, %rhs
