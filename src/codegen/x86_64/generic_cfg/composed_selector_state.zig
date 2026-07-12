@@ -358,7 +358,29 @@ pub fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc,
                     try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.lo, .reg = pair.lo } });
                     try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = pair.hi } });
                 },
-                .spill128 => {},
+                .spill128 => |source| {
+                    if (source.lo.eql(spill.lo) and source.hi.eql(spill.hi)) return;
+                    try clobberAccumulator(selector);
+                    if (source.hi.eql(spill.lo)) {
+                        if (!source.hi.eql(spill.hi)) {
+                            try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source.hi });
+                            try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.hi });
+                        }
+                        if (!source.lo.eql(spill.lo)) {
+                            try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source.lo });
+                            try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.lo });
+                        }
+                    } else {
+                        if (!source.lo.eql(spill.lo)) {
+                            try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source.lo });
+                            try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.lo });
+                        }
+                        if (!source.hi.eql(spill.hi)) {
+                            try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source.hi });
+                            try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.hi });
+                        }
+                    }
+                },
                 .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64 => return error.UnsupportedCodegenValue,
             }
         },

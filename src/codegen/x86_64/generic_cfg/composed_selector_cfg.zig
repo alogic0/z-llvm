@@ -293,8 +293,8 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         if (try emitValueIntoLoc(selector, incoming.value, dst, result_name, metadata.bits)) |diagnostic| return diagnostic;
         try selector_state.bindValueLoc(selector, result_name, dst);
         switch (dst) {
-            .scratch32, .scratch64, .spill64 => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .scratch32, .scratch64, .spill64, .spill128 => {},
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;
@@ -346,7 +346,14 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
             },
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
         },
-        .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+        .spill128 => switch (value) {
+            .named => {
+                const actual = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, value) };
+                selector_state.materializeLocIntoLocWithBits(selector, actual, dst, bits) catch return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, value) };
+            },
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
+        },
+        .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
     }
     return null;
 }

@@ -54,6 +54,54 @@ test "generic cfg selector returns overlapping i128 pair without scratch envelop
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[1]);
 }
 
+test "generic cfg selector copies named i128 phi source into pair spill" {
+    var machine = MachineFunction.init("pair-phi-spill", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+
+    try selector_state.bindValueLoc(&selector, "incoming", .{ .scratch128 = pair_a });
+    try std.testing.expect((try selector_cfg.emitValueIntoLoc(
+        &selector,
+        .{ .named = "incoming" },
+        .{ .spill128 = .{ .lo = .slot0, .hi = .slot2 } },
+        "result",
+        128,
+    )) == null);
+
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = pair_a.lo } },
+        .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = pair_a.hi } },
+    }, machine.instructions.items);
+}
+
+test "generic cfg selector copies overlapping pair-spilled phi source safely" {
+    var machine = MachineFunction.init("pair-phi-spill-copy", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 24;
+
+    try selector_state.bindValueLoc(&selector, "incoming", .{ .spill128 = .{ .lo = .slot0, .hi = .slot2 } });
+    try std.testing.expect((try selector_cfg.emitValueIntoLoc(
+        &selector,
+        .{ .named = "incoming" },
+        .{ .spill128 = .{ .lo = .slot2, .hi = .slot4 } },
+        "result",
+        128,
+    )) == null);
+
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .reload_rsp_rax = .slot2 },
+        .{ .spill_rax_rsp = .slot4 },
+        .{ .reload_rsp_rax = .slot0 },
+        .{ .spill_rax_rsp = .slot2 },
+    }, machine.instructions.items);
+}
+
 test "generic cfg selector restores only live displaced phi destinations" {
     var machine = MachineFunction.init("live-phi-restore", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

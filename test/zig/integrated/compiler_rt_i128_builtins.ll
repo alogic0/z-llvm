@@ -19,6 +19,19 @@ Entry:
   ret i128 %frozen
 }
 
+define dso_local i128 @zllvm_i128_phi(i32 %choose, i128 %lhs, i128 %rhs) {
+Entry:
+  %condition = icmp ne i32 %choose, 0
+  br i1 %condition, label %Left, label %Right
+Left:
+  br label %Merge
+Right:
+  br label %Merge
+Merge:
+  %value = phi i128 [ %lhs, %Left ], [ %rhs, %Right ]
+  ret i128 %value
+}
+
 define dso_local i32 @zllvm_ne_zero_i16(i32 %value) {
 Entry:
   %narrow = trunc i32 %value to i16

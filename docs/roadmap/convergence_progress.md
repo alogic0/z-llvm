@@ -3281,6 +3281,17 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_ashrdi3_acceptance_pressure.tsv`, and
   `docs/evidence/distribution_all_after_ashrdi3_acceptance.summary`.
 
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability:
+  i128 phi results now use frame-backed pair destinations, with named pair
+  sources copied from registers or spill pairs through the authoritative
+  value-location map. Pair-spill copies preserve both limbs under overlapping
+  frame ranges, and executable checks cover both predecessor paths. The exact
+  `__lshrti3`, `__ashrti3`, and `__ashlti3` rows advance from
+  `stage2-phi-width` to `composed-block-binary-op`; report-all and item-15
+  counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_lshrti3_i128_phi.summary` and
+  `docs/evidence/selector_tier2_lshrti3_i128_phi.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

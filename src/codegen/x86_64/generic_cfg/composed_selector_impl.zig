@@ -169,13 +169,16 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
             const bits = switch (metadata.class) {
                 .gpr32 => @as(u16, 32),
                 .gpr64 => @as(u16, 64),
-                .gpr128, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
+                .gpr128 => @as(u16, 128),
+                .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
             };
-            const planned_spill = if (selector.allocation_plan) |plan| switch (plan.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" }) {
+            const planned_spill = if (bits != 128 and selector.allocation_plan != null) switch (selector.allocation_plan.?.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" }) {
                 .spill => |index| selector_state.spillFrameIndexMaybe(index) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
                 .gpr32, .gpr64, .gpr128, .stack_object, .stack_pointer => null,
             } else null;
-            const destination: ValueLoc = if (planned_spill) |frame_index|
+            const destination: ValueLoc = if (bits == 128)
+                .{ .spill128 = selector_state.allocatePairSpillSlots(selector, result_name) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" } }
+            else if (planned_spill) |frame_index|
                 .{ .spill64 = frame_index }
             else if (nextPhiReg(&used_in_block)) |reg|
                 if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg }
@@ -227,8 +230,8 @@ fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnost
         const loc = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         try selector_state.bindValueLoc(selector, result_name, loc);
         switch (loc) {
-            .scratch32, .scratch64, .spill64 => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128 => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .scratch32, .scratch64, .spill64, .spill128 => {},
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;
