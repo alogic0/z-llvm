@@ -755,8 +755,8 @@ test "generic cfg selector stage two materializes unconditional phi edges" {
     var phi_moves: usize = 0;
     for (machine.instructions.items) |instruction| {
         switch (instruction) {
-            .mov_arg64_arg => |mov| {
-                if (mov.dst == .r8) phi_moves += 1;
+            .spill_arg64_rsp => |spill| {
+                if (spill.reg == .rcx) phi_moves += 1;
             },
             else => {},
         }
@@ -802,13 +802,11 @@ test "generic cfg selector stage two materializes pointer phi edges" {
 
     var phi_reloads: usize = 0;
     for (machine.instructions.items) |instruction| switch (instruction) {
-        .reload_arg64_rsp => |reload| if (reload.reg == .r8) {
-            phi_reloads += 1;
-        },
+        .spill_rax_rsp => phi_reloads += 1,
         else => {},
     };
     try std.testing.expectEqual(@as(usize, 2), phi_reloads);
-    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .r8 });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .rcx });
     try expectNamedInstruction(machine.instructions.items, .label, "merge");
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }

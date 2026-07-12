@@ -167,12 +167,16 @@ pub fn lowerCfgTerminator(
 ) !?Diagnostic {
     return switch (terminator) {
         .ret => |ret| blk: {
-            if (try restoreDisplacedPhiDestinations(selector)) |diagnostic| break :blk diagnostic;
+            if (selector.stack_frame_bytes == 0) {
+                if (try restoreDisplacedPhiDestinations(selector)) |diagnostic| break :blk diagnostic;
+            }
             break :blk try lowerReturn(selector, ret);
         },
         .br => |br| {
             const target_index = function.blockIndex(br.target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
-            if (!blockHasPhiIncomingFrom(function.blocks.items[target_index], function.blocks.items[block_index].name)) {
+            if (selector.stack_frame_bytes != 0) {
+                selector_state.spillLiveValuesForCfgBoundary(selector) catch return .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
+            } else if (!blockHasPhiIncomingFrom(function.blocks.items[target_index], function.blocks.items[block_index].name)) {
                 if (try restoreDisplacedPhiDestinations(selector)) |diagnostic| return diagnostic;
             }
             if (try emitPhiEdgeMoves(selector, function.blocks.items[target_index], function.blocks.items[block_index].name)) |diagnostic| return diagnostic;
@@ -187,7 +191,9 @@ pub fn lowerCfgTerminator(
             const else_index = function.blockIndex(condbr.else_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
             const then_has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[then_index], function.blocks.items[block_index].name);
             const else_has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[else_index], function.blocks.items[block_index].name);
-            if (!then_has_phi_edge and !else_has_phi_edge) {
+            if (selector.stack_frame_bytes != 0) {
+                selector_state.spillLiveValuesForCfgBoundary(selector) catch return .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
+            } else if (!then_has_phi_edge and !else_has_phi_edge) {
                 if (try restoreDisplacedPhiDestinations(selector)) |diagnostic| return diagnostic;
             }
             const previous_preserve_current = selector.preserve_current_position_values;
@@ -212,6 +218,7 @@ pub fn restoreDisplacedPhiDestinations(selector: *ComposedBlockSelector) !?Diagn
     var it = selector.phi_destinations.iterator();
     while (it.next()) |entry| {
         const name = entry.key_ptr.*;
+        if (!selector_state.valueIsLiveAfterCurrent(selector, name)) continue;
         const destination = entry.value_ptr.*;
         const actual = selector_state.valueLoc(selector, name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         if (valueLocEql(actual, destination)) continue;

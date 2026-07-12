@@ -1348,6 +1348,32 @@ pub fn spillPairValueOrError(selector: *ComposedBlockSelector, name: []const u8)
     if (try spillPairValue(selector, name)) |_| return error.UnsupportedCodegenValue;
 }
 
+pub fn spillLiveValuesForCfgBoundary(selector: *ComposedBlockSelector) !void {
+    while (liveRegisterValueName(selector)) |name| {
+        const loc = selector.values.get(name).?.loc;
+        switch (loc) {
+            .arg128, .scratch128 => try spillPairValueOrError(selector, name),
+            .arg32, .arg64, .eax, .rax, .scratch32, .scratch64 => try spillValueOrError(selector, name),
+            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => unreachable,
+        }
+        if (selector.phi_results.contains(name)) {
+            try selector.phi_destinations.put(name, selector.values.get(name).?.loc);
+        }
+    }
+}
+
+fn liveRegisterValueName(selector: *const ComposedBlockSelector) ?[]const u8 {
+    var it = selector.values.iterator();
+    while (it.next()) |entry| {
+        if (!valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        switch (entry.value_ptr.loc) {
+            .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128 => return entry.key_ptr.*,
+            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+        }
+    }
+    return null;
+}
+
 pub fn resolvePairValue(selector: *const ComposedBlockSelector, value: ir.Value) ?RegPair {
     const loc = resolveValue(selector, value) orelse return null;
     return switch (loc) {

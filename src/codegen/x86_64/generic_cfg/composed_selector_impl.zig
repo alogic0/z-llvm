@@ -171,7 +171,13 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
                 .gpr64 => @as(u16, 64),
                 .gpr128, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
             };
-            const destination: ValueLoc = if (nextPhiReg(&used_in_block)) |reg|
+            const planned_spill = if (selector.allocation_plan) |plan| switch (plan.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" }) {
+                .spill => |index| selector_state.spillFrameIndexMaybe(index) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
+                .gpr32, .gpr64, .gpr128, .stack_object, .stack_pointer => null,
+            } else null;
+            const destination: ValueLoc = if (planned_spill) |frame_index|
+                .{ .spill64 = frame_index }
+            else if (nextPhiReg(&used_in_block)) |reg|
                 if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg }
             else
                 .{ .spill64 = selector_state.allocateSpillSlot(selector, result_name) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" } };

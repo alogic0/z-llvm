@@ -85,10 +85,15 @@ pressure acceptance. Excluding intervening tail-call ABI rows, continue at
 pressure-exempt, advancing the row from `stage2-unsupported-value` to
 `stage2-phi-restore-loc`. Conservative per-planned-value frame homes then
 advance it through pointer equality with null and i64 stores through spilled
-pointers to `composed-block-icmp-form`.
+pointers. Named i32 unsigned comparisons, width-parametric division/remainder,
+and unsigned overflow arithmetic then make the row emit. Exact native execution
+drives CFG live-out intervals and stable frame-backed branch and phi state;
+`__udivmoddi4` now closes through five executable quotient/remainder paths at
+17 live values and 11 required spill slots. After the INBOX-16 test split,
+continue in rank order at `compiler_rt.shift.__ashlsi3`.
 Current item-15
-accounting is 33 composed rows, 17 terminal-template rows, zero stage-two
-boundary rows, and 11 open integer-helper fallback candidates.
+accounting is 34 composed rows, 17 terminal-template rows, zero stage-two
+boundary rows, and 10 open integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
 

@@ -7,6 +7,7 @@ const stage2_planning = @import("stage2_planning.zig");
 const impl = @import("composed_selector_impl.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
+const selector_cfg = @import("composed_selector_cfg.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 
@@ -1169,6 +1170,80 @@ test "generic cfg selector lowers i32 unsigned-subtract overflow components" {
     try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "borrow").?);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } }, machine.instructions.items[2]);
     try std.testing.expectEqual(x86_64_machine.Instruction.setb_eax, machine.instructions.items[4]);
+}
+
+test "generic cfg selector lowers lifetime markers as checked no-ops" {
+    var machine = MachineFunction.init("lifetime-markers", .void);
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "slot", .{ .stack_scalar = .{ .base_disp = 0, .bits = 8 } });
+
+    inline for (.{ "llvm.lifetime.start.p0", "llvm.lifetime.end.p0" }) |callee| {
+        var call = ir.CallInst{
+            .ret_ty = .void,
+            .callee = callee,
+            .args = .empty,
+        };
+        defer call.deinit(std.testing.allocator);
+        try call.args.append(std.testing.allocator, .{ .ty = .ptr, .value = .{ .named = "slot" } });
+        try std.testing.expect((try impl.lowerInstruction(&selector, .{ .result = null, .kind = .{ .call = call } })) == null);
+    }
+
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "generic cfg selector restores only live displaced phi destinations" {
+    var machine = MachineFunction.init("live-phi-restore", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("expired", 2);
+    try plan.interval_ends.put("live", 4);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 2;
+    try selector.phi_destinations.put("expired", .{ .scratch64 = .r8 });
+    try selector.phi_destinations.put("live", .{ .scratch64 = .rcx });
+    try selector_state.bindValueLoc(&selector, "expired", .{ .spill64 = .slot0 });
+    try selector_state.bindValueLoc(&selector, "live", .{ .spill64 = .slot2 });
+
+    try std.testing.expect((try selector_cfg.restoreDisplacedPhiDestinations(&selector)) == null);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.valueLoc(&selector, "expired").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector_state.valueLoc(&selector, "live").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot2 } },
+    }, machine.instructions.items);
+}
+
+test "generic cfg selector makes framed boundary-spilled phi destinations stable" {
+    var machine = MachineFunction.init("stable-boundary-phi", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("acc", 4);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 2;
+    selector.stack_frame_bytes = 24;
+    try selector.phi_results.put("acc", {});
+    try selector.phi_destinations.put("acc", .{ .scratch64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "acc", .{ .scratch64 = .r8 });
+
+    try selector_state.spillLiveValuesForCfgBoundary(&selector);
+
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.valueLoc(&selector, "acc").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.phi_destinations.get("acc").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .spill_arg64_rsp = .{ .reg = .r8, .frame_index = .slot0 } },
+    }, machine.instructions.items);
 }
 
 test "generic cfg selector lowers named i32 unsigned less-than" {

@@ -79,6 +79,7 @@ fn isColdAssumeBundle(bundle: []const u8) bool {
 
 pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     if (call.isDebugVariableLocation()) return null;
+    if (std.mem.eql(u8, call.callee, "llvm.lifetime.start.p0") or std.mem.eql(u8, call.callee, "llvm.lifetime.end.p0")) return lowerLifetimeMarker(result, call);
     if (std.mem.eql(u8, call.callee, "llvm.assume")) return lowerAssume(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.trap")) return try lowerTrap(selector, result, call);
     if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try lowerIntByteSizeCall(selector, result, call);
@@ -117,6 +118,16 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         128 => {},
         else => unreachable,
     };
+    return null;
+}
+
+fn lowerLifetimeMarker(result: ?[]const u8, call: ir.CallInst) ?Diagnostic {
+    if (result != null or call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.tail_kind != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+        return .{ .no_emitter = "composed-block-lifetime-call-form" };
+    }
+    if (call.ret_ty != .void or call.args.items.len != 1 or call.args.items[0].ty != .ptr) {
+        return .{ .no_emitter = "composed-block-lifetime-signature" };
+    }
     return null;
 }
 

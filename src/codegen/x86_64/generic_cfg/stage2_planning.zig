@@ -450,6 +450,12 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
         }
     }
 
+    var cfg_liveness = try buildStageTwoLiveness(allocator, function);
+    defer cfg_liveness.deinit();
+    for (cfg_liveness.blocks.items, 0..) |block, block_index| {
+        try recordSelectorIntervalUses(intervals.items, interval_indexes, block.live_out, terminator_positions.items[block_index]);
+    }
+
     return try allocateSelectorIntervals(allocator, intervals.items);
 }
 
