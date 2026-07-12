@@ -3146,6 +3146,15 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmoddi4_frame_homes.summary` and
   `docs/evidence/distribution_all_after_udivmoddi4_frame_homes.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: pointer equality with null now lowers through a 64-bit test and
+  flag-preserving `sete`, with permanent executable checks for null and
+  non-null pointers. The exact `compiler_rt.int.__udivmoddi4` row advances
+  from `composed-block-icmp-rhs` to `composed-block-store-width`; report-all
+  and item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmoddi4_ptr_null.summary` and
+  `docs/evidence/selector_tier2_udivmoddi4_ptr_null.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

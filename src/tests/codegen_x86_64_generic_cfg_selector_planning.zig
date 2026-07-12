@@ -2091,6 +2091,37 @@ test "generic cfg selector composes i32 inequality with zero" {
     try expectInstruction(machine.instructions.items, .setne_eax);
 }
 
+test "generic cfg selector composes pointer equality with null" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @ptr_eq_null(ptr %value) {
+        \\entry:
+        \\  %is_null = icmp eq ptr %value, null
+        \\  %result = zext i1 %is_null to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("ptr_eq_null", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .test_arg64 = .rcx });
+    try expectInstruction(machine.instructions.items, .sete_eax);
+}
+
 test "generic cfg selector composes ctlz i32 intrinsic" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

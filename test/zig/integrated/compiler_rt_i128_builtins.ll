@@ -775,6 +775,13 @@ Entry:
   ret i32 %result
 }
 
+define dso_local i32 @zllvm_ptr_eq_null(ptr %value) {
+Entry:
+  %is_null = icmp eq ptr %value, null
+  %result = zext i1 %is_null to i32
+  ret i32 %result
+}
+
 define dso_local i128 @__modti3(i128 %0, i128 %1) {
 Entry:
   %2 = alloca i128, align 16
