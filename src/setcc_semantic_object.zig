@@ -17,6 +17,7 @@ pub fn main(init: std.process.Init) !void {
         x86_64.MachineFunction.init("zllvm_setne_u64", .{ .int = 32 }),
         x86_64.MachineFunction.init("zllvm_setb_u64", .{ .int = 32 }),
         x86_64.MachineFunction.init("zllvm_ugt_u64", .{ .int = 32 }),
+        x86_64.MachineFunction.init("zllvm_ult_u32", .{ .int = 32 }),
     };
     defer for (&functions) |*function| function.deinit(allocator);
 
@@ -24,10 +25,21 @@ pub fn main(init: std.process.Init) !void {
     try appendPredicate(allocator, &functions[1], .setne_eax, false);
     try appendPredicate(allocator, &functions[2], .setb_eax, true);
     try appendPredicate(allocator, &functions[3], .setb_eax, false);
+    try appendUltU32(allocator, &functions[4]);
 
     const object = try elf.buildObject(allocator, &functions);
     defer allocator.free(object);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = object });
+}
+
+fn appendUltU32(allocator: std.mem.Allocator, function: *x86_64.MachineFunction) !void {
+    try function.instructions.appendSlice(allocator, &.{
+        .{ .mov_arg_arg = .{ .dst = .r8, .src = .rdi } },
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .{ .cmp_ecx_arg32 = .r8 },
+        .setb_eax,
+        .ret,
+    });
 }
 
 fn appendPredicate(

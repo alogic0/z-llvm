@@ -3176,6 +3176,17 @@ One line per completed cycle, append-only, newest last. This is the
   canaries. No capability or ratchet counter moves. Evidence
   `docs/evidence/distribution_all_after_inbox15_selector_split.summary`.
 
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: named
+  i32 unsigned less-than now materializes lhs in R8D and rhs in ECX so the
+  existing `cmpl %ecx, %r8d` plus flag-preserving `setb` implements LLVM's
+  unsigned predicate with the correct operand order. Executable checks cover
+  both directions and values across the signed high-bit boundary. The exact
+  `compiler_rt.int.__udivmoddi4` row advances from
+  `composed-block-icmp-form` to `composed-block-binary-op`; report-all and
+  item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmoddi4_ult_i32_named.summary` and
+  `docs/evidence/selector_tier2_udivmoddi4_ult_i32_named.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
