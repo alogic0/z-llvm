@@ -72,7 +72,9 @@ then advances through narrow scalar select lowering, with executable true and
 false boolean outcomes. Zero-defined `llvm.ctlz.i32` lowering then advances
 the row through i32 unsigned-greater immediate lowering to
 named i32 equality and then `composed-block-call-form` at its first
-`llvm.fshl.i32`, with executable predicate and live-value checks.
+`llvm.fshl.i32`. A general `shldl` machine form and intrinsic lowering now
+advance the row to `stage2-phi-src-spill64`, with executable cross-bit funnel
+shift coverage.
 Current item-15
 accounting is 30 composed rows, 17 terminal-template rows, zero stage-two
 boundary rows, and 14 open integer-helper fallback candidates.

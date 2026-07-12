@@ -6,6 +6,7 @@ declare i128 @llvm.abs.i128(i128, i1)
 declare i32 @llvm.abs.i32(i32, i1)
 declare i64 @llvm.abs.i64(i64, i1)
 declare i32 @llvm.ctlz.i32(i32, i1 immarg)
+declare i32 @llvm.fshl.i32(i32, i32, i32)
 declare { i32, i1 } @llvm.uadd.with.overflow.i32(i32, i32)
 declare { i128, i1 } @llvm.smul.with.overflow.i128(i128, i128)
 declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
@@ -757,6 +758,12 @@ Entry:
   %cmp = icmp eq i32 %lhs, %rhs
   %wide = zext i1 %cmp to i32
   %result = add i32 %lhs, %wide
+  ret i32 %result
+}
+
+define dso_local i32 @zllvm_fshl_i32(i32 %lhs, i32 %rhs) {
+Entry:
+  %result = tail call i32 @llvm.fshl.i32(i32 %lhs, i32 %rhs, i32 1)
   ret i32 %result
 }
 

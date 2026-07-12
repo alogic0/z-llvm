@@ -123,6 +123,24 @@ test "x86_64 encoding emits named i32 multiply operands" {
     }, bytes);
 }
 
+test "x86_64 encoding emits i32 funnel shift operands" {
+    var machine = codegen.x86_64.MachineFunction.init("fshl_i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .fshl_eax_arg32_imm5 = .{ .reg = .rcx, .amount = 1 } });
+    try machine.instructions.append(std.testing.allocator, .{ .fshl_eax_arg32_imm5 = .{ .reg = .r8, .amount = 1 } });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .fshl_eax_arg32_imm5 = .{ .reg = .rcx, .amount = 1 } }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .fshl_eax_arg32_imm5 = .{ .reg = .r8, .amount = 1 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x0f, 0xa4, 0xc8, 0x01,
+        0x44, 0x0f, 0xa4, 0xc0,
+        0x01, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding emits i32 absolute value" {
     var machine = codegen.x86_64.MachineFunction.init("abs_i32", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

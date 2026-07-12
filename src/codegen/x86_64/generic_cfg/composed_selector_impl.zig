@@ -1534,6 +1534,7 @@ pub const ComposedBlockSelector = struct {
         if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try selector.lowerAbsI64(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try selector.lowerAbsI128(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try selector.lowerCtlzI32(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try selector.lowerFshlI32(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try selector.lowerInlineMemcpy(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try selector.lowerUaddOverflowI32(result, call);
         if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try selector.lowerSmulOverflowI64(result, call);
@@ -1774,6 +1775,27 @@ pub const ComposedBlockSelector = struct {
         selector.emitValueIntoScratch(value_arg.value, .rdi, 32) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
         try selector.clobberAccumulator();
         try selector.machine.instructions.append(selector.allocator, .clz_i32_edi_eax);
+        try selector.bindEax(result_name);
+        return null;
+    }
+
+    fn lowerFshlI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+        const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+        if (call.inline_asm != null or call.callee_value != null or call.raw_args != null or call.operand_bundle != null) {
+            return .{ .no_emitter = "composed-block-fshl-call-form" };
+        }
+        if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 3) return .{ .no_emitter = "composed-block-fshl-signature" };
+        for (call.args.items) |arg| {
+            if (!arg.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-fshl-args" };
+        }
+        const amount_value = switch (call.args.items[2].value) {
+            .int => |int| try i64Value(int),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-fshl-amount" },
+        };
+        const amount: u5 = @intCast(@as(u64, @bitCast(amount_value)) & 31);
+        selector.emitValueIntoEax(call.args.items[0].value) catch return .{ .unsupported_value = "composed-block-fshl-lhs" };
+        selector.emitValueIntoScratch(call.args.items[1].value, .rcx, 32) catch return .{ .unsupported_value = "composed-block-fshl-rhs" };
+        try selector.machine.instructions.append(selector.allocator, .{ .fshl_eax_arg32_imm5 = .{ .reg = .rcx, .amount = amount } });
         try selector.bindEax(result_name);
         return null;
     }

@@ -2177,6 +2177,36 @@ test "generic cfg selector composes named i32 equality" {
     try expectInstruction(machine.instructions.items, .sete_eax);
 }
 
+test "generic cfg selector composes i32 funnel shift" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\declare i32 @llvm.fshl.i32(i32, i32, i32)
+        \\
+        \\define i32 @fshl_i32(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %result = tail call i32 @llvm.fshl.i32(i32 %lhs, i32 %rhs, i32 1)
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("fshl_i32", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (result) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try expectInstruction(machine.instructions.items, .{ .fshl_eax_arg32_imm5 = .{ .reg = .rcx, .amount = 1 } });
+}
+
 test "generic cfg selector composes wrapping i6 immediate lhs subtraction" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

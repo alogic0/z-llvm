@@ -3085,6 +3085,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmodsi4_eq_i32.summary` and
   `docs/evidence/selector_tier2_udivmodsi4_eq_i32.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: i32 funnel shifts now map to a general x86 `shldl` machine form
+  with allocator-visible operands, low/high-register encoding coverage, and a
+  permanent executable cross-bit check. The exact
+  `compiler_rt.int.__udivmodsi4` row advances through all `llvm.fshl.i32`
+  calls to `stage2-phi-src-spill64`; report-all and item-15 counts remain
+  unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmodsi4_fshl_i32.summary` and
+  `docs/evidence/selector_tier2_udivmodsi4_fshl_i32.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
