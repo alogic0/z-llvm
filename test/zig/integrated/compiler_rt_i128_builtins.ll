@@ -77,6 +77,15 @@ Entry:
   ret i64 %sum
 }
 
+define dso_local i64 @zllvm_multi_use_i64_binary(i64 %lhs, i64 %rhs) {
+Entry:
+  %sum = add i64 %lhs, %rhs
+  %x = xor i64 %sum, %lhs
+  %y = xor i64 %sum, %rhs
+  %result = and i64 %x, %y
+  ret i64 %result
+}
+
 define dso_local i32 @zllvm_negative_i128(i128 %value) {
 Entry:
   %negative = icmp slt i128 %value, 0

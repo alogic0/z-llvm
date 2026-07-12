@@ -48,9 +48,10 @@ object emission, native link, executable signed-overflow checks, and pressure
 acceptance. Continue in rank order at `compiler_rt.mulvsi3.__mulvsi3`; its
 exact empty cold bundle on `llvm.assume` is admitted and the row now fails
 closed through exact trap-block ownership, native link, executable SIGILL, and
-pressure acceptance. Continue in rank order at
-`compiler_rt.subvdi3.__subvdi3`. Current item-15 accounting is 19 composed
-rows, 17 terminal-template rows, zero stage-two boundary rows, and 25 open
+pressure acceptance. The generic multi-use binary lifetime fix then closes
+`__subvdi3`, `__subvsi3`, `__addvdi3`, and `__addvsi3`; continue in rank order
+at `compiler_rt.negv.__negvsi2`. Current item-15 accounting is 23 composed
+rows, 17 terminal-template rows, zero stage-two boundary rows, and 21 open
 integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:

@@ -473,6 +473,14 @@ pub const ComposedBlockSelector = struct {
         }
 
         const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
+        while (selector.liveAccumulatorNameAfterCurrent()) |live_name| {
+            if (try selector.preserveLiveAccumulatorValue(live_name)) |diagnostic| return diagnostic;
+        }
+        if (namedValue(binary.lhs)) |lhs_name| {
+            if (selector.valueIsLiveAfterCurrent(lhs_name)) {
+                if (try selector.preserveLiveAccumulatorValue(lhs_name)) |diagnostic| return diagnostic;
+            }
+        }
         const lhs = selector.resolveValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
         const rhs = selector.resolveValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
 
@@ -2494,6 +2502,26 @@ pub const ComposedBlockSelector = struct {
         return try selector.spillCurrentAccumulator();
     }
 
+    fn preserveLiveAccumulatorValue(selector: *ComposedBlockSelector, name: []const u8) !?Diagnostic {
+        const binding = selector.values.get(name) orelse return .{ .unsupported_value = "composed-block-preserve-live-lhs" };
+        const loc = binding.loc;
+        const bits = binding.vreg.bits;
+        switch (loc) {
+            .eax, .rax => {},
+            else => return null,
+        }
+        const dst = selector.scratch64RegForUseAvoiding(null) orelse return try selector.spillValue(name);
+        try selector.clobberArgReg(dst);
+        if (bits == 64) {
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst });
+            try selector.bindValueLoc(name, .{ .scratch64 = dst });
+        } else if (bits <= 32) {
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = dst });
+            try selector.bindValueLoc(name, .{ .scratch32 = dst });
+        } else return .{ .no_emitter = "composed-block-preserve-live-lhs-width" };
+        return null;
+    }
+
     pub fn spillValue(selector: *ComposedBlockSelector, name: []const u8) !?Diagnostic {
         if (selector.stack_frame_bytes < 24) return .{ .no_spill_envelope = "composed-block-spill-frame" };
         const loc = selector.resolveValue(.{ .named = name }) orelse return .{ .unsupported_value = "composed-block-spill-unknown" };
@@ -3200,6 +3228,18 @@ pub const ComposedBlockSelector = struct {
         var it = selector.values.iterator();
         while (it.next()) |entry| {
             if (!selector.valueIsLiveAtOrAfterCurrent(entry.key_ptr.*)) continue;
+            switch (entry.value_ptr.loc) {
+                .eax, .rax => return entry.key_ptr.*,
+                .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},
+            }
+        }
+        return null;
+    }
+
+    fn liveAccumulatorNameAfterCurrent(selector: ComposedBlockSelector) ?[]const u8 {
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (!selector.valueIsLiveAfterCurrent(entry.key_ptr.*)) continue;
             switch (entry.value_ptr.loc) {
                 .eax, .rax => return entry.key_ptr.*,
                 .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128 => {},

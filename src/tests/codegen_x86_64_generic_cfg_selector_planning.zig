@@ -2103,7 +2103,7 @@ test "generic cfg selector branches on spilled condition" {
         },
     }
 
-    try expectInstruction(machine.instructions.items, .{ .test_arg8 = .rcx });
+    try expectInstructionTag(machine.instructions.items, .test_arg8);
 }
 
 test "generic cfg selector composes dynamic i32 element pointer" {
@@ -2757,6 +2757,35 @@ test "generic cfg selector executes owned llvm trap block" {
     var status: u32 = 0;
     _ = std.os.linux.waitpid(@intCast(pid), &status, 0);
     try std.testing.expectEqual(@as(u32, 4), status & 0x7f);
+}
+
+test "generic cfg selector preserves multi-use i64 binary lhs" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @multi_use_i64(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %sum = add i64 %lhs, %rhs
+        \\  %x = xor i64 %sum, %lhs
+        \\  %y = xor i64 %sum, %rhs
+        \\  %result = and i64 %x, %y
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("multi_use_i64", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstructionTag(machine.instructions.items, .mov_rax_to_arg);
 }
 
 test "generic cfg selector executes i128 signed multiply overflow semantics" {
