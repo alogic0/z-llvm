@@ -2945,6 +2945,14 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_overflow_addsub_acceptance.summary`, and
   `docs/evidence/distribution_all_after_overflow_addsub_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  retry: nonzero immediate equality now lowers for integer widths up to 32 via
+  EAX, with permanent executable i32 minimum/adjacent cases. The focused
+  `__negvsi2` row advances from `composed-block-icmp-eq-rhs` to
+  `composed-block-binary-imm-lhs`; report-all remains 443 selected, 143
+  emitted, and 300 failed. Tier 2 is green; no tracker or ratchet moves.
+  Evidence `docs/evidence/std_debug_hello_negvsi2_eq_min.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

@@ -1142,10 +1142,14 @@ pub const ComposedBlockSelector = struct {
             };
             const imm = try i64Value(rhs);
             if (imm != 0) {
-                if (bits != 64) return .{ .no_emitter = "composed-block-icmp-eq-rhs" };
-                selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-                try selector.clobberAccumulator();
-                try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = imm } });
+                if (bits == 64) {
+                    selector.emitValueIntoScratch(icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+                    try selector.clobberAccumulator();
+                    try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = imm } });
+                } else if (bits <= 32) {
+                    selector.emitValueIntoEax(icmp.lhs) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+                    try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = try i32Value(rhs) });
+                } else return .{ .no_emitter = "composed-block-icmp-eq-rhs" };
                 try selector.machine.instructions.append(selector.allocator, .sete_eax);
                 try selector.bindEax(result_name);
                 return null;

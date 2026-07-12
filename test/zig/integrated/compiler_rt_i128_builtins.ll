@@ -86,6 +86,13 @@ Entry:
   ret i64 %result
 }
 
+define dso_local i32 @zllvm_eq_min_i32(i32 %value) {
+Entry:
+  %equal = icmp eq i32 %value, -2147483648
+  %wide = zext i1 %equal to i32
+  ret i32 %wide
+}
+
 define dso_local i32 @zllvm_negative_i128(i128 %value) {
 Entry:
   %negative = icmp slt i128 %value, 0

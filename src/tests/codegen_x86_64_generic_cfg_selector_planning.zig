@@ -2788,6 +2788,34 @@ test "generic cfg selector preserves multi-use i64 binary lhs" {
     try expectInstructionTag(machine.instructions.items, .mov_rax_to_arg);
 }
 
+test "generic cfg selector lowers i32 minimum equality" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @eq_min_i32(i32 %value) {
+        \\entry:
+        \\  %equal = icmp eq i32 %value, -2147483648
+        \\  %wide = zext i1 %equal to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("eq_min_i32", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .{ .cmp_eax_imm32 = std.math.minInt(i32) });
+    try expectInstruction(machine.instructions.items, .sete_eax);
+}
+
 test "generic cfg selector executes i128 signed multiply overflow semantics" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

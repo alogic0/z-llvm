@@ -50,9 +50,11 @@ exact empty cold bundle on `llvm.assume` is admitted and the row now fails
 closed through exact trap-block ownership, native link, executable SIGILL, and
 pressure acceptance. The generic multi-use binary lifetime fix then closes
 `__subvdi3`, `__subvsi3`, `__addvdi3`, and `__addvsi3`; continue in rank order
-at `compiler_rt.negv.__negvsi2`. Current item-15 accounting is 23 composed
-rows, 17 terminal-template rows, zero stage-two boundary rows, and 21 open
-integer-helper fallback candidates.
+at `compiler_rt.negv.__negvsi2`. Its i32 minimum equality is admitted and the
+row now fails closed at `no_emitter/composed-block-binary-imm-lhs` for
+`0 - value`. Current item-15 accounting is 23 composed rows, 17
+terminal-template rows, zero stage-two boundary rows, and 21 open integer-helper
+fallback candidates.
 
 Current operating note recorded 2026-07-10:
 
