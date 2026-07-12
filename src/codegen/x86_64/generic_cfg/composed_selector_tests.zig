@@ -8,6 +8,7 @@ const impl = @import("composed_selector_impl.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_frame = @import("composed_selector_frame.zig");
+const selector_memory = @import("composed_selector_memory.zig");
 
 const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
