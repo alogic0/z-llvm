@@ -3125,6 +3125,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/zig_integrated_exe_udivmodsi4_acceptance.summary`, and
   `docs/evidence/distribution_all_after_udivmodsi4_acceptance.summary`.
 
+- 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
+  capability: `llvm.usub.with.overflow.i32` aggregate results now follow the
+  existing overflow-tuple planning rule and are pressure-exempt, while their
+  extracted value and carry components remain planned scalar values. The exact
+  `compiler_rt.int.__udivmoddi4` row advances from the generic
+  `stage2-unsupported-value` planner failure to `stage2-phi-restore-loc`;
+  report-all and item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmoddi4_usub_tuple.summary` and
+  `docs/evidence/selector_tier2_udivmoddi4_usub_tuple.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

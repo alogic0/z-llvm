@@ -81,7 +81,9 @@ drives frame sizing, width-correct spill copies, stable framed parameter homes,
 and parallel phi-edge alias preservation to correctness. `__udivmodsi4`,
 `__udivsi3`, and `__umodsi3` now close through exact native execution and
 pressure acceptance. Excluding intervening tail-call ABI rows, continue at
-`compiler_rt.int.__udivmoddi4` at `stage2-unsupported-value`. Current item-15
+`compiler_rt.int.__udivmoddi4`. Its unsigned-subtract overflow tuples are now
+pressure-exempt, advancing the row from `stage2-unsupported-value` to
+`stage2-phi-restore-loc`. Current item-15
 accounting is 33 composed rows, 17 terminal-template rows, zero stage-two
 boundary rows, and 11 open integer-helper fallback candidates.
 

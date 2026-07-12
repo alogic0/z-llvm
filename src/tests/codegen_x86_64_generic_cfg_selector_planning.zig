@@ -2891,6 +2891,30 @@ test "generic cfg selector pressure-exempts i64 signed multiply overflow tuple" 
     try std.testing.expect(plan.assignment("value") != null);
 }
 
+test "generic cfg selector pressure-exempts i32 unsigned subtract overflow tuple" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare { i32, i1 } @llvm.usub.with.overflow.i32(i32, i32)
+        \\
+        \\define i32 @usub_overflow_i32(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %pair = call { i32, i1 } @llvm.usub.with.overflow.i32(i32 %lhs, i32 %rhs)
+        \\  %value = extractvalue { i32, i1 } %pair, 0
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var plan = try stage2_planning.buildSelectorAllocationPlan(std.testing.allocator, module.functions.items[0]);
+    defer plan.deinit();
+
+    try std.testing.expectEqual(@as(?stage2_planning.PlannedValueAssignment, null), plan.assignment("pair"));
+    try std.testing.expect(plan.assignment("value") != null);
+}
+
 test "generic cfg selector lowers i64 signed multiply overflow components" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
