@@ -6,6 +6,7 @@ const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const impl = @import("composed_selector_impl.zig");
 const selector_state = @import("composed_selector_state.zig");
+const selector_scalar = @import("composed_selector_scalar.zig");
 
 const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
@@ -102,7 +103,7 @@ test "generic cfg selector routes i128 trunc through planned expired register" {
     try selector_state.bindValueLoc(&selector, "wide", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
 
     try selector_state.expireExpiredBindings(&selector);
-    const diagnostic = try impl.lowerCast(&selector, "lo", .{
+    const diagnostic = try selector_scalar.lowerCast(&selector, "lo", .{
         .op = .trunc,
         .from_ty = .{ .int = 128 },
         .value = .{ .named = "wide" },
@@ -136,7 +137,7 @@ test "generic cfg selector materializes mul64 lhs into planned register" {
     try selector_state.bindValueLoc(&selector, "rhs", .{ .arg64 = .rsi });
 
     try selector_state.expireExpiredBindings(&selector);
-    const diagnostic = try impl.lowerMul64(&selector, "product", .{
+    const diagnostic = try selector_scalar.lowerMul64(&selector, "product", .{
         .op = .mul,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
@@ -177,7 +178,7 @@ test "generic cfg selector reloads spilled mul64 rhs through rax when scratch re
     try selector_state.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
     try selector_state.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot2 });
 
-    const diagnostic = try impl.lowerMul64(&selector, "product", .{
+    const diagnostic = try selector_scalar.lowerMul64(&selector, "product", .{
         .op = .mul,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
@@ -218,7 +219,7 @@ test "generic cfg selector spills live mul64 lhs before reusing its scratch regi
     try selector_state.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
     try selector_state.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
 
-    const diagnostic = try impl.lowerMul64(&selector, "product", .{
+    const diagnostic = try selector_scalar.lowerMul64(&selector, "product", .{
         .op = .mul,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
@@ -265,7 +266,7 @@ test "generic cfg selector reloads spilled mul64 lhs through rax when scratch re
     try selector_state.bindValueLoc(&selector, "lhs", .{ .spill64 = .slot10 });
     try selector_state.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot12 });
 
-    const diagnostic = try impl.lowerMul64(&selector, "product", .{
+    const diagnostic = try selector_scalar.lowerMul64(&selector, "product", .{
         .op = .mul,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
@@ -378,7 +379,7 @@ test "generic cfg selector reloads 32-bit spill rhs for binary accumulator op" {
     try selector_state.bindValueLoc(&selector, "lhs", .{ .scratch32 = .rdi });
     try selector_state.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot4 });
 
-    const diagnostic = try impl.lowerBinary(&selector, "sum", .{
+    const diagnostic = try selector_scalar.lowerBinary(&selector, "sum", .{
         .op = .add,
         .ty = .{ .int = 32 },
         .lhs = .{ .named = "lhs" },
@@ -465,7 +466,7 @@ test "generic cfg selector reloads spilled pair for i128 trunc" {
     defer selector.deinit();
 
     try selector_state.bindValueLoc(&selector, "wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
-    const diagnostic = try impl.lowerCast(&selector, "lo", .{
+    const diagnostic = try selector_scalar.lowerCast(&selector, "lo", .{
         .op = .trunc,
         .value = .{ .named = "wide" },
         .from_ty = .{ .int = 128 },
@@ -495,7 +496,7 @@ test "generic cfg selector i128 trunc reuses source low lane without clobbering 
     try selector_state.bindValueLoc(&selector, "lo", .{ .scratch64 = .rcx });
     try selector_state.bindValueLoc(&selector, "shifted", .{ .scratch128 = .{ .lo = .rdi, .hi = .rsi } });
 
-    const diagnostic = try impl.lowerCast(&selector, "hi", .{
+    const diagnostic = try selector_scalar.lowerCast(&selector, "hi", .{
         .op = .trunc,
         .value = .{ .named = "shifted" },
         .from_ty = .{ .int = 128 },
@@ -516,7 +517,7 @@ test "generic cfg selector masks reloaded i64 spill low half" {
     defer selector.deinit();
 
     try selector_state.bindValueLoc(&selector, "wide_lo", .{ .spill64 = .slot6 });
-    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "masked", .{
+    const diagnostic = try selector_scalar.lowerBinaryImmediateRhs(&selector, "masked", .{
         .op = .@"and",
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "wide_lo" },
@@ -547,7 +548,7 @@ test "generic cfg selector preserves live rax before another i64 low-half mask" 
     try selector_state.bindValueLoc(&selector, "left_masked", .rax);
     try selector_state.bindValueLoc(&selector, "right", .{ .scratch64 = .rsi });
 
-    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "right_masked", .{
+    const diagnostic = try selector_scalar.lowerBinaryImmediateRhs(&selector, "right_masked", .{
         .op = .@"and",
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "right" },
@@ -580,7 +581,7 @@ test "generic cfg selector lshr64 avoids live scalar scratch values" {
     try selector_state.bindValueLoc(&selector, "live", .{ .scratch64 = .rcx });
     try selector_state.bindValueLoc(&selector, "source", .{ .scratch64 = .r8 });
 
-    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
+    const diagnostic = try selector_scalar.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .lshr,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -621,7 +622,7 @@ test "generic cfg selector lshr64 reuses dead source scratch register" {
     try selector_state.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
     try selector_state.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
 
-    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
+    const diagnostic = try selector_scalar.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .lshr,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -651,7 +652,7 @@ test "generic cfg selector shl64 spills live rax source before destructive shift
 
     try selector_state.bindValueLoc(&selector, "source", .rax);
 
-    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
+    const diagnostic = try selector_scalar.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .shl,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -694,7 +695,7 @@ test "generic cfg selector lshr64 spills live source before reusing its scratch 
     try selector_state.bindValueLoc(&selector, "live_r8", .{ .scratch64 = .r8 });
     try selector_state.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
 
-    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
+    const diagnostic = try selector_scalar.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .lshr,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
@@ -740,7 +741,7 @@ test "generic cfg selector lshr64 reloads spilled source through rax when scratc
     try selector_state.bindValueLoc(&selector, "live_r9", .{ .scratch64 = .r9 });
     try selector_state.bindValueLoc(&selector, "source", .{ .spill64 = .slot10 });
 
-    const diagnostic = try impl.lowerBinaryImmediateRhs(&selector, "shifted", .{
+    const diagnostic = try selector_scalar.lowerBinaryImmediateRhs(&selector, "shifted", .{
         .op = .lshr,
         .ty = .{ .int = 64 },
         .lhs = .{ .named = "source" },
