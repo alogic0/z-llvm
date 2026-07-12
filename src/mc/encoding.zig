@@ -224,6 +224,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .sar_eax_cl => try bytes.appendSlice(allocator, &.{ 0xd3, 0xf8 }),
             .shl_rax_cl => try bytes.appendSlice(allocator, &.{ 0x48, 0xd3, 0xe0 }),
             .shr_rax_cl => try bytes.appendSlice(allocator, &.{ 0x48, 0xd3, 0xe8 }),
+            .sar_rax_cl => try bytes.appendSlice(allocator, &.{ 0x48, 0xd3, 0xf8 }),
             .fshl_eax_arg32_imm5 => |shift| {
                 if (shift.reg.rexR()) try bytes.append(allocator, 0x44);
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0xa4, 0xc0 | (@as(u8, shift.reg.lowCode()) << 3), shift.amount });
@@ -1692,7 +1693,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .shr_arg_imm5 => |shift| if (shift.reg.rexB()) 4 else 3,
         .shr_arg64_imm6, .sar_arg64_imm6 => 4,
         .shl_eax_cl, .shr_eax_cl, .sar_eax_cl => 2,
-        .shl_rax_cl, .shr_rax_cl => 3,
+        .shl_rax_cl, .shr_rax_cl, .sar_rax_cl => 3,
         .fshl_eax_arg32_imm5 => |shift| if (shift.reg.rexR()) 5 else 4,
         .or_eax_imm32 => 5,
         .imul_eax_imm32 => 6,

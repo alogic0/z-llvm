@@ -83,6 +83,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .sar_eax_cl => try writer.writeAll("\tsarl %cl, %eax\n"),
             .shl_rax_cl => try writer.writeAll("\tshlq %cl, %rax\n"),
             .shr_rax_cl => try writer.writeAll("\tshrq %cl, %rax\n"),
+            .sar_rax_cl => try writer.writeAll("\tsarq %cl, %rax\n"),
             .fshl_eax_arg32_imm5 => |shift| try writer.print("\tshldl ${}, {s}, %eax\n", .{ shift.amount, shift.reg.name32() }),
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),

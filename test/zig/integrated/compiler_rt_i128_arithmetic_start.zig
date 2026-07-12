@@ -4,6 +4,7 @@ extern fn zllvm_freeze_i128(i128) callconv(.c) i128;
 extern fn zllvm_i128_phi(u32, i128, i128) callconv(.c) i128;
 extern fn zllvm_variable_lshr_i64(u64, u64) callconv(.c) u64;
 extern fn zllvm_variable_shl_i64(u64, u64) callconv(.c) u64;
+extern fn zllvm_variable_ashr_i64(i64, i64) callconv(.c) i64;
 extern fn zllvm_ne_zero_i16(u32) callconv(.c) u32;
 extern fn zllvm_store_i32_index([*]u32, u64, u32) callconv(.c) u32;
 extern fn zllvm_load_i32_index([*]u32, u64) callconv(.c) u32;
@@ -178,7 +179,7 @@ pub export fn _start() callconv(.c) noreturn {
     const freeze_i128_bad: usize = @intFromBool(zllvm_freeze_i128(loadI128(&multi_rhs)) != multi_rhs);
     const i128_phi_bad: usize = @intFromBool(zllvm_i128_phi(1, loadI128(&multi_lhs), loadI128(&multi_rhs)) != multi_lhs or zllvm_i128_phi(0, loadI128(&multi_lhs), loadI128(&multi_rhs)) != multi_rhs);
     const variable_lshr_i64_bad: usize = @intFromBool(zllvm_variable_lshr_i64(0x8000_0000_0000_0000, 63) != 1 or zllvm_variable_lshr_i64(0xf000_0000_0000_0000, 4) != 0x0f00_0000_0000_0000);
-    const variable_shl_i64_bad: usize = @intFromBool(zllvm_variable_shl_i64(1, 63) != 0x8000_0000_0000_0000 or zllvm_variable_shl_i64(0xf, 60) != 0xf000_0000_0000_0000);
+    const variable_shl_i64_bad: usize = @intFromBool(zllvm_variable_shl_i64(1, 63) != 0x8000_0000_0000_0000 or zllvm_variable_shl_i64(0xf, 60) != 0xf000_0000_0000_0000 or zllvm_variable_ashr_i64(-16, 2) != -4 or zllvm_variable_ashr_i64(-1, 63) != -1 or zllvm_variable_ashr_i64(16, 2) != 4);
     const smul_positive_plain_bad: usize = @intFromBool(zllvm_smul_i128_value(12, 11) != 132 or zllvm_smul_i128_overflow(12, 11) != 0);
     const smul_negative_plain_bad: usize = @intFromBool(zllvm_smul_i128_value(-12, 11) != -132 or zllvm_smul_i128_overflow(-12, 11) != 0);
     const smul_positive_overflow_bad: usize = @intFromBool(zllvm_smul_i128_value(max_i128, 2) != -2 or zllvm_smul_i128_overflow(max_i128, 2) != 1);

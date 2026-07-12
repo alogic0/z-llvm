@@ -10,13 +10,12 @@ The composed selector now lowers named-count `shl i64` through a verified
 bit and full high-nibble placement.
 
 ```text
-summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=443 emitted_functions=160 failed_functions=283 first_failing_function=compiler_rt.trunc.__trunch first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
-compiler_rt.shift.__lshrti3: composed-block-binary-op
+summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=443 emitted_functions=162 failed_functions=281 first_failing_function=compiler_rt.trunc.__trunch first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
 compiler_rt.shift.__ashrti3: composed-block-binary-op
-compiler_rt.shift.__ashlti3: composed-block-binary-op
 ```
 
 Log: `tmp/std_debug_hello_lshrti3_variable_shl_i64.log`.
 
-No report-count migration occurred. The exact rows remain fail-closed at a
-later operation carrying the same coarse binary-op diagnostic.
+Fresh report after rebuilding `zig-out/bin/z_llvm` shows `__lshrti3` and
+`__ashlti3` emitting. Their exact acceptance remains pending; only
+`__ashrti3` remains fail-closed at the next operation-specific form.

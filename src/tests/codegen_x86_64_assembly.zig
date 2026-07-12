@@ -78,6 +78,7 @@ test "x86_64 assembly prints variable eax shifts" {
     try machine.instructions.append(std.testing.allocator, .sar_eax_cl);
     try machine.instructions.append(std.testing.allocator, .shl_rax_cl);
     try machine.instructions.append(std.testing.allocator, .shr_rax_cl);
+    try machine.instructions.append(std.testing.allocator, .sar_rax_cl);
     try machine.instructions.append(std.testing.allocator, .{ .sar_eax_imm5 = 7 });
     try machine.instructions.append(std.testing.allocator, .ret);
 
@@ -93,6 +94,7 @@ test "x86_64 assembly prints variable eax shifts" {
             "\tsarl %cl, %eax\n" ++
             "\tshlq %cl, %rax\n" ++
             "\tshrq %cl, %rax\n" ++
+            "\tsarq %cl, %rax\n" ++
             "\tsarl $7, %eax\n" ++
             "\tretq\n",
         output.writer.buffered(),

@@ -3302,11 +3302,21 @@ One line per completed cycle, append-only, newest last. This is the
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: named
   i64 left-shift counts now lower through a verified `shlq %cl, %rax` machine
-  form, with executable high-bit checks. The exact i128 shift rows clear this
-  limb operation but remain fail-closed at a later `composed-block-binary-op`;
-  report-all and item-15 counts remain unchanged. Evidence
+  form, with executable high-bit checks. Fresh rebuilt report-all advances to
+  162 emitted / 281 failed as `__lshrti3` and `__ashlti3` begin emitting;
+  exact acceptance and item-15 accounting remain pending, while `__ashrti3`
+  stays fail-closed at a later `composed-block-binary-op`. Evidence
   `docs/evidence/std_debug_hello_lshrti3_variable_shl_i64.summary` and
   `docs/evidence/selector_tier2_lshrti3_variable_shl_i64.summary`.
+
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper emission: named
+  i64 arithmetic-right shift counts now lower through a verified
+  `sarq %cl, %rax` machine form, with executable positive and negative checks.
+  `__ashrti3` joins `__lshrti3` and `__ashlti3` in emitting; fresh report-all
+  reaches 163 emitted / 280 failed. Exact native execution, pressure
+  diagnostics, Tier 3, and item-15 accounting remain pending. Evidence
+  `docs/evidence/std_debug_hello_ashrti3_variable_ashr_i64.summary` and
+  `docs/evidence/selector_tier2_ashrti3_variable_ashr_i64.summary`.
 
 ## Ratchet State
 
