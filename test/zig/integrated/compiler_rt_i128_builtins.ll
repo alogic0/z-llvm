@@ -38,6 +38,12 @@ Entry:
   ret i64 %result
 }
 
+define dso_local i64 @zllvm_variable_shl_i64(i64 %value, i64 %amount) {
+Entry:
+  %result = shl i64 %value, %amount
+  ret i64 %result
+}
+
 define dso_local i32 @zllvm_ne_zero_i16(i32 %value) {
 Entry:
   %narrow = trunc i32 %value to i16

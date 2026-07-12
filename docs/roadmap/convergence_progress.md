@@ -3300,6 +3300,14 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence `docs/evidence/std_debug_hello_lshrti3_variable_lshr_i64.summary`
   and `docs/evidence/selector_tier2_lshrti3_variable_lshr_i64.summary`.
 
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: named
+  i64 left-shift counts now lower through a verified `shlq %cl, %rax` machine
+  form, with executable high-bit checks. The exact i128 shift rows clear this
+  limb operation but remain fail-closed at a later `composed-block-binary-op`;
+  report-all and item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_lshrti3_variable_shl_i64.summary` and
+  `docs/evidence/selector_tier2_lshrti3_variable_shl_i64.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

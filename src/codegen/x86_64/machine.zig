@@ -104,6 +104,7 @@ pub const Instruction = union(enum) {
     shl_eax_cl,
     shr_eax_cl,
     sar_eax_cl,
+    shl_rax_cl,
     shr_rax_cl,
     fshl_eax_arg32_imm5: struct {
         reg: ArgReg,

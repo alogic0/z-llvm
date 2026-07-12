@@ -121,11 +121,11 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         try selector_state.bindEax(selector, result_name);
         return null;
     }
-    if (binary.op == .lshr and bits == 64) {
+    if ((binary.op == .shl or binary.op == .lshr) and bits == 64) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
         if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
         try selector_state.emitValueIntoRax(selector, binary.lhs);
-        try selector.machine.instructions.append(selector.allocator, .shr_rax_cl);
+        try selector.machine.instructions.append(selector.allocator, if (binary.op == .shl) .shl_rax_cl else .shr_rax_cl);
         try selector_state.bindRax(selector, result_name);
         return null;
     }

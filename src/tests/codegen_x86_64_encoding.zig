@@ -188,6 +188,7 @@ test "x86_64 encoding emits variable eax shifts" {
     try machine.instructions.append(std.testing.allocator, .shl_eax_cl);
     try machine.instructions.append(std.testing.allocator, .shr_eax_cl);
     try machine.instructions.append(std.testing.allocator, .sar_eax_cl);
+    try machine.instructions.append(std.testing.allocator, .shl_rax_cl);
     try machine.instructions.append(std.testing.allocator, .shr_rax_cl);
     try machine.instructions.append(std.testing.allocator, .{ .sar_eax_imm5 = 7 });
     try machine.instructions.append(std.testing.allocator, .ret);
@@ -195,11 +196,12 @@ test "x86_64 encoding emits variable eax shifts" {
     try std.testing.expectEqual(@as(u32, 2), mc.encoding.instructionSize(.shl_eax_cl));
     try std.testing.expectEqual(@as(u32, 2), mc.encoding.instructionSize(.shr_eax_cl));
     try std.testing.expectEqual(@as(u32, 2), mc.encoding.instructionSize(.sar_eax_cl));
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.shl_rax_cl));
     try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.shr_rax_cl));
     try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .sar_eax_imm5 = 7 }));
     const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
-    try std.testing.expectEqualSlices(u8, &.{ 0xd3, 0xe0, 0xd3, 0xe8, 0xd3, 0xf8, 0x48, 0xd3, 0xe8, 0xc1, 0xf8, 0x07, 0xc3 }, bytes);
+    try std.testing.expectEqualSlices(u8, &.{ 0xd3, 0xe0, 0xd3, 0xe8, 0xd3, 0xf8, 0x48, 0xd3, 0xe0, 0x48, 0xd3, 0xe8, 0xc1, 0xf8, 0x07, 0xc3 }, bytes);
 }
 
 test "x86_64 encoding sizes high-register rcx compare before backedge" {
