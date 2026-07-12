@@ -62,9 +62,13 @@ absolute-value binding before acceptance. Continue in rank order at
 `compiler_rt.absvsi2.__absvsi2`. Width-correct i32 absolute value and live-EAX
 preservation now close that row through exact native execution and pressure
 acceptance. Excluding intervening tail-call ABI rows, continue at
-`compiler_rt.mulXi3.__muldi3` at `composed-block-binary-op`. Current item-15
-accounting is 29 composed rows, 17 terminal-template rows, zero stage-two
-boundary rows, and 15 open integer-helper fallback candidates.
+`compiler_rt.mulXi3.__muldi3` at `composed-block-binary-op`. Named i32
+multiplication and fail-closed EAX preservation now close that row through
+exact decomposed native execution and pressure acceptance. Excluding
+intervening tail-call ABI rows, continue at
+`compiler_rt.int.__udivmodsi4` at `stage2-phi-registers`. Current item-15
+accounting is 30 composed rows, 17 terminal-template rows, zero stage-two
+boundary rows, and 14 open integer-helper fallback candidates.
 
 Current operating note recorded 2026-07-10:
 

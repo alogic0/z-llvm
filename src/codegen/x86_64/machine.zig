@@ -62,6 +62,7 @@ pub const Instruction = union(enum) {
     },
     sbb_arg64_rax: ArgReg,
     adc_rax_imm0,
+    imul_eax_arg32: ArgReg,
     imul_arg64_arg64: struct {
         dst: ArgReg,
         src: ArgReg,

@@ -186,6 +186,12 @@ pub fn encodeImulReg64Reg64(bytes: *std.ArrayList(u8), allocator: std.mem.Alloca
     try bytes.append(allocator, 0xc0 | (@as(u8, dst.lowCode()) << 3) | @as(u8, src.lowCode()));
 }
 
+pub fn encodeImulEaxReg32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, src: x86_64.ArgReg) !void {
+    if (src.rexB()) try bytes.append(allocator, 0x41);
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0xaf });
+    try bytes.append(allocator, 0xc0 | @as(u8, src.lowCode()));
+}
+
 pub fn encodeImulReg64Rax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: x86_64.ArgReg) !void {
     var rex: u8 = 0x48;
     if (dst.rexR()) rex |= 0x04;

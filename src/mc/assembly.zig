@@ -50,6 +50,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .binary_arg_rax => |binary| try writer.print("\t{s} {s}, %rax\n", .{ binary.op.mnemonic64(), binary.reg.name64() }),
             .sbb_arg64_rax => |reg| try writer.print("\tsbbq {s}, %rax\n", .{reg.name64()}),
             .adc_rax_imm0 => try writer.writeAll("\tadcq $0, %rax\n"),
+            .imul_eax_arg32 => |src| try writer.print("\timull {s}, %eax\n", .{src.name32()}),
             .imul_arg64_arg64 => |imul| try writer.print("\timulq {s}, {s}\n", .{ imul.src.name64(), imul.dst.name64() }),
             .imul_arg64_rax => |dst| try writer.print("\timulq %rax, {s}\n", .{dst.name64()}),
             .imul_rax_arg64 => |src| try writer.print("\timulq {s}, %rax\n", .{src.name64()}),

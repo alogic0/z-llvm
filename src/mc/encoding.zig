@@ -20,6 +20,7 @@ const encodeReg64ToReg64 = encoding_helpers.encodeReg64ToReg64;
 const encodeRspToReg64 = encoding_helpers.encodeRspToReg64;
 const encodeMovsxdReg32ToReg64 = encoding_helpers.encodeMovsxdReg32ToReg64;
 const encodeImulReg64Reg64 = encoding_helpers.encodeImulReg64Reg64;
+const encodeImulEaxReg32 = encoding_helpers.encodeImulEaxReg32;
 const encodeImulReg64Rax = encoding_helpers.encodeImulReg64Rax;
 const encodeImulRaxReg64 = encoding_helpers.encodeImulRaxReg64;
 const encodeImulRaxFrameSlot = encoding_helpers.encodeImulRaxFrameSlot;
@@ -169,6 +170,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .binary_arg_rax => |binary| try encodeRegToRax64Binary(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .sbb_arg64_rax => |reg| try encodeRegToRax64Binary(&bytes, allocator, 0x19, reg),
             .adc_rax_imm0 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xd0, 0x00 }),
+            .imul_eax_arg32 => |src| try encodeImulEaxReg32(&bytes, allocator, src),
             .imul_arg64_arg64 => |imul| try encodeImulReg64Reg64(&bytes, allocator, imul.dst, imul.src),
             .imul_arg64_rax => |dst| try encodeImulReg64Rax(&bytes, allocator, dst),
             .imul_rax_arg64 => |src| try encodeImulRaxReg64(&bytes, allocator, src),
@@ -1657,6 +1659,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .sbb_arg64_rax => 3,
         .adc_rax_imm0 => 4,
         .imul_arg64_arg64 => 4,
+        .imul_eax_arg32 => |reg| if (reg.rexB()) 4 else 3,
         .imul_arg64_rax, .imul_rax_arg64 => 4,
         .imul_rax_rsp => |frame_index| imulRaxFrameSlotInstructionSize(frame_index),
         .mul_rax_arg64_full, .imul_rax_arg64_full => |reg| if (reg.rexB()) 4 else 3,

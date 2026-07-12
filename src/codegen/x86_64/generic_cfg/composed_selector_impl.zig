@@ -460,6 +460,16 @@ pub const ComposedBlockSelector = struct {
         if ((binary.op == .udiv or binary.op == .urem) and bits == 64) {
             return try selector.lowerUnsignedDivRem64(result_name, binary);
         }
+        if (binary.op == .mul and bits <= 32) {
+            while (selector.liveAccumulatorNameAfterCurrent()) |live_name| {
+                if (try selector.preserveLiveAccumulatorValue(live_name)) |diagnostic| return diagnostic;
+            }
+            try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
+            try selector.emitValueIntoEax(binary.lhs);
+            try selector.machine.instructions.append(selector.allocator, .{ .imul_eax_arg32 = .rcx });
+            try selector.bindEax(result_name);
+            return null;
+        }
         if ((binary.op == .shl or binary.op == .lshr) and bits == 32) {
             try selector.emitValueIntoScratch(binary.rhs, .rcx, bits);
             try selector.emitValueIntoEax(binary.lhs);
@@ -2799,9 +2809,12 @@ pub const ComposedBlockSelector = struct {
 
     fn preserveCurrentEaxIntoScratch(selector: *ComposedBlockSelector) !?Diagnostic {
         const name = selector.liveEaxName() orelse return null;
-        if (!selector.scratchRegIsProvenFree(.rdx)) return null;
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdx });
-        try selector.bindValueLoc(name, .{ .scratch32 = .rdx });
+        const dst = selector.scratch64RegForUseAvoiding(null) orelse {
+            try selector.spillValueOrError(name);
+            return null;
+        };
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = dst });
+        try selector.bindValueLoc(name, .{ .scratch32 = dst });
         return null;
     }
 

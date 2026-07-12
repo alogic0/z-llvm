@@ -125,6 +125,12 @@ Entry:
   ret i32 %absolute
 }
 
+define dso_local i32 @zllvm_mul_i32(i32 %lhs, i32 %rhs) {
+Entry:
+  %product = mul i32 %lhs, %rhs
+  ret i32 %product
+}
+
 define dso_local i32 @zllvm_negative_i128(i128 %value) {
 Entry:
   %negative = icmp slt i128 %value, 0

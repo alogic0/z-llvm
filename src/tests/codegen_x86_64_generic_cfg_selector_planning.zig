@@ -1054,7 +1054,12 @@ test "generic cfg selector stage two composes i32 multiply loop" {
         },
     }
 
-    try expectInstruction(machine.instructions.items, .{ .mov_eax_to_arg = .rdx });
+    var saw_eax_preservation = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .mov_eax_to_arg => saw_eax_preservation = true,
+        else => {},
+    };
+    try std.testing.expect(saw_eax_preservation);
     try expectInstruction(machine.instructions.items, .{ .shl_eax_imm5 = 1 });
     try expectNamedInstruction(machine.instructions.items, .label, "loop");
     try expectNamedInstruction(machine.instructions.items, .label, "exit");
@@ -2925,6 +2930,32 @@ test "generic cfg selector lowers i32 absolute value intrinsic" {
         },
     }
     try expectInstruction(machine.instructions.items, .abs_i32_edi_eax);
+}
+
+test "generic cfg selector lowers named i32 multiplication" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @mul_i32(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %product = mul i32 %lhs, %rhs
+        \\  ret i32 %product
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var machine = codegen.x86_64.MachineFunction.init("mul_i32", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+    try expectInstruction(machine.instructions.items, .{ .imul_eax_arg32 = .rcx });
 }
 
 test "generic cfg selector executes framed i128 negation trap" {

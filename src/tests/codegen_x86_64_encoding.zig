@@ -105,6 +105,24 @@ test "x86_64 encoding sizes high-register binary rax operands" {
     }, bytes);
 }
 
+test "x86_64 encoding emits named i32 multiply operands" {
+    var machine = codegen.x86_64.MachineFunction.init("mul_i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .imul_eax_arg32 = .rcx });
+    try machine.instructions.append(std.testing.allocator, .{ .imul_eax_arg32 = .r8 });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .imul_eax_arg32 = .rcx }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .imul_eax_arg32 = .r8 }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x0f, 0xaf, 0xc1,
+        0x41, 0x0f, 0xaf,
+        0xc0, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding emits i32 absolute value" {
     var machine = codegen.x86_64.MachineFunction.init("abs_i32", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
