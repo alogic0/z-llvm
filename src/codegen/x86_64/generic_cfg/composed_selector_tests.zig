@@ -1196,6 +1196,32 @@ test "generic cfg selector lowers named i32 unsigned division and remainder" {
     }, remainder_machine.instructions.items);
 }
 
+test "generic cfg selector lowers named i32 unsigned greater-than" {
+    var machine = MachineFunction.init("ugt-i32-named", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+    const diagnostic = try selector_scalar.lowerIcmp(&selector, "cmp", .{
+        .predicate = .ugt,
+        .operand_ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    });
+
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+        .{ .mov_arg_arg = .{ .dst = .r8, .src = .rsi } },
+        .{ .cmp_ecx_arg32 = .r8 },
+        .setb_eax,
+    }, machine.instructions.items);
+}
+
 test "generic cfg selector lays out mixed scalar and array frame objects" {
     var function = ir.Function.init("mixed-frame", .void);
     defer function.deinit(std.testing.allocator);

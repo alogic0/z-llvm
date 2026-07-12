@@ -5,6 +5,7 @@ extern fn zllvm_ugt_u64(u64, u64) callconv(.c) u32;
 extern fn zllvm_ult_u32(u32, u32) callconv(.c) u32;
 extern fn zllvm_udiv_u32(u32, u32) callconv(.c) u32;
 extern fn zllvm_urem_u32(u32, u32) callconv(.c) u32;
+extern fn zllvm_ugt_u32(u32, u32) callconv(.c) u32;
 
 var low: u64 = 3;
 var high: u64 = 7;
@@ -33,6 +34,8 @@ pub export fn _start() callconv(.c) noreturn {
     bad += @intFromBool(zllvm_urem_u32(100, 7) != 2);
     bad += @intFromBool(zllvm_udiv_u32(unsigned_high, 7) != 306783378);
     bad += @intFromBool(zllvm_urem_u32(unsigned_high, 7) != 2);
+    bad += @intFromBool(zllvm_ugt_u32(unsigned_high, @intCast(rhs)) != 1);
+    bad += @intFromBool(zllvm_ugt_u32(@intCast(rhs), unsigned_high) != 0);
     exit(bad);
 }
 

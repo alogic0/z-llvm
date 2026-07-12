@@ -846,11 +846,12 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         }
         try selector_state.clobberAccumulator(selector);
         try selector.machine.instructions.append(selector.allocator, .sete_eax);
-    } else if (icmp.predicate == .ugt and icmp.operand_ty.eql(.{ .int = 64 }) and icmp.rhs == .named) {
-        selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-        selector_state.emitValueIntoScratch(selector, icmp.rhs, .r8, 64) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
+    } else if (icmp.predicate == .ugt and (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })) and icmp.rhs == .named) {
+        const bits: u16 = if (icmp.operand_ty.eql(.{ .int = 32 })) 32 else 64;
+        selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+        selector_state.emitValueIntoScratch(selector, icmp.rhs, .r8, bits) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
         try selector_state.clobberAccumulator(selector);
-        try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .r8 });
+        try selector.machine.instructions.append(selector.allocator, if (bits == 32) .{ .cmp_ecx_arg32 = .r8 } else .{ .cmp_rcx_arg64 = .r8 });
         try selector.machine.instructions.append(selector.allocator, .setb_eax);
     } else if (icmp.predicate == .ugt and icmp.operand_ty.eql(.{ .int = 64 }) and icmp.rhs == .int) {
         selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };

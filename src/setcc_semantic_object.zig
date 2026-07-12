@@ -20,6 +20,7 @@ pub fn main(init: std.process.Init) !void {
         x86_64.MachineFunction.init("zllvm_ult_u32", .{ .int = 32 }),
         x86_64.MachineFunction.init("zllvm_udiv_u32", .{ .int = 32 }),
         x86_64.MachineFunction.init("zllvm_urem_u32", .{ .int = 32 }),
+        x86_64.MachineFunction.init("zllvm_ugt_u32", .{ .int = 32 }),
     };
     defer for (&functions) |*function| function.deinit(allocator);
 
@@ -30,10 +31,21 @@ pub fn main(init: std.process.Init) !void {
     try appendUltU32(allocator, &functions[4]);
     try appendUnsignedDivU32(allocator, &functions[5], false);
     try appendUnsignedDivU32(allocator, &functions[6], true);
+    try appendUgtU32(allocator, &functions[7]);
 
     const object = try elf.buildObject(allocator, &functions);
     defer allocator.free(object);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = object });
+}
+
+fn appendUgtU32(allocator: std.mem.Allocator, function: *x86_64.MachineFunction) !void {
+    try function.instructions.appendSlice(allocator, &.{
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+        .{ .mov_arg_arg = .{ .dst = .r8, .src = .rsi } },
+        .{ .cmp_ecx_arg32 = .r8 },
+        .setb_eax,
+        .ret,
+    });
 }
 
 fn appendUnsignedDivU32(allocator: std.mem.Allocator, function: *x86_64.MachineFunction, remainder: bool) !void {

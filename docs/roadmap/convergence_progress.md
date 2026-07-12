@@ -3198,6 +3198,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_udivmoddi4_udiv_urem_i32.summary` and
   `docs/evidence/selector_tier2_udivmoddi4_udiv_urem_i32.summary`.
 
+- 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: named
+  unsigned greater-than now shares one i32/i64 selector branch with explicit
+  width-correct materialization and compare order. Executable checks prove
+  unsigned behavior across the i32 high-bit boundary. The exact
+  `compiler_rt.int.__udivmoddi4` row advances from the later
+  `composed-block-icmp-form` to `composed-block-call-form`; report-all and
+  item-15 counts remain unchanged. Evidence
+  `docs/evidence/std_debug_hello_udivmoddi4_ugt_i32_named.summary` and
+  `docs/evidence/selector_tier2_udivmoddi4_ugt_i32_named.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
