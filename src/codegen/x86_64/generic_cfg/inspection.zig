@@ -69,7 +69,7 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .call => |call| inspectCall(call),
         .phi => |phi| if (isSelectorScalarType(phi.ty)) null else .{ .unsupported_type = "phi" },
         .freeze => |freeze| if (isSelectorScalarType(freeze.ty)) null else .{ .unsupported_type = "freeze" },
-        .fcmp => .{ .unsupported_instruction = "fcmp" },
+        .fcmp => |fcmp| if (fcmp.operand_ty == .float or fcmp.operand_ty == .double) null else .{ .unsupported_type = "fcmp" },
         .atomicrmw => .{ .unsupported_instruction = "atomicrmw" },
         .cmpxchg => .{ .unsupported_instruction = "cmpxchg" },
         .fence => .{ .unsupported_instruction = "fence" },

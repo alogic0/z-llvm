@@ -873,10 +873,6 @@ pub fn genericCfgSupportsIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
 
 pub fn genericCfgSupportsFcmp(function: ir.Function, fcmp: ir.FcmpInst) bool {
     if (!fcmp.operand_ty.eql(.float) and !fcmp.operand_ty.eql(.double)) return false;
-    switch (fcmp.predicate) {
-        .ole, .oge => {},
-        else => return false,
-    }
     return genericCfgSupportsScalarValue(function, fcmp.lhs) and
         genericCfgSupportsScalarValue(function, fcmp.rhs);
 }

@@ -1,4 +1,5 @@
 const std = @import("std");
+const ir = @import("../ir.zig");
 const x86_64 = @import("../codegen/x86_64.zig");
 const selector_bytes = @import("../codegen/x86_64/selector_bytes.zig");
 const encoding_helpers = @import("encoding_helpers.zig");
@@ -1353,6 +1354,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x6e, 0xc0 | (@as(u8, load.reg.lowCode()) << 3) });
             },
             .ucomisd => |cmp| try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x2e, 0xc0 | (@as(u8, cmp.dst.lowCode()) << 3) | @as(u8, cmp.src.lowCode()) }),
+            .ucomiss => |cmp| try bytes.appendSlice(allocator, &.{ 0x0f, 0x2e, 0xc0 | (@as(u8, cmp.dst.lowCode()) << 3) | @as(u8, cmp.src.lowCode()) }),
+            .set_fcmp_eax => |predicate| try encodeFcmpResult(&bytes, allocator, predicate),
             .ucomisd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x2e, 0xc1 }),
             .ucomiss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x2e, 0xc1 }),
             .ucomiss_xmm0_xmm1 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x2e, 0xc8 }),
@@ -1655,6 +1658,39 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
     return try bytes.toOwnedSlice(allocator);
 }
 
+fn encodeFcmpResult(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, predicate: ir.FcmpPredicate) !void {
+    if (predicate == .false or predicate == .true) {
+        try bytes.appendSlice(allocator, if (predicate == .true) &.{ 0xb8, 1, 0, 0, 0 } else &.{ 0xb8, 0, 0, 0, 0 });
+        return;
+    }
+    const opcode: u8 = switch (predicate) {
+        .oeq, .ueq => 0x94,
+        .ogt, .ugt => 0x97,
+        .oge, .uge => 0x93,
+        .olt, .ult => 0x92,
+        .ole, .ule => 0x96,
+        .one, .une => 0x95,
+        .ord => 0x9b,
+        .uno => 0x9a,
+        .false, .true => unreachable,
+    };
+    try bytes.appendSlice(allocator, &.{ 0x0f, opcode, 0xc0 });
+    switch (predicate) {
+        .oeq, .olt, .ole => try bytes.appendSlice(allocator, &.{ 0x0f, 0x9b, 0xc4, 0x20, 0xe0 }),
+        .ugt, .uge, .une => try bytes.appendSlice(allocator, &.{ 0x0f, 0x9a, 0xc4, 0x08, 0xe0 }),
+        else => {},
+    }
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0xb6, 0xc0 });
+}
+
+fn fcmpResultSize(predicate: ir.FcmpPredicate) u32 {
+    return switch (predicate) {
+        .false, .true => 5,
+        .oeq, .olt, .ole, .ugt, .uge, .une => 11,
+        .ogt, .oge, .one, .ord, .uno, .ueq, .ult, .ule => 6,
+    };
+}
+
 pub fn instructionSize(instruction: x86_64.Instruction) u32 {
     return switch (instruction) {
         .label => 0,
@@ -1905,6 +1941,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_imm64_xmm => 15,
         .mov_imm32_xmm => 9,
         .ucomisd => 4,
+        .ucomiss => 3,
+        .set_fcmp_eax => |predicate| fcmpResultSize(predicate),
         .ucomisd_xmm1_xmm0 => 4,
         .ucomiss_xmm1_xmm0 => 3,
         .ucomiss_xmm0_xmm1 => 3,

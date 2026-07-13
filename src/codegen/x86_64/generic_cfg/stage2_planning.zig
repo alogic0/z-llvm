@@ -498,6 +498,7 @@ fn selectorInstructionResultMetadata(instruction: ir.Instruction) ?VirtualRegMet
         .cast => |cast| selectorValueMetadata(cast.to_ty),
         .freeze => |freeze| selectorValueMetadata(freeze.ty),
         .icmp => .{ .class = .gpr32, .bits = 32 },
+        .fcmp => .{ .class = .gpr32, .bits = 32 },
         .load => |load| selectorValueMetadata(load.ty),
         .call => |call| if (call.ret_ty == .void) null else selectorValueMetadata(call.ret_ty),
         .select => |select| selectorValueMetadata(select.ty),
@@ -512,7 +513,6 @@ fn selectorInstructionResultMetadata(instruction: ir.Instruction) ?VirtualRegMet
         .insertelement,
         .shufflevector,
         .insertvalue,
-        .fcmp,
         .fence,
         => null,
     };

@@ -9,6 +9,107 @@ const selector_fp = @import("composed_selector_fp.zig");
 const state_data = @import("composed_selector_state_data.zig");
 const stage2_planning = @import("stage2_planning.zig");
 
+const scalar_fcmp_predicates = [_]ir.FcmpPredicate{
+    .false, .oeq, .ogt, .oge, .olt, .ole, .one, .ord,
+    .uno,   .ueq, .ugt, .uge, .ult, .ule, .une, .true,
+};
+
+fn expectedFcmp(predicate: ir.FcmpPredicate, lhs: anytype, rhs: @TypeOf(lhs)) bool {
+    const unordered = std.math.isNan(lhs) or std.math.isNan(rhs);
+    return switch (predicate) {
+        .false => false,
+        .oeq => !unordered and lhs == rhs,
+        .ogt => !unordered and lhs > rhs,
+        .oge => !unordered and lhs >= rhs,
+        .olt => !unordered and lhs < rhs,
+        .ole => !unordered and lhs <= rhs,
+        .one => !unordered and lhs != rhs,
+        .ord => !unordered,
+        .uno => unordered,
+        .ueq => unordered or lhs == rhs,
+        .ugt => unordered or lhs > rhs,
+        .uge => unordered or lhs >= rhs,
+        .ult => unordered or lhs < rhs,
+        .ule => unordered or lhs <= rhs,
+        .une => unordered or lhs != rhs,
+        .true => true,
+    };
+}
+
+fn executeFloatFcmpPredicate(predicate: ir.FcmpPredicate) !void {
+    const input = try std.fmt.allocPrint(std.testing.allocator,
+        \\define i32 @compare(float %lhs, float %rhs) {{
+        \\entry:
+        \\  %result = fcmp {s} float %lhs, %rhs
+        \\  %wide = zext i1 %result to i32
+        \\  ret i32 %wide
+        \\}}
+        \\
+    , .{@tagName(predicate)});
+    defer std.testing.allocator.free(input);
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("compare", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const compare: *const fn (f32, f32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    for ([_][2]u32{
+        .{ 0x3f80_0000, 0x4000_0000 },
+        .{ 0x8000_0000, 0x0000_0000 },
+        .{ 0x4040_0000, 0x4000_0000 },
+        .{ 0x7fc1_2345, 0x3f80_0000 },
+        .{ 0x3f80_0000, 0x7fc5_4321 },
+        .{ 0xff80_0000, 0x7f80_0000 },
+    }) |case| {
+        const lhs: f32 = @bitCast(case[0]);
+        const rhs: f32 = @bitCast(case[1]);
+        try std.testing.expectEqual(@as(u32, @intFromBool(expectedFcmp(predicate, lhs, rhs))), compare(lhs, rhs));
+    }
+}
+
+fn executeDoubleFcmpPredicate(predicate: ir.FcmpPredicate) !void {
+    const input = try std.fmt.allocPrint(std.testing.allocator,
+        \\define i32 @compare(double %lhs, double %rhs) {{
+        \\entry:
+        \\  %result = fcmp {s} double %lhs, %rhs
+        \\  %wide = zext i1 %result to i32
+        \\  ret i32 %wide
+        \\}}
+        \\
+    , .{@tagName(predicate)});
+    defer std.testing.allocator.free(input);
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("compare", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const compare: *const fn (f64, f64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    for ([_][2]u64{
+        .{ 0x3ff0_0000_0000_0000, 0x4000_0000_0000_0000 },
+        .{ 0x8000_0000_0000_0000, 0x0000_0000_0000_0000 },
+        .{ 0x4008_0000_0000_0000, 0x4000_0000_0000_0000 },
+        .{ 0x7ff8_1234_5678_9abc, 0x3ff0_0000_0000_0000 },
+        .{ 0x3ff0_0000_0000_0000, 0x7ff8_9876_5432_1abc },
+        .{ 0xfff0_0000_0000_0000, 0x7ff0_0000_0000_0000 },
+    }) |case| {
+        const lhs: f64 = @bitCast(case[0]);
+        const rhs: f64 = @bitCast(case[1]);
+        try std.testing.expectEqual(@as(u32, @intFromBool(expectedFcmp(predicate, lhs, rhs))), compare(lhs, rhs));
+    }
+}
+
 test "generic cfg selector legalizes fpext half to float through nonrecursive libcall" {
     var machine = x86_64_machine.MachineFunction.init("extend-half", .float);
     defer machine.deinit(std.testing.allocator);
@@ -216,6 +317,59 @@ test "generic cfg selector preserves scalar FP subtraction and division operand 
         try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
             .{ .divsd_xmm = .{ .dst = .xmm2, .src = .xmm2 } },
         }, machine.instructions.items);
+    }
+}
+
+test "generic cfg selector materializes scalar FP compare operands without clobbering" {
+    var machine = x86_64_machine.MachineFunction.init("fp-compare-operands", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .spill_fp = .{ .frame_index = .slot0, .bits = 64 } });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
+
+    try std.testing.expect((try selector_fp.lowerFcmp(&selector, "ordered_less", .{
+        .predicate = .olt,
+        .operand_ty = .double,
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .reload_xmm64_rsp = .{ .frame_index = .slot0, .reg = .xmm1 } },
+        .{ .ucomisd = .{ .dst = .xmm1, .src = .xmm0 } },
+        .{ .set_fcmp_eax = .olt },
+    }, machine.instructions.items);
+
+    machine.instructions.clearRetainingCapacity();
+    try selector_state.bindValueLoc(&selector, "same", .{ .xmm = .{ .reg = .xmm3, .bits = 32 } });
+    try std.testing.expect((try selector_fp.lowerFcmp(&selector, "unordered_equal", .{
+        .predicate = .ueq,
+        .operand_ty = .float,
+        .lhs = .{ .named = "same" },
+        .rhs = .{ .named = "same" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .ucomiss = .{ .dst = .xmm3, .src = .xmm3 } },
+        .{ .set_fcmp_eax = .ueq },
+    }, machine.instructions.items);
+
+    machine.instructions.clearRetainingCapacity();
+    try std.testing.expect((try selector_fp.lowerFcmp(&selector, "constant_true", .{
+        .predicate = .true,
+        .operand_ty = .float,
+        .lhs = .{ .fp = "nan" },
+        .rhs = .{ .fp = "0.000000e+00" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .set_fcmp_eax = .true },
+    }, machine.instructions.items);
+}
+
+test "generic cfg selector executes every scalar float and double fcmp predicate" {
+    for (scalar_fcmp_predicates) |predicate| {
+        try executeFloatFcmpPredicate(predicate);
+        try executeDoubleFcmpPredicate(predicate);
     }
 }
 

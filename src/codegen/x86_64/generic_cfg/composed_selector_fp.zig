@@ -95,6 +95,34 @@ pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst
     return null;
 }
 
+pub fn lowerFcmp(selector: *ComposedBlockSelector, result: ?[]const u8, fcmp: ir.FcmpInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    const bits = fpBits(fcmp.operand_ty) orelse return .{ .no_emitter = "composed-block-fcmp-type" };
+
+    if (fcmp.predicate != .false and fcmp.predicate != .true) {
+        const lhs = fpValueReg(selector, fcmp.lhs, bits) orelse blk: {
+            const rhs_reg = fpValueReg(selector, fcmp.rhs, bits);
+            break :blk firstXmmExcept(rhs_reg);
+        };
+        if (try materializeFpValue(selector, fcmp.lhs, lhs, bits)) |diagnostic| return diagnostic;
+        const rhs = if (fpValueReg(selector, fcmp.rhs, bits)) |reg| reg else blk: {
+            const scratch = firstXmmExcept(lhs);
+            if (try materializeFpValue(selector, fcmp.rhs, scratch, bits)) |diagnostic| return diagnostic;
+            break :blk scratch;
+        };
+        try selector_state.clobberAccumulator(selector);
+        try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+            .{ .ucomiss = .{ .dst = lhs, .src = rhs } }
+        else
+            .{ .ucomisd = .{ .dst = lhs, .src = rhs } });
+    } else {
+        try selector_state.clobberAccumulator(selector);
+    }
+    try selector.machine.instructions.append(selector.allocator, .{ .set_fcmp_eax = fcmp.predicate });
+    try selector_state.bindEax(selector, result_name);
+    return null;
+}
+
 pub fn lowerFpCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     return switch (cast.op) {

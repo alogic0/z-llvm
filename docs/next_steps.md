@@ -51,9 +51,14 @@ through register-parametric SSE forms, non-commutative operand-order checks,
 and 44 bit-exact executable cases. Twelve directed compiler_rt rows advance
 from `fsub`/`fdiv` to `insertelement`; report-all remains 443 selected / 190
 emitting / 253 failing with no collateral emission or regression. The
-pre-authorized successor is scalar float/double `fcmp`; vector forms remain
-unauthorized while the Phase D review is pending. Evidence:
-`docs/evidence/std_debug_hello_scalar_fsub_fdiv_acceptance.summary`.
+pre-authorized successor now also closes all 16 scalar float/double `fcmp`
+predicates with 192 executable outcomes. Report-all advances to 192 emitting /
+251 failing; `compiler_rt.round.__roundh` and `roundf` are collateral emissions
+without separate semantic claims. The one-cycle pipeline is exhausted: do not
+begin a third cycle until INBOX-23 review is accepted or a new directive
+arrives. Vector forms remain unauthorized while the Phase D review is pending.
+Evidence: `docs/evidence/std_debug_hello_scalar_fsub_fdiv_acceptance.summary`
+and `docs/evidence/std_debug_hello_scalar_fcmp_acceptance.summary`.
 
 INBOX-21 closes type-driven scalar `fpext float -> double`, `fptrunc
 double -> float`, and `fmul` for float and double with register-parametric SSE

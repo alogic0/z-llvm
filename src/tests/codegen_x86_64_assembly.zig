@@ -136,6 +136,46 @@ test "x86_64 assembly prints parametric scalar FP operations" {
     );
 }
 
+test "x86_64 assembly prints scalar FP predicate materialization" {
+    var machine = codegen.x86_64.MachineFunction.init("scalar_fp_compare", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{
+        .{ .ucomiss = .{ .dst = .xmm3, .src = .xmm2 } },
+        .{ .set_fcmp_eax = .oeq },
+        .{ .ucomisd = .{ .dst = .xmm5, .src = .xmm4 } },
+        .{ .set_fcmp_eax = .ugt },
+        .{ .set_fcmp_eax = .ord },
+        .{ .set_fcmp_eax = .false },
+        .{ .set_fcmp_eax = .true },
+        .ret,
+    });
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl scalar_fp_compare\n" ++
+            "scalar_fp_compare:\n" ++
+            "\tucomiss %xmm2, %xmm3\n" ++
+            "\tsete %al\n" ++
+            "\tsetnp %ah\n" ++
+            "\tandb %ah, %al\n" ++
+            "\tmovzbl %al, %eax\n" ++
+            "\tucomisd %xmm4, %xmm5\n" ++
+            "\tseta %al\n" ++
+            "\tsetp %ah\n" ++
+            "\torb %ah, %al\n" ++
+            "\tmovzbl %al, %eax\n" ++
+            "\tsetnp %al\n" ++
+            "\tmovzbl %al, %eax\n" ++
+            "\tmovl $0, %eax\n" ++
+            "\tmovl $1, %eax\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 assembly prints flag-preserving signed greater setcc" {
     var machine = codegen.x86_64.MachineFunction.init("setg", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

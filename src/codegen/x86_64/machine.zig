@@ -370,6 +370,11 @@ pub const Instruction = union(enum) {
         src: XmmReg,
         dst: XmmReg,
     },
+    ucomiss: struct {
+        src: XmmReg,
+        dst: XmmReg,
+    },
+    set_fcmp_eax: ir.FcmpPredicate,
     ucomisd_xmm1_xmm0,
     ucomiss_xmm1_xmm0,
     ucomiss_xmm0_xmm1,

@@ -1,4 +1,5 @@
 const std = @import("std");
+const ir = @import("../ir.zig");
 const x86_64 = @import("../codegen/x86_64.zig");
 const selector_bytes = @import("../codegen/x86_64/selector_bytes.zig");
 
@@ -1318,6 +1319,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_imm64_xmm => |load| try writer.print("\tmovabsq ${x}, %rax\n\tmovq %rax, {s}\n", .{ load.bits, load.reg.name() }),
             .mov_imm32_xmm => |load| try writer.print("\tmovl ${x}, %eax\n\tmovd %eax, {s}\n", .{ load.bits, load.reg.name() }),
             .ucomisd => |cmp| try writer.print("\tucomisd {s}, {s}\n", .{ cmp.src.name(), cmp.dst.name() }),
+            .ucomiss => |cmp| try writer.print("\tucomiss {s}, {s}\n", .{ cmp.src.name(), cmp.dst.name() }),
+            .set_fcmp_eax => |predicate| try printFcmpResult(writer, predicate),
             .ucomisd_xmm1_xmm0 => try writer.writeAll("\tucomisd %xmm1, %xmm0\n"),
             .ucomiss_xmm1_xmm0 => try writer.writeAll("\tucomiss %xmm1, %xmm0\n"),
             .ucomiss_xmm0_xmm1 => try writer.writeAll("\tucomiss %xmm0, %xmm1\n"),
@@ -1586,6 +1589,31 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .ret => try writer.writeAll("\tretq\n"),
         }
     }
+}
+
+fn printFcmpResult(writer: anytype, predicate: ir.FcmpPredicate) !void {
+    if (predicate == .false or predicate == .true) {
+        try writer.print("\tmovl ${}, %eax\n", .{@intFromBool(predicate == .true)});
+        return;
+    }
+    const setcc = switch (predicate) {
+        .oeq, .ueq => "sete",
+        .ogt, .ugt => "seta",
+        .oge, .uge => "setae",
+        .olt, .ult => "setb",
+        .ole, .ule => "setbe",
+        .one, .une => "setne",
+        .ord => "setnp",
+        .uno => "setp",
+        .false, .true => unreachable,
+    };
+    try writer.print("\t{s} %al\n", .{setcc});
+    switch (predicate) {
+        .oeq, .olt, .ole => try writer.writeAll("\tsetnp %ah\n\tandb %ah, %al\n"),
+        .ugt, .uge, .une => try writer.writeAll("\tsetp %ah\n\torb %ah, %al\n"),
+        else => {},
+    }
+    try writer.writeAll("\tmovzbl %al, %eax\n");
 }
 
 fn printByteDirective(writer: anytype, bytes: []const u8) !void {

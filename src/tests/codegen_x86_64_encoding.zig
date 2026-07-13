@@ -755,3 +755,46 @@ test "x86_64 encoding emits parametric scalar FP arithmetic and conversions" {
     });
     try std.testing.expectError(error.ReturnRegisterUndefined, codegen.x86_64.verifyFunction(integer_machine));
 }
+
+test "x86_64 encoding emits scalar FP predicate materialization" {
+    var machine = codegen.x86_64.MachineFunction.init("scalar_fp_compare", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{
+        .{ .ucomiss = .{ .dst = .xmm3, .src = .xmm2 } },
+        .{ .set_fcmp_eax = .oeq },
+        .{ .ucomisd = .{ .dst = .xmm5, .src = .xmm4 } },
+        .{ .set_fcmp_eax = .ugt },
+        .{ .set_fcmp_eax = .ord },
+        .{ .set_fcmp_eax = .false },
+        .{ .set_fcmp_eax = .true },
+        .ret,
+    });
+
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .ucomiss = .{ .dst = .xmm3, .src = .xmm2 } }));
+    try std.testing.expectEqual(@as(u32, 11), mc.encoding.instructionSize(.{ .set_fcmp_eax = .oeq }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .ucomisd = .{ .dst = .xmm5, .src = .xmm4 } }));
+    try std.testing.expectEqual(@as(u32, 11), mc.encoding.instructionSize(.{ .set_fcmp_eax = .ugt }));
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .set_fcmp_eax = .ord }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .set_fcmp_eax = .false }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .set_fcmp_eax = .true }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x0f, 0x2e, 0xda,
+        0x0f, 0x94, 0xc0,
+        0x0f, 0x9b, 0xc4,
+        0x20, 0xe0, 0x0f,
+        0xb6, 0xc0, 0x66,
+        0x0f, 0x2e, 0xec,
+        0x0f, 0x97, 0xc0,
+        0x0f, 0x9a, 0xc4,
+        0x08, 0xe0, 0x0f,
+        0xb6, 0xc0, 0x0f,
+        0x9b, 0xc0, 0x0f,
+        0xb6, 0xc0, 0xb8,
+        0,    0,    0,
+        0,    0xb8, 1,
+        0,    0,    0,
+        0xc3,
+    }, bytes);
+}
