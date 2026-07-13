@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
+const x86_64_verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
@@ -179,4 +180,145 @@ test "generic cfg selector makes framed boundary-spilled phi destinations stable
     try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
         .{ .spill_arg64_rsp = .{ .reg = .r8, .frame_index = .slot0 } },
     }, machine.instructions.items);
+}
+
+test "composed selector preserves scalar FP select values exactly" {
+    const input =
+        \\define float @select_f32(i32 %flag, float %on_true, float %on_false) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %cond, float %on_true, float %on_false
+        \\  ret float %selected
+        \\}
+        \\define double @select_f64(i32 %flag, double %on_true, double %on_false) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %cond, double %on_true, double %on_false
+        \\  ret double %selected
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items, 0..) |function, index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (index == 0) {
+            const select: *const fn (u32, f32, f32) callconv(.c) f32 = @ptrCast(mapping.ptr);
+            const true_bits: u32 = 0x7fc1_2345;
+            const false_bits: u32 = 0x8000_0000;
+            try std.testing.expectEqual(true_bits, @as(u32, @bitCast(select(1, @bitCast(true_bits), @bitCast(false_bits)))));
+            try std.testing.expectEqual(false_bits, @as(u32, @bitCast(select(0, @bitCast(true_bits), @bitCast(false_bits)))));
+        } else {
+            const select: *const fn (u32, f64, f64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+            const true_bits: u64 = 0xfff8_1234_5678_9abc;
+            const false_bits: u64 = 0x0000_0000_0000_0000;
+            try std.testing.expectEqual(true_bits, @as(u64, @bitCast(select(1, @bitCast(true_bits), @bitCast(false_bits)))));
+            try std.testing.expectEqual(false_bits, @as(u64, @bitCast(select(0, @bitCast(true_bits), @bitCast(false_bits)))));
+        }
+    }
+}
+
+test "composed selector carries scalar FP phi values around loops" {
+    const input =
+        \\define float @phi_f32(i32 %count, float %first, float %second) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %index = phi i32 [ 0, %entry ], [ %next, %loop ]
+        \\  %left = phi float [ %first, %entry ], [ %right, %loop ]
+        \\  %right = phi float [ %second, %entry ], [ %left, %loop ]
+        \\  %next = add i32 %index, 1
+        \\  %again = icmp ult i32 %next, %count
+        \\  br i1 %again, label %loop, label %exit
+        \\exit:
+        \\  ret float %left
+        \\}
+        \\define double @phi_f64(i32 %count, double %first) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %index = phi i32 [ 0, %entry ], [ %next, %loop ]
+        \\  %value = phi double [ %first, %entry ], [ 0x8000000000000000, %loop ]
+        \\  %next = add i32 %index, 1
+        \\  %again = icmp ult i32 %next, %count
+        \\  br i1 %again, label %loop, label %exit
+        \\exit:
+        \\  ret double %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items, 0..) |function, index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (index == 0) {
+            const phi: *const fn (u32, f32, f32) callconv(.c) f32 = @ptrCast(mapping.ptr);
+            const first: u32 = 0x7fc1_2345;
+            const second: u32 = 0x8000_0000;
+            try std.testing.expectEqual(first, @as(u32, @bitCast(phi(1, @bitCast(first), @bitCast(second)))));
+            try std.testing.expectEqual(second, @as(u32, @bitCast(phi(2, @bitCast(first), @bitCast(second)))));
+            try std.testing.expectEqual(first, @as(u32, @bitCast(phi(3, @bitCast(first), @bitCast(second)))));
+        } else {
+            const phi: *const fn (u32, f64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+            const first: u64 = 0x7ff8_1234_5678_9abc;
+            try std.testing.expectEqual(first, @as(u64, @bitCast(phi(1, @bitCast(first)))));
+            try std.testing.expectEqual(@as(u64, 0x8000_0000_0000_0000), @as(u64, @bitCast(phi(2, @bitCast(first)))));
+        }
+    }
+}
+
+test "composed selector keeps vector selects and phis fail closed" {
+    const input =
+        \\define float @vector_select(i32 %flag) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %cond, <2 x float> <float 1.000000e+00, float 2.000000e+00>, <2 x float> zeroinitializer
+        \\  %lane = extractelement <2 x float> %selected, i64 0
+        \\  ret float %lane
+        \\}
+        \\define float @vector_phi() {
+        \\entry:
+        \\  br label %merge
+        \\merge:
+        \\  %value = phi <2 x float> [ zeroinitializer, %entry ]
+        \\  %lane = extractelement <2 x float> %value, i64 0
+        \\  ret float %lane
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items) |function| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function);
+        switch (selection) {
+            .unsupported => {},
+            .selected => return error.TestUnexpectedResult,
+        }
+    }
 }

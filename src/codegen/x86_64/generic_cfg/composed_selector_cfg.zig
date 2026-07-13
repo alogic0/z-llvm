@@ -8,6 +8,7 @@ const stage2_planning = @import("stage2_planning.zig");
 const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
+const selector_fp = @import("composed_selector_fp.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 const selector_calls = @import("composed_selector_calls.zig");
@@ -30,6 +31,7 @@ const pair_b = selector_types.pair_b;
 const selector_allocatable_pairs = selector_types.selector_allocatable_pairs;
 const selector_allocatable_regs = selector_types.selector_allocatable_regs;
 const argRegIndex = selector_types.argRegIndex;
+const xmmRegIndex = selector_types.xmmRegIndex;
 
 pub const Diagnostic = inspection.Diagnostic;
 pub const SelectionResult = inspection.SelectionResult;
@@ -93,6 +95,7 @@ pub fn blockEndsInTrap(block: ir.BasicBlock) bool {
 pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select: ir.SelectInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (!select.cond_ty.eql(.{ .int = 1 })) return .{ .no_emitter = "composed-block-select-cond" };
+    if (select.ty == .float or select.ty == .double) return lowerFpSelect(selector, result_name, select);
     const bits: u16 = if (select.ty.eql(.ptr)) 64 else intBits(select.ty) orelse return .{ .no_emitter = "composed-block-select-type" };
     if (bits == 0 or (bits > 32 and bits != 64)) return .{ .no_emitter = "composed-block-select-width" };
 
@@ -118,6 +121,37 @@ pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select
     try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
     try selector_state.bindAccumulator(selector, result_name, bits);
     return null;
+}
+
+fn lowerFpSelect(selector: *ComposedBlockSelector, result_name: []const u8, select: ir.SelectInst) !?Diagnostic {
+    const bits: u16 = if (select.ty == .float) 32 else if (select.ty == .double) 64 else return .{ .no_emitter = "composed-block-select-type" };
+    if (try emitBranchCondition(selector, select.cond)) |diagnostic| return diagnostic;
+
+    const true_reg = fpValueReg(selector, select.true_value, bits);
+    const false_reg = fpValueReg(selector, select.false_value, bits);
+    const dst = fpSelectScratch(true_reg, false_reg);
+    if (try selector_fp.materializeFpValue(selector, select.false_value, dst, bits)) |diagnostic| return diagnostic;
+    const end_label = try ownedSelectEndLabel(selector);
+    try selector.machine.instructions.append(selector.allocator, .{ .je = end_label });
+    if (try selector_fp.materializeFpValue(selector, select.true_value, dst, bits)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
+    return null;
+}
+
+fn fpValueReg(selector: *ComposedBlockSelector, value: ir.Value, bits: u16) ?x86_64_types.XmmReg {
+    const loc = selector_state.resolveValue(selector, value) orelse return null;
+    return switch (loc) {
+        .xmm => |fp| if (fp.bits == bits and fp.vectorShape() == null) fp.reg else null,
+        else => null,
+    };
+}
+
+fn fpSelectScratch(first: ?x86_64_types.XmmReg, second: ?x86_64_types.XmmReg) x86_64_types.XmmReg {
+    for (selector_types.selector_allocatable_xmm_regs) |reg| {
+        if ((first == null or reg != first.?) and (second == null or reg != second.?)) return reg;
+    }
+    unreachable;
 }
 
 pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic {
@@ -288,6 +322,9 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
     selector.preserve_current_position_values = true;
     defer selector.preserve_current_position_values = previous_preserve_current;
     if (try stabilizePhiEdgeSources(selector, target, predecessor)) |diagnostic| return diagnostic;
+    var fp_snapshots: std.ArrayList(FpPhiSnapshot) = .empty;
+    defer fp_snapshots.deinit(selector.allocator);
+    if (try snapshotFpPhiSources(selector, target, predecessor, &fp_snapshots)) |diagnostic| return diagnostic;
     for (target.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const phi = switch (instruction.kind) {
@@ -298,12 +335,75 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
         const dst = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
-        if (try emitValueIntoLoc(selector, incoming.value, dst, result_name, metadata.bits)) |diagnostic| return diagnostic;
+        if (fpPhiSnapshot(&fp_snapshots, result_name)) |snapshot| {
+            selector_state.materializeLocIntoLoc(selector, .{ .xmm = .{ .reg = snapshot.reg, .bits = snapshot.bits } }, dst) catch return .{ .unsupported_value = "stage2-phi-src" };
+        } else if (try emitValueIntoLoc(selector, incoming.value, dst, result_name, metadata.bits)) |diagnostic| return diagnostic;
         try selector_state.bindValueLoc(selector, result_name, dst);
         switch (dst) {
             .scratch32, .scratch64, .xmm, .spill64, .spill128, .spill_fp => {},
             .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill_vector => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
+    }
+    return null;
+}
+
+const FpPhiSnapshot = struct {
+    result_name: []const u8,
+    reg: x86_64_types.XmmReg,
+    bits: u16,
+};
+
+fn snapshotFpPhiSources(
+    selector: *ComposedBlockSelector,
+    target: ir.BasicBlock,
+    predecessor: []const u8,
+    snapshots: *std.ArrayList(FpPhiSnapshot),
+) !?Diagnostic {
+    var unavailable = [_]bool{false} ** selector_types.selector_allocatable_xmm_regs.len;
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
+        if (selector.phi_destinations.get(result_name)) |dst| switch (dst) {
+            .xmm => |fp| unavailable[xmmRegIndex(fp.reg)] = true,
+            else => {},
+        };
+        const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
+        if (selector_state.resolveValue(selector, incoming.value)) |source| switch (source) {
+            .xmm => |fp| unavailable[xmmRegIndex(fp.reg)] = true,
+            else => {},
+        };
+    }
+
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
+        if (metadata.class != .fp32 and metadata.class != .fp64) continue;
+        const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
+        const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
+        if (incoming.value != .named) continue;
+        const reg = for (selector_types.selector_allocatable_xmm_regs) |candidate| {
+            const index = xmmRegIndex(candidate);
+            if (unavailable[index]) continue;
+            unavailable[index] = true;
+            break candidate;
+        } else return .{ .no_spill_envelope = "stage2-phi-fp-snapshot" };
+        if (try selector_fp.materializeFpValue(selector, incoming.value, reg, metadata.bits)) |diagnostic| return diagnostic;
+        try snapshots.append(selector.allocator, .{ .result_name = result_name, .reg = reg, .bits = metadata.bits });
+    }
+    return null;
+}
+
+fn fpPhiSnapshot(snapshots: *const std.ArrayList(FpPhiSnapshot), result_name: []const u8) ?FpPhiSnapshot {
+    for (snapshots.items) |snapshot| {
+        if (std.mem.eql(u8, snapshot.result_name, result_name)) return snapshot;
     }
     return null;
 }
@@ -390,7 +490,18 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
                 const actual = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, value) };
                 selector_state.materializeLocIntoLoc(selector, actual, dst) catch return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, value) };
             },
-            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
+            .fp => {
+                const scratch = switch (dst) {
+                    .xmm => |fp| fp.reg,
+                    .spill_fp => .xmm0,
+                    else => unreachable,
+                };
+                if (try selector_fp.materializeFpValue(selector, value, scratch, bits)) |diagnostic| return diagnostic;
+                if (dst == .spill_fp) {
+                    selector_state.materializeLocIntoLoc(selector, .{ .xmm = .{ .reg = scratch, .bits = bits } }, dst) catch return .{ .unsupported_value = "stage2-phi-src" };
+                }
+            },
+            .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
         },
         .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill_vector => return .{ .no_emitter = "stage2-phi-dst-loc" },
     }
