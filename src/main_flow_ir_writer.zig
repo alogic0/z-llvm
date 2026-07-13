@@ -470,6 +470,11 @@ pub fn emitCodegenModule(
     var first_failing_selector_detail: []const u8 = "-";
     var stderr_buffer: [4096]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
+    const module_context: codegen.x86_64.ReadOnlyModuleContext = .{
+        .globals = module.globals.items,
+        .named_types = module.named_types.items,
+        .target_datalayout = module.target_datalayout,
+    };
     for (module.functions.items) |function| {
         if (!shouldLowerCodegenFunction(module, function)) continue;
         selected_functions += 1;
@@ -477,6 +482,7 @@ pub fn emitCodegenModule(
         var selector_diagnostic_detail: ?[]const u8 = null;
         var machine = codegen.x86_64.lowerFunctionWithOptions(allocator, triple, function, .{
             .generic_cfg_selector = options.generic_cfg_selector,
+            .module_context = &module_context,
             .generic_cfg_selector_diagnostic_tag = &selector_diagnostic_tag,
             .generic_cfg_selector_diagnostic_detail = &selector_diagnostic_detail,
         }) catch |err| {
@@ -531,7 +537,7 @@ pub fn emitCodegenModule(
     if (emit == .@"asm") {
         for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
     } else {
-        try mc.elf.writeObjectWithModuleData(allocator, machines.items, module.aliases.items, module.globals.items, stdout);
+        try mc.elf.writeObjectWithModuleContext(allocator, machines.items, module.aliases.items, module_context, stdout);
     }
     try stdout.flush();
 }

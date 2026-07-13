@@ -2,6 +2,7 @@ const std = @import("std");
 const encoding = @import("encoding.zig");
 const ir = @import("../ir.zig");
 const x86_64 = @import("../codegen/x86_64.zig");
+const constant_table = @import("../codegen/x86_64/constant_table.zig");
 
 const Section = struct {
     name_offset: u32,
@@ -64,6 +65,18 @@ pub fn writeObjectWithModuleData(
     try writer.writeAll(object);
 }
 
+pub fn writeObjectWithModuleContext(
+    allocator: std.mem.Allocator,
+    functions: []const x86_64.MachineFunction,
+    aliases: []const ir.GlobalAlias,
+    module_context: x86_64.ReadOnlyModuleContext,
+    writer: anytype,
+) !void {
+    const object = try buildObjectWithModuleContext(allocator, functions, aliases, module_context);
+    defer allocator.free(object);
+    try writer.writeAll(object);
+}
+
 pub fn buildObjectWithAliases(
     allocator: std.mem.Allocator,
     functions: []const x86_64.MachineFunction,
@@ -77,6 +90,25 @@ pub fn buildObjectWithModuleData(
     functions: []const x86_64.MachineFunction,
     aliases: []const ir.GlobalAlias,
     globals: []const ir.Global,
+) ![]u8 {
+    return buildObjectWithOptionalModuleContext(allocator, functions, aliases, globals, null);
+}
+
+pub fn buildObjectWithModuleContext(
+    allocator: std.mem.Allocator,
+    functions: []const x86_64.MachineFunction,
+    aliases: []const ir.GlobalAlias,
+    module_context: x86_64.ReadOnlyModuleContext,
+) ![]u8 {
+    return buildObjectWithOptionalModuleContext(allocator, functions, aliases, module_context.globals, module_context);
+}
+
+fn buildObjectWithOptionalModuleContext(
+    allocator: std.mem.Allocator,
+    functions: []const x86_64.MachineFunction,
+    aliases: []const ir.GlobalAlias,
+    globals: []const ir.Global,
+    module_context: ?x86_64.ReadOnlyModuleContext,
 ) ![]u8 {
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(allocator);
@@ -109,7 +141,7 @@ pub fn buildObjectWithModuleData(
         try symbol_indices.put(function.name, @intCast(symbols.items.len));
     }
 
-    try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals);
+    try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals, module_context);
     try appendSyntheticF128Constants(allocator, &data, &symbols, &symbol_indices, functions);
     try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases);
 
@@ -212,9 +244,26 @@ fn appendSupportedGlobals(
     symbols: *std.ArrayList(Symbol),
     symbol_indices: *std.StringHashMap(u32),
     globals: []const ir.Global,
+    module_context: ?x86_64.ReadOnlyModuleContext,
 ) !void {
     for (globals) |global| {
         if (symbol_indices.contains(global.name)) continue;
+        if (module_context) |context| if (try constant_table.decodeGlobal(allocator, context, global)) |decoded_value| {
+            var decoded = decoded_value;
+            defer decoded.deinit(allocator);
+            try alignArrayList(data, allocator, decoded.alignment);
+            const start: u64 = data.items.len;
+            try data.appendSlice(allocator, decoded.bytes);
+            try symbols.append(allocator, .{
+                .name = decoded.symbol,
+                .value = start,
+                .size = decoded.serialized_size,
+                .section_index = 2,
+                .info = 0x11,
+            });
+            try symbol_indices.put(decoded.symbol, @intCast(symbols.items.len));
+            continue;
+        };
         const is_tls = isThreadLocal(global);
         const section_data = if (is_tls) tdata else data;
         const start: u64 = section_data.items.len;
@@ -501,6 +550,15 @@ fn collectCallRelocations(
             },
             .load_global_ptr_rax, .lea_global_rax, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx => |symbol| {
                 const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 3,
+                    .symbol_index = symbol_index,
+                    .kind = 2,
+                    .addend = -4,
+                });
+            },
+            .lea_global_arg64 => |lea| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, lea.symbol);
                 try relocations.append(allocator, .{
                     .offset = function_offset + offset + 3,
                     .symbol_index = symbol_index,

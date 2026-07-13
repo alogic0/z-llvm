@@ -1,5 +1,7 @@
 const std = @import("std");
 const x86_64_machine = @import("../machine.zig");
+const x86_64_types = @import("../types.zig");
+const ir = @import("../../../ir.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 
@@ -21,6 +23,8 @@ const OverflowResultLoc = struct {
 pub const ComposedBlockSelector = struct {
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
+    module_context: ?*const x86_64_types.ReadOnlyModuleContext = null,
+    function: ?*const ir.Function = null,
     allocation_plan: ?*const SelectorAllocationPlan = null,
     values: std.StringHashMap(ValueBinding),
     abi_pointer_params: NameSet,
@@ -45,6 +49,8 @@ pub const ComposedBlockSelector = struct {
         return .{
             .allocator = allocator,
             .machine = machine,
+            .module_context = null,
+            .function = null,
             .allocation_plan = null,
             .values = std.StringHashMap(ValueBinding).init(allocator),
             .abi_pointer_params = NameSet.init(allocator),

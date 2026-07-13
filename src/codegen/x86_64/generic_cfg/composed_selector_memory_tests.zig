@@ -2,7 +2,9 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_verify = @import("../verify.zig");
+const constant_table = @import("../constant_table.zig");
 const encoding = @import("../../../mc/encoding.zig");
+const elf = @import("../../../mc/elf.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const impl = @import("composed_selector_impl.zig");
@@ -276,4 +278,244 @@ test "composed selector rejects FP stores through derived pointers" {
         .unsupported => |diagnostic| try std.testing.expectEqualStrings("composed-block-store-fp-ptr", diagnostic.no_emitter),
         .selected => return error.TestUnexpectedResult,
     }
+}
+
+test "constant table shapes execute first interior and last probes" {
+    const input = try buildConstantTableModuleText(std.testing.allocator);
+    defer std.testing.allocator.free(input);
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const context: x86_64_machine.ReadOnlyModuleContext = .{
+        .globals = module.globals.items,
+        .named_types = module.named_types.items,
+        .target_datalayout = module.target_datalayout,
+    };
+
+    const Probe = struct {
+        function_name: []const u8,
+        symbol: []const u8,
+        indexes: [3]u64,
+        element_indexes: [3]usize,
+        offset: usize,
+        integer: bool = false,
+    };
+    const probes = [_]Probe{
+        .{ .function_name = "probe_i16", .symbol = "table_i16", .indexes = .{ 0, 63, 127 }, .element_indexes = .{ 0, 63, 127 }, .offset = 0, .integer = true },
+        .{ .function_name = "probe_f64_16", .symbol = "table_f64_16", .indexes = .{ 0, 7, 15 }, .element_indexes = .{ 0, 7, 15 }, .offset = 0 },
+        .{ .function_name = "probe_f64_512_lo", .symbol = "table_f64_512", .indexes = .{ 0, 128, 255 }, .element_indexes = .{ 0, 256, 510 }, .offset = 0 },
+        .{ .function_name = "probe_f64_512_hi", .symbol = "table_f64_512", .indexes = .{ 0, 128, 255 }, .element_indexes = .{ 1, 257, 511 }, .offset = 8 },
+        .{ .function_name = "probe_pair_lo", .symbol = "table_pair", .indexes = .{ 0, 64, 127 }, .element_indexes = .{ 0, 128, 254 }, .offset = 0 },
+        .{ .function_name = "probe_pair_hi", .symbol = "table_pair", .indexes = .{ 0, 64, 127 }, .element_indexes = .{ 1, 129, 255 }, .offset = 8 },
+    };
+
+    for (probes) |probe| {
+        const function = findFunction(module, probe.function_name) orelse return error.TestUnexpectedResult;
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        const selection = try impl.tryLowerComposedCfgWithContext(std.testing.allocator, &machine, function, &context);
+        switch (selection) {
+            .selected => {},
+            .unsupported => |diagnostic| {
+                std.debug.print("constant-table probe {s}: {any}\n", .{ probe.function_name, diagnostic });
+                return error.TestUnexpectedResult;
+            },
+        }
+        try x86_64_verify.verifyFunction(machine);
+        const code = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(code);
+        var decoded = (try constant_table.decodeSymbol(std.testing.allocator, context, probe.symbol)).?;
+        defer decoded.deinit(std.testing.allocator);
+
+        const table_offset = std.mem.alignForward(usize, code.len, decoded.alignment);
+        const mapping_len = table_offset + decoded.bytes.len;
+        const mapping = try std.posix.mmap(null, mapping_len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memset(mapping, 0);
+        @memcpy(mapping[0..code.len], code);
+        @memcpy(mapping[table_offset..][0..decoded.bytes.len], decoded.bytes);
+        const relocation_offset = findLeaPc32Offset(mapping[0..code.len]) orelse return error.TestUnexpectedResult;
+        const next_ip = relocation_offset + 4;
+        const displacement: i32 = @intCast(@as(isize, @intCast(table_offset)) - @as(isize, @intCast(next_ip)));
+        std.mem.writeInt(i32, mapping[relocation_offset..][0..4], displacement, .little);
+
+        for (probe.indexes, probe.element_indexes) |index, element_index| {
+            if (probe.integer) {
+                const call: *const fn (u64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+                const expected = std.mem.readInt(u16, decoded.bytes[element_index * 2 ..][0..2], .little);
+                try std.testing.expectEqual(@as(u32, expected), call(index));
+            } else {
+                const call: *const fn (u64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+                const expected = std.mem.readInt(u64, decoded.bytes[element_index * 8 ..][0..8], .little);
+                try std.testing.expectEqual(expected, @as(u64, @bitCast(call(index))));
+            }
+        }
+    }
+
+    var machines: std.ArrayList(MachineFunction) = .empty;
+    defer {
+        for (machines.items) |*machine| machine.deinit(std.testing.allocator);
+        machines.deinit(std.testing.allocator);
+    }
+    for (module.functions.items) |function| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        errdefer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfgWithContext(std.testing.allocator, &machine, function, &context));
+        try machines.append(std.testing.allocator, machine);
+    }
+    const object = try elf.buildObjectWithModuleContext(std.testing.allocator, machines.items, &.{}, context);
+    defer std.testing.allocator.free(object);
+    inline for (.{ "table_i16", "table_f64_16", "table_f64_512", "table_pair", ".rela.text" }) |needle| {
+        try std.testing.expect(std.mem.indexOf(u8, object, needle) != null);
+    }
+}
+
+test "constant table admission rejects unproved indexes and writable globals" {
+    const input =
+        \\target datalayout = "e-m:e-i64:64-n8:16:32:64-S128"
+        \\@writable = internal global [16 x double] zeroinitializer, align 8
+        \\@readonly = internal constant [16 x double] [double 1.0, double 2.0, double 3.0, double 4.0, double 5.0, double 6.0, double 7.0, double 8.0, double 9.0, double 10.0, double 11.0, double 12.0, double 13.0, double 14.0, double 15.0, double 16.0], align 8
+        \\define double @unproved(i64 %index) {
+        \\entry:
+        \\  %ptr = getelementptr [8 x i8], ptr @readonly, i64 %index
+        \\  %value = load double, ptr %ptr, align 8
+        \\  ret double %value
+        \\}
+        \\define double @writable_table(i64 %index) {
+        \\entry:
+        \\  %masked = and i64 %index, 15
+        \\  %ptr = getelementptr [8 x i8], ptr @writable, i64 %masked
+        \\  %value = load double, ptr %ptr, align 8
+        \\  ret double %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const context: x86_64_machine.ReadOnlyModuleContext = .{
+        .globals = module.globals.items,
+        .named_types = module.named_types.items,
+        .target_datalayout = module.target_datalayout,
+    };
+    for (module.functions.items, 0..) |function, index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        const result = try impl.tryLowerComposedCfgWithContext(std.testing.allocator, &machine, function, &context);
+        switch (result) {
+            .selected => return error.TestUnexpectedResult,
+            .unsupported => |diagnostic| try std.testing.expectEqualStrings(
+                if (index == 0) "composed-block-gep-readonly-table-range" else "composed-block-gep-readonly-table-global",
+                diagnostic.no_emitter,
+            ),
+        }
+    }
+}
+
+fn buildConstantTableModuleText(allocator: std.mem.Allocator) ![]u8 {
+    var text: std.ArrayList(u8) = .empty;
+    errdefer text.deinit(allocator);
+    try text.appendSlice(allocator, "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128\"\n");
+    try text.appendSlice(allocator, "%pair = type { double, double }\n");
+    try text.appendSlice(allocator, "@table_i16 = internal constant [128 x i16] [");
+    for (0..128) |index| {
+        if (index != 0) try text.appendSlice(allocator, ", ");
+        try appendFmt(&text, allocator, "i16 {}", .{1000 + index});
+    }
+    try text.appendSlice(allocator, "], align 2\n@table_f64_16 = internal constant [16 x double] [");
+    for (0..16) |index| {
+        if (index != 0) try text.appendSlice(allocator, ", ");
+        try appendF64Literal(&text, allocator, @floatFromInt(index + 1));
+    }
+    try text.appendSlice(allocator, "], align 8\n@table_f64_512 = internal constant [512 x double] [");
+    for (0..512) |index| {
+        if (index != 0) try text.appendSlice(allocator, ", ");
+        try appendF64Literal(&text, allocator, @floatFromInt(index + 100));
+    }
+    try text.appendSlice(allocator, "], align 8\n@table_pair = internal constant [128 x %pair] [");
+    for (0..128) |index| {
+        if (index != 0) try text.appendSlice(allocator, ", ");
+        try text.appendSlice(allocator, "%pair { ");
+        try appendF64Literal(&text, allocator, @floatFromInt(index + 1000));
+        try text.appendSlice(allocator, ", ");
+        try appendF64Literal(&text, allocator, @floatFromInt(index + 2000));
+        try text.appendSlice(allocator, " }");
+    }
+    try text.appendSlice(allocator, "], align 8\n");
+    try text.appendSlice(allocator,
+        \\define i32 @probe_i16(i64 %index) {
+        \\entry:
+        \\  %masked = and i64 %index, 127
+        \\  %ptr = getelementptr [2 x i8], ptr @table_i16, i64 %masked
+        \\  %value = load i16, ptr %ptr, align 2
+        \\  %wide = zext i16 %value to i32
+        \\  ret i32 %wide
+        \\}
+        \\define double @probe_f64_16(i64 %index) {
+        \\entry:
+        \\  %masked = and i64 %index, 15
+        \\  %ptr = getelementptr [8 x i8], ptr @table_f64_16, i64 %masked
+        \\  %value = load double, ptr %ptr, align 8
+        \\  ret double %value
+        \\}
+        \\define double @probe_f64_512_lo(i32 %index) {
+        \\entry:
+        \\  %shifted = shl i32 %index, 1
+        \\  %masked = and i32 %shifted, 510
+        \\  %wide = zext i32 %masked to i64
+        \\  %ptr = getelementptr [8 x i8], ptr @table_f64_512, i64 %wide
+        \\  %value = load double, ptr %ptr, align 8
+        \\  ret double %value
+        \\}
+        \\define double @probe_f64_512_hi(i32 %index) {
+        \\entry:
+        \\  %shifted = shl i32 %index, 1
+        \\  %masked = and i32 %shifted, 510
+        \\  %wide = zext i32 %masked to i64
+        \\  %ptr = getelementptr [8 x i8], ptr @table_f64_512, i64 %wide
+        \\  %hi = getelementptr i8, ptr %ptr, i64 8
+        \\  %value = load double, ptr %hi, align 8
+        \\  ret double %value
+        \\}
+        \\define double @probe_pair_lo(i64 %index) {
+        \\entry:
+        \\  %masked = and i64 %index, 127
+        \\  %ptr = getelementptr [16 x i8], ptr @table_pair, i64 %masked
+        \\  %value = load double, ptr %ptr, align 8
+        \\  ret double %value
+        \\}
+        \\define double @probe_pair_hi(i64 %index) {
+        \\entry:
+        \\  %masked = and i64 %index, 127
+        \\  %ptr = getelementptr [16 x i8], ptr @table_pair, i64 %masked
+        \\  %hi = getelementptr i8, ptr %ptr, i64 8
+        \\  %value = load double, ptr %hi, align 8
+        \\  ret double %value
+        \\}
+        \\
+    );
+    return text.toOwnedSlice(allocator);
+}
+
+fn appendF64Literal(text: *std.ArrayList(u8), allocator: std.mem.Allocator, value: f64) !void {
+    try appendFmt(text, allocator, "double 0x{X:0>16}", .{@as(u64, @bitCast(value))});
+}
+
+fn appendFmt(text: *std.ArrayList(u8), allocator: std.mem.Allocator, comptime format: []const u8, args: anytype) !void {
+    const piece = try std.fmt.allocPrint(allocator, format, args);
+    defer allocator.free(piece);
+    try text.appendSlice(allocator, piece);
+}
+
+fn findFunction(module: ir.Module, name: []const u8) ?ir.Function {
+    for (module.functions.items) |function| if (std.mem.eql(u8, function.name, name)) return function;
+    return null;
+}
+
+fn findLeaPc32Offset(code: []const u8) ?usize {
+    var index: usize = 0;
+    while (index + 7 <= code.len) : (index += 1) {
+        if (code[index] == 0x48 and code[index + 1] == 0x8d and code[index + 2] == 0x0d) return index + 3;
+    }
+    return null;
 }

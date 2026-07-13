@@ -37,24 +37,24 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-30 and its one pre-authorized successor are complete. Exact scalar half
-equality against positive or negative zero closes `__log2h`, `__log10h`, and
-`__logh`; `__sqrth` advances honestly to unsupported half `fmul`. The native
-half-row proof also exposed and drove standalone framed-FP-phi repair
-`70c63cc4`. The successor then adds only the typed f64x2 `<0, 3>` two-source
-shuffle via fixed `shufpd $2`, closing `compiler_rt.log10.log10` through 15
-precomputed raw-bit native cases. Report-all is now 443 selected / 214 emitting
-/ 229 failing, with no successor-cycle collateral emissions. Tier 2 and the
-single row-closure Tier 3 are green.
+INBOX-31 is implemented at the reviewed constant-table boundary. One shared
+typed decoder serves selector admission and ELF serialization; the lowering
+API carries read-only module context; typed table pointers remain in the
+existing value-location map; and GPR arithmetic feeds the existing
+RIP-relative PC32 relocation path. The four admitted shapes pass 18/18 native
+first/interior/last probes, and `readelf` proves their exact defined data
+objects plus six `R_X86_64_PC32` relocations with addend `-4`.
 
-Stop for the required review: the one-cycle pipeline is exhausted, no third
-capability is authorized, and typed global-table GEP plus scalar load requires
-a bounded architectural decision because it crosses global relocation,
-indexed-addressing, pointer-location, and load-materialization ownership. Do
-not begin that work before review. Evidence:
-`docs/evidence/std_debug_hello_half_zero_fcmp_acceptance.summary`,
-`docs/evidence/std_debug_hello_f64x2_shuffle_0_3_acceptance.summary`, and
-`docs/evidence/distribution_all_after_inbox30_f64x2_shuffle_0_3.summary`.
+All six directed rows advance but none closes: `sqrt`/`sqrtf` now stop at
+64-bit multiply RHS, `log`/`__exp2h`/`exp2f` at unsupported binary widths, and
+`exp2` at an unsupported integer comparison form. Report-all therefore remains
+443 selected / 214 emitting / 229 failing. Stop for the required post-cycle
+review: INBOX-31 has no pre-authorized successor, and `.rodata`, STB_LOCAL
+ordering, shared-library PIC, writable-table admission, and table stores remain
+explicitly excluded. Tier 2 and the single object-writer-boundary Tier 3 are
+green. Evidence:
+`docs/evidence/std_debug_hello_constant_table_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox31_constant_tables.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

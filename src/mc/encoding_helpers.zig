@@ -461,6 +461,44 @@ pub fn encodeArgPtrDisp8U16ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.A
     try encodeArgPtrDisp8Tail(bytes, allocator, reg, offset);
 }
 
+pub fn encodeArgPtrDisp8U16ToArg(
+    bytes: *std.ArrayList(u8),
+    allocator: std.mem.Allocator,
+    base: x86_64.ArgReg,
+    dst: x86_64.ArgReg,
+    offset: u8,
+) !void {
+    const rex = @as(u8, 0x40) | (@as(u8, @intFromBool(dst.rexR())) << 2) | @as(u8, @intFromBool(base.rexB()));
+    if (rex != 0x40) try bytes.append(allocator, rex);
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0xb7 });
+    const reg_bits: u8 = @as(u8, dst.lowCode()) << 3;
+    if (offset == 0) {
+        try bytes.append(allocator, reg_bits | @as(u8, base.lowCode()));
+    } else {
+        try bytes.append(allocator, 0x40 | reg_bits | @as(u8, base.lowCode()));
+        try bytes.append(allocator, offset);
+    }
+}
+
+pub fn encodeArgPtrDisp8ToXmm(
+    bytes: *std.ArrayList(u8),
+    allocator: std.mem.Allocator,
+    base: x86_64.ArgReg,
+    dst: x86_64.XmmReg,
+    offset: u8,
+) !void {
+    try bytes.append(allocator, 0xf2);
+    if (base.rexB()) try bytes.append(allocator, 0x41);
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0x10 });
+    const reg_bits: u8 = @as(u8, dst.lowCode()) << 3;
+    if (offset == 0) {
+        try bytes.append(allocator, reg_bits | @as(u8, base.lowCode()));
+    } else {
+        try bytes.append(allocator, 0x40 | reg_bits | @as(u8, base.lowCode()));
+        try bytes.append(allocator, offset);
+    }
+}
+
 pub fn encodePushByvalTailArgPtr(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8, len: u8) !void {
     try validateByvalTail(offset, len);
     try encodeReserveZeroedStackEightbyte(bytes, allocator);

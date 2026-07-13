@@ -82,6 +82,15 @@ pub fn tryLowerComposedCfg(
     machine: *MachineFunction,
     function: ir.Function,
 ) !SelectionResult {
+    return tryLowerComposedCfgWithContext(allocator, machine, function, null);
+}
+
+pub fn tryLowerComposedCfgWithContext(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_types.ReadOnlyModuleContext,
+) !SelectionResult {
     if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "stage2-ret-type" });
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > stage2_max_blocks) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
@@ -91,6 +100,8 @@ pub fn tryLowerComposedCfg(
 
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
+    composed.module_context = module_context;
+    composed.function = &function;
     composed.allocation_plan = &allocation_plan;
     composed.next_spill_slot = allocation_plan.spill_slots;
     composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
@@ -235,7 +246,7 @@ fn stabilizeFramedParams(selector: *ComposedBlockSelector, function: ir.Function
                 if (try selector_state.spillPairValue(selector, param.name)) |diagnostic| return diagnostic;
             },
             .xmm => if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic,
-            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .unsupported_value = "stage2-param-home" },
+            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr => return .{ .unsupported_value = "stage2-param-home" },
         }
     }
     return null;
@@ -281,7 +292,7 @@ fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnost
         try selector_state.bindValueLoc(selector, result_name, loc);
         switch (loc) {
             .scratch32, .scratch64, .xmm, .spill64, .spill128, .spill_fp, .spill_vector => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;
@@ -335,6 +346,15 @@ pub fn tryLowerComposedBlock(
     machine: *MachineFunction,
     function: ir.Function,
 ) !SelectionResult {
+    return tryLowerComposedBlockWithContext(allocator, machine, function, null);
+}
+
+pub fn tryLowerComposedBlockWithContext(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_types.ReadOnlyModuleContext,
+) !SelectionResult {
     if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "composed-block-ret-type" });
     if (function.blocks.items.len != 1) return unsupported(.{ .no_emitter = "composed-block-not-single-block" });
 
@@ -342,6 +362,8 @@ pub fn tryLowerComposedBlock(
     defer allocation_plan.deinit();
 
     var composed = ComposedBlockSelector.init(allocator, machine);
+    composed.module_context = module_context;
+    composed.function = &function;
     composed.allocation_plan = &allocation_plan;
     composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
     defer composed.deinit();

@@ -3583,6 +3583,22 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_f64x2_shuffle_0_3_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox30_f64x2_shuffle_0_3.summary`.
 
+- 2026-07-13 (this commit, INBOX-31) Item 12 module-aware constant-table
+  capability: one shared typed decoder now gives the selector and ELF writer a
+  read-only view of four admitted captured table shapes. Typed table pointers
+  remain in the existing value-location map; GPR index arithmetic feeds
+  register-parametric RIP-relative address and i16/double load forms; ELF
+  serialization reuses `.data`, global symbols, and `R_X86_64_PC32` with
+  addend `-4`. An 18-call native canary and `readelf` prove first/interior/last
+  accesses, pair offsets, exact object sizes, and all six relocations. All six
+  directed rows advance, but none closes, so report-all remains 443 selected /
+  214 emitting / 229 failing. Tier 2 is green; Tier 3 acceptance is recorded
+  separately. The capability excludes `.rodata`, STB_LOCAL ordering, PIC,
+  writable-table admission, and stores. Stop for the required architectural
+  review; no successor is authorized. Evidence
+  `docs/evidence/std_debug_hello_constant_table_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox31_constant_tables.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

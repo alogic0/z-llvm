@@ -1,0 +1,62 @@
+# Module-Aware Constant Table Acceptance
+
+schema_version: 1
+directive: `INBOX-31`
+target: `x86_64-linux-gnu`
+validation_tier: 3
+result: pass
+
+The selector and ELF writer now consume one shared typed constant-table
+decoder through a read-only module context. Admission is limited to four
+captured shapes: `[128 x i16]`, `[16 x double]`, `[512 x double]` with an
+even 0..510 index proof, and `[128 x T]` where named `T` resolves exactly to
+`{ double, double }`. The existing value-location map owns table pointers;
+index normalization and stride arithmetic stay in GPRs, and symbol addresses
+use the existing RIP-relative `R_X86_64_PC32` relocation path.
+
+Focused fail-closed coverage rejects writable tables and unproved indexes.
+Other layouts, pointer-bearing initializers, table stores, `.rodata`
+migration, STB_LOCAL ordering, and shared-library PIC remain excluded. The
+current ELF policy deliberately serializes the admitted constants as global
+objects in the existing `.data` section.
+
+A generated canary uses initializer text copied from all four captured table
+shapes. Six emitted probe functions cover the i16 table, the 16-double table,
+both low/high accesses to the 512-double table, and both fields of the named
+pair table. A native `zig build-exe -fno-lld` link passes 18/18 precomputed
+first/interior/last calls, including distinct offset-zero and offset-eight
+pair loads.
+
+`readelf` proves four defined `.data` objects at exact sizes 256, 128, 4096,
+and 2048 bytes and six `.rela.text` entries. Every entry is
+`R_X86_64_PC32` with addend `-4`; no new relocation kind or linker ownership
+was introduced.
+
+Fresh report-all remains 443 selected / 214 emitting / 229 failing. All six
+directed rows advance past their table GEP/load frontier, but none closes:
+
+- `compiler_rt.sqrt.sqrt` and `compiler_rt.sqrt.sqrtf` stop at
+  `composed-block-mul64-rhs`;
+- `compiler_rt.log.log` and `compiler_rt.exp2.__exp2h` stop at
+  `composed-block-binary-width`;
+- `compiler_rt.exp2.exp2` stops at `composed-block-icmp-form`;
+- `compiler_rt.exp2.exp2f` stops at `composed-block-binary-width`.
+
+Tier 2 passes all 24 build steps and 925/925 tests. The single Tier 3
+invocation passes all 17 subgates and is recorded in
+`docs/evidence/distribution_all_after_inbox31_constant_tables.summary`.
+
+Logs and artifacts:
+
+- `tmp/inbox31_constant_table_report.log`, sha256
+  `724ac8f2309376ddde999f2bd0f65a693e82bcf58565e4c24c448f175bd01f10`;
+- `tmp/inbox31_constant_table_tier2.log`, sha256
+  `c45b071b22035296a5c038e5b85c6014c3890c1db21119aebe83b90a4a71b19f`;
+- `tmp/inbox31_constant_table_canary.o`, sha256
+  `bb89bfd7f07ffac2f3d22bceeb3ec8895664f9cc8d9408527820cf2fa015a1ca`;
+- `tmp/inbox31_constant_table_symbols.log`, sha256
+  `4a736573a6b6eb59f190a1ee8aef47e32a6569450b5a6f5741296d648431376e`;
+- `tmp/inbox31_constant_table_relocations.log`, sha256
+  `079abcbf10c922ecaa0376e873f59d491321c417195b9fd432a321c2bdb40f9e`;
+- `tmp/inbox31_constant_table_sections.log`, sha256
+  `94cb913618313d88e4d756cad081b7a92772d71bcdfea2c8442c4d152063c9da`.

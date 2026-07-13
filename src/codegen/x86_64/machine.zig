@@ -7,6 +7,7 @@ const XmmReg = types.XmmReg;
 const MachineBinaryOp = types.MachineBinaryOp;
 const FrameIndex = types.FrameIndex;
 const CodegenPath = types.CodegenPath;
+pub const ReadOnlyModuleContext = types.ReadOnlyModuleContext;
 
 pub const Instruction = union(enum) {
     label: []const u8,
@@ -578,6 +579,16 @@ pub const Instruction = union(enum) {
         reg: ArgReg,
         offset: u8,
     },
+    load_arg_ptr_disp8_u16_arg: struct {
+        base: ArgReg,
+        dst: ArgReg,
+        offset: u8,
+    },
+    load_arg_ptr_disp8_xmm: struct {
+        base: ArgReg,
+        dst: XmmReg,
+        offset: u8,
+    },
     add_arg_ptr_disp4_eax: ArgReg,
     store_eax_arg_ptr: ArgReg,
     store_imm64_arg_ptr_disp8: struct {
@@ -671,6 +682,10 @@ pub const Instruction = union(enum) {
     lea_global_rdi: []const u8,
     lea_global_rsi: []const u8,
     lea_global_rdx: []const u8,
+    lea_global_arg64: struct {
+        reg: ArgReg,
+        symbol: []const u8,
+    },
     store_eax_global_i32: []const u8,
     load_tls_i32_eax: []const u8,
     add_tls_i32_eax: []const u8,

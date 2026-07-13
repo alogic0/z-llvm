@@ -20,6 +20,15 @@ pub fn tryLower(
     machine: *MachineFunction,
     function: ir.Function,
 ) !SelectionResult {
+    return tryLowerWithContext(allocator, machine, function, null);
+}
+
+pub fn tryLowerWithContext(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+) !SelectionResult {
     const inspected = inspectFunction(function);
     if (try legacy_lowering.tryLower(allocator, machine, function)) return .selected;
     switch (inspected) {
@@ -37,7 +46,7 @@ pub fn tryLower(
                 if (function.blocks.items.len > 1) {
                     const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
                     if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
-                    return tryLowerComposedCfgFailClosed(allocator, machine, function);
+                    return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context);
                 }
                 return inspected;
             },
@@ -47,10 +56,10 @@ pub fn tryLower(
     if (function.blocks.items.len > 1) {
         const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
         if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
-        return tryLowerComposedCfgFailClosed(allocator, machine, function);
+        return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context);
     }
     const composed_start_len = machine.instructions.items.len;
-    switch (try tryLowerComposedBlockFailClosed(allocator, machine, function)) {
+    switch (try tryLowerComposedBlockFailClosed(allocator, machine, function, module_context)) {
         .selected => return .selected,
         .unsupported => |diagnostic| switch (diagnostic) {
             .no_emitter => {
@@ -80,9 +89,10 @@ fn tryLowerComposedBlockFailClosed(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
     const start_len = machine.instructions.items.len;
-    const result = composed_selector.tryLowerComposedBlock(allocator, machine, function) catch |err| {
+    const result = composed_selector.tryLowerComposedBlockWithContext(allocator, machine, function, module_context) catch |err| {
         machine.instructions.items.len = start_len;
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "composed-block-unsupported-value" }),
@@ -100,9 +110,10 @@ fn tryLowerComposedCfgFailClosed(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
     const start_len = machine.instructions.items.len;
-    const result = composed_selector.tryLowerComposedCfg(allocator, machine, function) catch |err| {
+    const result = composed_selector.tryLowerComposedCfgWithContext(allocator, machine, function, module_context) catch |err| {
         machine.instructions.items.len = start_len;
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "stage2-unsupported-value" }),

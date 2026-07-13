@@ -1,4 +1,5 @@
 const std = @import("std");
+const constant_table = @import("../constant_table.zig");
 const x86_64_types = @import("../types.zig");
 
 pub const ArgReg = x86_64_types.ArgReg;
@@ -33,10 +34,23 @@ pub const ValueLoc = union(enum) {
     stack128_value: u32,
     stack_i32_array: StackArrayLoc,
     stack_i32_ptr: StackPtrLoc,
+    readonly_table_ptr: ReadOnlyTablePtrLoc,
     spill64: FrameIndex,
     spill128: PairSpillLoc,
     spill_fp: FpSpillLoc,
     spill_vector: VectorSpillLoc,
+};
+
+pub const ReadOnlyTablePtrLoc = struct {
+    storage: Storage,
+    symbol: []const u8,
+    shape: constant_table.Shape,
+    offset: u8 = 0,
+
+    pub const Storage = union(enum) {
+        reg: ArgReg,
+        spill: FrameIndex,
+    };
 };
 
 pub const VirtualRegClass = enum {

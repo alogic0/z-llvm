@@ -257,7 +257,7 @@ pub fn lowerFunctionWithOptions(
     errdefer machine.deinit(allocator);
 
     if (options.generic_cfg_selector) {
-        switch (try x86_64_generic_cfg_selector.tryLower(allocator, &machine, function)) {
+        switch (try x86_64_generic_cfg_selector.tryLowerWithContext(allocator, &machine, function, options.module_context)) {
             .selected => {
                 machine.codegen_path = .generic_cfg;
                 try verifyFunction(machine);

@@ -61,6 +61,8 @@ const encodeArgPtrDisp32ToRax = encoding_helpers.encodeArgPtrDisp32ToRax;
 const encodeArgPtrDisp8ToEax = encoding_helpers.encodeArgPtrDisp8ToEax;
 const encodeArgPtrDisp8U8ToEax = encoding_helpers.encodeArgPtrDisp8U8ToEax;
 const encodeArgPtrDisp8U16ToEax = encoding_helpers.encodeArgPtrDisp8U16ToEax;
+const encodeArgPtrDisp8U16ToArg = encoding_helpers.encodeArgPtrDisp8U16ToArg;
+const encodeArgPtrDisp8ToXmm = encoding_helpers.encodeArgPtrDisp8ToXmm;
 const encodePushByvalTailArgPtr = encoding_helpers.encodePushByvalTailArgPtr;
 const encodePushByvalTailStackPtr = encoding_helpers.encodePushByvalTailStackPtr;
 const pushByvalTailArgPtrSize = encoding_helpers.pushByvalTailArgPtrSize;
@@ -1531,6 +1533,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .load_arg_ptr_disp8_eax => |load| try encodeArgPtrDisp8ToEax(&bytes, allocator, load.reg, load.offset),
             .load_arg_ptr_disp8_u8_eax => |load| try encodeArgPtrDisp8U8ToEax(&bytes, allocator, load.reg, load.offset),
             .load_arg_ptr_disp8_u16_eax => |load| try encodeArgPtrDisp8U16ToEax(&bytes, allocator, load.reg, load.offset),
+            .load_arg_ptr_disp8_u16_arg => |load| try encodeArgPtrDisp8U16ToArg(&bytes, allocator, load.base, load.dst, load.offset),
+            .load_arg_ptr_disp8_xmm => |load| try encodeArgPtrDisp8ToXmm(&bytes, allocator, load.base, load.dst, load.offset),
             .add_arg_ptr_disp4_eax => |reg| try encodeArgPtrDisp4ToEax(&bytes, allocator, reg),
             .store_eax_arg_ptr => |reg| try encodeEaxToArgPtr(&bytes, allocator, reg),
             .store_imm64_arg_ptr_disp8 => |store| try encodeStoreImm64ArgPtrDisp8(&bytes, allocator, store.reg, store.offset, store.imm),
@@ -1575,6 +1579,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .lea_global_rdi => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x3d, 0, 0, 0, 0 }),
             .lea_global_rsi => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x35, 0, 0, 0, 0 }),
             .lea_global_rdx => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x15, 0, 0, 0, 0 }),
+            .lea_global_arg64 => |lea| {
+                try bytes.append(allocator, if (lea.reg.rexR()) 0x4c else 0x48);
+                try bytes.appendSlice(allocator, &.{ 0x8d, (@as(u8, lea.reg.lowCode()) << 3) | 0x05, 0, 0, 0, 0 });
+            },
             .store_eax_global_i32 => try bytes.appendSlice(allocator, &.{ 0x89, 0x05, 0, 0, 0, 0 }),
             .load_tls_i32_eax => try bytes.appendSlice(allocator, &.{ 0x64, 0x8b, 0x04, 0x25, 0, 0, 0, 0 }),
             .add_tls_i32_eax => try bytes.appendSlice(allocator, &.{ 0x64, 0x03, 0x04, 0x25, 0, 0, 0, 0 }),
@@ -2029,6 +2037,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .load_arg_ptr_disp8_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 2 + if (load.offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_disp8_u8_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_disp8_u16_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,
+        .load_arg_ptr_disp8_u16_arg => |load| (if (load.base.rexB() or load.dst.rexR()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,
+        .load_arg_ptr_disp8_xmm => |load| 4 + (if (load.base.rexB()) @as(u32, 1) else 0) + if (load.offset == 0) @as(u32, 0) else 1,
         .add_arg_ptr_disp4_eax => |reg| if (reg.rexB()) 4 else 3,
         .store_eax_arg_ptr => |reg| if (reg.rexB()) 3 else 2,
         .store_imm64_arg_ptr_disp8 => |store| 7 + if (store.offset == 0) @as(u32, 0) else 1,
@@ -2058,7 +2068,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .store_f128_xmm0_arg_ptr => |store| f128ArgPtrInstructionSize(store.reg, store.offset),
         .volatile_roundtrip_rdi_esi_eax => 4,
         .load_global_i32_eax, .store_eax_global_i32 => 6,
-        .load_global_ptr_rax, .lea_global_rax, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx => 7,
+        .load_global_ptr_rax, .lea_global_rax, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .lea_global_arg64 => 7,
         .load_tls_i32_eax, .add_tls_i32_eax, .store_eax_tls_i32 => 8,
         .atomic_xadd_global_eax => 8,
         .mov_rsp_rdi => 3,

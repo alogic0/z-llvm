@@ -1,4 +1,5 @@
 const std = @import("std");
+const constant_table = @import("constant_table.zig");
 
 pub const ArgReg = enum {
     rdi,
@@ -248,4 +249,7 @@ pub const CodegenOptions = struct {
     generic_cfg_selector: bool = false,
     generic_cfg_selector_diagnostic_tag: ?*?[]const u8 = null,
     generic_cfg_selector_diagnostic_detail: ?*?[]const u8 = null,
+    module_context: ?*const constant_table.ReadOnlyModuleContext = null,
 };
+
+pub const ReadOnlyModuleContext = constant_table.ReadOnlyModuleContext;

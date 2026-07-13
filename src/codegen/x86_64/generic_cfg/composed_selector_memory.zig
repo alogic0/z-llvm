@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const constant_table = @import("../constant_table.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_types = @import("../types.zig");
 const inspection = @import("inspection.zig");
@@ -84,7 +85,7 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
             const len = parseI32ArrayType(alloca.allocated_ty) orelse return .{ .no_emitter = "composed-block-alloca-plan-type" };
             if (stack_array.len != len) return .{ .no_emitter = "composed-block-alloca-plan-type" };
         },
-        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack128_value, .stack_i32_ptr, .spill64, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-alloca-plan-loc" },
+        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack128_value, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-alloca-plan-loc" },
     }
     return null;
 }
@@ -92,8 +93,10 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
 pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir.LoadInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (load.attrs.isBarrier()) return .{ .no_emitter = "composed-block-load-barrier" };
+    if (selector_state.resolveValue(selector, load.ptr)) |ptr| if (ptr == .readonly_table_ptr)
+        return lowerReadOnlyTableLoad(selector, result_name, load, ptr.readonly_table_ptr);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
-    if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
+    if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
     const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
     switch (ptr) {
         .stack_scalar => |stack| {
@@ -137,7 +140,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
             try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_eax = .rcx });
             try selector_state.bindEax(selector, result_name);
         },
-        .arg32, .arg128, .xmm, .eax, .rax, .scratch32, .scratch128, .stack128_value, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-load-ptr" },
+        .arg32, .arg128, .xmm, .eax, .rax, .scratch32, .scratch128, .stack128_value, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-load-ptr" },
     }
     return null;
 }
@@ -156,7 +159,7 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
         .scratch32, .scratch64 => "composed-block-store-value-scratch",
         .eax, .rax => "composed-block-store-value-accumulator",
         .spill64 => "composed-block-store-value-spill",
-        .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128, .spill_fp, .spill_vector => "composed-block-store-value-other",
+        .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector => "composed-block-store-value-other",
     } else "composed-block-store-value-other";
     if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64(selector, ptr, store.value, value_detail);
     selector_state.emitValueIntoEax(selector, store.value) catch return .{ .unsupported_value = value_detail };
@@ -195,6 +198,7 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
             };
             try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = .rcx });
         },
+        .readonly_table_ptr => return .{ .no_emitter = "composed-block-store-readonly-table" },
         .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack128, .stack128_value, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-store-ptr" },
     }
     return null;
@@ -277,7 +281,7 @@ fn lowerStoreI64(selector: *ComposedBlockSelector, ptr: ValueLoc, value: ir.Valu
             error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-spill-ptr" },
             else => return err,
         },
-        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-store-ptr" },
+        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-store-ptr" },
     }
     selector_state.emitValueIntoRax(selector, value) catch return .{ .unsupported_value = value_detail };
     try selector.machine.instructions.append(selector.allocator, .store_rax_rcx_ptr);
@@ -286,13 +290,15 @@ fn lowerStoreI64(selector: *ComposedBlockSelector, ptr: ValueLoc, value: ir.Valu
 
 pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.GepInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (gep.ptr == .named and std.mem.startsWith(u8, gep.ptr.named, "@"))
+        return try lowerReadOnlyTableGep(selector, result_name, gep);
     if (isBytePointerSource(gep.source_ty)) return try lowerBytePointerGep(selector, result_name, gep);
     if (isI32ElementPointerSource(gep.source_ty)) return try lowerI32ElementPointerGep(selector, result_name, gep);
     const len = parseI32ArrayType(gep.source_ty) orelse return .{ .no_emitter = "composed-block-gep-source" };
     const base = selector_state.resolveValue(selector, gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
     const stack_array = switch (base) {
         .stack_i32_array => |stack_array| stack_array,
-        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_ptr, .spill64, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-gep-ptr" },
+        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-gep-ptr" },
     };
     if (stack_array.len != len) return .{ .no_emitter = "composed-block-gep-len" };
     if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
@@ -373,6 +379,13 @@ pub fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []cons
         .int => |int| {
             const offset = std.math.cast(i32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
             if (selector_state.resolveValue(selector, gep.ptr)) |base| switch (base) {
+                .readonly_table_ptr => |ptr| {
+                    if (offset != 8 or ptr.offset != 0 or !ptr.shape.allowsOffset(8)) return .{ .no_emitter = "composed-block-gep-readonly-table-offset" };
+                    var adjusted = ptr;
+                    adjusted.offset = 8;
+                    try selector_state.bindValueLoc(selector, result_name, .{ .readonly_table_ptr = adjusted });
+                    return null;
+                },
                 .stack_i32_ptr => |stack_ptr| {
                     const adjusted = std.math.add(i64, stack_ptr.disp, offset) catch return .{ .no_emitter = "composed-block-gep-index-range" };
                     const disp = std.math.cast(u32, adjusted) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
@@ -393,6 +406,128 @@ pub fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []cons
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
     }
+    return null;
+}
+
+fn lowerReadOnlyTableGep(selector: *ComposedBlockSelector, result_name: []const u8, gep: ir.GepInst) !?Diagnostic {
+    if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-readonly-table-addrspace" };
+    if (gep.indices.items.len != 1) return .{ .no_emitter = "composed-block-gep-readonly-table-index-count" };
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 }) or index.value != .named) return .{ .no_emitter = "composed-block-gep-readonly-table-index" };
+    const context = selector.module_context orelse return .{ .no_emitter = "composed-block-gep-readonly-table-context" };
+    var decoded = (constant_table.decodeSymbol(selector.allocator, context.*, gep.ptr.named) catch return .{ .no_emitter = "composed-block-gep-readonly-table-global" }) orelse
+        return .{ .no_emitter = "composed-block-gep-readonly-table-global" };
+    defer decoded.deinit(selector.allocator);
+    if (!sourceStrideMatchesShape(gep.source_ty, decoded.shape)) return .{ .no_emitter = "composed-block-gep-readonly-table-source" };
+    const shift = tableIndexShift(decoded.shape);
+    if (!hasAdmittedIndexProof(selector, index.value.named, decoded.shape)) return .{ .no_emitter = "composed-block-gep-readonly-table-range" };
+
+    selector_state.emitValueIntoScratch(selector, index.value, .r8, 64) catch return .{ .unsupported_value = "composed-block-gep-readonly-table-index" };
+    try selector_state.clobberArgReg(selector, .rcx);
+    try selector.machine.instructions.append(selector.allocator, .{ .lea_global_arg64 = .{ .reg = .rcx, .symbol = decoded.symbol } });
+    try selector.machine.instructions.append(selector.allocator, .{ .shl_r8_imm6 = shift });
+    try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
+    try selector_state.bindValueLoc(selector, result_name, .{ .readonly_table_ptr = .{
+        .storage = .{ .reg = .rcx },
+        .symbol = decoded.symbol,
+        .shape = decoded.shape,
+    } });
+    return null;
+}
+
+fn lowerReadOnlyTableLoad(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    load: ir.LoadInst,
+    ptr: selector_types.ReadOnlyTablePtrLoc,
+) !?Diagnostic {
+    if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-load-readonly-table-addrspace" };
+    if (!ptr.shape.allowsOffset(ptr.offset)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
+    const base: ArgReg = switch (ptr.storage) {
+        .reg => |reg| reg,
+        .spill => |frame_index| blk: {
+            selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx }) catch return .{ .unsupported_value = "composed-block-load-readonly-table-spill" };
+            break :blk .rcx;
+        },
+    };
+    if (ptr.shape == .i16_128) {
+        if (!load.ty.eql(.{ .int = 16 }) or ptr.offset != 0) return .{ .no_emitter = "composed-block-load-readonly-table-type" };
+        try selector_state.clobberArgReg(selector, .r8);
+        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_u16_arg = .{ .base = base, .dst = .r8, .offset = 0 } });
+        try selector_state.bindResultLoc(selector, result_name, .{ .scratch32 = .r8 });
+        return null;
+    }
+    if (load.ty != .double) return .{ .no_emitter = "composed-block-load-readonly-table-type" };
+    try selector_state.clobberXmmReg(selector, .xmm0);
+    try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_xmm = .{ .base = base, .dst = .xmm0, .offset = ptr.offset } });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
+    return null;
+}
+
+fn sourceStrideMatchesShape(source_ty: ir.Type, shape: constant_table.Shape) bool {
+    const expected = switch (shape) {
+        .i16_128 => "[2 x i8]",
+        .f64_16, .f64_512_pairs => "[8 x i8]",
+        .f64_pair_128 => "[16 x i8]",
+    };
+    return switch (source_ty) {
+        .aggregate => |text| std.mem.eql(u8, std.mem.trim(u8, text, " \t"), expected),
+        else => false,
+    };
+}
+
+fn tableIndexShift(shape: constant_table.Shape) u6 {
+    return switch (shape) {
+        .i16_128 => 1,
+        .f64_16, .f64_512_pairs => 3,
+        .f64_pair_128 => 4,
+    };
+}
+
+fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u8, shape: constant_table.Shape) bool {
+    const function = selector.function orelse return false;
+    const source_name = stripZext(function.*, name) orelse name;
+    const mask: i128 = switch (shape) {
+        .i16_128, .f64_pair_128 => 127,
+        .f64_16 => 15,
+        .f64_512_pairs => 510,
+    };
+    const binary = findInstruction(function.*, source_name) orelse return false;
+    const and_inst = switch (binary.kind) {
+        .binary => |value| if (value.op == .@"and" and intOperand(value.lhs, value.rhs, mask)) value else return false,
+        else => return false,
+    };
+    if (shape != .f64_512_pairs) return true;
+    const shifted = namedNonIntOperand(and_inst.lhs, and_inst.rhs) orelse return false;
+    const shift_inst = findInstruction(function.*, shifted) orelse return false;
+    return switch (shift_inst.kind) {
+        .binary => |value| value.op == .shl and intOperand(value.lhs, value.rhs, 1),
+        else => false,
+    };
+}
+
+fn stripZext(function: ir.Function, name: []const u8) ?[]const u8 {
+    const instruction = findInstruction(function, name) orelse return null;
+    return switch (instruction.kind) {
+        .cast => |cast| if (cast.op == .zext and cast.value == .named) cast.value.named else null,
+        else => null,
+    };
+}
+
+fn findInstruction(function: ir.Function, name: []const u8) ?ir.Instruction {
+    for (function.blocks.items) |block| for (block.instructions.items) |instruction| {
+        if (instruction.result) |result| if (std.mem.eql(u8, result, name)) return instruction;
+    };
+    return null;
+}
+
+fn intOperand(lhs: ir.Value, rhs: ir.Value, expected: i128) bool {
+    return (lhs == .int and lhs.int == expected) or (rhs == .int and rhs.int == expected);
+}
+
+fn namedNonIntOperand(lhs: ir.Value, rhs: ir.Value) ?[]const u8 {
+    if (lhs == .named and rhs == .int) return lhs.named;
+    if (rhs == .named and lhs == .int) return rhs.named;
     return null;
 }
 

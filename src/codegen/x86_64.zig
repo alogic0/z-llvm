@@ -12,6 +12,7 @@ pub const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 pub const FrameIndex = x86_64_types.FrameIndex;
 pub const CodegenPath = x86_64_types.CodegenPath;
 pub const CodegenOptions = x86_64_types.CodegenOptions;
+pub const ReadOnlyModuleContext = x86_64_types.ReadOnlyModuleContext;
 pub const SysVAggregateEightbyteClass = sysv_abi.AggregateEightbyteClass;
 pub const SysVAggregateKind = sysv_abi.AggregateKind;
 pub const SysVAggregateClassification = sysv_abi.AggregateClassification;
