@@ -138,6 +138,87 @@ test "generic cfg selector handles spilled constant and identical scalar FP mult
     try std.testing.expect(saw_reload and saw_constant and saw_identical);
 }
 
+test "generic cfg selector preserves scalar FP subtraction and division operand order" {
+    {
+        var machine = x86_64_machine.MachineFunction.init("fp-named-order", .float);
+        defer machine.deinit(std.testing.allocator);
+        var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .xmm = .{ .reg = .xmm3, .bits = 32 } });
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .xmm = .{ .reg = .xmm0, .bits = 32 } });
+
+        try std.testing.expect((try selector_fp.lowerFpBinary(&selector, "difference", .{
+            .op = .fsub,
+            .ty = .float,
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "rhs" },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .subss_xmm = .{ .dst = .xmm3, .src = .xmm0 } },
+        }, machine.instructions.items);
+    }
+
+    {
+        var machine = x86_64_machine.MachineFunction.init("fp-spilled-lhs", .float);
+        defer machine.deinit(std.testing.allocator);
+        var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.stack_frame_bytes = 16;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .spill_fp = .{ .frame_index = .slot0, .bits = 32 } });
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .xmm = .{ .reg = .xmm0, .bits = 32 } });
+
+        try std.testing.expect((try selector_fp.lowerFpBinary(&selector, "quotient", .{
+            .op = .fdiv,
+            .ty = .float,
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "rhs" },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .reload_xmm32_rsp = .{ .frame_index = .slot0, .reg = .xmm1 } },
+            .{ .divss_xmm = .{ .dst = .xmm1, .src = .xmm0 } },
+        }, machine.instructions.items);
+    }
+
+    {
+        var machine = x86_64_machine.MachineFunction.init("fp-spilled-rhs", .double);
+        defer machine.deinit(std.testing.allocator);
+        var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.stack_frame_bytes = 16;
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .spill_fp = .{ .frame_index = .slot0, .bits = 64 } });
+
+        try std.testing.expect((try selector_fp.lowerFpBinary(&selector, "difference", .{
+            .op = .fsub,
+            .ty = .double,
+            .lhs = .{ .fp = "8.000000e+00" },
+            .rhs = .{ .named = "rhs" },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_imm64_xmm = .{ .reg = .xmm0, .bits = 0x4020_0000_0000_0000 } },
+            .{ .reload_xmm64_rsp = .{ .frame_index = .slot0, .reg = .xmm1 } },
+            .{ .subsd_xmm = .{ .dst = .xmm0, .src = .xmm1 } },
+        }, machine.instructions.items);
+    }
+
+    {
+        var machine = x86_64_machine.MachineFunction.init("fp-identical", .double);
+        defer machine.deinit(std.testing.allocator);
+        var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .xmm = .{ .reg = .xmm2, .bits = 64 } });
+
+        try std.testing.expect((try selector_fp.lowerFpBinary(&selector, "quotient", .{
+            .op = .fdiv,
+            .ty = .double,
+            .lhs = .{ .named = "value" },
+            .rhs = .{ .named = "value" },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .divsd_xmm = .{ .dst = .xmm2, .src = .xmm2 } },
+        }, machine.instructions.items);
+    }
+}
+
 test "generic cfg selector executes bit-exact scalar FP widening and narrowing" {
     const input =
         \\define double @widen(float %value) {
@@ -277,6 +358,156 @@ test "generic cfg selector executes bit-exact scalar float and double multiplica
         const rhs: f64 = @bitCast(case[1]);
         const expected = lhs * rhs;
         try std.testing.expectEqual(@as(u64, @bitCast(expected)), @as(u64, @bitCast(mul_double(lhs, rhs))));
+    }
+}
+
+test "generic cfg selector executes bit-exact scalar float subtraction and division" {
+    const input =
+        \\define float @sub_float(float %lhs, float %rhs) {
+        \\entry:
+        \\  %result = fsub float %lhs, %rhs
+        \\  ret float %result
+        \\}
+        \\define float @div_float(float %lhs, float %rhs) {
+        \\entry:
+        \\  %result = fdiv float %lhs, %rhs
+        \\  ret float %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var sub_machine = x86_64_machine.MachineFunction.init("sub_float", .float);
+    defer sub_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &sub_machine, module.functions.items[0]));
+    const sub_bytes = try encoding.encodeFunction(std.testing.allocator, sub_machine);
+    defer std.testing.allocator.free(sub_bytes);
+    const sub_mapping = try std.posix.mmap(null, sub_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(sub_mapping);
+    @memcpy(sub_mapping, sub_bytes);
+    const sub_float: *const fn (f32, f32) callconv(.c) f32 = @ptrCast(sub_mapping.ptr);
+    inline for (.{
+        .{ @as(u32, 0x3fc0_0000), @as(u32, 0x4010_0000) },
+        .{ @as(u32, 0x3f80_0000), @as(u32, 0x3f80_0000) },
+        .{ @as(u32, 0x8000_0000), @as(u32, 0x0000_0000) },
+        .{ @as(u32, 0x0000_0000), @as(u32, 0x8000_0000) },
+        .{ @as(u32, 0x0080_0000), @as(u32, 0x007f_ffff) },
+        .{ @as(u32, 0x7f7f_ffff), @as(u32, 0xff7f_ffff) },
+        .{ @as(u32, 0x7f80_0000), @as(u32, 0x3f80_0000) },
+        .{ @as(u32, 0xff80_0000), @as(u32, 0xbf80_0000) },
+        .{ @as(u32, 0x7fc1_2345), @as(u32, 0x3f80_0000) },
+        .{ @as(u32, 0x7f80_0000), @as(u32, 0x7f80_0000) },
+    }) |case| {
+        const lhs: f32 = @bitCast(case[0]);
+        const rhs: f32 = @bitCast(case[1]);
+        const expected = lhs - rhs;
+        try std.testing.expectEqual(@as(u32, @bitCast(expected)), @as(u32, @bitCast(sub_float(lhs, rhs))));
+    }
+
+    var div_machine = x86_64_machine.MachineFunction.init("div_float", .float);
+    defer div_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &div_machine, module.functions.items[1]));
+    const div_bytes = try encoding.encodeFunction(std.testing.allocator, div_machine);
+    defer std.testing.allocator.free(div_bytes);
+    const div_mapping = try std.posix.mmap(null, div_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(div_mapping);
+    @memcpy(div_mapping, div_bytes);
+    const div_float: *const fn (f32, f32) callconv(.c) f32 = @ptrCast(div_mapping.ptr);
+    inline for (.{
+        .{ @as(u32, 0x40c0_0000), @as(u32, 0x4000_0000) },
+        .{ @as(u32, 0x4000_0000), @as(u32, 0x40c0_0000) },
+        .{ @as(u32, 0x3f80_0000), @as(u32, 0x0000_0000) },
+        .{ @as(u32, 0xbf80_0000), @as(u32, 0x0000_0000) },
+        .{ @as(u32, 0x3f80_0000), @as(u32, 0x8000_0000) },
+        .{ @as(u32, 0x0000_0000), @as(u32, 0x0000_0000) },
+        .{ @as(u32, 0x7f80_0000), @as(u32, 0x7f80_0000) },
+        .{ @as(u32, 0x0080_0000), @as(u32, 0x4000_0000) },
+        .{ @as(u32, 0x7f7f_ffff), @as(u32, 0x0080_0000) },
+        .{ @as(u32, 0x0000_0001), @as(u32, 0x4000_0000) },
+        .{ @as(u32, 0x8000_0001), @as(u32, 0x4000_0000) },
+        .{ @as(u32, 0x7fc1_2345), @as(u32, 0x3f80_0000) },
+    }) |case| {
+        const lhs: f32 = @bitCast(case[0]);
+        const rhs: f32 = @bitCast(case[1]);
+        const expected = lhs / rhs;
+        try std.testing.expectEqual(@as(u32, @bitCast(expected)), @as(u32, @bitCast(div_float(lhs, rhs))));
+    }
+}
+
+test "generic cfg selector executes bit-exact scalar double subtraction and division" {
+    const input =
+        \\define double @sub_double(double %lhs, double %rhs) {
+        \\entry:
+        \\  %result = fsub double %lhs, %rhs
+        \\  ret double %result
+        \\}
+        \\define double @div_double(double %lhs, double %rhs) {
+        \\entry:
+        \\  %result = fdiv double %lhs, %rhs
+        \\  ret double %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var sub_machine = x86_64_machine.MachineFunction.init("sub_double", .double);
+    defer sub_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &sub_machine, module.functions.items[0]));
+    const sub_bytes = try encoding.encodeFunction(std.testing.allocator, sub_machine);
+    defer std.testing.allocator.free(sub_bytes);
+    const sub_mapping = try std.posix.mmap(null, sub_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(sub_mapping);
+    @memcpy(sub_mapping, sub_bytes);
+    const sub_double: *const fn (f64, f64) callconv(.c) f64 = @ptrCast(sub_mapping.ptr);
+    inline for (.{
+        .{ @as(u64, 0x3ff8_0000_0000_0000), @as(u64, 0x4002_0000_0000_0000) },
+        .{ @as(u64, 0x3ff0_0000_0000_0000), @as(u64, 0x3ff0_0000_0000_0000) },
+        .{ @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x0000_0000_0000_0000) },
+        .{ @as(u64, 0x0000_0000_0000_0000), @as(u64, 0x8000_0000_0000_0000) },
+        .{ @as(u64, 0x0010_0000_0000_0000), @as(u64, 0x000f_ffff_ffff_ffff) },
+        .{ @as(u64, 0x7fef_ffff_ffff_ffff), @as(u64, 0xffef_ffff_ffff_ffff) },
+        .{ @as(u64, 0x7ff0_0000_0000_0000), @as(u64, 0x3ff0_0000_0000_0000) },
+        .{ @as(u64, 0xfff0_0000_0000_0000), @as(u64, 0xbff0_0000_0000_0000) },
+        .{ @as(u64, 0x7ff8_1234_5678_9abc), @as(u64, 0x3ff0_0000_0000_0000) },
+        .{ @as(u64, 0x7ff0_0000_0000_0000), @as(u64, 0x7ff0_0000_0000_0000) },
+    }) |case| {
+        const lhs: f64 = @bitCast(case[0]);
+        const rhs: f64 = @bitCast(case[1]);
+        const expected = lhs - rhs;
+        try std.testing.expectEqual(@as(u64, @bitCast(expected)), @as(u64, @bitCast(sub_double(lhs, rhs))));
+    }
+
+    var div_machine = x86_64_machine.MachineFunction.init("div_double", .double);
+    defer div_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &div_machine, module.functions.items[1]));
+    const div_bytes = try encoding.encodeFunction(std.testing.allocator, div_machine);
+    defer std.testing.allocator.free(div_bytes);
+    const div_mapping = try std.posix.mmap(null, div_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(div_mapping);
+    @memcpy(div_mapping, div_bytes);
+    const div_double: *const fn (f64, f64) callconv(.c) f64 = @ptrCast(div_mapping.ptr);
+    inline for (.{
+        .{ @as(u64, 0x4018_0000_0000_0000), @as(u64, 0x4000_0000_0000_0000) },
+        .{ @as(u64, 0x4000_0000_0000_0000), @as(u64, 0x4018_0000_0000_0000) },
+        .{ @as(u64, 0x3ff0_0000_0000_0000), @as(u64, 0x0000_0000_0000_0000) },
+        .{ @as(u64, 0xbff0_0000_0000_0000), @as(u64, 0x0000_0000_0000_0000) },
+        .{ @as(u64, 0x3ff0_0000_0000_0000), @as(u64, 0x8000_0000_0000_0000) },
+        .{ @as(u64, 0x0000_0000_0000_0000), @as(u64, 0x0000_0000_0000_0000) },
+        .{ @as(u64, 0x7ff0_0000_0000_0000), @as(u64, 0x7ff0_0000_0000_0000) },
+        .{ @as(u64, 0x0010_0000_0000_0000), @as(u64, 0x4000_0000_0000_0000) },
+        .{ @as(u64, 0x7fef_ffff_ffff_ffff), @as(u64, 0x0010_0000_0000_0000) },
+        .{ @as(u64, 0x0000_0000_0000_0001), @as(u64, 0x4000_0000_0000_0000) },
+        .{ @as(u64, 0x8000_0000_0000_0001), @as(u64, 0x4000_0000_0000_0000) },
+        .{ @as(u64, 0x7ff8_1234_5678_9abc), @as(u64, 0x3ff0_0000_0000_0000) },
+    }) |case| {
+        const lhs: f64 = @bitCast(case[0]);
+        const rhs: f64 = @bitCast(case[1]);
+        const expected = lhs / rhs;
+        try std.testing.expectEqual(@as(u64, @bitCast(expected)), @as(u64, @bitCast(div_double(lhs, rhs))));
     }
 }
 

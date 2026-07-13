@@ -86,8 +86,8 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
     return switch (binary.op) {
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
         .udiv, .sdiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
-        .fadd, .fmul => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
-        .fsub, .fdiv, .frem => .{ .unsupported_instruction = @tagName(binary.op) },
+        .fadd, .fsub, .fmul, .fdiv => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
+        .frem => .{ .unsupported_instruction = @tagName(binary.op) },
     };
 }
 

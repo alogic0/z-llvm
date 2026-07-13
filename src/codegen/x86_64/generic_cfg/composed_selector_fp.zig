@@ -15,7 +15,7 @@ const scalar_xmm_regs = selector_types.selector_allocatable_xmm_regs;
 pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const bits = fpBits(binary.ty) orelse return .{ .no_emitter = "composed-block-fp-binary-type" };
-    if (binary.op == .fmul) return lowerFpMul(selector, result_name, binary, bits);
+    if (binary.op == .fmul or binary.op == .fsub or binary.op == .fdiv) return lowerFpRegisterBinary(selector, result_name, binary, bits);
     if (binary.op != .fadd) return .{ .no_emitter = "composed-block-fp-binary-type" };
 
     if (try materializeFpValue(selector, binary.rhs, .xmm1, bits)) |diagnostic| return diagnostic;
@@ -25,7 +25,7 @@ pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, bina
     return null;
 }
 
-fn lowerFpMul(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
+fn lowerFpRegisterBinary(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
     const dst = fpValueReg(selector, binary.lhs, bits) orelse blk: {
         const rhs_reg = fpValueReg(selector, binary.rhs, bits);
         break :blk firstXmmExcept(rhs_reg);
@@ -37,10 +37,21 @@ fn lowerFpMul(selector: *ComposedBlockSelector, result_name: []const u8, binary:
         break :blk scratch;
     };
     try selector_state.clobberXmmReg(selector, dst);
-    try selector.machine.instructions.append(selector.allocator, if (bits == 32)
-        .{ .mulss_xmm = .{ .dst = dst, .src = src } }
-    else
-        .{ .mulsd_xmm = .{ .dst = dst, .src = src } });
+    switch (binary.op) {
+        .fmul => try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+            .{ .mulss_xmm = .{ .dst = dst, .src = src } }
+        else
+            .{ .mulsd_xmm = .{ .dst = dst, .src = src } }),
+        .fsub => try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+            .{ .subss_xmm = .{ .dst = dst, .src = src } }
+        else
+            .{ .subsd_xmm = .{ .dst = dst, .src = src } }),
+        .fdiv => try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+            .{ .divss_xmm = .{ .dst = dst, .src = src } }
+        else
+            .{ .divsd_xmm = .{ .dst = dst, .src = src } }),
+        else => unreachable,
+    }
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
     return null;
 }

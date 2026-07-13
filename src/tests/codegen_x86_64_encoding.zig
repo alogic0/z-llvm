@@ -710,7 +710,7 @@ test "x86_64 encoding materializes FP immediates into generic xmm registers" {
     }, bytes);
 }
 
-test "x86_64 encoding emits parametric scalar FP conversions and multiplies" {
+test "x86_64 encoding emits parametric scalar FP arithmetic and conversions" {
     var machine = codegen.x86_64.MachineFunction.init("scalar_fp_parametric", .void);
     defer machine.deinit(std.testing.allocator);
     try machine.instructions.appendSlice(std.testing.allocator, &.{
@@ -718,6 +718,10 @@ test "x86_64 encoding emits parametric scalar FP conversions and multiplies" {
         .{ .cvtsd2ss_xmm = .{ .dst = .xmm5, .src = .xmm4 } },
         .{ .mulss_xmm = .{ .dst = .xmm7, .src = .xmm6 } },
         .{ .mulsd_xmm = .{ .dst = .xmm1, .src = .xmm0 } },
+        .{ .subss_xmm = .{ .dst = .xmm2, .src = .xmm3 } },
+        .{ .subsd_xmm = .{ .dst = .xmm4, .src = .xmm5 } },
+        .{ .divss_xmm = .{ .dst = .xmm6, .src = .xmm7 } },
+        .{ .divsd_xmm = .{ .dst = .xmm0, .src = .xmm1 } },
         .ret,
     });
 
@@ -725,6 +729,10 @@ test "x86_64 encoding emits parametric scalar FP conversions and multiplies" {
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .cvtsd2ss_xmm = .{ .dst = .xmm5, .src = .xmm4 } }));
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .mulss_xmm = .{ .dst = .xmm7, .src = .xmm6 } }));
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .mulsd_xmm = .{ .dst = .xmm1, .src = .xmm0 } }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .subss_xmm = .{ .dst = .xmm2, .src = .xmm3 } }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .subsd_xmm = .{ .dst = .xmm4, .src = .xmm5 } }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .divss_xmm = .{ .dst = .xmm6, .src = .xmm7 } }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .divsd_xmm = .{ .dst = .xmm0, .src = .xmm1 } }));
     const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
     try std.testing.expectEqualSlices(u8, &.{
@@ -732,6 +740,10 @@ test "x86_64 encoding emits parametric scalar FP conversions and multiplies" {
         0xf2, 0x0f, 0x5a, 0xec,
         0xf3, 0x0f, 0x59, 0xfe,
         0xf2, 0x0f, 0x59, 0xc8,
+        0xf3, 0x0f, 0x5c, 0xd3,
+        0xf2, 0x0f, 0x5c, 0xe5,
+        0xf3, 0x0f, 0x5e, 0xf7,
+        0xf2, 0x0f, 0x5e, 0xc1,
         0xc3,
     }, bytes);
 

@@ -109,6 +109,10 @@ test "x86_64 assembly prints parametric scalar FP operations" {
         .{ .cvtsd2ss_xmm = .{ .dst = .xmm5, .src = .xmm4 } },
         .{ .mulss_xmm = .{ .dst = .xmm7, .src = .xmm6 } },
         .{ .mulsd_xmm = .{ .dst = .xmm1, .src = .xmm0 } },
+        .{ .subss_xmm = .{ .dst = .xmm2, .src = .xmm3 } },
+        .{ .subsd_xmm = .{ .dst = .xmm4, .src = .xmm5 } },
+        .{ .divss_xmm = .{ .dst = .xmm6, .src = .xmm7 } },
+        .{ .divsd_xmm = .{ .dst = .xmm0, .src = .xmm1 } },
         .ret,
     });
 
@@ -123,6 +127,10 @@ test "x86_64 assembly prints parametric scalar FP operations" {
             "\tcvtsd2ss %xmm4, %xmm5\n" ++
             "\tmulss %xmm6, %xmm7\n" ++
             "\tmulsd %xmm0, %xmm1\n" ++
+            "\tsubss %xmm3, %xmm2\n" ++
+            "\tsubsd %xmm5, %xmm4\n" ++
+            "\tdivss %xmm7, %xmm6\n" ++
+            "\tdivsd %xmm1, %xmm0\n" ++
             "\tretq\n",
         output.writer.buffered(),
     );

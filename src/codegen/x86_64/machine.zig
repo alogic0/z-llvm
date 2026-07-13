@@ -306,6 +306,22 @@ pub const Instruction = union(enum) {
         dst: XmmReg,
         src: XmmReg,
     },
+    subsd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    subss_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    divsd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    divss_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
     addsd_xmm1_xmm0,
     addss_xmm1_xmm0,
     subss_xmm1_xmm0,

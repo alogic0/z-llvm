@@ -46,6 +46,15 @@ packed-operation, and verifier model before implementation. Vector lowering
 remains unauthorized. Evidence:
 `docs/evidence/phase_d_vector_inventory.md`.
 
+INBOX-23 closes type-driven scalar `fsub` and `fdiv` for float and double
+through register-parametric SSE forms, non-commutative operand-order checks,
+and 44 bit-exact executable cases. Twelve directed compiler_rt rows advance
+from `fsub`/`fdiv` to `insertelement`; report-all remains 443 selected / 190
+emitting / 253 failing with no collateral emission or regression. The
+pre-authorized successor is scalar float/double `fcmp`; vector forms remain
+unauthorized while the Phase D review is pending. Evidence:
+`docs/evidence/std_debug_hello_scalar_fsub_fdiv_acceptance.summary`.
+
 INBOX-21 closes type-driven scalar `fpext float -> double`, `fptrunc
 double -> float`, and `fmul` for float and double with register-parametric SSE
 forms and bit-exact executable coverage. The internal `compiler_rt.tan.tanf`
