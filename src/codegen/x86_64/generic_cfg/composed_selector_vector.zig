@@ -104,8 +104,18 @@ pub fn lowerShuffleVector(selector: *ComposedBlockSelector, result: ?[]const u8,
     if (!isPackedFp2(shuffle.lhs_ty)) return .{ .no_emitter = "composed-vector-shuffle-form" };
     const mask = ir.vector_constant.classifyPacked2ShuffleMask(shuffle) orelse return .{ .no_emitter = "composed-vector-shuffle-form" };
     const source = describeVectorValue(selector, shuffle.lhs, shuffle.lhs_ty) orelse return .{ .unsupported_value = "composed-vector-shuffle-source" };
-    const dst = resultXmmReg(selector, result_name, shuffle.lhs, null) orelse return .{ .no_spill_envelope = "composed-vector-shuffle-dst" };
-    if (try materializeVectorValue(selector, shuffle.lhs, source, dst, null)) |diagnostic| return diagnostic;
+    const rhs = if (mask == .f64_lane0_lane3)
+        describeVectorValue(selector, shuffle.rhs, shuffle.rhs_ty) orelse return .{ .unsupported_value = "composed-vector-shuffle-rhs" }
+    else
+        null;
+    const rhs_reg = if (rhs != null) vectorValueReg(selector, shuffle.rhs) else null;
+    const dst = resultXmmReg(selector, result_name, shuffle.lhs, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-shuffle-dst" };
+    if (try materializeVectorValue(selector, shuffle.lhs, source, dst, rhs_reg)) |diagnostic| return diagnostic;
+    const src = if (rhs) |rhs_operand| vectorValueReg(selector, shuffle.rhs) orelse blk: {
+        const scratch = scratchXmmReg(selector, dst, null);
+        if (try materializeVectorValue(selector, shuffle.rhs, rhs_operand, scratch, dst)) |diagnostic| return diagnostic;
+        break :blk scratch;
+    } else null;
     try selector_state.clobberXmmReg(selector, dst);
     var result_shape = source.shape;
     switch (mask) {
@@ -116,6 +126,11 @@ pub fn lowerShuffleVector(selector: *ComposedBlockSelector, result: ?[]const u8,
         .lane1_to_lane0 => {
             try appendHighToLow(selector, source.shape.lane_type, dst);
             result_shape.defined_lanes = if ((source.shape.defined_lanes & 0b10) != 0) 0b01 else 0;
+        },
+        .f64_lane0_lane3 => {
+            try selector.machine.instructions.append(selector.allocator, .{ .shufpd_lane0_lane3_xmm = .{ .dst = dst, .src = src.? } });
+            result_shape.defined_lanes = (source.shape.defined_lanes & 0b01) |
+                (rhs.?.shape.defined_lanes & 0b10);
         },
     }
     try bindVectorResult(selector, result_name, dst, result_shape);

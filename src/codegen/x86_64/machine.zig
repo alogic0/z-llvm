@@ -381,6 +381,10 @@ pub const Instruction = union(enum) {
         dst: XmmReg,
         src: XmmReg,
     },
+    shufpd_lane0_lane3_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
     unpcklps_xmm: struct {
         dst: XmmReg,
         src: XmmReg,

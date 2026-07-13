@@ -18,6 +18,7 @@ test "generic cfg selector encodes bounded packed double operations" {
     try machine.instructions.append(std.testing.allocator, .{ .movsd_xmm = .{ .dst = .xmm6, .src = .xmm7 } });
     try machine.instructions.append(std.testing.allocator, .{ .unpcklpd_xmm = .{ .dst = .xmm1, .src = .xmm2 } });
     try machine.instructions.append(std.testing.allocator, .{ .unpckhpd_xmm = .{ .dst = .xmm3, .src = .xmm4 } });
+    try machine.instructions.append(std.testing.allocator, .{ .shufpd_lane0_lane3_xmm = .{ .dst = .xmm2, .src = .xmm5 } });
     try machine.instructions.append(std.testing.allocator, .{ .addps_xmm = .{ .dst = .xmm2, .src = .xmm3 } });
     try machine.instructions.append(std.testing.allocator, .{ .subps_xmm = .{ .dst = .xmm6, .src = .xmm7 } });
     try machine.instructions.append(std.testing.allocator, .{ .mulps_xmm = .{ .dst = .xmm4, .src = .xmm5 } });
@@ -34,12 +35,13 @@ test "generic cfg selector encodes bounded packed double operations" {
         0xf2, 0x0f, 0x10, 0xf7,
         0x66, 0x0f, 0x14, 0xca,
         0x66, 0x0f, 0x15, 0xdc,
-        0x0f, 0x58, 0xd3, 0x0f,
-        0x5c, 0xf7, 0x0f, 0x59,
-        0xe5, 0xf3, 0x0f, 0x10,
-        0xf7, 0x0f, 0x14, 0xca,
-        0x0f, 0xc6, 0xdb, 0x55,
-        0xc3,
+        0x66, 0x0f, 0xc6, 0xd5,
+        0x02, 0x0f, 0x58, 0xd3,
+        0x0f, 0x5c, 0xf7, 0x0f,
+        0x59, 0xe5, 0xf3, 0x0f,
+        0x10, 0xf7, 0x0f, 0x14,
+        0xca, 0x0f, 0xc6, 0xdb,
+        0x55, 0xc3,
     }, bytes);
 
     var spill_machine = x86_64_machine.MachineFunction.init("packed-spill", .void);
@@ -181,6 +183,91 @@ test "generic cfg selector propagates lane-shift definedness" {
     poisoned_shift.lhs = .{ .named = "lane0_only" };
     try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "poisoned_shift", poisoned_shift)) == null);
     try std.testing.expectEqual(@as(u2, 0), selector_state.valueLoc(&selector, "poisoned_shift").?.xmm.vectorShape().?.defined_lanes);
+}
+
+test "generic cfg selector lowers exact f64x2 lane zero-three shuffle" {
+    var machine = x86_64_machine.MachineFunction.init("vector-cross-shuffle", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .xmm = .{
+        .reg = .xmm2,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f64x2(0b01) },
+    } });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .xmm = .{
+        .reg = .xmm3,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f64x2(0b10) },
+    } });
+
+    const shuffle: ir.ShuffleVectorInst = .{
+        .lhs_ty = .{ .vector = .{ .len = 2, .elem_ty = .double } },
+        .lhs = .{ .named = "lhs" },
+        .rhs_ty = .{ .vector = .{ .len = 2, .elem_ty = .double } },
+        .rhs = .{ .named = "rhs" },
+        .mask_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 32 } } },
+        .mask = .{ .vector = "<i32 0, i32 3>" },
+    };
+    try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "cross", shuffle)) == null);
+    const cross = selector_state.valueLoc(&selector, "cross").?.xmm;
+    try std.testing.expectEqual(@as(u2, 0b11), cross.vectorShape().?.defined_lanes);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .shufpd_lane0_lane3_xmm = .{ .dst = cross.reg, .src = .xmm3 } }, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector executes exact f64x2 lane zero-three shuffle bit exactly" {
+    const input =
+        \\define double @cross_shuffle_low(double %a0, double %a1, double %b0, double %b1) {
+        \\entry:
+        \\  %a.seed = insertelement <2 x double> poison, double %a0, i64 0
+        \\  %a = insertelement <2 x double> %a.seed, double %a1, i64 1
+        \\  %b.seed = insertelement <2 x double> poison, double %b0, i64 0
+        \\  %b = insertelement <2 x double> %b.seed, double %b1, i64 1
+        \\  %cross = shufflevector <2 x double> %a, <2 x double> %b, <2 x i32> <i32 0, i32 3>
+        \\  %low = extractelement <2 x double> %cross, i64 0
+        \\  ret double %low
+        \\}
+        \\define double @cross_shuffle_high(double %a0, double %a1, double %b0, double %b1) {
+        \\entry:
+        \\  %a.seed = insertelement <2 x double> poison, double %a0, i64 0
+        \\  %a = insertelement <2 x double> %a.seed, double %a1, i64 1
+        \\  %b.seed = insertelement <2 x double> poison, double %b0, i64 0
+        \\  %b = insertelement <2 x double> %b.seed, double %b1, i64 1
+        \\  %cross = shufflevector <2 x double> %a, <2 x double> %b, <2 x i32> <i32 0, i32 3>
+        \\  %high = extractelement <2 x double> %cross, i64 1
+        \\  ret double %high
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machines: [2]x86_64_machine.MachineFunction = .{
+        x86_64_machine.MachineFunction.init("cross_shuffle_low", .double),
+        x86_64_machine.MachineFunction.init("cross_shuffle_high", .double),
+    };
+    defer for (&machines) |*machine| machine.deinit(std.testing.allocator);
+    var mappings: [2]?[]align(std.heap.page_size_min) u8 = .{ null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (&machines, module.functions.items, &mappings) |*machine, function, *mapping| {
+        try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, machine, function));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine.*);
+        defer std.testing.allocator.free(bytes);
+        mapping.* = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mapping.*.?, bytes);
+    }
+    const low: *const fn (f64, f64, f64, f64) callconv(.c) f64 = @ptrCast(mappings[0].?.ptr);
+    const high: *const fn (f64, f64, f64, f64) callconv(.c) f64 = @ptrCast(mappings[1].?.ptr);
+
+    inline for (.{
+        .{ @as(u64, 0), @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x3ff0_0000_0000_0000), @as(u64, 0xbff0_0000_0000_0000) },
+        .{ @as(u64, 1), @as(u64, 0x8000_0000_0000_0001), @as(u64, 0x7ff0_0000_0000_0000), @as(u64, 0xfff0_0000_0000_0000) },
+        .{ @as(u64, 0x7ff8_1234_5678_9abc), @as(u64, 0xfff8_9876_5432_1abc), @as(u64, 0x7ff0_0000_0000_0001), @as(u64, 0xfff0_0000_0000_0042) },
+    }) |case| {
+        const args: [4]f64 = .{ @bitCast(case[0]), @bitCast(case[1]), @bitCast(case[2]), @bitCast(case[3]) };
+        try std.testing.expectEqual(case[0], @as(u64, @bitCast(low(args[0], args[1], args[2], args[3]))));
+        try std.testing.expectEqual(case[3], @as(u64, @bitCast(high(args[0], args[1], args[2], args[3]))));
+    }
 }
 
 test "generic cfg selector executes packed double construction and pressure spills bit exactly" {
@@ -541,7 +628,7 @@ test "generic cfg selector fails closed outside the bounded vector slice" {
         \\define double @bad(double %x) {
         \\entry:
         \\  %v = insertelement <2 x double> poison, double %x, i64 0
-        \\  %r = shufflevector <2 x double> %v, <2 x double> poison, <2 x i32> <i32 0, i32 3>
+        \\  %r = shufflevector <2 x double> %v, <2 x double> poison, <2 x i32> <i32 0, i32 2>
         \\  %e = extractelement <2 x double> %r, i64 0
         \\  ret double %e
         \\}

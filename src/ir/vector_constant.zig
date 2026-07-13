@@ -88,6 +88,7 @@ pub fn isSplatMask(
 pub const Packed2ShuffleMask = enum {
     splat_lane0,
     lane1_to_lane0,
+    f64_lane0_lane3,
 };
 
 pub fn classifyPacked2ShuffleMask(shuffle: core.ShuffleVectorInst) ?Packed2ShuffleMask {
@@ -98,6 +99,8 @@ pub fn classifyPacked2ShuffleMask(shuffle: core.ShuffleVectorInst) ?Packed2Shuff
     const parsed = parseFixed(2, shuffle.mask, mask_ty) orelse return null;
     if (maskLaneEquals(parsed.lanes[0], 0) and maskLaneEquals(parsed.lanes[1], 0)) return .splat_lane0;
     if (maskLaneEquals(parsed.lanes[0], 1) and parsed.lanes[1] == .poison) return .lane1_to_lane0;
+    if (shuffle.lhs_ty.vector.elem_ty == .double and
+        maskLaneEquals(parsed.lanes[0], 0) and maskLaneEquals(parsed.lanes[1], 3)) return .f64_lane0_lane3;
     return null;
 }
 
@@ -188,4 +191,7 @@ test "fixed vector constants and typed splat masks are structured once" {
     try std.testing.expect(classifyPacked2ShuffleMask(lane_shift) == null);
     lane_shift.mask = .{ .vector = "<i32 0, i32 3>" };
     try std.testing.expect(classifyPacked2ShuffleMask(lane_shift) == null);
+    lane_shift.lhs_ty.vector.elem_ty = .double;
+    lane_shift.rhs_ty.vector.elem_ty = .double;
+    try std.testing.expectEqual(Packed2ShuffleMask.f64_lane0_lane3, classifyPacked2ShuffleMask(lane_shift).?);
 }

@@ -37,18 +37,24 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-29 and its one pre-authorized successor are complete. Typed scalar
-integer-to-FP conversion covers i8 through i64, including odd widths and the
-u64 correction path; typed plain i32/i64 signed-less-than immediate comparison
-then closes `log2`, `log2f`, `log10f`, and `logf`. Their parser/printer-derived
-native module passes 32 precomputed raw-bit results. Report-all is now 443
-selected / 210 emitting / 233 failing, including four collateral soft-float
-arithmetic emissions without semantic claims. The remaining targeted log
-frontier is three half wrappers at scalar half `fcmp`, double `log10` at the
-cross-input `<0, 3>` shuffle, and double `log` at a global-table GEP source.
-No third cycle is authorized; stop for review and successor direction.
-Evidence: `docs/evidence/std_debug_hello_slt_immediate_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox29_slt_immediate.summary`.
+INBOX-30 and its one pre-authorized successor are complete. Exact scalar half
+equality against positive or negative zero closes `__log2h`, `__log10h`, and
+`__logh`; `__sqrth` advances honestly to unsupported half `fmul`. The native
+half-row proof also exposed and drove standalone framed-FP-phi repair
+`70c63cc4`. The successor then adds only the typed f64x2 `<0, 3>` two-source
+shuffle via fixed `shufpd $2`, closing `compiler_rt.log10.log10` through 15
+precomputed raw-bit native cases. Report-all is now 443 selected / 214 emitting
+/ 229 failing, with no successor-cycle collateral emissions. Tier 2 and the
+single row-closure Tier 3 are green.
+
+Stop for the required review: the one-cycle pipeline is exhausted, no third
+capability is authorized, and typed global-table GEP plus scalar load requires
+a bounded architectural decision because it crosses global relocation,
+indexed-addressing, pointer-location, and load-materialization ownership. Do
+not begin that work before review. Evidence:
+`docs/evidence/std_debug_hello_half_zero_fcmp_acceptance.summary`,
+`docs/evidence/std_debug_hello_f64x2_shuffle_0_3_acceptance.summary`, and
+`docs/evidence/distribution_all_after_inbox30_f64x2_shuffle_0_3.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

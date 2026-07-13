@@ -3559,6 +3559,30 @@ One line per completed cycle, append-only, newest last. This is the
   and
   `docs/evidence/distribution_all_after_inbox29_slt_immediate.summary`.
 
+- 2026-07-13 (`f510d241`, INBOX-30) Item 12 exact half comparison capability:
+  typed `fcmp oeq half` against either zero bit pattern lowers as
+  `(bits & 0x7fff) == 0`, while named comparisons and all other half predicates
+  remain fail-closed. Three directed half log wrappers close; `__sqrth`
+  advances to unsupported half `fmul`. A 39-call precomputed-bit native matrix
+  covers zeros, subnormals, normals, infinities, and quiet/signaling NaNs. Its
+  first run exposed the stale framed-FP-phi destination repaired separately in
+  `70c63cc4`. Report-all advances to 443 selected / 213 emitting / 230 failing.
+  Tier 2 and the single row-closure Tier 3 are green. Evidence
+  `docs/evidence/std_debug_hello_half_zero_fcmp_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox30_half_zero_fcmp.summary`.
+
+- 2026-07-13 (this commit, INBOX-30 pre-authorized successor) Item 12 exact
+  two-source vector shuffle capability: typed f64x2 `<0, 3>` lowers through a
+  fixed `shufpd $2` form and propagates static definedness from A0 and B1.
+  Other two-source masks and f32x2 `<0, 3>` remain fail-closed. A 15-case
+  precomputed-bit native proof closes `compiler_rt.log10.log10`; report-all
+  advances to 443 selected / 214 emitting / 229 failing with no collateral
+  emissions. Tier 2 and the single row-closure Tier 3 are green. The pipeline
+  is exhausted; stop for review, and do not begin global-table GEP work before
+  its bounded architectural decision. Evidence
+  `docs/evidence/std_debug_hello_f64x2_shuffle_0_3_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox30_f64x2_shuffle_0_3.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
