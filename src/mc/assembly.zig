@@ -1299,6 +1299,11 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .xorps_xmm1_xmm0 => try writer.writeAll("\txorps %xmm1, %xmm0\n"),
             .movapd_xmm1_xmm0 => try writer.writeAll("\tmovapd %xmm1, %xmm0\n"),
             .movapd_xmm => |mov| try writer.print("\tmovapd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
+            .addpd_xmm => |op| try writer.print("\taddpd {s}, {s}\n", .{ op.src.name(), op.dst.name() }),
+            .mulpd_xmm => |op| try writer.print("\tmulpd {s}, {s}\n", .{ op.src.name(), op.dst.name() }),
+            .movsd_xmm => |mov| try writer.print("\tmovsd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
+            .unpcklpd_xmm => |mov| try writer.print("\tunpcklpd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
+            .unpckhpd_xmm => |mov| try writer.print("\tunpckhpd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
             .unpcklps_xmm => |mov| try writer.print("\tunpcklps {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
             .shufps_high_f32_to_low => |reg| try writer.print("\tshufps $85, {s}, {s}\n", .{ reg.name(), reg.name() }),
             .cvtsi2ss_edi_xmm0 => try writer.writeAll("\tcvtsi2ssl %edi, %xmm0\n"),
@@ -1380,6 +1385,16 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             },
             .reload_xmm64_rsp => |reload| {
                 try writer.writeAll("\tmovsd ");
+                try printFrameAddress(writer, reload.frame_index);
+                try writer.print(", {s}\n", .{reload.reg.name()});
+            },
+            .spill_xmm128_rsp => |spill| {
+                try writer.print("\tmovupd {s}, ", .{spill.reg.name()});
+                try printFrameAddress(writer, spill.frame_index);
+                try writer.writeByte('\n');
+            },
+            .reload_xmm128_rsp => |reload| {
+                try writer.writeAll("\tmovupd ");
                 try printFrameAddress(writer, reload.frame_index);
                 try writer.print(", {s}\n", .{reload.reg.name()});
             },

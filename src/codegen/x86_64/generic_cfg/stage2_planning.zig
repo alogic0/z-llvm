@@ -347,6 +347,7 @@ pub const PlannedValueAssignment = union(enum) {
     fp16: XmmReg,
     fp32: XmmReg,
     fp64: XmmReg,
+    vector_f64x2: XmmReg,
     stack_object,
     stack_pointer: ArgReg,
     spill: usize,
@@ -471,6 +472,10 @@ pub fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {
         .half => .{ .class = .fp16, .bits = 16 },
         .float => .{ .class = .fp32, .bits = 32 },
         .double => .{ .class = .fp64, .bits = 64 },
+        .vector => |vector| if (vector.len == 2 and vector.elem_ty == .double)
+            .{ .class = .vector_f64x2, .bits = 128 }
+        else
+            null,
         else => selectorIntegerMetadata(ty),
     };
 }
@@ -509,12 +514,12 @@ fn selectorInstructionResultMetadata(instruction: ir.Instruction) ?VirtualRegMet
         .store,
         .atomicrmw,
         .cmpxchg,
-        .extractelement,
-        .insertelement,
-        .shufflevector,
         .insertvalue,
         .fence,
         => null,
+        .extractelement => |extract| if (extract.vector_ty == .vector) selectorValueMetadata(extract.vector_ty.vector.elem_ty.toType()) else null,
+        .insertelement => |insert| selectorValueMetadata(insert.vector_ty),
+        .shufflevector => |shuffle| selectorValueMetadata(shuffle.lhs_ty),
     };
 }
 
@@ -616,6 +621,7 @@ fn allocateSelectorInterval(occupied: *SelectorRegisterOccupancy, interval: Sele
         .fp16 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp16 = reg } else .{ .spill = next_spill_slot },
         .fp32 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp32 = reg } else .{ .spill = next_spill_slot },
         .fp64 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp64 = reg } else .{ .spill = next_spill_slot },
+        .vector_f64x2 => if (allocateSelectorXmm(occupied)) |reg| .{ .vector_f64x2 = reg } else .{ .spill = next_spill_slot },
         .stack_object => .stack_object,
         .stack_pointer => if (allocateSelectorReg(occupied)) |reg| .{ .stack_pointer = reg } else .{ .spill = next_spill_slot },
     };
@@ -663,14 +669,14 @@ fn releaseSelectorAssignment(occupied: *SelectorRegisterOccupancy, assignment: P
             occupied.gpr[argRegIndex(pair.lo)] = false;
             occupied.gpr[argRegIndex(pair.hi)] = false;
         },
-        .fp16, .fp32, .fp64 => |reg| occupied.xmm[xmmRegIndex(reg)] = false,
+        .fp16, .fp32, .fp64, .vector_f64x2 => |reg| occupied.xmm[xmmRegIndex(reg)] = false,
         .stack_object, .spill => {},
     }
 }
 
 fn assignmentUsesRegisters(assignment: PlannedValueAssignment) bool {
     return switch (assignment) {
-        .gpr32, .gpr64, .gpr128, .fp16, .fp32, .fp64, .stack_pointer => true,
+        .gpr32, .gpr64, .gpr128, .fp16, .fp32, .fp64, .vector_f64x2, .stack_pointer => true,
         .stack_object, .spill => false,
     };
 }

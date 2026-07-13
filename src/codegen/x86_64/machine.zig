@@ -332,6 +332,26 @@ pub const Instruction = union(enum) {
         dst: XmmReg,
         src: XmmReg,
     },
+    addpd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    mulpd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    movsd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    unpcklpd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    unpckhpd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
     unpcklps_xmm: struct {
         dst: XmmReg,
         src: XmmReg,
@@ -425,6 +445,14 @@ pub const Instruction = union(enum) {
         frame_index: FrameIndex,
     },
     reload_xmm64_rsp: struct {
+        reg: XmmReg,
+        frame_index: FrameIndex,
+    },
+    spill_xmm128_rsp: struct {
+        reg: XmmReg,
+        frame_index: FrameIndex,
+    },
+    reload_xmm128_rsp: struct {
         reg: XmmReg,
         frame_index: FrameIndex,
     },

@@ -3404,6 +3404,18 @@ One line per completed cycle, append-only, newest last. This is the
   one-cycle pipeline is now exhausted. Evidence
   `docs/evidence/std_debug_hello_scalar_fcmp_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-24) Item 12 Phase D vector capability: the
+  existing XMM register bank now owns a typed `<2 x double>` packed shape with
+  static defined-lane masks, bounded insertion/splat/add/multiply/extraction,
+  and atomic pair-slot unaligned spills. A dual-construction pressure canary
+  passes exact signed-zero, finite, subnormal, infinity, and NaN-payload cases
+  while proving a vector spill/reload. Report-all remains 192 emitted / 251
+  failed with no collateral emission or regression; directed rows advance to
+  their next scalar, memory, CFG, non-splat, or excluded-type frontiers. Tier 2
+  is green and final Tier 3 acceptance is recorded in the evidence summary.
+  Stop for the plan's periodic review; no successor is authorized. Evidence
+  `docs/evidence/std_debug_hello_vector_f64x2_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

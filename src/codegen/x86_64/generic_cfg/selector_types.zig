@@ -1,3 +1,4 @@
+const std = @import("std");
 const x86_64_types = @import("../types.zig");
 
 pub const ArgReg = x86_64_types.ArgReg;
@@ -35,6 +36,7 @@ pub const ValueLoc = union(enum) {
     spill64: FrameIndex,
     spill128: PairSpillLoc,
     spill_fp: FpSpillLoc,
+    spill_vector: VectorSpillLoc,
 };
 
 pub const VirtualRegClass = enum {
@@ -44,6 +46,7 @@ pub const VirtualRegClass = enum {
     fp16,
     fp32,
     fp64,
+    vector_f64x2,
     stack_object,
     stack_pointer,
 };
@@ -72,11 +75,64 @@ pub const PairSpillLoc = struct {
 pub const FpRegLoc = struct {
     reg: XmmReg,
     bits: u16,
+    shape: XmmValueShape = .scalar,
+
+    pub fn vectorShape(loc: FpRegLoc) ?VectorShape {
+        return switch (loc.shape) {
+            .scalar => null,
+            .vector => |shape| shape,
+        };
+    }
+
+    pub fn shapeEql(loc: FpRegLoc, other: FpRegLoc) bool {
+        if (loc.bits != other.bits or std.meta.activeTag(loc.shape) != std.meta.activeTag(other.shape)) return false;
+        return switch (loc.shape) {
+            .scalar => true,
+            .vector => |shape| shape.eql(other.shape.vector),
+        };
+    }
+};
+
+pub const XmmValueShape = union(enum) {
+    scalar,
+    vector: VectorShape,
+};
+
+pub const VectorShape = struct {
+    lane_type: LaneType,
+    lane_count: u8,
+    lane_bits: u16,
+    defined_lanes: u2,
+
+    pub const LaneType = enum {
+        double,
+    };
+
+    pub fn f64x2(defined_lanes: u2) VectorShape {
+        return .{
+            .lane_type = .double,
+            .lane_count = 2,
+            .lane_bits = 64,
+            .defined_lanes = defined_lanes,
+        };
+    }
+
+    pub fn eql(shape: VectorShape, other: VectorShape) bool {
+        return shape.lane_type == other.lane_type and
+            shape.lane_count == other.lane_count and
+            shape.lane_bits == other.lane_bits and
+            shape.defined_lanes == other.defined_lanes;
+    }
 };
 
 pub const FpSpillLoc = struct {
     frame_index: FrameIndex,
     bits: u16,
+};
+
+pub const VectorSpillLoc = struct {
+    frames: PairSpillLoc,
+    shape: VectorShape,
 };
 
 pub const StackArrayLoc = struct {

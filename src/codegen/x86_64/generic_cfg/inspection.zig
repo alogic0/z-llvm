@@ -73,15 +73,19 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .atomicrmw => .{ .unsupported_instruction = "atomicrmw" },
         .cmpxchg => .{ .unsupported_instruction = "cmpxchg" },
         .fence => .{ .unsupported_instruction = "fence" },
-        .extractelement => .{ .unsupported_instruction = "extractelement" },
-        .insertelement => .{ .unsupported_instruction = "insertelement" },
-        .shufflevector => .{ .unsupported_instruction = "shufflevector" },
+        .extractelement => |extract| inspectExtractElement(extract),
+        .insertelement => |insert| inspectInsertElement(insert),
+        .shufflevector => |shuffle| inspectShuffleVector(shuffle),
         .extractvalue => |extract| inspectExtractValue(extract),
         .insertvalue => .{ .unsupported_instruction = "insertvalue" },
     };
 }
 
 fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
+    if (isF64x2(binary.ty)) return switch (binary.op) {
+        .fadd, .fmul => null,
+        else => .{ .unsupported_instruction = @tagName(binary.op) },
+    };
     if (!isSelectorScalarType(binary.ty)) return .{ .unsupported_type = "binary" };
     return switch (binary.op) {
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
@@ -89,6 +93,49 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
         .fadd, .fsub, .fmul, .fdiv => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
         .frem => .{ .unsupported_instruction = @tagName(binary.op) },
     };
+}
+
+fn inspectExtractElement(extract: ir.ExtractElementInst) ?Diagnostic {
+    if (!isF64x2(extract.vector_ty)) return .{ .unsupported_type = "extractelement" };
+    if (!extract.index_ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "extractelement-index" };
+    return inspectLaneIndex(extract.index, "extractelement");
+}
+
+fn inspectInsertElement(insert: ir.InsertElementInst) ?Diagnostic {
+    if (!isF64x2(insert.vector_ty) or insert.value_ty != .double) return .{ .unsupported_type = "insertelement" };
+    if (!insert.index_ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "insertelement-index" };
+    return inspectLaneIndex(insert.index, "insertelement");
+}
+
+fn inspectShuffleVector(shuffle: ir.ShuffleVectorInst) ?Diagnostic {
+    if (!isF64x2(shuffle.lhs_ty) or !shuffle.rhs_ty.eql(shuffle.lhs_ty) or
+        !shuffle.mask_ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 32 } } }))
+    {
+        return .{ .unsupported_type = "shufflevector" };
+    }
+    return switch (shuffle.mask) {
+        .zero_initializer => null,
+        .vector => |text| if (isSplatZeroMask(text)) null else .{ .unsupported_instruction = "shufflevector-mask" },
+        else => .{ .unsupported_instruction = "shufflevector-mask" },
+    };
+}
+
+fn inspectLaneIndex(index: ir.Value, comptime operation: []const u8) ?Diagnostic {
+    return switch (index) {
+        .int => |lane| if (lane == 0 or lane == 1) null else .{ .unsupported_instruction = operation ++ "-index" },
+        .named => .{ .unsupported_instruction = operation ++ "-dynamic-index" },
+        else => .{ .unsupported_instruction = operation ++ "-index" },
+    };
+}
+
+fn isSplatZeroMask(text: []const u8) bool {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    return std.mem.eql(u8, trimmed, "<i32 0, i32 0>") or
+        std.mem.eql(u8, trimmed, "splat (i32 0)");
+}
+
+fn isF64x2(ty: ir.Type) bool {
+    return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .double;
 }
 
 fn inspectCast(cast: ir.CastInst) ?Diagnostic {

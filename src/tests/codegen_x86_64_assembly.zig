@@ -136,6 +136,39 @@ test "x86_64 assembly prints parametric scalar FP operations" {
     );
 }
 
+test "x86_64 assembly prints bounded packed double operations and unaligned spills" {
+    var machine = codegen.x86_64.MachineFunction.init("packed_double", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{
+        .{ .addpd_xmm = .{ .dst = .xmm2, .src = .xmm3 } },
+        .{ .mulpd_xmm = .{ .dst = .xmm4, .src = .xmm5 } },
+        .{ .movsd_xmm = .{ .dst = .xmm6, .src = .xmm7 } },
+        .{ .unpcklpd_xmm = .{ .dst = .xmm1, .src = .xmm2 } },
+        .{ .unpckhpd_xmm = .{ .dst = .xmm3, .src = .xmm4 } },
+        .{ .spill_xmm128_rsp = .{ .reg = .xmm2, .frame_index = .slot0 } },
+        .{ .reload_xmm128_rsp = .{ .reg = .xmm3, .frame_index = .slot0 } },
+        .ret,
+    });
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl packed_double\n" ++
+            "packed_double:\n" ++
+            "\taddpd %xmm3, %xmm2\n" ++
+            "\tmulpd %xmm5, %xmm4\n" ++
+            "\tmovsd %xmm7, %xmm6\n" ++
+            "\tunpcklpd %xmm2, %xmm1\n" ++
+            "\tunpckhpd %xmm4, %xmm3\n" ++
+            "\tmovupd %xmm2, (%rsp)\n" ++
+            "\tmovupd (%rsp), %xmm3\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 assembly prints scalar FP predicate materialization" {
     var machine = codegen.x86_64.MachineFunction.init("scalar_fp_compare", .void);
     defer machine.deinit(std.testing.allocator);

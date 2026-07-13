@@ -37,40 +37,16 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-Phase D architectural review is pending. The INBOX-22 read-only inventory was
-committed in `d7d43ea7` and recommends the adopted `<2 x double>` candidate
-slice with one revision: permit constant lane-0 or lane-1 insertion into a
-poison or existing value while preserving static lane-definedness. The review
-must approve, revise, or defer the vector value-location, allocation, spill,
-packed-operation, and verifier model before implementation. Vector lowering
-remains unauthorized. Evidence:
-`docs/evidence/phase_d_vector_inventory.md`.
-
-INBOX-23 closes type-driven scalar `fsub` and `fdiv` for float and double
-through register-parametric SSE forms, non-commutative operand-order checks,
-and 44 bit-exact executable cases. Twelve directed compiler_rt rows advance
-from `fsub`/`fdiv` to `insertelement`; report-all remains 443 selected / 190
-emitting / 253 failing with no collateral emission or regression. The
-pre-authorized successor now also closes all 16 scalar float/double `fcmp`
-predicates with 192 executable outcomes. Report-all advances to 192 emitting /
-251 failing; `compiler_rt.round.__roundh` and `roundf` are collateral emissions
-without separate semantic claims. The one-cycle pipeline is exhausted: do not
-begin a third cycle until INBOX-23 review is accepted or a new directive
-arrives. Vector forms remain unauthorized while the Phase D review is pending.
-Evidence: `docs/evidence/std_debug_hello_scalar_fsub_fdiv_acceptance.summary`
-and `docs/evidence/std_debug_hello_scalar_fcmp_acceptance.summary`.
-
-INBOX-21 closes type-driven scalar `fpext float -> double`, `fptrunc
-double -> float`, and `fmul` for float and double with register-parametric SSE
-forms and bit-exact executable coverage. The internal `compiler_rt.tan.tanf`
-body consumes the widening and multiplication forms and now stops at its first
-vector frontier: `UnsupportedCodegenControlFlow / unsupported_instruction /
-insertelement`. Vector lowering and tangent-polynomial recognition remain out
-of scope. Debug compiler_rt report-all is now 443 selected / 190 emitting / 253
-failing. `compiler_rt.fma.fmaf` is the one collateral emission and has no
-separate semantic acceptance claim. Stop for architectural review at this
-boundary. Evidence:
-`docs/evidence/std_debug_hello_tanf_scalar_fp_acceptance.summary`.
+INBOX-24 implements the reviewed Phase D `<2 x double>` slice with static
+defined-lane masks, constant insertion/extraction, splat-only shuffle, packed
+addition/multiplication, and atomic pair-slot unaligned spills. The bit-exact
+pressure canary passes and report-all remains 443 selected / 192 emitting /
+251 failing with no regression or collateral emission. The three immediate
+rows clear their admitted vector forms; later rows stop at explicit scalar,
+non-splat, CFG, or excluded-element-type boundaries. No successor is
+authorized. Stop for the plan's periodic review before expanding vector
+operations or choosing another capability. Evidence:
+`docs/evidence/std_debug_hello_vector_f64x2_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
