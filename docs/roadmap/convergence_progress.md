@@ -3467,6 +3467,21 @@ One line per completed cycle, append-only, newest last. This is the
   pipeline is exhausted and work stops for review. Evidence
   `docs/evidence/std_debug_hello_scalar_fp_pointer_store_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-27 Part 1) Standalone frame correctness
+  repair: every alloca-bearing composed-selector function now reserves the
+  convenience-spill range before frame payload layout, and instruction
+  lowering consumes only the frame authority's preplanned alloca locations.
+  The observed live-f32-spill/local-double-store collision now passes five
+  exact executable cases. An audit of all 30 alloca-bearing functions in the
+  accepted 199-emission report found that `compiler_rt.int.__moddi3` also hit
+  the old aliasing envelope: its sign spill and out-parameter both used offset
+  zero, so its prior structural closure was not semantic proof. The repaired
+  stream separates the payload at displacement 256 from spill slots 0/2/4.
+  Tier 2 and the shared-frame-layout Tier 3 are green; report counters are not
+  moved by this correctness-only cycle. Evidence
+  `docs/evidence/std_debug_hello_alloca_spill_collision_repair.summary` and
+  `docs/evidence/distribution_all_after_inbox27_alloca_spill_collision.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

@@ -93,6 +93,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     var payload_bytes: u32 = 0;
     var scalar_slot_count: usize = 0;
     var array_count: usize = 0;
+    var saw_alloca = false;
     var saw_phi = false;
     var saw_array_alloca = false;
     var saw_fixed_smul_overflow = false;
@@ -104,7 +105,10 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
             if (instruction.kind == .phi) saw_phi = true;
-            if (instruction.kind == .alloca and parseI32ArrayType(instruction.kind.alloca.allocated_ty) != null) saw_array_alloca = true;
+            if (instruction.kind == .alloca) {
+                saw_alloca = true;
+                if (parseI32ArrayType(instruction.kind.alloca.allocated_ty) != null) saw_array_alloca = true;
+            }
             if (instruction.kind == .call and
                 (std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i64") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128"))) saw_fixed_smul_overflow = true;
@@ -114,7 +118,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     }
 
     const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
-    const reserve_spill_area = pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_scalar_sse_call or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
+    const reserve_spill_area = saw_alloca or pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_scalar_sse_call or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
     const spill_reserved_bytes = spillReservedBytes(selector, reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" };
     payload_bytes = if (saw_array_alloca) @max(spill_reserved_bytes, stage2SpillReservedBytes()) else 0;
 

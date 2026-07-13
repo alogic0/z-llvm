@@ -1314,14 +1314,15 @@ test "generic cfg selector composes stack out-param direct call and i64 return" 
         .unsupported => |diagnostic| return std.testing.expectEqualStrings("selected", diagnostic.tagName()),
     }
 
-    try std.testing.expectEqual(@as(usize, 6), machine.instructions.items.len);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_24, machine.instructions.items[0]);
+    try std.testing.expectEqual(@as(usize, 7), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .sub_rsp_imm32 = 280 }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_rsp_arg64 = .rdx }, machine.instructions.items[1]);
-    try std.testing.expectEqualStrings("callee", machine.instructions.items[2].direct_call.symbol);
-    try std.testing.expect(machine.instructions.items[2].direct_call.ret_ty.eql(.{ .int = 64 }));
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 0 }, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[4]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_arg64_imm32 = .{ .reg = .rdx, .imm = 256 } }, machine.instructions.items[2]);
+    try std.testing.expectEqualStrings("callee", machine.instructions.items[3].direct_call.symbol);
+    try std.testing.expect(machine.instructions.items[3].direct_call.ret_ty.eql(.{ .int = 64 }));
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp32_rax = 256 }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_rsp_imm32 = 280 }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
 }
 
 test "generic cfg selector composes i128 stack out-param direct call wrapper" {
@@ -1445,7 +1446,7 @@ test "generic cfg selector composes signed i64 remainder stack call with spills"
         },
     }
 
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_24, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .sub_rsp_imm32 = 280 }, machine.instructions.items[0]);
     try expectInstruction(machine.instructions.items, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } });
     try expectInstruction(machine.instructions.items, .{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rcx } });
     try expectInstruction(machine.instructions.items, .{ .spill_rax_rsp = .slot2 });
@@ -1463,8 +1464,9 @@ test "generic cfg selector composes signed i64 remainder stack call with spills"
     };
     try std.testing.expect(saw_rsi_materialization);
     try expectInstruction(machine.instructions.items, .{ .mov_rsp_arg64 = .rdx });
-    try expectInstruction(machine.instructions.items, .{ .load_stack_disp8_rax = 0 });
-    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[machine.instructions.items.len - 2]);
+    try expectInstruction(machine.instructions.items, .{ .add_arg64_imm32 = .{ .reg = .rdx, .imm = 256 } });
+    try expectInstruction(machine.instructions.items, .{ .load_stack_disp32_rax = 256 });
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_rsp_imm32 = 280 }, machine.instructions.items[machine.instructions.items.len - 2]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 

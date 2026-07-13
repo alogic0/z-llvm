@@ -1,6 +1,8 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
+const x86_64_types = @import("../types.zig");
+const x86_64_verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
@@ -270,4 +272,48 @@ test "generic cfg selector lays out mixed scalar and array frame objects" {
     try std.testing.expectEqual(@as(u32, 296), selector.stack_frame_bytes);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .sub_rsp_imm32 = 296 }, machine.instructions.items[0]);
+}
+
+test "generic cfg selector keeps scalar allocas disjoint from emergency FP spills" {
+    const input =
+        \\define void @preserve_f32_across_local_store(float %value, ptr %out) {
+        \\entry:
+        \\  %slot = alloca double, align 8
+        \\  store double 0.000000e+00, ptr %slot, align 8
+        \\  store float %value, ptr %out, align 4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    var machine = MachineFunction.init(function.name, function.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+    try x86_64_verify.verifyFunction(machine);
+
+    var value_spill: ?x86_64_types.FrameIndex = null;
+    var local_store: ?x86_64_types.FrameIndex = null;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_xmm32_rsp => |spill| value_spill = spill.frame_index,
+        .spill_xmm64_rsp => |spill| local_store = spill.frame_index,
+        else => {},
+    };
+    try std.testing.expect(value_spill != null and local_store != null);
+    try std.testing.expect(!value_spill.?.eql(local_store.?));
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const preserve: *const fn (f32, *f32) callconv(.c) void = @ptrCast(mapping.ptr);
+    inline for (.{ @as(u32, 0x0000_0000), @as(u32, 0x8000_0000), @as(u32, 0x0000_0001), @as(u32, 0x7f80_0000), @as(u32, 0x7fc1_2345) }) |bits| {
+        var out: f32 = undefined;
+        preserve(@bitCast(bits), &out);
+        try std.testing.expectEqual(bits, @as(u32, @bitCast(out)));
+    }
 }
