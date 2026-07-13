@@ -3613,6 +3613,21 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_named_i1_or_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox32_named_i1_or.summary`.
 
+- 2026-07-13 (this commit, INBOX-32 pre-authorized successor) Item 12 signed
+  comparison capability: exact plain `icmp sgt i64` with an immediate RHS now
+  lowers through the existing 64-bit compare and `setg` forms, while
+  `samesign` and unsupported shapes remain fail-closed. Five permanent
+  executable boundary calls and 20 precomputed-bit native calls close
+  `compiler_rt.exp2.exp2`; its captured `ldexp` helper body remains unsupported
+  and is resolved by a separately compiled pinned-Zig dependency for native
+  acceptance. Four scalar conversion/rounding rows emit collaterally without
+  semantic claims. Report-all advances to 443 selected / 226 emitting / 217
+  failing. Tier 2 and the row-closure Tier 3 are green. The pipeline is
+  exhausted; stop for review before the noted multiply-location repair.
+  Evidence `docs/evidence/std_debug_hello_sgt_i64_immediate_acceptance.summary`
+  and
+  `docs/evidence/distribution_all_after_inbox32_sgt_i64_immediate.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
