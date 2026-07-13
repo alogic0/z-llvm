@@ -1,0 +1,58 @@
+# Named Signed Integer Comparison Acceptance
+
+schema_version: 1
+directive: `INBOX-33` evidence-ranked successor
+target: `x86_64-linux-gnu`
+validation_tier: 3
+result: pass
+
+The composed selector now admits plain scalar `icmp slt` and `icmp sgt` over
+two named i32 or i64 values. Both operands use the existing typed scratch
+materialization and register-parametric compare forms. The setcc choice
+accounts for the machine layer's AT&T `cmp lhs, rhs` operand order.
+`samesign`, i16/i128, immediate operands, unsigned predicates, vectors, and
+other comparison shapes remain fail-closed.
+
+Permanent structural coverage proves all four width/predicate combinations
+and the exact compare/setcc stream. Near misses keep `samesign` i32 and plain
+i16 comparisons at `composed-block-icmp-form`. Executable selector coverage
+checks swapped and equal operands at signed boundaries for i32 `slt` and i64
+`sgt`, for ten exact calls.
+
+The initial frontier ranking expected `compiler_rt.gedf2.__gedf2`,
+`compiler_rt.gesf2.__gesf2`, `compiler_rt.cmpdf2.__cmpdf2`, and
+`compiler_rt.comparef.__cmpsf2` to close. Fresh captured IR inspection showed
+that each first reaches an earlier `samesign ugt` immediate comparison, so
+all four correctly remain fail-closed at `composed-block-icmp-form` and carry
+no closure claim.
+
+The exact named relational form instead closes the captured
+`compiler_rt.fmod.fmod` and `compiler_rt.fmod.fmodf` rows. A parser/printer
+derived module defines only those two z_llvm-emitted bodies. Forty
+precomputed-bit native calls match the pinned Zig compiler-rt implementation
+over both zero signs, subnormals, normal and extreme finite values, exact and
+inexact remainders, infinities, zero divisors, and quiet/signaling NaN
+payloads. The emitted object defines both rows and has no relocations.
+
+Fresh report-all advances from 443 selected / 227 emitting / 216 failing to
+443 selected / 229 emitting / 214 failing. `fmod` and `fmodf` are the only new
+emissions; there are no unproved collateral emissions.
+
+```text
+summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=229 failed_functions=214 local_fail=1
+focused tests: unit=924/924 signed_named_boundary_calls=10/10 fail_closed_near_misses=2/2 native_fmod_calls=40/40
+tier2: pass; steps=24/24 tests=932/932 structural=8/8 assembly/encoding/object inspection=pass integrated_executable=5/5
+```
+
+Logs and artifacts:
+
+- `tmp/inbox33_signed_named_report.log`, sha256 `e88618b97d92f01f2a1558e19ee763c33c635ae46441c29e51000efd05180b8d`;
+- `tmp/inbox33_signed_named_tier2.log`, sha256 `305aed93708d7e0ac2bd3d2beeb1edbcb348d8a1bc75c4c1541bc86814cb59be`;
+- `tmp/inbox33_fmod_reference.log`, sha256 `cc36059de71b00cc2522aec6d2945242cc22e552d85d0e52faf1e4671828373b`;
+- `tmp/inbox33_fmod_rows.ll`, sha256 `2127355f2f90a1937ee721c40c1b961584a964975bb270bea07b710c74a9b674`;
+- `tmp/inbox33_fmod_rows.o`, sha256 `aa58c1c510accd0919f1686bd98c0cfb7af4cae8a0ad885c2824ee07eb629252`;
+- `tmp/inbox33_fmod_rows_readelf.log`, sha256 `9db5b571e49dde287db5bdae1404e5eaffb5953da69c13ee13f19cda0412427e`;
+- `tmp/inbox33_fmod_rows_acceptance`, sha256 `8b2d19a7717a09df28f12344258e6cd7ae92d33260d0ddcb70929cae02b6e07e`.
+
+Tier 3 acceptance is recorded separately in
+`docs/evidence/distribution_all_after_inbox33_signed_named_comparisons.summary`.

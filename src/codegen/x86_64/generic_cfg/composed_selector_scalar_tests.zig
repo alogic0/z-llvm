@@ -1114,6 +1114,108 @@ test "generic cfg selector executes signed less-than immediate boundaries" {
     for (narrow_cases) |case| try std.testing.expectEqual(case.expected, narrow_function(case.input));
 }
 
+test "generic cfg selector lowers plain named signed comparisons" {
+    inline for (.{
+        .{ .bits = 32, .predicate = ir.IcmpPredicate.slt },
+        .{ .bits = 32, .predicate = ir.IcmpPredicate.sgt },
+        .{ .bits = 64, .predicate = ir.IcmpPredicate.slt },
+        .{ .bits = 64, .predicate = ir.IcmpPredicate.sgt },
+    }) |case| {
+        var machine = MachineFunction.init("signed-named", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "lhs", if (case.bits == 32) .{ .arg32 = .rdi } else .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "rhs", if (case.bits == 32) .{ .arg32 = .rsi } else .{ .arg64 = .rsi });
+
+        const diagnostic = try selector_scalar.lowerIcmp(&selector, "cmp", .{
+            .predicate = case.predicate,
+            .operand_ty = .{ .int = case.bits },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "rhs" },
+        });
+
+        try std.testing.expect(diagnostic == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+        try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
+        try std.testing.expectEqual(if (case.bits == 32)
+            x86_64_machine.Instruction{ .cmp_ecx_arg32 = .r8 }
+        else
+            x86_64_machine.Instruction{ .cmp_rcx_arg64 = .r8 }, machine.instructions.items[2]);
+        try std.testing.expectEqual(if (case.predicate == .slt)
+            x86_64_machine.Instruction.setg_eax
+        else
+            x86_64_machine.Instruction.setl_eax, machine.instructions.items[3]);
+    }
+
+    inline for (.{
+        .{ .bits = 32, .samesign = true },
+        .{ .bits = 16, .samesign = false },
+    }) |case| {
+        var machine = MachineFunction.init("signed-named-near-miss", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+        const diagnostic = (try selector_scalar.lowerIcmp(&selector, "cmp", .{
+            .predicate = .slt,
+            .samesign = case.samesign,
+            .operand_ty = .{ .int = case.bits },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "rhs" },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-form", diagnostic.detail());
+    }
+}
+
+test "generic cfg selector executes plain named signed comparison boundaries" {
+    const input =
+        \\define i32 @less_i32(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %comparison = icmp slt i32 %lhs, %rhs
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\define i32 @greater_i64(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %comparison = icmp sgt i64 %lhs, %rhs
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const cases = [_]struct { lhs: i64, rhs: i64 }{
+        .{ .lhs = std.math.minInt(i32), .rhs = std.math.maxInt(i32) },
+        .{ .lhs = -1, .rhs = 0 },
+        .{ .lhs = 0, .rhs = 0 },
+        .{ .lhs = 0, .rhs = -1 },
+        .{ .lhs = std.math.maxInt(i32), .rhs = std.math.minInt(i32) },
+    };
+
+    for (module.functions.items, 0..) |function_ir, function_index| {
+        var machine = MachineFunction.init(function_ir.name, .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (function_index == 0) {
+            const function: *const fn (i32, i32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+            for (cases) |case| try std.testing.expectEqual(@intFromBool(case.lhs < case.rhs), function(@intCast(case.lhs), @intCast(case.rhs)));
+        } else {
+            const function: *const fn (i64, i64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+            for (cases) |case| try std.testing.expectEqual(@intFromBool(case.lhs > case.rhs), function(case.lhs, case.rhs));
+        }
+    }
+}
+
 test "generic cfg selector lowers unsigned i32 less-than immediate" {
     var machine = MachineFunction.init("ult-i32-imm", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);

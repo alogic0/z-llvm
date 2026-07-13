@@ -3640,6 +3640,21 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence `docs/evidence/std_debug_hello_mul64_rax_rhs_repair.summary` and
   `docs/evidence/distribution_all_after_inbox33_mul64_rax_rhs.summary`.
 
+- 2026-07-13 (this commit, INBOX-33 evidence-ranked successor) Item 12 signed
+  comparison capability: plain named `icmp slt/sgt` for i32/i64 now uses the
+  existing typed scratch, compare, and setcc paths. Ten permanent boundary
+  calls cover both widths, and two near misses preserve `samesign` and i16
+  fail-closed behavior. The four initially ranked compare wrappers remain
+  blocked by earlier `samesign ugt` immediate forms. Forty precomputed-bit
+  native calls instead close `compiler_rt.fmod.fmod` and
+  `compiler_rt.fmod.fmodf`, the only new emissions. Report-all advances to 443
+  selected / 229 emitting / 214 failing. Tier 2 and the row-closure Tier 3 are
+  green. The authorized pipeline is exhausted; stop for review before any
+  further capability. Evidence
+  `docs/evidence/std_debug_hello_signed_named_comparisons_acceptance.summary`
+  and
+  `docs/evidence/distribution_all_after_inbox33_signed_named_comparisons.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
