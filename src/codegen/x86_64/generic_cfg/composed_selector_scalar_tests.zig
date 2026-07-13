@@ -959,6 +959,78 @@ test "generic cfg selector lowers variable i16 shifts" {
     }
 }
 
+test "generic cfg selector lowers i64 immediate-left variable lshr" {
+    var machine = MachineFunction.init("variable-i64-lshr", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "amount", .{ .arg64 = .rdi });
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+        .op = .lshr,
+        .ty = .{ .int = 64 },
+        .lhs = .{ .int = -1 },
+        .rhs = .{ .named = "amount" },
+    })) == null);
+    try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+        .{ .mov_imm_rax = -1 },
+        .shr_rax_cl,
+    }, machine.instructions.items);
+}
+
+test "generic cfg selector lowers i64 immediate xor" {
+    var machine = MachineFunction.init("i64-immediate-xor", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rdi });
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+        .op = .xor,
+        .ty = .{ .int = 64 },
+        .lhs = .{ .named = "value" },
+        .rhs = .{ .int = -1 },
+    })) == null);
+    try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_rax = .rdi },
+        .{ .mov_imm_rcx = -1 },
+        .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } },
+    }, machine.instructions.items);
+}
+
+test "generic cfg selector preserves live accumulator across comparison" {
+    const input =
+        \\declare void @llvm.assume(i1)
+        \\define i64 @preserve(i32 %input) {
+        \\entry:
+        \\  %selected = add i32 %input, 0
+        \\  %valid = icmp sgt i32 %selected, -1
+        \\  call void @llvm.assume(i1 %valid)
+        \\  %wide = zext i32 %selected to i64
+        \\  ret i64 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("preserve", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn (u32) callconv(.c) u64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u64, 17), function(17));
+}
+
 test "generic cfg selector lowers i32 arithmetic-right shifts" {
     inline for (.{ ir.Value{ .int = 7 }, ir.Value{ .named = "amount" } }) |rhs| {
         var machine = MachineFunction.init("i32-ashr", .{ .int = 32 });

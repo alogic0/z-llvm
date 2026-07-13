@@ -10,13 +10,18 @@ const Diagnostic = inspection.Diagnostic;
 
 pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-    if (binary.op != .fadd or binary.ty != .float) return .{ .no_emitter = "composed-block-fp-binary-type" };
+    if (binary.op != .fadd) return .{ .no_emitter = "composed-block-fp-binary-type" };
+    const bits = fpBits(binary.ty) orelse return .{ .no_emitter = "composed-block-fp-binary-type" };
 
-    if (try materializeFpValue(selector, binary.rhs, .xmm1, 32)) |diagnostic| return diagnostic;
-    if (try materializeFpValue(selector, binary.lhs, .xmm0, 32)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.append(selector.allocator, .addss_xmm1_xmm0);
-    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 32 } });
+    if (try materializeFpValue(selector, binary.rhs, .xmm1, bits)) |diagnostic| return diagnostic;
+    if (try materializeFpValue(selector, binary.lhs, .xmm0, bits)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, if (bits == 32) .addss_xmm1_xmm0 else .addsd_xmm1_xmm0);
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
     return null;
+}
+
+fn fpBits(ty: ir.Type) ?u16 {
+    return if (ty == .float) 32 else if (ty == .double) 64 else null;
 }
 
 fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst: @import("../types.zig").XmmReg, bits: u16) !?Diagnostic {
@@ -26,9 +31,12 @@ fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst: @i
             selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = dst, .bits = bits } }) catch return .{ .unsupported_value = "composed-block-fp-source" };
         },
         .fp => {
-            if (bits != 32) return .{ .no_emitter = "composed-block-fp-immediate-width" };
             try selector_state.clobberXmmReg(selector, dst);
-            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = dst, .bits = try x86_64_match.fp32TextBits(value) } });
+            switch (bits) {
+                32 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = dst, .bits = try x86_64_match.fp32TextBits(value) } }),
+                64 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm64_xmm = .{ .reg = dst, .bits = try x86_64_match.fp64TextBits(value) } }),
+                else => return .{ .no_emitter = "composed-block-fp-immediate-width" },
+            }
         },
         .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-fp-source" },
     }
@@ -49,13 +57,15 @@ pub fn isFpIntBitcast(cast: ir.CastInst) bool {
     return (cast.from_ty == .half and cast.to_ty.eql(.{ .int = 16 })) or
         (cast.from_ty.eql(.{ .int = 16 }) and cast.to_ty == .half) or
         (cast.from_ty == .float and cast.to_ty.eql(.{ .int = 32 })) or
-        (cast.from_ty.eql(.{ .int = 32 }) and cast.to_ty == .float);
+        (cast.from_ty.eql(.{ .int = 32 }) and cast.to_ty == .float) or
+        (cast.from_ty == .double and cast.to_ty.eql(.{ .int = 64 })) or
+        (cast.from_ty.eql(.{ .int = 64 }) and cast.to_ty == .double);
 }
 
 fn lowerFpIntBitcast(selector: *ComposedBlockSelector, result_name: []const u8, cast: ir.CastInst) !?Diagnostic {
     if (!isFpIntBitcast(cast)) return .{ .no_emitter = "composed-block-fp-bitcast-type" };
-    if (cast.from_ty == .half or cast.from_ty == .float) {
-        const bits: u16 = if (cast.from_ty == .half) 16 else 32;
+    if (cast.from_ty == .half or cast.from_ty == .float or cast.from_ty == .double) {
+        const bits: u16 = if (cast.from_ty == .half) 16 else if (cast.from_ty == .float) 32 else 64;
         const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-fp-bitcast-source" };
         try selector_state.clobberAccumulator(selector);
         const reg = switch (source) {
@@ -67,15 +77,24 @@ fn lowerFpIntBitcast(selector: *ComposedBlockSelector, result_name: []const u8, 
             },
             else => return .{ .unsupported_value = "composed-block-fp-bitcast-source" },
         };
-        try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = reg });
-        try selector_state.bindEax(selector, result_name);
+        if (bits == 64) {
+            try selector.machine.instructions.append(selector.allocator, .{ .movq_xmm_rax = reg });
+            try selector_state.bindRax(selector, result_name);
+        } else {
+            try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = reg });
+            try selector_state.bindEax(selector, result_name);
+        }
         return null;
     }
 
-    const bits: u16 = if (cast.to_ty == .half) 16 else 32;
-    selector_state.emitValueIntoEax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-fp-bitcast-source" };
+    const bits: u16 = if (cast.to_ty == .half) 16 else if (cast.to_ty == .float) 32 else 64;
+    if (bits == 64) {
+        selector_state.emitValueIntoRax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-fp-bitcast-source" };
+    } else {
+        selector_state.emitValueIntoEax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-fp-bitcast-source" };
+    }
     try selector_state.clobberXmmReg(selector, .xmm0);
-    try selector.machine.instructions.append(selector.allocator, .{ .movd_eax_xmm = .xmm0 });
+    try selector.machine.instructions.append(selector.allocator, if (bits == 64) .{ .movq_rax_xmm = .xmm0 } else .{ .movd_eax_xmm = .xmm0 });
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
     return null;
 }

@@ -37,18 +37,19 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None. INBOX-18 closes `compiler_rt.trunc.__trunch` through operation- and
-type-driven half extension/truncation libcalls, scalar float arithmetic,
-FP/integer bitcasts, FP phi edges, and the exact side-effect barrier. The
-in-module `__extendhfsf2` and `__truncsfhf2` helpers emit without recursive
-conversion, the focused object links through their aliases, and 14 raw-half
-cases pass exact native execution. Debug compiler_rt report-all is now
-443 selected / 170 emitting / 273 failing. The first failure is tail-call ABI
-row `compiler_rt.trunc.truncl`; excluding that separate family and wider-format
-boundaries `truncq`/`__truncx`, the next soft-float selector frontier is
-`compiler_rt.trunc.trunc` at typed `fadd`. Stop for review before expanding the
-soft-float cluster. Evidence:
-`docs/evidence/std_debug_hello_trunch_acceptance.summary`.
+None. INBOX-19 closes `compiler_rt.trunc.trunc` through width-driven
+double/i64 bitcasts, scalar `addsd`, float/double side-effect barriers, variable
+i64 shift, and immediate i64 XOR lowering. Exact native execution passes 24
+raw-double cases and drove a general live-accumulator preservation repair for
+predicate production. Debug compiler_rt report-all is now 443 selected / 173
+emitting / 270 failing; typed-form generalization also makes
+`compiler_rt.extendhfdf2.__extendhfdf2` and
+`compiler_rt.extendsfdf2.__extendsfdf2` emit. The first failure remains tail-call
+ABI row `compiler_rt.trunc.truncl`; `truncq` and `__truncx` remain wider-format
+boundaries. Excluding those directed boundaries, the next non-tail soft-float
+frontier is `compiler_rt.tan.tanh` at `no_emitter` /
+`composed-block-call-form`. Stop after this reviewed canary boundary. Evidence:
+`docs/evidence/std_debug_hello_trunc_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

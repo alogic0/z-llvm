@@ -86,7 +86,7 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
     return switch (binary.op) {
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
         .udiv, .sdiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
-        .fadd => if (binary.ty == .float) null else .{ .unsupported_instruction = @tagName(binary.op) },
+        .fadd => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
         .fsub, .fmul, .fdiv, .frem => .{ .unsupported_instruction = @tagName(binary.op) },
     };
 }
@@ -120,7 +120,8 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (call.inline_asm) |inline_asm| {
         if (!inline_asm.sideeffect or inline_asm.template.len != 0 or
             !std.mem.eql(u8, inline_asm.constraints, "rm,~{dirflag},~{fpsr},~{flags}") or
-            call.ret_ty != .void or call.args.items.len != 1 or call.args.items[0].ty != .float)
+            call.ret_ty != .void or call.args.items.len != 1 or
+            (call.args.items[0].ty != .float and call.args.items[0].ty != .double))
         {
             return .{ .unsupported_instruction = "inline-asm-call" };
         }

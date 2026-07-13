@@ -246,19 +246,26 @@ test "x86_64 encoding emits scalar FP bit moves and unsigned above setcc" {
     defer machine.deinit(std.testing.allocator);
     try machine.instructions.append(std.testing.allocator, .{ .movd_xmm_eax = .xmm2 });
     try machine.instructions.append(std.testing.allocator, .{ .movd_eax_xmm = .xmm3 });
+    try machine.instructions.append(std.testing.allocator, .{ .movq_xmm_rax = .xmm1 });
+    try machine.instructions.append(std.testing.allocator, .{ .movq_rax_xmm = .xmm2 });
     try machine.instructions.append(std.testing.allocator, .seta_eax);
     try machine.instructions.append(std.testing.allocator, .ret);
 
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .movd_xmm_eax = .xmm2 }));
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .movd_eax_xmm = .xmm3 }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .movq_xmm_rax = .xmm1 }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .movq_rax_xmm = .xmm2 }));
     try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.seta_eax));
     const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
     try std.testing.expectEqualSlices(u8, &.{
         0x66, 0x0f, 0x7e, 0xd0,
         0x66, 0x0f, 0x6e, 0xd8,
-        0x0f, 0x97, 0xc0, 0x0f,
-        0xb6, 0xc0, 0xc3,
+        0x66, 0x48, 0x0f, 0x7e,
+        0xc8, 0x66, 0x48, 0x0f,
+        0x6e, 0xd0, 0x0f, 0x97,
+        0xc0, 0x0f, 0xb6, 0xc0,
+        0xc3,
     }, bytes);
 }
 

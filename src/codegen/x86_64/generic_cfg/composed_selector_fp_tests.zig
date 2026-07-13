@@ -104,6 +104,38 @@ test "generic cfg selector executes type-driven scalar float addition" {
     try std.testing.expectEqual(std.math.inf(f32), add(std.math.inf(f32), 1.0));
 }
 
+test "generic cfg selector executes type-driven scalar double addition" {
+    const input =
+        \\define double @add(double %lhs, double %rhs) {
+        \\entry:
+        \\  %sum = fadd double %lhs, %rhs
+        \\  ret double %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("add", .double);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    var saw_addsd = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .addsd_xmm1_xmm0 => saw_addsd = true,
+        else => {},
+    };
+    try std.testing.expect(saw_addsd);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const add: *const fn (f64, f64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u64, @bitCast(@as(f64, 3.75))), @as(u64, @bitCast(add(1.5, 2.25))));
+    try std.testing.expectEqual(@as(u64, 0x8000_0000_0000_0000), @as(u64, @bitCast(add(-0.0, -0.0))));
+    try std.testing.expectEqual(std.math.inf(f64), add(std.math.inf(f64), 1.0));
+}
+
 test "generic cfg selector validates empty side-effect FP barriers" {
     var machine = x86_64_machine.MachineFunction.init("fp-barrier", .void);
     defer machine.deinit(std.testing.allocator);
@@ -114,6 +146,22 @@ test "generic cfg selector validates empty side-effect FP barriers" {
     defer args.deinit(std.testing.allocator);
     try args.append(std.testing.allocator, .{ .ty = .float, .value = .{ .named = "value" } });
 
+    try std.testing.expect((try selector_calls.lowerCall(&selector, null, .{
+        .ret_ty = .void,
+        .callee = "",
+        .inline_asm = .{
+            .template = "",
+            .constraints = "rm,~{dirflag},~{fpsr},~{flags}",
+            .sideeffect = true,
+            .may_load = true,
+        },
+        .args = args,
+    })) == null);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    try selector_state.bindValueLoc(&selector, "wide", .{ .xmm = .{ .reg = .xmm3, .bits = 64 } });
+    args.clearRetainingCapacity();
+    try args.append(std.testing.allocator, .{ .ty = .double, .value = .{ .named = "wide" } });
     try std.testing.expect((try selector_calls.lowerCall(&selector, null, .{
         .ret_ty = .void,
         .callee = "",
@@ -162,6 +210,45 @@ test "generic cfg selector preserves exact float bitcasts" {
             } else {
                 const function: *const fn (u32) callconv(.c) f32 = @ptrCast(mapping.ptr);
                 try std.testing.expectEqual(bits, @as(u32, @bitCast(function(bits))));
+            }
+        }
+    }
+}
+
+test "generic cfg selector preserves exact double bitcasts" {
+    const input =
+        \\define i64 @to_bits(double %value) {
+        \\entry:
+        \\  %bits = bitcast double %value to i64
+        \\  ret i64 %bits
+        \\}
+        \\define double @from_bits(i64 %bits) {
+        \\entry:
+        \\  %value = bitcast i64 %bits to double
+        \\  ret double %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    inline for (.{ 0, 1 }) |index| {
+        var machine = x86_64_machine.MachineFunction.init(module.functions.items[index].name, module.functions.items[index].ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[index]));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        inline for (.{ @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x7ff8_1234_5678_9abc), @as(u64, 0x0000_0000_0000_0001) }) |bits| {
+            if (index == 0) {
+                const function: *const fn (f64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+                try std.testing.expectEqual(bits, function(@bitCast(bits)));
+            } else {
+                const function: *const fn (u64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+                try std.testing.expectEqual(bits, @as(u64, @bitCast(function(bits))));
             }
         }
     }

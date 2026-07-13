@@ -129,6 +129,8 @@ test "x86_64 assembly prints scalar FP bit moves and unsigned above setcc" {
     defer machine.deinit(std.testing.allocator);
     try machine.instructions.append(std.testing.allocator, .{ .movd_xmm_eax = .xmm2 });
     try machine.instructions.append(std.testing.allocator, .{ .movd_eax_xmm = .xmm3 });
+    try machine.instructions.append(std.testing.allocator, .{ .movq_xmm_rax = .xmm1 });
+    try machine.instructions.append(std.testing.allocator, .{ .movq_rax_xmm = .xmm2 });
     try machine.instructions.append(std.testing.allocator, .seta_eax);
     try machine.instructions.append(std.testing.allocator, .ret);
 
@@ -142,6 +144,8 @@ test "x86_64 assembly prints scalar FP bit moves and unsigned above setcc" {
             "fp_bits_seta:\n" ++
             "\tmovd %xmm2, %eax\n" ++
             "\tmovd %eax, %xmm3\n" ++
+            "\tmovq %xmm1, %rax\n" ++
+            "\tmovq %rax, %xmm2\n" ++
             "\tseta %al\n" ++
             "\tmovzbl %al, %eax\n" ++
             "\tretq\n",

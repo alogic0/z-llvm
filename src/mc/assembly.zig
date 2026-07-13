@@ -21,6 +21,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_rax_rsi => try writer.writeAll("\tmovq %rax, %rsi\n"),
             .mov_arg_rax => |reg| try writer.print("\tmovq {s}, %rax\n", .{reg.name64()}),
             .movq_xmm_rax => |reg| try writer.print("\tmovq {s}, %rax\n", .{reg.name()}),
+            .movq_rax_xmm => |reg| try writer.print("\tmovq %rax, {s}\n", .{reg.name()}),
             .movd_xmm_eax => |reg| try writer.print("\tmovd {s}, %eax\n", .{reg.name()}),
             .movd_eax_xmm => |reg| try writer.print("\tmovd %eax, {s}\n", .{reg.name()}),
             .mov_arg_eax => |reg| try writer.print("\tmovl {s}, %eax\n", .{reg.name32()}),

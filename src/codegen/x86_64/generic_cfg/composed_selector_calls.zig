@@ -146,14 +146,16 @@ fn lowerFpBarrier(selector: *ComposedBlockSelector, result: ?[]const u8, call: i
     const inline_asm = call.inline_asm orelse return .{ .no_emitter = "composed-block-inline-asm-call" };
     if (!inline_asm.sideeffect or inline_asm.template.len != 0 or
         !std.mem.eql(u8, inline_asm.constraints, "rm,~{dirflag},~{fpsr},~{flags}") or
-        call.ret_ty != .void or call.args.items.len != 1 or call.args.items[0].ty != .float)
+        call.ret_ty != .void or call.args.items.len != 1 or
+        (call.args.items[0].ty != .float and call.args.items[0].ty != .double))
     {
         return .{ .no_emitter = "composed-block-inline-asm-call" };
     }
     const loc = selector_state.resolveValue(selector, call.args.items[0].value) orelse return .{ .unsupported_value = "composed-block-inline-asm-value" };
+    const bits: u16 = if (call.args.items[0].ty == .float) 32 else 64;
     switch (loc) {
-        .xmm => |fp| if (fp.bits != 32) return .{ .unsupported_value = "composed-block-inline-asm-value" },
-        .spill_fp => |fp| if (fp.bits != 32) return .{ .unsupported_value = "composed-block-inline-asm-value" },
+        .xmm => |fp| if (fp.bits != bits) return .{ .unsupported_value = "composed-block-inline-asm-value" },
+        .spill_fp => |fp| if (fp.bits != bits) return .{ .unsupported_value = "composed-block-inline-asm-value" },
         else => return .{ .unsupported_value = "composed-block-inline-asm-value" },
     }
     return null;

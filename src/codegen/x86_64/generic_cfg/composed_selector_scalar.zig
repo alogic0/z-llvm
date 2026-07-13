@@ -373,6 +373,15 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
             }
         },
         .xor => {
+            if (bits == 64) {
+                if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
+                selector_state.emitValueIntoRax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-xor64-lhs" };
+                try selector_state.clobberArgReg(selector, .rcx);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
+                try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } });
+                try selector_state.bindRax(selector, result_name);
+                return null;
+            }
             if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
             try selector_state.emitValueIntoEax(selector, binary.lhs);
             try selector_state.clobberArgReg(selector, .rcx);
@@ -640,6 +649,14 @@ pub fn lowerBinaryImmediateLhs(selector: *ComposedBlockSelector, result_name: []
         return null;
     }
     if (binary.op != .lshr) return .{ .no_emitter = "composed-block-binary-imm-lhs" };
+    if (bits == 64) {
+        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+        try selector_state.clobberAccumulator(selector);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(lhs) });
+        try selector.machine.instructions.append(selector.allocator, .shr_rax_cl);
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
     if (bits > 32) return .{ .no_emitter = "composed-block-variable-shift-width" };
 
     try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
@@ -747,6 +764,9 @@ pub fn lowerFreeze(selector: *ComposedBlockSelector, result: ?[]const u8, freeze
 
 pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
+        if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
+    }
     const is_ne_zero_i16 = icmp.predicate == .ne and icmp.operand_ty.eql(.{ .int = 16 }) and switch (icmp.rhs) {
         .int => |int| try i64Value(int) == 0,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
