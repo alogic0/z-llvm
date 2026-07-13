@@ -73,7 +73,7 @@ pub fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .scratch64 => |reg| reg == rhs.scratch64,
         .scratch128 => |pair| pair.eql(rhs.scratch128),
         .xmm => |fp| fp.reg == rhs.xmm.reg and fp.shapeEql(rhs.xmm),
-        .stack_scalar => |stack| stack.base_disp == rhs.stack_scalar.base_disp and stack.bits == rhs.stack_scalar.bits,
+        .stack_scalar => |stack| stack.base_disp == rhs.stack_scalar.base_disp and stack.bits == rhs.stack_scalar.bits and stack.kind == rhs.stack_scalar.kind,
         .stack128 => |disp| disp == rhs.stack128,
         .stack128_value => |disp| disp == rhs.stack128_value,
         .stack_i32_array => |array| array.base_disp == rhs.stack_i32_array.base_disp and array.len == rhs.stack_i32_array.len,

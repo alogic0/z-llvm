@@ -9,6 +9,7 @@ const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_frame = @import("composed_selector_frame.zig");
+const selector_fp = @import("composed_selector_fp.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -87,6 +88,14 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
         try selector_state.bindValueLoc(selector, result_name, .{ .stack_scalar = .{ .base_disp = 0, .bits = 64 } });
         return null;
     }
+    if (scalarFpBits(alloca.allocated_ty)) |bits| {
+        if (selector.stack_slot_allocated or selector.stack_array_allocated) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
+        try selector_frame.appendSubRsp(selector, 24);
+        selector.stack_slot_allocated = true;
+        selector.stack_frame_bytes = 24;
+        try selector_state.bindValueLoc(selector, result_name, .{ .stack_scalar = .{ .base_disp = 0, .bits = bits, .kind = .fp } });
+        return null;
+    }
     if (alloca.allocated_ty.eql(.{ .int = 128 })) {
         if (selector.stack_slot_allocated or selector.stack_array_allocated) return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
         const frame_bytes = stack128FrameBytes();
@@ -112,6 +121,7 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
 pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir.LoadInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (load.attrs.isBarrier()) return .{ .no_emitter = "composed-block-load-barrier" };
+    if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
     if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
     const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
     switch (ptr) {
@@ -163,6 +173,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
+    if (scalarFpBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
     if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
     const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     const value_loc = switch (store.value) {
@@ -215,6 +226,57 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
         },
         .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack128, .stack128_value, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-store-ptr" },
     }
+    return null;
+}
+
+fn scalarFpBits(ty: ir.Type) ?u16 {
+    return if (ty == .float) 32 else if (ty == .double) 64 else null;
+}
+
+fn lowerLoadFp(selector: *ComposedBlockSelector, result_name: []const u8, load: ir.LoadInst, bits: u16) !?Diagnostic {
+    if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-load-fp-addrspace" };
+    const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
+    const stack = switch (ptr) {
+        .stack_scalar => |stack| stack,
+        else => return .{ .no_emitter = "composed-block-load-fp-ptr" },
+    };
+    if (stack.kind != .fp or stack.bits != bits) return .{ .no_emitter = "composed-block-load-stack-width" };
+
+    try selector_state.clobberXmmReg(selector, .xmm0);
+    if (bits == 32) {
+        if (stack.base_disp <= std.math.maxInt(u8)) {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_xmm0_f32 = @intCast(stack.base_disp) });
+        } else {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_xmm0_f32 = stack.base_disp });
+        }
+    } else if (bits == 64) {
+        if (stack.base_disp <= std.math.maxInt(u8)) {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_xmm0 = @intCast(stack.base_disp) });
+        } else {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_xmm0 = stack.base_disp });
+        }
+    } else unreachable;
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
+    return null;
+}
+
+fn lowerStoreFp(selector: *ComposedBlockSelector, store: ir.StoreInst, bits: u16) !?Diagnostic {
+    if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-store-fp-addrspace" };
+    const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+    const stack = switch (ptr) {
+        .stack_scalar => |stack| stack,
+        else => return .{ .no_emitter = "composed-block-store-fp-ptr" },
+    };
+    if (stack.kind != .fp or stack.bits != bits) return .{ .no_emitter = "composed-block-store-stack-width" };
+    if (try selector_fp.materializeFpValue(selector, store.value, .xmm0, bits)) |diagnostic| return diagnostic;
+
+    if (stack.base_disp % 4 != 0) return .{ .no_emitter = "composed-block-store-fp-align" };
+    const frame_index = FrameIndex.fromSlot(stack.base_disp / 4) catch return .{ .no_spill_envelope = "composed-block-store-fp-frame" };
+    if (bits == 32) {
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm32_rsp = .{ .frame_index = frame_index, .reg = .xmm0 } });
+    } else if (bits == 64) {
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm64_rsp = .{ .frame_index = frame_index, .reg = .xmm0 } });
+    } else unreachable;
     return null;
 }
 

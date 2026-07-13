@@ -15,14 +15,10 @@ const scalar_xmm_regs = selector_types.selector_allocatable_xmm_regs;
 pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const bits = fpBits(binary.ty) orelse return .{ .no_emitter = "composed-block-fp-binary-type" };
-    if (binary.op == .fmul or binary.op == .fsub or binary.op == .fdiv) return lowerFpRegisterBinary(selector, result_name, binary, bits);
-    if (binary.op != .fadd) return .{ .no_emitter = "composed-block-fp-binary-type" };
-
-    if (try materializeFpValue(selector, binary.rhs, .xmm1, bits)) |diagnostic| return diagnostic;
-    if (try materializeFpValue(selector, binary.lhs, .xmm0, bits)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.append(selector.allocator, if (bits == 32) .addss_xmm1_xmm0 else .addsd_xmm1_xmm0);
-    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
-    return null;
+    return switch (binary.op) {
+        .fadd, .fmul, .fsub, .fdiv => lowerFpRegisterBinary(selector, result_name, binary, bits),
+        else => .{ .no_emitter = "composed-block-fp-binary-type" },
+    };
 }
 
 fn lowerFpRegisterBinary(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
@@ -38,6 +34,10 @@ fn lowerFpRegisterBinary(selector: *ComposedBlockSelector, result_name: []const 
     };
     try selector_state.clobberXmmReg(selector, dst);
     switch (binary.op) {
+        .fadd => try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+            .{ .addss_xmm = .{ .dst = dst, .src = src } }
+        else
+            .{ .addsd_xmm = .{ .dst = dst, .src = src } }),
         .fmul => try selector.machine.instructions.append(selector.allocator, if (bits == 32)
             .{ .mulss_xmm = .{ .dst = dst, .src = src } }
         else

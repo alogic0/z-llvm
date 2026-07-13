@@ -538,7 +538,22 @@ pub fn rejectUnsupportedCallArgAttrs(arg: ir.CallArg) !void {
         if (arg.ty != .ptr) return error.UnsupportedSretByvalAbi;
         return;
     }
+    if (arg.ty == .ptr and pointerCallAttrsAreAdvisory(text)) return;
     return error.UnsupportedCallAttributeAbi;
+}
+
+fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
+    var tokens = std.mem.tokenizeAny(u8, attrs, " \t,");
+    var saw_attr = false;
+    while (tokens.next()) |token| {
+        saw_attr = true;
+        if (std.mem.eql(u8, token, "nonnull")) continue;
+        if (!std.mem.eql(u8, token, "align")) return false;
+        const alignment_text = tokens.next() orelse return false;
+        const alignment = std.fmt.parseUnsigned(u64, alignment_text, 10) catch return false;
+        if (alignment == 0 or !std.math.isPowerOfTwo(alignment)) return false;
+    }
+    return saw_attr;
 }
 
 pub fn callArgByvalType(arg: ir.CallArg) ?ir.Type {
@@ -787,4 +802,22 @@ test "SysV call envelope accepts attribute group references without hiding bundl
         .args = .empty,
     };
     try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallEnvelope(bundled_call));
+}
+
+test "SysV call planner admits only advisory local-pointer argument attributes" {
+    try rejectUnsupportedCallArgAttrs(.{
+        .ty = .ptr,
+        .attrs = "nonnull align 8",
+        .value = .{ .named = "slot" },
+    });
+    try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{
+        .ty = .ptr,
+        .attrs = "nonnull dereferenceable(8)",
+        .value = .{ .named = "slot" },
+    }));
+    try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{
+        .ty = .{ .int = 64 },
+        .attrs = "align 8",
+        .value = .{ .named = "value" },
+    }));
 }

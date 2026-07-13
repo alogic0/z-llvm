@@ -415,7 +415,7 @@ changes the counts; cite the discovery/fix evidence summary.
 | ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
 | ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
 | ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
-| Debug compiler_rt | std-hello | 443 selected | 190 emitting | 253 failures | `docs/evidence/std_debug_hello_tanf_scalar_fp_acceptance.summary` |
+| Debug compiler_rt | std-hello | 443 selected | 193 emitting | 250 failures | `docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary` |
 
 ## Cluster Board (item 9a onward)
 
@@ -3415,6 +3415,19 @@ One line per completed cycle, append-only, newest last. This is the
   is green and final Tier 3 acceptance is recorded in the evidence summary.
   Stop for the plan's periodic review; no successor is authorized. Evidence
   `docs/evidence/std_debug_hello_vector_f64x2_acceptance.summary`.
+
+- 2026-07-13 (this commit, INBOX-25) Item 12 scalar FP stack-memory and
+  out-parameter capability: typed float/double frame objects, exact local
+  loads/stores, narrow advisory pointer attributes, and the existing SysV
+  GPR/XMM call planner now cover the rem_pio2f caller shape. A parametric
+  `addss`/`addsd` repair removes the fixed-XMM alias false rejection exposed by
+  the newly reachable bodies. Twelve exact round trips and a three-case native
+  out-parameter canary pass. `tanf`/`sinf` advance to scalar FP select, `cosf`
+  to an FP phi edge, and `sincosf` to the excluded external FP store. Report-all
+  advances to 193 emitting / 250 failing through one unrelated collateral
+  integer emission. Tier 2 is green; no directed trig row closes, so Tier 3 is
+  not triggered. Evidence
+  `docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary`.
 
 ## Ratchet State
 

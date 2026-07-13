@@ -1293,6 +1293,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .subss_xmm => |sub| try writer.print("\tsubss {s}, {s}\n", .{ sub.src.name(), sub.dst.name() }),
             .divsd_xmm => |div| try writer.print("\tdivsd {s}, {s}\n", .{ div.src.name(), div.dst.name() }),
             .divss_xmm => |div| try writer.print("\tdivss {s}, {s}\n", .{ div.src.name(), div.dst.name() }),
+            .addsd_xmm => |add| try writer.print("\taddsd {s}, {s}\n", .{ add.src.name(), add.dst.name() }),
+            .addss_xmm => |add| try writer.print("\taddss {s}, {s}\n", .{ add.src.name(), add.dst.name() }),
             .addss_xmm1_xmm0 => try writer.writeAll("\taddss %xmm1, %xmm0\n"),
             .subss_xmm1_xmm0 => try writer.writeAll("\tsubss %xmm1, %xmm0\n"),
             .divsd_xmm1_xmm0 => try writer.writeAll("\tdivsd %xmm1, %xmm0\n"),

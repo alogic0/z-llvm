@@ -85,6 +85,10 @@ pub fn allocaAlignment(attrs: ?[]const u8, natural_alignment: u32) ?u32 {
     return natural_alignment;
 }
 
+fn stackFpBits(ty: ir.Type) ?u16 {
+    return if (ty == .float) 32 else if (ty == .double) 64 else null;
+}
+
 pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
     var payload_bytes: u32 = 0;
     var scalar_slot_count: usize = 0;
@@ -121,8 +125,10 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
             const result_name = instruction.result orelse return .{ .unsupported_value = "composed-block-missing-result" };
             const alloca = instruction.kind.alloca;
             if (alloca.allocated_ty_addrspace != null) return .{ .no_emitter = "composed-block-alloca-addrspace" };
-            if (intBits(alloca.allocated_ty)) |bits| {
-                if (bits != 8 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-alloca-form" };
+            const integer_bits = intBits(alloca.allocated_ty);
+            const fp_bits = stackFpBits(alloca.allocated_ty);
+            if (integer_bits orelse fp_bits) |bits| {
+                if (integer_bits != null and bits != 8 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-alloca-form" };
                 payload_bytes = @max(payload_bytes, spill_reserved_bytes);
                 scalar_slot_count += 1;
                 const natural_alignment: u32 = if (bits == 128) 16 else @max(@as(u32, 1), @as(u32, bits / 8));
@@ -134,7 +140,11 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
                 if (bits == 128) {
                     try selector_state.bindValueLoc(selector, result_name, .{ .stack128 = base_disp });
                 } else {
-                    try selector_state.bindValueLoc(selector, result_name, .{ .stack_scalar = .{ .base_disp = base_disp, .bits = bits } });
+                    try selector_state.bindValueLoc(selector, result_name, .{ .stack_scalar = .{
+                        .base_disp = base_disp,
+                        .bits = bits,
+                        .kind = if (fp_bits != null) .fp else .integer,
+                    } });
                 }
             } else if (parseI32ArrayType(alloca.allocated_ty)) |len| {
                 array_count += 1;

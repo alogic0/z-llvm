@@ -708,7 +708,7 @@ test "generic cfg selector executes type-driven scalar double addition" {
     try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
     var saw_addsd = false;
     for (machine.instructions.items) |instruction| switch (instruction) {
-        .addsd_xmm1_xmm0 => saw_addsd = true,
+        .addsd_xmm => saw_addsd = true,
         else => {},
     };
     try std.testing.expect(saw_addsd);
@@ -721,6 +721,30 @@ test "generic cfg selector executes type-driven scalar double addition" {
     try std.testing.expectEqual(@as(u64, @bitCast(@as(f64, 3.75))), @as(u64, @bitCast(add(1.5, 2.25))));
     try std.testing.expectEqual(@as(u64, 0x8000_0000_0000_0000), @as(u64, @bitCast(add(-0.0, -0.0))));
     try std.testing.expectEqual(std.math.inf(f64), add(std.math.inf(f64), 1.0));
+}
+
+test "generic cfg selector preserves an fadd lhs resident in XMM1" {
+    const input =
+        \\define double @add_xmm1_lhs(float %skip, double %lhs) {
+        \\entry:
+        \\  %sum = fadd double %lhs, 1.000000e+00
+        \\  ret double %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("add_xmm1_lhs", .double);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const add: *const fn (f32, f64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u64, 0x400c_0000_0000_0000), @as(u64, @bitCast(add(0.0, 2.5))));
 }
 
 test "generic cfg selector validates empty side-effect FP barriers" {

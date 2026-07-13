@@ -143,6 +143,12 @@ pub const StackArrayLoc = struct {
 pub const StackScalarLoc = struct {
     base_disp: u32,
     bits: u16,
+    kind: Kind = .integer,
+
+    pub const Kind = enum {
+        integer,
+        fp,
+    };
 };
 
 pub const StackPtrLoc = struct {

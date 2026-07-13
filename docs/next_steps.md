@@ -37,17 +37,17 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-24 implements the reviewed Phase D `<2 x double>` slice with static
-defined-lane masks, constant insertion/extraction, splat-only shuffle, packed
-addition/multiplication, and atomic pair-slot unaligned spills. The bit-exact
-pressure canary passes and report-all remains 443 selected / 192 emitting /
-251 failing with no regression or collateral emission. The three immediate
-rows clear their admitted vector forms; later rows stop at explicit scalar,
-non-splat, CFG, or excluded-element-type boundaries. No successor is
-authorized. Stop for the plan's periodic review before expanding vector
-operations or choosing another capability. Evidence:
-`docs/evidence/std_debug_hello_vector_f64x2_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox24_vector_acceptance.summary`.
+INBOX-25 adds typed scalar float/double frame objects, exact local FP
+loads/stores, and the `fastcc i32(float, ptr-local-double)` out-parameter call
+path. `tanf` and `sinf` now stop at scalar FP select, `cosf` at an FP phi edge,
+and `sincosf` at the deliberately excluded external FP store. Report-all is
+443 selected / 193 emitting / 250 failing; the one new emission is collateral
+`compiler_rt.int.__udivdi3` and has no semantic claim. Tier 2 is green and no
+directed trig row closes, so Tier 3 was not triggered. The pre-authorized next
+cycle is the `<2 x float>` successor, beginning with structured vector
+constants and one shared typed splat-mask predicate before mirroring the
+bounded double slice. Evidence:
+`docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
