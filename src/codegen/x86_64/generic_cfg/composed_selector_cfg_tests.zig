@@ -322,3 +322,105 @@ test "composed selector keeps vector selects and phis fail closed" {
         }
     }
 }
+
+test "composed selector lowers typed i32 switches as compare chains" {
+    const input =
+        \\define i32 @masked_switch(i32 %input) {
+        \\entry:
+        \\  %key = and i32 %input, 3
+        \\  switch i32 %key, label %impossible [
+        \\    i32 0, label %case0
+        \\    i32 1, label %case1
+        \\    i32 2, label %case2
+        \\    i32 3, label %case3
+        \\  ]
+        \\case0:
+        \\  ret i32 11
+        \\case1:
+        \\  ret i32 13
+        \\case2:
+        \\  ret i32 17
+        \\impossible:
+        \\  unreachable
+        \\case3:
+        \\  ret i32 19
+        \\}
+        \\define i32 @ordinary_switch(i32 %input) {
+        \\entry:
+        \\  %narrow = trunc i32 %input to i16
+        \\  switch i16 %narrow, label %default [
+        \\    i16 -1, label %negative
+        \\    i16 7, label %seven
+        \\  ]
+        \\negative:
+        \\  ret i32 23
+        \\seven:
+        \\  ret i32 29
+        \\default:
+        \\  ret i32 31
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items, 0..) |function, function_index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (function_index == 0) {
+            const switch_fn: *const fn (i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+            const expected = [_]i32{ 11, 13, 17, 19, 11, 13, 17, 19 };
+            for (expected, 0..) |value, input_value| try std.testing.expectEqual(value, switch_fn(@intCast(input_value)));
+            try std.testing.expectEqual(@as(i32, 19), switch_fn(-1));
+        } else {
+            const switch_fn: *const fn (i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+            try std.testing.expectEqual(@as(i32, 23), switch_fn(-1));
+            try std.testing.expectEqual(@as(i32, 29), switch_fn(7));
+            try std.testing.expectEqual(@as(i32, 31), switch_fn(0));
+            try std.testing.expectEqual(@as(i32, 31), switch_fn(99));
+        }
+    }
+}
+
+test "composed selector rejects an unproven unreachable switch default" {
+    const input =
+        \\define i32 @missing_mask_case(i32 %input) {
+        \\entry:
+        \\  %key = and i32 %input, 3
+        \\  switch i32 %key, label %impossible [
+        \\    i32 0, label %case0
+        \\    i32 1, label %case1
+        \\    i32 2, label %case2
+        \\  ]
+        \\case0:
+        \\  ret i32 11
+        \\case1:
+        \\  ret i32 13
+        \\case2:
+        \\  ret i32 17
+        \\impossible:
+        \\  unreachable
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("missing_mask_case", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (selection) {
+        .unsupported => {},
+        .selected => return error.TestUnexpectedResult,
+    }
+}

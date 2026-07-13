@@ -3492,6 +3492,21 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence
   `docs/evidence/zig_integrated_exe_moddi3_umoddi3_closure_reproof.summary`.
 
+- 2026-07-13 (this commit, INBOX-27 Part 2) Item 12 typed integer switch
+  capability: bounded i1-through-i32 compare chains normalize narrow
+  conditions and case constants, while an explicit `and 3` proof admits only
+  a complete 0/1/2/3 case set before omitting a plain unreachable default.
+  Switch-to-phi edges, larger case sets, indirect branches, and unproved
+  unreachable defaults remain fail-closed. Exact executable tests cover the
+  exhaustive masked form and a reachable-default i16 form. `sinf`, `cosf`,
+  and `sincosf` close through 12 bit-exact native cases each, including all
+  four switch residues; report-all advances to 443 selected / 202 emitting /
+  241 failing. One fma row and twelve conversion rows advance collaterally
+  without semantic claims. Tier 2 and the row-closure Tier 3 are green. No
+  third capability is authorized; stop for periodic review. Evidence
+  `docs/evidence/std_debug_hello_typed_switch_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox27_typed_switch.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

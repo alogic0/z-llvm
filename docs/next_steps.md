@@ -37,19 +37,18 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-26 and its one pre-authorized successor are complete. Commit `5131ad43`
-adds scalar FP selects and source-safe FP phi edges, closes `tanf`, and passes
-its Tier 3 acceptance. The successor adds scalar float/double stores through
-exact named ABI pointer parameters, including stabilized 64-bit pointer
-spills, while derived pointers remain fail-closed. `sincosf` clears the
-external-store frontier and now stops with `sinf` and `cosf` at the unsupported
-switch terminator. Report-all remains 443 selected / 199 emitting / 244
-failing, with no row-closure or ratchet claim in the successor. Its Tier 2 is
-green and Tier 3 is not triggered. The one-cycle pipeline is exhausted; stop
-for review. Evidence:
-`docs/evidence/std_debug_hello_scalar_fp_select_phi_acceptance.summary`,
-`docs/evidence/distribution_all_after_scalar_fp_select_phi.summary`, and
-`docs/evidence/std_debug_hello_scalar_fp_pointer_store_acceptance.summary`.
+INBOX-27 is complete through three standalone commits: Part 1 repairs the
+alloca/spill frame collision (`916694a6`), the fix-forward commit re-proves
+`__moddi3` and `__umoddi3` through the permanent executable canary
+(`3716cbeb`), and Part 2 adds bounded typed integer switch compare chains.
+The explicit masked-range proof closes `sinf`, `cosf`, and `sincosf` through
+bit-exact native acceptance over all four switch residues. Report-all is now
+443 selected / 202 emitting / 241 failing; Tier 2 and the required Tier 3 are
+green. No third capability is authorized. Stop and request the plan's
+periodic review before selecting another goal. Evidence:
+`docs/evidence/zig_integrated_exe_moddi3_umoddi3_closure_reproof.summary`,
+`docs/evidence/std_debug_hello_typed_switch_acceptance.summary`, and
+`docs/evidence/distribution_all_after_inbox27_typed_switch.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

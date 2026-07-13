@@ -73,6 +73,7 @@ const shiftAmount7 = composed_helpers.shiftAmount7;
 const i32Value = composed_helpers.i32Value;
 const i32BitPattern = composed_helpers.i32BitPattern;
 const i64Value = composed_helpers.i64Value;
+const max_compare_chain_switch_cases = 8;
 
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
 
@@ -250,9 +251,164 @@ pub fn lowerCfgTerminator(
             }
             return null;
         },
-        .@"unreachable" => if (blockEndsInTrap(function.blocks.items[block_index])) null else .{ .no_emitter = "stage2-terminator-not-owned" },
-        .@"switch", .indirectbr => .{ .no_emitter = "stage2-terminator-not-owned" },
+        .@"switch" => |switch_term| try lowerSwitch(selector, function, block_index, switch_term),
+        .@"unreachable" => if (blockEndsInTrap(function.blocks.items[block_index]) or
+            isExclusivelyProvenMaskedSwitchDefault(function, function.blocks.items[block_index].name))
+            null
+        else
+            .{ .no_emitter = "stage2-terminator-not-owned" },
+        .indirectbr => .{ .no_emitter = "stage2-terminator-not-owned" },
     };
+}
+
+fn lowerSwitch(
+    selector: *ComposedBlockSelector,
+    function: ir.Function,
+    block_index: usize,
+    switch_term: ir.SwitchTerminator,
+) !?Diagnostic {
+    const bits = intBits(switch_term.cond_ty) orelse return .{ .no_emitter = "stage2-switch-type" };
+    if (bits == 0 or bits > 32) return .{ .no_emitter = "stage2-switch-width" };
+    if (switch_term.cases.items.len == 0 or switch_term.cases.items.len > max_compare_chain_switch_cases) {
+        return .{ .no_emitter = "stage2-switch-case-count" };
+    }
+
+    var case_values: [max_compare_chain_switch_cases]i32 = undefined;
+    const predecessor = function.blocks.items[block_index].name;
+    const default_index = function.blockIndex(switch_term.default_target) orelse return .{ .unsupported_control_flow = "stage2-switch-target" };
+    if (blockHasPhiIncomingFrom(function.blocks.items[default_index], predecessor)) return .{ .no_emitter = "stage2-switch-phi-edge" };
+
+    for (switch_term.cases.items, 0..) |case, case_index| {
+        if (!case.value_ty.eql(switch_term.cond_ty) or case.value != .int) return .{ .no_emitter = "stage2-switch-case-type" };
+        const value = switchCaseValue(case.value.int, bits) orelse return .{ .no_emitter = "stage2-switch-case-value" };
+        for (case_values[0..case_index]) |previous| {
+            if (previous == value) return .{ .no_emitter = "stage2-switch-duplicate-case" };
+        }
+        case_values[case_index] = value;
+        const target_index = function.blockIndex(case.target) orelse return .{ .unsupported_control_flow = "stage2-switch-target" };
+        if (blockHasPhiIncomingFrom(function.blocks.items[target_index], predecessor)) return .{ .no_emitter = "stage2-switch-phi-edge" };
+    }
+
+    const exhaustive_case = maskedSwitchExhaustiveCaseIndex(function, switch_term, bits, case_values[0..switch_term.cases.items.len]);
+    if (selector.stack_frame_bytes != 0) {
+        selector_state.spillLiveValuesForCfgBoundary(selector) catch return .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
+    } else if (try restoreDisplacedPhiDestinations(selector)) |diagnostic| {
+        return diagnostic;
+    }
+    selector_state.emitValueIntoEax(selector, switch_term.cond) catch return .{ .unsupported_value = "stage2-switch-cond" };
+    if (bits < 32) try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = switchValueMask(bits) });
+
+    for (switch_term.cases.items, case_values[0..switch_term.cases.items.len], 0..) |case, value, case_index| {
+        if (exhaustive_case != null and exhaustive_case.? == case_index) continue;
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = value });
+        try selector.machine.instructions.append(selector.allocator, .{ .je = case.target });
+    }
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = if (exhaustive_case) |case_index|
+        switch_term.cases.items[case_index].target
+    else
+        switch_term.default_target });
+    return null;
+}
+
+fn maskedSwitchExhaustiveCaseIndex(function: ir.Function, switch_term: ir.SwitchTerminator, bits: u16, case_values: []const i32) ?usize {
+    if (bits < 2 or bits > 32 or case_values.len != 4) return null;
+    const cond_name = switch (switch_term.cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const producer = instructionByResult(function, cond_name) orelse return null;
+    const binary = switch (producer.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != .@"and" or !binary.ty.eql(switch_term.cond_ty)) return null;
+    const mask = switch (binary.rhs) {
+        .int => |value| value,
+        else => switch (binary.lhs) {
+            .int => |value| value,
+            else => return null,
+        },
+    };
+    if ((switchCaseValue(mask, bits) orelse return null) != 3) return null;
+
+    var seen: u4 = 0;
+    var final_case: ?usize = null;
+    for (case_values, 0..) |value, case_index| {
+        if (value < 0 or value > 3) return null;
+        const bit: u4 = @as(u4, 1) << @intCast(value);
+        if (seen & bit != 0) return null;
+        seen |= bit;
+        if (value == 3) final_case = case_index;
+    }
+    if (seen != 0b1111) return null;
+    const default_index = function.blockIndex(switch_term.default_target) orelse return null;
+    if (!blockIsPlainUnreachable(function.blocks.items[default_index])) return null;
+    return final_case;
+}
+
+fn switchCaseValue(value: i128, bits: u16) ?i32 {
+    if (bits == 0 or bits > 32) return null;
+    if (bits == 32) return i32Value(value) catch null;
+    const raw = i64Value(value) catch return null;
+    const pattern: u64 = @bitCast(raw);
+    return @intCast(pattern & @as(u32, @bitCast(switchValueMask(bits))));
+}
+
+fn switchValueMask(bits: u16) i32 {
+    std.debug.assert(bits > 0 and bits < 32);
+    const shift: u5 = @intCast(bits);
+    return @bitCast((@as(u32, 1) << shift) - 1);
+}
+
+fn instructionByResult(function: ir.Function, name: []const u8) ?ir.Instruction {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, name)) return instruction;
+            }
+        }
+    }
+    return null;
+}
+
+fn blockIsPlainUnreachable(block: ir.BasicBlock) bool {
+    for (block.instructions.items) |instruction| {
+        if (!instruction.removed) return false;
+    }
+    const terminator = block.terminator orelse return false;
+    return terminator == .@"unreachable";
+}
+
+fn isExclusivelyProvenMaskedSwitchDefault(function: ir.Function, target: []const u8) bool {
+    var proven_default = false;
+    for (function.blocks.items) |block| {
+        const terminator = block.terminator orelse continue;
+        switch (terminator) {
+            .br => |br| if (std.mem.eql(u8, br.target, target)) return false,
+            .condbr => |condbr| if (std.mem.eql(u8, condbr.then_target, target) or std.mem.eql(u8, condbr.else_target, target)) return false,
+            .@"switch" => |switch_term| {
+                for (switch_term.cases.items) |case| {
+                    if (std.mem.eql(u8, case.target, target)) return false;
+                }
+                if (!std.mem.eql(u8, switch_term.default_target, target)) continue;
+                const bits = intBits(switch_term.cond_ty) orelse return false;
+                var values: [max_compare_chain_switch_cases]i32 = undefined;
+                if (switch_term.cases.items.len > values.len) return false;
+                for (switch_term.cases.items, 0..) |case, index| {
+                    if (case.value != .int) return false;
+                    values[index] = switchCaseValue(case.value.int, bits) orelse return false;
+                }
+                if (maskedSwitchExhaustiveCaseIndex(function, switch_term, bits, values[0..switch_term.cases.items.len]) == null) return false;
+                proven_default = true;
+            },
+            .indirectbr => |indirectbr| for (indirectbr.targets.items) |indirect_target| {
+                if (std.mem.eql(u8, indirect_target, target)) return false;
+            },
+            .ret, .@"unreachable" => {},
+        }
+    }
+    return proven_default;
 }
 
 pub fn restoreDisplacedPhiDestinations(selector: *ComposedBlockSelector) !?Diagnostic {
