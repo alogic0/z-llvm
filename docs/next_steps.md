@@ -37,7 +37,16 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None. INBOX-21 closes type-driven scalar `fpext float -> double`, `fptrunc
+Phase D architectural review is pending. The INBOX-22 read-only inventory was
+committed in `d7d43ea7` and recommends the adopted `<2 x double>` candidate
+slice with one revision: permit constant lane-0 or lane-1 insertion into a
+poison or existing value while preserving static lane-definedness. The review
+must approve, revise, or defer the vector value-location, allocation, spill,
+packed-operation, and verifier model before implementation. Vector lowering
+remains unauthorized. Evidence:
+`docs/evidence/phase_d_vector_inventory.md`.
+
+INBOX-21 closes type-driven scalar `fpext float -> double`, `fptrunc
 double -> float`, and `fmul` for float and double with register-parametric SSE
 forms and bit-exact executable coverage. The internal `compiler_rt.tan.tanf`
 body consumes the widening and multiplication forms and now stops at its first
