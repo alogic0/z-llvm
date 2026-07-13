@@ -1281,6 +1281,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .seta_eax => try writer.writeAll("\tseta %al\n\tmovzbl %al, %eax\n"),
             .sete_eax => try writer.writeAll("\tsete %al\n\tmovzbl %al, %eax\n"),
             .setg_eax => try writer.writeAll("\tsetg %al\n\tmovzbl %al, %eax\n"),
+            .setl_eax => try writer.writeAll("\tsetl %al\n\tmovzbl %al, %eax\n"),
             .setne_eax => try writer.writeAll("\tsetne %al\n\tmovzbl %al, %eax\n"),
             .test_eax_eax => try writer.writeAll("\ttestl %eax, %eax\n"),
             .test_rax_rax => try writer.writeAll("\ttestq %rax, %rax\n"),

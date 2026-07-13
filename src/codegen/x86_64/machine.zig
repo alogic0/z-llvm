@@ -292,6 +292,7 @@ pub const Instruction = union(enum) {
     seta_eax,
     sete_eax,
     setg_eax,
+    setl_eax,
     setne_eax,
     test_eax_eax,
     test_rax_rax,

@@ -3545,6 +3545,20 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_scalar_int_to_fp_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox29_int_to_fp.summary`.
 
+- 2026-07-13 (this commit, INBOX-29 pre-authorized successor) Item 12 scalar
+  comparison capability: typed plain `icmp slt` with i32/i64 immediate right
+  operands now lowers through width-correct compares and `setl`, while
+  `samesign` and unsupported shapes remain fail-closed. Eight focused boundary
+  outcomes and 32 precomputed-bit native log calls pass. Four directed log
+  rows close; four soft-float arithmetic rows emit collaterally without
+  separate semantic claims. Report-all advances to 443 selected / 210 emitting
+  / 233 failing. Tier 2 and the row-closure Tier 3 are green. The one-cycle
+  pipeline is exhausted; stop for review with three half wrappers at `fcmp`,
+  double `log10` at cross-input shuffle, and double `log` at global-table GEP.
+  Evidence `docs/evidence/std_debug_hello_slt_immediate_acceptance.summary`
+  and
+  `docs/evidence/distribution_all_after_inbox29_slt_immediate.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

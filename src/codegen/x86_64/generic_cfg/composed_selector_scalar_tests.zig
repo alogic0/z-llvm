@@ -882,6 +882,116 @@ test "generic cfg selector lowers signed i32 greater-than immediate" {
     }, machine.instructions.items);
 }
 
+test "generic cfg selector lowers plain signed less-than immediates" {
+    inline for (.{
+        .{ .bits = 32, .rhs = 8_388_608 },
+        .{ .bits = 64, .rhs = 4_503_599_627_370_496 },
+    }) |case| {
+        var machine = MachineFunction.init("slt-imm", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", if (case.bits == 32) .{ .arg32 = .rdi } else .{ .arg64 = .rdi });
+
+        const diagnostic = try selector_scalar.lowerIcmp(&selector, "cmp", .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = case.bits },
+            .lhs = .{ .named = "value" },
+            .rhs = .{ .int = case.rhs },
+        });
+
+        try std.testing.expect(diagnostic == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+        if (case.bits == 32) {
+            try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+                .{ .mov_arg_eax = .rdi },
+                .{ .cmp_eax_imm32 = 8_388_608 },
+                .setl_eax,
+            }, machine.instructions.items);
+        } else {
+            try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+                .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+                .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 4_503_599_627_370_496 } },
+                .setl_eax,
+            }, machine.instructions.items);
+        }
+    }
+
+    var machine = MachineFunction.init("samesign-slt-imm", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+    const diagnostic = (try selector_scalar.lowerIcmp(&selector, "cmp", .{
+        .predicate = .slt,
+        .samesign = true,
+        .operand_ty = .{ .int = 32 },
+        .lhs = .{ .named = "value" },
+        .rhs = .{ .int = 8_388_608 },
+    })).?;
+    try std.testing.expectEqualStrings("composed-block-icmp-form", diagnostic.detail());
+}
+
+test "generic cfg selector executes signed less-than immediate boundaries" {
+    const wide_input =
+        \\define i32 @compare_wide(i64 %value) {
+        \\entry:
+        \\  %comparison = icmp slt i64 %value, 4503599627370496
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var wide_module = try ir.Module.parse(std.testing.allocator, wide_input);
+    defer wide_module.deinit();
+    try wide_module.verify();
+    var wide_machine = MachineFunction.init("compare_wide", .{ .int = 32 });
+    defer wide_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &wide_machine, wide_module.functions.items[0]));
+    const wide_bytes = try encoding.encodeFunction(std.testing.allocator, wide_machine);
+    defer std.testing.allocator.free(wide_bytes);
+    const wide_mapping = try std.posix.mmap(null, wide_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(wide_mapping);
+    @memcpy(wide_mapping, wide_bytes);
+    const wide_function: *const fn (i64) callconv(.c) u32 = @ptrCast(wide_mapping.ptr);
+    const wide_cases = [_]struct { input: i64, expected: u32 }{
+        .{ .input = -1, .expected = 1 },
+        .{ .input = 4_503_599_627_370_495, .expected = 1 },
+        .{ .input = 4_503_599_627_370_496, .expected = 0 },
+        .{ .input = std.math.maxInt(i64), .expected = 0 },
+    };
+    for (wide_cases) |case| try std.testing.expectEqual(case.expected, wide_function(case.input));
+
+    const narrow_input =
+        \\define i32 @compare_narrow(i32 %value) {
+        \\entry:
+        \\  %comparison = icmp slt i32 %value, 8388608
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var narrow_module = try ir.Module.parse(std.testing.allocator, narrow_input);
+    defer narrow_module.deinit();
+    try narrow_module.verify();
+    var narrow_machine = MachineFunction.init("compare_narrow", .{ .int = 32 });
+    defer narrow_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &narrow_machine, narrow_module.functions.items[0]));
+    const narrow_bytes = try encoding.encodeFunction(std.testing.allocator, narrow_machine);
+    defer std.testing.allocator.free(narrow_bytes);
+    const narrow_mapping = try std.posix.mmap(null, narrow_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(narrow_mapping);
+    @memcpy(narrow_mapping, narrow_bytes);
+    const narrow_function: *const fn (i32) callconv(.c) u32 = @ptrCast(narrow_mapping.ptr);
+    const narrow_cases = [_]struct { input: i32, expected: u32 }{
+        .{ .input = -1, .expected = 1 },
+        .{ .input = 8_388_607, .expected = 1 },
+        .{ .input = 8_388_608, .expected = 0 },
+        .{ .input = std.math.maxInt(i32), .expected = 0 },
+    };
+    for (narrow_cases) |case| try std.testing.expectEqual(case.expected, narrow_function(case.input));
+}
+
 test "generic cfg selector lowers unsigned i32 less-than immediate" {
     var machine = MachineFunction.init("ult-i32-imm", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);
