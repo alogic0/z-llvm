@@ -67,3 +67,6 @@ ok distribution all gates
 
 Logs: `tmp/inbox24_tier2.log`, `tmp/inbox24_vector_final_report.log`, and
 `tmp/inbox24_distribution_all.log`.
+
+Dedicated Tier-3 review artifact:
+`docs/evidence/distribution_all_after_inbox24_vector_acceptance.summary`.

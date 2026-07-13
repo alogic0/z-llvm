@@ -46,7 +46,8 @@ rows clear their admitted vector forms; later rows stop at explicit scalar,
 non-splat, CFG, or excluded-element-type boundaries. No successor is
 authorized. Stop for the plan's periodic review before expanding vector
 operations or choosing another capability. Evidence:
-`docs/evidence/std_debug_hello_vector_f64x2_acceptance.summary`.
+`docs/evidence/std_debug_hello_vector_f64x2_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox24_vector_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
