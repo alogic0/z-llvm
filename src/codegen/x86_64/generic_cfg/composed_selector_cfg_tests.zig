@@ -424,3 +424,39 @@ test "composed selector rejects an unproven unreachable switch default" {
         .selected => return error.TestUnexpectedResult,
     }
 }
+
+test "generic cfg selector preserves same-block FP results across framed phi edges" {
+    const input =
+        \\define float @choose_computed(float %value, i32 %pick) {
+        \\entry:
+        \\  %condition = icmp ne i32 %pick, 0
+        \\  br i1 %condition, label %left, label %right
+        \\left:
+        \\  %left_value = fdiv float -1.000000e+00, %value
+        \\  br label %merge
+        \\right:
+        \\  %right_value = fadd float %value, 2.000000e+00
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi float [ %left_value, %left ], [ %right_value, %right ]
+        \\  ret float %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("choose_computed", .float);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const choose: *const fn (f32, u32) callconv(.c) f32 = @ptrCast(mapping.ptr);
+
+    const zero: f32 = @bitCast(@as(u32, 0));
+    try std.testing.expectEqual(@as(u32, 0xff80_0000), @as(u32, @bitCast(choose(zero, 1))));
+    try std.testing.expectEqual(@as(u32, 0x4000_0000), @as(u32, @bitCast(choose(zero, 0))));
+}
