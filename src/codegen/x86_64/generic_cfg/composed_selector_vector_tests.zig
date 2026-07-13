@@ -17,6 +17,11 @@ test "generic cfg selector encodes bounded packed double operations" {
     try machine.instructions.append(std.testing.allocator, .{ .movsd_xmm = .{ .dst = .xmm6, .src = .xmm7 } });
     try machine.instructions.append(std.testing.allocator, .{ .unpcklpd_xmm = .{ .dst = .xmm1, .src = .xmm2 } });
     try machine.instructions.append(std.testing.allocator, .{ .unpckhpd_xmm = .{ .dst = .xmm3, .src = .xmm4 } });
+    try machine.instructions.append(std.testing.allocator, .{ .addps_xmm = .{ .dst = .xmm2, .src = .xmm3 } });
+    try machine.instructions.append(std.testing.allocator, .{ .mulps_xmm = .{ .dst = .xmm4, .src = .xmm5 } });
+    try machine.instructions.append(std.testing.allocator, .{ .movss_xmm = .{ .dst = .xmm6, .src = .xmm7 } });
+    try machine.instructions.append(std.testing.allocator, .{ .unpcklps_xmm = .{ .dst = .xmm1, .src = .xmm2 } });
+    try machine.instructions.append(std.testing.allocator, .{ .shufps_high_f32_to_low = .xmm3 });
     try machine.instructions.append(std.testing.allocator, .ret);
     const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
@@ -26,7 +31,11 @@ test "generic cfg selector encodes bounded packed double operations" {
         0xf2, 0x0f, 0x10, 0xf7,
         0x66, 0x0f, 0x14, 0xca,
         0x66, 0x0f, 0x15, 0xdc,
-        0xc3,
+        0x0f, 0x58, 0xd3, 0x0f,
+        0x59, 0xe5, 0xf3, 0x0f,
+        0x10, 0xf7, 0x0f, 0x14,
+        0xca, 0x0f, 0xc6, 0xdb,
+        0x55, 0xc3,
     }, bytes);
 
     var spill_machine = x86_64_machine.MachineFunction.init("packed-spill", .void);
@@ -47,6 +56,25 @@ test "generic cfg selector encodes bounded packed double operations" {
         0x1c, 0x24, 0x48, 0x83,
         0xc4, 0x18, 0xc3,
     }, spill_bytes);
+
+    var float_spill_machine = x86_64_machine.MachineFunction.init("packed-float-spill", .void);
+    defer float_spill_machine.deinit(std.testing.allocator);
+    try float_spill_machine.instructions.appendSlice(std.testing.allocator, &.{
+        .sub_rsp_24,
+        .{ .spill_xmm128ps_rsp = .{ .reg = .xmm2, .frame_index = .slot0 } },
+        .{ .reload_xmm128ps_rsp = .{ .reg = .xmm3, .frame_index = .slot0 } },
+        .add_rsp_24,
+        .ret,
+    });
+    const float_spill_bytes = try encoding.encodeFunction(std.testing.allocator, float_spill_machine);
+    defer std.testing.allocator.free(float_spill_bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x83, 0xec, 0x18,
+        0x0f, 0x11, 0x14, 0x24,
+        0x0f, 0x10, 0x1c, 0x24,
+        0x48, 0x83, 0xc4, 0x18,
+        0xc3,
+    }, float_spill_bytes);
 }
 
 test "generic cfg selector lowers the bounded packed double shape" {
@@ -245,6 +273,135 @@ test "generic cfg selector executes packed double construction and pressure spil
     }
 }
 
+test "generic cfg selector executes packed float construction and movups pressure spills bit exactly" {
+    const input =
+        \\define void @vector_f32_canary(ptr %out, float %low, float %high) {
+        \\entry:
+        \\  %seed = insertelement <2 x float> poison, float %low, i64 0
+        \\  %splat = shufflevector <2 x float> %seed, <2 x float> poison, <2 x i32> zeroinitializer
+        \\  %pair = insertelement <2 x float> %seed, float %high, i64 1
+        \\  %copy0 = insertelement <2 x float> %pair, float %high, i64 1
+        \\  %copy1 = insertelement <2 x float> %pair, float %high, i64 1
+        \\  %copy2 = insertelement <2 x float> %pair, float %high, i64 1
+        \\  %copy3 = insertelement <2 x float> %pair, float %high, i64 1
+        \\  %copy4 = insertelement <2 x float> %pair, float %high, i64 1
+        \\  %copy5 = insertelement <2 x float> %pair, float %high, i64 1
+        \\  %copy6 = insertelement <2 x float> %pair, float %high, i64 1
+        \\  %copy7 = insertelement <2 x float> %pair, float %high, i64 1
+        \\  %sum = fadd <2 x float> %pair, <float 0.000000e+00, float 0.000000e+00>
+        \\  %product = fmul <2 x float> %pair, <float 1.000000e+00, float 1.000000e+00>
+        \\  %s0 = extractelement <2 x float> %splat, i64 0
+        \\  %s1 = extractelement <2 x float> %splat, i64 1
+        \\  %p0 = extractelement <2 x float> %pair, i64 0
+        \\  %p1 = extractelement <2 x float> %pair, i64 1
+        \\  %a0 = extractelement <2 x float> %sum, i64 0
+        \\  %a1 = extractelement <2 x float> %sum, i64 1
+        \\  %m0 = extractelement <2 x float> %product, i64 0
+        \\  %m1 = extractelement <2 x float> %product, i64 1
+        \\  %c0 = extractelement <2 x float> %copy0, i64 0
+        \\  %c1 = extractelement <2 x float> %copy1, i64 1
+        \\  %c2 = extractelement <2 x float> %copy2, i64 0
+        \\  %c3 = extractelement <2 x float> %copy3, i64 1
+        \\  %c4 = extractelement <2 x float> %copy4, i64 0
+        \\  %c5 = extractelement <2 x float> %copy5, i64 1
+        \\  %c6 = extractelement <2 x float> %copy6, i64 0
+        \\  %c7 = extractelement <2 x float> %copy7, i64 1
+        \\  %b0 = bitcast float %s0 to i32
+        \\  %b1 = bitcast float %s1 to i32
+        \\  %b2 = bitcast float %p0 to i32
+        \\  %b3 = bitcast float %p1 to i32
+        \\  %b4 = bitcast float %a0 to i32
+        \\  %b5 = bitcast float %a1 to i32
+        \\  %b6 = bitcast float %m0 to i32
+        \\  %b7 = bitcast float %m1 to i32
+        \\  %b8 = bitcast float %c0 to i32
+        \\  %b9 = bitcast float %c1 to i32
+        \\  %b10 = bitcast float %c2 to i32
+        \\  %b11 = bitcast float %c3 to i32
+        \\  %b12 = bitcast float %c4 to i32
+        \\  %b13 = bitcast float %c5 to i32
+        \\  %b14 = bitcast float %c6 to i32
+        \\  %b15 = bitcast float %c7 to i32
+        \\  store i32 %b0, ptr %out, align 4
+        \\  %o1 = getelementptr i8, ptr %out, i64 4
+        \\  store i32 %b1, ptr %o1, align 4
+        \\  %o2 = getelementptr i8, ptr %out, i64 8
+        \\  store i32 %b2, ptr %o2, align 4
+        \\  %o3 = getelementptr i8, ptr %out, i64 12
+        \\  store i32 %b3, ptr %o3, align 4
+        \\  %o4 = getelementptr i8, ptr %out, i64 16
+        \\  store i32 %b4, ptr %o4, align 4
+        \\  %o5 = getelementptr i8, ptr %out, i64 20
+        \\  store i32 %b5, ptr %o5, align 4
+        \\  %o6 = getelementptr i8, ptr %out, i64 24
+        \\  store i32 %b6, ptr %o6, align 4
+        \\  %o7 = getelementptr i8, ptr %out, i64 28
+        \\  store i32 %b7, ptr %o7, align 4
+        \\  %o8 = getelementptr i8, ptr %out, i64 32
+        \\  store i32 %b8, ptr %o8, align 4
+        \\  %o9 = getelementptr i8, ptr %out, i64 36
+        \\  store i32 %b9, ptr %o9, align 4
+        \\  %o10 = getelementptr i8, ptr %out, i64 40
+        \\  store i32 %b10, ptr %o10, align 4
+        \\  %o11 = getelementptr i8, ptr %out, i64 44
+        \\  store i32 %b11, ptr %o11, align 4
+        \\  %o12 = getelementptr i8, ptr %out, i64 48
+        \\  store i32 %b12, ptr %o12, align 4
+        \\  %o13 = getelementptr i8, ptr %out, i64 52
+        \\  store i32 %b13, ptr %o13, align 4
+        \\  %o14 = getelementptr i8, ptr %out, i64 56
+        \\  store i32 %b14, ptr %o14, align 4
+        \\  %o15 = getelementptr i8, ptr %out, i64 60
+        \\  store i32 %b15, ptr %o15, align 4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("vector_f32_canary", .void);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+
+    var saw_spill = false;
+    var saw_reload = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_xmm128ps_rsp => saw_spill = true,
+        .reload_xmm128ps_rsp => saw_reload = true,
+        else => {},
+    };
+    try std.testing.expect(saw_spill);
+    try std.testing.expect(saw_reload);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const canary: *const fn (*[16]u32, f32, f32) callconv(.c) void = @ptrCast(mapping.ptr);
+
+    inline for (.{
+        .{ @as(u32, 0x0000_0000), @as(u32, 0x8000_0000) },
+        .{ @as(u32, 0x3fc0_0000), @as(u32, 0xc010_0000) },
+        .{ @as(u32, 0x0000_0001), @as(u32, 0x8000_0001) },
+        .{ @as(u32, 0x7f80_0000), @as(u32, 0xff80_0000) },
+        .{ @as(u32, 0x7fc1_2345), @as(u32, 0xffc5_4321) },
+    }) |case| {
+        const low: f32 = @bitCast(case[0]);
+        const high: f32 = @bitCast(case[1]);
+        var output: [16]u32 = undefined;
+        canary(&output, low, high);
+        const expected = [16]u32{
+            case[0],             case[0],              case[0],             case[1],
+            @bitCast(low + 0.0), @bitCast(high + 0.0), @bitCast(low * 1.0), @bitCast(high * 1.0),
+            case[0],             case[1],              case[0],             case[1],
+            case[0],             case[1],              case[0],             case[1],
+        };
+        try std.testing.expectEqualSlices(u32, &expected, &output);
+    }
+}
+
 test "generic cfg selector fails closed outside the bounded vector slice" {
     const Case = struct { ir_text: []const u8, tag: std.meta.Tag(inspection.Diagnostic), detail: []const u8 };
     const cases = [_]Case{
@@ -282,6 +439,24 @@ test "generic cfg selector fails closed outside the bounded vector slice" {
         \\  ret double %e
         \\}
         , .tag = .unsupported_instruction, .detail = "shufflevector-mask" },
+        .{ .ir_text =
+        \\define float @bad(float %x) {
+        \\entry:
+        \\  %v = insertelement <2 x float> poison, float %x, i64 0
+        \\  %r = shufflevector <2 x float> %v, <2 x float> poison, <2 x i32> <i32 1, i32 poison>
+        \\  %e = extractelement <2 x float> %r, i64 0
+        \\  ret float %e
+        \\}
+        , .tag = .unsupported_instruction, .detail = "shufflevector-mask" },
+        .{ .ir_text =
+        \\define float @bad(float %x) {
+        \\entry:
+        \\  %v = insertelement <2 x float> poison, float %x, i64 0
+        \\  %r = fsub <2 x float> %v, %v
+        \\  %e = extractelement <2 x float> %r, i64 0
+        \\  ret float %e
+        \\}
+        , .tag = .unsupported_instruction, .detail = "fsub" },
         .{ .ir_text =
         \\define i1 @bad(double %x) {
         \\entry:

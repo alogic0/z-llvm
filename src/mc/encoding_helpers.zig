@@ -346,12 +346,13 @@ pub fn encodeStackDisp32U16ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.A
 pub fn encodeXmmFrameSlot(
     bytes: *std.ArrayList(u8),
     allocator: std.mem.Allocator,
-    prefix: u8,
+    prefix: ?u8,
     opcode: u8,
     reg: x86_64.XmmReg,
     frame_index: x86_64.FrameIndex,
 ) !void {
-    try bytes.appendSlice(allocator, &.{ prefix, 0x0f, opcode });
+    if (prefix) |byte| try bytes.append(allocator, byte);
+    try bytes.appendSlice(allocator, &.{ 0x0f, opcode });
     try encodeRspFrameOperand(bytes, allocator, @as(u8, reg.lowCode()), frame_index);
 }
 
@@ -731,8 +732,9 @@ pub fn encodeMovapdXmm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, 
     try bytes.append(allocator, 0xc0 | (@as(u8, dst.lowCode()) << 3) | @as(u8, src.lowCode()));
 }
 
-pub fn encodeScalarXmmOp(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, prefix: u8, opcode: u8, dst: x86_64.XmmReg, src: x86_64.XmmReg) !void {
-    try bytes.appendSlice(allocator, &.{ prefix, 0x0f, opcode });
+pub fn encodeScalarXmmOp(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, prefix: ?u8, opcode: u8, dst: x86_64.XmmReg, src: x86_64.XmmReg) !void {
+    if (prefix) |byte| try bytes.append(allocator, byte);
+    try bytes.appendSlice(allocator, &.{ 0x0f, opcode });
     try bytes.append(allocator, 0xc0 | (@as(u8, dst.lowCode()) << 3) | @as(u8, src.lowCode()));
 }
 

@@ -37,17 +37,18 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-25 adds typed scalar float/double frame objects, exact local FP
-loads/stores, and the `fastcc i32(float, ptr-local-double)` out-parameter call
-path. `tanf` and `sinf` now stop at scalar FP select, `cosf` at an FP phi edge,
-and `sincosf` at the deliberately excluded external FP store. Report-all is
-443 selected / 193 emitting / 250 failing; the one new emission is collateral
-`compiler_rt.int.__udivdi3` and has no semantic claim. Tier 2 is green and no
-directed trig row closes, so Tier 3 was not triggered. The pre-authorized next
-cycle is the `<2 x float>` successor, beginning with structured vector
-constants and one shared typed splat-mask predicate before mirroring the
-bounded double slice. Evidence:
-`docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary`.
+INBOX-25 and its one pre-authorized successor are complete. Commit `c7e01c3a`
+adds typed scalar FP frame memory and the rem_pio2f out-parameter call path.
+The successor centralizes typed fixed-vector constants and splat recognition,
+generalizes the packed-XMM allocation class, and mirrors the bounded f64x2
+slice for f32x2 with `movups` pair spills. The six half/float log rows now stop
+at their excluded lane-shift shuffle; `__unordsf2` stops at the excluded vector
+`fabs` call. Report-all remains 443 selected / 193 emitting / 250 failing, so
+there is no row-closure or ratchet claim. Tier 2 and the policy-triggered Tier
+3 are green. No third cycle is authorized; stop for review. Evidence:
+`docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary`,
+`docs/evidence/std_debug_hello_vector_f32x2_acceptance.summary`, and
+`docs/evidence/distribution_all_after_f32x2.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

@@ -82,7 +82,7 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
 }
 
 fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
-    if (isF64x2(binary.ty)) return switch (binary.op) {
+    if (isPackedFp2(binary.ty)) return switch (binary.op) {
         .fadd, .fmul => null,
         else => .{ .unsupported_instruction = @tagName(binary.op) },
     };
@@ -96,28 +96,24 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
 }
 
 fn inspectExtractElement(extract: ir.ExtractElementInst) ?Diagnostic {
-    if (!isF64x2(extract.vector_ty)) return .{ .unsupported_type = "extractelement" };
+    if (!isPackedFp2(extract.vector_ty)) return .{ .unsupported_type = "extractelement" };
     if (!extract.index_ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "extractelement-index" };
     return inspectLaneIndex(extract.index, "extractelement");
 }
 
 fn inspectInsertElement(insert: ir.InsertElementInst) ?Diagnostic {
-    if (!isF64x2(insert.vector_ty) or insert.value_ty != .double) return .{ .unsupported_type = "insertelement" };
+    if (!isPackedFp2(insert.vector_ty) or !insert.value_ty.eql(insert.vector_ty.vector.elem_ty.toType())) return .{ .unsupported_type = "insertelement" };
     if (!insert.index_ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "insertelement-index" };
     return inspectLaneIndex(insert.index, "insertelement");
 }
 
 fn inspectShuffleVector(shuffle: ir.ShuffleVectorInst) ?Diagnostic {
-    if (!isF64x2(shuffle.lhs_ty) or !shuffle.rhs_ty.eql(shuffle.lhs_ty) or
+    if (!isPackedFp2(shuffle.lhs_ty) or !shuffle.rhs_ty.eql(shuffle.lhs_ty) or
         !shuffle.mask_ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 32 } } }))
     {
         return .{ .unsupported_type = "shufflevector" };
     }
-    return switch (shuffle.mask) {
-        .zero_initializer => null,
-        .vector => |text| if (isSplatZeroMask(text)) null else .{ .unsupported_instruction = "shufflevector-mask" },
-        else => .{ .unsupported_instruction = "shufflevector-mask" },
-    };
+    return if (ir.vector_constant.isSplatMask(2, shuffle, 0)) null else .{ .unsupported_instruction = "shufflevector-mask" };
 }
 
 fn inspectLaneIndex(index: ir.Value, comptime operation: []const u8) ?Diagnostic {
@@ -128,14 +124,9 @@ fn inspectLaneIndex(index: ir.Value, comptime operation: []const u8) ?Diagnostic
     };
 }
 
-fn isSplatZeroMask(text: []const u8) bool {
-    const trimmed = std.mem.trim(u8, text, " \t");
-    return std.mem.eql(u8, trimmed, "<i32 0, i32 0>") or
-        std.mem.eql(u8, trimmed, "splat (i32 0)");
-}
-
-fn isF64x2(ty: ir.Type) bool {
-    return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .double;
+fn isPackedFp2(ty: ir.Type) bool {
+    return ty == .vector and ty.vector.len == 2 and
+        (ty.vector.elem_ty == .float or ty.vector.elem_ty == .double);
 }
 
 fn inspectCast(cast: ir.CastInst) ?Diagnostic {

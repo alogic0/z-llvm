@@ -197,11 +197,11 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
                 .gpr32 => @as(u16, 32),
                 .gpr64 => @as(u16, 64),
                 .gpr128 => @as(u16, 128),
-                .fp16, .fp32, .fp64, .vector_f64x2, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
+                .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
             };
             const planned_spill = if (bits != 128 and selector.allocation_plan != null) switch (selector.allocation_plan.?.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" }) {
                 .spill => |index| selector_state.spillFrameIndexMaybe(index) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
-                .gpr32, .gpr64, .gpr128, .fp16, .fp32, .fp64, .vector_f64x2, .stack_object, .stack_pointer => null,
+                .gpr32, .gpr64, .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer => null,
             } else null;
             const destination: ValueLoc = if (bits == 128)
                 .{ .spill128 = selector_state.allocatePairSpillSlots(selector, result_name) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" } }

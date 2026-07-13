@@ -347,7 +347,7 @@ pub const PlannedValueAssignment = union(enum) {
     fp16: XmmReg,
     fp32: XmmReg,
     fp64: XmmReg,
-    vector_f64x2: XmmReg,
+    vector_xmm: XmmReg,
     stack_object,
     stack_pointer: ArgReg,
     spill: usize,
@@ -472,8 +472,8 @@ pub fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {
         .half => .{ .class = .fp16, .bits = 16 },
         .float => .{ .class = .fp32, .bits = 32 },
         .double => .{ .class = .fp64, .bits = 64 },
-        .vector => |vector| if (vector.len == 2 and vector.elem_ty == .double)
-            .{ .class = .vector_f64x2, .bits = 128 }
+        .vector => |vector| if (vector.len == 2 and (vector.elem_ty == .float or vector.elem_ty == .double))
+            .{ .class = .vector_xmm, .bits = 128 }
         else
             null,
         else => selectorIntegerMetadata(ty),
@@ -621,7 +621,7 @@ fn allocateSelectorInterval(occupied: *SelectorRegisterOccupancy, interval: Sele
         .fp16 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp16 = reg } else .{ .spill = next_spill_slot },
         .fp32 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp32 = reg } else .{ .spill = next_spill_slot },
         .fp64 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp64 = reg } else .{ .spill = next_spill_slot },
-        .vector_f64x2 => if (allocateSelectorXmm(occupied)) |reg| .{ .vector_f64x2 = reg } else .{ .spill = next_spill_slot },
+        .vector_xmm => if (allocateSelectorXmm(occupied)) |reg| .{ .vector_xmm = reg } else .{ .spill = next_spill_slot },
         .stack_object => .stack_object,
         .stack_pointer => if (allocateSelectorReg(occupied)) |reg| .{ .stack_pointer = reg } else .{ .spill = next_spill_slot },
     };
@@ -669,14 +669,14 @@ fn releaseSelectorAssignment(occupied: *SelectorRegisterOccupancy, assignment: P
             occupied.gpr[argRegIndex(pair.lo)] = false;
             occupied.gpr[argRegIndex(pair.hi)] = false;
         },
-        .fp16, .fp32, .fp64, .vector_f64x2 => |reg| occupied.xmm[xmmRegIndex(reg)] = false,
+        .fp16, .fp32, .fp64, .vector_xmm => |reg| occupied.xmm[xmmRegIndex(reg)] = false,
         .stack_object, .spill => {},
     }
 }
 
 fn assignmentUsesRegisters(assignment: PlannedValueAssignment) bool {
     return switch (assignment) {
-        .gpr32, .gpr64, .gpr128, .fp16, .fp32, .fp64, .vector_f64x2, .stack_pointer => true,
+        .gpr32, .gpr64, .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .stack_pointer => true,
         .stack_object, .spill => false,
     };
 }

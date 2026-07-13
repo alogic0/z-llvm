@@ -3429,6 +3429,20 @@ One line per completed cycle, append-only, newest last. This is the
   not triggered. Evidence
   `docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-25 pre-authorized successor) Item 12 packed
+  float vector capability: one shared typed fixed-vector constant parser and
+  splat predicate replace selector-local lane and mask text parsing. The
+  packed-XMM allocation class now carries both f64x2 and f32x2 typed shapes;
+  f32x2 mirrors the bounded insertion/splat/add/multiply/extraction slice and
+  uses pair-slot `movups` spills. A dual-construction pressure canary passes
+  80/80 exact output words across zeros, finite values, subnormals, infinities,
+  and NaN payloads. Six log rows advance to lane-shift shuffle and
+  `__unordsf2` to vector `fabs`; report-all remains 193 emitting / 250 failing.
+  Tier 2 and the policy-triggered Tier 3 are green. No third cycle is
+  authorized; stop for review. Evidence
+  `docs/evidence/std_debug_hello_vector_f32x2_acceptance.summary` and
+  `docs/evidence/distribution_all_after_f32x2.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

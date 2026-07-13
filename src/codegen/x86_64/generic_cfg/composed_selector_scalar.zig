@@ -503,7 +503,7 @@ pub fn plannedScratch64RegForResult(selector: *const ComposedBlockSelector, name
     const assignment = plan.assignment(name) orelse return null;
     const reg = switch (assignment) {
         .gpr64 => |reg| reg,
-        .gpr32, .gpr128, .fp16, .fp32, .fp64, .vector_f64x2, .stack_object, .stack_pointer, .spill => return null,
+        .gpr32, .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer, .spill => return null,
     };
     return if (scratch64RegIsAvailableForUse(selector, reg)) reg else null;
 }

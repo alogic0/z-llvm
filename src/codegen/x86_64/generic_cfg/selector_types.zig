@@ -27,7 +27,7 @@ pub const ValueLoc = union(enum) {
     scratch32: ArgReg,
     scratch64: ArgReg,
     scratch128: RegPair,
-    xmm: FpRegLoc,
+    xmm: XmmValueLoc,
     stack_scalar: StackScalarLoc,
     stack128: u32,
     stack128_value: u32,
@@ -46,7 +46,7 @@ pub const VirtualRegClass = enum {
     fp16,
     fp32,
     fp64,
-    vector_f64x2,
+    vector_xmm,
     stack_object,
     stack_pointer,
 };
@@ -72,19 +72,19 @@ pub const PairSpillLoc = struct {
     hi: FrameIndex,
 };
 
-pub const FpRegLoc = struct {
+pub const XmmValueLoc = struct {
     reg: XmmReg,
     bits: u16,
     shape: XmmValueShape = .scalar,
 
-    pub fn vectorShape(loc: FpRegLoc) ?VectorShape {
+    pub fn vectorShape(loc: XmmValueLoc) ?VectorShape {
         return switch (loc.shape) {
             .scalar => null,
             .vector => |shape| shape,
         };
     }
 
-    pub fn shapeEql(loc: FpRegLoc, other: FpRegLoc) bool {
+    pub fn shapeEql(loc: XmmValueLoc, other: XmmValueLoc) bool {
         if (loc.bits != other.bits or std.meta.activeTag(loc.shape) != std.meta.activeTag(other.shape)) return false;
         return switch (loc.shape) {
             .scalar => true,
@@ -105,8 +105,18 @@ pub const VectorShape = struct {
     defined_lanes: u2,
 
     pub const LaneType = enum {
+        float,
         double,
     };
+
+    pub fn f32x2(defined_lanes: u2) VectorShape {
+        return .{
+            .lane_type = .float,
+            .lane_count = 2,
+            .lane_bits = 32,
+            .defined_lanes = defined_lanes,
+        };
+    }
 
     pub fn f64x2(defined_lanes: u2) VectorShape {
         return .{

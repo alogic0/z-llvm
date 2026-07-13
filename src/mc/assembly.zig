@@ -1303,7 +1303,10 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .movapd_xmm => |mov| try writer.print("\tmovapd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
             .addpd_xmm => |op| try writer.print("\taddpd {s}, {s}\n", .{ op.src.name(), op.dst.name() }),
             .mulpd_xmm => |op| try writer.print("\tmulpd {s}, {s}\n", .{ op.src.name(), op.dst.name() }),
+            .addps_xmm => |op| try writer.print("\taddps {s}, {s}\n", .{ op.src.name(), op.dst.name() }),
+            .mulps_xmm => |op| try writer.print("\tmulps {s}, {s}\n", .{ op.src.name(), op.dst.name() }),
             .movsd_xmm => |mov| try writer.print("\tmovsd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
+            .movss_xmm => |mov| try writer.print("\tmovss {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
             .unpcklpd_xmm => |mov| try writer.print("\tunpcklpd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
             .unpckhpd_xmm => |mov| try writer.print("\tunpckhpd {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
             .unpcklps_xmm => |mov| try writer.print("\tunpcklps {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
@@ -1397,6 +1400,16 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             },
             .reload_xmm128_rsp => |reload| {
                 try writer.writeAll("\tmovupd ");
+                try printFrameAddress(writer, reload.frame_index);
+                try writer.print(", {s}\n", .{reload.reg.name()});
+            },
+            .spill_xmm128ps_rsp => |spill| {
+                try writer.print("\tmovups {s}, ", .{spill.reg.name()});
+                try printFrameAddress(writer, spill.frame_index);
+                try writer.writeByte('\n');
+            },
+            .reload_xmm128ps_rsp => |reload| {
+                try writer.writeAll("\tmovups ");
                 try printFrameAddress(writer, reload.frame_index);
                 try writer.print(", {s}\n", .{reload.reg.name()});
             },

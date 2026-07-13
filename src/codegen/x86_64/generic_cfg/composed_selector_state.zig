@@ -177,7 +177,7 @@ pub fn bindFixedProductResult(selector: *ComposedBlockSelector, name: []const u8
             try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = spill.hi, .reg = .rdx } });
             try bindValueLoc(selector, name, .{ .spill128 = spill });
         },
-        .gpr32, .gpr64, .fp16, .fp32, .fp64, .vector_f64x2, .stack_object, .stack_pointer => return error.UnsupportedCodegenValue,
+        .gpr32, .gpr64, .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer => return error.UnsupportedCodegenValue,
     }
 }
 
@@ -212,7 +212,7 @@ pub fn plannedResultLoc(selector: *const ComposedBlockSelector, name: []const u8
             .spill_fp => |fp| if (fp.bits == 64) .{ .xmm = .{ .reg = reg, .bits = 64 } } else null,
             else => null,
         },
-        .vector_f64x2 => |reg| switch (actual) {
+        .vector_xmm => |reg| switch (actual) {
             .xmm => |fp| if (fp.vectorShape()) |shape| .{ .xmm = .{ .reg = reg, .bits = 128, .shape = .{ .vector = shape } } } else null,
             .spill_vector => |vector| .{ .xmm = .{ .reg = reg, .bits = 128, .shape = .{ .vector = vector.shape } } },
             else => null,
@@ -346,7 +346,10 @@ pub fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc,
                 const dst_shape = dst.vectorShape() orelse return error.UnsupportedCodegenValue;
                 if (!src.shape.eql(dst_shape) or !frameIndexFitsFrame(selector, src.frames.lo) or !frameIndexFitsFrame(selector, src.frames.hi)) return error.UnsupportedCodegenValue;
                 try clobberXmmReg(selector, dst.reg);
-                try selector.machine.instructions.append(selector.allocator, .{ .reload_xmm128_rsp = .{ .frame_index = src.frames.lo, .reg = dst.reg } });
+                try selector.machine.instructions.append(selector.allocator, switch (src.shape.lane_type) {
+                    .float => .{ .reload_xmm128ps_rsp = .{ .frame_index = src.frames.lo, .reg = dst.reg } },
+                    .double => .{ .reload_xmm128_rsp = .{ .frame_index = src.frames.lo, .reg = dst.reg } },
+                });
             },
             else => return error.UnsupportedCodegenValue,
         },
@@ -373,7 +376,10 @@ pub fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc,
             .xmm => |src| {
                 const src_shape = src.vectorShape() orelse return error.UnsupportedCodegenValue;
                 if (!src_shape.eql(dst.shape) or !frameIndexFitsFrame(selector, dst.frames.lo) or !frameIndexFitsFrame(selector, dst.frames.hi)) return error.UnsupportedCodegenValue;
-                try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm128_rsp = .{ .frame_index = dst.frames.lo, .reg = src.reg } });
+                try selector.machine.instructions.append(selector.allocator, switch (src_shape.lane_type) {
+                    .float => .{ .spill_xmm128ps_rsp = .{ .frame_index = dst.frames.lo, .reg = src.reg } },
+                    .double => .{ .spill_xmm128_rsp = .{ .frame_index = dst.frames.lo, .reg = src.reg } },
+                });
             },
             .spill_vector => |src| {
                 if (!src.shape.eql(dst.shape)) return error.UnsupportedCodegenValue;
@@ -518,7 +524,7 @@ pub fn virtualRegMetadata(loc: ValueLoc) VirtualRegMetadata {
             16 => .fp16,
             32 => .fp32,
             64 => .fp64,
-            128 => if (fp.vectorShape() != null) .vector_f64x2 else unreachable,
+            128 => if (fp.vectorShape() != null) .vector_xmm else unreachable,
             else => unreachable,
         }, .bits = fp.bits },
         .spill_fp => |fp| .{ .class = switch (fp.bits) {
@@ -527,7 +533,7 @@ pub fn virtualRegMetadata(loc: ValueLoc) VirtualRegMetadata {
             64 => .fp64,
             else => unreachable,
         }, .bits = fp.bits },
-        .spill_vector => .{ .class = .vector_f64x2, .bits = 128 },
+        .spill_vector => .{ .class = .vector_xmm, .bits = 128 },
         .stack_scalar, .stack128, .stack_i32_array => .{ .class = .stack_object, .bits = 0 },
         .stack_i32_ptr => .{ .class = .stack_pointer, .bits = 64 },
     };
@@ -616,7 +622,10 @@ pub fn spillValue(selector: *ComposedBlockSelector, name: []const u8) !?Diagnost
     if (loc == .xmm and loc.xmm.vectorShape() != null) {
         const shape = loc.xmm.vectorShape().?;
         const frames = allocatePairSpillSlots(selector, name) orelse return .{ .no_spill_envelope = "composed-block-vector-spill-slots" };
-        try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm128_rsp = .{ .frame_index = frames.lo, .reg = loc.xmm.reg } });
+        try selector.machine.instructions.append(selector.allocator, switch (shape.lane_type) {
+            .float => .{ .spill_xmm128ps_rsp = .{ .frame_index = frames.lo, .reg = loc.xmm.reg } },
+            .double => .{ .spill_xmm128_rsp = .{ .frame_index = frames.lo, .reg = loc.xmm.reg } },
+        });
         try bindValueLoc(selector, name, .{ .spill_vector = .{ .frames = frames, .shape = shape } });
         return null;
     }

@@ -348,7 +348,19 @@ pub const Instruction = union(enum) {
         dst: XmmReg,
         src: XmmReg,
     },
+    addps_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    mulps_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
     movsd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    movss_xmm: struct {
         dst: XmmReg,
         src: XmmReg,
     },
@@ -461,6 +473,14 @@ pub const Instruction = union(enum) {
         frame_index: FrameIndex,
     },
     reload_xmm128_rsp: struct {
+        reg: XmmReg,
+        frame_index: FrameIndex,
+    },
+    spill_xmm128ps_rsp: struct {
+        reg: XmmReg,
+        frame_index: FrameIndex,
+    },
+    reload_xmm128ps_rsp: struct {
         reg: XmmReg,
         frame_index: FrameIndex,
     },
