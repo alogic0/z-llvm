@@ -344,11 +344,19 @@ pub const Instruction = union(enum) {
         dst: XmmReg,
         src: XmmReg,
     },
+    subpd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
     mulpd_xmm: struct {
         dst: XmmReg,
         src: XmmReg,
     },
     addps_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    subps_xmm: struct {
         dst: XmmReg,
         src: XmmReg,
     },

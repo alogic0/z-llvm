@@ -3519,6 +3519,18 @@ One line per completed cycle, append-only, newest last. This is the
   Tier 2 is green and no Tier 3 trigger occurs. Evidence
   `docs/evidence/std_debug_hello_vector_lane_shift_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-28 pre-authorized successor) Item 12 packed
+  FP subtraction capability: register-parametric `subps`/`subpd` machine forms
+  and type-driven f32x2/f64x2 lowering preserve operand order and intersect
+  static defined-lane masks. The existing pressure canaries pass 210 exact
+  output words, including 40 forward/reverse subtraction results across
+  signed zeros, finite values, subnormals, infinities, and NaN payloads.
+  `compiler_rt.log.log` advances from packed `fsub` to concrete `sitofp i12`
+  without closing, so report-all remains 443 selected / 202 emitting / 241
+  failing. Tier 2 is green and no Tier 3 trigger occurs. The one-cycle
+  pipeline is exhausted; stop for periodic review. Evidence
+  `docs/evidence/std_debug_hello_packed_fsub_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

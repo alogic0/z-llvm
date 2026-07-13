@@ -26,7 +26,7 @@ const VectorOperand = struct {
 pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-missing-result" };
     if (!isPackedFp2(binary.ty)) return .{ .no_emitter = "composed-vector-binary-type" };
-    if (binary.op != .fadd and binary.op != .fmul) return .{ .no_emitter = "composed-vector-binary-op" };
+    if (binary.op != .fadd and binary.op != .fsub and binary.op != .fmul) return .{ .no_emitter = "composed-vector-binary-op" };
 
     const lhs = describeVectorValue(selector, binary.lhs, binary.ty) orelse return .{ .unsupported_value = "composed-vector-binary-lhs" };
     const rhs = describeVectorValue(selector, binary.rhs, binary.ty) orelse return .{ .unsupported_value = "composed-vector-binary-rhs" };
@@ -41,14 +41,18 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
 
     try selector_state.clobberXmmReg(selector, dst);
     try selector.machine.instructions.append(selector.allocator, switch (lhs.shape.lane_type) {
-        .float => if (binary.op == .fadd)
-            .{ .addps_xmm = .{ .dst = dst, .src = src } }
-        else
-            .{ .mulps_xmm = .{ .dst = dst, .src = src } },
-        .double => if (binary.op == .fadd)
-            .{ .addpd_xmm = .{ .dst = dst, .src = src } }
-        else
-            .{ .mulpd_xmm = .{ .dst = dst, .src = src } },
+        .float => switch (binary.op) {
+            .fadd => .{ .addps_xmm = .{ .dst = dst, .src = src } },
+            .fsub => .{ .subps_xmm = .{ .dst = dst, .src = src } },
+            .fmul => .{ .mulps_xmm = .{ .dst = dst, .src = src } },
+            else => unreachable,
+        },
+        .double => switch (binary.op) {
+            .fadd => .{ .addpd_xmm = .{ .dst = dst, .src = src } },
+            .fsub => .{ .subpd_xmm = .{ .dst = dst, .src = src } },
+            .fmul => .{ .mulpd_xmm = .{ .dst = dst, .src = src } },
+            else => unreachable,
+        },
     });
     var result_shape = lhs.shape;
     result_shape.defined_lanes &= rhs.shape.defined_lanes;

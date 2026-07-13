@@ -37,18 +37,17 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-27 is complete through three standalone commits: Part 1 repairs the
-alloca/spill frame collision (`916694a6`), the fix-forward commit re-proves
-`__moddi3` and `__umoddi3` through the permanent executable canary
-(`3716cbeb`), and Part 2 adds bounded typed integer switch compare chains.
-The explicit masked-range proof closes `sinf`, `cosf`, and `sincosf` through
-bit-exact native acceptance over all four switch residues. Report-all is now
-443 selected / 202 emitting / 241 failing; Tier 2 and the required Tier 3 are
-green. No third capability is authorized. Stop and request the plan's
-periodic review before selecting another goal. Evidence:
-`docs/evidence/zig_integrated_exe_moddi3_umoddi3_closure_reproof.summary`,
-`docs/evidence/std_debug_hello_typed_switch_acceptance.summary`, and
-`docs/evidence/distribution_all_after_inbox27_typed_switch.summary`.
+INBOX-28 is complete through the typed packed lane-shift commit `11483785`
+and its single pre-authorized packed-fsub successor. Exact f32x2/f64x2
+pressure canaries cover `<1, poison>` lane shifts and both subtraction operand
+orders. The seven directed log rows advance through lane shift to concrete
+`sitofp` instructions without closing; packed fsub additionally advances
+`compiler_rt.log.log` to `sitofp i12 ... to double`. Report-all remains 443
+selected / 202 emitting / 241 failing. Both cycles pass Tier 2, neither
+triggers Tier 3, and the one-cycle pipeline is exhausted. Stop and request the
+plan's periodic review before selecting another capability. Evidence:
+`docs/evidence/std_debug_hello_vector_lane_shift_acceptance.summary` and
+`docs/evidence/std_debug_hello_packed_fsub_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

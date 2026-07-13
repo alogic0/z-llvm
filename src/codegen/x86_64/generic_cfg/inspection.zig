@@ -83,7 +83,7 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
 
 fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
     if (isPackedFp2(binary.ty)) return switch (binary.op) {
-        .fadd, .fmul => null,
+        .fadd, .fsub, .fmul => null,
         else => .{ .unsupported_instruction = @tagName(binary.op) },
     };
     if (!isSelectorScalarType(binary.ty)) return .{ .unsupported_type = "binary" };

@@ -136,11 +136,13 @@ test "x86_64 assembly prints parametric scalar FP operations" {
     );
 }
 
-test "x86_64 assembly prints bounded packed double operations and unaligned spills" {
+test "x86_64 assembly prints bounded packed operations and unaligned spills" {
     var machine = codegen.x86_64.MachineFunction.init("packed_double", .void);
     defer machine.deinit(std.testing.allocator);
     try machine.instructions.appendSlice(std.testing.allocator, &.{
         .{ .addpd_xmm = .{ .dst = .xmm2, .src = .xmm3 } },
+        .{ .subpd_xmm = .{ .dst = .xmm6, .src = .xmm7 } },
+        .{ .subps_xmm = .{ .dst = .xmm3, .src = .xmm2 } },
         .{ .mulpd_xmm = .{ .dst = .xmm4, .src = .xmm5 } },
         .{ .movsd_xmm = .{ .dst = .xmm6, .src = .xmm7 } },
         .{ .unpcklpd_xmm = .{ .dst = .xmm1, .src = .xmm2 } },
@@ -158,6 +160,8 @@ test "x86_64 assembly prints bounded packed double operations and unaligned spil
             "\t.globl packed_double\n" ++
             "packed_double:\n" ++
             "\taddpd %xmm3, %xmm2\n" ++
+            "\tsubpd %xmm7, %xmm6\n" ++
+            "\tsubps %xmm2, %xmm3\n" ++
             "\tmulpd %xmm5, %xmm4\n" ++
             "\tmovsd %xmm7, %xmm6\n" ++
             "\tunpcklpd %xmm2, %xmm1\n" ++
