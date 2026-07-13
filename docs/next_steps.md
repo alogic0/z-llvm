@@ -37,27 +37,20 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-Both INBOX-32 pipeline cycles are complete. Exact named `or i1 %a, %b` closes
-`compiler_rt.log.log`, `compiler_rt.exp2.exp2f`, and
-`compiler_rt.exp2.__exp2h`; exact plain `icmp sgt i64` with an immediate RHS
-closes `compiler_rt.exp2.exp2`. Permanent executable coverage proves the i1
-truth table through branch/select consumers and signed i64 threshold
-boundaries. Native bit-exact acceptance executes 46 calls across the first
-three rows and 20 calls across `exp2`.
+INBOX-33's false-rejection repair is complete. `lowerMul64` now consumes an
+i64 RHS already resident in RAX through the existing non-destructive machine
+form. Executable regression coverage proves the formerly rejected state and
+keeps an EAX width mismatch fail-closed. Bit-exact native acceptance closes
+`compiler_rt.sqrt.sqrtf` across 18 cases; double `sqrt` advances to its first
+i128 multiply and remains fail-closed at `composed-block-pair-binary-op`.
 
-Report-all is now 443 selected / 226 emitting / 217 failing. Eight collateral
-emissions across the two cycles carry no semantic claims. The captured
-`math.ldexp.ldexp__anon_5959` body remains unsupported; `exp2` native
-acceptance resolves it through a separately compiled pinned-Zig helper object.
-Tier 2 and one row-closure Tier 3 per cycle are green.
-
-Stop for review. No third cycle is authorized. The i64-multiply
-RAX-resident-RHS repair is the noted candidate for the next directive, but it
-must not start without authorization. Evidence:
-`docs/evidence/std_debug_hello_named_i1_or_acceptance.summary`,
-`docs/evidence/distribution_all_after_inbox32_named_i1_or.summary`,
-`docs/evidence/std_debug_hello_sgt_i64_immediate_acceptance.summary`, and
-`docs/evidence/distribution_all_after_inbox32_sgt_i64_immediate.summary`.
+Report-all is now 443 selected / 227 emitting / 216 failing, with no collateral
+emissions. Tier 2 and the row-closure Tier 3 are green. Continue with the one
+pre-authorized successor only after recording the strongest bounded typed
+choice from the refreshed frontier. Vector masks, aggregate ABI, x87/fp128,
+and new subsystem ownership remain excluded; no third cycle is authorized.
+Evidence: `docs/evidence/std_debug_hello_mul64_rax_rhs_repair.summary` and
+`docs/evidence/distribution_all_after_inbox33_mul64_rax_rhs.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

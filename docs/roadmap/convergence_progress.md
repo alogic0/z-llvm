@@ -3628,6 +3628,18 @@ One line per completed cycle, append-only, newest last. This is the
   and
   `docs/evidence/distribution_all_after_inbox32_sgt_i64_immediate.summary`.
 
+- 2026-07-13 (this commit, INBOX-33) Item 12 false-rejection repair:
+  `lowerMul64` now consumes an i64 RHS already resident in RAX through the
+  existing non-destructive `imul_arg64_rax` form. Two executable products and
+  an EAX width near miss cover the exact location boundary. Eighteen
+  precomputed-bit native calls close `compiler_rt.sqrt.sqrtf`; double `sqrt`
+  advances to the explicitly excluded first i128 multiply. Report-all advances
+  to 443 selected / 227 emitting / 216 failing with no collateral emissions.
+  Tier 2 and the row-closure Tier 3 are green. Continue with one
+  evidence-ranked bounded typed successor; no third cycle is authorized.
+  Evidence `docs/evidence/std_debug_hello_mul64_rax_rhs_repair.summary` and
+  `docs/evidence/distribution_all_after_inbox33_mul64_rax_rhs.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

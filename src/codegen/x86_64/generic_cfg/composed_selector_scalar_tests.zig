@@ -101,6 +101,57 @@ test "generic cfg selector reloads spilled mul64 rhs through rax when scratch re
     try std.testing.expectEqual(x86_64_machine.Instruction{ .imul_arg64_rax = .rdx }, machine.instructions.items[1]);
 }
 
+test "generic cfg selector multiplies by an rax-resident i64 rhs" {
+    var machine = MachineFunction.init("mul64-rax-rhs", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rsi });
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .rax);
+
+    const diagnostic = try selector_scalar.lowerMul64(&selector, "product", .{
+        .op = .mul,
+        .ty = .{ .int = 64 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    });
+
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector_state.valueLoc(&selector, "product").?);
+    try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "rhs").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_rax = .rsi },
+        .{ .imul_arg64_rax = .rdi },
+    }, machine.instructions.items);
+
+    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+    try machine.instructions.append(std.testing.allocator, .ret);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u64, 42), function(6, 7));
+    try std.testing.expectEqual(@as(u64, 0xffff_ffff_ffff_fffe), function(2, 0x7fff_ffff_ffff_ffff));
+
+    var near_miss_machine = MachineFunction.init("mul64-eax-rhs", .{ .int = 64 });
+    defer near_miss_machine.deinit(std.testing.allocator);
+    var near_miss_selector = ComposedBlockSelector.init(std.testing.allocator, &near_miss_machine);
+    defer near_miss_selector.deinit();
+    try selector_state.bindValueLoc(&near_miss_selector, "lhs", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&near_miss_selector, "rhs", .eax);
+    const near_miss = (try selector_scalar.lowerMul64(&near_miss_selector, "product", .{
+        .op = .mul,
+        .ty = .{ .int = 64 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })).?;
+    try std.testing.expectEqualStrings("composed-block-mul64-rhs", near_miss.detail());
+}
+
 test "generic cfg selector spills live mul64 lhs before reusing its scratch register" {
     var machine = MachineFunction.init("mul64-spill-live-lhs", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

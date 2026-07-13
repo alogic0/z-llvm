@@ -469,6 +469,7 @@ pub fn lowerMul64(selector: *ComposedBlockSelector, result_name: []const u8, bin
     const rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
     switch (rhs) {
         .scratch64, .arg64 => |src| try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } }),
+        .rax => try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_rax = dst }),
         .spill64 => |frame_index| {
             if (scratch64RegForUseAvoiding(selector, dst)) |src| {
                 selector_state.emitValueIntoScratch(selector, binary.rhs, src, 64) catch return .{ .unsupported_value = "composed-block-mul64-rhs" };
@@ -479,7 +480,7 @@ pub fn lowerMul64(selector: *ComposedBlockSelector, result_name: []const u8, bin
                 try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_rax = dst });
             }
         },
-        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-mul64-rhs" },
+        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-mul64-rhs" },
     }
     try selector_state.bindScratch(selector, result_name, dst, 64);
     return null;
