@@ -24,7 +24,7 @@ fn fpBits(ty: ir.Type) ?u16 {
     return if (ty == .float) 32 else if (ty == .double) 64 else null;
 }
 
-fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst: @import("../types.zig").XmmReg, bits: u16) !?Diagnostic {
+pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst: @import("../types.zig").XmmReg, bits: u16) !?Diagnostic {
     switch (value) {
         .named => {
             const source = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = "composed-block-fp-source" };

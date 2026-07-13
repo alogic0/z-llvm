@@ -37,19 +37,22 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None. INBOX-19 closes `compiler_rt.trunc.trunc` through width-driven
-double/i64 bitcasts, scalar `addsd`, float/double side-effect barriers, variable
-i64 shift, and immediate i64 XOR lowering. Exact native execution passes 24
-raw-double cases and drove a general live-accumulator preservation repair for
-predicate production. Debug compiler_rt report-all is now 443 selected / 173
-emitting / 270 failing; typed-form generalization also makes
-`compiler_rt.extendhfdf2.__extendhfdf2` and
-`compiler_rt.extendsfdf2.__extendsfdf2` emit. The first failure remains tail-call
-ABI row `compiler_rt.trunc.truncl`; `truncq` and `__truncx` remain wider-format
-boundaries. Excluding those directed boundaries, the next non-tail soft-float
-frontier is `compiler_rt.tan.tanh` at `no_emitter` /
-`composed-block-call-form`. Stop after this reviewed canary boundary. Evidence:
-`docs/evidence/std_debug_hello_trunc_acceptance.summary`.
+None. INBOX-20 closes scalar SSE direct-call ABI for register-passed half,
+float, and double values through the authoritative x86_64 SysV planner. The
+real `compiler_rt.tan.tanh` emits with an exact relocation to
+`compiler_rt.tan.tanf`; a static native executable resolves that dotted symbol
+to a controlled local stub and passes four bit-exact half caller-ABI cases.
+This does not implement or claim tangent semantics. Debug compiler_rt
+report-all is now 443 selected / 189 emitting / 254 failing. The exact next
+soft-float frontier is the internal `compiler_rt.tan.tanf` body at
+`UnsupportedCodegenControlFlow / unsupported_instruction / fpext`, which was
+not entered. The corrected call-marker inventory contains 42 advisory `tail`
+rows, zero tracked `notail` rows, and zero genuine `musttail` rows; ten now emit
+as ordinary calls and 32 expose their real non-tail frontier. `musttail` remains
+fail-closed, and no tail jump or tail-call ABI was added. Stop for review after
+the INBOX-20 commit. Evidence:
+`docs/evidence/std_debug_hello_tanh_call_abi_acceptance.summary` and
+`docs/evidence/std_debug_hello_tail_marker_inventory_inbox20.tsv`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

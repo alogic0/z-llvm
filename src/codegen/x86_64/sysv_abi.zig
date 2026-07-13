@@ -333,6 +333,14 @@ pub fn callHasByvalArgAttrs(call: ir.CallInst) bool {
 }
 
 pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.CallInst) !CallPlan {
+    return planCallWithFunction(allocator, function, call);
+}
+
+pub fn planScalarCall(allocator: std.mem.Allocator, call: ir.CallInst) !CallPlan {
+    return planCallWithFunction(allocator, null, call);
+}
+
+fn planCallWithFunction(allocator: std.mem.Allocator, function: ?ir.Function, call: ir.CallInst) !CallPlan {
     try rejectUnsupportedCallEnvelope(call);
     try rejectUnsupportedCallSignature(call);
     try rejectUnsupportedAbiType(call.ret_ty);
@@ -410,9 +418,10 @@ pub fn planCall(allocator: std.mem.Allocator, function: ir.Function, call: ir.Ca
             continue;
         }
         if (isAggregateType(arg.ty)) {
+            const caller = function orelse return error.UnsupportedCodegenType;
             plan.has_non_i32_arg = true;
             const classification = try classifyAggregate(arg.ty);
-            const pass = try planAggregatePassThrough(function, arg, classification, &int_arg_index, &fp_arg_index);
+            const pass = try planAggregatePassThrough(caller, arg, classification, &int_arg_index, &fp_arg_index);
             switch (pass.dest) {
                 .registers => {
                     plan.counts.register_aggregate_args += 1;
@@ -452,8 +461,21 @@ pub fn isScalarSseAbiType(ty: ir.Type) bool {
     return ty == .half or ty == .float or ty == .double;
 }
 
+pub fn callHasScalarSseType(call: ir.CallInst) bool {
+    if (isScalarSseAbiType(call.ret_ty)) return true;
+    for (call.args.items) |arg| {
+        if (isScalarSseAbiType(arg.ty)) return true;
+    }
+    return false;
+}
+
 pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {
-    if (call.tail_kind != null) return error.UnsupportedTailCallAbi;
+    if (call.tail_kind) |tail_kind| {
+        if (std.mem.eql(u8, tail_kind, "musttail")) return error.UnsupportedTailCallAbi;
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) {
+            return error.UnsupportedTailCallAbi;
+        }
+    }
     if (call.inline_asm != null) return error.UnsupportedCallAttributeAbi;
     if (call.ret_attrs) |attrs| {
         try rejectUnsupportedAbiAttrPayload(attrs);
@@ -467,9 +489,18 @@ pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {
         if (attrsContainAbiPayload(attrs, "sret") or attrsContainAbiPayload(attrs, "byval")) {
             return error.UnsupportedSretByvalAbi;
         }
-        return error.UnsupportedCallAttributeAbi;
+        if (!isAttributeGroupReference(attrs)) return error.UnsupportedCallAttributeAbi;
     }
     if (call.operand_bundle != null) return error.UnsupportedCallAttributeAbi;
+}
+
+fn isAttributeGroupReference(attrs: []const u8) bool {
+    const trimmed = std.mem.trim(u8, attrs, " \t");
+    if (trimmed.len < 2 or trimmed[0] != '#') return false;
+    for (trimmed[1..]) |c| {
+        if (!std.ascii.isDigit(c)) return false;
+    }
+    return true;
 }
 
 pub fn rejectUnsupportedCallSignature(call: ir.CallInst) !void {
@@ -737,4 +768,23 @@ test "SysV call signature helper rejects varargs and non-default callconv" {
         .args = .empty,
     };
     try std.testing.expectError(error.UnsupportedCallConvAbi, rejectUnsupportedCallSignature(callconv_call));
+}
+
+test "SysV call envelope accepts attribute group references without hiding bundles" {
+    const grouped_call: ir.CallInst = .{
+        .ret_ty = .float,
+        .callee = "callee",
+        .attrs = "#40",
+        .args = .empty,
+    };
+    try rejectUnsupportedCallEnvelope(grouped_call);
+
+    const bundled_call: ir.CallInst = .{
+        .ret_ty = .float,
+        .callee = "callee",
+        .attrs = "#40",
+        .operand_bundle = "[ \"deopt\"() ]",
+        .args = .empty,
+    };
+    try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallEnvelope(bundled_call));
 }

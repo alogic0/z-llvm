@@ -164,7 +164,7 @@ test "x86_64 codegen passes register aggregate argument through direct helper ca
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
 }
 
-test "x86_64 codegen rejects unsupported call ABI shapes" {
+test "x86_64 codegen rejects unsupported call ABI shapes and lowers advisory tail calls" {
     const unsupported_cc_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -200,10 +200,15 @@ test "x86_64 codegen rejects unsupported call ABI shapes" {
     var tail_call_module = try ir.Module.parse(std.testing.allocator, tail_call_input);
     defer tail_call_module.deinit();
     try tail_call_module.verify();
-    try std.testing.expectError(
-        error.UnsupportedTailCallAbi,
-        codegen.x86_64.lowerFunction(std.testing.allocator, tail_call_module.target_triple.?, tail_call_module.functions.items[0]),
-    );
+    var tail_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, tail_call_module.target_triple.?, tail_call_module.functions.items[0]);
+    defer tail_machine.deinit(std.testing.allocator);
+    var saw_ordinary_call = false;
+    for (tail_machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => saw_ordinary_call = true,
+        .direct_jump => return error.UnexpectedTailJump,
+        else => {},
+    };
+    try std.testing.expect(saw_ordinary_call);
 }
 
 test "x86_64 codegen supports one stack-passed i32 call argument" {

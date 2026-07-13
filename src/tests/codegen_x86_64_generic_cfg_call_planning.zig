@@ -1162,7 +1162,7 @@ test "x86_64 SysV call planner rejects indirect varargs explicitly" {
     );
 }
 
-test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail callconv boundaries" {
+test "x86_64 SysV call planner treats tail markers by ABI requirement" {
     const indirect_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -1197,14 +1197,19 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
     defer tail_module.deinit();
     try tail_module.verify();
     const tail_call = tail_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
-    try std.testing.expectError(
-        abi_boundaries.Category.tail_call.errorValue(),
-        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, tail_module.functions.items[0], tail_call),
-    );
-    try std.testing.expectError(
-        abi_boundaries.Category.tail_call.errorValue(),
-        codegen.x86_64.lowerFunction(std.testing.allocator, tail_module.target_triple.?, tail_module.functions.items[0]),
-    );
+    const tail_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, tail_module.functions.items[0], tail_call);
+    try std.testing.expectEqual(@as(usize, 1), tail_counts.gpr_args);
+    var tail_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, tail_module.target_triple.?, tail_module.functions.items[0]);
+    defer tail_machine.deinit(std.testing.allocator);
+    var saw_tail_call = false;
+    for (tail_machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |direct_call| if (std.mem.eql(u8, direct_call.symbol, "callee")) {
+            saw_tail_call = true;
+        },
+        .direct_jump => return error.UnexpectedTailJump,
+        else => {},
+    };
+    try std.testing.expect(saw_tail_call);
 
     const musttail_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1247,14 +1252,19 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
     defer notail_module.deinit();
     try notail_module.verify();
     const notail_call = notail_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
-    try std.testing.expectError(
-        abi_boundaries.Category.tail_call.errorValue(),
-        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, notail_module.functions.items[0], notail_call),
-    );
-    try std.testing.expectError(
-        abi_boundaries.Category.tail_call.errorValue(),
-        codegen.x86_64.lowerFunction(std.testing.allocator, notail_module.target_triple.?, notail_module.functions.items[0]),
-    );
+    const notail_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, notail_module.functions.items[0], notail_call);
+    try std.testing.expectEqual(@as(usize, 1), notail_counts.gpr_args);
+    var notail_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, notail_module.target_triple.?, notail_module.functions.items[0]);
+    defer notail_machine.deinit(std.testing.allocator);
+    var saw_notail_call = false;
+    for (notail_machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |direct_call| if (std.mem.eql(u8, direct_call.symbol, "callee")) {
+            saw_notail_call = true;
+        },
+        .direct_jump => return error.UnexpectedTailJump,
+        else => {},
+    };
+    try std.testing.expect(saw_notail_call);
 
     const indirect_tail_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1271,14 +1281,11 @@ test "x86_64 SysV call planner accepts narrow indirect calls and rejects tail ca
     try indirect_tail_module.verify();
     const indirect_tail_call = indirect_tail_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expect(indirect_tail_call.callee_value != null);
-    try std.testing.expectError(
-        abi_boundaries.Category.tail_call.errorValue(),
-        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_tail_module.functions.items[0], indirect_tail_call),
-    );
-    try std.testing.expectError(
-        abi_boundaries.Category.tail_call.errorValue(),
-        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_tail_module.target_triple.?, indirect_tail_module.functions.items[0]),
-    );
+    const indirect_tail_counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, indirect_tail_module.functions.items[0], indirect_tail_call);
+    try std.testing.expectEqual(@as(usize, 1), indirect_tail_counts.gpr_args);
+    var indirect_tail_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, indirect_tail_module.target_triple.?, indirect_tail_module.functions.items[0]);
+    defer indirect_tail_machine.deinit(std.testing.allocator);
+    try expectMachineInstruction(indirect_tail_machine.instructions.items, .{ .indirect_call_rax = .{ .int = 32 } });
 
     const callconv_input =
         \\target triple = "x86_64-unknown-linux-gnu"

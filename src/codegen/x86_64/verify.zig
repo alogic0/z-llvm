@@ -400,15 +400,19 @@ pub fn verifyFunction(function: MachineFunction) !void {
         => {},
     };
 
-    var eax_defined = function.ret_ty == .void or function.ret_ty.eql(.half) or function.ret_ty.eql(.float) or function.ret_ty.eql(.double) or
+    const returns_scalar_sse = sysv_abi.isScalarSseAbiType(function.ret_ty);
+    var eax_defined = function.ret_ty == .void or returns_scalar_sse or
         sysv_abi.aggregateReturnHasNoGpr(function.ret_ty);
     var eax_defined_before_label = eax_defined;
+    var xmm0_defined = returns_scalar_sse;
+    var xmm0_defined_before_label = xmm0_defined;
     var saw_terminator = false;
     var preserve_eax_at_next_label = false;
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => |label| {
             eax_defined_before_label = eax_defined;
+            xmm0_defined_before_label = xmm0_defined;
             if (preserve_eax_at_next_label) {
                 preserve_eax_at_next_label = false;
             } else if (!std.mem.endsWith(u8, label, "generic_cfg_select_end") and
@@ -416,6 +420,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 !std.mem.endsWith(u8, label, "conditional_slice_sum_skip"))
             {
                 eax_defined = function.ret_ty == .void or sysv_abi.aggregateReturnHasNoGpr(function.ret_ty);
+                xmm0_defined = returns_scalar_sse;
             }
         },
         .shl_eax_cl => eax_defined = true,
@@ -440,12 +445,16 @@ pub fn verifyFunction(function: MachineFunction) !void {
         },
         .direct_call => |call| {
             if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
-            eax_defined = function.ret_ty == .void or call.ret_ty != .void;
+            const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(call.ret_ty);
+            eax_defined = function.ret_ty == .void or (!call_returns_scalar_sse and call.ret_ty != .void);
+            if (call_returns_scalar_sse) xmm0_defined = true;
         },
         .direct_jump => {},
         .indirect_call_rax => |ret_ty| {
             if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
-            eax_defined = function.ret_ty == .void or ret_ty != .void;
+            const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(ret_ty);
+            eax_defined = function.ret_ty == .void or (!call_returns_scalar_sse and ret_ty != .void);
+            if (call_returns_scalar_sse) xmm0_defined = true;
         },
         .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .push_imm32, .push_stack_disp8, .push_stack_disp32, .push_arg, .pop_arg, .push_rax, .push_xmm64, .push_byval_tail_arg_ptr, .push_byval_tail_stack_ptr => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
@@ -596,14 +605,18 @@ pub fn verifyFunction(function: MachineFunction) !void {
         },
         .mov_arg_arg, .mov_arg64_arg, .xor_edx_edx, .shl_rdx_imm6, .shl_rcx_imm6, .shl_r8_imm6, .or_rcx_rax, .or_rcx_rdx, .add_rcx_imm32, .add_r8_rcx, .sub_r8_rcx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .store_eax_rdi_rcx4_ptr, .store_al_rcx_ptr, .store_ax_rcx_ptr, .store_eax_rcx_ptr, .store_rax_rcx_ptr, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .stack_probe_rax_rcx_rsp, .spinlocked_memcpy_rsi_to_rdx_len_edi, .spinlocked_store_i128_rdi_rsi_rdx, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_al_arg_ptr_disp8, .store_al_arg_ptr_disp32, .store_ax_arg_ptr_disp8, .store_ax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_xmm0_f32_arg_ptr_disp8, .store_xmm0_f32_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .load_stack_disp8_xmm_f32, .load_stack_disp32_xmm_f32, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .syscall, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => {},
         .ret => {
-            if (!eax_defined) return error.ReturnRegisterUndefined;
+            if (returns_scalar_sse) {
+                if (!xmm0_defined) return error.ReturnRegisterUndefined;
+            } else if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
             saw_terminator = true;
             eax_defined = function.ret_ty == .void;
+            xmm0_defined = false;
         },
         .ud2 => {
             saw_terminator = true;
             eax_defined = eax_defined_before_label;
+            xmm0_defined = xmm0_defined_before_label;
             preserve_eax_at_next_label = true;
         },
     };

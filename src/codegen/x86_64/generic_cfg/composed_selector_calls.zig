@@ -2,6 +2,7 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_types = @import("../types.zig");
+const sysv_abi = @import("../sysv_abi.zig");
 const inspection = @import("inspection.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
@@ -9,6 +10,7 @@ const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_frame = @import("composed_selector_frame.zig");
+const selector_fp = @import("composed_selector_fp.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
@@ -98,9 +100,12 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
     if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
-    if (!isDefaultOrFastcc(call.calling_conv) or call.tail_kind != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+    if (!isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
         return .{ .no_emitter = "composed-block-call-form" };
     }
+    if (sysv_abi.callHasScalarSseType(call)) return lowerScalarSseCall(selector, result, call);
+    try sysv_abi.rejectUnsupportedCallEnvelope(call);
+    try sysv_abi.rejectUnsupportedCallSignature(call);
     const ret_bits = if (call.ret_ty == .void) @as(u16, 0) else intBits(call.ret_ty) orelse return .{ .no_emitter = "composed-block-call-ret" };
     if (ret_bits != 0 and ret_bits != 32 and ret_bits != 64 and ret_bits != 128) return .{ .no_emitter = "composed-block-call-ret-width" };
     var abi_index: usize = 0;
@@ -113,7 +118,10 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         if (abi_index > 6) return .{ .unsupported_value = "composed-block-call-arg-count" };
     }
 
+    const needs_alignment = selector.stack_frame_bytes == 0;
+    if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
     try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
     if (result) |result_name| switch (ret_bits) {
         0 => return .{ .unsupported_value = "composed-block-void-call-result" },
         32 => try selector_state.bindEax(selector, result_name),
@@ -121,6 +129,49 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         128 => {},
         else => unreachable,
     };
+    return null;
+}
+
+fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    var plan = try sysv_abi.planScalarCall(selector.allocator, call);
+    defer plan.deinit(selector.allocator);
+
+    if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    for (call.args.items) |arg| {
+        if (!sysv_abi.isScalarSseAbiType(arg.ty)) continue;
+        const name = switch (arg.value) {
+            .named => |name| name,
+            else => continue,
+        };
+        if (try selector_state.spillValue(selector, name)) |diagnostic| return diagnostic;
+    }
+
+    for (call.args.items, plan.assignments.items) |arg, assignment| switch (assignment) {
+        .gpr => |target| if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic,
+        .sse => |target| {
+            const bits: u16 = if (arg.ty == .half) 16 else if (arg.ty == .float) 32 else if (arg.ty == .double) 64 else unreachable;
+            if (try selector_fp.materializeFpValue(selector, arg.value, target, bits)) |diagnostic| return diagnostic;
+        },
+        .stack_i32_const, .stack_i32_param => return .{ .unsupported_value = "composed-block-call-stack-gpr-arg" },
+        .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param => return .{ .unsupported_value = "composed-block-call-stack-fp-arg" },
+        .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return .{ .no_emitter = "composed-block-call-aggregate-arg" },
+    };
+
+    try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    if (result) |result_name| {
+        if (sysv_abi.isScalarSseAbiType(call.ret_ty)) {
+            const bits: u16 = if (call.ret_ty == .half) 16 else if (call.ret_ty == .float) 32 else 64;
+            try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
+        } else if (call.ret_ty.eql(.{ .int = 32 })) {
+            try selector_state.bindEax(selector, result_name);
+        } else if (call.ret_ty.eql(.{ .int = 64 }) or call.ret_ty == .ptr) {
+            try selector_state.bindRax(selector, result_name);
+        } else if (call.ret_ty == .void) {
+            return .{ .unsupported_value = "composed-block-void-call-result" };
+        } else {
+            return .{ .no_emitter = "composed-block-call-ret" };
+        }
+    }
     return null;
 }
 
