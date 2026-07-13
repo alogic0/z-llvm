@@ -3531,6 +3531,20 @@ One line per completed cycle, append-only, newest last. This is the
   pipeline is exhausted; stop for periodic review. Evidence
   `docs/evidence/std_debug_hello_packed_fsub_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-29) Item 12 scalar integer-to-FP capability:
+  typed `sitofp`/`uitofp` from i8 through i64 to float or double now normalize
+  narrow and odd widths explicitly. Unsigned i64 uses a high-half correction
+  instead of signed reinterpretation. Twenty-seven executable cases prove 54
+  precomputed result bit patterns across signed/unsigned width boundaries and
+  mantissa rounding. Nine log rows advance to half `fcmp`, integer `icmp`, a
+  cross-input shuffle, or a global-table GEP; none closes, so report-all
+  remains 443 selected / 202 emitting / 241 failing. Tier 2 is green. The
+  shared frame-reservation trigger required Tier 3; one infrastructure-hung
+  full invocation plus narrow unchanged-input recovery accounts for all 17
+  green subgates. Evidence
+  `docs/evidence/std_debug_hello_scalar_int_to_fp_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox29_int_to_fp.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

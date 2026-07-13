@@ -37,17 +37,17 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-28 is complete through the typed packed lane-shift commit `11483785`
-and its single pre-authorized packed-fsub successor. Exact f32x2/f64x2
-pressure canaries cover `<1, poison>` lane shifts and both subtraction operand
-orders. The seven directed log rows advance through lane shift to concrete
-`sitofp` instructions without closing; packed fsub additionally advances
-`compiler_rt.log.log` to `sitofp i12 ... to double`. Report-all remains 443
-selected / 202 emitting / 241 failing. Both cycles pass Tier 2, neither
-triggers Tier 3, and the one-cycle pipeline is exhausted. Stop and request the
-plan's periodic review before selecting another capability. Evidence:
-`docs/evidence/std_debug_hello_vector_lane_shift_acceptance.summary` and
-`docs/evidence/std_debug_hello_packed_fsub_acceptance.summary`.
+INBOX-29 scalar integer-to-FP lowering is complete. Typed `sitofp`/`uitofp`
+now covers i8 through i64 sources, including odd-width normalization and a
+correct u64 high-half path, with 54 exact executable result checks. Nine log
+rows advance without closing, so report-all remains 443 selected / 202
+emitting / 241 failing. Their refreshed frontier is: four float/double rows at
+signed-less-than immediate `icmp`, three half wrappers at scalar half `fcmp`,
+one double row at cross-input `<0, 3>` shuffle, and one double row at a
+global-table GEP source. The strongest bounded successor is signed-less-than
+immediate i32/i64 lowering because it is the only shared form blocking four
+rows; state that evidence before starting the pre-authorized successor.
+Evidence: `docs/evidence/std_debug_hello_scalar_int_to_fp_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

@@ -104,7 +104,7 @@ fn loadStackU64IntoRax(selector: *ComposedBlockSelector, disp: u32) !void {
     }
 }
 
-fn ownedEdgeLabel(selector: *ComposedBlockSelector) ![]const u8 {
+pub fn allocateEdgeLabel(selector: *ComposedBlockSelector) ![]const u8 {
     const label = try std.fmt.allocPrint(selector.allocator, "__zllvm_edge_{d}", .{selector.edge_label_count});
     errdefer selector.allocator.free(label);
     try selector.machine.owned_labels.append(selector.allocator, label);
@@ -739,8 +739,8 @@ pub fn accumulateRegWithCarry(selector: *ComposedBlockSelector, lhs: ArgReg, rhs
 }
 
 pub fn emitSignedUpperCorrection(selector: *ComposedBlockSelector, sign_limb: FrameIndex, subtract: PairSpillLoc) !void {
-    const correction_label = try ownedEdgeLabel(selector);
-    const end_label = try ownedEdgeLabel(selector);
+    const correction_label = try allocateEdgeLabel(selector);
+    const end_label = try allocateEdgeLabel(selector);
     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = sign_limb } });
     try selector.machine.instructions.append(selector.allocator, .{ .test_arg64 = .rcx });
     try selector.machine.instructions.append(selector.allocator, .{ .js = correction_label });
