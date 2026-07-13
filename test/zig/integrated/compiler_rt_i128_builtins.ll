@@ -12,6 +12,29 @@ declare { i128, i1 } @llvm.smul.with.overflow.i128(i128, i128)
 declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
 declare void @llvm.memcpy.inline.p0.p0.i64(ptr, ptr, i64, i1)
 declare i128 @compiler_rt.udivmod.udivmod__anon_15304(i128, i128, ptr)
+declare i64 @compiler_rt.int.__udivmoddi4(i64, i64, ptr)
+
+define dso_local i64 @__umoddi3(i64 %lhs, i64 %rhs) {
+Entry:
+  %slot = alloca i64, align 8
+  %unused = call i64 @compiler_rt.int.__udivmoddi4(i64 %lhs, i64 %rhs, ptr nonnull align 8 %slot)
+  %remainder = load i64, ptr %slot, align 8
+  ret i64 %remainder
+}
+
+define dso_local i64 @__moddi3(i64 %lhs, i64 %rhs) {
+Entry:
+  %sign = ashr i64 %lhs, 63
+  %lhs.xor = xor i64 %sign, %lhs
+  %lhs.abs = sub i64 %lhs.xor, %sign
+  %rhs.abs = tail call i64 @llvm.abs.i64(i64 %rhs, i1 false)
+  %slot = alloca i64, align 8
+  %unused = call i64 @compiler_rt.int.__udivmoddi4(i64 %lhs.abs, i64 %rhs.abs, ptr nonnull align 8 %slot)
+  %remainder = load i64, ptr %slot, align 8
+  %signed.xor = xor i64 %remainder, %sign
+  %signed = sub i64 %signed.xor, %sign
+  ret i64 %signed
+}
 
 define dso_local i128 @zllvm_freeze_i128(i128 %value) {
 Entry:

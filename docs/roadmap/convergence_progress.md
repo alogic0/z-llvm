@@ -3482,6 +3482,16 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_alloca_spill_collision_repair.summary` and
   `docs/evidence/distribution_all_after_inbox27_alloca_spill_collision.summary`.
 
+- 2026-07-13 (this commit, INBOX-27 fix-forward) The permanent composed-selector
+  executable canary now re-proves `compiler_rt.int.__moddi3` after the frame
+  collision repair and covers the sibling `__umoddi3` shape. Three unsigned and
+  four signed i64 remainder cases pass exactly through the alloca-backed
+  `__udivmoddi4` call path, including a high-bit unsigned dividend and every
+  dividend/divisor sign combination. Repository tests and all five permanent
+  integrated executable canaries pass; report counters remain unchanged.
+  Evidence
+  `docs/evidence/zig_integrated_exe_moddi3_umoddi3_closure_reproof.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
