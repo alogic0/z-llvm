@@ -86,8 +86,8 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
     return switch (binary.op) {
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
         .udiv, .sdiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
-        .fadd => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
-        .fsub, .fmul, .fdiv, .frem => .{ .unsupported_instruction = @tagName(binary.op) },
+        .fadd, .fmul => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
+        .fsub, .fdiv, .frem => .{ .unsupported_instruction = @tagName(binary.op) },
     };
 }
 
@@ -97,8 +97,8 @@ fn inspectCast(cast: ir.CastInst) ?Diagnostic {
     }
     return switch (cast.op) {
         .trunc, .zext, .sext, .bitcast, .ptrtoint, .inttoptr => null,
-        .fpext => if (cast.from_ty == .half and cast.to_ty == .float) null else .{ .unsupported_instruction = @tagName(cast.op) },
-        .fptrunc => if (cast.from_ty == .float and cast.to_ty == .half) null else .{ .unsupported_instruction = @tagName(cast.op) },
+        .fpext => if ((cast.from_ty == .half and cast.to_ty == .float) or (cast.from_ty == .float and cast.to_ty == .double)) null else .{ .unsupported_instruction = @tagName(cast.op) },
+        .fptrunc => if ((cast.from_ty == .float and cast.to_ty == .half) or (cast.from_ty == .double and cast.to_ty == .float)) null else .{ .unsupported_instruction = @tagName(cast.op) },
         .fptosi, .fptoui, .sitofp, .uitofp => .{ .unsupported_instruction = @tagName(cast.op) },
     };
 }

@@ -78,6 +78,208 @@ test "generic cfg selector legalizes fptrunc float to half through nonrecursive 
     try std.testing.expectEqual(@as(u16, 16), selector_state.valueLoc(&selector, "narrow").?.xmm.bits);
 }
 
+test "generic cfg selector uses parametric registers for scalar FP casts and multiply" {
+    var machine = x86_64_machine.MachineFunction.init("parametric-fp", .double);
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "float_value", .{ .xmm = .{ .reg = .xmm3, .bits = 32 } });
+    try selector_state.bindValueLoc(&selector, "double_rhs", .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
+
+    try std.testing.expect((try selector_fp.lowerFpCast(&selector, "wide", .{
+        .op = .fpext,
+        .from_ty = .float,
+        .value = .{ .named = "float_value" },
+        .to_ty = .double,
+    })) == null);
+    try std.testing.expect((try selector_fp.lowerFpBinary(&selector, "product", .{
+        .op = .fmul,
+        .ty = .double,
+        .lhs = .{ .named = "wide" },
+        .rhs = .{ .named = "double_rhs" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .cvtss2sd_xmm = .{ .dst = .xmm3, .src = .xmm3 } },
+        .{ .mulsd_xmm = .{ .dst = .xmm3, .src = .xmm0 } },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(@as(u16, 64), selector_state.valueLoc(&selector, "product").?.xmm.bits);
+}
+
+test "generic cfg selector handles spilled constant and identical scalar FP multiply operands" {
+    var machine = x86_64_machine.MachineFunction.init("fp-operands", .float);
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+    try selector_state.bindValueLoc(&selector, "spilled", .{ .spill_fp = .{ .frame_index = .slot0, .bits = 32 } });
+
+    try std.testing.expect((try selector_fp.lowerFpBinary(&selector, "constant_product", .{
+        .op = .fmul,
+        .ty = .float,
+        .lhs = .{ .named = "spilled" },
+        .rhs = .{ .fp = "2.000000e+00" },
+    })) == null);
+    try std.testing.expect((try selector_fp.lowerFpBinary(&selector, "square", .{
+        .op = .fmul,
+        .ty = .float,
+        .lhs = .{ .named = "constant_product" },
+        .rhs = .{ .named = "constant_product" },
+    })) == null);
+
+    var saw_reload = false;
+    var saw_constant = false;
+    var saw_identical = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .reload_xmm32_rsp => |reload| saw_reload = reload.reg == .xmm0 and reload.frame_index.eql(.slot0),
+        .mov_imm32_xmm => |load| saw_constant = load.reg == .xmm1 and load.bits == 0x4000_0000,
+        .mulss_xmm => |mul| saw_identical = saw_identical or mul.dst == mul.src,
+        else => {},
+    };
+    try std.testing.expect(saw_reload and saw_constant and saw_identical);
+}
+
+test "generic cfg selector executes bit-exact scalar FP widening and narrowing" {
+    const input =
+        \\define double @widen(float %value) {
+        \\entry:
+        \\  %result = fpext float %value to double
+        \\  ret double %result
+        \\}
+        \\define float @narrow(double %value) {
+        \\entry:
+        \\  %result = fptrunc double %value to float
+        \\  ret float %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var widen_machine = x86_64_machine.MachineFunction.init("widen", .double);
+    defer widen_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &widen_machine, module.functions.items[0]));
+    const widen_bytes = try encoding.encodeFunction(std.testing.allocator, widen_machine);
+    defer std.testing.allocator.free(widen_bytes);
+    const widen_mapping = try std.posix.mmap(null, widen_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(widen_mapping);
+    @memcpy(widen_mapping, widen_bytes);
+    const widen: *const fn (f32) callconv(.c) f64 = @ptrCast(widen_mapping.ptr);
+    inline for (.{
+        @as(u32, 0x0000_0000),
+        @as(u32, 0x8000_0000),
+        @as(u32, 0x3fc0_0000),
+        @as(u32, 0xc020_0000),
+        @as(u32, 0x0000_0001),
+        @as(u32, 0x8000_0001),
+        @as(u32, 0x7f80_0000),
+        @as(u32, 0xff80_0000),
+        @as(u32, 0x7fc1_2345),
+    }) |bits| {
+        const value: f32 = @bitCast(bits);
+        const expected: f64 = value;
+        try std.testing.expectEqual(@as(u64, @bitCast(expected)), @as(u64, @bitCast(widen(value))));
+    }
+
+    var narrow_machine = x86_64_machine.MachineFunction.init("narrow", .float);
+    defer narrow_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &narrow_machine, module.functions.items[1]));
+    const narrow_bytes = try encoding.encodeFunction(std.testing.allocator, narrow_machine);
+    defer std.testing.allocator.free(narrow_bytes);
+    const narrow_mapping = try std.posix.mmap(null, narrow_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(narrow_mapping);
+    @memcpy(narrow_mapping, narrow_bytes);
+    const narrow: *const fn (f64) callconv(.c) f32 = @ptrCast(narrow_mapping.ptr);
+    inline for (.{
+        @as(u64, 0x0000_0000_0000_0000),
+        @as(u64, 0x8000_0000_0000_0000),
+        @as(u64, 0x3ff0_0000_0000_0000),
+        @as(u64, 0xbff0_0000_0000_0000),
+        @as(u64, 0x3ff0_0000_0fff_ffff),
+        @as(u64, 0x3ff0_0000_1000_0000),
+        @as(u64, 0x3ff0_0000_1000_0001),
+        @as(u64, 0x36a0_0000_0000_0000),
+        @as(u64, 0x7ff0_0000_0000_0000),
+        @as(u64, 0xfff0_0000_0000_0000),
+        @as(u64, 0x7ff8_1234_5678_9abc),
+    }) |bits| {
+        const value: f64 = @bitCast(bits);
+        const expected: f32 = @floatCast(value);
+        try std.testing.expectEqual(@as(u32, @bitCast(expected)), @as(u32, @bitCast(narrow(value))));
+    }
+}
+
+test "generic cfg selector executes bit-exact scalar float and double multiplication" {
+    const input =
+        \\define float @mul_float(float %lhs, float %rhs) {
+        \\entry:
+        \\  %result = fmul float %lhs, %rhs
+        \\  ret float %result
+        \\}
+        \\define double @mul_double(double %lhs, double %rhs) {
+        \\entry:
+        \\  %result = fmul double %lhs, %rhs
+        \\  ret double %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var float_machine = x86_64_machine.MachineFunction.init("mul_float", .float);
+    defer float_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &float_machine, module.functions.items[0]));
+    const float_bytes = try encoding.encodeFunction(std.testing.allocator, float_machine);
+    defer std.testing.allocator.free(float_bytes);
+    const float_mapping = try std.posix.mmap(null, float_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(float_mapping);
+    @memcpy(float_mapping, float_bytes);
+    const mul_float: *const fn (f32, f32) callconv(.c) f32 = @ptrCast(float_mapping.ptr);
+    inline for (.{
+        .{ @as(u32, 0x0000_0000), @as(u32, 0xc040_0000) },
+        .{ @as(u32, 0x8000_0000), @as(u32, 0xc040_0000) },
+        .{ @as(u32, 0x3fc0_0000), @as(u32, 0xc000_0000) },
+        .{ @as(u32, 0x0000_0001), @as(u32, 0x3f80_0000) },
+        .{ @as(u32, 0x7f7f_ffff), @as(u32, 0x4000_0000) },
+        .{ @as(u32, 0x0080_0000), @as(u32, 0x3f00_0000) },
+        .{ @as(u32, 0x0000_0001), @as(u32, 0x3f00_0000) },
+        .{ @as(u32, 0x7f80_0000), @as(u32, 0xc000_0000) },
+        .{ @as(u32, 0x7fc1_2345), @as(u32, 0x3f80_0000) },
+    }) |case| {
+        const lhs: f32 = @bitCast(case[0]);
+        const rhs: f32 = @bitCast(case[1]);
+        const expected = lhs * rhs;
+        try std.testing.expectEqual(@as(u32, @bitCast(expected)), @as(u32, @bitCast(mul_float(lhs, rhs))));
+    }
+
+    var double_machine = x86_64_machine.MachineFunction.init("mul_double", .double);
+    defer double_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &double_machine, module.functions.items[1]));
+    const double_bytes = try encoding.encodeFunction(std.testing.allocator, double_machine);
+    defer std.testing.allocator.free(double_bytes);
+    const double_mapping = try std.posix.mmap(null, double_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(double_mapping);
+    @memcpy(double_mapping, double_bytes);
+    const mul_double: *const fn (f64, f64) callconv(.c) f64 = @ptrCast(double_mapping.ptr);
+    inline for (.{
+        .{ @as(u64, 0x0000_0000_0000_0000), @as(u64, 0xc008_0000_0000_0000) },
+        .{ @as(u64, 0x8000_0000_0000_0000), @as(u64, 0xc008_0000_0000_0000) },
+        .{ @as(u64, 0x3ff8_0000_0000_0000), @as(u64, 0xc000_0000_0000_0000) },
+        .{ @as(u64, 0x0000_0000_0000_0001), @as(u64, 0x3ff0_0000_0000_0000) },
+        .{ @as(u64, 0x7fef_ffff_ffff_ffff), @as(u64, 0x4000_0000_0000_0000) },
+        .{ @as(u64, 0x0010_0000_0000_0000), @as(u64, 0x3fe0_0000_0000_0000) },
+        .{ @as(u64, 0x0000_0000_0000_0001), @as(u64, 0x3fe0_0000_0000_0000) },
+        .{ @as(u64, 0x7ff0_0000_0000_0000), @as(u64, 0xc000_0000_0000_0000) },
+        .{ @as(u64, 0x7ff8_1234_5678_9abc), @as(u64, 0x3ff0_0000_0000_0000) },
+    }) |case| {
+        const lhs: f64 = @bitCast(case[0]);
+        const rhs: f64 = @bitCast(case[1]);
+        const expected = lhs * rhs;
+        try std.testing.expectEqual(@as(u64, @bitCast(expected)), @as(u64, @bitCast(mul_double(lhs, rhs))));
+    }
+}
+
 test "generic cfg selector executes type-driven scalar float addition" {
     const input =
         \\define float @add(float %lhs, float %rhs) {

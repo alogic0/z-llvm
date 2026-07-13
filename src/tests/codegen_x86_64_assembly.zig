@@ -101,6 +101,33 @@ test "x86_64 assembly prints variable eax shifts" {
     );
 }
 
+test "x86_64 assembly prints parametric scalar FP operations" {
+    var machine = codegen.x86_64.MachineFunction.init("scalar_fp_parametric", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{
+        .{ .cvtss2sd_xmm = .{ .dst = .xmm3, .src = .xmm2 } },
+        .{ .cvtsd2ss_xmm = .{ .dst = .xmm5, .src = .xmm4 } },
+        .{ .mulss_xmm = .{ .dst = .xmm7, .src = .xmm6 } },
+        .{ .mulsd_xmm = .{ .dst = .xmm1, .src = .xmm0 } },
+        .ret,
+    });
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl scalar_fp_parametric\n" ++
+            "scalar_fp_parametric:\n" ++
+            "\tcvtss2sd %xmm2, %xmm3\n" ++
+            "\tcvtsd2ss %xmm4, %xmm5\n" ++
+            "\tmulss %xmm6, %xmm7\n" ++
+            "\tmulsd %xmm0, %xmm1\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 assembly prints flag-preserving signed greater setcc" {
     var machine = codegen.x86_64.MachineFunction.init("setg", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

@@ -270,7 +270,7 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
     defer selector.current_position += 1;
     return switch (instruction.kind) {
         .phi => null,
-        .binary => |binary| if (binary.op == .fadd)
+        .binary => |binary| if (binary.op == .fadd or binary.op == .fmul)
             selector_fp.lowerFpBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-fp-binary-value")
         else
             selector_scalar.lowerBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-binary-value"),

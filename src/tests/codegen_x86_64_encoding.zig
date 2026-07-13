@@ -709,3 +709,37 @@ test "x86_64 encoding materializes FP immediates into generic xmm registers" {
         0x48, 0x0f, 0x6e, 0xf8, 0xc3,
     }, bytes);
 }
+
+test "x86_64 encoding emits parametric scalar FP conversions and multiplies" {
+    var machine = codegen.x86_64.MachineFunction.init("scalar_fp_parametric", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{
+        .{ .cvtss2sd_xmm = .{ .dst = .xmm3, .src = .xmm2 } },
+        .{ .cvtsd2ss_xmm = .{ .dst = .xmm5, .src = .xmm4 } },
+        .{ .mulss_xmm = .{ .dst = .xmm7, .src = .xmm6 } },
+        .{ .mulsd_xmm = .{ .dst = .xmm1, .src = .xmm0 } },
+        .ret,
+    });
+
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .cvtss2sd_xmm = .{ .dst = .xmm3, .src = .xmm2 } }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .cvtsd2ss_xmm = .{ .dst = .xmm5, .src = .xmm4 } }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .mulss_xmm = .{ .dst = .xmm7, .src = .xmm6 } }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .mulsd_xmm = .{ .dst = .xmm1, .src = .xmm0 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0xf3, 0x0f, 0x5a, 0xda,
+        0xf2, 0x0f, 0x5a, 0xec,
+        0xf3, 0x0f, 0x59, 0xfe,
+        0xf2, 0x0f, 0x59, 0xc8,
+        0xc3,
+    }, bytes);
+
+    var integer_machine = codegen.x86_64.MachineFunction.init("fp_does_not_define_eax", .{ .int = 32 });
+    defer integer_machine.deinit(std.testing.allocator);
+    try integer_machine.instructions.appendSlice(std.testing.allocator, &.{
+        .{ .mulss_xmm = .{ .dst = .xmm0, .src = .xmm1 } },
+        .ret,
+    });
+    try std.testing.expectError(error.ReturnRegisterUndefined, codegen.x86_64.verifyFunction(integer_machine));
+}

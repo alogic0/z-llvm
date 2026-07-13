@@ -37,22 +37,17 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-None. INBOX-20 closes scalar SSE direct-call ABI for register-passed half,
-float, and double values through the authoritative x86_64 SysV planner. The
-real `compiler_rt.tan.tanh` emits with an exact relocation to
-`compiler_rt.tan.tanf`; a static native executable resolves that dotted symbol
-to a controlled local stub and passes four bit-exact half caller-ABI cases.
-This does not implement or claim tangent semantics. Debug compiler_rt
-report-all is now 443 selected / 189 emitting / 254 failing. The exact next
-soft-float frontier is the internal `compiler_rt.tan.tanf` body at
-`UnsupportedCodegenControlFlow / unsupported_instruction / fpext`, which was
-not entered. The corrected call-marker inventory contains 42 advisory `tail`
-rows, zero tracked `notail` rows, and zero genuine `musttail` rows; ten now emit
-as ordinary calls and 32 expose their real non-tail frontier. `musttail` remains
-fail-closed, and no tail jump or tail-call ABI was added. Stop for review after
-the INBOX-20 commit. Evidence:
-`docs/evidence/std_debug_hello_tanh_call_abi_acceptance.summary` and
-`docs/evidence/std_debug_hello_tail_marker_inventory_inbox20.tsv`.
+None. INBOX-21 closes type-driven scalar `fpext float -> double`, `fptrunc
+double -> float`, and `fmul` for float and double with register-parametric SSE
+forms and bit-exact executable coverage. The internal `compiler_rt.tan.tanf`
+body consumes the widening and multiplication forms and now stops at its first
+vector frontier: `UnsupportedCodegenControlFlow / unsupported_instruction /
+insertelement`. Vector lowering and tangent-polynomial recognition remain out
+of scope. Debug compiler_rt report-all is now 443 selected / 190 emitting / 253
+failing. `compiler_rt.fma.fmaf` is the one collateral emission and has no
+separate semantic acceptance claim. Stop for architectural review at this
+boundary. Evidence:
+`docs/evidence/std_debug_hello_tanf_scalar_fp_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

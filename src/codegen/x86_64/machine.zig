@@ -298,6 +298,14 @@ pub const Instruction = union(enum) {
     test_rdx_rdx,
     mulsd_xmm1_xmm0,
     mulss_xmm1_xmm0,
+    mulsd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    mulss_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
     addsd_xmm1_xmm0,
     addss_xmm1_xmm0,
     subss_xmm1_xmm0,
@@ -321,6 +329,14 @@ pub const Instruction = union(enum) {
     cvttsd2si_xmm0_eax,
     cvtsd2ss_xmm0_xmm0,
     cvtss2sd_xmm0_xmm0,
+    cvtsd2ss_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    cvtss2sd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
     mov_edi_edi,
     mov_imm64_xmm0: u64,
     mov_imm64_xmm1: u64,

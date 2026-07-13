@@ -731,6 +731,11 @@ pub fn encodeMovapdXmm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, 
     try bytes.append(allocator, 0xc0 | (@as(u8, dst.lowCode()) << 3) | @as(u8, src.lowCode()));
 }
 
+pub fn encodeScalarXmmOp(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, prefix: u8, opcode: u8, dst: x86_64.XmmReg, src: x86_64.XmmReg) !void {
+    try bytes.appendSlice(allocator, &.{ prefix, 0x0f, opcode });
+    try bytes.append(allocator, 0xc0 | (@as(u8, dst.lowCode()) << 3) | @as(u8, src.lowCode()));
+}
+
 pub fn encodeCmpRcxToArg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
     var rex: u8 = 0x48;
     if (reg.rexB()) rex |= 0x01;

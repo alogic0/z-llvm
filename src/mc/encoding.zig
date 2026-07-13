@@ -87,6 +87,7 @@ const f128ArgPtrInstructionSize = encoding_helpers.f128ArgPtrInstructionSize;
 const encodeCmp8Imm = encoding_helpers.encodeCmp8Imm;
 const encodeCmp16Imm = encoding_helpers.encodeCmp16Imm;
 const encodeMovapdXmm = encoding_helpers.encodeMovapdXmm;
+const encodeScalarXmmOp = encoding_helpers.encodeScalarXmmOp;
 const encodeCmpRcxToArg64 = encoding_helpers.encodeCmpRcxToArg64;
 const encodeCmpEcxToArg32 = encoding_helpers.encodeCmpEcxToArg32;
 const encodeCmpArg32ToR8d = encoding_helpers.encodeCmpArg32ToR8d;
@@ -1296,6 +1297,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .test_rdx_rdx => try bytes.appendSlice(allocator, &.{ 0x48, 0x85, 0xd2 }),
             .mulsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x59, 0xc1 }),
             .mulss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x59, 0xc1 }),
+            .mulsd_xmm => |mul| try encodeScalarXmmOp(&bytes, allocator, 0xf2, 0x59, mul.dst, mul.src),
+            .mulss_xmm => |mul| try encodeScalarXmmOp(&bytes, allocator, 0xf3, 0x59, mul.dst, mul.src),
             .addss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x58, 0xc1 }),
             .subss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5c, 0xc1 }),
             .divsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x5e, 0xc1 }),
@@ -1312,6 +1315,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .cvttsd2si_xmm0_eax => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x2c, 0xc0 }),
             .cvtsd2ss_xmm0_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x5a, 0xc0 }),
             .cvtss2sd_xmm0_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5a, 0xc0 }),
+            .cvtsd2ss_xmm => |cvt| try encodeScalarXmmOp(&bytes, allocator, 0xf2, 0x5a, cvt.dst, cvt.src),
+            .cvtss2sd_xmm => |cvt| try encodeScalarXmmOp(&bytes, allocator, 0xf3, 0x5a, cvt.dst, cvt.src),
             .mov_edi_edi => try bytes.appendSlice(allocator, &.{ 0x89, 0xff }),
             .mov_imm64_xmm0 => |value| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
@@ -1871,8 +1876,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setne_eax => 6,
         .test_eax_eax => 2,
         .test_rax_rax, .test_rdx_rdx => 3,
-        .mulsd_xmm1_xmm0 => 4,
-        .mulss_xmm1_xmm0 => 4,
+        .mulsd_xmm1_xmm0, .mulsd_xmm => 4,
+        .mulss_xmm1_xmm0, .mulss_xmm => 4,
         .addss_xmm1_xmm0 => 4,
         .subss_xmm1_xmm0 => 4,
         .divsd_xmm1_xmm0, .xorps_xmm1_xmm0 => 4,
@@ -1885,8 +1890,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .cvtsi2sd_rdi_xmm0 => 5,
         .cvttss2si_xmm0_eax => 4,
         .cvttsd2si_xmm0_eax => 4,
-        .cvtsd2ss_xmm0_xmm0 => 4,
-        .cvtss2sd_xmm0_xmm0 => 4,
+        .cvtsd2ss_xmm0_xmm0, .cvtsd2ss_xmm => 4,
+        .cvtss2sd_xmm0_xmm0, .cvtss2sd_xmm => 4,
         .mov_edi_edi => 2,
         .mov_imm64_xmm0 => 15,
         .mov_imm64_xmm1 => 15,

@@ -1,17 +1,22 @@
 const ir = @import("../../../ir.zig");
 const x86_64_match = @import("../match.zig");
+const x86_64_types = @import("../types.zig");
 const inspection = @import("inspection.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const state_data = @import("composed_selector_state_data.zig");
+const selector_types = @import("selector_types.zig");
 
 const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const Diagnostic = inspection.Diagnostic;
+const XmmReg = x86_64_types.XmmReg;
+const scalar_xmm_regs = selector_types.selector_allocatable_xmm_regs;
 
 pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-    if (binary.op != .fadd) return .{ .no_emitter = "composed-block-fp-binary-type" };
     const bits = fpBits(binary.ty) orelse return .{ .no_emitter = "composed-block-fp-binary-type" };
+    if (binary.op == .fmul) return lowerFpMul(selector, result_name, binary, bits);
+    if (binary.op != .fadd) return .{ .no_emitter = "composed-block-fp-binary-type" };
 
     if (try materializeFpValue(selector, binary.rhs, .xmm1, bits)) |diagnostic| return diagnostic;
     if (try materializeFpValue(selector, binary.lhs, .xmm0, bits)) |diagnostic| return diagnostic;
@@ -20,17 +25,53 @@ pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, bina
     return null;
 }
 
+fn lowerFpMul(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
+    const dst = fpValueReg(selector, binary.lhs, bits) orelse blk: {
+        const rhs_reg = fpValueReg(selector, binary.rhs, bits);
+        break :blk firstXmmExcept(rhs_reg);
+    };
+    if (try materializeFpValue(selector, binary.lhs, dst, bits)) |diagnostic| return diagnostic;
+    const src = if (fpValueReg(selector, binary.rhs, bits)) |reg| reg else blk: {
+        const scratch = firstXmmExcept(dst);
+        if (try materializeFpValue(selector, binary.rhs, scratch, bits)) |diagnostic| return diagnostic;
+        break :blk scratch;
+    };
+    try selector_state.clobberXmmReg(selector, dst);
+    try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+        .{ .mulss_xmm = .{ .dst = dst, .src = src } }
+    else
+        .{ .mulsd_xmm = .{ .dst = dst, .src = src } });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
+    return null;
+}
+
+fn fpValueReg(selector: *ComposedBlockSelector, value: ir.Value, bits: u16) ?XmmReg {
+    const source = selector_state.resolveValue(selector, value) orelse return null;
+    return switch (source) {
+        .xmm => |fp| if (fp.bits == bits) fp.reg else null,
+        else => null,
+    };
+}
+
+fn firstXmmExcept(avoid: ?XmmReg) XmmReg {
+    for (scalar_xmm_regs) |reg| {
+        if (avoid == null or reg != avoid.?) return reg;
+    }
+    unreachable;
+}
+
 fn fpBits(ty: ir.Type) ?u16 {
     return if (ty == .float) 32 else if (ty == .double) 64 else null;
 }
 
-pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst: @import("../types.zig").XmmReg, bits: u16) !?Diagnostic {
+pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst: XmmReg, bits: u16) !?Diagnostic {
     switch (value) {
         .named => {
             const source = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = "composed-block-fp-source" };
             selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = dst, .bits = bits } }) catch return .{ .unsupported_value = "composed-block-fp-source" };
         },
         .fp => {
+            try selector_state.clobberAccumulator(selector);
             try selector_state.clobberXmmReg(selector, dst);
             switch (bits) {
                 32 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = dst, .bits = try x86_64_match.fp32TextBits(value) } }),
@@ -46,11 +87,29 @@ pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst
 pub fn lowerFpCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     return switch (cast.op) {
-        .fpext => lowerHalfToFloat(selector, result_name, cast),
-        .fptrunc => lowerFloatToHalf(selector, result_name, cast),
+        .fpext => if (cast.from_ty == .float and cast.to_ty == .double)
+            lowerScalarFpCast(selector, result_name, cast, 32, 64)
+        else
+            lowerHalfToFloat(selector, result_name, cast),
+        .fptrunc => if (cast.from_ty == .double and cast.to_ty == .float)
+            lowerScalarFpCast(selector, result_name, cast, 64, 32)
+        else
+            lowerFloatToHalf(selector, result_name, cast),
         .bitcast => lowerFpIntBitcast(selector, result_name, cast),
         else => .{ .no_emitter = "composed-block-fp-cast-op" },
     };
+}
+
+fn lowerScalarFpCast(selector: *ComposedBlockSelector, result_name: []const u8, cast: ir.CastInst, from_bits: u16, to_bits: u16) !?Diagnostic {
+    const dst = fpValueReg(selector, cast.value, from_bits) orelse .xmm0;
+    if (try materializeFpValue(selector, cast.value, dst, from_bits)) |diagnostic| return diagnostic;
+    try selector_state.clobberXmmReg(selector, dst);
+    try selector.machine.instructions.append(selector.allocator, if (from_bits == 32)
+        .{ .cvtss2sd_xmm = .{ .dst = dst, .src = dst } }
+    else
+        .{ .cvtsd2ss_xmm = .{ .dst = dst, .src = dst } });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = to_bits } });
+    return null;
 }
 
 pub fn isFpIntBitcast(cast: ir.CastInst) bool {
