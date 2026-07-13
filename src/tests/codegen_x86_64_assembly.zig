@@ -124,6 +124,31 @@ test "x86_64 assembly prints flag-preserving signed greater setcc" {
     );
 }
 
+test "x86_64 assembly prints scalar FP bit moves and unsigned above setcc" {
+    var machine = codegen.x86_64.MachineFunction.init("fp_bits_seta", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .movd_xmm_eax = .xmm2 });
+    try machine.instructions.append(std.testing.allocator, .{ .movd_eax_xmm = .xmm3 });
+    try machine.instructions.append(std.testing.allocator, .seta_eax);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+
+    try std.testing.expectEqualStrings(
+        "\t.text\n" ++
+            "\t.globl fp_bits_seta\n" ++
+            "fp_bits_seta:\n" ++
+            "\tmovd %xmm2, %eax\n" ++
+            "\tmovd %eax, %xmm3\n" ++
+            "\tseta %al\n" ++
+            "\tmovzbl %al, %eax\n" ++
+            "\tretq\n",
+        output.writer.buffered(),
+    );
+}
+
 test "x86_64 assembly prints unsigned i32 division" {
     var machine = codegen.x86_64.MachineFunction.init("unsigned_div_i32", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

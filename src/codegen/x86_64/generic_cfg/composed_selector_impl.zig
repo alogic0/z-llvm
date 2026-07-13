@@ -9,6 +9,7 @@ const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_frame = @import("composed_selector_frame.zig");
+const selector_fp = @import("composed_selector_fp.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 const selector_calls = @import("composed_selector_calls.zig");
 const selector_cfg = @import("composed_selector_cfg.zig");
@@ -174,6 +175,23 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
             const phi = instruction.kind.phi;
             const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
+            if (metadata.class == .fp16 or metadata.class == .fp32 or metadata.class == .fp64) {
+                const assignment = selector.allocation_plan.?.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" };
+                const destination: ValueLoc = switch (assignment) {
+                    .fp16 => |reg| if (metadata.bits == 16) .{ .xmm = .{ .reg = reg, .bits = 16 } } else return .{ .no_emitter = "stage2-phi-width" },
+                    .fp32 => |reg| if (metadata.bits == 32) .{ .xmm = .{ .reg = reg, .bits = 32 } } else return .{ .no_emitter = "stage2-phi-width" },
+                    .fp64 => |reg| if (metadata.bits == 64) .{ .xmm = .{ .reg = reg, .bits = 64 } } else return .{ .no_emitter = "stage2-phi-width" },
+                    .spill => |index| .{ .spill_fp = .{
+                        .frame_index = selector_state.spillFrameIndexMaybe(index) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
+                        .bits = metadata.bits,
+                    } },
+                    else => return .{ .no_emitter = "stage2-phi-width" },
+                };
+                try selector.phi_results.put(result_name, {});
+                try selector.phi_destinations.put(result_name, destination);
+                try selector_state.bindValueLoc(selector, result_name, destination);
+                continue;
+            }
             const bits = switch (metadata.class) {
                 .gpr32 => @as(u16, 32),
                 .gpr64 => @as(u16, 64),
@@ -239,8 +257,8 @@ fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnost
         const loc = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         try selector_state.bindValueLoc(selector, result_name, loc);
         switch (loc) {
-            .scratch32, .scratch64, .spill64, .spill128 => {},
-            .arg32, .arg64, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill_fp => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .scratch32, .scratch64, .xmm, .spill64, .spill128, .spill_fp => {},
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;
@@ -252,9 +270,15 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
     defer selector.current_position += 1;
     return switch (instruction.kind) {
         .phi => null,
-        .binary => |binary| selector_scalar.lowerBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-binary-value"),
+        .binary => |binary| if (binary.op == .fadd)
+            selector_fp.lowerFpBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-fp-binary-value")
+        else
+            selector_scalar.lowerBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-binary-value"),
         .alloca => |alloca| selector_memory.lowerAlloca(selector, instruction.result, alloca) catch |err| return instructionValueError(selector, err, "stage2-alloca-value"),
-        .cast => |cast| selector_scalar.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-cast-value"),
+        .cast => |cast| if (cast.op == .fpext or cast.op == .fptrunc or (cast.op == .bitcast and selector_fp.isFpIntBitcast(cast)))
+            selector_fp.lowerFpCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-fp-cast-value")
+        else
+            selector_scalar.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-cast-value"),
         .freeze => |freeze| selector_scalar.lowerFreeze(selector, instruction.result, freeze) catch |err| return instructionValueError(selector, err, "stage2-freeze-value"),
         .icmp => |icmp| selector_scalar.lowerIcmp(selector, instruction.result, icmp) catch |err| return instructionValueError(selector, err, "stage2-icmp-value"),
         .load => |load| selector_memory.lowerLoad(selector, instruction.result, load) catch |err| return instructionValueError(selector, err, "stage2-load-value"),

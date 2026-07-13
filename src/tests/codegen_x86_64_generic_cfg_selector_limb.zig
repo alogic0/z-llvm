@@ -1468,7 +1468,7 @@ test "generic cfg selector composes signed i64 remainder stack call with spills"
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
-test "generic cfg selector skeleton fails closed with first unsupported instruction form" {
+test "generic cfg selector skeleton admits supported scalar float addition" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -1487,8 +1487,8 @@ test "generic cfg selector skeleton fails closed with first unsupported instruct
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| diagnostic,
     };
-    try std.testing.expectEqualStrings("unsupported_instruction", diagnostic.tagName());
-    try std.testing.expectEqualStrings("fadd", diagnostic.detail());
+    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqualStrings("selector-skeleton-has-no-emitters", diagnostic.detail());
 }
 
 test "generic cfg selector planning accepts scalar phi and overflow extracts" {

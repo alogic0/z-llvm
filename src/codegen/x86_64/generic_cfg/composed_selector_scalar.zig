@@ -198,6 +198,10 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
     };
     const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+    if (bits <= 32) switch (binary.op) {
+        .shl, .ashr, .@"and", .@"or", .add, .sub, .xor => if (try selector_state.preserveCurrentEaxIntoScratch(selector)) |diagnostic| return diagnostic,
+        else => {},
+    };
     switch (binary.op) {
         .lshr => {
             if (bits == 128) {
@@ -867,6 +871,13 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         }
         try selector_state.clobberAccumulator(selector);
         try selector.machine.instructions.append(selector.allocator, .sete_eax);
+    } else if ((icmp.predicate == .ult or icmp.predicate == .ugt) and icmp.operand_ty.eql(.{ .int = 16 }) and icmp.rhs == .int) {
+        const imm = try i64Value(icmp.rhs.int);
+        if (imm < 0 or imm > std.math.maxInt(u16)) return .{ .no_emitter = "composed-block-icmp-rhs" };
+        selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, 16) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+        try selector_state.clobberAccumulator(selector);
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = @intCast(imm) } });
+        try selector.machine.instructions.append(selector.allocator, if (icmp.predicate == .ult) .setb_eax else .seta_eax);
     } else if (icmp.predicate == .ugt and (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })) and icmp.rhs == .named) {
         const bits: u16 = if (icmp.operand_ty.eql(.{ .int = 32 })) 32 else 64;
         selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };

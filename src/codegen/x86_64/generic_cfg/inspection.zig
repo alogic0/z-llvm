@@ -86,7 +86,8 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
     return switch (binary.op) {
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
         .udiv, .sdiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
-        .fadd, .fsub, .fmul, .fdiv, .frem => .{ .unsupported_instruction = @tagName(binary.op) },
+        .fadd => if (binary.ty == .float) null else .{ .unsupported_instruction = @tagName(binary.op) },
+        .fsub, .fmul, .fdiv, .frem => .{ .unsupported_instruction = @tagName(binary.op) },
     };
 }
 
@@ -96,7 +97,9 @@ fn inspectCast(cast: ir.CastInst) ?Diagnostic {
     }
     return switch (cast.op) {
         .trunc, .zext, .sext, .bitcast, .ptrtoint, .inttoptr => null,
-        .fpext, .fptrunc, .fptosi, .fptoui, .sitofp, .uitofp => .{ .unsupported_instruction = @tagName(cast.op) },
+        .fpext => if (cast.from_ty == .half and cast.to_ty == .float) null else .{ .unsupported_instruction = @tagName(cast.op) },
+        .fptrunc => if (cast.from_ty == .float and cast.to_ty == .half) null else .{ .unsupported_instruction = @tagName(cast.op) },
+        .fptosi, .fptoui, .sitofp, .uitofp => .{ .unsupported_instruction = @tagName(cast.op) },
     };
 }
 
@@ -114,7 +117,15 @@ fn inspectSelect(select: ir.SelectInst) ?Diagnostic {
 }
 
 fn inspectCall(call: ir.CallInst) ?Diagnostic {
-    if (call.inline_asm != null) return .{ .unsupported_instruction = "inline-asm-call" };
+    if (call.inline_asm) |inline_asm| {
+        if (!inline_asm.sideeffect or inline_asm.template.len != 0 or
+            !std.mem.eql(u8, inline_asm.constraints, "rm,~{dirflag},~{fpsr},~{flags}") or
+            call.ret_ty != .void or call.args.items.len != 1 or call.args.items[0].ty != .float)
+        {
+            return .{ .unsupported_instruction = "inline-asm-call" };
+        }
+        return null;
+    }
     if (call.callee_value != null) return .{ .unsupported_value = "indirect-call" };
     if (call.raw_args != null) return .{ .unsupported_instruction = "raw-call-args" };
     if (call.isDebugVariableLocation()) return null;
@@ -130,6 +141,16 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
             return .{ .unsupported_instruction = "llvm.trap" };
         }
         return null;
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.fabs.f16")) {
+        return if (call.ret_ty == .half and call.args.items.len == 1 and call.args.items[0].ty == .half) null else .{ .unsupported_type = "llvm.fabs.f16" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.fabs.f32")) {
+        return if (call.ret_ty == .float and call.args.items.len == 1 and call.args.items[0].ty == .float) null else .{ .unsupported_type = "llvm.fabs.f32" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) {
+        return if (call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 2 and
+            call.args.items[0].ty.eql(.{ .int = 16 }) and call.args.items[1].ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "llvm.ctlz.i16" };
     }
     if (call.operand_bundle != null) return .{ .unsupported_instruction = "operand-bundle-call" };
     if (isOverflowIntrinsic(call.callee)) {

@@ -906,6 +906,32 @@ test "generic cfg selector lowers unsigned i32 less-than immediate" {
     }, machine.instructions.items);
 }
 
+test "generic cfg selector lowers unsigned i16 immediate comparisons" {
+    inline for (.{ .ult, .ugt }) |predicate| {
+        var machine = MachineFunction.init("unsigned-i16-imm", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+
+        const diagnostic = try selector_scalar.lowerIcmp(&selector, "cmp", .{
+            .predicate = predicate,
+            .operand_ty = .{ .int = 16 },
+            .lhs = .{ .named = "value" },
+            .rhs = .{ .int = 0x7800 },
+        });
+
+        try std.testing.expect(diagnostic == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+            .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = 0x7800 } },
+            if (predicate == .ult) .setb_eax else .seta_eax,
+        }, machine.instructions.items);
+    }
+}
+
 test "generic cfg selector lowers variable i16 shifts" {
     inline for (.{ .shl, .lshr }) |op| {
         var machine = MachineFunction.init("variable-i16-shift", .{ .int = 16 });
@@ -956,4 +982,32 @@ test "generic cfg selector lowers i32 arithmetic-right shifts" {
         };
         try std.testing.expectEqual(expected, machine.instructions.items[machine.instructions.items.len - 1]);
     }
+}
+
+test "generic cfg selector preserves live accumulator across immediate binary" {
+    const input =
+        \\define i32 @live_immediate(i32 %value) {
+        \\entry:
+        \\  %source = add i32 %value, 1
+        \\  %derived = add i32 %source, 2
+        \\  %result = add i32 %source, %derived
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("live_immediate", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+
+    try std.testing.expectEqual(@as(u32, 12), function(4));
 }

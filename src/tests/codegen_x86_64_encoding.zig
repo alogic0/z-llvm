@@ -241,6 +241,27 @@ test "x86_64 encoding emits flag-preserving signed greater setcc" {
     }, bytes);
 }
 
+test "x86_64 encoding emits scalar FP bit moves and unsigned above setcc" {
+    var machine = codegen.x86_64.MachineFunction.init("fp_bits_seta", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .movd_xmm_eax = .xmm2 });
+    try machine.instructions.append(std.testing.allocator, .{ .movd_eax_xmm = .xmm3 });
+    try machine.instructions.append(std.testing.allocator, .seta_eax);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .movd_xmm_eax = .xmm2 }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .movd_eax_xmm = .xmm3 }));
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.seta_eax));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x66, 0x0f, 0x7e, 0xd0,
+        0x66, 0x0f, 0x6e, 0xd8,
+        0x0f, 0x97, 0xc0, 0x0f,
+        0xb6, 0xc0, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 encoding emits imul arg64 by rax" {
     var machine = codegen.x86_64.MachineFunction.init("imul_rax", .void);
     defer machine.deinit(std.testing.allocator);

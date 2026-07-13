@@ -79,13 +79,17 @@ fn isColdAssumeBundle(bundle: []const u8) bool {
 
 pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     if (call.isDebugVariableLocation()) return null;
+    if (call.inline_asm != null) return lowerFpBarrier(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.lifetime.start.p0") or std.mem.eql(u8, call.callee, "llvm.lifetime.end.p0")) return lowerLifetimeMarker(result, call);
     if (std.mem.eql(u8, call.callee, "llvm.assume")) return lowerAssume(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.trap")) return try lowerTrap(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.fabs.f16")) return try lowerFpAbs(selector, result, call, 16);
+    if (std.mem.eql(u8, call.callee, "llvm.fabs.f32")) return try lowerFpAbs(selector, result, call, 32);
     if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try lowerIntByteSizeCall(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i32")) return try lowerAbsI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try lowerAbsI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try lowerAbsI128(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) return try lowerCtlzI16(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try lowerCtlzI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
@@ -93,7 +97,6 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
-    if (call.inline_asm != null) return .{ .no_emitter = "composed-block-inline-asm-call" };
     if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
     if (!isDefaultOrFastcc(call.calling_conv) or call.tail_kind != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
         return .{ .no_emitter = "composed-block-call-form" };
@@ -118,6 +121,41 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         128 => {},
         else => unreachable,
     };
+    return null;
+}
+
+fn lowerFpAbs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, bits: u16) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-fabs-result" };
+    const ty: ir.Type = if (bits == 16) .half else .float;
+    if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty) or call.inline_asm != null or call.callee_value != null) {
+        return .{ .no_emitter = "composed-block-fabs-form" };
+    }
+    const source = selector_state.resolveValue(selector, call.args.items[0].value) orelse return .{ .unsupported_value = "composed-block-fabs-source" };
+    selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = .xmm0, .bits = bits } }) catch return .{ .unsupported_value = "composed-block-fabs-source" };
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = .xmm0 });
+    try selector_state.clobberXmmReg(selector, .xmm0);
+    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = if (bits == 16) 0x7fff else 0x7fff_ffff });
+    try selector.machine.instructions.append(selector.allocator, .{ .movd_eax_xmm = .xmm0 });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
+    return null;
+}
+
+fn lowerFpBarrier(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) ?Diagnostic {
+    if (result != null) return .{ .unsupported_value = "composed-block-inline-asm-result" };
+    const inline_asm = call.inline_asm orelse return .{ .no_emitter = "composed-block-inline-asm-call" };
+    if (!inline_asm.sideeffect or inline_asm.template.len != 0 or
+        !std.mem.eql(u8, inline_asm.constraints, "rm,~{dirflag},~{fpsr},~{flags}") or
+        call.ret_ty != .void or call.args.items.len != 1 or call.args.items[0].ty != .float)
+    {
+        return .{ .no_emitter = "composed-block-inline-asm-call" };
+    }
+    const loc = selector_state.resolveValue(selector, call.args.items[0].value) orelse return .{ .unsupported_value = "composed-block-inline-asm-value" };
+    switch (loc) {
+        .xmm => |fp| if (fp.bits != 32) return .{ .unsupported_value = "composed-block-inline-asm-value" },
+        .spill_fp => |fp| if (fp.bits != 32) return .{ .unsupported_value = "composed-block-inline-asm-value" },
+        else => return .{ .unsupported_value = "composed-block-inline-asm-value" },
+    }
     return null;
 }
 
@@ -339,6 +377,29 @@ pub fn lowerCtlzI32(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 32) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
     try selector_state.clobberAccumulator(selector);
     try selector.machine.instructions.append(selector.allocator, .clz_i32_edi_eax);
+    try selector_state.bindEax(selector, result_name);
+    return null;
+}
+
+pub fn lowerCtlzI16(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (call.inline_asm != null or call.callee_value != null or call.raw_args != null or call.operand_bundle != null) {
+        return .{ .no_emitter = "composed-block-ctlz-call-form" };
+    }
+    if (!call.ret_ty.eql(.{ .int = 16 }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-ctlz-signature" };
+    const value_arg = call.args.items[0];
+    const undef_arg = call.args.items[1];
+    const valid_zero_flag = undef_arg.value.eql(.{ .int = 0 }) or undef_arg.value.eql(.{ .int = 1 });
+    if (!value_arg.ty.eql(.{ .int = 16 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
+        return .{ .no_emitter = "composed-block-ctlz-args" };
+    }
+    selector_state.emitValueIntoEax(selector, value_arg.value) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 0xffff });
+    try selector_state.clobberArgReg(selector, .rdi);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdi });
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.append(selector.allocator, .clz_i32_edi_eax);
+    try selector.machine.instructions.append(selector.allocator, .{ .add_eax_imm32 = -16 });
     try selector_state.bindEax(selector, result_name);
     return null;
 }
