@@ -3,6 +3,7 @@ const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
 const cabi_tls_global_lowering = @import("cabi_tls_global_lowering.zig");
 const sysv_abi = @import("../sysv_abi.zig");
 const type_layout = @import("../../../zig_air_type_layout.zig");
+const fp_semantics = @import("../../../analysis/fp_semantics.zig");
 
 const std = shared.std;
 const ir = shared.ir;
@@ -872,9 +873,30 @@ pub fn genericCfgSupportsIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
 }
 
 pub fn genericCfgSupportsFcmp(function: ir.Function, fcmp: ir.FcmpInst) bool {
+    if (fcmp.operand_ty.eql(.half)) return genericCfgSupportsHalfOeqZero(function, fcmp);
     if (!fcmp.operand_ty.eql(.float) and !fcmp.operand_ty.eql(.double)) return false;
     return genericCfgSupportsScalarValue(function, fcmp.lhs) and
         genericCfgSupportsScalarValue(function, fcmp.rhs);
+}
+
+fn genericCfgSupportsHalfOeqZero(function: ir.Function, fcmp: ir.FcmpInst) bool {
+    if (fcmp.predicate != .oeq) return false;
+    if (namedValueIsSupported(function, fcmp.lhs) and valueIsHalfZeroLiteral(fcmp.rhs)) return true;
+    return namedValueIsSupported(function, fcmp.rhs) and valueIsHalfZeroLiteral(fcmp.lhs);
+}
+
+fn namedValueIsSupported(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .named => |name| genericCfgSupportsNamedValue(function, name),
+        else => false,
+    };
+}
+
+fn valueIsHalfZeroLiteral(value: ir.Value) bool {
+    return switch (value) {
+        .fp => |text| fp_semantics.isHalfZeroLiteral(text),
+        else => false,
+    };
 }
 
 pub fn genericCfgSupportsCast(function: ir.Function, cast: ir.CastInst) bool {

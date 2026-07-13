@@ -83,6 +83,17 @@ pub fn looksLikeFpLiteral(text: []const u8) bool {
         std.mem.startsWith(u8, text, "+0x");
 }
 
+pub fn halfLiteralBits(spelling: []const u8) !u16 {
+    const text = std.mem.trim(u8, spelling, " \t");
+    if (text.len != 7 or !std.mem.startsWith(u8, text, "0xH")) return error.InvalidFloatingPointLiteral;
+    return std.fmt.parseInt(u16, text[3..], 16) catch error.InvalidFloatingPointLiteral;
+}
+
+pub fn isHalfZeroLiteral(spelling: []const u8) bool {
+    const bits = halfLiteralBits(spelling) catch return false;
+    return bits & 0x7fff == 0;
+}
+
 fn isPositiveZeroSpelling(text: []const u8) bool {
     return std.mem.eql(u8, text, "0.0") or
         std.mem.eql(u8, text, "+0.0") or

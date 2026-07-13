@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const fp_semantics = @import("../../../analysis/fp_semantics.zig");
 
 pub const Diagnostic = union(enum) {
     unsupported_control_flow: []const u8,
@@ -69,7 +70,7 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .call => |call| inspectCall(call),
         .phi => |phi| if (isSelectorScalarType(phi.ty)) null else .{ .unsupported_type = "phi" },
         .freeze => |freeze| if (isSelectorScalarType(freeze.ty)) null else .{ .unsupported_type = "freeze" },
-        .fcmp => |fcmp| if (fcmp.operand_ty == .float or fcmp.operand_ty == .double) null else .{ .unsupported_type = "fcmp" },
+        .fcmp => |fcmp| inspectFcmp(fcmp),
         .atomicrmw => .{ .unsupported_instruction = "atomicrmw" },
         .cmpxchg => .{ .unsupported_instruction = "cmpxchg" },
         .fence => .{ .unsupported_instruction = "fence" },
@@ -78,6 +79,25 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .shufflevector => |shuffle| inspectShuffleVector(shuffle),
         .extractvalue => |extract| inspectExtractValue(extract),
         .insertvalue => .{ .unsupported_instruction = "insertvalue" },
+    };
+}
+
+fn inspectFcmp(fcmp: ir.FcmpInst) ?Diagnostic {
+    if (fcmp.operand_ty == .float or fcmp.operand_ty == .double) return null;
+    if (fcmp.operand_ty != .half or fcmp.predicate != .oeq) return .{ .unsupported_type = "fcmp" };
+    if (valueIsNamed(fcmp.lhs) and valueIsHalfZeroLiteral(fcmp.rhs)) return null;
+    if (valueIsNamed(fcmp.rhs) and valueIsHalfZeroLiteral(fcmp.lhs)) return null;
+    return .{ .unsupported_type = "fcmp" };
+}
+
+fn valueIsNamed(value: ir.Value) bool {
+    return value == .named;
+}
+
+fn valueIsHalfZeroLiteral(value: ir.Value) bool {
+    return switch (value) {
+        .fp => |text| fp_semantics.isHalfZeroLiteral(text),
+        else => false,
     };
 }
 

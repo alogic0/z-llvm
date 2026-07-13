@@ -1,4 +1,5 @@
 const ir = @import("../../../ir.zig");
+const fp_semantics = @import("../../../analysis/fp_semantics.zig");
 const x86_64_match = @import("../match.zig");
 const x86_64_types = @import("../types.zig");
 const inspection = @import("inspection.zig");
@@ -97,6 +98,7 @@ pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst
 
 pub fn lowerFcmp(selector: *ComposedBlockSelector, result: ?[]const u8, fcmp: ir.FcmpInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (halfOeqZeroSource(fcmp)) |source_value| return lowerHalfOeqZero(selector, result_name, source_value);
     const bits = fpBits(fcmp.operand_ty) orelse return .{ .no_emitter = "composed-block-fcmp-type" };
 
     if (fcmp.predicate != .false and fcmp.predicate != .true) {
@@ -119,6 +121,41 @@ pub fn lowerFcmp(selector: *ComposedBlockSelector, result: ?[]const u8, fcmp: ir
         try selector_state.clobberAccumulator(selector);
     }
     try selector.machine.instructions.append(selector.allocator, .{ .set_fcmp_eax = fcmp.predicate });
+    try selector_state.bindEax(selector, result_name);
+    return null;
+}
+
+fn halfOeqZeroSource(fcmp: ir.FcmpInst) ?ir.Value {
+    if (fcmp.operand_ty != .half or fcmp.predicate != .oeq) return null;
+    if (fcmp.lhs == .named and isHalfZeroLiteral(fcmp.rhs)) return fcmp.lhs;
+    if (fcmp.rhs == .named and isHalfZeroLiteral(fcmp.lhs)) return fcmp.rhs;
+    return null;
+}
+
+fn isHalfZeroLiteral(value: ir.Value) bool {
+    const text = switch (value) {
+        .fp => |text| text,
+        else => return false,
+    };
+    return fp_semantics.isHalfZeroLiteral(text);
+}
+
+fn lowerHalfOeqZero(selector: *ComposedBlockSelector, result_name: []const u8, source_value: ir.Value) !?Diagnostic {
+    const source = selector_state.resolveValue(selector, source_value) orelse return .{ .unsupported_value = "composed-block-half-zero-source" };
+    try selector_state.clobberAccumulator(selector);
+    const reg = switch (source) {
+        .xmm => |fp| if (fp.bits == 16) fp.reg else return .{ .unsupported_value = "composed-block-half-zero-source" },
+        .spill_fp => |fp| blk: {
+            if (fp.bits != 16) return .{ .unsupported_value = "composed-block-half-zero-source" };
+            selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = .xmm0, .bits = 16 } }) catch return .{ .unsupported_value = "composed-block-half-zero-source" };
+            break :blk .xmm0;
+        },
+        else => return .{ .unsupported_value = "composed-block-half-zero-source" },
+    };
+    try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = reg });
+    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 0x7fff });
+    try selector.machine.instructions.append(selector.allocator, .test_eax_eax);
+    try selector.machine.instructions.append(selector.allocator, .sete_eax);
     try selector_state.bindEax(selector, result_name);
     return null;
 }

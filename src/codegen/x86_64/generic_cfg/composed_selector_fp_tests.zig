@@ -373,6 +373,101 @@ test "generic cfg selector executes every scalar float and double fcmp predicate
     }
 }
 
+test "generic cfg selector lowers only half oeq against literal zero as a bit test" {
+    var machine = x86_64_machine.MachineFunction.init("half-zero", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "value", .{ .xmm = .{ .reg = .xmm2, .bits = 16 } });
+    try selector_state.bindValueLoc(&selector, "other", .{ .xmm = .{ .reg = .xmm3, .bits = 16 } });
+
+    try std.testing.expect((try selector_fp.lowerFcmp(&selector, "positive", .{
+        .predicate = .oeq,
+        .operand_ty = .half,
+        .lhs = .{ .named = "value" },
+        .rhs = .{ .fp = "0xH0000" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .movd_xmm_eax = .xmm2 },
+        .{ .and_eax_imm32 = 0x7fff },
+        .test_eax_eax,
+        .sete_eax,
+    }, machine.instructions.items);
+
+    machine.instructions.clearRetainingCapacity();
+    try std.testing.expect((try selector_fp.lowerFcmp(&selector, "negative_reversed", .{
+        .predicate = .oeq,
+        .operand_ty = .half,
+        .lhs = .{ .fp = "0xH8000" },
+        .rhs = .{ .named = "value" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .movd_xmm_eax = .xmm2 },
+        .{ .and_eax_imm32 = 0x7fff },
+        .test_eax_eax,
+        .sete_eax,
+    }, machine.instructions.items);
+
+    for ([_]ir.FcmpInst{
+        .{ .predicate = .uno, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .fp = "0xH0000" } },
+        .{ .predicate = .olt, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .fp = "0xH0000" } },
+        .{ .predicate = .oeq, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .fp = "0xH3c00" } },
+        .{ .predicate = .oeq, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .named = "other" } },
+    }) |near_miss| {
+        machine.instructions.clearRetainingCapacity();
+        const diagnostic = (try selector_fp.lowerFcmp(&selector, "near_miss", near_miss)).?;
+        try std.testing.expectEqualStrings("composed-block-fcmp-type", diagnostic.no_emitter);
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "generic cfg selector executes half zero bit tests in both operand orders" {
+    const input =
+        \\define i32 @zero_rhs(half %value) {
+        \\entry:
+        \\  %is_zero = fcmp oeq half %value, 0xH0000
+        \\  %wide = zext i1 %is_zero to i32
+        \\  ret i32 %wide
+        \\}
+        \\define i32 @zero_lhs(half %value) {
+        \\entry:
+        \\  %is_zero = fcmp oeq half 0xH8000, %value
+        \\  %wide = zext i1 %is_zero to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    inline for (.{ 0, 1 }) |index| {
+        var machine = x86_64_machine.MachineFunction.init(module.functions.items[index].name, .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[index]));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        const is_zero: *const fn (f16) callconv(.c) u32 = @ptrCast(mapping.ptr);
+        inline for (.{
+            .{ @as(u16, 0x0000), @as(u32, 1) },
+            .{ @as(u16, 0x8000), @as(u32, 1) },
+            .{ @as(u16, 0x0001), @as(u32, 0) },
+            .{ @as(u16, 0x8001), @as(u32, 0) },
+            .{ @as(u16, 0x3c00), @as(u32, 0) },
+            .{ @as(u16, 0xbc00), @as(u32, 0) },
+            .{ @as(u16, 0x7c00), @as(u32, 0) },
+            .{ @as(u16, 0xfc00), @as(u32, 0) },
+            .{ @as(u16, 0x7e01), @as(u32, 0) },
+            .{ @as(u16, 0xfe55), @as(u32, 0) },
+            .{ @as(u16, 0x7d01), @as(u32, 0) },
+            .{ @as(u16, 0xfd55), @as(u32, 0) },
+        }) |case| try std.testing.expectEqual(case[1], is_zero(@bitCast(case[0])));
+    }
+}
+
 test "generic cfg selector executes bit-exact scalar FP widening and narrowing" {
     const input =
         \\define double @widen(float %value) {
