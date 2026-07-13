@@ -85,6 +85,30 @@ pub fn isSplatMask(
     return true;
 }
 
+pub const Packed2ShuffleMask = enum {
+    splat_lane0,
+    lane1_to_lane0,
+};
+
+pub fn classifyPacked2ShuffleMask(shuffle: core.ShuffleVectorInst) ?Packed2ShuffleMask {
+    if (shuffle.lhs_ty != .vector or shuffle.rhs_ty != .vector or shuffle.mask_ty != .vector) return null;
+    if (!shuffle.rhs_ty.eql(shuffle.lhs_ty) or shuffle.lhs_ty.vector.len != 2) return null;
+    const mask_ty = shuffle.mask_ty.vector;
+    if (mask_ty.len != 2 or mask_ty.elem_ty != .int or mask_ty.elem_ty.int != 32) return null;
+    const parsed = parseFixed(2, shuffle.mask, mask_ty) orelse return null;
+    if (maskLaneEquals(parsed.lanes[0], 0) and maskLaneEquals(parsed.lanes[1], 0)) return .splat_lane0;
+    if (maskLaneEquals(parsed.lanes[0], 1) and parsed.lanes[1] == .poison) return .lane1_to_lane0;
+    return null;
+}
+
+fn maskLaneEquals(lane: Lane, expected: i128) bool {
+    return switch (lane) {
+        .int => |value| value == expected,
+        .zero_initializer => expected == 0,
+        else => false,
+    };
+}
+
 fn parseTypedLane(raw: []const u8, elem_ty: core.VectorElementType) ?Lane {
     const lane = std.mem.trim(u8, raw, " \t");
     const separator = std.mem.indexOfAny(u8, lane, " \t") orelse return null;
@@ -155,4 +179,13 @@ test "fixed vector constants and typed splat masks are structured once" {
         .mask = .{ .vector = "<i32 0, i32 0>" },
     };
     try std.testing.expect(isSplatMask(2, shuffle, 0));
+    try std.testing.expectEqual(Packed2ShuffleMask.splat_lane0, classifyPacked2ShuffleMask(shuffle).?);
+
+    var lane_shift = shuffle;
+    lane_shift.mask = .{ .vector = "<i32 1, i32 poison>" };
+    try std.testing.expectEqual(Packed2ShuffleMask.lane1_to_lane0, classifyPacked2ShuffleMask(lane_shift).?);
+    lane_shift.mask = .{ .vector = "<i32 1, i32 undef>" };
+    try std.testing.expect(classifyPacked2ShuffleMask(lane_shift) == null);
+    lane_shift.mask = .{ .vector = "<i32 0, i32 3>" };
+    try std.testing.expect(classifyPacked2ShuffleMask(lane_shift) == null);
 }

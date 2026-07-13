@@ -144,6 +144,41 @@ test "generic cfg selector tracks defined packed double lanes and pair spill own
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_xmm128_rsp = .{ .frame_index = .slot0, .reg = masked_reg } }, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector propagates lane-shift definedness" {
+    var machine = x86_64_machine.MachineFunction.init("vector-lane-shift", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "pair", .{ .xmm = .{
+        .reg = .xmm2,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f64x2(0b11) },
+    } });
+    try selector_state.bindValueLoc(&selector, "lane0_only", .{ .xmm = .{
+        .reg = .xmm3,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f64x2(0b01) },
+    } });
+
+    const lane_shift: ir.ShuffleVectorInst = .{
+        .lhs_ty = .{ .vector = .{ .len = 2, .elem_ty = .double } },
+        .lhs = .{ .named = "pair" },
+        .rhs_ty = .{ .vector = .{ .len = 2, .elem_ty = .double } },
+        .rhs = .poison,
+        .mask_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 32 } } },
+        .mask = .{ .vector = "<i32 1, i32 poison>" },
+    };
+    try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "shifted", lane_shift)) == null);
+    const shifted = selector_state.valueLoc(&selector, "shifted").?.xmm;
+    try std.testing.expectEqual(@as(u2, 0b01), shifted.vectorShape().?.defined_lanes);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .unpckhpd_xmm = .{ .dst = shifted.reg, .src = shifted.reg } }, machine.instructions.items[machine.instructions.items.len - 1]);
+
+    var poisoned_shift = lane_shift;
+    poisoned_shift.lhs = .{ .named = "lane0_only" };
+    try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "poisoned_shift", poisoned_shift)) == null);
+    try std.testing.expectEqual(@as(u2, 0), selector_state.valueLoc(&selector, "poisoned_shift").?.xmm.vectorShape().?.defined_lanes);
+}
+
 test "generic cfg selector executes packed double construction and pressure spills bit exactly" {
     const input =
         \\define void @vector_canary(ptr %out, double %low, double %high) {
@@ -151,6 +186,7 @@ test "generic cfg selector executes packed double construction and pressure spil
         \\  %seed = insertelement <2 x double> poison, double %low, i64 0
         \\  %splat = shufflevector <2 x double> %seed, <2 x double> poison, <2 x i32> zeroinitializer
         \\  %pair = insertelement <2 x double> %seed, double %high, i64 1
+        \\  %shift = shufflevector <2 x double> %pair, <2 x double> poison, <2 x i32> <i32 1, i32 poison>
         \\  %copy0 = insertelement <2 x double> %pair, double %high, i64 1
         \\  %copy1 = insertelement <2 x double> %pair, double %high, i64 1
         \\  %copy2 = insertelement <2 x double> %pair, double %high, i64 1
@@ -177,6 +213,7 @@ test "generic cfg selector executes packed double construction and pressure spil
         \\  %c5 = extractelement <2 x double> %copy5, i64 1
         \\  %c6 = extractelement <2 x double> %copy6, i64 0
         \\  %c7 = extractelement <2 x double> %copy7, i64 1
+        \\  %h0 = extractelement <2 x double> %shift, i64 0
         \\  %b0 = bitcast double %s0 to i64
         \\  %b1 = bitcast double %s1 to i64
         \\  %b2 = bitcast double %p0 to i64
@@ -193,6 +230,7 @@ test "generic cfg selector executes packed double construction and pressure spil
         \\  %b13 = bitcast double %c5 to i64
         \\  %b14 = bitcast double %c6 to i64
         \\  %b15 = bitcast double %c7 to i64
+        \\  %b16 = bitcast double %h0 to i64
         \\  store i64 %b0, ptr %out, align 8
         \\  %o1 = getelementptr i8, ptr %out, i64 8
         \\  store i64 %b1, ptr %o1, align 8
@@ -224,6 +262,8 @@ test "generic cfg selector executes packed double construction and pressure spil
         \\  store i64 %b14, ptr %o14, align 8
         \\  %o15 = getelementptr i8, ptr %out, i64 120
         \\  store i64 %b15, ptr %o15, align 8
+        \\  %o16 = getelementptr i8, ptr %out, i64 128
+        \\  store i64 %b16, ptr %o16, align 8
         \\  ret void
         \\}
         \\
@@ -250,7 +290,7 @@ test "generic cfg selector executes packed double construction and pressure spil
     const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
     defer std.posix.munmap(mapping);
     @memcpy(mapping, bytes);
-    const canary: *const fn (*[16]u64, f64, f64) callconv(.c) void = @ptrCast(mapping.ptr);
+    const canary: *const fn (*[17]u64, f64, f64) callconv(.c) void = @ptrCast(mapping.ptr);
 
     inline for (.{
         .{ @as(u64, 0x0000_0000_0000_0000), @as(u64, 0x8000_0000_0000_0000) },
@@ -261,13 +301,14 @@ test "generic cfg selector executes packed double construction and pressure spil
     }) |case| {
         const low: f64 = @bitCast(case[0]);
         const high: f64 = @bitCast(case[1]);
-        var output: [16]u64 = undefined;
+        var output: [17]u64 = undefined;
         canary(&output, low, high);
-        const expected = [16]u64{
+        const expected = [17]u64{
             case[0],             case[0],              case[0],             case[1],
             @bitCast(low + 0.0), @bitCast(high + 0.0), @bitCast(low * 1.0), @bitCast(high * 1.0),
             case[0],             case[1],              case[0],             case[1],
             case[0],             case[1],              case[0],             case[1],
+            case[1],
         };
         try std.testing.expectEqualSlices(u64, &expected, &output);
     }
@@ -280,6 +321,7 @@ test "generic cfg selector executes packed float construction and movups pressur
         \\  %seed = insertelement <2 x float> poison, float %low, i64 0
         \\  %splat = shufflevector <2 x float> %seed, <2 x float> poison, <2 x i32> zeroinitializer
         \\  %pair = insertelement <2 x float> %seed, float %high, i64 1
+        \\  %shift = shufflevector <2 x float> %pair, <2 x float> poison, <2 x i32> <i32 1, i32 poison>
         \\  %copy0 = insertelement <2 x float> %pair, float %high, i64 1
         \\  %copy1 = insertelement <2 x float> %pair, float %high, i64 1
         \\  %copy2 = insertelement <2 x float> %pair, float %high, i64 1
@@ -306,6 +348,7 @@ test "generic cfg selector executes packed float construction and movups pressur
         \\  %c5 = extractelement <2 x float> %copy5, i64 1
         \\  %c6 = extractelement <2 x float> %copy6, i64 0
         \\  %c7 = extractelement <2 x float> %copy7, i64 1
+        \\  %h0 = extractelement <2 x float> %shift, i64 0
         \\  %b0 = bitcast float %s0 to i32
         \\  %b1 = bitcast float %s1 to i32
         \\  %b2 = bitcast float %p0 to i32
@@ -322,6 +365,7 @@ test "generic cfg selector executes packed float construction and movups pressur
         \\  %b13 = bitcast float %c5 to i32
         \\  %b14 = bitcast float %c6 to i32
         \\  %b15 = bitcast float %c7 to i32
+        \\  %b16 = bitcast float %h0 to i32
         \\  store i32 %b0, ptr %out, align 4
         \\  %o1 = getelementptr i8, ptr %out, i64 4
         \\  store i32 %b1, ptr %o1, align 4
@@ -353,6 +397,8 @@ test "generic cfg selector executes packed float construction and movups pressur
         \\  store i32 %b14, ptr %o14, align 4
         \\  %o15 = getelementptr i8, ptr %out, i64 60
         \\  store i32 %b15, ptr %o15, align 4
+        \\  %o16 = getelementptr i8, ptr %out, i64 64
+        \\  store i32 %b16, ptr %o16, align 4
         \\  ret void
         \\}
         \\
@@ -379,7 +425,7 @@ test "generic cfg selector executes packed float construction and movups pressur
     const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
     defer std.posix.munmap(mapping);
     @memcpy(mapping, bytes);
-    const canary: *const fn (*[16]u32, f32, f32) callconv(.c) void = @ptrCast(mapping.ptr);
+    const canary: *const fn (*[17]u32, f32, f32) callconv(.c) void = @ptrCast(mapping.ptr);
 
     inline for (.{
         .{ @as(u32, 0x0000_0000), @as(u32, 0x8000_0000) },
@@ -390,13 +436,14 @@ test "generic cfg selector executes packed float construction and movups pressur
     }) |case| {
         const low: f32 = @bitCast(case[0]);
         const high: f32 = @bitCast(case[1]);
-        var output: [16]u32 = undefined;
+        var output: [17]u32 = undefined;
         canary(&output, low, high);
-        const expected = [16]u32{
+        const expected = [17]u32{
             case[0],             case[0],              case[0],             case[1],
             @bitCast(low + 0.0), @bitCast(high + 0.0), @bitCast(low * 1.0), @bitCast(high * 1.0),
             case[0],             case[1],              case[0],             case[1],
             case[0],             case[1],              case[0],             case[1],
+            case[1],
         };
         try std.testing.expectEqualSlices(u32, &expected, &output);
     }
@@ -443,9 +490,18 @@ test "generic cfg selector fails closed outside the bounded vector slice" {
         \\define float @bad(float %x) {
         \\entry:
         \\  %v = insertelement <2 x float> poison, float %x, i64 0
-        \\  %r = shufflevector <2 x float> %v, <2 x float> poison, <2 x i32> <i32 1, i32 poison>
+        \\  %r = shufflevector <2 x float> %v, <2 x float> poison, <2 x i32> <i32 1, i32 undef>
         \\  %e = extractelement <2 x float> %r, i64 0
         \\  ret float %e
+        \\}
+        , .tag = .unsupported_instruction, .detail = "shufflevector-mask" },
+        .{ .ir_text =
+        \\define double @bad(double %x) {
+        \\entry:
+        \\  %v = insertelement <2 x double> poison, double %x, i64 0
+        \\  %r = shufflevector <2 x double> %v, <2 x double> poison, <2 x i32> <i32 0, i32 3>
+        \\  %e = extractelement <2 x double> %r, i64 0
+        \\  ret double %e
         \\}
         , .tag = .unsupported_instruction, .detail = "shufflevector-mask" },
         .{ .ir_text =

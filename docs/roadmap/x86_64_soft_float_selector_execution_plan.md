@@ -192,6 +192,20 @@ planner new alignment semantics, changing padding or offset selection,
 introducing independent paired-slot lifetime or identity, or changing
 collision, liveness, or eviction behavior requires review.
 
+### Standing Correctness And Evidence Conventions
+
+- When an audit invalidates a previously accepted row closure, a synthetic
+  reproducer may prove the repair but cannot restore the closure claim. The
+  affected row, and any explicitly named sibling shape, require executable
+  row-exact semantic reproof before later capability work continues.
+- When admission depends on a control-flow proof, executable coverage must
+  visit every admitted successor and must include a near-miss form that fails
+  closed. Structural inspection alone is not acceptance evidence for the
+  proof.
+- Frontier evidence must name the concrete intrinsic or IR operation behind
+  a generic call boundary. A diagnostic such as `call` is an implementation
+  location, not a capability inventory entry.
+
 ## Execution Phases
 
 ### Phase A: Scalar FP Core

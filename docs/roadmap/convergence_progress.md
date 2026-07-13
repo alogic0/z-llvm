@@ -3507,6 +3507,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_typed_switch_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox27_typed_switch.summary`.
 
+- 2026-07-13 (this commit, INBOX-28) Item 12 packed lane-shift capability:
+  the shared typed shuffle classifier admits exact `<1, poison>` masks for
+  f32x2 and f64x2, lowering through the existing `shufps`/`unpckhpd` forms
+  while propagating only source lane 1 into defined output lane 0. Pressure
+  canaries pass 170 exact words across signed zeros, finite values,
+  subnormals, infinities, and NaN payloads; malformed near-miss masks remain
+  fail-closed. The seven directed log rows and collateral double `log10`
+  advance to concrete scalar `sitofp`; double `log` remains at packed `fsub`.
+  Report-all therefore remains 443 selected / 202 emitting / 241 failing.
+  Tier 2 is green and no Tier 3 trigger occurs. Evidence
+  `docs/evidence/std_debug_hello_vector_lane_shift_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

@@ -113,7 +113,7 @@ fn inspectShuffleVector(shuffle: ir.ShuffleVectorInst) ?Diagnostic {
     {
         return .{ .unsupported_type = "shufflevector" };
     }
-    return if (ir.vector_constant.isSplatMask(2, shuffle, 0)) null else .{ .unsupported_instruction = "shufflevector-mask" };
+    return if (ir.vector_constant.classifyPacked2ShuffleMask(shuffle) != null) null else .{ .unsupported_instruction = "shufflevector-mask" };
 }
 
 fn inspectLaneIndex(index: ir.Value, comptime operation: []const u8) ?Diagnostic {

@@ -97,16 +97,23 @@ pub fn lowerInsertElement(selector: *ComposedBlockSelector, result: ?[]const u8,
 
 pub fn lowerShuffleVector(selector: *ComposedBlockSelector, result: ?[]const u8, shuffle: ir.ShuffleVectorInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-missing-result" };
-    if (!isPackedFp2(shuffle.lhs_ty) or !ir.vector_constant.isSplatMask(2, shuffle, 0)) {
-        return .{ .no_emitter = "composed-vector-shuffle-form" };
-    }
+    if (!isPackedFp2(shuffle.lhs_ty)) return .{ .no_emitter = "composed-vector-shuffle-form" };
+    const mask = ir.vector_constant.classifyPacked2ShuffleMask(shuffle) orelse return .{ .no_emitter = "composed-vector-shuffle-form" };
     const source = describeVectorValue(selector, shuffle.lhs, shuffle.lhs_ty) orelse return .{ .unsupported_value = "composed-vector-shuffle-source" };
     const dst = resultXmmReg(selector, result_name, shuffle.lhs, null) orelse return .{ .no_spill_envelope = "composed-vector-shuffle-dst" };
     if (try materializeVectorValue(selector, shuffle.lhs, source, dst, null)) |diagnostic| return diagnostic;
     try selector_state.clobberXmmReg(selector, dst);
-    try appendUnpackLow(selector, source.shape.lane_type, dst, dst);
     var result_shape = source.shape;
-    result_shape.defined_lanes = if ((source.shape.defined_lanes & 0b01) != 0) 0b11 else 0;
+    switch (mask) {
+        .splat_lane0 => {
+            try appendUnpackLow(selector, source.shape.lane_type, dst, dst);
+            result_shape.defined_lanes = if ((source.shape.defined_lanes & 0b01) != 0) 0b11 else 0;
+        },
+        .lane1_to_lane0 => {
+            try appendHighToLow(selector, source.shape.lane_type, dst);
+            result_shape.defined_lanes = if ((source.shape.defined_lanes & 0b10) != 0) 0b01 else 0;
+        },
+    }
     try bindVectorResult(selector, result_name, dst, result_shape);
     return null;
 }
@@ -291,6 +298,13 @@ fn appendUnpackLow(selector: *ComposedBlockSelector, lane_type: VectorShape.Lane
     try selector.machine.instructions.append(selector.allocator, switch (lane_type) {
         .float => .{ .unpcklps_xmm = .{ .dst = dst, .src = src } },
         .double => .{ .unpcklpd_xmm = .{ .dst = dst, .src = src } },
+    });
+}
+
+fn appendHighToLow(selector: *ComposedBlockSelector, lane_type: VectorShape.LaneType, dst: XmmReg) !void {
+    try selector.machine.instructions.append(selector.allocator, switch (lane_type) {
+        .float => .{ .shufps_high_f32_to_low = dst },
+        .double => .{ .unpckhpd_xmm = .{ .dst = dst, .src = dst } },
     });
 }
 
