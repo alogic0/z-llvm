@@ -187,3 +187,93 @@ test "composed selector keeps unsupported FP memory fail closed" {
     })).?;
     try std.testing.expectEqualStrings("composed-block-store-fp-ptr", external_diagnostic.no_emitter);
 }
+
+test "composed selector stores scalar FP values through proven pointer parameters" {
+    const input =
+        \\define void @store_f32(float %value, ptr %out) {
+        \\entry:
+        \\  store float %value, ptr %out, align 4
+        \\  ret void
+        \\}
+        \\define void @store_f64(double %value, ptr %out) {
+        \\entry:
+        \\  store double %value, ptr %out, align 8
+        \\  ret void
+        \\}
+        \\define void @store_f32_framed(float %value, ptr %out) {
+        \\entry:
+        \\  %slot = alloca double, align 8
+        \\  br label %body
+        \\body:
+        \\  store float %value, ptr %out, align 4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items, 0..) |function, index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+        if (index == 2) {
+            var saw_fp_reload = false;
+            var saw_pointer_reload = false;
+            var saw_spilled_pointer_store = false;
+            for (machine.instructions.items) |instruction| switch (instruction) {
+                .reload_xmm32_rsp => saw_fp_reload = true,
+                .reload_arg64_rsp => |reload| saw_pointer_reload = reload.reg == .rcx,
+                .store_xmm0_f32_arg_ptr_disp8 => |store| saw_spilled_pointer_store = store.reg == .rcx and store.offset == 0,
+                else => {},
+            };
+            try std.testing.expect(saw_fp_reload and saw_pointer_reload and saw_spilled_pointer_store);
+        }
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (index == 1) {
+            const store: *const fn (f64, *f64) callconv(.c) void = @ptrCast(mapping.ptr);
+            inline for (.{ @as(u64, 0x0000_0000_0000_0000), @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x0000_0000_0000_0001), @as(u64, 0x7ff0_0000_0000_0000), @as(u64, 0x7ff8_1234_5678_9abc) }) |bits| {
+                var out: f64 = undefined;
+                store(@bitCast(bits), &out);
+                try std.testing.expectEqual(bits, @as(u64, @bitCast(out)));
+            }
+        } else {
+            const store: *const fn (f32, *f32) callconv(.c) void = @ptrCast(mapping.ptr);
+            inline for (.{ @as(u32, 0x0000_0000), @as(u32, 0x8000_0000), @as(u32, 0x0000_0001), @as(u32, 0x7f80_0000), @as(u32, 0x7fc1_2345) }) |bits| {
+                var out: f32 = undefined;
+                store(@bitCast(bits), &out);
+                try std.testing.expectEqual(bits, @as(u32, @bitCast(out)));
+            }
+        }
+    }
+}
+
+test "composed selector rejects FP stores through derived pointers" {
+    const input =
+        \\define void @store_unproven(ptr %base, float %value) {
+        \\entry:
+        \\  %out = getelementptr i8, ptr %base, i64 4
+        \\  store float %value, ptr %out, align 4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("store_unproven", .void);
+    defer machine.deinit(std.testing.allocator);
+    const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (selection) {
+        .unsupported => |diagnostic| try std.testing.expectEqualStrings("composed-block-store-fp-ptr", diagnostic.no_emitter),
+        .selected => return error.TestUnexpectedResult,
+    }
+}

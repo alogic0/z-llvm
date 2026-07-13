@@ -263,20 +263,39 @@ fn lowerLoadFp(selector: *ComposedBlockSelector, result_name: []const u8, load: 
 fn lowerStoreFp(selector: *ComposedBlockSelector, store: ir.StoreInst, bits: u16) !?Diagnostic {
     if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-store-fp-addrspace" };
     const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
-    const stack = switch (ptr) {
-        .stack_scalar => |stack| stack,
+    if (ptr == .stack_scalar) {
+        const stack = ptr.stack_scalar;
+        if (stack.kind != .fp or stack.bits != bits) return .{ .no_emitter = "composed-block-store-stack-width" };
+        if (try selector_fp.materializeFpValue(selector, store.value, .xmm0, bits)) |diagnostic| return diagnostic;
+
+        if (stack.base_disp % 4 != 0) return .{ .no_emitter = "composed-block-store-fp-align" };
+        const frame_index = FrameIndex.fromSlot(stack.base_disp / 4) catch return .{ .no_spill_envelope = "composed-block-store-fp-frame" };
+        if (bits == 32) {
+            try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm32_rsp = .{ .frame_index = frame_index, .reg = .xmm0 } });
+        } else if (bits == 64) {
+            try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm64_rsp = .{ .frame_index = frame_index, .reg = .xmm0 } });
+        } else unreachable;
+        return null;
+    }
+
+    const ptr_name = switch (store.ptr) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-store-fp-ptr" },
+    };
+    if (!selector.abi_pointer_params.contains(ptr_name)) return .{ .no_emitter = "composed-block-store-fp-ptr" };
+    if (try selector_fp.materializeFpValue(selector, store.value, .xmm0, bits)) |diagnostic| return diagnostic;
+    const ptr_reg = switch (ptr) {
+        .arg64, .scratch64 => |reg| reg,
+        .spill64 => |frame_index| blk: {
+            selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx }) catch return .{ .unsupported_value = "composed-block-store-fp-ptr" };
+            break :blk .rcx;
+        },
         else => return .{ .no_emitter = "composed-block-store-fp-ptr" },
     };
-    if (stack.kind != .fp or stack.bits != bits) return .{ .no_emitter = "composed-block-store-stack-width" };
-    if (try selector_fp.materializeFpValue(selector, store.value, .xmm0, bits)) |diagnostic| return diagnostic;
-
-    if (stack.base_disp % 4 != 0) return .{ .no_emitter = "composed-block-store-fp-align" };
-    const frame_index = FrameIndex.fromSlot(stack.base_disp / 4) catch return .{ .no_spill_envelope = "composed-block-store-fp-frame" };
-    if (bits == 32) {
-        try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm32_rsp = .{ .frame_index = frame_index, .reg = .xmm0 } });
-    } else if (bits == 64) {
-        try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm64_rsp = .{ .frame_index = frame_index, .reg = .xmm0 } });
-    } else unreachable;
+    try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+        .{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = ptr_reg, .offset = 0 } }
+    else
+        .{ .store_xmm0_arg_ptr_disp8 = .{ .reg = ptr_reg, .offset = 0 } });
     return null;
 }
 

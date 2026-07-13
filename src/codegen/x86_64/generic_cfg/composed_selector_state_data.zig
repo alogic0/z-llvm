@@ -23,6 +23,7 @@ pub const ComposedBlockSelector = struct {
     machine: *MachineFunction,
     allocation_plan: ?*const SelectorAllocationPlan = null,
     values: std.StringHashMap(ValueBinding),
+    abi_pointer_params: NameSet,
     phi_results: NameSet,
     phi_destinations: std.StringHashMap(ValueLoc),
     overflow_results: std.StringHashMap(OverflowResultLoc),
@@ -46,6 +47,7 @@ pub const ComposedBlockSelector = struct {
             .machine = machine,
             .allocation_plan = null,
             .values = std.StringHashMap(ValueBinding).init(allocator),
+            .abi_pointer_params = NameSet.init(allocator),
             .phi_results = NameSet.init(allocator),
             .phi_destinations = std.StringHashMap(ValueLoc).init(allocator),
             .overflow_results = std.StringHashMap(OverflowResultLoc).init(allocator),
@@ -58,6 +60,7 @@ pub const ComposedBlockSelector = struct {
         selector.spill_slots.deinit();
         selector.phi_destinations.deinit();
         selector.phi_results.deinit();
+        selector.abi_pointer_params.deinit();
         selector.values.deinit();
     }
 };

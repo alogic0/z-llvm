@@ -149,6 +149,7 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
         }
         const reg = ArgReg.fromIndex(gpr_index) catch return .{ .unsupported_value = "composed-block-param-reg" };
         if (param.ty == .ptr) {
+            try selector.abi_pointer_params.put(param.name, {});
             try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg });
         } else {
             const bits = intBits(param.ty) orelse return .{ .no_emitter = "composed-block-param-not-scalar" };

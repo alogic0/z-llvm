@@ -37,18 +37,19 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-25 and its one pre-authorized successor are complete. Commit `c7e01c3a`
-adds typed scalar FP frame memory and the rem_pio2f out-parameter call path.
-The successor centralizes typed fixed-vector constants and splat recognition,
-generalizes the packed-XMM allocation class, and mirrors the bounded f64x2
-slice for f32x2 with `movups` pair spills. The six half/float log rows now stop
-at their excluded lane-shift shuffle; `__unordsf2` stops at the excluded vector
-`fabs` call. Report-all remains 443 selected / 193 emitting / 250 failing, so
-there is no row-closure or ratchet claim. Tier 2 and the policy-triggered Tier
-3 are green. No third cycle is authorized; stop for review. Evidence:
-`docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary`,
-`docs/evidence/std_debug_hello_vector_f32x2_acceptance.summary`, and
-`docs/evidence/distribution_all_after_f32x2.summary`.
+INBOX-26 and its one pre-authorized successor are complete. Commit `5131ad43`
+adds scalar FP selects and source-safe FP phi edges, closes `tanf`, and passes
+its Tier 3 acceptance. The successor adds scalar float/double stores through
+exact named ABI pointer parameters, including stabilized 64-bit pointer
+spills, while derived pointers remain fail-closed. `sincosf` clears the
+external-store frontier and now stops with `sinf` and `cosf` at the unsupported
+switch terminator. Report-all remains 443 selected / 199 emitting / 244
+failing, with no row-closure or ratchet claim in the successor. Its Tier 2 is
+green and Tier 3 is not triggered. The one-cycle pipeline is exhausted; stop
+for review. Evidence:
+`docs/evidence/std_debug_hello_scalar_fp_select_phi_acceptance.summary`,
+`docs/evidence/distribution_all_after_scalar_fp_select_phi.summary`, and
+`docs/evidence/std_debug_hello_scalar_fp_pointer_store_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
