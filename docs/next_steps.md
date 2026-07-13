@@ -37,24 +37,21 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-31 is implemented at the reviewed constant-table boundary. One shared
-typed decoder serves selector admission and ELF serialization; the lowering
-API carries read-only module context; typed table pointers remain in the
-existing value-location map; and GPR arithmetic feeds the existing
-RIP-relative PC32 relocation path. The four admitted shapes pass 18/18 native
-first/interior/last probes, and `readelf` proves their exact defined data
-objects plus six `R_X86_64_PC32` relocations with addend `-4`.
+INBOX-32 Part 1 is complete: exact named `or i1 %a, %b` lowers through the
+existing scalar value-location model, while immediate and wider unadmitted OR
+forms remain fail-closed. Permanent truth-table coverage passes both operand
+orders through branch and select consumers. Bit-exact native acceptance closes
+`compiler_rt.log.log`, `compiler_rt.exp2.exp2f`, and
+`compiler_rt.exp2.__exp2h`; report-all advances to 443 selected / 221 emitting
+/ 222 failing. Four unsigned FP-to-int emissions are collateral without
+semantic claims. Tier 2 and the single row-closure Tier 3 are green.
 
-All six directed rows advance but none closes: `sqrt`/`sqrtf` now stop at
-64-bit multiply RHS, `log`/`__exp2h`/`exp2f` at unsupported binary widths, and
-`exp2` at an unsupported integer comparison form. Report-all therefore remains
-443 selected / 214 emitting / 229 failing. Stop for the required post-cycle
-review: INBOX-31 has no pre-authorized successor, and `.rodata`, STB_LOCAL
-ordering, shared-library PIC, writable-table admission, and table stores remain
-explicitly excluded. Tier 2 and the single object-writer-boundary Tier 3 are
-green. Evidence:
-`docs/evidence/std_debug_hello_constant_table_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox31_constant_tables.summary`.
+Continue with the pre-authorized successor only: typed `icmp sgt i64` against
+an immediate, targeting `compiler_rt.exp2.exp2`. The i64-multiply
+RAX-resident-RHS repair remains unauthorized until review, and no third cycle
+may start. Evidence:
+`docs/evidence/std_debug_hello_named_i1_or_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox32_named_i1_or.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

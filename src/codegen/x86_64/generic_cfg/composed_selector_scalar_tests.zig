@@ -1193,3 +1193,88 @@ test "generic cfg selector preserves live accumulator across immediate binary" {
 
     try std.testing.expectEqual(@as(u32, 12), function(4));
 }
+
+test "generic cfg selector executes named i1 or through branch and select" {
+    const input =
+        \\define i32 @or_branch(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %left = icmp ne i32 %lhs, 0
+        \\  %right = icmp ne i32 %rhs, 0
+        \\  %combined = or i1 %left, %right
+        \\  br i1 %combined, label %yes, label %no
+        \\yes:
+        \\  ret i32 1
+        \\no:
+        \\  ret i32 0
+        \\}
+        \\define i32 @or_select(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %left = icmp ne i32 %lhs, 0
+        \\  %right = icmp ne i32 %rhs, 0
+        \\  %combined = or i1 %right, %left
+        \\  %selected = select i1 %combined, i32 1, i32 0
+        \\  ret i32 %selected
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const cases = [_]struct {
+        lhs: u32,
+        rhs: u32,
+        expected: u32,
+    }{
+        .{ .lhs = 0, .rhs = 0, .expected = 0 },
+        .{ .lhs = 0, .rhs = 9, .expected = 1 },
+        .{ .lhs = 7, .rhs = 0, .expected = 1 },
+        .{ .lhs = 7, .rhs = 9, .expected = 1 },
+    };
+
+    for (module.functions.items) |function_ir| {
+        var machine = MachineFunction.init(function_ir.name, .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+
+        var saw_or = false;
+        for (machine.instructions.items) |instruction| switch (instruction) {
+            .binary_arg_eax => |binary| saw_or = saw_or or binary.op == .@"or",
+            else => {},
+        };
+        try std.testing.expect(saw_or);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        const function: *const fn (u32, u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+        for (cases) |case| try std.testing.expectEqual(case.expected, function(case.lhs, case.rhs));
+    }
+}
+
+test "generic cfg selector keeps unadmitted narrow or forms fail closed" {
+    var machine = MachineFunction.init("unadmitted-or", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+    const immediate = (try selector_scalar.lowerBinary(&selector, "i1_result", .{
+        .op = .@"or",
+        .ty = .{ .int = 1 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .int = 1 },
+    })).?;
+    try std.testing.expectEqualStrings("composed-block-binary-width", immediate.detail());
+
+    const i8_named = (try selector_scalar.lowerBinary(&selector, "i8_result", .{
+        .op = .@"or",
+        .ty = .{ .int = 8 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })).?;
+    try std.testing.expectEqualStrings("composed-block-binary-width", i8_named.detail());
+}

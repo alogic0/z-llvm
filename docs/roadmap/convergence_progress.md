@@ -3599,6 +3599,20 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_constant_table_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox31_constant_tables.summary`.
 
+- 2026-07-13 (this commit, INBOX-32) Item 12 named predicate capability:
+  exact typed `or i1 %a, %b` over named values now lowers through the existing
+  scalar value-location model, while immediate and wider unadmitted OR forms
+  remain fail-closed. Eight permanent truth-table calls cover both operand
+  orders through branch and select consumers. Forty-six precomputed-bit native
+  calls close `compiler_rt.log.log`, `compiler_rt.exp2.exp2f`, and
+  `compiler_rt.exp2.__exp2h`. Four unsigned FP-to-int helpers emit
+  collaterally without separate semantic claims. Report-all advances to 443
+  selected / 221 emitting / 222 failing. Tier 2 and the row-closure Tier 3 are
+  green. Continue with the pre-authorized exact `icmp sgt i64` immediate
+  successor; no third cycle is authorized. Evidence
+  `docs/evidence/std_debug_hello_named_i1_or_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox32_named_i1_or.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

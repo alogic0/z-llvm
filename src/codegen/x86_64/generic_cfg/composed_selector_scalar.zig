@@ -74,10 +74,10 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
     if (bits == 1) {
-        if (binary.op != .@"and" or valueIsInt(binary.lhs) or valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
+        if ((binary.op != .@"and" and binary.op != .@"or") or valueIsInt(binary.lhs) or valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
         selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
         selector_state.emitValueIntoEax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .@"and", .reg = .rcx } });
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = machineBinaryOp(binary.op) orelse unreachable, .reg = .rcx } });
         try selector_state.bindEax(selector, result_name);
         return null;
     }
