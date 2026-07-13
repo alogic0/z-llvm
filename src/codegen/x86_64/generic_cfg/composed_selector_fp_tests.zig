@@ -989,6 +989,56 @@ test "generic cfg selector preserves exact fabs payload bits" {
     }) |case| try std.testing.expectEqual(case[1], @as(u16, @bitCast(function(@bitCast(case[0])))));
 }
 
+test "generic cfg selector preserves exact double fabs payload bits" {
+    const input =
+        \\declare double @llvm.fabs.f64(double)
+        \\define double @abs_double(double %value) {
+        \\entry:
+        \\  %absolute = call double @llvm.fabs.f64(double %value)
+        \\  ret double %absolute
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("abs_double", .double);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn (f64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+    inline for (.{
+        .{ @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x0000_0000_0000_0000) },
+        .{ @as(u64, 0xfff8_1234_5678_9abc), @as(u64, 0x7ff8_1234_5678_9abc) },
+        .{ @as(u64, 0xfff0_0000_0000_0042), @as(u64, 0x7ff0_0000_0000_0042) },
+        .{ @as(u64, 0x8000_0000_0000_0001), @as(u64, 0x0000_0000_0000_0001) },
+    }) |case| try std.testing.expectEqual(case[1], @as(u64, @bitCast(function(@bitCast(case[0])))));
+}
+
+test "generic cfg selector rejects unknown llvm intrinsics before direct calls" {
+    const input =
+        \\declare double @llvm.sqrt.f64(double)
+        \\define double @bad(double %value) {
+        \\entry:
+        \\  %result = call double @llvm.sqrt.f64(double %value)
+        \\  ret double %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("bad", .double);
+    defer machine.deinit(std.testing.allocator);
+    const result = try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expect(result == .unsupported);
+    try std.testing.expectEqualStrings("composed-block-llvm-intrinsic", result.unsupported.detail());
+}
+
 test "generic cfg selector executes float phi edges exactly" {
     const input =
         \\define float @choose(float %lhs, float %rhs, i32 %pick) {

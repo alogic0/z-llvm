@@ -3655,6 +3655,19 @@ One line per completed cycle, append-only, newest last. This is the
   and
   `docs/evidence/distribution_all_after_inbox33_signed_named_comparisons.summary`.
 
+- 2026-07-13 (this commit, INBOX-34 prerequisite correctness repair) Item 12
+  call-boundary correction: unimplemented `llvm.*` intrinsics now fail closed
+  before ordinary scalar direct-call lowering, and exact typed
+  `llvm.fabs.f64` clears only the payload sign bit. Executable cases preserve
+  zero, subnormal, and quiet/signaling NaN payload bits. The accepted report
+  baseline is corrected from 443 selected / 229 emitting / 214 failing to 443
+  selected / 226 emitting / 217 failing: `__cmpti2`, `__ucmpti2`, and
+  `__bitreversedi2` had retained unresolved LLVM intrinsic calls and were not
+  valid emissions. Tier 2 and the shared-call-boundary Tier 3 are green.
+  Resume INBOX-34's exact named i32/i64 inequality capability. Evidence
+  `docs/evidence/std_debug_hello_llvm_intrinsic_boundary_repair.summary` and
+  `docs/evidence/distribution_all_after_inbox34_llvm_intrinsic_boundary_repair.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

@@ -87,6 +87,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.trap")) return try lowerTrap(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f16")) return try lowerFpAbs(selector, result, call, 16);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f32")) return try lowerFpAbs(selector, result, call, 32);
+    if (std.mem.eql(u8, call.callee, "llvm.fabs.f64")) return try lowerFpAbs(selector, result, call, 64);
     if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try lowerIntByteSizeCall(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i32")) return try lowerAbsI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try lowerAbsI64(selector, result, call);
@@ -99,6 +100,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
+    if (std.mem.startsWith(u8, call.callee, "llvm.")) return .{ .no_emitter = "composed-block-llvm-intrinsic" };
     if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
     if (!isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
         return .{ .no_emitter = "composed-block-call-form" };
@@ -177,17 +179,30 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
 
 fn lowerFpAbs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, bits: u16) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-fabs-result" };
-    const ty: ir.Type = if (bits == 16) .half else .float;
+    const ty: ir.Type = switch (bits) {
+        16 => .half,
+        32 => .float,
+        64 => .double,
+        else => unreachable,
+    };
     if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty) or call.inline_asm != null or call.callee_value != null) {
         return .{ .no_emitter = "composed-block-fabs-form" };
     }
     const source = selector_state.resolveValue(selector, call.args.items[0].value) orelse return .{ .unsupported_value = "composed-block-fabs-source" };
     selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = .xmm0, .bits = bits } }) catch return .{ .unsupported_value = "composed-block-fabs-source" };
     try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = .xmm0 });
-    try selector_state.clobberXmmReg(selector, .xmm0);
-    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = if (bits == 16) 0x7fff else 0x7fff_ffff });
-    try selector.machine.instructions.append(selector.allocator, .{ .movd_eax_xmm = .xmm0 });
+    if (bits == 64) {
+        try selector.machine.instructions.append(selector.allocator, .{ .movq_xmm_rax = .xmm0 });
+        try selector.machine.instructions.append(selector.allocator, .{ .shl_rax_imm6 = 1 });
+        try selector.machine.instructions.append(selector.allocator, .{ .shr_rax_imm6 = 1 });
+        try selector_state.clobberXmmReg(selector, .xmm0);
+        try selector.machine.instructions.append(selector.allocator, .{ .movq_rax_xmm = .xmm0 });
+    } else {
+        try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = .xmm0 });
+        try selector_state.clobberXmmReg(selector, .xmm0);
+        try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = if (bits == 16) 0x7fff else 0x7fff_ffff });
+        try selector.machine.instructions.append(selector.allocator, .{ .movd_eax_xmm = .xmm0 });
+    }
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
     return null;
 }
