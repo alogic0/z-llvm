@@ -94,7 +94,10 @@ For an ordinary cycle, the supervisor should:
 3. Identify the smallest coherent typed capability that advances that real
    failure. Do not reduce the goal to a single symbol-specific workaround.
 4. Give the worker a bounded capability goal with explicit exclusions,
-   acceptance evidence, and validation routing.
+   acceptance evidence, and validation routing. The directive must identify
+   the baseline commit, accepted-report path and identity, captured-IR path
+   and content hash, and Zig configuration on which its scope and evidence
+   claims depend.
 5. Allow the worker to use Tier 1 checks during development and Tier 2 at
    capability close.
 6. Inspect the completed commit for scope, ownership, fail-closed behavior,
@@ -108,6 +111,59 @@ For an ordinary cycle, the supervisor should:
 Do not interrupt a dirty in-progress cycle with a new directive. Queue the
 next instruction only after the current capability is committed or the worker
 reports a genuine blocker.
+
+### Conditional One-Cycle Pipeline
+
+To preserve throughput without accumulating unreviewed architectural debt, a
+directive may pre-authorize exactly one successor cycle. The successor must
+have an exact scope, prerequisites, exclusions, and acceptance contract, and
+must stay inside architecture already accepted by this plan.
+
+After cycle N is committed with its required evidence and a clean worktree,
+the worker may begin the pre-authorized cycle N+1 while the supervisor reviews
+N. The worker may not begin N+2 until review of N succeeds. There must never be
+more than one active successor whose prerequisite cycle is not yet accepted.
+
+If review of N finds a defect while N+1 is active:
+
+- allow N+1 to finish when the finding is limited to evidence or
+  documentation and does not invalidate N+1; repair the finding before N+2;
+- stop and preserve N+1 when the finding changes an assumption, ownership
+  rule, or correctness property on which N+1 depends; repair N, then resume
+  and revalidate N+1;
+- interrupt immediately for confirmed P0 wrong-code, ABI corruption,
+  verifier unsoundness, or corruption of a shared primitive.
+
+Pre-authorization is optional. Do not use it across a mandatory checkpoint,
+for a Tier 3 failure, or when the successor depends on facts that the review
+of N is meant to establish.
+
+### Cycle Contracts
+
+Every routine cycle must close one named behavioral or evidence contract. A
+cycle need not add a new selector capability, but merely moving a diagnostic
+without closing a stated contract is not sufficient. Valid contract classes
+are:
+
+- a reusable typed capability with focused semantic evidence;
+- a correctness repair with a regression that would have caught the defect;
+- a false-rejection repair with positive acceptance evidence and a preserved
+  fail-closed boundary;
+- a diagnostic correction that makes the unsupported boundary precise; or
+- an infrastructure repair that restores an existing accepted contract.
+
+The directive and completion report must name the contract class and state
+what observable result closes it.
+
+### Worktree Coordination
+
+The worker's clean-worktree requirement applies to the implementation cycle,
+not to unrelated files created concurrently by the supervisor. During an
+active worker cycle, communicate new directives and review notes through the
+repository's designated ignored inbox mechanism. Coordinate any tracked
+roadmap, evidence, or tracker edits at a committed cycle boundary so that the
+worker is never asked to absorb, discard, or accidentally commit supervisor
+changes.
 
 ## Routine Continuation Rules
 
@@ -126,6 +182,15 @@ The supervisor may continue autonomously when all of these are true:
 - collateral emissions are not overclaimed as separately proven functions;
 - validation matches `validation_tiers.md`;
 - the cycle ends in one coherent commit with a clean worktree.
+
+Using an existing shared subsystem through its accepted interface does not by
+itself cross an architectural boundary. A cycle does cross the boundary when
+it changes that subsystem's ownership or invariants. For frame and spills,
+requesting an already supported size/alignment, consuming returned offsets,
+and emitting an operation supported by that contract is routine. Teaching the
+planner new alignment semantics, changing padding or offset selection,
+introducing independent paired-slot lifetime or identity, or changing
+collision, liveness, or eviction behavior requires review.
 
 ## Execution Phases
 
@@ -210,6 +275,59 @@ The inventory is evidence for the architectural decision, not authorization
 to implement vector lowering. It should be derived from existing logs and IR
 where possible and must not trigger `distribution-all`.
 
+#### Candidate Minimal Vector Slice
+
+The supervisor-worker architectural discussion established the following
+candidate for evaluation by the Phase D inventory. Recording it here prevents
+the inventory from silently widening into a generic LLVM vector project; it
+does not authorize implementation.
+
+The candidate shares the existing XMM physical register bank while adding
+typed vector shape and static lane-definedness to SSA value information. The
+first slice is limited to `<2 x double>` and:
+
+- constant-index `insertelement` into lane 0 from a poison vector;
+- the `<0, 0>` splat form of `shufflevector`;
+- full two-lane constants;
+- register-parametric packed double add and multiply;
+- constant-index extraction of lane 0 or lane 1;
+- vector copies; and
+- one logical 16-byte spill/reload with 8-byte alignment and an unaligned
+  128-bit move.
+
+Lane-definedness belongs to the SSA value, not fundamentally to the physical
+register. Poison defines no lanes; constant insertion defines the selected
+lane; shuffle remaps definedness; and operations propagate it conservatively.
+The selector and verifier must continue to reject dynamic lane indexes and
+unsupported masks precisely.
+
+The existing frame planner's atomic allocation of two contiguous 8-byte spill
+units under one logical allocation is sufficient for this candidate spill.
+Adding the vector value location and its 128-bit spill/reload operation is part
+of the vector slice, not a second frame authority. The allocation does not
+guarantee a 16-byte-aligned base. Requiring such alignment, using aligned-only
+moves, or changing base rounding, padding, slot lifetime, collision, or
+eviction semantics remains a frame-planner architectural change and requires
+separate review.
+
+The first executable microcanary must exercise a representative two-lane
+polynomial fragment, consume both lanes, force overlapping live XMM values and
+at least one vector spill, and compare exact result bits for relevant zeros,
+finite values, subnormals, infinities, and NaNs.
+
+The initial slice explicitly excludes vector phis, vector masks and
+comparisons, vector memory operations other than its private spill/reload,
+vector calls or returns, dynamic indexes, cross-input or arbitrary shuffles,
+AVX widths, and wider or different lane shapes. It is expected only to advance
+the current `tanf` frontier to its predicted scalar `fdiv` frontier; it does
+not by itself close `tanf` or the wider vector-bearing population.
+
+Before implementation is authorized, the Phase D inventory must confirm or
+revise this candidate, quantify the immediate and latent populations, and
+receive explicit architectural approval. Any revision that changes vector
+ownership, allocation, spill alignment, lane semantics, or operation scope is
+part of that review rather than an autonomous worker decision.
+
 ### Phase E: Extended FP Architectural Checkpoint
 
 Keep these explicit boundaries until a separate reviewed plan exists:
@@ -248,6 +366,20 @@ The supervisor must stop autonomous continuation when:
 At a mandatory stop, preserve the dirty worktree if the cycle is incomplete,
 record the full state required by `working-cycle.md`, and request review. Do
 not paper over the boundary with a terminal template.
+
+### P0 Declaration And Recovery
+
+The user or supervisor may declare a P0 through the worker inbox with the
+evidence, priority, and interrupt instruction. The worker may self-declare a
+P0 only after an executable mismatch or compelling proof confirms wrong-code,
+ABI corruption, verifier unsoundness, or corruption of a shared primitive.
+Suspicion alone requires stopping to preserve state and obtain the narrowest
+reproduction; it is not yet a P0 declaration.
+
+For a confirmed P0, preserve the active dirty cycle, implement and validate a
+standalone repair, then resume and revalidate the interrupted cycle against
+the repaired baseline. Do not bury a P0 repair inside an unrelated capability
+commit.
 
 ## Validation And Distribution-All Policy
 
@@ -295,7 +427,8 @@ exercises the operation's actual hazards.
 
 ## Supervisor Commit Review
 
-Before directing another cycle, confirm:
+Before accepting a cycle, confirm the following. A pre-authorized successor
+may already be active only under the Conditional One-Cycle Pipeline above:
 
 - the commit contains one coherent capability;
 - the worktree is clean;
