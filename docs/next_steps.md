@@ -37,21 +37,20 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-47 is complete and cumulatively accepted by this stop-state commit.
-Part 1 (`84bd7111`) closes `compiler_rt.divsc3.__divsc3` through exact
-canonical f32x2 select/copysign and packed unsigned comparison forms. Part 2
-(`39cc18d5`) adds the reviewed f64x2 parity forms with an honest zero-closure
-result. The accepted compiler_rt report is now 443 selected / 261 emitting /
-182 failing. The single cumulative Tier 3 passed all 17 subgates against tree
-`6817bd3a46c4950e73945af7090c930f27bf768c`; strict real rows remain
-100/100/100 and integrated executables remain 6/6. Evidence:
-`docs/evidence/distribution_all_after_inbox47_vector_pipeline.summary`.
+INBOX-48 is complete and accepted. Commit `1c5ff956` adds exact fully defined
+f64x2 PHI destinations through the existing XMM/pair-spill value map and
+parallel edge-copy authority. The single Tier 3 passed all 17 subgates against
+tree `536f6a30e9c6f68ce2d1ea30174cf8fedf98db49`; strict real rows remain
+100/100/100 and integrated executables remain 6/6. The accepted compiler_rt
+report remains 443 selected / 261 emitting / 182 failing. Evidence:
+`docs/evidence/distribution_all_after_inbox48_f64x2_phi.summary`.
 
-No implementation successor is authorized. Request the bounded f64x2
-vector-PHI architectural review for `compiler_rt.divdc3.__divdc3`, which still
-fails first at `unsupported_value` / `stage2-phi-dst`. The review must decide
-the typed PHI destination/edge model and alias-safe materialization before any
-implementation. `__muldc3` remains deferred at the 256-bit/AVX checkpoint.
+The expected `compiler_rt.divdc3.__divdc3` closure did not occur: it advanced
+from `stage2-phi-dst` to a later `<2 x i64>` constant extraction at
+`no_emitter` / `composed-vector-extract-type`. No pinned-row semantic claim was
+made. Continue with INBOX-48's pre-authorized exact bit-permutation leaves
+pipeline; the i64x2 extraction remains a separate future capability.
+`__muldc3` remains deferred at the 256-bit/AVX checkpoint.
 
 The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
 comparison matched 1,258 semantic records across all 17 gates. The historical

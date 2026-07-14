@@ -4115,6 +4115,18 @@ One line per completed cycle, append-only, newest last. This is the
   the unexpected later frontier before the pre-authorized successor. Evidence
   `docs/evidence/std_debug_hello_inbox48_f64x2_phi.summary`.
 
+- 2026-07-14 (this commit, INBOX-48 acceptance) Item 12 f64x2 PHI close:
+  the single required Tier 3 passes all 17 subgates against committed tree
+  `536f6a30e9c6f68ce2d1ea30174cf8fedf98db49`. Integrated objects remain
+  146/146 in all three pipelines, strict real rows remain 100/100/100,
+  integrated executables remain 6/6, and release-source object/link/probe
+  boundaries remain 100/100 each. This accepts the reusable PHI capability
+  with zero row closures; the compiler_rt report remains 443 / 261 / 182 and
+  `__divdc3` remains unaccepted at its later `<2 x i64>` extraction frontier.
+  Total reported duration is 2,283,788 ms, effectively unchanged from
+  INBOX-47. Continue with the pre-authorized bit-permutation leaves pipeline.
+  Evidence `docs/evidence/distribution_all_after_inbox48_f64x2_phi.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
