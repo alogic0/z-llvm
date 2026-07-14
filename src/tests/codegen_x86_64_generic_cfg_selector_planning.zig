@@ -3229,6 +3229,164 @@ test "generic cfg selector lowers i32 absolute value intrinsic" {
     try expectInstruction(machine.instructions.items, .abs_i32_edi_eax);
 }
 
+test "generic cfg selector reserves frame for live value across absolute value intrinsic" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @llvm.abs.i32(i32, i1)
+        \\
+        \\define i32 @signed_quotient_shape(i32 %value, i32 %divisor) {
+        \\entry:
+        \\  %mixed_sign = xor i32 %divisor, %value
+        \\  %sign = ashr i32 %mixed_sign, 31
+        \\  %magnitude = call i32 @llvm.abs.i32(i32 %value, i1 false)
+        \\  %divisor_magnitude = call i32 @llvm.abs.i32(i32 %divisor, i1 false)
+        \\  %quotient = udiv i32 %magnitude, %divisor_magnitude
+        \\  %adjusted = xor i32 %quotient, %sign
+        \\  %signed = sub i32 %adjusted, %sign
+        \\  ret i32 %signed
+        \\}
+        \\
+        \\define i32 @signed_remainder_shape(i32 %value, i32 %divisor) {
+        \\entry:
+        \\  %mixed_sign = xor i32 %divisor, %value
+        \\  %sign = ashr i32 %mixed_sign, 31
+        \\  %magnitude = call i32 @llvm.abs.i32(i32 %value, i1 false)
+        \\  %divisor_magnitude = call i32 @llvm.abs.i32(i32 %divisor, i1 false)
+        \\  %quotient = udiv i32 %magnitude, %divisor_magnitude
+        \\  %adjusted = xor i32 %quotient, %sign
+        \\  %negative_quotient = sub i32 %sign, %adjusted
+        \\  %negative_product = mul i32 %negative_quotient, %divisor
+        \\  %remainder = add i32 %negative_product, %value
+        \\  ret i32 %remainder
+        \\}
+        \\
+        \\define i32 @signed_divmod_shape(i32 %value, i32 %divisor, ptr %remainder_out) {
+        \\entry:
+        \\  %mixed_sign = xor i32 %divisor, %value
+        \\  %sign = ashr i32 %mixed_sign, 31
+        \\  %magnitude = call i32 @llvm.abs.i32(i32 %value, i1 false)
+        \\  %divisor_magnitude = call i32 @llvm.abs.i32(i32 %divisor, i1 false)
+        \\  %quotient = udiv i32 %magnitude, %divisor_magnitude
+        \\  %adjusted = xor i32 %quotient, %sign
+        \\  %signed = sub i32 %adjusted, %sign
+        \\  %product = mul i32 %signed, %divisor
+        \\  %remainder = sub i32 %value, %product
+        \\  store i32 %remainder, ptr %remainder_out, align 4
+        \\  ret i32 %signed
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var plan = try stage2_planning.buildSelectorAllocationPlan(std.testing.allocator, module.functions.items[0]);
+    defer plan.deinit();
+    try std.testing.expectEqual(@as(usize, 2), plan.preservation_spill_slots);
+    try std.testing.expectEqual(@as(usize, 0), plan.spill_slots);
+
+    var machine = codegen.x86_64.MachineFunction.init("signed_quotient_shape", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("unexpected selector diagnostic {s}: {s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestExpectedSelected;
+        },
+    }
+
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .sub_rsp_imm32 = 264 }, machine.instructions.items[0]);
+    var saw_scalar_spill = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_eax_rsp, .spill_rax_rsp, .spill_arg_rsp, .spill_arg64_rsp => saw_scalar_spill = true,
+        else => {},
+    };
+    try std.testing.expect(saw_scalar_spill);
+    try expectInstruction(machine.instructions.items, .abs_i32_edi_eax);
+    try expectInstruction(machine.instructions.items, .{ .div_arg32 = .rcx });
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_rsp_imm32 = 264 }, machine.instructions.items[machine.instructions.items.len - 2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+
+    if (@import("builtin").os.tag != .linux) return error.SkipZigTest;
+    const cases = [_]struct { dividend: i32, divisor: i32, quotient: i32, remainder: i32 }{
+        .{ .dividend = 17, .divisor = 5, .quotient = 3, .remainder = 2 },
+        .{ .dividend = -17, .divisor = 5, .quotient = -3, .remainder = -2 },
+        .{ .dividend = 17, .divisor = -5, .quotient = -3, .remainder = 2 },
+        .{ .dividend = -17, .divisor = -5, .quotient = 3, .remainder = -2 },
+        .{ .dividend = std.math.minInt(i32), .divisor = 7, .quotient = -306783378, .remainder = -2 },
+        .{ .dividend = std.math.maxInt(i32), .divisor = -1, .quotient = -2147483647, .remainder = 0 },
+    };
+
+    const quotient_bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(quotient_bytes);
+    const quotient_mapping = try std.posix.mmap(null, quotient_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(quotient_mapping);
+    @memcpy(quotient_mapping, quotient_bytes);
+    const signedQuotient: *const fn (i32, i32) callconv(.c) i32 = @ptrCast(quotient_mapping.ptr);
+    for (cases) |case| try std.testing.expectEqual(case.quotient, signedQuotient(case.dividend, case.divisor));
+
+    var remainder_machine = codegen.x86_64.MachineFunction.init("signed_remainder_shape", module.functions.items[1].ret_ty);
+    defer remainder_machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &remainder_machine, module.functions.items[1])) {
+        .selected => {},
+        .unsupported => return error.TestExpectedSelected,
+    }
+    const remainder_bytes = try mc.encoding.encodeFunction(std.testing.allocator, remainder_machine);
+    defer std.testing.allocator.free(remainder_bytes);
+    const remainder_mapping = try std.posix.mmap(null, remainder_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(remainder_mapping);
+    @memcpy(remainder_mapping, remainder_bytes);
+    const signedRemainder: *const fn (i32, i32) callconv(.c) i32 = @ptrCast(remainder_mapping.ptr);
+    for (cases) |case| try std.testing.expectEqual(case.remainder, signedRemainder(case.dividend, case.divisor));
+
+    var divmod_machine = codegen.x86_64.MachineFunction.init("signed_divmod_shape", module.functions.items[2].ret_ty);
+    defer divmod_machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &divmod_machine, module.functions.items[2])) {
+        .selected => {},
+        .unsupported => return error.TestExpectedSelected,
+    }
+    const divmod_bytes = try mc.encoding.encodeFunction(std.testing.allocator, divmod_machine);
+    defer std.testing.allocator.free(divmod_bytes);
+    const divmod_mapping = try std.posix.mmap(null, divmod_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(divmod_mapping);
+    @memcpy(divmod_mapping, divmod_bytes);
+    const signedDivmod: *const fn (i32, i32, *i32) callconv(.c) i32 = @ptrCast(divmod_mapping.ptr);
+    for (cases) |case| {
+        var remainder: i32 = undefined;
+        try std.testing.expectEqual(case.quotient, signedDivmod(case.dividend, case.divisor, &remainder));
+        try std.testing.expectEqual(case.remainder, remainder);
+    }
+}
+
+test "generic cfg selector keeps absolute value wrapper frameless without live preservation" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @llvm.abs.i32(i32, i1)
+        \\
+        \\define i32 @abs_i32_frameless(i32 %value) {
+        \\entry:
+        \\  %absolute = call i32 @llvm.abs.i32(i32 %value, i1 false)
+        \\  ret i32 %absolute
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var plan = try stage2_planning.buildSelectorAllocationPlan(std.testing.allocator, module.functions.items[0]);
+    defer plan.deinit();
+    try std.testing.expectEqual(@as(usize, 0), plan.preservation_spill_slots);
+
+    var machine = codegen.x86_64.MachineFunction.init("abs_i32_frameless", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => return error.TestExpectedSelected,
+    }
+    try std.testing.expectEqual(codegen.x86_64.Instruction.abs_i32_edi_eax, machine.instructions.items[0]);
+}
+
 test "generic cfg selector lowers named i32 multiplication" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"

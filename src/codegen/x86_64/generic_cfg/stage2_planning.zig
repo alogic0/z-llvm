@@ -358,7 +358,9 @@ pub const SelectorAllocationPlan = struct {
     allocator: std.mem.Allocator,
     assignments: std.StringHashMap(PlannedValueAssignment),
     interval_ends: std.StringHashMap(usize),
+    preservation_values: std.StringHashMap(void),
     spill_slots: usize = 0,
+    preservation_spill_slots: usize = 0,
     max_active_values: usize = 0,
 
     pub fn init(allocator: std.mem.Allocator) SelectorAllocationPlan {
@@ -366,10 +368,12 @@ pub const SelectorAllocationPlan = struct {
             .allocator = allocator,
             .assignments = std.StringHashMap(PlannedValueAssignment).init(allocator),
             .interval_ends = std.StringHashMap(usize).init(allocator),
+            .preservation_values = std.StringHashMap(void).init(allocator),
         };
     }
 
     pub fn deinit(plan: *SelectorAllocationPlan) void {
+        plan.preservation_values.deinit();
         plan.interval_ends.deinit();
         plan.assignments.deinit();
     }
@@ -407,6 +411,9 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
     var terminator_positions: std.ArrayList(usize) = .empty;
     defer terminator_positions.deinit(allocator);
 
+    var preservation_barrier_positions: std.ArrayList(usize) = .empty;
+    defer preservation_barrier_positions.deinit(allocator);
+
     var position: usize = 0;
     for (function.params.items) |param| {
         const metadata = selectorValueMetadata(param.ty) orelse return error.UnsupportedCodegenValue;
@@ -422,6 +429,9 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
                     const metadata = selectorInstructionResultMetadata(instruction) orelse return error.UnsupportedCodegenValue;
                     try recordSelectorIntervalDef(allocator, &intervals, &interval_indexes, result, metadata, position);
                 }
+            }
+            if (instruction.kind == .call and callRequiresPreservationFrame(instruction.kind.call)) {
+                try preservation_barrier_positions.append(allocator, position);
             }
             position += 1;
         }
@@ -465,7 +475,29 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
         try recordSelectorIntervalUses(intervals.items, interval_indexes, block.live_out, terminator_positions.items[block_index]);
     }
 
-    return try allocateSelectorIntervals(allocator, intervals.items);
+    var plan = try allocateSelectorIntervals(allocator, intervals.items);
+    try recordPreservationDemands(&plan, intervals.items, preservation_barrier_positions.items);
+    return plan;
+}
+
+fn callRequiresPreservationFrame(call: ir.CallInst) bool {
+    if (call.isDebugVariableLocation()) return false;
+    if (!std.mem.startsWith(u8, call.callee, "llvm.")) return true;
+    return std.mem.eql(u8, call.callee, "llvm.abs.i32") or
+        std.mem.eql(u8, call.callee, "llvm.abs.i64") or
+        std.mem.eql(u8, call.callee, "llvm.abs.i128");
+}
+
+fn recordPreservationDemands(plan: *SelectorAllocationPlan, intervals: []const SelectorValueInterval, barrier_positions: []const usize) !void {
+    for (barrier_positions) |position| {
+        var live_slots: usize = 0;
+        for (intervals) |interval| {
+            if (interval.start >= position or interval.end <= position) continue;
+            live_slots += selectorSpillSlotCount(interval);
+            try plan.preservation_values.put(interval.name, {});
+        }
+        plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
+    }
 }
 
 pub fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {

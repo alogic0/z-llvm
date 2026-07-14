@@ -263,8 +263,11 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
 }
 
 fn stabilizeFramedParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
-    if (function.blocks.items.len <= 1 or selector.stack_frame_bytes == 0) return null;
+    if (selector.stack_frame_bytes == 0) return null;
+    const stabilize_all = function.blocks.items.len > 1;
+    const plan = selector.allocation_plan orelse return .{ .unsupported_value = "stage2-param-home-plan" };
     for (function.params.items) |param| {
+        if (!stabilize_all and !plan.preservation_values.contains(param.name)) continue;
         const loc = selector_state.valueLoc(selector, param.name) orelse return .{ .unsupported_value = "stage2-param-home" };
         switch (loc) {
             .spill64, .spill128, .spill_fp, .spill_vector => {},
@@ -433,6 +436,7 @@ pub fn tryLowerComposedBlockWithContext(
 
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
+    if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
 
     const block = function.blocks.items[0];
     for (block.instructions.items) |instruction| {

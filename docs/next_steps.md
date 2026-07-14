@@ -37,6 +37,24 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
+INBOX-50 Part 1 is complete and accepted. Preservation demand now participates
+in the existing stage-two plan and shared frame reservation, with stable homes
+only for single-block parameters proven live across a preservation barrier.
+The report moves from 443 / 267 / 176 to 443 / 270 / 173, closing
+`__divmodsi4`, `__modsi3`, and `__divsi3`; `__divdi3` and `__divmoddi4`
+advance honestly to the separate unknown-pointer call boundary. The accepted-
+row audit found no prior accepted hit. The immediate Tier 3 passes all 17
+subgates against staged implementation tree
+`0ec31119087ee5b2ca33e104582ae6e95742432e`. Evidence:
+`docs/evidence/std_debug_hello_inbox50_frame_repair.summary` and
+`docs/evidence/distribution_all_after_inbox50_frame_repair.summary`.
+
+Continue with the pre-authorized INBOX-50 comparison-RHS pipeline: exact
+modulo-i16 negative-literal unsigned comparisons first, refresh and commit,
+then operand-order-safe named i64 `ult`. Hold the four expected closures
+provisional until one cumulative Tier 3 at the end. No third pipeline is
+authorized.
+
 INBOX-48 is complete and accepted. Commit `1c5ff956` adds exact fully defined
 f64x2 PHI destinations through the existing XMM/pair-spill value map and
 parallel edge-copy authority. The single Tier 3 passed all 17 subgates against

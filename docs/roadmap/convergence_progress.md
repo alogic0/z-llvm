@@ -4209,6 +4209,26 @@ One line per completed cycle, append-only, newest last. This is the
   no successor capability is authorized. Evidence
   `docs/evidence/distribution_all_after_inbox49_pipeline.summary`.
 
+- 2026-07-14 (this commit, INBOX-50 Part 1) Item 12 preservation-frame
+  false-rejection repair: stage-two planning now records selection-time
+  preservation demand, and the shared frame authority reserves its existing
+  spill area when live values cross a direct-call or exact absolute-value
+  barrier. Single-block framed parameters receive stable homes only when the
+  plan proves them live across such a barrier. Permanent execution covers
+  quotient, remainder, and pointer-divmod shapes across 18 precomputed signed
+  cases. The accepted-row audit found no prior accepted row could have
+  traversed the exact defect because every no-frame dynamic spill propagates
+  selection failure. The report moves from 443 / 267 / 176 to
+  443 / 270 / 173, closing `__divmodsi4`, `__modsi3`, and `__divsi3`.
+  `__divdi3` and `__divmoddi4` advance honestly to the separate unknown-pointer
+  call boundary; no closure is claimed for them. Tier 2 passes 24/24 steps and
+  1006/1006 tests. The immediate shared-frame Tier 3 passes all 17 subgates
+  against staged implementation tree
+  `0ec31119087ee5b2ca33e104582ae6e95742432e`, accepting the repair and three
+  closures. Continue with the separately gated comparison-RHS pipeline.
+  Evidence `docs/evidence/std_debug_hello_inbox50_frame_repair.summary` and
+  `docs/evidence/distribution_all_after_inbox50_frame_repair.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
