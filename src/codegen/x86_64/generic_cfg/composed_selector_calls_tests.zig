@@ -79,6 +79,83 @@ test "generic cfg selector lowers i16 count-leading-zeros" {
     }
 }
 
+test "generic cfg selector lowers only exact i32 count-trailing-zeros forms" {
+    inline for (.{ 0, 1 }) |zero_is_poison| {
+        var machine = MachineFunction.init("cttz-i32", .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rsi });
+
+        var call = ir.CallInst{
+            .ret_ty = .{ .int = 32 },
+            .callee = "llvm.cttz.i32",
+            .tail_kind = "tail",
+            .args = .empty,
+        };
+        defer call.deinit(std.testing.allocator);
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "value" } });
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = zero_is_poison } });
+
+        try std.testing.expect((try selector_calls.lowerCttzI32(&selector, "count", call)) == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "count").?);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg_arg = .{ .dst = .rdi, .src = .rsi } },
+            .ctz_i32_edi_eax,
+        }, machine.instructions.items);
+    }
+
+    var bad_machine = MachineFunction.init("bad-cttz", .{ .int = 32 });
+    defer bad_machine.deinit(std.testing.allocator);
+    var bad_selector = ComposedBlockSelector.init(std.testing.allocator, &bad_machine);
+    defer bad_selector.deinit();
+    try selector_state.bindValueLoc(&bad_selector, "value", .{ .arg32 = .rdi });
+    var bad_call = ir.CallInst{
+        .ret_ty = .{ .int = 32 },
+        .callee = "llvm.cttz.i32",
+        .args = .empty,
+    };
+    defer bad_call.deinit(std.testing.allocator);
+    try bad_call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "value" } });
+    try bad_call.args.append(std.testing.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 2 } });
+    const diagnostic = (try selector_calls.lowerCttzI32(&bad_selector, "count", bad_call)).?;
+    try std.testing.expectEqualStrings("composed-block-cttz-args", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), bad_machine.instructions.items.len);
+}
+
+test "generic cfg selector executes zero-defined i32 count-trailing-zeros" {
+    const input =
+        \\declare i32 @llvm.cttz.i32(i32, i1 immarg)
+        \\define i32 @cttz_defined(i32 %value) {
+        \\entry:
+        \\  %count = call i32 @llvm.cttz.i32(i32 %value, i1 false)
+        \\  ret i32 %count
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("cttz_defined", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const cttz: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    inline for (.{
+        .{ @as(u32, 0), @as(u32, 32) },
+        .{ @as(u32, 1), @as(u32, 0) },
+        .{ @as(u32, 0x8000_0000), @as(u32, 31) },
+        .{ @as(u32, 0x0001_0000), @as(u32, 16) },
+        .{ @as(u32, 0xffff_ffff), @as(u32, 0) },
+    }) |case| try std.testing.expectEqual(case[1], cttz(case[0]));
+}
+
 test "composed selector stages swapped scalar SSE call arguments" {
     const input =
         \\declare float @callee(float, float)

@@ -37,24 +37,17 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-36 is acknowledged and its read-only vector-mask checkpoint inventory is
-complete against accepted commits `60f6fad4`, `ac122f64`, and `0a5bc7e5`.
-The accepted report remains 443 selected / 233 emitting / 210 failing; no gate
-or code change was permitted or performed. Seven captured functions create
-vector masks. Only `compiler_rt.comparef.__unordsf2` is at an immediate mask
-frontier; the other rows are first blocked by aggregate ABI, frame, half,
-fp128, or wider-vector boundaries.
-
-Stop and request the INBOX-36 architectural discussion. The recommended
-canonical representation is full-width all-ones/all-zeros lanes in XMM with
-static defined-lane masks and explicit `movmskps`/`movmskpd` conversion at
-scalar consumers. The first bounded slice closes only `__unordsf2`; vector
-selects, f64 masks, `<4 x i1>`, aggregate ABI, and wider vectors stay
-fail-closed. Closure-per-effort still favors the newly exposed typed
-`llvm.cttz.i32` scalar cycle first: two expected closures using an existing
-machine/verifier operation. No mask or scalar capability is authorized until
-the review resolves ordering and the mask architecture. Evidence:
-`docs/evidence/vector_mask_checkpoint_inventory.md`.
+INBOX-37 is acknowledged. Part 1 closes exactly
+`compiler_rt.floatunsisf.__floatunsisf` and
+`compiler_rt.floatsisf.__floatsisf` through exact typed `llvm.cttz.i32`, with
+zero-defined permanent execution and 23 precomputed-result exact-row calls.
+Report-all is now 443 selected / 235 emitting / 208 failing; Tier 2 and the
+single row-closure Tier 3 are green. Continue with the pre-authorized exact
+typed `llvm.ctlz.i64` successor, refresh all eight directed arithmetic and
+conversion rows, and claim closures only where the refreshed report proves
+them. Do not start `llvm.cttz.i64`; it requires its own directive. Evidence:
+`docs/evidence/std_debug_hello_cttz_i32_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox37_cttz_i32.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

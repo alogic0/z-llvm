@@ -3752,6 +3752,20 @@ One line per completed cycle, append-only, newest last. This is the
   gate ran. Stop for the required vector-mask architectural review. Evidence
   `docs/evidence/vector_mask_checkpoint_inventory.md`.
 
+- 2026-07-13 (this commit, INBOX-37 Part 1) Item 12 typed trailing-zero
+  capability: exact `llvm.cttz.i32` now reuses the existing zero-defined
+  machine/verifier operation while all wider, malformed, and non-literal
+  variants remain fail-closed. Permanent execution covers zero, single-bit,
+  and all-ones inputs. A relocation-free exact-row object executes 23
+  precomputed conversion cases and closes exactly
+  `compiler_rt.floatunsisf.__floatunsisf` and
+  `compiler_rt.floatsisf.__floatsisf`; report-all advances from 443 selected /
+  233 emitting / 210 failing to 443 / 235 / 208 with no collateral emissions.
+  Tier 2 and the row-closure Tier 3 are green. Continue with INBOX-37's
+  pre-authorized exact typed `llvm.ctlz.i64` successor. Evidence
+  `docs/evidence/std_debug_hello_cttz_i32_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox37_cttz_i32.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
