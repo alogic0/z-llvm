@@ -37,23 +37,24 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-35 and its pre-authorized successor are complete. The `lowerIcmp`
-ownership interlude is structurally green. Exact `icmp samesign ult i6` now
-normalizes the source to six bits before the physical compare; the two
-conversion candidates advance honestly to their later concrete
-`llvm.cttz.i32` frontier without an emission claim. Exact half stores through
-ABI-proven pointer parameters then close `compiler_rt.sincos.sincosh` through
-20 precomputed row-exact outputs. Fresh report-all is 443 selected / 233
-emitting / 210 failing.
+INBOX-36 is acknowledged and its read-only vector-mask checkpoint inventory is
+complete against accepted commits `60f6fad4`, `ac122f64`, and `0a5bc7e5`.
+The accepted report remains 443 selected / 233 emitting / 210 failing; no gate
+or code change was permitted or performed. Seven captured functions create
+vector masks. Only `compiler_rt.comparef.__unordsf2` is at an immediate mask
+frontier; the other rows are first blocked by aggregate ABI, frame, half,
+fp128, or wider-vector boundaries.
 
-Tier 2 is green for both capabilities and the `sincosh` row-closure Tier 3 is
-green. The INBOX-35 pipeline is exhausted. Stop for the planned fresh-inventory
-and vector-mask architectural checkpoint, including the physical `<2 x i1>`
-decision for `__unordsf2`; no vector-mask or unrelated capability is
-authorized before that review. Evidence:
-`docs/evidence/std_debug_hello_i6_samesign_ult_acceptance.summary`,
-`docs/evidence/std_debug_hello_half_pointer_store_acceptance.summary`, and
-`docs/evidence/distribution_all_after_inbox35_half_pointer_store.summary`.
+Stop and request the INBOX-36 architectural discussion. The recommended
+canonical representation is full-width all-ones/all-zeros lanes in XMM with
+static defined-lane masks and explicit `movmskps`/`movmskpd` conversion at
+scalar consumers. The first bounded slice closes only `__unordsf2`; vector
+selects, f64 masks, `<4 x i1>`, aggregate ABI, and wider vectors stay
+fail-closed. Closure-per-effort still favors the newly exposed typed
+`llvm.cttz.i32` scalar cycle first: two expected closures using an existing
+machine/verifier operation. No mask or scalar capability is authorized until
+the review resolves ordering and the mask architecture. Evidence:
+`docs/evidence/vector_mask_checkpoint_inventory.md`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

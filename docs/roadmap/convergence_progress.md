@@ -3739,6 +3739,19 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_half_pointer_store_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox35_half_pointer_store.summary`.
 
+- 2026-07-13 (this commit, INBOX-36) Item 12 architectural inventory: a
+  read-only scan of the accepted 443 / 233 / 210 report and pinned captured IR
+  finds seven vector-mask functions and one additional vector-bitcast-only
+  function. `__unordsf2` is the sole immediate mask candidate; complex divide
+  rows demonstrate that a mask must serve both scalar extraction and packed
+  vector select, while four multiply-complex rows consume `<4 x i1>` as `i4`.
+  The recommended authority is full-width XMM lane masks with static
+  definedness and explicit `movmsk` conversion at scalar consumers. The first
+  bounded slice would close only `__unordsf2`; the scalar frontier still ranks
+  a two-closure `llvm.cttz.i32` cycle ahead by effort. No code changed and no
+  gate ran. Stop for the required vector-mask architectural review. Evidence
+  `docs/evidence/vector_mask_checkpoint_inventory.md`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
