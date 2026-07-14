@@ -1,6 +1,11 @@
 const std = @import("std");
 
-const schema_version = 1;
+const schema_version = 2;
+
+const CanonicalLog = struct {
+    records: [][]u8,
+    gate_count: usize,
+};
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -12,19 +17,26 @@ pub fn main(init: std.process.Init) !void {
     const actual_path = args.next() orelse return error.MissingActualLog;
     if (args.next() != null) return error.UnexpectedArgument;
 
-    const expected = try canonicalRecords(allocator, io, expected_path);
-    defer freeRecords(allocator, expected);
-    const actual = try canonicalRecords(allocator, io, actual_path);
-    defer freeRecords(allocator, actual);
+    var repo_path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const repo_path_len = try std.Io.Dir.cwd().realPathFile(io, ".", &repo_path_buffer);
+    const repo_path = repo_path_buffer[0..repo_path_len];
+
+    const expected = try canonicalLog(allocator, io, expected_path, repo_path);
+    defer freeLog(allocator, expected);
+    const actual = try canonicalLog(allocator, io, actual_path, repo_path);
+    defer freeLog(allocator, actual);
 
     var stderr_buffer: [4096]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
-    if (expected.len != actual.len) {
-        try stderr_writer.interface.print("canonical record count differs: expected={} actual={}\n", .{ expected.len, actual.len });
+    if (expected.records.len != actual.records.len) {
+        try stderr_writer.interface.print(
+            "canonical record count differs: expected={} actual={}\n",
+            .{ expected.records.len, actual.records.len },
+        );
         try stderr_writer.interface.flush();
         return error.SemanticMismatch;
     }
-    for (expected, actual, 0..) |expected_record, actual_record, index| {
+    for (expected.records, actual.records, 0..) |expected_record, actual_record, index| {
         if (std.mem.eql(u8, expected_record, actual_record)) continue;
         try stderr_writer.interface.print(
             "canonical record changed at index {}:\nexpected: {s}\nactual:   {s}\n",
@@ -37,57 +49,225 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print(
-        "summary distribution-all-equivalence schema_version={} expected={s} actual={s} canonical_records={} semantic_match=true local_fail=0\n",
-        .{ schema_version, expected_path, actual_path, expected.len },
+        "summary distribution-all-equivalence schema_version={} expected={s} actual={s} gates={} canonical_records={} semantic_match=true local_fail=0\n",
+        .{ schema_version, expected_path, actual_path, expected.gate_count, expected.records.len },
     );
     try stdout_writer.interface.flush();
 }
 
-fn canonicalRecords(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![][]u8 {
+fn canonicalLog(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    repo_path: []const u8,
+) !CanonicalLog {
     const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(512 * 1024 * 1024));
     defer allocator.free(contents);
     var records: std.ArrayList([]u8) = .empty;
-    errdefer freeRecords(allocator, records.items);
-    var saw_success = false;
+    errdefer {
+        for (records.items) |record| allocator.free(record);
+        records.deinit(allocator);
+    }
     var lines = std.mem.splitScalar(u8, contents, '\n');
     while (lines.next()) |line| {
-        const record = canonicalRecord(allocator, line) orelse continue;
+        const record = try canonicalRecord(allocator, line, repo_path) orelse continue;
         errdefer allocator.free(record);
-        if (std.mem.eql(u8, record, "ok distribution all gates")) saw_success = true;
         try records.append(allocator, record);
     }
-    if (!saw_success) return error.MissingSuccessfulExitRecord;
-    return try records.toOwnedSlice(allocator);
+    const owned_records = try records.toOwnedSlice(allocator);
+    errdefer freeRecords(allocator, owned_records);
+    return .{
+        .records = owned_records,
+        .gate_count = try validateStructure(allocator, owned_records),
+    };
 }
 
-fn canonicalRecord(allocator: std.mem.Allocator, line: []const u8) ?[]u8 {
-    if (std.mem.startsWith(u8, line, "summary distribution-all-slowest ") or
+fn canonicalRecord(
+    allocator: std.mem.Allocator,
+    line: []const u8,
+    repo_path: []const u8,
+) !?[]u8 {
+    if (line.len == 0 or
+        std.mem.startsWith(u8, line, "summary distribution-all-slowest ") or
         std.mem.startsWith(u8, line, "summary distribution-all-timing ")) return null;
-    if (std.mem.startsWith(u8, line, "gate-end ")) {
-        const volatile_start = std.mem.indexOf(u8, line, " duration_ms=") orelse line.len;
-        return allocator.dupe(u8, line[0..volatile_start]) catch null;
+
+    const semantic = if (std.mem.startsWith(u8, line, "gate-end "))
+        try removeFields(allocator, line, &.{ "duration_ms", "cache_status" })
+    else if (std.mem.startsWith(u8, line, "gate-input "))
+        try removeFields(allocator, line, &.{"cache_mode"})
+    else if (std.mem.startsWith(u8, line, "air-export-cache "))
+        try removeFields(allocator, line, &.{ "status", "duration_ms" })
+    else
+        try allocator.dupe(u8, line);
+    defer allocator.free(semantic);
+
+    try rejectUnknownVolatileFields(semantic);
+    return try normalizePaths(allocator, semantic, repo_path);
+}
+
+fn removeFields(
+    allocator: std.mem.Allocator,
+    line: []const u8,
+    field_names: []const []const u8,
+) ![]u8 {
+    var output: std.ArrayList(u8) = .empty;
+    errdefer output.deinit(allocator);
+    var tokens = std.mem.tokenizeScalar(u8, line, ' ');
+    var first = true;
+    var removed_count: usize = 0;
+    while (tokens.next()) |token| {
+        const separator = std.mem.indexOfScalar(u8, token, '=');
+        const name = if (separator) |index| token[0..index] else token;
+        var remove = false;
+        for (field_names) |field_name| {
+            if (std.mem.eql(u8, name, field_name)) {
+                remove = true;
+                break;
+            }
+        }
+        if (remove) {
+            removed_count += 1;
+            continue;
+        }
+        if (!first) try output.append(allocator, ' ');
+        try output.appendSlice(allocator, token);
+        first = false;
     }
-    if (std.mem.startsWith(u8, line, "gate-start ") or
-        std.mem.startsWith(u8, line, "summary ") or
-        std.mem.eql(u8, line, "ok distribution all gates"))
-    {
-        return normalizePaths(allocator, line) catch null;
+    if (removed_count != field_names.len) return error.MissingDeclaredVolatileField;
+    return try output.toOwnedSlice(allocator);
+}
+
+fn rejectUnknownVolatileFields(line: []const u8) !void {
+    const volatile_markers = [_][]const u8{
+        " duration_ms=",
+        " elapsed_ms=",
+        " wall_ms=",
+        " pid=",
+        " process_id=",
+        " timestamp=",
+        " cache_status=",
+        " cache_observation=",
+        " cache_mode=",
+    };
+    for (volatile_markers) |marker| {
+        if (std.mem.indexOf(u8, line, marker) != null) return error.UnclassifiedVolatileField;
+    }
+}
+
+fn normalizePaths(
+    allocator: std.mem.Allocator,
+    line: []const u8,
+    repo_path: []const u8,
+) ![]u8 {
+    var repo_normalized: std.ArrayList(u8) = .empty;
+    defer repo_normalized.deinit(allocator);
+    var rest = line;
+    while (std.mem.indexOf(u8, rest, repo_path)) |index| {
+        try repo_normalized.appendSlice(allocator, rest[0..index]);
+        try repo_normalized.appendSlice(allocator, "<repo>");
+        rest = rest[index + repo_path.len ..];
+    }
+    try repo_normalized.appendSlice(allocator, rest);
+    return normalizeScratchIds(allocator, repo_normalized.items);
+}
+
+fn normalizeScratchIds(allocator: std.mem.Allocator, line: []const u8) ![]u8 {
+    var output: std.ArrayList(u8) = .empty;
+    errdefer output.deinit(allocator);
+    var cursor: usize = 0;
+    while (std.mem.indexOfPos(u8, line, cursor, "tmp/")) |tmp_start| {
+        const component_start = tmp_start + "tmp/".len;
+        try output.appendSlice(allocator, line[cursor..component_start]);
+        var component_end = component_start;
+        while (component_end < line.len and line[component_end] != '/' and
+            !std.ascii.isWhitespace(line[component_end])) : (component_end += 1)
+        {}
+        const component = line[component_start..component_end];
+        const suffix_start = if (std.mem.lastIndexOfScalar(u8, component, '_')) |index| index + 1 else component.len;
+        if (component_end < line.len and line[component_end] == '/' and
+            suffix_start < component.len and allDigits(component[suffix_start..]))
+        {
+            try output.appendSlice(allocator, component[0..suffix_start]);
+            try output.appendSlice(allocator, "<run>");
+        } else {
+            try output.appendSlice(allocator, component);
+        }
+        cursor = component_end;
+    }
+    try output.appendSlice(allocator, line[cursor..]);
+    return try output.toOwnedSlice(allocator);
+}
+
+fn allDigits(text: []const u8) bool {
+    if (text.len == 0) return false;
+    for (text) |byte| {
+        if (!std.ascii.isDigit(byte)) return false;
+    }
+    return true;
+}
+
+fn validateStructure(allocator: std.mem.Allocator, records: []const []const u8) !usize {
+    var seen_ids: std.ArrayList([]const u8) = .empty;
+    defer seen_ids.deinit(allocator);
+    var active_id: ?[]const u8 = null;
+    var saw_start = false;
+    var completed_gates: usize = 0;
+    var inventory_count: ?usize = null;
+    var success_count: usize = 0;
+
+    for (records, 0..) |record, record_index| {
+        if (std.mem.startsWith(u8, record, "gate-input ")) {
+            if (active_id != null) return error.OverlappingGateLifecycle;
+            const id = fieldValue(record, "id") orelse return error.MissingGateId;
+            for (seen_ids.items) |seen_id| {
+                if (std.mem.eql(u8, id, seen_id)) return error.DuplicateGateId;
+            }
+            try seen_ids.append(allocator, id);
+            active_id = id;
+            saw_start = false;
+        } else if (std.mem.startsWith(u8, record, "gate-start ")) {
+            const id = fieldValue(record, "id") orelse return error.MissingGateId;
+            const expected_id = active_id orelse return error.GateStartWithoutInput;
+            if (saw_start or !std.mem.eql(u8, id, expected_id)) return error.GateLifecycleMismatch;
+            saw_start = true;
+        } else if (std.mem.startsWith(u8, record, "gate-end ")) {
+            const id = fieldValue(record, "id") orelse return error.MissingGateId;
+            const expected_id = active_id orelse return error.GateEndWithoutInput;
+            if (!saw_start or !std.mem.eql(u8, id, expected_id)) return error.GateLifecycleMismatch;
+            const exit_status = fieldValue(record, "exit_status") orelse return error.MissingChildExitStatus;
+            if (!std.mem.eql(u8, exit_status, "0")) return error.ChildGateFailed;
+            active_id = null;
+            saw_start = false;
+            completed_gates += 1;
+        } else if (std.mem.startsWith(u8, record, "summary distribution-all-gate-inventory ")) {
+            if (inventory_count != null) return error.DuplicateGateInventory;
+            const subgates = fieldValue(record, "subgates") orelse return error.MissingGateCount;
+            inventory_count = try std.fmt.parseInt(usize, subgates, 10);
+        } else if (std.mem.eql(u8, record, "ok distribution all gates")) {
+            success_count += 1;
+            if (record_index + 1 != records.len) return error.SuccessRecordNotLast;
+        }
+    }
+    if (active_id != null) return error.IncompleteGateLifecycle;
+    const expected_gates = inventory_count orelse return error.MissingGateInventory;
+    if (completed_gates != expected_gates or seen_ids.items.len != expected_gates) {
+        return error.GateInventoryMismatch;
+    }
+    if (success_count != 1) return error.MissingSuccessfulExitRecord;
+    return completed_gates;
+}
+
+fn fieldValue(line: []const u8, field_name: []const u8) ?[]const u8 {
+    var tokens = std.mem.tokenizeScalar(u8, line, ' ');
+    while (tokens.next()) |token| {
+        const separator = std.mem.indexOfScalar(u8, token, '=') orelse continue;
+        if (std.mem.eql(u8, token[0..separator], field_name)) return token[separator + 1 ..];
     }
     return null;
 }
 
-fn normalizePaths(allocator: std.mem.Allocator, line: []const u8) ![]u8 {
-    var output: std.ArrayList(u8) = .empty;
-    errdefer output.deinit(allocator);
-    var rest = line;
-    const repo = "/home/oleg/prog/z_llvm/";
-    while (std.mem.indexOf(u8, rest, repo)) |index| {
-        try output.appendSlice(allocator, rest[0..index]);
-        try output.appendSlice(allocator, "<repo>/");
-        rest = rest[index + repo.len ..];
-    }
-    try output.appendSlice(allocator, rest);
-    return try output.toOwnedSlice(allocator);
+fn freeLog(allocator: std.mem.Allocator, log: CanonicalLog) void {
+    freeRecords(allocator, log.records);
 }
 
 fn freeRecords(allocator: std.mem.Allocator, records: []const []u8) void {
@@ -95,13 +275,73 @@ fn freeRecords(allocator: std.mem.Allocator, records: []const []u8) void {
     allocator.free(records);
 }
 
-test "canonical records ignore only distribution timing observations" {
+test "canonical records remove only declared timing and cache observations" {
     const allocator = std.testing.allocator;
-    const end = canonicalRecord(allocator, "gate-end tool=x duration_ms=12 cache_status=hit").?;
+    const end = (try canonicalRecord(
+        allocator,
+        "gate-end id=x tool=x exit_status=0 duration_ms=12 cache_status=hit",
+        "/repo",
+    )).?;
     defer allocator.free(end);
-    try std.testing.expectEqualStrings("gate-end tool=x", end);
-    try std.testing.expect(canonicalRecord(allocator, "summary distribution-all-timing subgates=17 total_duration_ms=1") == null);
-    const semantic = canonicalRecord(allocator, "summary gate total=4 local_fail=0").?;
-    defer allocator.free(semantic);
-    try std.testing.expectEqualStrings("summary gate total=4 local_fail=0", semantic);
+    try std.testing.expectEqualStrings("gate-end id=x tool=x exit_status=0", end);
+    try std.testing.expect((try canonicalRecord(
+        allocator,
+        "summary distribution-all-timing subgates=17 total_duration_ms=1",
+        "/repo",
+    )) == null);
+    const cache = (try canonicalRecord(
+        allocator,
+        "air-export-cache mode=ReleaseFast status=hit duration_ms=12 cache_key=abc descriptor_bytes=4",
+        "/repo",
+    )).?;
+    defer allocator.free(cache);
+    try std.testing.expectEqualStrings(
+        "air-export-cache mode=ReleaseFast cache_key=abc descriptor_bytes=4",
+        cache,
+    );
+}
+
+test "canonical records normalize repository and scratch run paths" {
+    const allocator = std.testing.allocator;
+    const record = (try canonicalRecord(
+        allocator,
+        "summary output=/repo/tmp/vector_gate_1234/object.o local_fail=0",
+        "/repo",
+    )).?;
+    defer allocator.free(record);
+    try std.testing.expectEqualStrings(
+        "summary output=<repo>/tmp/vector_gate_<run>/object.o local_fail=0",
+        record,
+    );
+}
+
+test "canonical records reject unclassified volatility" {
+    try std.testing.expectError(
+        error.UnclassifiedVolatileField,
+        canonicalRecord(std.testing.allocator, "summary gate pid=12 local_fail=0", "/repo"),
+    );
+}
+
+test "structure validation requires complete unique gate lifecycles" {
+    const records = [_][]const u8{
+        "distribution all gates target=x86_64-unknown-linux-gnu",
+        "gate-input id=one tool=one target=x runner=zig-run input_scope=runner-command cache_contract=unreported",
+        "gate-start id=one tool=one",
+        "ok child one",
+        "gate-end id=one tool=one exit_status=0",
+        "summary distribution-all-gate-inventory schema_version=1 subgates=1 local_fail=0",
+        "ok distribution all gates",
+    };
+    try std.testing.expectEqual(@as(usize, 1), try validateStructure(std.testing.allocator, &records));
+
+    const incomplete = [_][]const u8{
+        "gate-input id=one tool=one",
+        "gate-start id=one tool=one",
+        "summary distribution-all-gate-inventory schema_version=1 subgates=1 local_fail=0",
+        "ok distribution all gates",
+    };
+    try std.testing.expectError(
+        error.IncompleteGateLifecycle,
+        validateStructure(std.testing.allocator, &incomplete),
+    );
 }

@@ -47,14 +47,24 @@ broader fma switch population, both with zero immediate closure claims.
 `__divdc3` remains a separately reviewed vector-PHI planner capability with
 zero closure by itself. `__muldc3` remains deferred.
 
-The immediate next bounded contract is the user-authorized Phase 0-1
-infrastructure interlude: same-state fresh/cached timing and input evidence,
-canonical normalized-output equivalence, and diagnosis of the 14/17 uncached
-subgates. Do not begin Phase 2, concurrency, broader cache work, or a selector
-capability during that interlude. Afterward, the recommended first two
-capability pipelines are the scalar conversion frontier and scalar leaf
-frontier, each with provisional Tier-2/native closures and one cumulative Tier
-3. Evidence: `docs/evidence/inbox44_frontier_ranking.md`.
+The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
+comparison matched 1,258 semantic records across all 17 gates. The historical
+14/17 `cache_status=none` population is now correctly classified as 14 gates
+with unreported cache telemetry, not 14 proven cache misses. The same-state
+fresh/cached pair took 37.81/27.98 minutes of actual wall time; the familiar
+~39-minute cached number is summed child duration and double-counts the three
+concurrent real-row gates. Phase 1 compiled-tool reuse remains a no-go because
+compilation/startup is not isolated at the required 10% threshold. Do not
+begin Phase 1, Phase 2, broader caching, or concurrency work from this result.
+Evidence: `docs/evidence/distribution_all_phase0_1_observability.summary`.
+
+The recommended next bounded implementation is INBOX-44 Pipeline 1:
+normalized i6/i7 unsigned-immediate comparisons, then exact `llvm.cttz.i64`
+only if the refreshed six-row frontier confirms it, with provisional Tier-2
+closures and one cumulative Tier 3. Pipeline 2 remains the named-i16 predicate
+matrix followed by i128 pair comparison. Both await the next implementation
+directive; `__muldc3` remains deferred. Ranking evidence:
+`docs/evidence/inbox44_frontier_ranking.md`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
