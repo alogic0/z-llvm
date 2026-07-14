@@ -73,6 +73,21 @@ Tier 3 is not the default end of every worker cycle. After a tier-3 run,
 inspect and record its result before starting another cycle or another full
 run. A failed run is investigated with the narrowest reproducing subgate.
 
+### Row-closure batching (amendment 2026-07-14, user-directed)
+
+Individual compiler_rt row closures are recorded as provisional
+(Tier-2/native-proven) on focused Tier 2 plus exact native row evidence.
+One cumulative Tier 3 accepts the batch: at the end of a two-step
+pipeline (not once per half, unless the first half must be independently
+accepted before the second can safely begin), or at the
+four-to-six-commit or family checkpoint for batches of low-risk
+closures. Immediate Tier 3 is retained for confirmed wrong-code repairs
+and for changes to ABI, shared frame layout, relocation/linker
+ownership, AIR export, verifier invariants, or milestone claims. Do not
+launch Tier 3 during a read-only periodic review or merely because the
+worker stopped. A provisional closure is not a completed tracker claim
+until the cumulative Tier 3 accepts it.
+
 ## Change-impact routing
 
 Explicit and binding — do not decide ad hoc that a risky change is
