@@ -350,7 +350,10 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         .call => |call| selector_calls.lowerCall(selector, instruction.result, call) catch |err| return instructionValueError(selector, err, "stage2-call-value"),
         .extractvalue => |extract| selector_calls.lowerExtractValue(selector, instruction.result, extract) catch |err| return instructionValueError(selector, err, "stage2-extractvalue-value"),
         .insertvalue => |insert| selector_aggregate.lowerInsertValue(selector, instruction.result, insert) catch |err| return instructionValueError(selector, err, "stage2-insertvalue-value"),
-        .select => |select| selector_cfg.lowerSelect(selector, instruction.result, select) catch |err| return instructionValueError(selector, err, "stage2-select-value"),
+        .select => |select| if (select.ty == .vector)
+            selector_vector.lowerSelect(selector, instruction.result, select) catch |err| return instructionValueError(selector, err, "stage2-vector-select-value")
+        else
+            selector_cfg.lowerSelect(selector, instruction.result, select) catch |err| return instructionValueError(selector, err, "stage2-select-value"),
         .extractelement => |extract| selector_vector.lowerExtractElement(selector, instruction.result, extract) catch |err| return instructionValueError(selector, err, "stage2-vector-extract-value"),
         .insertelement => |insert| selector_vector.lowerInsertElement(selector, instruction.result, insert) catch |err| return instructionValueError(selector, err, "stage2-vector-insert-value"),
         .shufflevector => |shuffle| selector_vector.lowerShuffleVector(selector, instruction.result, shuffle) catch |err| return instructionValueError(selector, err, "stage2-vector-shuffle-value"),

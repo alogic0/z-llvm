@@ -247,7 +247,7 @@ fn packedFpLaneBits(ty: ir.Type) ?u16 {
 fn inspectIcmp(icmp: ir.IcmpInst) ?Diagnostic {
     if (icmp.operand_ty == .vector) {
         const vector = icmp.operand_ty.vector;
-        if (!icmp.samesign or icmp.predicate != .ugt or vector.len != 2 or vector.elem_ty != .int or vector.elem_ty.int != 32 or
+        if (!icmp.samesign or (icmp.predicate != .ugt and icmp.predicate != .ult) or vector.len != 2 or vector.elem_ty != .int or vector.elem_ty.int != 32 or
             !isVectorOperand(icmp.lhs, icmp.operand_ty) or !isVectorOperand(icmp.rhs, icmp.operand_ty))
         {
             return .{ .unsupported_type = "icmp" };
@@ -259,6 +259,13 @@ fn inspectIcmp(icmp: ir.IcmpInst) ?Diagnostic {
 }
 
 fn inspectSelect(select: ir.SelectInst) ?Diagnostic {
+    const f32x2: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
+    if (select.ty.eql(f32x2)) {
+        const mask2: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 1 } } };
+        return if (select.cond_ty.eql(mask2) and
+            isVectorOperand(select.true_value, select.ty) and
+            isVectorOperand(select.false_value, select.ty)) null else .{ .unsupported_type = "select-cond" };
+    }
     if (!isSelectorScalarType(select.ty)) return .{ .unsupported_type = "select" };
     return switch (select.cond_ty) {
         .int => |bits| if (bits == 1) null else .{ .unsupported_type = "select-cond" },
@@ -317,6 +324,11 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (std.mem.eql(u8, call.callee, "llvm.copysign.f32")) {
         return if (call.ret_ty == .float and call.args.items.len == 2 and
             call.args.items[0].ty == .float and call.args.items[1].ty == .float) null else .{ .unsupported_type = "llvm.copysign.f32" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.copysign.v2f32")) {
+        const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
+        return if (call.ret_ty.eql(vector_ty) and call.args.items.len == 2 and
+            call.args.items[0].ty.eql(vector_ty) and call.args.items[1].ty.eql(vector_ty)) null else .{ .unsupported_type = "llvm.copysign.v2f32" };
     }
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) {
         const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };

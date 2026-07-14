@@ -92,6 +92,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.maxnum.f32")) return try selector_fp.lowerMaxNum(selector, result, call, 32);
     if (std.mem.eql(u8, call.callee, "llvm.maxnum.f64")) return try selector_fp.lowerMaxNum(selector, result, call, 64);
     if (std.mem.eql(u8, call.callee, "llvm.copysign.f32")) return try selector_fp.lowerCopySignF32(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.copysign.v2f32")) return try selector_vector.lowerCopySignV2F32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) return try selector_vector.lowerFabsV2F32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v4f32")) return try selector_vector.lowerFabsV4F32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try lowerIntByteSizeCall(selector, result, call);

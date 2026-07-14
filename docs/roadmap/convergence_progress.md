@@ -4056,6 +4056,21 @@ One line per completed cycle, append-only, newest last. This is the
   effectively unchanged from INBOX-45. Evidence
   `docs/evidence/distribution_all_after_inbox46_named_i16_i128_compare.summary`.
 
+- 2026-07-14 (this commit, INBOX-47 Part 1) Item 12 bounded f32x2 vector
+  capability: exact canonical-mask select and `llvm.copysign.v2f32` now reuse
+  the existing XMM shape and bitwise machine forms through lane-width helpers.
+  Permanent execution also closes the captured row's previously missed exact
+  packed unsigned `ult` comparison as the operand-swapped member of the
+  existing `ugt` family. The exact extracted row passes five pinned-Zig
+  finite, scaled, zero-denominator, infinite-numerator, and
+  finite-over-infinite cases. `compiler_rt.divsc3.__divsc3` is the sole
+  provisional emission, moving report-all from 443 / 260 / 183 to
+  443 / 261 / 182 with no collateral emissions or new failures. Tier 2 is
+  green at 24/24 steps and 986/986 tests. No Tier 3 ran; continue with the
+  pre-authorized f64x2 parity successor, then accept the pipeline with its one
+  cumulative gate. Evidence
+  `docs/evidence/std_debug_hello_inbox47_f32x2_select_copysign.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

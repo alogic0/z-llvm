@@ -62,6 +62,100 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
     return null;
 }
 
+pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select: ir.SelectInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-vector-select-result" };
+    const ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
+    const mask_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 1 } } };
+    if (!select.ty.eql(ty) or !select.cond_ty.eql(mask_ty)) return .{ .no_emitter = "composed-vector-select-form" };
+
+    const condition = describeVectorValue(selector, select.cond, mask_ty) orelse return .{ .unsupported_value = "composed-vector-select-cond" };
+    const true_value = describeVectorValue(selector, select.true_value, ty) orelse return .{ .unsupported_value = "composed-vector-select-true" };
+    const false_value = describeVectorValue(selector, select.false_value, ty) orelse return .{ .unsupported_value = "composed-vector-select-false" };
+    if (!condition.shape.eql(VectorShape.mask32x2(0b11))) return .{ .unsupported_value = "composed-vector-select-cond" };
+    if (!true_value.shape.eql(VectorShape.f32x2(0b11))) return .{ .unsupported_value = "composed-vector-select-true" };
+    if (!false_value.shape.eql(VectorShape.f32x2(0b11))) return .{ .unsupported_value = "composed-vector-select-false" };
+
+    const false_initial = vectorValueReg(selector, select.false_value);
+    const condition_initial = vectorValueReg(selector, select.cond);
+    const dst = resultXmmRegAvoidingTwo(selector, result_name, select.true_value, false_initial, condition_initial) orelse
+        return .{ .no_spill_envelope = "composed-vector-select-dst" };
+    if (try materializeVectorValue(selector, select.true_value, true_value, dst, false_initial)) |_| return .{ .unsupported_value = "composed-vector-select-true-materialize" };
+    const false_reg = vectorValueReg(selector, select.false_value) orelse blk: {
+        const scratch = if (condition_initial) |condition_reg|
+            scratchXmmRegAvoidingTwo(selector, dst, condition_reg)
+        else
+            scratchXmmReg(selector, dst, null);
+        if (try materializeVectorValueAvoidingTwo(selector, select.false_value, false_value, scratch, dst, condition_initial)) |_| return .{ .unsupported_value = "composed-vector-select-false-materialize" };
+        break :blk scratch;
+    };
+    const condition_reg = vectorValueReg(selector, select.cond) orelse blk: {
+        const scratch = scratchXmmReg(selector, dst, false_reg);
+        if (try materializeVectorValue(selector, select.cond, condition, scratch, dst)) |_| return .{ .unsupported_value = "composed-vector-select-cond-materialize" };
+        break :blk scratch;
+    };
+
+    try selector_state.clobberXmmReg(selector, dst);
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .pxor_xmm = .{ .dst = dst, .src = false_reg } },
+        .{ .andps_xmm = .{ .dst = dst, .src = condition_reg } },
+        .{ .pxor_xmm = .{ .dst = dst, .src = false_reg } },
+    });
+    try bindVectorResult(selector, result_name, dst, VectorShape.f32x2(0b11));
+    return null;
+}
+
+pub fn lowerCopySignV2F32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    return lowerCopySign(selector, result, call, .float);
+}
+
+fn lowerCopySign(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, lane_type: VectorShape.LaneType) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-vector-copysign-result" };
+    const ty: ir.Type = switch (lane_type) {
+        .float => .{ .vector = .{ .len = 2, .elem_ty = .float } },
+        .double => .{ .vector = .{ .len = 2, .elem_ty = .double } },
+        .integer => unreachable,
+    };
+    if (!call.ret_ty.eql(ty) or call.args.items.len != 2 or
+        !call.args.items[0].ty.eql(ty) or !call.args.items[1].ty.eql(ty) or
+        call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null)
+    {
+        return .{ .no_emitter = "composed-vector-copysign-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) {
+            return .{ .no_emitter = "composed-vector-copysign-tail-kind" };
+        }
+    }
+
+    const magnitude = describeVectorValue(selector, call.args.items[0].value, ty) orelse return .{ .unsupported_value = "composed-vector-copysign-magnitude" };
+    const sign = describeVectorValue(selector, call.args.items[1].value, ty) orelse return .{ .unsupported_value = "composed-vector-copysign-sign" };
+    const expected_shape = if (lane_type == .float) VectorShape.f32x2(0b11) else VectorShape.f64x2(0b11);
+    if (!magnitude.shape.eql(expected_shape)) return .{ .unsupported_value = "composed-vector-copysign-magnitude" };
+    if (!sign.shape.eql(expected_shape)) return .{ .unsupported_value = "composed-vector-copysign-sign" };
+
+    const sign_initial = vectorValueReg(selector, call.args.items[1].value);
+    const dst = resultXmmReg(selector, result_name, call.args.items[0].value, sign_initial) orelse
+        return .{ .no_spill_envelope = "composed-vector-copysign-dst" };
+    if (try materializeVectorValue(selector, call.args.items[0].value, magnitude, dst, sign_initial)) |_| return .{ .unsupported_value = "composed-vector-copysign-magnitude-materialize" };
+    const sign_reg = vectorValueReg(selector, call.args.items[1].value) orelse blk: {
+        const scratch = scratchXmmReg(selector, dst, null);
+        if (try materializeVectorValue(selector, call.args.items[1].value, sign, scratch, dst)) |_| return .{ .unsupported_value = "composed-vector-copysign-sign-materialize" };
+        break :blk scratch;
+    };
+    const mask = scratchXmmReg(selector, dst, sign_reg);
+    try materializeLaneSplat(selector, if (lane_type == .float) 0x8000_0000 else 0x8000_0000_0000_0000, mask, expected_shape.lane_bits);
+    try selector_state.clobberXmmReg(selector, sign_reg);
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .pxor_xmm = .{ .dst = sign_reg, .src = dst } },
+        .{ .andps_xmm = .{ .dst = sign_reg, .src = mask } },
+    });
+    try selector_state.clobberXmmReg(selector, dst);
+    try selector.machine.instructions.append(selector.allocator, .{ .pxor_xmm = .{ .dst = dst, .src = sign_reg } });
+    try bindVectorResult(selector, result_name, dst, expected_shape);
+    return null;
+}
+
 pub fn lowerFabsV2F32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     return lowerFabsF32(selector, result, call, 2);
 }
@@ -130,18 +224,20 @@ fn lowerMask4ToI4(selector: *ComposedBlockSelector, result_name: []const u8, cas
 pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-icmp-result" };
     const shape = shapeForType(icmp.operand_ty, 0) orelse return .{ .no_emitter = "composed-vector-icmp-form" };
-    if (!icmp.samesign or icmp.predicate != .ugt or shape.lane_type != .integer or shape.lane_bits != 32) {
-        return .{ .no_emitter = "composed-vector-icmp-form" };
-    }
-    const lhs = describeVectorValue(selector, icmp.lhs, icmp.operand_ty) orelse return .{ .unsupported_value = "composed-vector-icmp-lhs" };
-    const rhs = describeVectorValue(selector, icmp.rhs, icmp.operand_ty) orelse return .{ .unsupported_value = "composed-vector-icmp-rhs" };
+    if (!icmp.samesign) return .{ .no_emitter = "composed-vector-icmp-samesign" };
+    if (icmp.predicate != .ugt and icmp.predicate != .ult) return .{ .no_emitter = "composed-vector-icmp-predicate" };
+    if (shape.lane_type != .integer or shape.lane_bits != 32) return .{ .no_emitter = "composed-vector-icmp-shape" };
+    const lhs_value = if (icmp.predicate == .ugt) icmp.lhs else icmp.rhs;
+    const rhs_value = if (icmp.predicate == .ugt) icmp.rhs else icmp.lhs;
+    const lhs = describeVectorValue(selector, lhs_value, icmp.operand_ty) orelse return .{ .unsupported_value = "composed-vector-icmp-lhs" };
+    const rhs = describeVectorValue(selector, rhs_value, icmp.operand_ty) orelse return .{ .unsupported_value = "composed-vector-icmp-rhs" };
     if (lhs.shape.kind != .data or rhs.shape.kind != .data) return .{ .unsupported_value = "composed-vector-icmp-operand" };
-    const rhs_reg = vectorValueReg(selector, icmp.rhs);
-    const dst = resultXmmReg(selector, result_name, icmp.lhs, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-icmp-dst" };
-    if (try materializeVectorValue(selector, icmp.lhs, lhs, dst, rhs_reg)) |diagnostic| return diagnostic;
+    const rhs_reg = vectorValueReg(selector, rhs_value);
+    const dst = resultXmmReg(selector, result_name, lhs_value, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-icmp-dst" };
+    if (try materializeVectorValue(selector, lhs_value, lhs, dst, rhs_reg)) |diagnostic| return diagnostic;
     const src = rhs_reg orelse blk: {
         const scratch = scratchXmmReg(selector, dst, null);
-        if (try materializeVectorValue(selector, icmp.rhs, rhs, scratch, dst)) |diagnostic| return diagnostic;
+        if (try materializeVectorValue(selector, rhs_value, rhs, scratch, dst)) |diagnostic| return diagnostic;
         break :blk scratch;
     };
     const bias = scratchXmmRegAvoidingTwo(selector, dst, src);
@@ -386,8 +482,19 @@ fn materializeVectorValue(
     dst: XmmReg,
     protected: ?XmmReg,
 ) !?Diagnostic {
+    return materializeVectorValueAvoidingTwo(selector, value, operand, dst, protected, null);
+}
+
+fn materializeVectorValueAvoidingTwo(
+    selector: *ComposedBlockSelector,
+    value: ir.Value,
+    operand: VectorOperand,
+    dst: XmmReg,
+    protected: ?XmmReg,
+    second_protected: ?XmmReg,
+) !?Diagnostic {
     if (operand.constant) |constant| {
-        const high = scratchXmmReg(selector, dst, protected);
+        const high = scratchXmmRegAvoidingThree(selector, dst, protected, second_protected);
         const materialized_bits: u16 = if (constant.shape.lane_count == 4) 64 else constant.shape.lane_bits;
         try materializeLaneBits(selector, constant.bits[0], dst, materialized_bits);
         try materializeLaneBits(selector, constant.bits[1], high, materialized_bits);
@@ -439,6 +546,31 @@ fn resultXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8,
     return null;
 }
 
+fn resultXmmRegAvoidingTwo(
+    selector: *const ComposedBlockSelector,
+    result_name: []const u8,
+    reusable: ir.Value,
+    first_avoid: ?XmmReg,
+    second_avoid: ?XmmReg,
+) ?XmmReg {
+    if (plannedVectorXmmReg(selector, result_name)) |reg| {
+        if ((first_avoid == null or reg != first_avoid.?) and (second_avoid == null or reg != second_avoid.?)) return reg;
+    }
+    if (reusable == .named) {
+        if (vectorValueReg(@constCast(selector), reusable)) |reg| {
+            if ((first_avoid == null or reg != first_avoid.?) and (second_avoid == null or reg != second_avoid.?)) return reg;
+        }
+    }
+    for (xmm_regs) |reg| {
+        if ((first_avoid != null and reg == first_avoid.?) or (second_avoid != null and reg == second_avoid.?)) continue;
+        if (xmmRegAvailable(selector, reg)) return reg;
+    }
+    for (xmm_regs) |reg| {
+        if ((first_avoid == null or reg != first_avoid.?) and (second_avoid == null or reg != second_avoid.?)) return reg;
+    }
+    return null;
+}
+
 fn plannedVectorXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8) ?XmmReg {
     const plan = selector.allocation_plan orelse return null;
     const assignment = plan.assignment(result_name) orelse return null;
@@ -461,12 +593,16 @@ fn plannedScalarXmmReg(selector: *const ComposedBlockSelector, result_name: []co
 }
 
 fn scratchXmmReg(selector: *const ComposedBlockSelector, avoid: XmmReg, second_avoid: ?XmmReg) XmmReg {
+    return scratchXmmRegAvoidingThree(selector, avoid, second_avoid, null);
+}
+
+fn scratchXmmRegAvoidingThree(selector: *const ComposedBlockSelector, first: XmmReg, second: ?XmmReg, third: ?XmmReg) XmmReg {
     for (xmm_regs) |reg| {
-        if (reg == avoid or (second_avoid != null and reg == second_avoid.?)) continue;
+        if (reg == first or (second != null and reg == second.?) or (third != null and reg == third.?)) continue;
         if (xmmRegAvailable(selector, reg)) return reg;
     }
     for (xmm_regs) |reg| {
-        if (reg != avoid and (second_avoid == null or reg != second_avoid.?)) return reg;
+        if (reg != first and (second == null or reg != second.?) and (third == null or reg != third.?)) return reg;
     }
     unreachable;
 }
@@ -625,11 +761,19 @@ fn integerLaneBits(value: i128, bits: u16) ?u64 {
 }
 
 fn materializeI32Splat(selector: *ComposedBlockSelector, bits: u32, reg: XmmReg) !void {
-    try materializeLaneBits(selector, bits, reg, 32);
-    try selector.machine.instructions.appendSlice(selector.allocator, &.{
-        .{ .unpcklps_xmm = .{ .dst = reg, .src = reg } },
-        .{ .unpcklps_xmm = .{ .dst = reg, .src = reg } },
-    });
+    try materializeLaneSplat(selector, bits, reg, 32);
+}
+
+fn materializeLaneSplat(selector: *ComposedBlockSelector, bits: u64, reg: XmmReg, lane_bits: u16) !void {
+    try materializeLaneBits(selector, bits, reg, lane_bits);
+    if (lane_bits == 32) {
+        try selector.machine.instructions.appendSlice(selector.allocator, &.{
+            .{ .unpcklps_xmm = .{ .dst = reg, .src = reg } },
+            .{ .unpcklps_xmm = .{ .dst = reg, .src = reg } },
+        });
+    } else {
+        try selector.machine.instructions.append(selector.allocator, .{ .unpcklpd_xmm = .{ .dst = reg, .src = reg } });
+    }
 }
 
 fn scratchXmmRegAvoidingTwo(selector: *const ComposedBlockSelector, first: XmmReg, second: XmmReg) XmmReg {
