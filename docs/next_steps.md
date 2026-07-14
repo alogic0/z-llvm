@@ -45,22 +45,22 @@ tree `536f6a30e9c6f68ce2d1ea30174cf8fedf98db49`; strict real rows remain
 report remains 443 selected / 261 emitting / 182 failing. Evidence:
 `docs/evidence/distribution_all_after_inbox48_f64x2_phi.summary`.
 
-INBOX-49 Part 1 is Tier-2/native-proven. Exact full-defined `<2 x i64>` lane
-0/1 extraction closes `compiler_rt.divdc3.__divdc3` provisionally, moving the
-report from the accepted 443 / 264 / 179 baseline to 443 / 265 / 178 with no
-collateral change. The pinned-Zig five-edge proof passes 5/5 literal expected
-bit cases. Evidence:
-`docs/evidence/std_debug_hello_inbox49_i64x2_extract.summary`.
+INBOX-49 is complete and cumulatively accepted. Exact full-defined
+`<2 x i64>` extraction closes `compiler_rt.divdc3.__divdc3`; exact range-
+attributed `llvm.ctpop.i64/i128` software lowering closes `__popcountdi2` and
+`__popcountti2`. The report moves from the prior accepted 443 / 264 / 179 to
+443 / 267 / 176 with no collateral change. The pinned-Zig proofs pass 5/5
+five-edge complex-division cases and 12/12 relocation-free popcount cases,
+with no POPCNT. The cumulative Tier 3 passes all 17 subgates on committed
+tree `af36078479ed29e91040c24e9c6f4239a7143db7`. Evidence:
+`docs/evidence/std_debug_hello_inbox49_i64x2_extract.summary`,
+`docs/evidence/std_debug_hello_inbox49_popcount.summary`, and
+`docs/evidence/distribution_all_after_inbox49_pipeline.summary`.
 
-INBOX-49 Part 2 is Tier-2/native-proven. Exact range-attributed
-`llvm.ctpop.i64/i128` software lowering provisionally closes `__popcountdi2`
-and `__popcountti2`, moving the report to 443 / 267 / 176 with no collateral
-change. The relocation-free pinned-Zig proof passes 12/12 cases and contains
-no POPCNT. Evidence:
-`docs/evidence/std_debug_hello_inbox49_popcount.summary`. Commit this slice,
-then run the one cumulative Tier 3 that accepts Part 1 (`__divdc3`) and Part 2
-together. Stop for periodic review after acceptance; `__muldc3` remains
-deferred at the 256-bit/AVX checkpoint.
+Stop for the INBOX-49 periodic review. No successor is authorized;
+`__muldc3` remains deferred at the 256-bit/AVX checkpoint, and the review must
+rank the remaining switch-PHI/EI population against the roughly 15-20-row
+reachable endgame.
 
 The audit confirmed a P0 baseline-ISA violation in both accepted
 `frontier_popcount_u32` and `compiler_rt.limb64.__popcount_limb64` paths.

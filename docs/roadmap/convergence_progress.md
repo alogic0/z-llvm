@@ -4197,6 +4197,18 @@ One line per completed cycle, append-only, newest last. This is the
   to accept these rows together with Part 1's `__divdc3`. Evidence
   `docs/evidence/std_debug_hello_inbox49_popcount.summary`.
 
+- 2026-07-14 (this commit, INBOX-49 cumulative acceptance) Item 12 pipeline
+  close: the one cumulative Tier 3 passes all 17 subgates against committed
+  tree `af36078479ed29e91040c24e9c6f4239a7143db7`. Integrated objects remain
+  146/146 in all three pipelines, strict real rows remain 100/100/100, and
+  source-owned native link, object inspection, and compatibility probes remain
+  100/100 each. This accepts `__divdc3`, `__popcountdi2`, and `__popcountti2`,
+  making 443 / 267 / 176 the accepted compiler_rt report state with no
+  collateral emission or new failure. The standalone baseline-safe popcount
+  P0 is also accepted independently at `76831275`. Stop for periodic review;
+  no successor capability is authorized. Evidence
+  `docs/evidence/distribution_all_after_inbox49_pipeline.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
