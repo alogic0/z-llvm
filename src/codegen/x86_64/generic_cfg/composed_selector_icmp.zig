@@ -150,7 +150,7 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
                     try selector.machine.instructions.append(selector.allocator, .{ .test_arg32 = .rcx });
                 } else return .{ .no_emitter = "composed-block-icmp-lhs-width" };
             },
-            .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-icmp-lhs-loc" },
+            .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-icmp-lhs-loc" },
         }
         try selector_state.clobberAccumulator(selector);
         try selector.machine.instructions.append(selector.allocator, .sete_eax);

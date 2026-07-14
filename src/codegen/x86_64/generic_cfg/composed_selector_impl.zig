@@ -251,7 +251,7 @@ fn stabilizeFramedParams(selector: *ComposedBlockSelector, function: ir.Function
                 if (try selector_state.spillPairValue(selector, param.name)) |diagnostic| return diagnostic;
             },
             .xmm => if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic,
-            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .unsupported_value = "stage2-param-home" },
+            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .unsupported_value = "stage2-param-home" },
         }
     }
     return null;
@@ -299,7 +299,7 @@ fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnost
         try selector_state.bindValueLoc(selector, result_name, loc);
         switch (loc) {
             .scratch32, .scratch64, .xmm, .spill64, .spill128, .spill_fp, .spill_vector => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;

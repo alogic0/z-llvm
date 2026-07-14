@@ -34,6 +34,7 @@ pub const ValueLoc = union(enum) {
     stack128_value: u32,
     stack_i32_array: StackArrayLoc,
     stack_i32_ptr: StackPtrLoc,
+    stack_f32_pair_ptr: StackF32PairPtrLoc,
     readonly_table_ptr: ReadOnlyTablePtrLoc,
     spill64: FrameIndex,
     spill128: PairSpillLoc,
@@ -233,6 +234,11 @@ pub const StackScalarLoc = struct {
 pub const StackPtrLoc = struct {
     disp: u32,
     index: ?StackIndexLoc = null,
+};
+
+pub const StackF32PairPtrLoc = struct {
+    object_base_disp: u32,
+    disp: u32,
 };
 
 pub const StackIndexLoc = struct {

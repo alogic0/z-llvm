@@ -10,4 +10,5 @@ test {
     _ = @import("composed_selector_calls_tests.zig");
     _ = @import("composed_selector_cfg_tests.zig");
     _ = @import("composed_selector_aggregate_tests.zig");
+    _ = @import("composed_selector_aggregate_object_tests.zig");
 }

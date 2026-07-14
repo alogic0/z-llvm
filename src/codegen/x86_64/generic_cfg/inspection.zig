@@ -2,6 +2,8 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const fp_semantics = @import("../../../analysis/fp_semantics.zig");
 const sysv_abi = @import("../sysv_abi.zig");
+const x86_64_types = @import("../types.zig");
+const aggregate_object = @import("aggregate_object.zig");
 
 pub const Diagnostic = union(enum) {
     unsupported_control_flow: []const u8,
@@ -28,6 +30,10 @@ pub const SelectionResult = union(enum) {
 };
 
 pub fn inspectFunction(function: ir.Function) SelectionResult {
+    return inspectFunctionWithContext(function, null);
+}
+
+pub fn inspectFunctionWithContext(function: ir.Function, context: ?*const x86_64_types.ReadOnlyModuleContext) SelectionResult {
     if (function.calling_conv != null) {
         return unsupported(.{ .unsupported_control_flow = "non-default-calling-convention" });
     }
@@ -43,7 +49,7 @@ pub fn inspectFunction(function: ir.Function) SelectionResult {
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
-            if (inspectInstruction(instruction)) |diagnostic| {
+            if (inspectInstruction(instruction, context)) |diagnostic| {
                 return unsupported(diagnostic);
             }
         }
@@ -58,14 +64,14 @@ pub fn inspectFunction(function: ir.Function) SelectionResult {
     return unsupported(.{ .no_emitter = "selector-skeleton-has-no-emitters" });
 }
 
-fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
+fn inspectInstruction(instruction: ir.Instruction, context: ?*const x86_64_types.ReadOnlyModuleContext) ?Diagnostic {
     return switch (instruction.kind) {
         .binary => |binary| inspectBinary(binary),
         .cast => |cast| inspectCast(cast),
         .icmp => |icmp| inspectIcmp(icmp),
         .select => |select| inspectSelect(select),
-        .alloca => |alloca| if (isSelectorScalarType(alloca.allocated_ty) or parseI32ArrayType(alloca.allocated_ty) != null) null else .{ .unsupported_type = "alloca" },
-        .load => |load| if (isSelectorScalarType(load.ty)) null else .{ .unsupported_type = "load" },
+        .alloca => |alloca| if (isSelectorScalarType(alloca.allocated_ty) or parseI32ArrayType(alloca.allocated_ty) != null or aggregate_object.isF32PairType(context, alloca.allocated_ty)) null else .{ .unsupported_type = "alloca" },
+        .load => |load| if (isSelectorScalarType(load.ty) or isPackedF32x2(load.ty)) null else .{ .unsupported_type = "load" },
         .store => |store| if (isSelectorScalarType(store.ty)) null else .{ .unsupported_type = "store" },
         .gep => null,
         .call => |call| inspectCall(call),
@@ -81,6 +87,10 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .extractvalue => |extract| inspectExtractValue(extract),
         .insertvalue => |insert| if (sysv_abi.sseAggregateReturnKind(insert.aggregate_ty) != null) null else .{ .unsupported_instruction = "insertvalue" },
     };
+}
+
+fn isPackedF32x2(ty: ir.Type) bool {
+    return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .float;
 }
 
 fn inspectFcmp(fcmp: ir.FcmpInst) ?Diagnostic {

@@ -37,22 +37,18 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-42 slice 1 is complete. `sysv_abi.zig` now exactly classifies
-`{ <2 x float> }` into packed low XMM0 and `{ double, double }` into XMM0/XMM1.
-Typed terminal aggregate leaves, alias-safe return materialization, verifier
-definedness, and a pinned-Zig `callconv(.c)` canary are green through Tier 3.
-Report-all remains honestly at 443 selected / 247 emitting / 196 failing with
-zero closures; the four complex rows advance to their reviewed body or
-aggregate-object frontiers.
+The INBOX-42 pipeline is complete. Its pre-authorized successor adds one exact
+8-byte, 4-aligned `{ float, float }` stack object through the existing frame
+authority, bounded constant field pointers, ordinary 64-bit pointer PHIs, f32
+stores, and an offset-zero packed load. Permanent executable and negative
+coverage are green through Tier 3. Report-all remains honestly at 443 selected
+/ 247 emitting / 196 failing with zero closures and zero collateral emissions:
+`__divsc3` advances to `llvm.maxnum.f32`, while `__mulsc3` advances to
+`<4 x float>` construction.
 
-Continue immediately with INBOX-42's pre-authorized aggregate stack-object
-slice: one exact 8-byte, 4-aligned f32-pair object through the existing frame
-authority; bounds-checked constant field offsets; pointer PHIs through the
-existing edge path; and captured f32 store/load/merge forms. Expected closures
-remain zero. Commit that successor separately, then stop for review; no third
-cycle is authorized. Slice-1 evidence:
-`docs/evidence/std_debug_hello_aggregate_sse_returns_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox42_aggregate_sse_returns.summary`.
+Stop for review. No third INBOX-42 cycle is authorized. Review evidence:
+`docs/evidence/std_debug_hello_aggregate_object_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox42_aggregate_object.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

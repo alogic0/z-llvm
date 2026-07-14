@@ -3900,6 +3900,23 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_aggregate_sse_returns_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox42_aggregate_sse_returns.summary`.
 
+- 2026-07-14 (this commit, INBOX-42 pre-authorized successor) Item 12 exact f32
+  aggregate stack objects: a shared typed decoder admits only one 8-byte,
+  4-aligned `{ float, float }` object through the existing frame authority.
+  Typed base/current displacements, bounded constant byte GEPs, scalar f32
+  stores, and an offset-zero packed load reuse the value map; pointer PHIs use
+  ordinary 64-bit register/spill destinations. CFG liveness now preserves the
+  existing pressure exemption for frame-owned PHI sources, and verifier XMM
+  definedness covers the packed load forms. Permanent execution proves both
+  object-selection branches bit-exactly, and five negative boundaries remain
+  fail-closed. Report-all stays at 443 / 247 / 196 with zero closures and zero
+  collateral emissions: `__divsc3` advances to `llvm.maxnum.f32` and
+  `__mulsc3` to `<4 x float>` construction. Tier 2 and the shared-frame Tier 3
+  are green. The INBOX-42 pipeline is exhausted; stop for review with no third
+  cycle authorized. Evidence
+  `docs/evidence/std_debug_hello_aggregate_object_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox42_aggregate_object.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

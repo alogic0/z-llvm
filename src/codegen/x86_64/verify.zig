@@ -701,6 +701,9 @@ fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u
         .reload_xmm64_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 64,
         .reload_xmm128_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 128,
         .reload_xmm128ps_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 128,
+        .load_stack_disp8_xmm0, .load_stack_disp32_xmm0 => defined_bits[0] = 64,
+        .load_stack_disp8_xmm0_f32, .load_stack_disp32_xmm0_f32 => defined_bits[0] = 32,
+        .load_arg_ptr_disp8_xmm => |load| defined_bits[@intFromEnum(load.dst)] = 64,
         .movd_xmm_eax => defined_bits[0] = 32,
         .movq_xmm_rax => defined_bits[0] = 64,
         .movss_xmm => |move| {

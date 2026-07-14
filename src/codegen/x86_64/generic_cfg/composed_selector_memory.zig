@@ -10,6 +10,7 @@ const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_fp = @import("composed_selector_fp.zig");
+const aggregate_object = @import("aggregate_object.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -85,6 +86,7 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
             const len = parseI32ArrayType(alloca.allocated_ty) orelse return .{ .no_emitter = "composed-block-alloca-plan-type" };
             if (stack_array.len != len) return .{ .no_emitter = "composed-block-alloca-plan-type" };
         },
+        .stack_f32_pair_ptr => if (!aggregate_object.isF32PairType(selector.module_context, alloca.allocated_ty)) return .{ .no_emitter = "composed-block-alloca-plan-type" },
         .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack128_value, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-alloca-plan-loc" },
     }
     return null;
@@ -95,6 +97,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
     if (load.attrs.isBarrier()) return .{ .no_emitter = "composed-block-load-barrier" };
     if (selector_state.resolveValue(selector, load.ptr)) |ptr| if (ptr == .readonly_table_ptr)
         return lowerReadOnlyTableLoad(selector, result_name, load, ptr.readonly_table_ptr);
+    if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
     if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
     const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
@@ -140,7 +143,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
             try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_eax = .rcx });
             try selector_state.bindEax(selector, result_name);
         },
-        .arg32, .arg128, .xmm, .eax, .rax, .scratch32, .scratch128, .stack128_value, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-load-ptr" },
+        .arg32, .arg128, .xmm, .eax, .rax, .scratch32, .scratch128, .stack128_value, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-load-ptr" },
     }
     return null;
 }
@@ -160,7 +163,7 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
         .scratch32, .scratch64 => "composed-block-store-value-scratch",
         .eax, .rax => "composed-block-store-value-accumulator",
         .spill64 => "composed-block-store-value-spill",
-        .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => "composed-block-store-value-other",
+        .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => "composed-block-store-value-other",
     } else "composed-block-store-value-other";
     if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64(selector, ptr, store.value, value_detail);
     selector_state.emitValueIntoEax(selector, store.value) catch return .{ .unsupported_value = value_detail };
@@ -200,7 +203,7 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
             try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = .rcx });
         },
         .readonly_table_ptr => return .{ .no_emitter = "composed-block-store-readonly-table" },
-        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack128, .stack128_value, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-store-ptr" },
+        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack128, .stack128_value, .stack_f32_pair_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-store-ptr" },
     }
     return null;
 }
@@ -264,9 +267,56 @@ fn lowerLoadFp(selector: *ComposedBlockSelector, result_name: []const u8, load: 
     return null;
 }
 
+fn lowerLoadF32Pair(selector: *ComposedBlockSelector, result_name: []const u8, load: ir.LoadInst) !?Diagnostic {
+    if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-load-f32-pair-addrspace" };
+    const view = aggregatePointerView(selector, load.ptr) orelse return .{ .no_emitter = "composed-block-load-f32-pair-ptr" };
+    if (view.offset != 0 or !view.allows(aggregate_object.byte_size)) return .{ .no_emitter = "composed-block-load-f32-pair-bounds" };
+    const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
+    try selector_state.clobberXmmReg(selector, .xmm0);
+    switch (ptr) {
+        .stack_f32_pair_ptr => |stack| {
+            if (stack.disp <= std.math.maxInt(u8)) {
+                try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_xmm0 = @intCast(stack.disp) });
+            } else {
+                try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_xmm0 = stack.disp });
+            }
+        },
+        .arg64, .scratch64 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_xmm = .{ .base = reg, .dst = .xmm0, .offset = 0 } }),
+        .spill64 => |frame_index| {
+            try selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx });
+            try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_xmm = .{ .base = .rcx, .dst = .xmm0, .offset = 0 } });
+        },
+        else => return .{ .no_emitter = "composed-block-load-f32-pair-ptr" },
+    }
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{
+        .reg = .xmm0,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f32x2(0b11) },
+    } });
+    return null;
+}
+
 fn lowerStoreFp(selector: *ComposedBlockSelector, store: ir.StoreInst, bits: u16) !?Diagnostic {
     if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-store-fp-addrspace" };
     const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+    if (aggregatePointerView(selector, store.ptr)) |view| {
+        if (bits != 32 or !view.allows(4)) return .{ .no_emitter = "composed-block-store-f32-pair-bounds" };
+        if (try selector_fp.materializeFpValue(selector, store.value, .xmm0, bits)) |diagnostic| return diagnostic;
+        switch (ptr) {
+            .stack_f32_pair_ptr => |stack| {
+                if (stack.disp % 4 != 0) return .{ .no_emitter = "composed-block-store-f32-pair-align" };
+                const frame_index = FrameIndex.fromSlot(stack.disp / 4) catch return .{ .no_spill_envelope = "composed-block-store-f32-pair-frame" };
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm32_rsp = .{ .frame_index = frame_index, .reg = .xmm0 } });
+            },
+            .arg64, .scratch64 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } }),
+            .spill64 => |frame_index| {
+                try selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx });
+                try selector.machine.instructions.append(selector.allocator, .{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = .rcx, .offset = 0 } });
+            },
+            else => return .{ .no_emitter = "composed-block-store-f32-pair-ptr" },
+        }
+        return null;
+    }
     if (ptr == .stack_scalar) {
         const stack = ptr.stack_scalar;
         if (stack.kind != .fp or stack.bits != bits) return .{ .no_emitter = "composed-block-store-stack-width" };
@@ -327,7 +377,7 @@ fn lowerStoreI64(selector: *ComposedBlockSelector, ptr: ValueLoc, value: ir.Valu
             error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-spill-ptr" },
             else => return err,
         },
-        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-store-ptr" },
+        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-store-ptr" },
     }
     selector_state.emitValueIntoRax(selector, value) catch return .{ .unsupported_value = value_detail };
     try selector.machine.instructions.append(selector.allocator, .store_rax_rcx_ptr);
@@ -344,7 +394,7 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
     const base = selector_state.resolveValue(selector, gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
     const stack_array = switch (base) {
         .stack_i32_array => |stack_array| stack_array,
-        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-gep-ptr" },
+        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-gep-ptr" },
     };
     if (stack_array.len != len) return .{ .no_emitter = "composed-block-gep-len" };
     if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
@@ -425,6 +475,17 @@ pub fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []cons
         .int => |int| {
             const offset = std.math.cast(i32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
             if (selector_state.resolveValue(selector, gep.ptr)) |base| switch (base) {
+                .stack_f32_pair_ptr => |ptr| {
+                    const adjusted = std.math.add(i64, ptr.disp, offset) catch return .{ .no_emitter = "composed-block-gep-index-range" };
+                    const disp = std.math.cast(u32, adjusted) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
+                    const object_end = std.math.add(u32, ptr.object_base_disp, aggregate_object.byte_size) catch return .{ .no_emitter = "composed-block-gep-index-range" };
+                    if (disp < ptr.object_base_disp or disp > object_end) return .{ .no_emitter = "composed-block-gep-index-range" };
+                    try selector_state.bindValueLoc(selector, result_name, .{ .stack_f32_pair_ptr = .{
+                        .object_base_disp = ptr.object_base_disp,
+                        .disp = disp,
+                    } });
+                    return null;
+                },
                 .readonly_table_ptr => |ptr| {
                     if (offset != 8 or ptr.offset != 0 or !ptr.shape.allowsOffset(8)) return .{ .no_emitter = "composed-block-gep-readonly-table-offset" };
                     var adjusted = ptr;
@@ -453,6 +514,15 @@ pub fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []cons
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
     }
     return null;
+}
+
+fn aggregatePointerView(selector: *const ComposedBlockSelector, value: ir.Value) ?aggregate_object.PointerView {
+    const function = selector.function orelse return null;
+    return aggregate_object.pointerView(function.*, selector.module_context, value);
+}
+
+fn isF32x2(ty: ir.Type) bool {
+    return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .float;
 }
 
 fn lowerReadOnlyTableGep(selector: *ComposedBlockSelector, result_name: []const u8, gep: ir.GepInst) !?Diagnostic {

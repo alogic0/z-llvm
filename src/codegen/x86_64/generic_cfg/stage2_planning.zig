@@ -238,7 +238,7 @@ fn buildStageTwoLiveness(allocator: std.mem.Allocator, function: ir.Function) !S
             const phi = instruction.kind.phi;
             for (phi.incoming.items) |incoming| {
                 const predecessor_index = function.blockIndex(incoming.block) orelse return error.UnsupportedCodegenControlFlow;
-                try addNamedValue(&blocks.items[predecessor_index].phi_out, incoming.value);
+                try addNamedPressureUse(&blocks.items[predecessor_index].phi_out, incoming.value, pressure_exempt_values);
             }
         }
     }
@@ -980,11 +980,6 @@ fn addBlockUse(stage_block: *StageTwoBlock, value: ir.Value, pressure_exempt_val
     if (pressure_exempt_values.contains(name)) return;
     if (stage_block.defs.contains(name)) return;
     try stage_block.uses.put(name, {});
-}
-
-fn addNamedValue(set: *NameSet, value: ir.Value) !void {
-    const name = namedValue(value) orelse return;
-    try set.put(name, {});
 }
 
 pub fn namedValue(value: ir.Value) ?[]const u8 {

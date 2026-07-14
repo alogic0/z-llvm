@@ -29,7 +29,7 @@ pub fn tryLowerWithContext(
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
-    const inspected = inspectFunction(function);
+    const inspected = inspection.inspectFunctionWithContext(function, module_context);
     if (try legacy_lowering.tryLower(allocator, machine, function)) return .selected;
     switch (inspected) {
         .selected => unreachable,

@@ -59,7 +59,7 @@ pub fn isCommutative(op: MachineBinaryOp) bool {
 pub fn locIsAccumulator(loc: ValueLoc) bool {
     return switch (loc) {
         .eax, .rax => true,
-        .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => false,
+        .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => false,
     };
 }
 
@@ -79,6 +79,7 @@ pub fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .stack128_value => |disp| disp == rhs.stack128_value,
         .stack_i32_array => |array| array.base_disp == rhs.stack_i32_array.base_disp and array.len == rhs.stack_i32_array.len,
         .stack_i32_ptr => |ptr| ptr.disp == rhs.stack_i32_ptr.disp and ptr.index == null and rhs.stack_i32_ptr.index == null,
+        .stack_f32_pair_ptr => |ptr| ptr.object_base_disp == rhs.stack_f32_pair_ptr.object_base_disp and ptr.disp == rhs.stack_f32_pair_ptr.disp,
         .readonly_table_ptr => |ptr| blk: {
             const other = rhs.readonly_table_ptr;
             if (!std.mem.eql(u8, ptr.symbol, other.symbol) or ptr.shape != other.shape or ptr.offset != other.offset or std.meta.activeTag(ptr.storage) != std.meta.activeTag(other.storage)) break :blk false;
@@ -104,7 +105,7 @@ pub fn locContainsReg(loc: ValueLoc, reg: ArgReg) bool {
             .reg => |value_reg| value_reg == reg,
             .spill => false,
         },
-        .eax, .rax, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => false,
+        .eax, .rax, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => false,
     };
 }
 

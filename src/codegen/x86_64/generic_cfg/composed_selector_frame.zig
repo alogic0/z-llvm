@@ -8,6 +8,7 @@ const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
+const aggregate_object = @import("aggregate_object.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
@@ -161,6 +162,17 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
                         .kind = if (fp_bits != null) .fp else .integer,
                     } });
                 }
+            } else if (aggregate_object.isF32PairType(selector.module_context, alloca.allocated_ty)) {
+                scalar_slot_count += 1;
+                const alignment = allocaAlignment(alloca.attrs, aggregate_object.alignment) orelse return .{ .no_emitter = "composed-block-alloca-align" };
+                if (alignment != aggregate_object.alignment) return .{ .no_emitter = "composed-block-aggregate-alloca-align" };
+                payload_bytes = std.mem.alignForward(u32, @max(payload_bytes, spill_reserved_bytes), alignment);
+                const base_disp = payload_bytes;
+                payload_bytes = std.math.add(u32, payload_bytes, aggregate_object.byte_size) catch return .{ .no_spill_envelope = "composed-block-stack-slot-count" };
+                try selector_state.bindValueLoc(selector, result_name, .{ .stack_f32_pair_ptr = .{
+                    .object_base_disp = base_disp,
+                    .disp = base_disp,
+                } });
             } else if (parseI32ArrayType(alloca.allocated_ty)) |len| {
                 array_count += 1;
                 const alignment = allocaAlignment(alloca.attrs, 4) orelse return .{ .no_emitter = "composed-block-alloca-align" };
