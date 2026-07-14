@@ -4,7 +4,7 @@ schema_version: 1
 directive: `INBOX-45 Part 2`
 target: `x86_64-linux`
 validation_tier: 2
-closure_status: `provisional pending cumulative pipeline Tier 3`
+closure_status: `accepted by cumulative pipeline Tier 3`
 result: pass
 
 The cycle baseline is `8cc48e46`, whose two narrow-comparison closures remain
@@ -52,8 +52,9 @@ native rows: symbols=6 relocations=0 bit_exact_calls=75/75
 tier2: pass; steps=24/24 tests=977/977
 ```
 
-No Tier 3 ran in this commit. These six closures and the two Part 1 closures
-remain provisional until the single cumulative INBOX-45 pipeline Tier 3.
+No Tier 3 ran in this capability commit. The later cumulative INBOX-45 gate
+accepted these six closures and the two Part 1 closures; see
+`docs/evidence/distribution_all_after_inbox45_narrow_cmp_cttz_i64.summary`.
 
 Artifacts:
 

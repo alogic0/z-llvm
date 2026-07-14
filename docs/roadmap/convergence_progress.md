@@ -4010,6 +4010,18 @@ One line per completed cycle, append-only, newest last. This is the
   cumulative pipeline gate. Evidence
   `docs/evidence/std_debug_hello_inbox45_cttz_i64.summary`.
 
+- 2026-07-14 (this commit, INBOX-45 cumulative acceptance) Item 12 pipeline A
+  close: the single required Tier 3 passes all 17 subgates against committed
+  tree `1d90ef75d73149eaa8aeb062e8640daee8330a3b`. It accepts all eight
+  provisional conversion-row closures from Parts 1 and 2, making
+  443 / 256 / 187 the accepted compiler_rt report state. Integrated objects
+  remain 146/146 in all three pipelines, strict real rows remain 100/100/100,
+  integrated executables remain 6/6, and release-source object/link/probe
+  boundaries remain 100/100 each. Total reported duration is 2,268,761 ms,
+  3.4% below the prior INBOX-43 run with no material runtime regression.
+  Evidence
+  `docs/evidence/distribution_all_after_inbox45_narrow_cmp_cttz_i64.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
