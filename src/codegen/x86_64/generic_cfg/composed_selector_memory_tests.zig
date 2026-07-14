@@ -192,6 +192,12 @@ test "composed selector keeps unsupported FP memory fail closed" {
 
 test "composed selector stores scalar FP values through proven pointer parameters" {
     const input =
+        \\define void @store_f16_pair(half %value, ptr %out_a, ptr %out_b) {
+        \\entry:
+        \\  store half %value, ptr %out_a, align 2
+        \\  store half %value, ptr %out_b, align 2
+        \\  ret void
+        \\}
         \\define void @store_f32(float %value, ptr %out) {
         \\entry:
         \\  store float %value, ptr %out, align 4
@@ -221,7 +227,7 @@ test "composed selector stores scalar FP values through proven pointer parameter
         defer machine.deinit(std.testing.allocator);
         try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
         try x86_64_verify.verifyFunction(machine);
-        if (index == 2) {
+        if (index == 3) {
             var saw_fp_reload = false;
             var saw_pointer_reload = false;
             var saw_spilled_pointer_store = false;
@@ -239,7 +245,16 @@ test "composed selector stores scalar FP values through proven pointer parameter
         const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
         defer std.posix.munmap(mapping);
         @memcpy(mapping, bytes);
-        if (index == 1) {
+        if (index == 0) {
+            const store: *const fn (f16, *u16, *u16) callconv(.c) void = @ptrCast(mapping.ptr);
+            inline for (.{ @as(u16, 0x0000), @as(u16, 0x8000), @as(u16, 0x0001), @as(u16, 0x3c00), @as(u16, 0x7c00), @as(u16, 0x7e55), @as(u16, 0x7d55) }) |bits| {
+                var out_a: u16 = undefined;
+                var out_b: u16 = undefined;
+                store(@bitCast(bits), &out_a, &out_b);
+                try std.testing.expectEqual(bits, out_a);
+                try std.testing.expectEqual(bits, out_b);
+            }
+        } else if (index == 2) {
             const store: *const fn (f64, *f64) callconv(.c) void = @ptrCast(mapping.ptr);
             inline for (.{ @as(u64, 0x0000_0000_0000_0000), @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x0000_0000_0000_0001), @as(u64, 0x7ff0_0000_0000_0000), @as(u64, 0x7ff8_1234_5678_9abc) }) |bits| {
                 var out: f64 = undefined;
@@ -265,18 +280,26 @@ test "composed selector rejects FP stores through derived pointers" {
         \\  store float %value, ptr %out, align 4
         \\  ret void
         \\}
+        \\define void @store_unproven_half(ptr %base, half %value) {
+        \\entry:
+        \\  %out = getelementptr i8, ptr %base, i64 2
+        \\  store half %value, ptr %out, align 2
+        \\  ret void
+        \\}
         \\
     ;
     var module = try ir.Module.parse(std.testing.allocator, input);
     defer module.deinit();
     try module.verify();
 
-    var machine = MachineFunction.init("store_unproven", .void);
-    defer machine.deinit(std.testing.allocator);
-    const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
-    switch (selection) {
-        .unsupported => |diagnostic| try std.testing.expectEqualStrings("composed-block-store-fp-ptr", diagnostic.no_emitter),
-        .selected => return error.TestUnexpectedResult,
+    for (module.functions.items) |function| {
+        var machine = MachineFunction.init(function.name, .void);
+        defer machine.deinit(std.testing.allocator);
+        const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function);
+        switch (selection) {
+            .unsupported => |diagnostic| try std.testing.expectEqualStrings("composed-block-store-fp-ptr", diagnostic.no_emitter),
+            .selected => return error.TestUnexpectedResult,
+        }
     }
 }
 

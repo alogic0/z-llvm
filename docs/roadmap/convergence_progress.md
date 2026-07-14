@@ -3725,6 +3725,20 @@ One line per completed cycle, append-only, newest last. This is the
   with the pre-authorized half pointer-store successor. Evidence
   `docs/evidence/std_debug_hello_i6_samesign_ult_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-35 pre-authorized successor) Item 12 scalar
+  FP memory capability: exact half stores through ABI-proven pointer
+  parameters now preserve the low 16 XMM payload bits through EAX and the
+  existing `movw` pointer-store form. Fourteen permanent output words and 20
+  precomputed row-exact `sincosh` outputs cover signed zeros, subnormals,
+  finite values, infinities, and quiet/signaling NaN payloads; derived pointer
+  forms remain fail-closed. `compiler_rt.sincos.sincosh` is the only new
+  emission, advancing report-all to 443 selected / 233 emitting / 210 failing.
+  Tier 2 and the row-closure Tier 3 are green. The INBOX-35 pipeline is
+  exhausted; stop for the fresh inventory and vector-mask architectural
+  checkpoint. Evidence
+  `docs/evidence/std_debug_hello_half_pointer_store_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox35_half_pointer_store.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

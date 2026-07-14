@@ -147,7 +147,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
-    if (scalarFpBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
+    if (scalarFpStoreBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
     if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
     const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     const value_loc = switch (store.value) {
@@ -208,6 +208,10 @@ fn scalarFpBits(ty: ir.Type) ?u16 {
     return if (ty == .float) 32 else if (ty == .double) 64 else null;
 }
 
+fn scalarFpStoreBits(ty: ir.Type) ?u16 {
+    return if (ty == .half) 16 else scalarFpBits(ty);
+}
+
 fn lowerLoadFp(selector: *ComposedBlockSelector, result_name: []const u8, load: ir.LoadInst, bits: u16) !?Diagnostic {
     if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-load-fp-addrspace" };
     const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
@@ -239,6 +243,7 @@ fn lowerStoreFp(selector: *ComposedBlockSelector, store: ir.StoreInst, bits: u16
     if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-store-fp-addrspace" };
     const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     if (ptr == .stack_scalar) {
+        if (bits == 16) return .{ .no_emitter = "composed-block-store-fp-ptr" };
         const stack = ptr.stack_scalar;
         if (stack.kind != .fp or stack.bits != bits) return .{ .no_emitter = "composed-block-store-stack-width" };
         if (try selector_fp.materializeFpValue(selector, store.value, .xmm0, bits)) |diagnostic| return diagnostic;
@@ -267,10 +272,15 @@ fn lowerStoreFp(selector: *ComposedBlockSelector, store: ir.StoreInst, bits: u16
         },
         else => return .{ .no_emitter = "composed-block-store-fp-ptr" },
     };
-    try selector.machine.instructions.append(selector.allocator, if (bits == 32)
-        .{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = ptr_reg, .offset = 0 } }
-    else
-        .{ .store_xmm0_arg_ptr_disp8 = .{ .reg = ptr_reg, .offset = 0 } });
+    if (bits == 16) {
+        try selector_state.clobberAccumulator(selector);
+        try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = .xmm0 });
+        try selector.machine.instructions.append(selector.allocator, .{ .store_ax_arg_ptr_disp8 = .{ .reg = ptr_reg, .offset = 0 } });
+    } else if (bits == 32) {
+        try selector.machine.instructions.append(selector.allocator, .{ .store_xmm0_f32_arg_ptr_disp8 = .{ .reg = ptr_reg, .offset = 0 } });
+    } else if (bits == 64) {
+        try selector.machine.instructions.append(selector.allocator, .{ .store_xmm0_arg_ptr_disp8 = .{ .reg = ptr_reg, .offset = 0 } });
+    } else unreachable;
     return null;
 }
 

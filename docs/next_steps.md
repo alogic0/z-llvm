@@ -37,20 +37,23 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-34 and its pre-authorized successor are complete. Exact plain named
-`icmp ne` for i32/i64 closes `__gedf2`, `__gesf2`, `__cmpdf2`, and `__cmpsf2`;
-exact immediate-left i32 variable `shl` closes `ceilf` and `floorf`. Both row
-objects are relocation-free and pass corrected `_start`-based native
-executables against precomputed expected bits. The prerequisite intrinsic
-boundary repair invalidated three prior false-positive emissions, so the
-accepted report is now 443 selected / 232 emitting / 211 failing.
+INBOX-35 and its pre-authorized successor are complete. The `lowerIcmp`
+ownership interlude is structurally green. Exact `icmp samesign ult i6` now
+normalizes the source to six bits before the physical compare; the two
+conversion candidates advance honestly to their later concrete
+`llvm.cttz.i32` frontier without an emission claim. Exact half stores through
+ABI-proven pointer parameters then close `compiler_rt.sincos.sincosh` through
+20 precomputed row-exact outputs. Fresh report-all is 443 selected / 233
+emitting / 210 failing.
 
-Tier 2 and the row-closure Tier 3 are green for both capabilities. The
-pipeline is exhausted; stop for review before the noted narrow i6 comparison,
-half store through pointer arguments, or `lowerIcmp` ownership split. Evidence:
-`docs/evidence/std_debug_hello_named_integer_inequality_acceptance.summary`,
-`docs/evidence/std_debug_hello_immediate_left_shl_acceptance.summary`, and
-`docs/evidence/distribution_all_after_inbox34_immediate_left_shl.summary`.
+Tier 2 is green for both capabilities and the `sincosh` row-closure Tier 3 is
+green. The INBOX-35 pipeline is exhausted. Stop for the planned fresh-inventory
+and vector-mask architectural checkpoint, including the physical `<2 x i1>`
+decision for `__unordsf2`; no vector-mask or unrelated capability is
+authorized before that review. Evidence:
+`docs/evidence/std_debug_hello_i6_samesign_ult_acceptance.summary`,
+`docs/evidence/std_debug_hello_half_pointer_store_acceptance.summary`, and
+`docs/evidence/distribution_all_after_inbox35_half_pointer_store.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
