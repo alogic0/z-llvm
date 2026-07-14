@@ -37,22 +37,20 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-33's repair and one authorized successor are complete. Plain named
-`icmp slt/sgt` for i32/i64 now lowers through the existing typed scratch,
-compare, and setcc paths. Exact native acceptance closes
-`compiler_rt.fmod.fmod` and `compiler_rt.fmod.fmodf` across 40 precomputed-bit
-calls; report-all is now 443 selected / 229 emitting / 214 failing with no
-unproved collateral emissions.
+INBOX-34 and its pre-authorized successor are complete. Exact plain named
+`icmp ne` for i32/i64 closes `__gedf2`, `__gesf2`, `__cmpdf2`, and `__cmpsf2`;
+exact immediate-left i32 variable `shl` closes `ceilf` and `floorf`. Both row
+objects are relocation-free and pass corrected `_start`-based native
+executables against precomputed expected bits. The prerequisite intrinsic
+boundary repair invalidated three prior false-positive emissions, so the
+accepted report is now 443 selected / 232 emitting / 211 failing.
 
-The pre-implementation ranking was corrected by captured-IR inspection:
-`__gedf2`, `__gesf2`, `__cmpdf2`, and `__cmpsf2` encounter an earlier
-`samesign ugt` immediate form and remain fail-closed. Tier 2 and the
-row-closure Tier 3 are green. The authorized pipeline is exhausted, and
-INBOX-33 permits no third cycle. Stop for review before any further
-capability. Evidence:
-`docs/evidence/std_debug_hello_signed_named_comparisons_acceptance.summary`
-and
-`docs/evidence/distribution_all_after_inbox33_signed_named_comparisons.summary`.
+Tier 2 and the row-closure Tier 3 are green for both capabilities. The
+pipeline is exhausted; stop for review before the noted narrow i6 comparison,
+half store through pointer arguments, or `lowerIcmp` ownership split. Evidence:
+`docs/evidence/std_debug_hello_named_integer_inequality_acceptance.summary`,
+`docs/evidence/std_debug_hello_immediate_left_shl_acceptance.summary`, and
+`docs/evidence/distribution_all_after_inbox34_immediate_left_shl.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

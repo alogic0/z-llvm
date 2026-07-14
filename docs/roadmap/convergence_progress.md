@@ -3692,6 +3692,19 @@ One line per completed cycle, append-only, newest last. This is the
   corrected in
   `docs/evidence/std_debug_hello_named_integer_inequality_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-34 pre-authorized successor) Item 12 typed
+  immediate-left shift: exact i32 `shl imm, %named` now uses the existing CL
+  count and EAX payload path; i16/i64 variants remain fail-closed. Five
+  permanent executable count boundaries and 52 precomputed-bit native calls
+  close `compiler_rt.floor_ceil.ceilf` and `floorf` from one relocation-free
+  object. Report-all advances from 443 selected / 230 emitting / 213 failing
+  to 443 selected / 232 emitting / 211 failing with no collateral emissions.
+  Tier 2 and the row-closure Tier 3 are green. The INBOX-34 pipeline is
+  exhausted; stop for review before the noted i6 comparison, half store, or
+  `lowerIcmp` structural split. Evidence
+  `docs/evidence/std_debug_hello_immediate_left_shl_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox34_immediate_left_shl.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

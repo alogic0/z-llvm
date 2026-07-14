@@ -1442,6 +1442,72 @@ test "generic cfg selector lowers i64 immediate-left variable lshr" {
     }, machine.instructions.items);
 }
 
+test "generic cfg selector lowers exact i32 immediate-left variable shl" {
+    var machine = MachineFunction.init("variable-i32-immediate-left-shl", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rdi });
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+        .op = .shl,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .int = -1 },
+        .rhs = .{ .named = "amount" },
+    })) == null);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+        .{ .mov_imm_eax = -1 },
+        .shl_eax_cl,
+    }, machine.instructions.items);
+
+    inline for (.{ 16, 64 }) |bits| {
+        var near_miss_machine = MachineFunction.init("variable-immediate-left-shl-near-miss", .{ .int = bits });
+        defer near_miss_machine.deinit(std.testing.allocator);
+        var near_miss_selector = ComposedBlockSelector.init(std.testing.allocator, &near_miss_machine);
+        defer near_miss_selector.deinit();
+        try selector_state.bindValueLoc(&near_miss_selector, "amount", if (bits == 16) .{ .arg32 = .rdi } else .{ .arg64 = .rdi });
+        const diagnostic = (try selector_scalar.lowerBinary(&near_miss_selector, "result", .{
+            .op = .shl,
+            .ty = .{ .int = bits },
+            .lhs = .{ .int = -1 },
+            .rhs = .{ .named = "amount" },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-binary-imm-lhs", diagnostic.detail());
+    }
+}
+
+test "generic cfg selector executes i32 immediate-left variable shl boundaries" {
+    const input =
+        \\define i32 @shift_mask(i32 %amount) {
+        \\entry:
+        \\  %result = shl nsw i32 -1, %amount
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("shift_mask", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    inline for (.{
+        .{ @as(u32, 0), @as(u32, 0xffff_ffff) },
+        .{ @as(u32, 1), @as(u32, 0xffff_fffe) },
+        .{ @as(u32, 15), @as(u32, 0xffff_8000) },
+        .{ @as(u32, 30), @as(u32, 0xc000_0000) },
+        .{ @as(u32, 31), @as(u32, 0x8000_0000) },
+    }) |case| try std.testing.expectEqual(case[1], function(case[0]));
+}
+
 test "generic cfg selector lowers i64 immediate xor" {
     var machine = MachineFunction.init("i64-immediate-xor", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
