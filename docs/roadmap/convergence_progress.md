@@ -3974,6 +3974,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_accumulator_alias_p0_repair.summary` and
   `docs/evidence/distribution_all_after_inbox45_accumulator_alias_p0.summary`.
 
+- 2026-07-14 (this commit, fix-forward after `0717acf7`) Item 12 accepted-row
+  audit: a structured IR/liveness scan conservatively found 15 functions that
+  could contain multiple live sub-32-bit aliases across a destructive
+  immediate operation. Eight were already failing and two were internal
+  helpers without accepted per-function closure claims. The five intersecting
+  accepted rows (`__floatsisf`, `__floatunsisf`, `__ashlsi3`, `__ashrsi3`,
+  and `__lshrsi3`) each emit a nonempty, byte-identical object before and after
+  the accumulator repair. Therefore no accepted closure hit the defect, no
+  row is invalidated, and the row-exact re-proof rule does not activate. The
+  preserved INBOX-45 comparison cycle may resume. Evidence
+  `docs/evidence/inbox45_accumulator_alias_closure_audit.md`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
