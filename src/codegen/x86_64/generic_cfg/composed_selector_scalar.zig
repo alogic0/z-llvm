@@ -200,6 +200,20 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,
     };
     const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+    if (binary.op == .sdiv) {
+        if (bits != 32 or rhs != 2 or binary.lhs != .named) return .{ .no_emitter = "composed-block-sdiv-form" };
+        while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
+            if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
+        }
+        selector_state.emitValueIntoEax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-sdiv-lhs" };
+        selector_state.clobberArgReg(selector, .rcx) catch return .{ .no_spill_envelope = "composed-block-sdiv-rcx" };
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rcx });
+        try selector.machine.instructions.append(selector.allocator, .{ .shr_eax_imm5 = 31 });
+        try selector.machine.instructions.append(selector.allocator, .add_ecx_eax);
+        try selector.machine.instructions.append(selector.allocator, .{ .sar_eax_imm5 = 1 });
+        try selector_state.bindEax(selector, result_name);
+        return null;
+    }
     if (bits <= 32) switch (binary.op) {
         .shl, .ashr, .@"and", .@"or", .add, .sub, .xor => if (try selector_state.preserveCurrentEaxIntoScratch(selector)) |diagnostic| return diagnostic,
         else => {},

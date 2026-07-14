@@ -109,7 +109,8 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
     if (!isSelectorScalarType(binary.ty)) return .{ .unsupported_type = "binary" };
     return switch (binary.op) {
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
-        .udiv, .sdiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
+        .sdiv => if (binary.ty.eql(.{ .int = 32 }) and valueIsNamed(binary.lhs) and binary.rhs == .int and binary.rhs.int == 2) null else .{ .unsupported_instruction = @tagName(binary.op) },
+        .udiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
         .fadd, .fsub, .fmul, .fdiv => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
         .frem => .{ .unsupported_instruction = @tagName(binary.op) },
     };

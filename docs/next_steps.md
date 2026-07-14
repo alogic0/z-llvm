@@ -37,25 +37,19 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-The INBOX-38 pipeline is complete. Part 1 admits the shared scalar i7 binary
-width and repairs stable framed scalar phi homes, closing `__divdf3` and
-advancing the other seven directed rows. The pre-authorized successor admits
-exact `fptosi float|double -> i32`; permanent execution covers both source
-types, a live first EAX result, signed fractional truncation, subnormals, and
-the defined i32 boundaries. `exp` and `expf` both advance to
-`composed-block-gep-readonly-table-global`, the function-local table shape
-excluded from the accepted module-aware table slice. No closure is claimed for
-the successor. Report-all remains 443 selected / 236 emitting / 207 failing.
-Part 1 passed Tier 2 plus its single closure-triggered Tier 3; the successor
-passed Tier 2 and did not trigger another Tier 3.
+INBOX-39 Part 1 is complete. Exact `sdiv i32 %named, 2` now rounds negative
+odd values toward zero, and exact powi execution drove a shared conditional-phi
+source-stabilization repair before acceptance. `__powidf2` and `__powisf2` are
+the only closures, advancing report-all to 443 selected / 238 emitting / 205
+failing. Permanent execution, exact native row proof, Tier 2, and the single
+closure/shared-CFG Tier 3 are green.
 
-Stop for the next scalar-tranche directive. The strongest concrete candidate
-from the agreed tranche after this refresh is exact signed i32 division by two
-for `__powidf2` and `__powisf2`; implementation is not part of INBOX-38's
-exhausted pipeline. Evidence:
-`docs/evidence/std_debug_hello_i7_binary_phi_acceptance.summary`,
-`docs/evidence/distribution_all_after_inbox38_i7_phi.summary`, and
-`docs/evidence/std_debug_hello_fptosi_i32_acceptance.summary`.
+Continue with INBOX-39's pre-authorized successor: exact half-to-double `fpext`
+composed through the proven half-to-float helper and existing scalar
+float-to-double conversion, targeting `compiler_rt.fma.__fmah`. Keep unrelated
+half operations fail-closed and commit the successor separately. Evidence:
+`docs/evidence/std_debug_hello_sdiv_i32_by_two_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox39_sdiv2.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

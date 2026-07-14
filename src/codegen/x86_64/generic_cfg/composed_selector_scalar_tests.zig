@@ -1746,3 +1746,69 @@ test "generic cfg selector executes i7 immediate binary operations modulo 128" {
     try std.testing.expectEqualStrings("composed-block-binary-width", diagnostic.detail());
     try std.testing.expectEqual(@as(usize, 0), rejected_machine.instructions.items.len);
 }
+
+test "generic cfg selector executes signed i32 division by two toward zero" {
+    const input =
+        \\define i32 @divide_by_two(i32 %value) {
+        \\entry:
+        \\  %quotient = sdiv i32 %value, 2
+        \\  ret i32 %quotient
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("divide_by_two", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const divide_by_two: *const fn (i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+
+    inline for (.{
+        .{ std.math.minInt(i32), -1073741824 },
+        .{ -8, -4 },
+        .{ -7, -3 },
+        .{ -5, -2 },
+        .{ -3, -1 },
+        .{ -1, 0 },
+        .{ 0, 0 },
+        .{ 1, 0 },
+        .{ 2, 1 },
+        .{ 3, 1 },
+        .{ 7, 3 },
+        .{ std.math.maxInt(i32), 1073741823 },
+    }) |case| try std.testing.expectEqual(@as(i32, case[1]), divide_by_two(case[0]));
+}
+
+test "generic cfg selector keeps other signed division forms fail closed" {
+    const Case = struct { bits: u16, lhs: ir.Value, rhs: ir.Value };
+    const cases = [_]Case{
+        .{ .bits = 32, .lhs = .{ .named = "value" }, .rhs = .{ .int = 3 } },
+        .{ .bits = 64, .lhs = .{ .named = "value" }, .rhs = .{ .int = 2 } },
+        .{ .bits = 32, .lhs = .{ .int = 8 }, .rhs = .{ .named = "value" } },
+        .{ .bits = 32, .lhs = .{ .named = "value" }, .rhs = .{ .named = "divisor" } },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init("rejected-sdiv", .{ .int = case.bits });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", if (case.bits == 64) .{ .arg64 = .rdi } else .{ .arg32 = .rdi });
+        try selector_state.bindValueLoc(&selector, "divisor", .{ .arg32 = .rsi });
+        const diagnostic = (try selector_scalar.lowerBinary(&selector, "result", .{
+            .op = .sdiv,
+            .ty = .{ .int = case.bits },
+            .lhs = case.lhs,
+            .rhs = case.rhs,
+        })).?;
+        try std.testing.expect(std.mem.startsWith(u8, diagnostic.detail(), "composed-block-"));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}

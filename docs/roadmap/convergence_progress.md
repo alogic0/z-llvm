@@ -3806,6 +3806,21 @@ One line per completed cycle, append-only, newest last. This is the
   for the next scalar-tranche directive. Evidence
   `docs/evidence/std_debug_hello_fptosi_i32_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-39 Part 1) Item 12 exact signed division and
+  CFG correctness: `sdiv i32 %named, 2` now implements truncation toward zero
+  with sign correction before arithmetic shift; permanent execution includes
+  negative odd values and four nearby forms remain fail-closed. Exact powi
+  execution exposed a conditional-phi source that could be rebound to an
+  edge-local spill before the sibling edge was emitted, so both successor
+  source sets now stabilize before the conditional jump. A permanent framed
+  two-successor regression and 22 precomputed-bit row calls are green.
+  `__powidf2` and `__powisf2` are the only new emissions, advancing report-all
+  from 443 / 236 / 207 to 443 / 238 / 205. Tier 2 and the single row-closure
+  and shared-CFG Tier 3 are green. Continue with INBOX-39's pre-authorized
+  half-to-double `fpext` composition successor targeting `__fmah`. Evidence
+  `docs/evidence/std_debug_hello_sdiv_i32_by_two_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox39_sdiv2.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

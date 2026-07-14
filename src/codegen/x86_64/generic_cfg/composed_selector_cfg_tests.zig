@@ -229,6 +229,46 @@ test "generic cfg selector executes framed backward phi edges from stable homes"
     try std.testing.expectEqual(@as(u32, 101), backward_phi(0, 1));
 }
 
+test "generic cfg selector stabilizes shared conditional phi sources before branching" {
+    const input =
+        \\define double @conditional_phi(double %value, i32 %flag) {
+        \\entry:
+        \\  %slot = alloca double, align 8
+        \\  store double 0.000000e+00, ptr %slot, align 8
+        \\  %updated = fmul double %value, 2.000000e+00
+        \\  %condition = icmp ne i32 %flag, 0
+        \\  br i1 %condition, label %on_true, label %on_false
+        \\on_true:
+        \\  %true_value = phi double [ %updated, %entry ]
+        \\  ret double %true_value
+        \\on_false:
+        \\  %false_value = phi double [ %updated, %entry ]
+        \\  %result = fmul double %false_value, 4.000000e+00
+        \\  ret double %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("conditional_phi", .double);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const conditional_phi: *const fn (f64, i32) callconv(.c) f64 = @ptrCast(mapping.ptr);
+
+    try std.testing.expectEqual(@as(u64, @bitCast(@as(f64, 6.0))), @as(u64, @bitCast(conditional_phi(3.0, 1))));
+    try std.testing.expectEqual(@as(u64, @bitCast(@as(f64, 24.0))), @as(u64, @bitCast(conditional_phi(3.0, 0))));
+    try std.testing.expectEqual(@as(u64, @bitCast(@as(f64, -5.0))), @as(u64, @bitCast(conditional_phi(-2.5, 1))));
+    try std.testing.expectEqual(@as(u64, @bitCast(@as(f64, -20.0))), @as(u64, @bitCast(conditional_phi(-2.5, 0))));
+}
+
 test "composed selector preserves scalar FP select values exactly" {
     const input =
         \\define float @select_f32(i32 %flag, float %on_true, float %on_false) {

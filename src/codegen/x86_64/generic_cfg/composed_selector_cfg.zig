@@ -438,6 +438,8 @@ pub fn lowerConditionalPhiEdges(
     const else_target = function.blocks.items[else_index].name;
     const then_edge_label = try ownedEdgeLabel(selector);
 
+    if (try stabilizePhiEdgeSources(selector, function.blocks.items[then_index], predecessor)) |diagnostic| return diagnostic;
+    if (try stabilizePhiEdgeSources(selector, function.blocks.items[else_index], predecessor)) |diagnostic| return diagnostic;
     try selector.machine.instructions.append(selector.allocator, .{ .jne = then_edge_label });
 
     if (try emitPhiEdgeMoves(selector, function.blocks.items[else_index], predecessor)) |diagnostic| return diagnostic;
