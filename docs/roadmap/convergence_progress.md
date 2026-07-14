@@ -4045,6 +4045,17 @@ One line per completed cycle, append-only, newest last. This is the
   gate. Evidence
   `docs/evidence/std_debug_hello_inbox46_i128_compare.summary`.
 
+- 2026-07-14 (this commit, INBOX-46 cumulative acceptance) Item 12 pipeline B
+  close: the single required Tier 3 passes all 17 subgates against committed
+  tree `03c824c377765ac01cb1f53a47494f4ff602b12e`. It accepts all four
+  provisional comparison-row closures from Parts 1 and 2, making
+  443 / 260 / 183 the accepted compiler_rt report state. Integrated objects
+  remain 146/146 in all three pipelines, strict real rows remain 100/100/100,
+  integrated executables remain 6/6, and release-source object/link/probe
+  boundaries remain 100/100 each. Total reported duration is 2,268,358 ms,
+  effectively unchanged from INBOX-45. Evidence
+  `docs/evidence/distribution_all_after_inbox46_named_i16_i128_compare.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

@@ -4,7 +4,7 @@ schema_version: 1
 directive: `INBOX-46 Part 2`
 target: `x86_64-linux`
 validation_tier: 2
-closure_status: `provisional; cumulative pipeline Tier 3 pending`
+closure_status: `accepted by cumulative pipeline Tier 3`
 result: pass
 
 The cycle baseline is `ad9bcbef`, where the two INBOX-46 Part 1 closures are
@@ -50,9 +50,9 @@ native rows: symbols=2 relocations=0 i128_pairs=12/12 exact_calls=24/24
 tier2: pass; steps=24/24 tests=983/983
 ```
 
-No Tier 3 ran in this capability commit. All four INBOX-46 row closures remain
-provisional until the one cumulative pipeline gate against the committed
-two-part tree.
+No Tier 3 ran in this capability commit. The later cumulative INBOX-46 gate
+accepted all four pipeline rows; see
+`docs/evidence/distribution_all_after_inbox46_named_i16_i128_compare.summary`.
 
 Artifacts:
 

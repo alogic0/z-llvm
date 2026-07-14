@@ -1,0 +1,78 @@
+# Distribution-All After INBOX-46 Pipeline B
+
+schema_version: 1
+directive: `INBOX-46 cumulative pipeline acceptance`
+target: `x86_64-linux-gnu`
+validation_tier: 3
+status: pass
+
+Implementation identity before the run: committed baseline
+`c63804255ac4730c871a44a1fccb6a863138ce00`, with clean staged/committed tree
+`03c824c377765ac01cb1f53a47494f4ff602b12e`.
+
+Changed subsystem: x86_64 composed-selector integer comparisons and intrinsic
+call lowering. Part 1 adds exact named i16 `slt` / `sgt` / `ne` normalization
+through existing compare/setcc forms. Part 2 adds exact
+`llvm.ucmp.i32.i128` and `llvm.scmp.i32.i128` over existing SysV i128 argument
+pairs, plus a state-owned unique EAX join label using the existing verifier
+join convention.
+
+Tier-3 trigger: the `validation_tiers.md` row-closure batching amendment and
+INBOX-46 require one cumulative Tier 3 at the end of this two-step pipeline to
+accept its four Tier-2/native-proven provisional closures.
+
+Exact command and evidence log:
+
+```text
+zig build distribution-all --summary all > tmp/distribution_all_after_inbox46_named_i16_i128_compare.log 2>&1
+```
+
+Prior evidence cannot be reused because the latest Tier 3 predates both exact
+named-i16 comparison lowering and exact signed/unsigned i128 pair-comparison
+intrinsics, their permanent executable cases, and the four resulting row
+emissions. The preface was recorded before the single invocation in
+`tmp/inbox46_pipeline_tier3_preface.txt`, sha256
+`ec79a959f071f6265bbe465be58284b8e871e2c4db3651dbb2868f631077b324`.
+
+The invocation passed all 17 subgates. Selected native-link inspection and
+probes remain 45/45. Integrated objects remain 146/146 for postopt, preopt,
+and IR-writer pipelines. Release-source-owned integrated objects remain
+100/100. Strict real rows remain 100/100/100 in ReleaseFast, ReleaseSafe, and
+ReleaseSmall. Integrated executables remain 6/6. Release-source object
+inspection, native linking, and native probes remain 100/100 each. Boundary
+gates are green.
+
+This cumulative result accepts all four provisional pipeline closures:
+
+- `__gehf2` and `__cmphf2` from Part 1;
+- `__ucmpti2` and `__cmpti2` from Part 2.
+
+The accepted compiler_rt report state is now 443 selected / 260 emitting /
+183 failing. Part 1 exact native evidence is
+`docs/evidence/std_debug_hello_inbox46_named_i16.summary`; Part 2 exact native
+evidence is `docs/evidence/std_debug_hello_inbox46_i128_compare.summary`.
+
+```text
+summary native-link-object-inspection inventory=selected-native-link inspected=45 elf64_rel=45 unsupported_relocation_rows=0 local_fail=0
+summary native-link-probe target=x86_64-unknown-linux-gnu accepted=45 failed=0
+summary zig-integrated-object pipeline=postopt total=146 executable_ok=146 local_fail=0
+summary zig-integrated-object pipeline=preopt total=146 executable_ok=146 local_fail=0
+summary zig-integrated-object pipeline=preopt ir_writer=true total=146 executable_ok=146 local_fail=0
+summary distribution-real-rows mode=ReleaseFast limit=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 local_fail=0
+summary distribution-real-rows mode=ReleaseSafe limit=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 local_fail=0
+summary distribution-real-rows mode=ReleaseSmall limit=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 local_fail=0
+summary zig-integrated-exe total=6 build_ok=6 run_ok=6 stdout_ok=6 exit_ok=6 local_fail=0
+summary native-link-object-inspection inventory=release-source-owned inspected=100 elf64_rel=100 unsupported_relocation_rows=0 local_fail=0
+summary distribution-native-link inventory=release-source-owned total=100 executable_abi_proof_rows=100 local_object_codegen_failures=0 local_fail=0
+summary native-link-probe inventory=release-source-owned accepted=100 local_object_codegen_failures=0 failed=0
+summary distribution-all-timing subgates=17 total_duration_ms=2268358 cache_hit_subgates=3 cache_none_subgates=14 fresh_real_rows=false local_fail=0
+ok distribution all gates
+```
+
+The reported total is 403 ms (0.018%) below the prior INBOX-45 Tier-3 total
+of 2,268,761 ms. This is not a material runtime change. The slowest uncached
+subgate remains integrated preopt at 547,509 ms; the three strict real-row
+subgates reported cache hits.
+
+Log: `tmp/distribution_all_after_inbox46_named_i16_i128_compare.log`, sha256
+`6a84e569fe071ea512f989f43277ec96012dc6e72db210540f7757074d128d97`.
