@@ -1321,6 +1321,19 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .addps_xmm => |op| try encodeScalarXmmOp(&bytes, allocator, null, 0x58, op.dst, op.src),
             .subps_xmm => |op| try encodeScalarXmmOp(&bytes, allocator, null, 0x5c, op.dst, op.src),
             .mulps_xmm => |op| try encodeScalarXmmOp(&bytes, allocator, null, 0x59, op.dst, op.src),
+            .andps_xmm => |op| try encodeScalarXmmOp(&bytes, allocator, null, 0x54, op.dst, op.src),
+            .pxor_xmm => |op| try encodeScalarXmmOp(&bytes, allocator, 0x66, 0xef, op.dst, op.src),
+            .pcmpgtd_xmm => |op| try encodeScalarXmmOp(&bytes, allocator, 0x66, 0x66, op.dst, op.src),
+            .cmpeqps_xmm => |op| {
+                try encodeScalarXmmOp(&bytes, allocator, null, 0xc2, op.dst, op.src);
+                try bytes.append(allocator, 0x00);
+            },
+            .cmpeqpd_xmm => |op| {
+                try encodeScalarXmmOp(&bytes, allocator, 0x66, 0xc2, op.dst, op.src);
+                try bytes.append(allocator, 0x00);
+            },
+            .movmskps_xmm_eax => |src| try bytes.appendSlice(allocator, &.{ 0x0f, 0x50, 0xc0 | @as(u8, src.lowCode()) }),
+            .movmskpd_xmm_eax => |src| try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x50, 0xc0 | @as(u8, src.lowCode()) }),
             .movsd_xmm => |mov| try encodeScalarXmmOp(&bytes, allocator, 0xf2, 0x10, mov.dst, mov.src),
             .movss_xmm => |mov| try encodeScalarXmmOp(&bytes, allocator, 0xf3, 0x10, mov.dst, mov.src),
             .unpcklpd_xmm => |mov| try encodeScalarXmmOp(&bytes, allocator, 0x66, 0x14, mov.dst, mov.src),
@@ -1953,7 +1966,11 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .divsd_xmm1_xmm0, .xorps_xmm1_xmm0 => 4,
         .movapd_xmm1_xmm0, .movapd_xmm, .addpd_xmm, .subpd_xmm, .mulpd_xmm, .movsd_xmm, .movss_xmm, .unpcklpd_xmm, .unpckhpd_xmm => 4,
         .shufpd_lane0_lane3_xmm => 5,
-        .addps_xmm, .subps_xmm, .mulps_xmm => 3,
+        .addps_xmm, .subps_xmm, .mulps_xmm, .andps_xmm => 3,
+        .pxor_xmm, .pcmpgtd_xmm, .movmskpd_xmm_eax => 4,
+        .cmpeqps_xmm => 4,
+        .cmpeqpd_xmm => 5,
+        .movmskps_xmm_eax => 3,
         .unpcklps_xmm => 3,
         .shufps_high_f32_to_low => 4,
         .cvtsi2ss_edi_xmm0 => 4,

@@ -415,7 +415,7 @@ changes the counts; cite the discovery/fix evidence summary.
 | ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
 | ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
 | ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
-| Debug compiler_rt | std-hello | 443 selected | 193 emitting | 250 failures | `docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary` |
+| Debug compiler_rt | std-hello | 443 selected | 247 emitting | 196 failures | `docs/evidence/std_debug_hello_vector_mask_acceptance.summary` |
 
 ## Cluster Board (item 9a onward)
 
@@ -3866,6 +3866,23 @@ One line per completed cycle, append-only, newest last. This is the
   directive. Evidence
   `docs/evidence/std_debug_hello_half_fadd_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox40_half_fadd.summary`.
+
+- 2026-07-14 (this commit, INBOX-41) Item 12 canonical vector-mask bridge:
+  the existing XMM vector location now records canonical two-lane masks with
+  32/64-bit source widths, static definedness, and all-zero/all-one lanes.
+  Packed fabs preserves every non-sign bit; FP-to-integer vector bitcasts
+  retag without data movement; packed oeq and sign-biased unsigned i32 compare
+  produce canonical masks; constant mask lanes extract through movmsk and the
+  allocation-plan GPR authority. The existing pair-slot frame path owns mask
+  spills. Permanent execution covers exact `__unordsf2`, fabs NaN payloads,
+  both packed oeq widths, undefined-lane rejection, and standing fail-closed
+  forms. The extracted relocation-free row passes eight precomputed native
+  calls and is the only new emission, advancing report-all from 443 / 246 /
+  197 to 443 / 247 / 196 with no collateral changes. Tier 2 and the single
+  shared-shape Tier 3 are green. Stop for the aggregate-ABI architectural
+  review; vector selects remain unauthorized. Evidence
+  `docs/evidence/std_debug_hello_vector_mask_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox41_mask.summary`.
 
 ## Ratchet State
 

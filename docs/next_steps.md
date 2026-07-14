@@ -37,23 +37,24 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-40 is complete. Half `fadd` widens through `__extendhfsf2`, adds with
-`addss`, and truncates through `__truncsfhf2`; the recorded precision proof
-rules out a binary32-to-binary16 double-rounding change. Exact captured
-stack-memory-barrier and i16 scalar prerequisites close the two directed
-`__floorh`/`__ceilh` rows. `__fixhfsi` emits collaterally without a semantic
-claim; report-all is now 443 selected / 246 emitting / 197 failing. Permanent
-execution, 48 precomputed native row calls, Tier 2, and the single
-row-closure/shared-frame Tier 3 are green.
+INBOX-41 is complete. The existing XMM vector location now owns canonical
+two-lane masks with 32/64-bit source widths, static definedness, and all-zero /
+all-one lane invariants. Packed fabs, exact FP-to-integer vector retagging,
+packed oeq and unsigned comparison, movmsk scalar extraction, pair spilling,
+and their machine/encoder/verifier forms close exactly `__unordsf2`.
+Report-all is now 443 selected / 247 emitting / 196 failing, with no collateral
+emissions or new failures. Permanent bit-exact execution, extracted-object
+inspection, native `-fno-lld` execution, Tier 2, and the single Tier 3 are
+green.
 
-Stop before vector-mask implementation. The next agreed capability is the
-lanes-canonical mask slice described by accepted inventory `e6c145f7` and
-`docs/evidence/vector_mask_checkpoint_inventory.md`, as the bridge into the
-aggregate-ABI review. INBOX-40 explicitly requires a new directive citing
-that reviewed architecture; no mask implementation is currently authorized.
-Current cycle evidence:
-`docs/evidence/std_debug_hello_half_fadd_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox40_half_fadd.summary`.
+Stop for the mandatory aggregate-ABI architectural review. The next boundary
+is complex `{ float, float }` / `{ double, double }` returns and aggregate
+allocas, with `sysv_abi.zig` remaining the classification authority. Decide
+the bounded return/alloca slice and how it composes with the now-proven mask
+shape before authorizing vector selects or any successor capability. Current
+cycle evidence:
+`docs/evidence/std_debug_hello_vector_mask_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox41_mask.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

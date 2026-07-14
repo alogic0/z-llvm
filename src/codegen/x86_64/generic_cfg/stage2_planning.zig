@@ -472,7 +472,8 @@ pub fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {
         .half => .{ .class = .fp16, .bits = 16 },
         .float => .{ .class = .fp32, .bits = 32 },
         .double => .{ .class = .fp64, .bits = 64 },
-        .vector => |vector| if (vector.len == 2 and (vector.elem_ty == .float or vector.elem_ty == .double))
+        .vector => |vector| if (vector.len == 2 and (vector.elem_ty == .float or vector.elem_ty == .double or
+            (vector.elem_ty == .int and (vector.elem_ty.int == 1 or vector.elem_ty.int == 32 or vector.elem_ty.int == 64))))
             .{ .class = .vector_xmm, .bits = 128 }
         else
             null,
@@ -502,8 +503,14 @@ fn selectorInstructionResultMetadata(instruction: ir.Instruction) ?VirtualRegMet
         .binary => |binary| selectorValueMetadata(binary.ty),
         .cast => |cast| selectorValueMetadata(cast.to_ty),
         .freeze => |freeze| selectorValueMetadata(freeze.ty),
-        .icmp => .{ .class = .gpr32, .bits = 32 },
-        .fcmp => .{ .class = .gpr32, .bits = 32 },
+        .icmp => |icmp| if (icmp.operand_ty == .vector)
+            selectorValueMetadata(.{ .vector = .{ .len = icmp.operand_ty.vector.len, .elem_ty = .{ .int = 1 } } })
+        else
+            .{ .class = .gpr32, .bits = 32 },
+        .fcmp => |fcmp| if (fcmp.operand_ty == .vector)
+            selectorValueMetadata(.{ .vector = .{ .len = fcmp.operand_ty.vector.len, .elem_ty = .{ .int = 1 } } })
+        else
+            .{ .class = .gpr32, .bits = 32 },
         .load => |load| selectorValueMetadata(load.ty),
         .call => |call| if (call.ret_ty == .void) null else selectorValueMetadata(call.ret_ty),
         .select => |select| selectorValueMetadata(select.ty),

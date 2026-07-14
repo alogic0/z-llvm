@@ -366,6 +366,28 @@ pub const Instruction = union(enum) {
         dst: XmmReg,
         src: XmmReg,
     },
+    andps_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    pxor_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    pcmpgtd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    cmpeqps_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    cmpeqpd_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+    },
+    movmskps_xmm_eax: XmmReg,
+    movmskpd_xmm_eax: XmmReg,
     movsd_xmm: struct {
         dst: XmmReg,
         src: XmmReg,

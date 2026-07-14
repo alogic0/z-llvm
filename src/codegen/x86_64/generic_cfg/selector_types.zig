@@ -113,6 +113,7 @@ pub const XmmValueShape = union(enum) {
 };
 
 pub const VectorShape = struct {
+    kind: Kind = .data,
     lane_type: LaneType,
     lane_count: u8,
     lane_bits: u16,
@@ -121,6 +122,12 @@ pub const VectorShape = struct {
     pub const LaneType = enum {
         float,
         double,
+        integer,
+    };
+
+    pub const Kind = enum {
+        data,
+        canonical_mask,
     };
 
     pub fn f32x2(defined_lanes: u2) VectorShape {
@@ -141,8 +148,39 @@ pub const VectorShape = struct {
         };
     }
 
+    pub fn i32x2(defined_lanes: u2) VectorShape {
+        return .{
+            .lane_type = .integer,
+            .lane_count = 2,
+            .lane_bits = 32,
+            .defined_lanes = defined_lanes,
+        };
+    }
+
+    pub fn i64x2(defined_lanes: u2) VectorShape {
+        return .{
+            .lane_type = .integer,
+            .lane_count = 2,
+            .lane_bits = 64,
+            .defined_lanes = defined_lanes,
+        };
+    }
+
+    pub fn mask32x2(defined_lanes: u2) VectorShape {
+        var shape = i32x2(defined_lanes);
+        shape.kind = .canonical_mask;
+        return shape;
+    }
+
+    pub fn mask64x2(defined_lanes: u2) VectorShape {
+        var shape = i64x2(defined_lanes);
+        shape.kind = .canonical_mask;
+        return shape;
+    }
+
     pub fn eql(shape: VectorShape, other: VectorShape) bool {
-        return shape.lane_type == other.lane_type and
+        return shape.kind == other.kind and
+            shape.lane_type == other.lane_type and
             shape.lane_count == other.lane_count and
             shape.lane_bits == other.lane_bits and
             shape.defined_lanes == other.defined_lanes;

@@ -83,6 +83,12 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
 }
 
 fn inspectFcmp(fcmp: ir.FcmpInst) ?Diagnostic {
+    if (isPackedFp2(fcmp.operand_ty)) {
+        if (fcmp.predicate != .oeq or !isVectorOperand(fcmp.lhs, fcmp.operand_ty) or !isVectorOperand(fcmp.rhs, fcmp.operand_ty)) {
+            return .{ .unsupported_type = "fcmp" };
+        }
+        return null;
+    }
     if (fcmp.operand_ty == .float or fcmp.operand_ty == .double) return null;
     if (fcmp.operand_ty != .half) return .{ .unsupported_type = "fcmp" };
     if (fcmp.predicate == .oeq) {
@@ -125,7 +131,7 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
 }
 
 fn inspectExtractElement(extract: ir.ExtractElementInst) ?Diagnostic {
-    if (!isPackedFp2(extract.vector_ty)) return .{ .unsupported_type = "extractelement" };
+    if (!isPackedFp2(extract.vector_ty) and !isMask2(extract.vector_ty)) return .{ .unsupported_type = "extractelement" };
     if (!extract.index_ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "extractelement-index" };
     return inspectLaneIndex(extract.index, "extractelement");
 }
@@ -158,7 +164,21 @@ fn isPackedFp2(ty: ir.Type) bool {
         (ty.vector.elem_ty == .float or ty.vector.elem_ty == .double);
 }
 
+fn isMask2(ty: ir.Type) bool {
+    return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .int and ty.vector.elem_ty.int == 1;
+}
+
+fn isVectorOperand(value: ir.Value, ty: ir.Type) bool {
+    return value == .named or ir.vector_constant.parseFixed(2, value, ty.vector) != null;
+}
+
 fn inspectCast(cast: ir.CastInst) ?Diagnostic {
+    if (cast.op == .bitcast and isPackedFp2(cast.from_ty) and cast.to_ty == .vector and
+        cast.to_ty.vector.len == 2 and cast.to_ty.vector.elem_ty == .int and
+        cast.to_ty.vector.elem_ty.int == packedFpLaneBits(cast.from_ty).?)
+    {
+        return null;
+    }
     if (!isSelectorScalarType(cast.from_ty) or !isSelectorScalarType(cast.to_ty)) {
         return .{ .unsupported_type = "cast" };
     }
@@ -175,7 +195,25 @@ fn inspectCast(cast: ir.CastInst) ?Diagnostic {
     };
 }
 
+fn packedFpLaneBits(ty: ir.Type) ?u16 {
+    if (!isPackedFp2(ty)) return null;
+    return switch (ty.vector.elem_ty) {
+        .float => 32,
+        .double => 64,
+        else => null,
+    };
+}
+
 fn inspectIcmp(icmp: ir.IcmpInst) ?Diagnostic {
+    if (icmp.operand_ty == .vector) {
+        const vector = icmp.operand_ty.vector;
+        if (!icmp.samesign or icmp.predicate != .ugt or vector.len != 2 or vector.elem_ty != .int or vector.elem_ty.int != 32 or
+            !isVectorOperand(icmp.lhs, icmp.operand_ty) or !isVectorOperand(icmp.rhs, icmp.operand_ty))
+        {
+            return .{ .unsupported_type = "icmp" };
+        }
+        return null;
+    }
     if (!isSelectorScalarType(icmp.operand_ty)) return .{ .unsupported_type = "icmp" };
     return null;
 }
@@ -227,6 +265,10 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     }
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f64")) {
         return if (call.ret_ty == .double and call.args.items.len == 1 and call.args.items[0].ty == .double) null else .{ .unsupported_type = "llvm.fabs.f64" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) {
+        const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
+        return if (call.ret_ty.eql(vector_ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(vector_ty)) null else .{ .unsupported_type = "llvm.fabs.v2f32" };
     }
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) {
         return if (call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 2 and

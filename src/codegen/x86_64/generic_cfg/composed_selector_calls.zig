@@ -8,6 +8,7 @@ const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
+const selector_vector = @import("composed_selector_vector.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_fp = @import("composed_selector_fp.zig");
@@ -88,6 +89,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f16")) return try lowerFpAbs(selector, result, call, 16);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f32")) return try lowerFpAbs(selector, result, call, 32);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f64")) return try lowerFpAbs(selector, result, call, 64);
+    if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) return try selector_vector.lowerFabsV2F32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try lowerIntByteSizeCall(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i32")) return try lowerAbsI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try lowerAbsI64(selector, result, call);

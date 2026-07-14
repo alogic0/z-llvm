@@ -313,7 +313,9 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         else
             selector_scalar.lowerBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-binary-value"),
         .alloca => |alloca| selector_memory.lowerAlloca(selector, instruction.result, alloca) catch |err| return instructionValueError(selector, err, "stage2-alloca-value"),
-        .cast => |cast| if (cast.op == .sitofp or cast.op == .uitofp)
+        .cast => |cast| if (cast.from_ty == .vector or cast.to_ty == .vector)
+            selector_vector.lowerBitcast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-vector-cast-value")
+        else if (cast.op == .sitofp or cast.op == .uitofp)
             selector_conversion.lowerIntToFpCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-int-fp-cast-value")
         else if (selector_conversion.isFpToSignedI32Cast(cast))
             selector_conversion.lowerFpToSignedIntCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-fp-int-cast-value")
@@ -322,8 +324,14 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         else
             selector_scalar.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-cast-value"),
         .freeze => |freeze| selector_scalar.lowerFreeze(selector, instruction.result, freeze) catch |err| return instructionValueError(selector, err, "stage2-freeze-value"),
-        .icmp => |icmp| selector_scalar.lowerIcmp(selector, instruction.result, icmp) catch |err| return instructionValueError(selector, err, "stage2-icmp-value"),
-        .fcmp => |fcmp| selector_fp.lowerFcmp(selector, instruction.result, fcmp) catch |err| return instructionValueError(selector, err, "stage2-fcmp-value"),
+        .icmp => |icmp| if (icmp.operand_ty == .vector)
+            selector_vector.lowerIcmp(selector, instruction.result, icmp) catch |err| return instructionValueError(selector, err, "stage2-vector-icmp-value")
+        else
+            selector_scalar.lowerIcmp(selector, instruction.result, icmp) catch |err| return instructionValueError(selector, err, "stage2-icmp-value"),
+        .fcmp => |fcmp| if (fcmp.operand_ty == .vector)
+            selector_vector.lowerFcmp(selector, instruction.result, fcmp) catch |err| return instructionValueError(selector, err, "stage2-vector-fcmp-value")
+        else
+            selector_fp.lowerFcmp(selector, instruction.result, fcmp) catch |err| return instructionValueError(selector, err, "stage2-fcmp-value"),
         .load => |load| selector_memory.lowerLoad(selector, instruction.result, load) catch |err| return instructionValueError(selector, err, "stage2-load-value"),
         .store => |store| selector_memory.lowerStore(selector, store) catch |err| return instructionValueError(selector, err, "stage2-store-value"),
         .gep => |gep| selector_memory.lowerGep(selector, instruction.result, gep) catch |err| return instructionValueError(selector, err, "stage2-gep-value"),

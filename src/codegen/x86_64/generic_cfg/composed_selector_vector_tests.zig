@@ -83,6 +83,35 @@ test "generic cfg selector encodes bounded packed double operations" {
     }, float_spill_bytes);
 }
 
+test "generic cfg selector encodes canonical vector mask operations" {
+    var machine = x86_64_machine.MachineFunction.init("mask-ops", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{
+        .{ .andps_xmm = .{ .dst = .xmm2, .src = .xmm3 } },
+        .{ .pxor_xmm = .{ .dst = .xmm6, .src = .xmm7 } },
+        .{ .pcmpgtd_xmm = .{ .dst = .xmm4, .src = .xmm5 } },
+        .{ .cmpeqps_xmm = .{ .dst = .xmm2, .src = .xmm3 } },
+        .{ .cmpeqpd_xmm = .{ .dst = .xmm6, .src = .xmm7 } },
+        .{ .movmskps_xmm_eax = .xmm4 },
+        .{ .movmskpd_xmm_eax = .xmm5 },
+        .ret,
+    });
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x0f, 0x54, 0xd3,
+        0x66, 0x0f, 0xef,
+        0xf7, 0x66, 0x0f,
+        0x66, 0xe5, 0x0f,
+        0xc2, 0xd3, 0x00,
+        0x66, 0x0f, 0xc2,
+        0xf7, 0x00, 0x0f,
+        0x50, 0xc4, 0x66,
+        0x0f, 0x50, 0xc5,
+        0xc3,
+    }, bytes);
+}
+
 test "generic cfg selector lowers the bounded packed double shape" {
     const input =
         \\define double @packed(double %low, double %high) {
@@ -148,6 +177,45 @@ test "generic cfg selector tracks defined packed double lanes and pair spill own
     try std.testing.expectEqual(selector_types.PairSpillLoc{ .lo = .slot0, .hi = .slot2 }, spill.frames);
     try std.testing.expectEqual(@as(usize, 2), selector.next_spill_slot);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_xmm128_rsp = .{ .frame_index = .slot0, .reg = masked_reg } }, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector records canonical mask definedness through pair spills" {
+    var machine = x86_64_machine.MachineFunction.init("mask-shape", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 32;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .xmm = .{
+        .reg = .xmm2,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f32x2(0b01) },
+    } });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .xmm = .{
+        .reg = .xmm3,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f32x2(0b11) },
+    } });
+    try std.testing.expect((try selector_vector.lowerFcmp(&selector, "mask", .{
+        .predicate = .oeq,
+        .operand_ty = .{ .vector = .{ .len = 2, .elem_ty = .float } },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })) == null);
+    const shape = selector_state.valueLoc(&selector, "mask").?.xmm.vectorShape().?;
+    try std.testing.expectEqual(selector_types.VectorShape.Kind.canonical_mask, shape.kind);
+    try std.testing.expectEqual(@as(u16, 32), shape.lane_bits);
+    try std.testing.expectEqual(@as(u2, 0b01), shape.defined_lanes);
+
+    try std.testing.expect((try selector_vector.lowerExtractElement(&selector, "poisoned", .{
+        .vector_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 1 } } },
+        .vector = .{ .named = "mask" },
+        .index_ty = .{ .int = 64 },
+        .index = .{ .int = 1 },
+    })) != null);
+    try std.testing.expect((try selector_state.spillValue(&selector, "mask")) == null);
+    const spill = selector_state.valueLoc(&selector, "mask").?.spill_vector;
+    try std.testing.expectEqual(selector_types.VectorShape.Kind.canonical_mask, spill.shape.kind);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_xmm128ps_rsp = .{ .frame_index = .slot0, .reg = .xmm2 } }, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
 test "generic cfg selector propagates lane-shift definedness" {
@@ -578,6 +646,132 @@ test "generic cfg selector executes packed float construction and movups pressur
     }
 }
 
+test "generic cfg selector executes canonical mask slice and unordsf2 bit exactly" {
+    const input =
+        \\declare <2 x float> @llvm.fabs.v2f32(<2 x float>)
+        \\define i32 @unordsf2(float %a, float %b) {
+        \\entry:
+        \\  %seed = insertelement <2 x float> poison, float %b, i64 0
+        \\  %pair = insertelement <2 x float> %seed, float %a, i64 1
+        \\  %absolute = tail call <2 x float> @llvm.fabs.v2f32(<2 x float> %pair)
+        \\  %bits = bitcast <2 x float> %absolute to <2 x i32>
+        \\  %unordered = icmp samesign ugt <2 x i32> %bits, splat (i32 2139095040)
+        \\  %lane0 = extractelement <2 x i1> %unordered, i64 0
+        \\  %lane1 = extractelement <2 x i1> %unordered, i64 1
+        \\  %either = select i1 %lane1, i1 true, i1 %lane0
+        \\  %result = zext i1 %either to i32
+        \\  ret i32 %result
+        \\}
+        \\define i32 @fabs_lane0_bits(float %a, float %b) {
+        \\entry:
+        \\  %seed = insertelement <2 x float> poison, float %a, i64 0
+        \\  %pair = insertelement <2 x float> %seed, float %b, i64 1
+        \\  %absolute = call <2 x float> @llvm.fabs.v2f32(<2 x float> %pair)
+        \\  %lane = extractelement <2 x float> %absolute, i64 0
+        \\  %bits = bitcast float %lane to i32
+        \\  ret i32 %bits
+        \\}
+        \\define i32 @fabs_lane1_bits(float %a, float %b) {
+        \\entry:
+        \\  %seed = insertelement <2 x float> poison, float %a, i64 0
+        \\  %pair = insertelement <2 x float> %seed, float %b, i64 1
+        \\  %absolute = call <2 x float> @llvm.fabs.v2f32(<2 x float> %pair)
+        \\  %lane = extractelement <2 x float> %absolute, i64 1
+        \\  %bits = bitcast float %lane to i32
+        \\  ret i32 %bits
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machines: [3]x86_64_machine.MachineFunction = .{
+        x86_64_machine.MachineFunction.init("unordsf2", .{ .int = 32 }),
+        x86_64_machine.MachineFunction.init("fabs_lane0_bits", .{ .int = 32 }),
+        x86_64_machine.MachineFunction.init("fabs_lane1_bits", .{ .int = 32 }),
+    };
+    defer for (&machines) |*machine| machine.deinit(std.testing.allocator);
+    var mappings: [3]?[]align(std.heap.page_size_min) u8 = .{ null, null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (&machines, module.functions.items, &mappings) |*machine, function, *mapping| {
+        try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, machine, function));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine.*);
+        defer std.testing.allocator.free(bytes);
+        mapping.* = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mapping.*.?, bytes);
+    }
+    const unordsf2: *const fn (f32, f32) callconv(.c) u32 = @ptrCast(mappings[0].?.ptr);
+    const fabs_lane0: *const fn (f32, f32) callconv(.c) u32 = @ptrCast(mappings[1].?.ptr);
+    const fabs_lane1: *const fn (f32, f32) callconv(.c) u32 = @ptrCast(mappings[2].?.ptr);
+
+    const Cases = [_]struct { a: u32, b: u32, expected: u32 }{
+        .{ .a = 0x0000_0000, .b = 0x8000_0000, .expected = 0 },
+        .{ .a = 0x0000_0001, .b = 0x807f_ffff, .expected = 0 },
+        .{ .a = 0x3f80_0000, .b = 0xc020_0000, .expected = 0 },
+        .{ .a = 0x7f80_0000, .b = 0xff80_0000, .expected = 0 },
+        .{ .a = 0x7fc1_2345, .b = 0x3f80_0000, .expected = 1 },
+        .{ .a = 0x3f80_0000, .b = 0xffc5_4321, .expected = 1 },
+        .{ .a = 0x7f80_0001, .b = 0xff80_0042, .expected = 1 },
+        .{ .a = 0xffc1_2345, .b = 0x7fc5_4321, .expected = 1 },
+    };
+    for (Cases) |case| {
+        const a: f32 = @bitCast(case.a);
+        const b: f32 = @bitCast(case.b);
+        try std.testing.expectEqual(case.expected, unordsf2(a, b));
+        try std.testing.expectEqual(case.a & 0x7fff_ffff, fabs_lane0(a, b));
+        try std.testing.expectEqual(case.b & 0x7fff_ffff, fabs_lane1(a, b));
+    }
+}
+
+test "generic cfg selector executes packed oeq masks at both admitted lane widths" {
+    const input =
+        \\define i32 @oeq_f32(float %a, float %b) {
+        \\entry:
+        \\  %va = insertelement <2 x float> poison, float %a, i64 0
+        \\  %vb = insertelement <2 x float> poison, float %b, i64 0
+        \\  %mask = fcmp oeq <2 x float> %va, %vb
+        \\  %result = extractelement <2 x i1> %mask, i64 0
+        \\  %wide = zext i1 %result to i32
+        \\  ret i32 %wide
+        \\}
+        \\define i32 @oeq_f64(double %a, double %b) {
+        \\entry:
+        \\  %va = insertelement <2 x double> poison, double %a, i64 0
+        \\  %vb = insertelement <2 x double> poison, double %b, i64 0
+        \\  %mask = fcmp oeq <2 x double> %va, %vb
+        \\  %result = extractelement <2 x i1> %mask, i64 0
+        \\  %wide = zext i1 %result to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machines: [2]x86_64_machine.MachineFunction = .{
+        x86_64_machine.MachineFunction.init("oeq_f32", .{ .int = 32 }),
+        x86_64_machine.MachineFunction.init("oeq_f64", .{ .int = 32 }),
+    };
+    defer for (&machines) |*machine| machine.deinit(std.testing.allocator);
+    var mappings: [2]?[]align(std.heap.page_size_min) u8 = .{ null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (&machines, module.functions.items, &mappings) |*machine, function, *mapping| {
+        try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, machine, function));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine.*);
+        defer std.testing.allocator.free(bytes);
+        mapping.* = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mapping.*.?, bytes);
+    }
+    const oeq_f32: *const fn (f32, f32) callconv(.c) u32 = @ptrCast(mappings[0].?.ptr);
+    const oeq_f64: *const fn (f64, f64) callconv(.c) u32 = @ptrCast(mappings[1].?.ptr);
+    try std.testing.expectEqual(@as(u32, 1), oeq_f32(0.0, -0.0));
+    try std.testing.expectEqual(@as(u32, 0), oeq_f32(1.0, 2.0));
+    try std.testing.expectEqual(@as(u32, 0), oeq_f32(@bitCast(@as(u32, 0x7fc1_2345)), @bitCast(@as(u32, 0x7fc1_2345))));
+    try std.testing.expectEqual(@as(u32, 1), oeq_f64(0.0, -0.0));
+    try std.testing.expectEqual(@as(u32, 0), oeq_f64(1.0, 2.0));
+    try std.testing.expectEqual(@as(u32, 0), oeq_f64(@bitCast(@as(u64, 0x7ff8_1234_5678_9abc)), @bitCast(@as(u64, 0x7ff8_1234_5678_9abc))));
+}
+
 test "generic cfg selector fails closed outside the bounded vector slice" {
     const Case = struct { ir_text: []const u8, tag: std.meta.Tag(inspection.Diagnostic), detail: []const u8 };
     const cases = [_]Case{
@@ -646,11 +840,39 @@ test "generic cfg selector fails closed outside the bounded vector slice" {
         \\define i1 @bad(double %x) {
         \\entry:
         \\  %v = insertelement <2 x double> poison, double %x, i64 0
-        \\  %r = fcmp oeq <2 x double> %v, %v
+        \\  %r = fcmp olt <2 x double> %v, %v
         \\  %e = extractelement <2 x i1> %r, i64 0
         \\  ret i1 %e
         \\}
         , .tag = .unsupported_type, .detail = "fcmp" },
+        .{ .ir_text =
+        \\define i1 @bad(float %a, float %b, i64 %lane) {
+        \\entry:
+        \\  %va = insertelement <2 x float> poison, float %a, i64 0
+        \\  %vb = insertelement <2 x float> poison, float %b, i64 0
+        \\  %mask = fcmp oeq <2 x float> %va, %vb
+        \\  %result = extractelement <2 x i1> %mask, i64 %lane
+        \\  ret i1 %result
+        \\}
+        , .tag = .unsupported_instruction, .detail = "extractelement-dynamic-index" },
+        .{ .ir_text =
+        \\define float @bad(float %a, float %b) {
+        \\entry:
+        \\  %va = insertelement <2 x float> poison, float %a, i64 0
+        \\  %vb = insertelement <2 x float> poison, float %b, i64 0
+        \\  %mask = fcmp oeq <2 x float> %va, %vb
+        \\  %selected = select <2 x i1> %mask, <2 x float> %va, <2 x float> %vb
+        \\  %result = extractelement <2 x float> %selected, i64 0
+        \\  ret float %result
+        \\}
+        , .tag = .unsupported_type, .detail = "select" },
+        .{ .ir_text =
+        \\define i4 @bad() {
+        \\entry:
+        \\  %result = bitcast <4 x i1> <i1 1, i1 0, i1 1, i1 0> to i4
+        \\  ret i4 %result
+        \\}
+        , .tag = .unsupported_type, .detail = "cast" },
         .{ .ir_text =
         \\define double @bad(ptr %p) {
         \\entry:

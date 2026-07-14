@@ -349,6 +349,10 @@ pub fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc,
                 try selector.machine.instructions.append(selector.allocator, switch (src.shape.lane_type) {
                     .float => .{ .reload_xmm128ps_rsp = .{ .frame_index = src.frames.lo, .reg = dst.reg } },
                     .double => .{ .reload_xmm128_rsp = .{ .frame_index = src.frames.lo, .reg = dst.reg } },
+                    .integer => if (src.shape.lane_bits == 32)
+                        .{ .reload_xmm128ps_rsp = .{ .frame_index = src.frames.lo, .reg = dst.reg } }
+                    else
+                        .{ .reload_xmm128_rsp = .{ .frame_index = src.frames.lo, .reg = dst.reg } },
                 });
             },
             else => return error.UnsupportedCodegenValue,
@@ -379,6 +383,10 @@ pub fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc,
                 try selector.machine.instructions.append(selector.allocator, switch (src_shape.lane_type) {
                     .float => .{ .spill_xmm128ps_rsp = .{ .frame_index = dst.frames.lo, .reg = src.reg } },
                     .double => .{ .spill_xmm128_rsp = .{ .frame_index = dst.frames.lo, .reg = src.reg } },
+                    .integer => if (src_shape.lane_bits == 32)
+                        .{ .spill_xmm128ps_rsp = .{ .frame_index = dst.frames.lo, .reg = src.reg } }
+                    else
+                        .{ .spill_xmm128_rsp = .{ .frame_index = dst.frames.lo, .reg = src.reg } },
                 });
             },
             .spill_vector => |src| {
@@ -638,6 +646,10 @@ pub fn spillValue(selector: *ComposedBlockSelector, name: []const u8) !?Diagnost
         try selector.machine.instructions.append(selector.allocator, switch (shape.lane_type) {
             .float => .{ .spill_xmm128ps_rsp = .{ .frame_index = frames.lo, .reg = loc.xmm.reg } },
             .double => .{ .spill_xmm128_rsp = .{ .frame_index = frames.lo, .reg = loc.xmm.reg } },
+            .integer => if (shape.lane_bits == 32)
+                .{ .spill_xmm128ps_rsp = .{ .frame_index = frames.lo, .reg = loc.xmm.reg } }
+            else
+                .{ .spill_xmm128_rsp = .{ .frame_index = frames.lo, .reg = loc.xmm.reg } },
         });
         try bindValueLoc(selector, name, .{ .spill_vector = .{ .frames = frames, .shape = shape } });
         return null;
