@@ -3705,6 +3705,14 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_immediate_left_shl_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox34_immediate_left_shl.summary`.
 
+- 2026-07-13 (this commit, INBOX-35 authorized interlude) Item 12 selector
+  ownership: the complete `lowerIcmp` predicate matrix moves byte-for-byte from
+  the scalar module to `composed_selector_icmp.zig`, while the scalar facade
+  preserves all call sites. Focused unit tests and structural smoke are green;
+  no Tier 3 was run under the move-only interlude contract. Continue with the
+  directed narrow i6 unsigned-immediate comparison. Evidence
+  `docs/evidence/inbox35_lower_icmp_ownership_split.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
