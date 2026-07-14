@@ -1198,7 +1198,7 @@ test "generic cfg selector lowers plain named signed comparisons" {
 
     inline for (.{
         .{ .bits = 32, .samesign = true },
-        .{ .bits = 16, .samesign = false },
+        .{ .bits = 15, .samesign = false },
     }) |case| {
         var machine = MachineFunction.init("signed-named-near-miss", .{ .int = 1 });
         defer machine.deinit(std.testing.allocator);
@@ -1291,7 +1291,7 @@ test "generic cfg selector lowers exact plain named integer inequality" {
     }
 
     inline for (.{
-        .{ .bits = 16, .samesign = false },
+        .{ .bits = 15, .samesign = false },
         .{ .bits = 32, .samesign = true },
     }) |case| {
         var machine = MachineFunction.init("named-ne-near-miss", .{ .int = 1 });

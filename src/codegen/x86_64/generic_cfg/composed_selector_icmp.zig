@@ -47,13 +47,14 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 0 } });
         try selector.machine.instructions.append(selector.allocator, .setne_eax);
     } else if (!icmp.samesign and icmp.predicate == .ne and icmp.rhs == .named and
-        (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })))
+        (icmp.operand_ty.eql(.{ .int = 16 }) or icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })))
     {
-        const bits: u16 = if (icmp.operand_ty.eql(.{ .int = 32 })) 32 else 64;
+        const bits: u16 = if (icmp.operand_ty.eql(.{ .int = 16 })) 16 else if (icmp.operand_ty.eql(.{ .int = 32 })) 32 else 64;
         selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
         selector_state.emitValueIntoScratch(selector, icmp.rhs, .r8, bits) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
         try selector_state.clobberAccumulator(selector);
-        try selector.machine.instructions.append(selector.allocator, if (bits == 32) .{ .cmp_ecx_arg32 = .r8 } else .{ .cmp_rcx_arg64 = .r8 });
+        if (bits == 16) try normalizeNamedI16CompareOperands(selector);
+        try selector.machine.instructions.append(selector.allocator, if (bits <= 32) .{ .cmp_ecx_arg32 = .r8 } else .{ .cmp_rcx_arg64 = .r8 });
         try selector.machine.instructions.append(selector.allocator, .setne_eax);
     } else if (icmp.predicate == .eq and icmp.operand_ty.eql(.ptr) and icmp.rhs == .null_value) {
         selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
@@ -253,13 +254,14 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         }
         try selector.machine.instructions.append(selector.allocator, .setl_eax);
     } else if (!icmp.samesign and (icmp.predicate == .slt or icmp.predicate == .sgt) and icmp.rhs == .named and
-        (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })))
+        (icmp.operand_ty.eql(.{ .int = 16 }) or icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })))
     {
-        const bits: u16 = if (icmp.operand_ty.eql(.{ .int = 32 })) 32 else 64;
+        const bits: u16 = if (icmp.operand_ty.eql(.{ .int = 16 })) 16 else if (icmp.operand_ty.eql(.{ .int = 32 })) 32 else 64;
         selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
         selector_state.emitValueIntoScratch(selector, icmp.rhs, .r8, bits) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };
         try selector_state.clobberAccumulator(selector);
-        try selector.machine.instructions.append(selector.allocator, if (bits == 32) .{ .cmp_ecx_arg32 = .r8 } else .{ .cmp_rcx_arg64 = .r8 });
+        if (bits == 16) try normalizeNamedI16CompareOperands(selector);
+        try selector.machine.instructions.append(selector.allocator, if (bits <= 32) .{ .cmp_ecx_arg32 = .r8 } else .{ .cmp_rcx_arg64 = .r8 });
         try selector.machine.instructions.append(selector.allocator, if (icmp.predicate == .slt) .setg_eax else .setl_eax);
     } else if (icmp.samesign and (icmp.predicate == .ult or icmp.predicate == .ugt) and
         (icmp.operand_ty.eql(.{ .int = 6 }) or icmp.operand_ty.eql(.{ .int = 7 })) and icmp.rhs == .int)
@@ -294,4 +296,13 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
     } else return .{ .no_emitter = "composed-block-icmp-form" };
     try selector_state.bindEax(selector, result_name);
     return null;
+}
+
+fn normalizeNamedI16CompareOperands(selector: *ComposedBlockSelector) !void {
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .shl_rcx_imm6 = 48 },
+        .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 48 } },
+        .{ .shl_r8_imm6 = 48 },
+        .{ .sar_arg64_imm6 = .{ .reg = .r8, .amount = 48 } },
+    });
 }

@@ -45,6 +45,137 @@ test "generic cfg selector executes signed i16 less-than zero" {
     }) |case| try std.testing.expectEqual(case[1], is_negative(case[0]));
 }
 
+test "generic cfg selector lowers exact named i16 comparisons" {
+    inline for (.{ ir.IcmpPredicate.slt, ir.IcmpPredicate.sgt, ir.IcmpPredicate.ne }) |predicate| {
+        var machine = MachineFunction.init("named-i16", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+        const diagnostic = try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = predicate,
+            .operand_ty = .{ .int = 16 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "rhs" },
+        });
+
+        try std.testing.expect(diagnostic == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+            .{ .mov_arg_arg = .{ .dst = .r8, .src = .rsi } },
+            .{ .shl_rcx_imm6 = 48 },
+            .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 48 } },
+            .{ .shl_r8_imm6 = 48 },
+            .{ .sar_arg64_imm6 = .{ .reg = .r8, .amount = 48 } },
+            .{ .cmp_ecx_arg32 = .r8 },
+            switch (predicate) {
+                .slt => .setg_eax,
+                .sgt => .setl_eax,
+                .ne => .setne_eax,
+                else => unreachable,
+            },
+        }, machine.instructions.items);
+    }
+}
+
+test "generic cfg selector keeps neighboring named integer comparison widths fail closed" {
+    inline for (.{ ir.IcmpPredicate.slt, ir.IcmpPredicate.sgt, ir.IcmpPredicate.ne }) |predicate| {
+        inline for (.{ 15, 17 }) |bits| {
+            var machine = MachineFunction.init("named-i16-near-miss", .{ .int = 1 });
+            defer machine.deinit(std.testing.allocator);
+            var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+            defer selector.deinit();
+            try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+            try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+            const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+                .predicate = predicate,
+                .operand_ty = .{ .int = bits },
+                .lhs = .{ .named = "lhs" },
+                .rhs = .{ .named = "rhs" },
+            })).?;
+            try std.testing.expectEqualStrings("composed-block-icmp-form", diagnostic.detail());
+        }
+    }
+}
+
+test "generic cfg selector executes named i16 comparisons over raw half bits" {
+    const input =
+        \\define i32 @less(i32 %lhs_raw, i32 %rhs_raw) {
+        \\entry:
+        \\  %lhs = trunc i32 %lhs_raw to i16
+        \\  %rhs = trunc i32 %rhs_raw to i16
+        \\  %comparison = icmp slt i16 %lhs, %rhs
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\define i32 @greater(i32 %lhs_raw, i32 %rhs_raw) {
+        \\entry:
+        \\  %lhs = trunc i32 %lhs_raw to i16
+        \\  %rhs = trunc i32 %rhs_raw to i16
+        \\  %comparison = icmp sgt i16 %lhs, %rhs
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\define i32 @unequal(i32 %lhs_raw, i32 %rhs_raw) {
+        \\entry:
+        \\  %lhs = trunc i32 %lhs_raw to i16
+        \\  %rhs = trunc i32 %rhs_raw to i16
+        \\  %comparison = icmp ne i16 %lhs, %rhs
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var mappings: [3]?[]align(std.heap.page_size_min) u8 = .{ null, null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (module.functions.items, 0..) |function_ir, index| {
+        var machine = MachineFunction.init(function_ir.name, function_ir.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        mappings[index] = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mappings[index].?, bytes);
+    }
+
+    const less: *const fn (u32, u32) callconv(.c) u32 = @ptrCast(mappings[0].?.ptr);
+    const greater: *const fn (u32, u32) callconv(.c) u32 = @ptrCast(mappings[1].?.ptr);
+    const unequal: *const fn (u32, u32) callconv(.c) u32 = @ptrCast(mappings[2].?.ptr);
+    const cases = [_]struct {
+        lhs: u16,
+        rhs: u16,
+        less: u32,
+        greater: u32,
+        unequal: u32,
+    }{
+        .{ .lhs = 0x0000, .rhs = 0x8000, .less = 0, .greater = 1, .unequal = 1 },
+        .{ .lhs = 0x8000, .rhs = 0x0000, .less = 1, .greater = 0, .unequal = 1 },
+        .{ .lhs = 0x0001, .rhs = 0x8001, .less = 0, .greater = 1, .unequal = 1 },
+        .{ .lhs = 0x8001, .rhs = 0x0001, .less = 1, .greater = 0, .unequal = 1 },
+        .{ .lhs = 0x3c00, .rhs = 0xbc00, .less = 0, .greater = 1, .unequal = 1 },
+        .{ .lhs = 0xbc00, .rhs = 0x3c00, .less = 1, .greater = 0, .unequal = 1 },
+        .{ .lhs = 0x7c00, .rhs = 0xfc00, .less = 0, .greater = 1, .unequal = 1 },
+        .{ .lhs = 0xfc00, .rhs = 0x7c00, .less = 1, .greater = 0, .unequal = 1 },
+        .{ .lhs = 0x7e01, .rhs = 0x7d01, .less = 0, .greater = 1, .unequal = 1 },
+        .{ .lhs = 0xfe01, .rhs = 0xfd01, .less = 0, .greater = 1, .unequal = 1 },
+        .{ .lhs = 0x7e01, .rhs = 0x7e01, .less = 0, .greater = 0, .unequal = 0 },
+        .{ .lhs = 0xfd01, .rhs = 0xfd01, .less = 0, .greater = 0, .unequal = 0 },
+    };
+    for (cases) |case| {
+        try std.testing.expectEqual(case.less, less(case.lhs, case.rhs));
+        try std.testing.expectEqual(case.greater, greater(case.lhs, case.rhs));
+        try std.testing.expectEqual(case.unequal, unequal(case.lhs, case.rhs));
+    }
+}
+
 test "generic cfg selector normalizes i6 and i7 before samesign unsigned immediate comparisons" {
     const Case = struct {
         predicate: ir.IcmpPredicate,

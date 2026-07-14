@@ -4022,6 +4022,17 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence
   `docs/evidence/distribution_all_after_inbox45_narrow_cmp_cttz_i64.summary`.
 
+- 2026-07-14 (this commit, INBOX-46 Part 1) Item 12 exact named i16
+  comparisons: non-`samesign` `slt`, `sgt`, and `ne` now sign-normalize both
+  low-16-bit operands and reuse the existing i32 compare/setcc path; adjacent
+  widths remain fail-closed. Exact extracted-row execution provisionally
+  closes `__gehf2` and `__cmphf2` with 28/28 precomputed raw-half calls,
+  moving report-all from 443 / 256 / 187 to 443 / 258 / 185 with no collateral
+  emissions. Tier 2 is green at 24/24 steps and 980/980 tests. No Tier 3 ran;
+  both closures remain provisional pending the single cumulative INBOX-46
+  gate after the pre-authorized i128 pair-comparison successor. Evidence
+  `docs/evidence/std_debug_hello_inbox46_named_i16.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
