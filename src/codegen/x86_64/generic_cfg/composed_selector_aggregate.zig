@@ -167,6 +167,12 @@ fn materializePackedLeaf(selector: *ComposedBlockSelector, name: []const u8, dst
         },
         else => return error.UnsupportedCodegenValue,
     }
+    if (selector.return_epilogue_label == null) {
+        try selector.machine.instructions.appendSlice(selector.allocator, &.{
+            .{ .movq_xmm_rax = dst },
+            .{ .movq_rax_xmm = dst },
+        });
+    }
 }
 
 fn materializeF64Loc(selector: *ComposedBlockSelector, loc: ValueLoc, dst: XmmReg) !void {

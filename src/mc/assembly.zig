@@ -1322,6 +1322,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .shufpd_lane0_lane3_xmm => |shuffle| try writer.print("\tshufpd $2, {s}, {s}\n", .{ shuffle.src.name(), shuffle.dst.name() }),
             .unpcklps_xmm => |mov| try writer.print("\tunpcklps {s}, {s}\n", .{ mov.src.name(), mov.dst.name() }),
             .shufps_high_f32_to_low => |reg| try writer.print("\tshufps $85, {s}, {s}\n", .{ reg.name(), reg.name() }),
+            .shufps_xmm => |shuffle| try writer.print("\tshufps ${d}, {s}, {s}\n", .{ shuffle.imm, shuffle.src.name(), shuffle.dst.name() }),
             .cvtsi2ss_edi_xmm0 => try writer.writeAll("\tcvtsi2ssl %edi, %xmm0\n"),
             .cvtsi2sd_edi_xmm0 => try writer.writeAll("\tcvtsi2sdl %edi, %xmm0\n"),
             .cvtsi2ss_rdi_xmm0 => try writer.writeAll("\tcvtsi2ssq %rdi, %xmm0\n"),

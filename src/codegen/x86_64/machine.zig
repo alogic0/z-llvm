@@ -413,6 +413,11 @@ pub const Instruction = union(enum) {
         src: XmmReg,
     },
     shufps_high_f32_to_low: XmmReg,
+    shufps_xmm: struct {
+        dst: XmmReg,
+        src: XmmReg,
+        imm: u8,
+    },
     cvtsi2ss_edi_xmm0,
     cvtsi2sd_edi_xmm0,
     cvtsi2ss_rdi_xmm0,

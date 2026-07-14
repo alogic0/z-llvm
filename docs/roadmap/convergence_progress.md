@@ -415,7 +415,7 @@ changes the counts; cite the discovery/fix evidence summary.
 | ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary` |
 | ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
 | ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` |
-| Debug compiler_rt | std-hello | 443 selected | 247 emitting | 196 failures | `docs/evidence/std_debug_hello_vector_mask_acceptance.summary` |
+| Debug compiler_rt | std-hello | 443 selected | 248 emitting | 195 failures | `docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.summary` |
 
 ## Cluster Board (item 9a onward)
 
@@ -3928,6 +3928,23 @@ One line per completed cycle, append-only, newest last. This is the
   `llvm.copysign.f32`. Tier 2 is green. Continue with INBOX-43's pre-authorized
   complete `<4 x float>` successor, which carries the single Tier 3 trigger.
   Evidence `docs/evidence/std_debug_hello_scalar_maxnum_acceptance.summary`.
+
+- 2026-07-14 (this commit, INBOX-43 pre-authorized successor) Item 12 complete
+  bounded f32x4 slice: four-bit static lane definedness, the exact captured
+  construction and shuffle masks, packed arithmetic/fabs/oeq, lane-0/lane-2
+  extraction, canonical mask-to-i4 lowering, and scalar `copysign.f32` now
+  reuse the existing XMM and allocation authorities. Permanent execution found
+  and prevented an upper-lane splat defect. The exact extracted row passes
+  pinned-Zig finite, signed-zero, and infinite fallback calls; its pair spill
+  uses the existing unaligned 16-byte frame path. Corrected physical
+  XMM-destination definition tracking and packed aggregate return
+  materialization close the verifier without weakening it.
+  `compiler_rt.mulsc3.__mulsc3` is the sole emission, advancing report-all from
+  443 / 247 / 196 to 443 / 248 / 195. Tier 2 and the single shared-shape Tier 3
+  are green. The INBOX-43 pipeline is exhausted; stop for periodic review with
+  no successor authorized. Evidence
+  `docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox43_f32x4.summary`.
 
 ## Ratchet State
 

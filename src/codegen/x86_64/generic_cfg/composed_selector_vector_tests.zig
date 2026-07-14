@@ -25,6 +25,7 @@ test "generic cfg selector encodes bounded packed double operations" {
     try machine.instructions.append(std.testing.allocator, .{ .movss_xmm = .{ .dst = .xmm6, .src = .xmm7 } });
     try machine.instructions.append(std.testing.allocator, .{ .unpcklps_xmm = .{ .dst = .xmm1, .src = .xmm2 } });
     try machine.instructions.append(std.testing.allocator, .{ .shufps_high_f32_to_low = .xmm3 });
+    try machine.instructions.append(std.testing.allocator, .{ .shufps_xmm = .{ .dst = .xmm5, .src = .xmm2, .imm = 0x14 } });
     try machine.instructions.append(std.testing.allocator, .ret);
     const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
@@ -41,7 +42,8 @@ test "generic cfg selector encodes bounded packed double operations" {
         0x59, 0xe5, 0xf3, 0x0f,
         0x10, 0xf7, 0x0f, 0x14,
         0xca, 0x0f, 0xc6, 0xdb,
-        0x55, 0xc3,
+        0x55, 0x0f, 0xc6, 0xea,
+        0x14, 0xc3,
     }, bytes);
 
     var spill_machine = x86_64_machine.MachineFunction.init("packed-spill", .void);
@@ -150,7 +152,7 @@ test "generic cfg selector tracks defined packed double lanes and pair spill own
         .index = .{ .int = 1 },
     })) == null);
     const lane1_shape = selector_state.valueLoc(&selector, "lane1").?.xmm.vectorShape().?;
-    try std.testing.expectEqual(@as(u2, 0b10), lane1_shape.defined_lanes);
+    try std.testing.expectEqual(@as(u4, 0b10), lane1_shape.defined_lanes);
 
     try std.testing.expect((try selector_vector.lowerInsertElement(&selector, "pair", .{
         .vector_ty = .{ .vector = .{ .len = 2, .elem_ty = .double } },
@@ -161,7 +163,7 @@ test "generic cfg selector tracks defined packed double lanes and pair spill own
         .index = .{ .int = 0 },
     })) == null);
     const pair_shape = selector_state.valueLoc(&selector, "pair").?.xmm.vectorShape().?;
-    try std.testing.expectEqual(@as(u2, 0b11), pair_shape.defined_lanes);
+    try std.testing.expectEqual(@as(u4, 0b11), pair_shape.defined_lanes);
     try std.testing.expect((try selector_vector.lowerBinary(&selector, "masked", .{
         .op = .fsub,
         .ty = .{ .vector = .{ .len = 2, .elem_ty = .double } },
@@ -169,7 +171,7 @@ test "generic cfg selector tracks defined packed double lanes and pair spill own
         .rhs = .{ .vector = "<double 1.000000e+00, double poison>" },
     })) == null);
     const masked_shape = selector_state.valueLoc(&selector, "masked").?.xmm.vectorShape().?;
-    try std.testing.expectEqual(@as(u2, 0b01), masked_shape.defined_lanes);
+    try std.testing.expectEqual(@as(u4, 0b01), masked_shape.defined_lanes);
     const masked_reg = selector_state.valueLoc(&selector, "masked").?.xmm.reg;
 
     try std.testing.expect((try selector_state.spillValue(&selector, "masked")) == null);
@@ -204,7 +206,7 @@ test "generic cfg selector records canonical mask definedness through pair spill
     const shape = selector_state.valueLoc(&selector, "mask").?.xmm.vectorShape().?;
     try std.testing.expectEqual(selector_types.VectorShape.Kind.canonical_mask, shape.kind);
     try std.testing.expectEqual(@as(u16, 32), shape.lane_bits);
-    try std.testing.expectEqual(@as(u2, 0b01), shape.defined_lanes);
+    try std.testing.expectEqual(@as(u4, 0b01), shape.defined_lanes);
 
     try std.testing.expect((try selector_vector.lowerExtractElement(&selector, "poisoned", .{
         .vector_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 1 } } },
@@ -244,13 +246,13 @@ test "generic cfg selector propagates lane-shift definedness" {
     };
     try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "shifted", lane_shift)) == null);
     const shifted = selector_state.valueLoc(&selector, "shifted").?.xmm;
-    try std.testing.expectEqual(@as(u2, 0b01), shifted.vectorShape().?.defined_lanes);
+    try std.testing.expectEqual(@as(u4, 0b01), shifted.vectorShape().?.defined_lanes);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .unpckhpd_xmm = .{ .dst = shifted.reg, .src = shifted.reg } }, machine.instructions.items[machine.instructions.items.len - 1]);
 
     var poisoned_shift = lane_shift;
     poisoned_shift.lhs = .{ .named = "lane0_only" };
     try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "poisoned_shift", poisoned_shift)) == null);
-    try std.testing.expectEqual(@as(u2, 0), selector_state.valueLoc(&selector, "poisoned_shift").?.xmm.vectorShape().?.defined_lanes);
+    try std.testing.expectEqual(@as(u4, 0), selector_state.valueLoc(&selector, "poisoned_shift").?.xmm.vectorShape().?.defined_lanes);
 }
 
 test "generic cfg selector lowers exact f64x2 lane zero-three shuffle" {
@@ -279,7 +281,7 @@ test "generic cfg selector lowers exact f64x2 lane zero-three shuffle" {
     };
     try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "cross", shuffle)) == null);
     const cross = selector_state.valueLoc(&selector, "cross").?.xmm;
-    try std.testing.expectEqual(@as(u2, 0b11), cross.vectorShape().?.defined_lanes);
+    try std.testing.expectEqual(@as(u4, 0b11), cross.vectorShape().?.defined_lanes);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .shufpd_lane0_lane3_xmm = .{ .dst = cross.reg, .src = .xmm3 } }, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
@@ -772,6 +774,95 @@ test "generic cfg selector executes packed oeq masks at both admitted lane width
     try std.testing.expectEqual(@as(u32, 0), oeq_f64(@bitCast(@as(u64, 0x7ff8_1234_5678_9abc)), @bitCast(@as(u64, 0x7ff8_1234_5678_9abc))));
 }
 
+test "generic cfg selector executes the complete f32x4 mulsc3 vector slice bit exactly" {
+    const input =
+        \\declare <4 x float> @llvm.fabs.v4f32(<4 x float>)
+        \\declare float @llvm.copysign.f32(float, float)
+        \\define i32 @arithmetic(float %a, float %b, float %c, float %d) {
+        \\entry:
+        \\  %a0 = insertelement <4 x float> poison, float %a, i64 0
+        \\  %a1 = insertelement <4 x float> %a0, float %b, i64 1
+        \\  %left = shufflevector <4 x float> %a1, <4 x float> poison, <4 x i32> <i32 0, i32 1, i32 1, i32 0>
+        \\  %b0 = insertelement <4 x float> poison, float %c, i64 0
+        \\  %b1 = insertelement <4 x float> %b0, float %d, i64 1
+        \\  %right = shufflevector <4 x float> %b1, <4 x float> poison, <4 x i32> <i32 0, i32 1, i32 0, i32 1>
+        \\  %products = fmul <4 x float> %left, %right
+        \\  %lane1 = shufflevector <4 x float> %products, <4 x float> poison, <4 x i32> <i32 1, i32 poison, i32 poison, i32 poison>
+        \\  %difference = fsub <4 x float> %products, %lane1
+        \\  %real = extractelement <4 x float> %difference, i64 0
+        \\  %lane3 = shufflevector <4 x float> %products, <4 x float> poison, <4 x i32> <i32 poison, i32 poison, i32 3, i32 poison>
+        \\  %sum = fadd <4 x float> %products, %lane3
+        \\  %imaginary = extractelement <4 x float> %sum, i64 2
+        \\  %combined = fadd float %real, %imaginary
+        \\  %bits = bitcast float %combined to i32
+        \\  ret i32 %bits
+        \\}
+        \\define i32 @infinity_mask(float %a, float %b) {
+        \\entry:
+        \\  %seed = insertelement <4 x float> poison, float %a, i64 0
+        \\  %pair = insertelement <4 x float> %seed, float %b, i64 1
+        \\  %lanes = shufflevector <4 x float> %pair, <4 x float> poison, <4 x i32> <i32 0, i32 1, i32 1, i32 0>
+        \\  %absolute = call <4 x float> @llvm.fabs.v4f32(<4 x float> %lanes)
+        \\  %infinite = fcmp oeq <4 x float> %absolute, splat (float 0x7FF0000000000000)
+        \\  %bits = bitcast <4 x i1> %infinite to i4
+        \\  %wide = zext i4 %bits to i32
+        \\  ret i32 %wide
+        \\}
+        \\define i32 @copysign_bits(float %magnitude, float %sign) {
+        \\entry:
+        \\  %value = tail call float @llvm.copysign.f32(float %magnitude, float %sign)
+        \\  %bits = bitcast float %value to i32
+        \\  ret i32 %bits
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machines: [3]x86_64_machine.MachineFunction = .{
+        x86_64_machine.MachineFunction.init("arithmetic", .{ .int = 32 }),
+        x86_64_machine.MachineFunction.init("infinity_mask", .{ .int = 32 }),
+        x86_64_machine.MachineFunction.init("copysign_bits", .{ .int = 32 }),
+    };
+    defer for (&machines) |*machine| machine.deinit(std.testing.allocator);
+    var mappings: [3]?[]align(std.heap.page_size_min) u8 = .{ null, null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (&machines, module.functions.items, &mappings) |*machine, function, *mapping| {
+        switch (try selector_impl.tryLowerComposedCfg(std.testing.allocator, machine, function)) {
+            .selected => {},
+            .unsupported => |diagnostic| {
+                std.debug.print("f32x4 canary {s}: {s}/{s}\n", .{ function.name, diagnostic.tagName(), diagnostic.detail() });
+                return error.TestUnexpectedResult;
+            },
+        }
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine.*);
+        defer std.testing.allocator.free(bytes);
+        mapping.* = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mapping.*.?, bytes);
+    }
+    const arithmetic: *const fn (f32, f32, f32, f32) callconv(.c) u32 = @ptrCast(mappings[0].?.ptr);
+    const infinity_mask: *const fn (f32, f32) callconv(.c) u32 = @ptrCast(mappings[1].?.ptr);
+    const copysign_bits: *const fn (f32, f32) callconv(.c) u32 = @ptrCast(mappings[2].?.ptr);
+
+    try std.testing.expectEqual(@as(u32, 0x4190_0000), arithmetic(2.0, 3.0, 5.0, 7.0));
+    try std.testing.expectEqual(@as(u32, 0), arithmetic(0.0, -0.0, 1.0, 1.0));
+    try std.testing.expectEqual(@as(u32, 0b1001), infinity_mask(std.math.inf(f32), 1.0));
+    try std.testing.expectEqual(@as(u32, 0b0110), infinity_mask(1.0, -std.math.inf(f32)));
+    try std.testing.expectEqual(@as(u32, 0), infinity_mask(@bitCast(@as(u32, 0x7fc1_2345)), 1.0));
+
+    const CopySignCase = struct { magnitude: u32, sign: u32, expected: u32 };
+    const copy_sign_cases = [_]CopySignCase{
+        .{ .magnitude = 0x0000_0000, .sign = 0x8000_0000, .expected = 0x8000_0000 },
+        .{ .magnitude = 0x8000_0001, .sign = 0x0000_0000, .expected = 0x0000_0001 },
+        .{ .magnitude = 0x7f80_0000, .sign = 0xff80_0000, .expected = 0xff80_0000 },
+        .{ .magnitude = 0xffc1_2345, .sign = 0x3f80_0000, .expected = 0x7fc1_2345 },
+        .{ .magnitude = 0x7f80_0042, .sign = 0xbf80_0000, .expected = 0xff80_0042 },
+    };
+    for (copy_sign_cases) |case| {
+        try std.testing.expectEqual(case.expected, copysign_bits(@bitCast(case.magnitude), @bitCast(case.sign)));
+    }
+}
+
 test "generic cfg selector fails closed outside the bounded vector slice" {
     const Case = struct { ir_text: []const u8, tag: std.meta.Tag(inspection.Diagnostic), detail: []const u8 };
     const cases = [_]Case{
@@ -791,6 +882,23 @@ test "generic cfg selector fails closed outside the bounded vector slice" {
         \\  ret double %r
         \\}
         , .tag = .unsupported_instruction, .detail = "extractelement-dynamic-index" },
+        .{ .ir_text =
+        \\define float @bad(float %x) {
+        \\entry:
+        \\  %v = insertelement <4 x float> poison, float %x, i64 2
+        \\  %e = extractelement <4 x float> %v, i64 2
+        \\  ret float %e
+        \\}
+        , .tag = .unsupported_instruction, .detail = "insertelement-index" },
+        .{ .ir_text =
+        \\define float @bad(float %x) {
+        \\entry:
+        \\  %v = insertelement <4 x float> poison, float %x, i64 0
+        \\  %r = shufflevector <4 x float> %v, <4 x float> poison, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
+        \\  %e = extractelement <4 x float> %r, i64 0
+        \\  ret float %e
+        \\}
+        , .tag = .unsupported_instruction, .detail = "shufflevector-mask" },
         .{ .ir_text =
         \\define double @bad(double %x) {
         \\entry:
@@ -867,10 +975,10 @@ test "generic cfg selector fails closed outside the bounded vector slice" {
         \\}
         , .tag = .unsupported_type, .detail = "select" },
         .{ .ir_text =
-        \\define i4 @bad() {
+        \\define i8 @bad() {
         \\entry:
-        \\  %result = bitcast <4 x i1> <i1 1, i1 0, i1 1, i1 0> to i4
-        \\  ret i4 %result
+        \\  %result = bitcast <8 x i1> <i1 1, i1 0, i1 1, i1 0, i1 1, i1 0, i1 1, i1 0> to i8
+        \\  ret i8 %result
         \\}
         , .tag = .unsupported_type, .detail = "cast" },
         .{ .ir_text =
@@ -890,11 +998,11 @@ test "generic cfg selector fails closed outside the bounded vector slice" {
         \\}
         , .tag = .unsupported_type, .detail = "store" },
         .{ .ir_text =
-        \\define float @bad(float %x) {
+        \\define double @bad(double %x) {
         \\entry:
-        \\  %v = insertelement <4 x float> poison, float %x, i64 0
-        \\  %e = extractelement <4 x float> %v, i64 0
-        \\  ret float %e
+        \\  %v = insertelement <4 x double> poison, double %x, i64 0
+        \\  %e = extractelement <4 x double> %v, i64 0
+        \\  ret double %e
         \\}
         , .tag = .unsupported_type, .detail = "insertelement" },
         .{ .ir_text =

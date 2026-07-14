@@ -135,7 +135,7 @@ pub const VectorShape = struct {
     lane_type: LaneType,
     lane_count: u8,
     lane_bits: u16,
-    defined_lanes: u2,
+    defined_lanes: u4,
 
     pub const LaneType = enum {
         float,
@@ -148,7 +148,7 @@ pub const VectorShape = struct {
         canonical_mask,
     };
 
-    pub fn f32x2(defined_lanes: u2) VectorShape {
+    pub fn f32x2(defined_lanes: u4) VectorShape {
         return .{
             .lane_type = .float,
             .lane_count = 2,
@@ -157,7 +157,7 @@ pub const VectorShape = struct {
         };
     }
 
-    pub fn f64x2(defined_lanes: u2) VectorShape {
+    pub fn f64x2(defined_lanes: u4) VectorShape {
         return .{
             .lane_type = .double,
             .lane_count = 2,
@@ -166,7 +166,7 @@ pub const VectorShape = struct {
         };
     }
 
-    pub fn i32x2(defined_lanes: u2) VectorShape {
+    pub fn i32x2(defined_lanes: u4) VectorShape {
         return .{
             .lane_type = .integer,
             .lane_count = 2,
@@ -175,7 +175,7 @@ pub const VectorShape = struct {
         };
     }
 
-    pub fn i64x2(defined_lanes: u2) VectorShape {
+    pub fn i64x2(defined_lanes: u4) VectorShape {
         return .{
             .lane_type = .integer,
             .lane_count = 2,
@@ -184,14 +184,38 @@ pub const VectorShape = struct {
         };
     }
 
-    pub fn mask32x2(defined_lanes: u2) VectorShape {
+    pub fn mask32x2(defined_lanes: u4) VectorShape {
         var shape = i32x2(defined_lanes);
         shape.kind = .canonical_mask;
         return shape;
     }
 
-    pub fn mask64x2(defined_lanes: u2) VectorShape {
+    pub fn mask64x2(defined_lanes: u4) VectorShape {
         var shape = i64x2(defined_lanes);
+        shape.kind = .canonical_mask;
+        return shape;
+    }
+
+    pub fn f32x4(defined_lanes: u4) VectorShape {
+        return .{
+            .lane_type = .float,
+            .lane_count = 4,
+            .lane_bits = 32,
+            .defined_lanes = defined_lanes,
+        };
+    }
+
+    pub fn i32x4(defined_lanes: u4) VectorShape {
+        return .{
+            .lane_type = .integer,
+            .lane_count = 4,
+            .lane_bits = 32,
+            .defined_lanes = defined_lanes,
+        };
+    }
+
+    pub fn mask32x4(defined_lanes: u4) VectorShape {
+        var shape = i32x4(defined_lanes);
         shape.kind = .canonical_mask;
         return shape;
     }

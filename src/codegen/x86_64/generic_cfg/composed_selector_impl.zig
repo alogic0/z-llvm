@@ -2,6 +2,7 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_types = @import("../types.zig");
+const sysv_abi = @import("../sysv_abi.zig");
 const inspection = @import("inspection.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
@@ -142,6 +143,12 @@ pub fn tryLowerComposedCfgWithContext(
     }
     if (composed.return_epilogue_label) |label| {
         try machine.instructions.append(allocator, .{ .label = label });
+        if (sysv_abi.sseAggregateReturnKind(function.ret_ty) == .packed_f32x2) {
+            try machine.instructions.appendSlice(allocator, &.{
+                .{ .movq_xmm_rax = .xmm0 },
+                .{ .movq_rax_xmm = .xmm0 },
+            });
+        }
         try selector_frame.appendAddRsp(&composed, composed.stack_frame_bytes);
         try machine.instructions.append(allocator, .ret);
     }

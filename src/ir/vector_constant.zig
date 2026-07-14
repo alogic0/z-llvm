@@ -91,6 +91,13 @@ pub const Packed2ShuffleMask = enum {
     f64_lane0_lane3,
 };
 
+pub const PackedF32x4ShuffleMask = enum {
+    pair_0110,
+    pair_0101,
+    lane1_to_lane0,
+    lane3_to_lane2,
+};
+
 pub fn classifyPacked2ShuffleMask(shuffle: core.ShuffleVectorInst) ?Packed2ShuffleMask {
     if (shuffle.lhs_ty != .vector or shuffle.rhs_ty != .vector or shuffle.mask_ty != .vector) return null;
     if (!shuffle.rhs_ty.eql(shuffle.lhs_ty) or shuffle.lhs_ty.vector.len != 2) return null;
@@ -101,6 +108,21 @@ pub fn classifyPacked2ShuffleMask(shuffle: core.ShuffleVectorInst) ?Packed2Shuff
     if (maskLaneEquals(parsed.lanes[0], 1) and parsed.lanes[1] == .poison) return .lane1_to_lane0;
     if (shuffle.lhs_ty.vector.elem_ty == .double and
         maskLaneEquals(parsed.lanes[0], 0) and maskLaneEquals(parsed.lanes[1], 3)) return .f64_lane0_lane3;
+    return null;
+}
+
+pub fn classifyPackedF32x4ShuffleMask(shuffle: core.ShuffleVectorInst) ?PackedF32x4ShuffleMask {
+    if (shuffle.lhs_ty != .vector or shuffle.rhs_ty != .vector or shuffle.mask_ty != .vector) return null;
+    if (!shuffle.rhs_ty.eql(shuffle.lhs_ty) or shuffle.lhs_ty.vector.len != 4 or shuffle.lhs_ty.vector.elem_ty != .float) return null;
+    const mask_ty = shuffle.mask_ty.vector;
+    if (mask_ty.len != 4 or mask_ty.elem_ty != .int or mask_ty.elem_ty.int != 32) return null;
+    const lanes = (parseFixed(4, shuffle.mask, mask_ty) orelse return null).lanes;
+    if (maskLaneEquals(lanes[0], 0) and maskLaneEquals(lanes[1], 1) and
+        maskLaneEquals(lanes[2], 1) and maskLaneEquals(lanes[3], 0)) return .pair_0110;
+    if (maskLaneEquals(lanes[0], 0) and maskLaneEquals(lanes[1], 1) and
+        maskLaneEquals(lanes[2], 0) and maskLaneEquals(lanes[3], 1)) return .pair_0101;
+    if (maskLaneEquals(lanes[0], 1) and lanes[1] == .poison and lanes[2] == .poison and lanes[3] == .poison) return .lane1_to_lane0;
+    if (lanes[0] == .poison and lanes[1] == .poison and maskLaneEquals(lanes[2], 3) and lanes[3] == .poison) return .lane3_to_lane2;
     return null;
 }
 
@@ -194,4 +216,25 @@ test "fixed vector constants and typed splat masks are structured once" {
     lane_shift.lhs_ty.vector.elem_ty = .double;
     lane_shift.rhs_ty.vector.elem_ty = .double;
     try std.testing.expectEqual(Packed2ShuffleMask.f64_lane0_lane3, classifyPacked2ShuffleMask(lane_shift).?);
+}
+
+test "f32x4 shuffle masks are admitted exactly" {
+    const f32x4: core.VectorType = .{ .len = 4, .elem_ty = .float };
+    var shuffle: core.ShuffleVectorInst = .{
+        .lhs_ty = .{ .vector = f32x4 },
+        .lhs = .poison,
+        .rhs_ty = .{ .vector = f32x4 },
+        .rhs = .poison,
+        .mask_ty = .{ .vector = .{ .len = 4, .elem_ty = .{ .int = 32 } } },
+        .mask = .{ .vector = "<i32 0, i32 1, i32 1, i32 0>" },
+    };
+    try std.testing.expectEqual(PackedF32x4ShuffleMask.pair_0110, classifyPackedF32x4ShuffleMask(shuffle).?);
+    shuffle.mask = .{ .vector = "<i32 0, i32 1, i32 0, i32 1>" };
+    try std.testing.expectEqual(PackedF32x4ShuffleMask.pair_0101, classifyPackedF32x4ShuffleMask(shuffle).?);
+    shuffle.mask = .{ .vector = "<i32 1, i32 poison, i32 poison, i32 poison>" };
+    try std.testing.expectEqual(PackedF32x4ShuffleMask.lane1_to_lane0, classifyPackedF32x4ShuffleMask(shuffle).?);
+    shuffle.mask = .{ .vector = "<i32 poison, i32 poison, i32 3, i32 poison>" };
+    try std.testing.expectEqual(PackedF32x4ShuffleMask.lane3_to_lane2, classifyPackedF32x4ShuffleMask(shuffle).?);
+    shuffle.mask = .{ .vector = "<i32 1, i32 undef, i32 poison, i32 poison>" };
+    try std.testing.expect(classifyPackedF32x4ShuffleMask(shuffle) == null);
 }

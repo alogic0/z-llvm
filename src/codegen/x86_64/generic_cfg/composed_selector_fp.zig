@@ -194,9 +194,63 @@ pub fn lowerMaxNum(selector: *ComposedBlockSelector, result: ?[]const u8, call: 
     return null;
 }
 
+pub fn lowerCopySignF32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-copysign-result" };
+    if (call.ret_ty != .float or call.args.items.len != 2 or
+        call.args.items[0].ty != .float or call.args.items[1].ty != .float or
+        call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null)
+    {
+        return .{ .no_emitter = "composed-block-copysign-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) {
+            return .{ .no_emitter = "composed-block-copysign-tail-kind" };
+        }
+    }
+
+    const lhs = fpValueReg(selector, call.args.items[0].value, 32) orelse blk: {
+        const rhs_reg = fpValueReg(selector, call.args.items[1].value, 32);
+        break :blk firstXmmExcept(rhs_reg);
+    };
+    if (try materializeFpValue(selector, call.args.items[0].value, lhs, 32)) |diagnostic| return diagnostic;
+    const rhs = fpValueReg(selector, call.args.items[1].value, 32) orelse blk: {
+        const scratch = firstXmmExcept(lhs);
+        if (try materializeFpValue(selector, call.args.items[1].value, scratch, 32)) |diagnostic| return diagnostic;
+        break :blk scratch;
+    };
+    const dst = firstXmmExceptTwo(lhs, rhs);
+    const magnitude = firstXmmExceptThree(lhs, rhs, dst);
+
+    if (try materializeFpValue(selector, call.args.items[1].value, dst, 32)) |diagnostic| return diagnostic;
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .movd_xmm_eax = dst },
+        .{ .and_eax_imm32 = @bitCast(@as(u32, 0x8000_0000)) },
+        .{ .movd_eax_xmm = dst },
+    });
+    if (try materializeFpValue(selector, call.args.items[0].value, magnitude, 32)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .movd_xmm_eax = magnitude },
+        .{ .and_eax_imm32 = 0x7fff_ffff },
+        .{ .movd_eax_xmm = magnitude },
+    });
+    try selector_state.clobberXmmReg(selector, dst);
+    try selector.machine.instructions.append(selector.allocator, .{ .pxor_xmm = .{ .dst = dst, .src = magnitude } });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = 32 } });
+    return null;
+}
+
 fn firstXmmExceptTwo(first: XmmReg, second: XmmReg) XmmReg {
     for (scalar_xmm_regs) |reg| {
         if (reg != first and reg != second) return reg;
+    }
+    unreachable;
+}
+
+fn firstXmmExceptThree(first: XmmReg, second: XmmReg, third: XmmReg) XmmReg {
+    for (scalar_xmm_regs) |reg| {
+        if (reg != first and reg != second and reg != third) return reg;
     }
     unreachable;
 }

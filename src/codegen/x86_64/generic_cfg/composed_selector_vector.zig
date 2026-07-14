@@ -26,7 +26,7 @@ const VectorOperand = struct {
 
 pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-missing-result" };
-    if (!isPackedFp2(binary.ty)) return .{ .no_emitter = "composed-vector-binary-type" };
+    if (!isPackedFp(binary.ty)) return .{ .no_emitter = "composed-vector-binary-type" };
     if (binary.op != .fadd and binary.op != .fsub and binary.op != .fmul) return .{ .no_emitter = "composed-vector-binary-op" };
 
     const lhs = describeVectorValue(selector, binary.lhs, binary.ty) orelse return .{ .unsupported_value = "composed-vector-binary-lhs" };
@@ -63,8 +63,16 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
 }
 
 pub fn lowerFabsV2F32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    return lowerFabsF32(selector, result, call, 2);
+}
+
+pub fn lowerFabsV4F32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    return lowerFabsF32(selector, result, call, 4);
+}
+
+fn lowerFabsF32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, comptime lane_count: u32) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-fabs-result" };
-    const ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
+    const ty: ir.Type = .{ .vector = .{ .len = lane_count, .elem_ty = .float } };
     if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty) or call.inline_asm != null or call.callee_value != null) {
         return .{ .no_emitter = "composed-vector-fabs-form" };
     }
@@ -84,6 +92,9 @@ pub fn lowerFabsV2F32(selector: *ComposedBlockSelector, result: ?[]const u8, cal
 
 pub fn lowerBitcast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-bitcast-result" };
+    if (cast.op == .bitcast and isMask4(cast.from_ty) and cast.to_ty.eql(.{ .int = 4 })) {
+        return lowerMask4ToI4(selector, result_name, cast);
+    }
     if (cast.op != .bitcast or !isPackedFp2(cast.from_ty)) return .{ .no_emitter = "composed-vector-bitcast-form" };
     const result_shape = shapeForType(cast.to_ty, 0) orelse return .{ .no_emitter = "composed-vector-bitcast-form" };
     if (result_shape.lane_type != .integer or result_shape.lane_bits != shapeForType(cast.from_ty, 0).?.lane_bits) {
@@ -98,6 +109,22 @@ pub fn lowerBitcast(selector: *ComposedBlockSelector, result: ?[]const u8, cast:
     retagged.defined_lanes = operand.shape.defined_lanes;
     try bindVectorResult(selector, result_name, dst, retagged);
     return null;
+}
+
+fn lowerMask4ToI4(selector: *ComposedBlockSelector, result_name: []const u8, cast: ir.CastInst) !?Diagnostic {
+    const operand = describeVectorValue(selector, cast.value, cast.from_ty) orelse return .{ .unsupported_value = "composed-vector-bitcast-source" };
+    if (!operand.shape.eql(VectorShape.mask32x4(0b1111))) return .{ .unsupported_value = "composed-vector-bitcast-source" };
+    const source_reg = vectorValueReg(selector, cast.value);
+    const reg = source_reg orelse scratchXmmReg(selector, .xmm0, null);
+    if (source_reg == null) {
+        if (try materializeVectorValue(selector, cast.value, operand, reg, null)) |diagnostic| return diagnostic;
+    }
+    selector_state.clobberAccumulator(selector) catch return .{ .no_spill_envelope = "composed-vector-bitcast-accumulator" };
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .movmskps_xmm_eax = reg },
+        .{ .and_eax_imm32 = 0xf },
+    });
+    return bindMaskScalarResult(selector, result_name, 4);
 }
 
 pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
@@ -153,7 +180,9 @@ pub fn lowerFcmp(selector: *ComposedBlockSelector, result: ?[]const u8, fcmp: ir
         .integer => unreachable,
     });
     const defined_lanes = lhs.shape.defined_lanes & rhs.shape.defined_lanes;
-    try bindVectorResult(selector, result_name, dst, if (shape.lane_bits == 32)
+    try bindVectorResult(selector, result_name, dst, if (shape.lane_count == 4)
+        VectorShape.mask32x4(defined_lanes)
+    else if (shape.lane_bits == 32)
         VectorShape.mask32x2(defined_lanes)
     else
         VectorShape.mask64x2(defined_lanes));
@@ -162,7 +191,7 @@ pub fn lowerFcmp(selector: *ComposedBlockSelector, result: ?[]const u8, fcmp: ir
 
 pub fn lowerInsertElement(selector: *ComposedBlockSelector, result: ?[]const u8, insert: ir.InsertElementInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-missing-result" };
-    if (!isPackedFp2(insert.vector_ty) or !insert.value_ty.eql(insert.vector_ty.vector.elem_ty.toType())) {
+    if (!isPackedFp(insert.vector_ty) or !insert.value_ty.eql(insert.vector_ty.vector.elem_ty.toType())) {
         return .{ .no_emitter = "composed-vector-insert-type" };
     }
     const lane = constantLane(insert.index) orelse return .{ .no_emitter = "composed-vector-insert-index" };
@@ -202,6 +231,7 @@ pub fn lowerInsertElement(selector: *ComposedBlockSelector, result: ?[]const u8,
 
 pub fn lowerShuffleVector(selector: *ComposedBlockSelector, result: ?[]const u8, shuffle: ir.ShuffleVectorInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-missing-result" };
+    if (isPackedF32x4(shuffle.lhs_ty)) return lowerF32x4Shuffle(selector, result_name, shuffle);
     if (!isPackedFp2(shuffle.lhs_ty)) return .{ .no_emitter = "composed-vector-shuffle-form" };
     const mask = ir.vector_constant.classifyPacked2ShuffleMask(shuffle) orelse return .{ .no_emitter = "composed-vector-shuffle-form" };
     const source = describeVectorValue(selector, shuffle.lhs, shuffle.lhs_ty) orelse return .{ .unsupported_value = "composed-vector-shuffle-source" };
@@ -238,16 +268,42 @@ pub fn lowerShuffleVector(selector: *ComposedBlockSelector, result: ?[]const u8,
     return null;
 }
 
+fn lowerF32x4Shuffle(selector: *ComposedBlockSelector, result_name: []const u8, shuffle: ir.ShuffleVectorInst) !?Diagnostic {
+    const mask = ir.vector_constant.classifyPackedF32x4ShuffleMask(shuffle) orelse return .{ .no_emitter = "composed-vector-shuffle-form" };
+    const source = describeVectorValue(selector, shuffle.lhs, shuffle.lhs_ty) orelse return .{ .unsupported_value = "composed-vector-shuffle-source" };
+    const dst = resultXmmReg(selector, result_name, shuffle.lhs, null) orelse return .{ .no_spill_envelope = "composed-vector-shuffle-dst" };
+    if (try materializeVectorValue(selector, shuffle.lhs, source, dst, null)) |diagnostic| return diagnostic;
+    try selector_state.clobberXmmReg(selector, dst);
+    const immediate: u8 = switch (mask) {
+        .pair_0110 => 0x14,
+        .pair_0101 => 0x44,
+        .lane1_to_lane0 => 0x01,
+        .lane3_to_lane2 => 0x30,
+    };
+    try selector.machine.instructions.append(selector.allocator, .{ .shufps_xmm = .{ .dst = dst, .src = dst, .imm = immediate } });
+    var result_shape = VectorShape.f32x4(0);
+    result_shape.defined_lanes = switch (mask) {
+        .pair_0110 => if ((source.shape.defined_lanes & 0b0011) == 0b0011) 0b1111 else 0,
+        .pair_0101 => if ((source.shape.defined_lanes & 0b0011) == 0b0011) 0b1111 else 0,
+        .lane1_to_lane0 => if ((source.shape.defined_lanes & 0b0010) != 0) 0b0001 else 0,
+        .lane3_to_lane2 => if ((source.shape.defined_lanes & 0b1000) != 0) 0b0100 else 0,
+    };
+    try bindVectorResult(selector, result_name, dst, result_shape);
+    return null;
+}
+
 pub fn lowerExtractElement(selector: *ComposedBlockSelector, result: ?[]const u8, extract: ir.ExtractElementInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-missing-result" };
     if (isMask2(extract.vector_ty)) return lowerMaskExtractElement(selector, result_name, extract);
-    if (!isPackedFp2(extract.vector_ty)) return .{ .no_emitter = "composed-vector-extract-type" };
-    const lane = constantLane(extract.index) orelse return .{ .no_emitter = "composed-vector-extract-index" };
+    if (!isPackedFp(extract.vector_ty)) return .{ .no_emitter = "composed-vector-extract-type" };
+    const lane = constantExtractLane(extract.index, extract.vector_ty) orelse return .{ .no_emitter = "composed-vector-extract-index" };
     const source = describeVectorValue(selector, extract.vector, extract.vector_ty) orelse return .{ .unsupported_value = "composed-vector-extract-source" };
     const source_reg = vectorValueReg(selector, extract.vector);
     const dst = plannedScalarXmmReg(selector, result_name, source.shape.lane_bits) orelse scratchXmmReg(selector, source_reg orelse .xmm0, source_reg);
     if (try materializeVectorValue(selector, extract.vector, source, dst, source_reg)) |diagnostic| return diagnostic;
-    if (lane == 1) switch (source.shape.lane_type) {
+    if (lane == 2) {
+        try selector.machine.instructions.append(selector.allocator, .{ .shufps_xmm = .{ .dst = dst, .src = dst, .imm = 0xaa } });
+    } else if (lane == 1) switch (source.shape.lane_type) {
         .float => try selector.machine.instructions.append(selector.allocator, .{ .shufps_high_f32_to_low = dst }),
         .double => try selector.machine.instructions.append(selector.allocator, .{ .unpckhpd_xmm = .{ .dst = dst, .src = dst } }),
         .integer => unreachable,
@@ -260,7 +316,7 @@ fn lowerMaskExtractElement(selector: *ComposedBlockSelector, result_name: []cons
     const lane = constantLane(extract.index) orelse return .{ .no_emitter = "composed-vector-extract-index" };
     const source = describeVectorValue(selector, extract.vector, extract.vector_ty) orelse return .{ .unsupported_value = "composed-vector-mask-extract-source" };
     if (source.shape.kind != .canonical_mask or source.shape.lane_count != 2 or
-        (source.shape.defined_lanes & (@as(u2, 1) << lane)) == 0)
+        (source.shape.defined_lanes & (@as(u4, 1) << lane)) == 0)
     {
         return .{ .unsupported_value = "composed-vector-mask-extract-shape" };
     }
@@ -276,25 +332,25 @@ fn lowerMaskExtractElement(selector: *ComposedBlockSelector, result_name: []cons
         .{ .movmskpd_xmm_eax = reg });
     if (lane == 1) try selector.machine.instructions.append(selector.allocator, .{ .shr_eax_imm5 = 1 });
     try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 1 });
-    if (try bindMaskScalarResult(selector, result_name)) |diagnostic| return diagnostic;
+    if (try bindMaskScalarResult(selector, result_name, 1)) |diagnostic| return diagnostic;
     return null;
 }
 
-fn bindMaskScalarResult(selector: *ComposedBlockSelector, result_name: []const u8) !?Diagnostic {
+fn bindMaskScalarResult(selector: *ComposedBlockSelector, result_name: []const u8, bits: u16) !?Diagnostic {
     const plan = selector.allocation_plan orelse {
-        try selector_state.bindAccumulator(selector, result_name, 1);
+        try selector_state.bindAccumulator(selector, result_name, bits);
         return null;
     };
     const assignment = plan.assignment(result_name) orelse {
-        try selector_state.bindAccumulator(selector, result_name, 1);
+        try selector_state.bindAccumulator(selector, result_name, bits);
         return null;
     };
     switch (assignment) {
         .gpr32 => |reg| {
             selector_state.materializeLocIntoLoc(selector, .eax, .{ .scratch32 = reg }) catch return .{ .no_spill_envelope = "composed-vector-mask-extract-result-reg" };
-            try selector_state.bindScratch(selector, result_name, reg, 1);
+            try selector_state.bindScratch(selector, result_name, reg, bits);
         },
-        .spill => try selector_state.bindAccumulator(selector, result_name, 1),
+        .spill => try selector_state.bindAccumulator(selector, result_name, bits),
         .gpr64, .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer => return .{ .unsupported_value = "composed-vector-mask-extract-result-plan" },
     }
     return null;
@@ -332,10 +388,15 @@ fn materializeVectorValue(
 ) !?Diagnostic {
     if (operand.constant) |constant| {
         const high = scratchXmmReg(selector, dst, protected);
-        try materializeLaneBits(selector, constant.bits[0], dst, constant.shape.lane_bits);
-        try materializeLaneBits(selector, constant.bits[1], high, constant.shape.lane_bits);
+        const materialized_bits: u16 = if (constant.shape.lane_count == 4) 64 else constant.shape.lane_bits;
+        try materializeLaneBits(selector, constant.bits[0], dst, materialized_bits);
+        try materializeLaneBits(selector, constant.bits[1], high, materialized_bits);
         try selector_state.clobberXmmReg(selector, dst);
-        try appendUnpackLow(selector, constant.shape.lane_type, dst, high);
+        if (constant.shape.lane_count == 4) {
+            try selector.machine.instructions.append(selector.allocator, .{ .unpcklpd_xmm = .{ .dst = dst, .src = high } });
+        } else {
+            try appendUnpackLow(selector, constant.shape.lane_type, dst, high);
+        }
         return null;
     }
     const source = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = "composed-vector-source" };
@@ -426,10 +487,19 @@ fn constantLane(value: ir.Value) ?u1 {
     };
 }
 
+fn constantExtractLane(value: ir.Value, ty: ir.Type) ?u2 {
+    return switch (value) {
+        .int => |lane| if ((ty.vector.len == 2 and (lane == 0 or lane == 1)) or
+            (ty.vector.len == 4 and (lane == 0 or lane == 2))) @intCast(lane) else null,
+        else => null,
+    };
+}
+
 fn parseVectorConstant(value: ir.Value, ty: ir.Type) ?VectorConstant {
+    if (isPackedF32x4(ty)) return parseF32x4Constant(value, ty);
     if (!isPackedFp2(ty) and !isPackedI32x2(ty)) return null;
     const parsed = ir.vector_constant.parseFixed(2, value, ty.vector) orelse return null;
-    const shape = shapeForType(ty, definedLaneMask(parsed.lanes)) orelse return null;
+    const shape = shapeForType(ty, definedLaneMask(2, parsed.lanes)) orelse return null;
     var bits: [2]u64 = undefined;
     for (parsed.lanes, 0..) |lane, index| {
         bits[index] = if (!lane.isDefined()) 0 else switch (lane) {
@@ -446,15 +516,41 @@ fn parseVectorConstant(value: ir.Value, ty: ir.Type) ?VectorConstant {
     return .{ .bits = bits, .shape = shape };
 }
 
-fn definedLaneMask(lanes: [2]ir.vector_constant.Lane) u2 {
-    var mask: u2 = 0;
-    if (lanes[0].isDefined()) mask |= 0b01;
-    if (lanes[1].isDefined()) mask |= 0b10;
+fn parseF32x4Constant(value: ir.Value, ty: ir.Type) ?VectorConstant {
+    const parsed = ir.vector_constant.parseFixed(4, value, ty.vector) orelse return null;
+    var lane_bits: [4]u32 = undefined;
+    for (parsed.lanes, 0..) |lane, index| {
+        lane_bits[index] = if (!lane.isDefined()) 0 else switch (lane) {
+            .zero_initializer => 0,
+            .fp => |text| x86_64_match.fp32TextBits(.{ .fp = text }) catch return null,
+            else => return null,
+        };
+    }
+    return .{
+        .bits = .{
+            @as(u64, lane_bits[0]) | (@as(u64, lane_bits[1]) << 32),
+            @as(u64, lane_bits[2]) | (@as(u64, lane_bits[3]) << 32),
+        },
+        .shape = VectorShape.f32x4(definedLaneMask(4, parsed.lanes)),
+    };
+}
+
+fn definedLaneMask(comptime lane_count: usize, lanes: [lane_count]ir.vector_constant.Lane) u4 {
+    var mask: u4 = 0;
+    for (lanes, 0..) |lane, index| {
+        if (lane.isDefined()) mask |= @as(u4, 1) << @intCast(index);
+    }
     return mask;
 }
 
-fn shapeForType(ty: ir.Type, defined_lanes: u2) ?VectorShape {
-    if (ty != .vector or ty.vector.len != 2) return null;
+fn shapeForType(ty: ir.Type, defined_lanes: u4) ?VectorShape {
+    if (ty != .vector) return null;
+    if (ty.vector.len == 4) return switch (ty.vector.elem_ty) {
+        .float => VectorShape.f32x4(defined_lanes),
+        .int => |bits| if (bits == 32) VectorShape.i32x4(defined_lanes) else null,
+        else => null,
+    };
+    if (ty.vector.len != 2) return null;
     return switch (ty.vector.elem_ty) {
         .float => VectorShape.f32x2(defined_lanes),
         .double => VectorShape.f64x2(defined_lanes),
@@ -498,12 +594,24 @@ fn isPackedFp2(ty: ir.Type) bool {
         (ty.vector.elem_ty == .float or ty.vector.elem_ty == .double);
 }
 
+fn isPackedF32x4(ty: ir.Type) bool {
+    return ty == .vector and ty.vector.len == 4 and ty.vector.elem_ty == .float;
+}
+
+fn isPackedFp(ty: ir.Type) bool {
+    return isPackedFp2(ty) or isPackedF32x4(ty);
+}
+
 fn isPackedI32x2(ty: ir.Type) bool {
     return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .int and ty.vector.elem_ty.int == 32;
 }
 
 fn isMask2(ty: ir.Type) bool {
     return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .int and ty.vector.elem_ty.int == 1;
+}
+
+fn isMask4(ty: ir.Type) bool {
+    return ty == .vector and ty.vector.len == 4 and ty.vector.elem_ty == .int and ty.vector.elem_ty.int == 1;
 }
 
 fn integerLaneBits(value: i128, bits: u16) ?u64 {
@@ -518,7 +626,10 @@ fn integerLaneBits(value: i128, bits: u16) ?u64 {
 
 fn materializeI32Splat(selector: *ComposedBlockSelector, bits: u32, reg: XmmReg) !void {
     try materializeLaneBits(selector, bits, reg, 32);
-    try selector.machine.instructions.append(selector.allocator, .{ .unpcklps_xmm = .{ .dst = reg, .src = reg } });
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .unpcklps_xmm = .{ .dst = reg, .src = reg } },
+        .{ .unpcklps_xmm = .{ .dst = reg, .src = reg } },
+    });
 }
 
 fn scratchXmmRegAvoidingTwo(selector: *const ComposedBlockSelector, first: XmmReg, second: XmmReg) XmmReg {

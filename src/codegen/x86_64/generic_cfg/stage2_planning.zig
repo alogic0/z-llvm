@@ -474,8 +474,10 @@ pub fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {
         .half => .{ .class = .fp16, .bits = 16 },
         .float => .{ .class = .fp32, .bits = 32 },
         .double => .{ .class = .fp64, .bits = 64 },
-        .vector => |vector| if (vector.len == 2 and (vector.elem_ty == .float or vector.elem_ty == .double or
-            (vector.elem_ty == .int and (vector.elem_ty.int == 1 or vector.elem_ty.int == 32 or vector.elem_ty.int == 64))))
+        .vector => |vector| if ((vector.len == 2 and (vector.elem_ty == .float or vector.elem_ty == .double or
+            (vector.elem_ty == .int and (vector.elem_ty.int == 1 or vector.elem_ty.int == 32 or vector.elem_ty.int == 64)))) or
+            (vector.len == 4 and (vector.elem_ty == .float or
+                (vector.elem_ty == .int and (vector.elem_ty.int == 1 or vector.elem_ty.int == 32)))))
             .{ .class = .vector_xmm, .bits = 128 }
         else
             null,

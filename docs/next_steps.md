@@ -37,20 +37,22 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-43 Part 1 is complete. Exact scalar `llvm.maxnum.f32/f64` uses existing
-XMM comparisons and branches with explicit one-NaN and signed-zero behavior;
-`minnum` remains fail-closed. Permanent raw-bit execution and Tier 2 are green.
-Report-all remains honestly at 443 selected / 247 emitting / 196 failing with
-zero closures and zero collateral emissions. `__divdc3` advances to its
-`stage2-phi-dst` vector join; `__divsc3` reaches the next captured intrinsic,
-scalar `llvm.copysign.f32`.
+INBOX-43 is complete. Exact scalar `llvm.maxnum.f32/f64` and the bounded
+four-lane float successor are accepted. The latter adds deliberate four-lane
+definedness, only the captured construction and shuffle masks, lane-2
+extraction, packed arithmetic/fabs/fcmp, canonical `<4 x i1>` masks, exact
+mask-to-i4 lowering, and the scalar `llvm.copysign.f32` prerequisite.
+`compiler_rt.mulsc3.__mulsc3` is the sole closure, advancing report-all to 443
+selected / 248 emitting / 195 failing with no collateral emissions or new
+failures. Permanent bit-exact execution, pinned-Zig native row execution, Tier
+2, and the single required Tier 3 are green.
 
-Continue with INBOX-43's pre-authorized complete `<4 x float>` successor for
-`__mulsc3`: deliberate four-lane definedness, the exact captured construction
-and shuffles, lane-2 extraction, packed arithmetic/fabs/fcmp, canonical
-`<4 x i1>` masks, and exact mask-to-i4 lowering. Expected closure is exactly
-`__mulsc3`; run one Tier 3 at acceptance. Evidence:
-`docs/evidence/std_debug_hello_scalar_maxnum_acceptance.summary`.
+The pipeline is exhausted and no successor is authorized. Stop for the
+periodic review and choose the next capability from the refreshed frontier;
+f64x4 and all broader vector forms remain outside this slice. Evidence:
+`docs/evidence/std_debug_hello_scalar_maxnum_acceptance.summary`,
+`docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.summary`, and
+`docs/evidence/distribution_all_after_inbox43_f32x4.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
