@@ -3,6 +3,7 @@ const common = @import("tool_common.zig");
 const native_cases = @import("native_link_cases.zig");
 const source_owned = @import("run_distribution_zig_integrated_object.zig");
 const source_handoff = @import("source_owned_handoff.zig");
+const release_bundle = @import("release_source_object_bundle.zig");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -12,11 +13,27 @@ pub fn main(init: std.process.Init) !void {
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
+    const release_bundle_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, release_bundle.env_name);
+    defer if (release_bundle_env) |value| allocator.free(value);
+    if (release_bundle_env != null and !filters.release_source_owned) {
+        try common.validationError(io, "release source object bundle requires --release-source-owned\n", .{});
+    }
     const target = if (filters.release_source_owned) source_handoff.normalizeZigTarget(target_env orelse "x86_64-linux-gnu") else target_env orelse "x86_64-unknown-linux-gnu";
     if (!std.mem.startsWith(u8, target, "x86_64-")) {
         try common.validationError(io, "native-link object inspection supports x86_64 ELF only; target={s}\n", .{target});
     }
-    const source_context = if (filters.release_source_owned) try source_handoff.Context.init(allocator, io, init, target) else null;
+    var bundle_consumer = if (release_bundle_env) |root|
+        try release_bundle.Consumer.init(
+            allocator,
+            io,
+            root,
+            target,
+            if (filters.mode == null and filters.case_id == null) source_handoff.expected_release_source_owned_rows else null,
+        )
+    else
+        null;
+    defer if (bundle_consumer) |*consumer| consumer.deinit();
+    const source_context = if (filters.release_source_owned and bundle_consumer == null) try source_handoff.Context.init(allocator, io, init, target) else null;
     defer if (source_context) |context| context.deinit(allocator);
 
     const temp = try common.TempDir.init(allocator, io, "native_link_object_inspection");
@@ -31,11 +48,14 @@ pub fn main(init: std.process.Init) !void {
     var undefined_import_rows: usize = 0;
 
     if (filters.release_source_owned) {
-        const context = source_context.?;
         for (source_owned.cases) |case| {
             if (!source_owned.isReleaseSourceOwnedCase(case) or !filters.matchesSourceOwned(case)) continue;
             inspected += 1;
-            const result = try inspectSourceOwnedCase(allocator, io, temp, context, case);
+            const result = if (bundle_consumer) |*consumer| blk: {
+                const object = try consumer.objectForRow(bundleRow(case));
+                defer allocator.free(object);
+                break :blk try inspectObject(allocator, io, temp, .{ .id = case.id, .mode = case.mode }, object);
+            } else try inspectSourceOwnedCase(allocator, io, temp, source_context.?, case);
             if (result.has_relocations) relocation_rows += 1;
             if (result.has_tls) tls_rows += 1;
             if (result.has_undefined_imports) undefined_import_rows += 1;
@@ -75,11 +95,26 @@ pub fn main(init: std.process.Init) !void {
     const mode_label = filters.mode orelse "all";
     const case_label = filters.case_id orelse "all";
     const inventory_label = if (filters.release_source_owned) "release-source-owned" else "selected-native-link";
+    if (bundle_consumer) |*consumer| {
+        try stdout_writer.interface.print(
+            "summary release-source-object-bundle status=reused consumer=object-inspection rows={} identity={s} executions_cached=false local_fail=0\n",
+            .{ consumer.rows, consumer.identity() },
+        );
+    }
     try stdout_writer.interface.print(
         "summary native-link-object-inspection inventory={s} target={s} mode={s} case={s} inspected={} elf64_rel={} relocation_rows={} tls_rows={} undefined_import_rows={} comdat_rows=0 eh_frame_rows=0 unsupported_relocation_rows=0 local_fail=0\n",
         .{ inventory_label, target, mode_label, case_label, inspected, inspected, relocation_rows, tls_rows, undefined_import_rows },
     );
     try stdout_writer.interface.flush();
+}
+
+fn bundleRow(case: source_owned.Case) release_bundle.Row {
+    return .{
+        .id = case.id,
+        .mode = case.mode,
+        .wrapper = case.wrapper,
+        .fixture = case.covered_fixture,
+    };
 }
 
 const Filters = struct {

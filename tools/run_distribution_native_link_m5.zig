@@ -3,6 +3,7 @@ const common = @import("tool_common.zig");
 const native_cases = @import("native_link_cases.zig");
 const source_owned = @import("run_distribution_zig_integrated_object.zig");
 const source_handoff = @import("source_owned_handoff.zig");
+const release_bundle = @import("release_source_object_bundle.zig");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -14,9 +15,25 @@ pub fn main(init: std.process.Init) !void {
     defer if (target_env) |value| allocator.free(value);
     const cc_target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "CC_TARGET");
     defer if (cc_target_env) |value| allocator.free(value);
+    const release_bundle_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, release_bundle.env_name);
+    defer if (release_bundle_env) |value| allocator.free(value);
+    if (release_bundle_env != null and !filters.release_source_owned) {
+        try common.validationError(io, "release source object bundle requires --release-source-owned\n", .{});
+    }
     const target = if (filters.release_source_owned) source_handoff.normalizeZigTarget(target_env orelse "x86_64-linux-gnu") else target_env orelse "x86_64-unknown-linux-gnu";
     const cc_target = cc_target_env orelse defaultCcTarget(target);
-    const source_context = if (filters.release_source_owned) try source_handoff.Context.init(allocator, io, init, target) else null;
+    var bundle_consumer = if (release_bundle_env) |root|
+        try release_bundle.Consumer.init(
+            allocator,
+            io,
+            root,
+            target,
+            if (filters.mode == null and filters.case_id == null) source_handoff.expected_release_source_owned_rows else null,
+        )
+    else
+        null;
+    defer if (bundle_consumer) |*consumer| consumer.deinit();
+    const source_context = if (filters.release_source_owned and bundle_consumer == null) try source_handoff.Context.init(allocator, io, init, target) else null;
     defer if (source_context) |context| context.deinit(allocator);
 
     const temp = try common.TempDir.init(allocator, io, "distribution_native_link_m5");
@@ -27,7 +44,6 @@ pub fn main(init: std.process.Init) !void {
     var selected: usize = 0;
 
     if (filters.release_source_owned) {
-        const context = source_context.?;
         var executable_abi_proof_rows: usize = 0;
         var link_only_rows: usize = 0;
         var runtime_boundary_rows: usize = 0;
@@ -35,7 +51,11 @@ pub fn main(init: std.process.Init) !void {
         for (source_owned.cases) |case| {
             if (!source_owned.isReleaseSourceOwnedCase(case) or !filters.matchesSourceOwned(case)) continue;
             selected += 1;
-            const result = try runSourceOwnedCase(allocator, io, temp, context, target, case);
+            const result = if (bundle_consumer) |*consumer| blk: {
+                const object = try consumer.objectForRow(bundleRow(case));
+                defer allocator.free(object);
+                break :blk try runSourceOwnedObject(allocator, io, temp, target, case, object);
+            } else try runSourceOwnedCase(allocator, io, temp, source_context.?, target, case);
             switch (result) {
                 .executable => executable_abi_proof_rows += 1,
                 .link_only => link_only_rows += 1,
@@ -53,6 +73,12 @@ pub fn main(init: std.process.Init) !void {
         }
         const mode_label = filters.mode orelse "all";
         const case_label = filters.case_id orelse "all";
+        if (bundle_consumer) |*consumer| {
+            try stdout_writer.interface.print(
+                "summary release-source-object-bundle status=reused consumer=native-link rows={} identity={s} executions_cached=false local_fail=0\n",
+                .{ consumer.rows, consumer.identity() },
+            );
+        }
         try stdout_writer.interface.print(
             "summary distribution-native-link inventory=release-source-owned target={s} mode={s} case={s} total={} executable_abi_proof_rows={} link_only_rows={} runtime_compiler_rt_libc_boundary_rows={} unsupported_zig_linker_feature_rows={} local_object_codegen_failures=0 local_fail=0\n",
             .{ target, mode_label, case_label, selected, executable_abi_proof_rows, link_only_rows, runtime_boundary_rows, unsupported_zig_linker_feature_rows },
@@ -221,10 +247,21 @@ fn runSourceOwnedCase(
     defer allocator.free(ir_path);
     const descriptor_path = try common.allocTempFile(allocator, temp, case.id, ".semantic_descriptor");
     defer allocator.free(descriptor_path);
+    try source_handoff.emitObject(allocator, io, context, case, object, marker, ir_path, descriptor_path);
+    return runSourceOwnedObject(allocator, io, temp, target, case, object);
+}
+
+fn runSourceOwnedObject(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    temp: common.TempDir,
+    target: []const u8,
+    case: source_owned.Case,
+    object: []const u8,
+) !SourceLinkResult {
     const exe = try common.allocTempFile(allocator, temp, case.id, "_source_owned_native_link");
     defer allocator.free(exe);
 
-    try source_handoff.emitObject(allocator, io, context, case, object, marker, ir_path, descriptor_path);
     const link_result = try source_handoff.probeLinkObject(allocator, io, target, object, exe);
     switch (link_result) {
         .accepted => {},
@@ -250,6 +287,15 @@ fn runSourceOwnedCase(
         },
         .link_only => return .link_only,
     }
+}
+
+fn bundleRow(case: source_owned.Case) release_bundle.Row {
+    return .{
+        .id = case.id,
+        .mode = case.mode,
+        .wrapper = case.wrapper,
+        .fixture = case.covered_fixture,
+    };
 }
 
 fn sourceLinkResultName(result: SourceLinkResult) []const u8 {

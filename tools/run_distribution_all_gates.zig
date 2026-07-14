@@ -1,11 +1,18 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
+const release_bundle = @import("release_source_object_bundle.zig");
 
 const Tool = struct {
     id: []const u8,
     path: []const u8,
     args: []const []const u8 = &.{},
     cache_contract: CacheContract = .unreported,
+    artifact_contract: ArtifactContract = .none,
+};
+
+const ArtifactContract = enum {
+    none,
+    release_source_object_bundle_v1,
 };
 
 const CacheContract = enum {
@@ -40,14 +47,14 @@ const tools = [_]Tool{
     .{ .id = "integrated-object-postopt", .path = "tools/run_distribution_zig_integrated_object.zig" },
     .{ .id = "integrated-object-preopt", .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--pipeline=preopt"} },
     .{ .id = "integrated-object-ir-writer", .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--ir-writer"} },
-    .{ .id = "integrated-object-release", .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--release-source-owned"} },
+    .{ .id = "integrated-object-release", .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--release-source-owned"}, .artifact_contract = .release_source_object_bundle_v1 },
     .{ .id = "real-rows-release-fast", .path = "src/distribution_real_rows_gate.zig", .args = &.{ "--mode=ReleaseFast", "--strict", "--limit=100" }, .cache_contract = .air_export_v1 },
     .{ .id = "real-rows-release-safe", .path = "src/distribution_real_rows_gate.zig", .args = &.{ "--mode=ReleaseSafe", "--strict", "--limit=100" }, .cache_contract = .air_export_v1 },
     .{ .id = "real-rows-release-small", .path = "src/distribution_real_rows_gate.zig", .args = &.{ "--mode=ReleaseSmall", "--strict", "--limit=100" }, .cache_contract = .air_export_v1 },
     .{ .id = "integrated-executable", .path = "tools/run_distribution_zig_integrated_exe.zig" },
-    .{ .id = "release-object-inspection", .path = "tools/run_native_link_object_inspection.zig", .args = &.{"--release-source-owned"} },
-    .{ .id = "release-native-link", .path = "tools/run_distribution_native_link_m5.zig", .args = &.{"--release-source-owned"} },
-    .{ .id = "release-native-probe", .path = "tools/probe_native_linker_compatibility.zig", .args = &.{"--release-source-owned"} },
+    .{ .id = "release-object-inspection", .path = "tools/run_native_link_object_inspection.zig", .args = &.{"--release-source-owned"}, .artifact_contract = .release_source_object_bundle_v1 },
+    .{ .id = "release-native-link", .path = "tools/run_distribution_native_link_m5.zig", .args = &.{"--release-source-owned"}, .artifact_contract = .release_source_object_bundle_v1 },
+    .{ .id = "release-native-probe", .path = "tools/probe_native_linker_compatibility.zig", .args = &.{"--release-source-owned"}, .artifact_contract = .release_source_object_bundle_v1 },
     .{ .id = "boundary-gates", .path = "tools/run_distribution_boundary_gates.zig" },
 };
 
@@ -61,6 +68,10 @@ pub fn main(init: std.process.Init) !void {
     const target = target_env orelse "x86_64-unknown-linux-gnu";
     const target_assignment = try std.fmt.allocPrint(allocator, "TARGET={s}", .{target});
     defer allocator.free(target_assignment);
+    const bundle_temp = try common.TempDir.init(allocator, io, "distribution_all_release_bundle");
+    defer bundle_temp.deinit(allocator, io);
+    const bundle_assignment = try std.fmt.allocPrint(allocator, "{s}={s}", .{ release_bundle.env_name, bundle_temp.path });
+    defer allocator.free(bundle_assignment);
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
@@ -77,9 +88,9 @@ pub fn main(init: std.process.Init) !void {
     var tool_index: usize = 0;
     while (tool_index < tools.len) {
         if (tool_index == 9) {
-            var first = try io.concurrent(runTool, .{ allocator, io, target_assignment, tool_index, fresh_real_rows });
-            var second = try io.concurrent(runTool, .{ allocator, io, target_assignment, tool_index + 1, fresh_real_rows });
-            var third = try io.concurrent(runTool, .{ allocator, io, target_assignment, tool_index + 2, fresh_real_rows });
+            var first = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index, fresh_real_rows });
+            var second = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index + 1, fresh_real_rows });
+            var third = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index + 2, fresh_real_rows });
             var completed = [_]CompletedTool{
                 try first.await(io),
                 try second.await(io),
@@ -104,7 +115,7 @@ pub fn main(init: std.process.Init) !void {
             tool_index += completed.len;
             continue;
         }
-        const completed = try runTool(allocator, io, target_assignment, tool_index, fresh_real_rows);
+        const completed = try runTool(allocator, io, target_assignment, bundle_assignment, tool_index, fresh_real_rows);
         try recordTool(
             &stdout_writer.interface,
             tool_index,
@@ -135,9 +146,11 @@ pub fn main(init: std.process.Init) !void {
     }
     const reported_cache_contracts = countCacheContracts(.air_export_v1);
     const unreported_cache_contracts = countCacheContracts(.unreported);
+    const release_bundle_contracts = countArtifactContracts(.release_source_object_bundle_v1);
+    const no_artifact_contracts = countArtifactContracts(.none);
     try stdout_writer.interface.print(
-        "summary distribution-all-gate-inventory schema_version=1 subgates={} runner=zig-run runner_input_scope=command target={s} reported_cache_contracts={} unreported_cache_contracts={} local_fail=0\n",
-        .{ tools.len, target, reported_cache_contracts, unreported_cache_contracts },
+        "summary distribution-all-gate-inventory schema_version=1 subgates={} runner=zig-run runner_input_scope=command target={s} reported_cache_contracts={} unreported_cache_contracts={} release_source_object_bundle_contracts={} no_artifact_contracts={} local_fail=0\n",
+        .{ tools.len, target, reported_cache_contracts, unreported_cache_contracts, release_bundle_contracts, no_artifact_contracts },
     );
     try stdout_writer.interface.print(
         "summary distribution-all-timing subgates={} total_duration_ms={} cache_hit_subgates={} cache_miss_subgates={} cache_mixed_subgates={} cache_none_subgates={} cache_observation_unreported_subgates={} slowest_reported={} fresh_real_rows={} local_fail=0\n",
@@ -169,8 +182,8 @@ fn recordTool(
     );
     for (tool.args) |arg| try writer.print(" {s}", .{arg});
     try writer.print(
-        " target={s} runner=zig-run input_scope=runner-command cache_contract={s} cache_mode={s}\n",
-        .{ target, @tagName(tool.cache_contract), cache_mode },
+        " target={s} runner=zig-run input_scope=runner-command cache_contract={s} cache_mode={s} artifact_contract={s}\n",
+        .{ target, @tagName(tool.cache_contract), cache_mode, @tagName(tool.artifact_contract) },
     );
     try writer.print("gate-start id={s} tool={s}", .{ tool.id, tool.path });
     for (tool.args) |arg| try writer.print(" {s}", .{arg});
@@ -207,11 +220,30 @@ fn countCacheContracts(contract: CacheContract) usize {
     return count;
 }
 
-fn runTool(allocator: std.mem.Allocator, io: std.Io, target_assignment: []const u8, tool_index: usize, fresh_real_rows: bool) !CompletedTool {
+fn countArtifactContracts(contract: ArtifactContract) usize {
+    var count: usize = 0;
+    for (tools) |tool| {
+        if (tool.artifact_contract == contract) count += 1;
+    }
+    return count;
+}
+
+fn runTool(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    target_assignment: []const u8,
+    bundle_assignment: []const u8,
+    tool_index: usize,
+    fresh_real_rows: bool,
+) !CompletedTool {
     const tool = tools[tool_index];
     var argv: std.ArrayList([]const u8) = .empty;
     defer argv.deinit(allocator);
-    try argv.appendSlice(allocator, &.{ "env", target_assignment, "zig", "run", tool.path });
+    try argv.appendSlice(allocator, &.{ "env", target_assignment });
+    if (tool.artifact_contract == .release_source_object_bundle_v1) {
+        try argv.append(allocator, bundle_assignment);
+    }
+    try argv.appendSlice(allocator, &.{ "zig", "run", tool.path });
     if (tool.args.len != 0) {
         try argv.append(allocator, "--");
         try argv.appendSlice(allocator, tool.args);
@@ -300,4 +332,9 @@ test "slowest measurements sort by descending duration" {
 test "cache contracts distinguish explicit telemetry from unreported gates" {
     try std.testing.expectEqual(@as(usize, 3), countCacheContracts(.air_export_v1));
     try std.testing.expectEqual(@as(usize, 14), countCacheContracts(.unreported));
+}
+
+test "artifact contracts identify the producer and three consumers" {
+    try std.testing.expectEqual(@as(usize, 4), countArtifactContracts(.release_source_object_bundle_v1));
+    try std.testing.expectEqual(@as(usize, 13), countArtifactContracts(.none));
 }
