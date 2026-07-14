@@ -270,6 +270,18 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xeb, 0xf1, // jmp 1b
                 0x89, 0xd0, // 2: movl %edx, %eax
             }),
+            .popcount_rax => try bytes.appendSlice(allocator, &.{
+                0x31, 0xd2, // xorl %edx, %edx
+                0x48, 0x85, 0xc0, // testq %rax, %rax
+                0x74, 0x11, // je 2f
+                0x48, 0x89, 0xc1, // 1: movq %rax, %rcx
+                0x48, 0x83, 0xe9, 0x01, // subq $1, %rcx
+                0x48, 0x21, 0xc8, // andq %rcx, %rax
+                0xff, 0xc2, // incl %edx
+                0x48, 0x85, 0xc0, // testq %rax, %rax
+                0x75, 0xef, // jne 1b
+                0x48, 0x89, 0xd0, // 2: movq %rdx, %rax
+            }),
             .bit_reverse_i32_edi_eax => try bytes.appendSlice(allocator, &.{
                 0x89, 0xf8, 0x0f, 0xc8, 0x89, 0xc2, 0xc1, 0xe8, 0x04, 0x25, 0x0f, 0x0f, 0x0f, 0x0f,
                 0x81, 0xe2, 0x0f, 0x0f, 0x0f, 0x0f, 0xc1, 0xe2, 0x04, 0x09, 0xd0, 0x89, 0xc2, 0xc1,
@@ -1828,6 +1840,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .clz_i32_edi_eax => 15,
         .ctz_i32_edi_eax => 12,
         .popcount_i32_edi_eax => 21,
+        .popcount_rax => 27,
         .bit_reverse_i32_edi_eax => 65,
         .bit_reverse_rax => 93,
         .ushl_sat_i32_edi_imm_eax => 20,

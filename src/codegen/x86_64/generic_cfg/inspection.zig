@@ -4,6 +4,7 @@ const fp_semantics = @import("../../../analysis/fp_semantics.zig");
 const sysv_abi = @import("../sysv_abi.zig");
 const x86_64_types = @import("../types.zig");
 const aggregate_object = @import("aggregate_object.zig");
+const intrinsic_attrs = @import("intrinsic_attrs.zig");
 
 pub const Diagnostic = union(enum) {
     unsupported_control_flow: []const u8,
@@ -360,6 +361,12 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) {
         const ty: ir.Type = .{ .int = 64 };
         return if (call.ret_ty.eql(ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(ty)) null else .{ .unsupported_type = "bit-permutation-i64" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.ctpop.i64") or std.mem.eql(u8, call.callee, "llvm.ctpop.i128")) {
+        const bits: u16 = if (std.mem.endsWith(u8, call.callee, ".i64")) 64 else 128;
+        const ty: ir.Type = .{ .int = bits };
+        return if (call.ret_ty.eql(ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(ty) and
+            intrinsic_attrs.matchesIntegerRange(call.ret_attrs, bits, 0, @as(u128, bits) + 1)) null else .{ .unsupported_type = "llvm.ctpop" };
     }
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) {
         return if (call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 2 and

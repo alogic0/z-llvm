@@ -125,6 +125,7 @@ pub const Instruction = union(enum) {
     clz_i32_edi_eax,
     ctz_i32_edi_eax,
     popcount_i32_edi_eax,
+    popcount_rax,
     bit_reverse_i32_edi_eax,
     bit_reverse_rax,
     ushl_sat_i32_edi_imm_eax: u5,

@@ -4183,6 +4183,20 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_inbox49_popcount_baseline_p0.summary` and
   `docs/evidence/distribution_all_after_inbox49_popcount_p0.summary`.
 
+- 2026-07-14 (this commit, INBOX-49 Part 2) Item 12 exact range-attributed
+  population count: a shared typed decoder admits only `range(i64 0, 65)` for
+  `llvm.ctpop.i64` and `range(i128 0, 129)` for `llvm.ctpop.i128`; malformed,
+  unrelated, wrong-width, and unsupported call forms remain fail-closed. A
+  baseline-safe 64-bit software operation is reused for both i128 limbs, with
+  the existing pair-spill/frame authority and an exact sum. Permanent tests
+  and the extracted relocation-free native object contain no POPCNT and pass
+  12/12 precomputed width-boundary cases. The report moves exactly from
+  443 / 265 / 178 to 443 / 267 / 176, provisionally closing `__popcountdi2`
+  and `__popcountti2` with no collateral change. Tier 2 passes 24/24 steps and
+  1004/1004 tests. Commit this slice, then run the cumulative INBOX-49 Tier 3
+  to accept these rows together with Part 1's `__divdc3`. Evidence
+  `docs/evidence/std_debug_hello_inbox49_popcount.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

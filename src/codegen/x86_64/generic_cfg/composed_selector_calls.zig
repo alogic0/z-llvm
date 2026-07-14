@@ -13,6 +13,7 @@ const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_fp = @import("composed_selector_fp.zig");
 const selector_memory = @import("composed_selector_memory.zig");
+const intrinsic_attrs = @import("intrinsic_attrs.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -107,6 +108,8 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i64")) return try lowerCtlzI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i32")) return try lowerCttzI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.ctpop.i64")) return try lowerCtpop(selector, result, call, 64);
+    if (std.mem.eql(u8, call.callee, "llvm.ctpop.i128")) return try lowerCtpop(selector, result, call, 128);
     if (std.mem.eql(u8, call.callee, "llvm.bswap.i128")) return try lowerBitPermutation(selector, result, call, 128, .byte_swap);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) return try lowerBitPermutation(selector, result, call, 64, .bit_reverse);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i128")) return try lowerBitPermutation(selector, result, call, 128, .bit_reverse);
@@ -531,6 +534,59 @@ pub fn lowerCttzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     try selector_state.clobberAccumulator(selector);
     try selector.machine.instructions.append(selector.allocator, .ctz_i64_rdi_eax);
     try selector_state.bindRax(selector, result_name);
+    return null;
+}
+
+fn lowerCtpop(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, bits: u16) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-ctpop-result" };
+    if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        !isDefaultOrFastcc(call.calling_conv) or call.raw_args != null or call.operand_bundle != null)
+    {
+        return .{ .no_emitter = "composed-block-ctpop-call-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) {
+            return .{ .no_emitter = "composed-block-ctpop-tail-kind" };
+        }
+    }
+    const upper: u128 = @as(u128, bits) + 1;
+    if (!intrinsic_attrs.matchesIntegerRange(call.ret_attrs, bits, 0, upper)) {
+        return .{ .no_emitter = "composed-block-ctpop-range" };
+    }
+    const ty: ir.Type = .{ .int = bits };
+    if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty) or call.args.items[0].attrs != null) {
+        return .{ .no_emitter = "composed-block-ctpop-signature" };
+    }
+
+    if (bits == 64) {
+        selector_state.emitValueIntoRax(selector, call.args.items[0].value) catch
+            return .{ .unsupported_value = "composed-block-ctpop-value" };
+        try selector_state.clobberArgReg(selector, .rcx);
+        try selector_state.clobberArgReg(selector, .rdx);
+        try selector.machine.instructions.append(selector.allocator, .popcount_rax);
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
+
+    if (bits != 128) unreachable;
+    const source = selector_state.ensurePairSpill(selector, call.args.items[0].value) catch
+        return .{ .no_spill_envelope = "composed-block-ctpop-pair" };
+    try selector_state.clobberArgReg(selector, pair_b.lo);
+    try selector_state.clobberArgReg(selector, pair_b.hi);
+    try selector_state.clobberArgReg(selector, .rcx);
+    try selector_state.clobberArgReg(selector, .rdx);
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .reload_rsp_rax = source.lo },
+        .popcount_rax,
+        .{ .mov_rax_to_arg = pair_b.lo },
+        .{ .reload_rsp_rax = source.hi },
+        .popcount_rax,
+        .{ .add_arg64_rax = pair_b.lo },
+        .{ .mov_rax_to_arg = pair_b.lo },
+        .{ .mov_imm_r9 = 0 },
+    });
+    try selector_state.bindPairScratch(selector, result_name, pair_b);
     return null;
 }
 

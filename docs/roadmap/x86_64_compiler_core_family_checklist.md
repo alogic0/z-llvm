@@ -984,10 +984,13 @@ Layer: semantic lowering and backend.
   ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=745`, `generic_cfg_functions=745`,
   `object_emitted_functions=745`, `executable_ok_rows=14`, and `local_fail=0`.
-  Wider widths, vector forms, and `bit_reverse` remain separate
-  scalar-transform work. INBOX-49's baseline audit invalidated and re-proved
-  this row after confirming that its earlier POPCNT encoding violated the
-  captured `-popcnt` target attributes.
+  Vector forms and `bit_reverse` remain separate scalar-transform work.
+  INBOX-49's baseline audit invalidated and re-proved this row after
+  confirming that its earlier POPCNT encoding violated the captured `-popcnt`
+  target attributes. The same cycle adds exact range-attributed
+  `llvm.ctpop.i64/i128` software lowering and native proofs for compiler_rt
+  `__popcountdi2` and `__popcountti2` without widening generic attribute or
+  intrinsic admission.
 - [x] Lower `bit_reverse`.
   Added `frontier_mixed_numeric.frontier_bit_reverse_u32`, which lowers scalar
   `@bitReverse(u32)` through the typed-v2 `zllvm-bit-reverse-v1` `ty_op`

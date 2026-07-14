@@ -742,3 +742,84 @@ test "generic cfg selector executes exact i64 and i128 bit permutations" {
         .{ std.math.maxInt(u128), std.math.maxInt(u128) },
     }) |case| try std.testing.expectEqual(case[1], bit_reverse_i128(case[0]));
 }
+
+test "generic cfg selector keeps range-attributed popcount near misses fail closed" {
+    inline for (.{
+        .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, null), .tail_kind = @as(?[]const u8, "tail") },
+        .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i64 0, 64)"), .tail_kind = @as(?[]const u8, "tail") },
+        .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i32 0, 65)"), .tail_kind = @as(?[]const u8, "tail") },
+        .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i64 0, 65), zeroext"), .tail_kind = @as(?[]const u8, "tail") },
+        .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 32, .ret_attrs = @as(?[]const u8, "range(i64 0, 65)"), .tail_kind = @as(?[]const u8, "tail") },
+        .{ .callee = "llvm.ctpop.i128", .ret_bits = 128, .arg_bits = 128, .ret_attrs = @as(?[]const u8, "range(i128 0, 129)"), .tail_kind = @as(?[]const u8, "musttail") },
+        .{ .callee = "llvm.ctpop.i32", .ret_bits = 32, .arg_bits = 32, .ret_attrs = @as(?[]const u8, "range(i32 0, 33)"), .tail_kind = @as(?[]const u8, "tail") },
+    }) |case| {
+        var machine = MachineFunction.init("ctpop-near-miss", .{ .int = case.ret_bits });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", if (case.arg_bits == 128) .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } } else .{ .arg64 = .rdi });
+        var call = ir.CallInst{
+            .ret_ty = .{ .int = case.ret_bits },
+            .callee = case.callee,
+            .ret_attrs = case.ret_attrs,
+            .tail_kind = case.tail_kind,
+            .args = .empty,
+        };
+        defer call.deinit(std.testing.allocator);
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = case.arg_bits }, .value = .{ .named = "value" } });
+        try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) != null);
+    }
+}
+
+test "generic cfg selector executes exact range-attributed i64 and i128 popcount" {
+    const input =
+        \\declare i64 @llvm.ctpop.i64(i64)
+        \\declare i128 @llvm.ctpop.i128(i128)
+        \\define i64 @popcount_i64(i64 %value) {
+        \\entry:
+        \\  %result = tail call range(i64 0, 65) i64 @llvm.ctpop.i64(i64 %value)
+        \\  ret i64 %result
+        \\}
+        \\define i128 @popcount_i128(i128 %value) {
+        \\entry:
+        \\  %result = notail call range(i128 0, 129) i128 @llvm.ctpop.i128(i128 %value)
+        \\  ret i128 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var mappings: [2]?[]align(std.heap.page_size_min) u8 = .{ null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (module.functions.items, 0..) |function_ir, index| {
+        var machine = MachineFunction.init(function_ir.name, function_ir.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        try std.testing.expect(std.mem.indexOf(u8, bytes, &.{ 0xf3, 0x48, 0x0f, 0xb8 }) == null);
+        mappings[index] = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mappings[index].?, bytes);
+    }
+
+    const popcount_i64: *const fn (u64) callconv(.c) u64 = @ptrCast(mappings[0].?.ptr);
+    const popcount_i128: *const fn (u128) callconv(.c) u128 = @ptrCast(mappings[1].?.ptr);
+    inline for (.{
+        .{ @as(u64, 0), @as(u64, 0) },
+        .{ @as(u64, 1), @as(u64, 1) },
+        .{ @as(u64, 0x8000_0000_0000_0001), @as(u64, 2) },
+        .{ @as(u64, 0x0123_4567_89ab_cdef), @as(u64, 32) },
+        .{ std.math.maxInt(u64), @as(u64, 64) },
+    }) |case| try std.testing.expectEqual(case[1], popcount_i64(case[0]));
+    inline for (.{
+        .{ @as(u128, 0), @as(u128, 0) },
+        .{ @as(u128, 1), @as(u128, 1) },
+        .{ @as(u128, 1) << 127, @as(u128, 1) },
+        .{ (@as(u128, 1) << 127) | 1, @as(u128, 2) },
+        .{ @as(u128, 0x0123_4567_89ab_cdef_fedc_ba98_7654_3210), @as(u128, 64) },
+        .{ std.math.maxInt(u128), @as(u128, 128) },
+    }) |case| try std.testing.expectEqual(case[1], popcount_i128(case[0]));
+}

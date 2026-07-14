@@ -95,6 +95,18 @@ test "x86_64 assembly prints baseline i32 popcount without POPCNT" {
     try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), "\tandl %ecx, %eax\n") != null);
 }
 
+test "x86_64 assembly prints baseline i64 popcount without POPCNT" {
+    var machine = codegen.x86_64.MachineFunction.init("popcount_i64", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{ .popcount_rax, .ret });
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+    try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), "popcnt") == null);
+    try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), "\tandq %rcx, %rax\n") != null);
+}
+
 test "x86_64 assembly prints variable eax shifts" {
     var machine = codegen.x86_64.MachineFunction.init("variable_eax_shifts", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

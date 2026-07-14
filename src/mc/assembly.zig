@@ -126,6 +126,20 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "2:\n" ++
                     "\tmovl %edx, %eax\n",
             ),
+            .popcount_rax => try writer.writeAll(
+                "\txorl %edx, %edx\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tje 2f\n" ++
+                    "1:\n" ++
+                    "\tmovq %rax, %rcx\n" ++
+                    "\tsubq $1, %rcx\n" ++
+                    "\tandq %rcx, %rax\n" ++
+                    "\tincl %edx\n" ++
+                    "\ttestq %rax, %rax\n" ++
+                    "\tjne 1b\n" ++
+                    "2:\n" ++
+                    "\tmovq %rdx, %rax\n",
+            ),
             .bit_reverse_i32_edi_eax => try writer.writeAll(
                 "\tmovl %edi, %eax\n" ++
                     "\tbswapl %eax\n" ++

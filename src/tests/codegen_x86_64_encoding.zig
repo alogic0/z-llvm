@@ -99,6 +99,34 @@ test "x86_64 encoding executes baseline i32 popcount without POPCNT" {
     }) |case| try std.testing.expectEqual(case[1], popcount(case[0]));
 }
 
+test "x86_64 encoding executes baseline i64 popcount without POPCNT" {
+    var machine = codegen.x86_64.MachineFunction.init("popcount_i64", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{
+        .{ .mov_arg_rax = .rdi },
+        .popcount_rax,
+        .ret,
+    });
+
+    try std.testing.expectEqual(@as(u32, 27), mc.encoding.instructionSize(.popcount_rax));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expect(std.mem.indexOf(u8, bytes, &.{ 0xf3, 0x48, 0x0f, 0xb8 }) == null);
+
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const popcount: *const fn (u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+    inline for (.{
+        .{ @as(u64, 0), @as(u64, 0) },
+        .{ @as(u64, 1), @as(u64, 1) },
+        .{ @as(u64, 1) << 63, @as(u64, 1) },
+        .{ @as(u64, 0x8000_0000_0000_0001), @as(u64, 2) },
+        .{ @as(u64, 0x0123_4567_89ab_cdef), @as(u64, 32) },
+        .{ std.math.maxInt(u64), @as(u64, 64) },
+    }) |case| try std.testing.expectEqual(case[1], popcount(case[0]));
+}
+
 test "x86_64 encoding sizes i64 add before direct call relocation" {
     var machine = codegen.x86_64.MachineFunction.init("add64_call", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

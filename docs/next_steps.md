@@ -52,20 +52,23 @@ collateral change. The pinned-Zig five-edge proof passes 5/5 literal expected
 bit cases. Evidence:
 `docs/evidence/std_debug_hello_inbox49_i64x2_extract.summary`.
 
-Continue with the pre-authorized INBOX-49 Part 2: audit accepted i32 popcount
-use against the captured `-popcnt` baseline, repair it as a standalone P0 if
-the audit confirms wrong-code exposure, then admit exact range-attributed
-`llvm.ctpop.i64/i128` through baseline-safe software lowering. One cumulative
-Tier 3 accepts the complete INBOX-49 pipeline. `__muldc3` remains deferred at
-the 256-bit/AVX checkpoint.
+INBOX-49 Part 2 is Tier-2/native-proven. Exact range-attributed
+`llvm.ctpop.i64/i128` software lowering provisionally closes `__popcountdi2`
+and `__popcountti2`, moving the report to 443 / 267 / 176 with no collateral
+change. The relocation-free pinned-Zig proof passes 12/12 cases and contains
+no POPCNT. Evidence:
+`docs/evidence/std_debug_hello_inbox49_popcount.summary`. Commit this slice,
+then run the one cumulative Tier 3 that accepts Part 1 (`__divdc3`) and Part 2
+together. Stop for periodic review after acceptance; `__muldc3` remains
+deferred at the 256-bit/AVX checkpoint.
 
 The audit confirmed a P0 baseline-ISA violation in both accepted
 `frontier_popcount_u32` and `compiler_rt.limb64.__popcount_limb64` paths.
 The standalone software repair and row-exact re-proofs are accepted; its
 mandatory immediate Tier 3 passed all 17 subgates. Evidence:
-`docs/evidence/std_debug_hello_inbox49_popcount_baseline_p0.summary`. Keep the
-new range-attributed i64/i128 capability out of this repair commit; resume it
-after the P0 commit is clean. Full-gate evidence:
+`docs/evidence/std_debug_hello_inbox49_popcount_baseline_p0.summary`. The new
+range-attributed capability is kept out of that repair commit and is recorded
+separately above. Full-gate evidence:
 `docs/evidence/distribution_all_after_inbox49_popcount_p0.summary`.
 
 The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
