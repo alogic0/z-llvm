@@ -4141,6 +4141,18 @@ One line per completed cycle, append-only, newest last. This is the
   closures. Evidence
   `docs/evidence/std_debug_hello_inbox48_bit_permutation.summary`.
 
+- 2026-07-14 (this commit, INBOX-48 successor acceptance) Item 12
+  bit-permutation pipeline close: the single cumulative Tier 3 passes all 17
+  subgates against committed tree
+  `23bf5cbdba0d9296c15f9baf7121527022c68a86`. This accepts the exact
+  `__bswapti2`, `__bitreversedi2`, and `__bitreverseti2` closures, making
+  443 / 264 / 179 the accepted compiler_rt report state. Integrated objects
+  remain 146/146 in all three pipelines, strict real rows remain 100/100/100,
+  integrated executables remain 6/6, and release-source object/link/probe
+  boundaries remain 100/100 each. Total reported duration is 2,281,518 ms,
+  effectively unchanged from the INBOX-48 PHI gate. Evidence
+  `docs/evidence/distribution_all_after_inbox48_bit_permutation.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
