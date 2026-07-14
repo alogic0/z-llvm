@@ -4300,6 +4300,20 @@ One line per completed cycle, append-only, newest last. This is the
   cumulative Tier 3 for all six closures. Evidence
   `docs/evidence/std_debug_hello_inbox51_select_immediate.summary`.
 
+- 2026-07-14 (this commit, INBOX-51 cumulative acceptance) Item 12 pipeline
+  close: the single cumulative Tier 3 passes all 17 subgates against committed
+  implementation tree `02b0100c022ded30fe2c2b90e9d4159b2e12a49e`. This
+  accepts `__floatsidf`, `__fixdfdi`, `__fixsfdi`, `__fixhfdi`, `__adddf3`,
+  and `__subdf3`, making 443 / 278 / 165 the accepted compiler_rt report
+  state. Integrated objects remain 146/146 in all three pipelines, strict
+  real rows remain 100/100/100, integrated executables remain 6/6, and the
+  release-source inspection/link/probe boundaries remain 100/100 each.
+  Actual wall time is 1,657.823 seconds; the 2,363.022-second summed child
+  duration includes concurrent work and is not wall time. Stop for periodic
+  review #13 and the switch-PHI/EI-conversion architectural discussion.
+  INBOX-52 remains queued. Evidence
+  `docs/evidence/distribution_all_after_inbox51_select_pipeline.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

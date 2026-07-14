@@ -1,11 +1,11 @@
-# INBOX-51 I64 Immediate Scalar Select Provisional Acceptance
+# INBOX-51 I64 Immediate Scalar Select Acceptance
 
 schema_version: 1
 directive: `INBOX-51 select-value pipeline`
 target: `x86_64-linux`
-validation_tier: 2
+validation_tier: 3
 result: pass
-closure_status: provisional pending one cumulative Tier 3
+closure_status: accepted by the cumulative INBOX-51 Tier 3
 
 The accepted capability baseline is INBOX-50 at 443 selected / 272 emitting /
 171 failing. Standalone scalar-fneg P0 commit `1a9b0924` repairs the
@@ -56,7 +56,9 @@ symbols. A pinned-Zig `callconv(.c)` caller passes 75/75 frozen checks:
 
 The subtraction NaN cases are a required post-P0 revalidation and now preserve
 the captured fneg sign semantics exactly. Tier 2 passes 24/24 steps and
-1013/1013 tests.
+1013/1013 tests. The cumulative Tier 3 then passes all 17 subgates against
+committed implementation tree
+`02b0100c022ded30fe2c2b90e9d4159b2e12a49e`, accepting all six closures.
 
 ```text
 summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=278 failed_functions=165 first_failing_function=compiler_rt.trunc.truncl first_failing_diagnostic=UnsupportedLongDoubleAbi first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
@@ -64,7 +66,7 @@ report delta: directed_closures=6 collateral_emissions=0 new_failures=0
 native rows: symbols=6 relocations=0 precomputed_checks=75/75
 full unit: pass; tests=1005/1005
 tier2: pass; steps=24/24 tests=1013/1013
-tier3: not run; reserved for cumulative INBOX-51 pipeline acceptance
+tier3: pass; subgates=17/17 committed_tree=02b0100c022ded30fe2c2b90e9d4159b2e12a49e
 ```
 
 Commands:
@@ -92,8 +94,9 @@ Artifacts:
 - objdump `tmp/inbox51_select_post_p0_objdump.log`, sha256
   `2f516a458bec29cf81f7689334e0050c81b8933f38721bd20c0c9bdf0c6eb72e`;
 - executable `tmp/inbox51_select_post_p0_acceptance`, sha256
-  `d5b5d4c1f9c3c5c3fac057cc44b44faa303a3c3a9c3cdac0b06c17d470e7c7a4`.
+  `d5b5d4c1f9c3c5c3fac057cc44b44faa303a3c3a9c3cdac0b06c17d470e7c7a4`;
+- cumulative Tier-3 acceptance
+  `docs/evidence/distribution_all_after_inbox51_select_pipeline.summary`.
 
-Commit this provisional capability, then run the one cumulative Tier 3 that
-accepts all six INBOX-51 closures. Stop for periodic review #13 afterward;
-that review is also the switch-PHI/EI program design discussion.
+INBOX-51 is complete and accepted. Stop for periodic review #13; that review
+is also the switch-PHI/EI program design discussion.

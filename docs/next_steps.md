@@ -88,15 +88,19 @@ focused validation. Evidence:
 `docs/evidence/std_debug_hello_inbox51_scalar_fneg_p0.summary` and
 `docs/evidence/distribution_all_after_inbox51_fneg_p0.summary`.
 
-INBOX-51 is complete provisionally after the P0 revalidation. Exact
+INBOX-51 is complete and accepted after the P0 revalidation. Exact
 select-owned i64 literal materialization closes `__floatsidf`, `__fixdfdi`,
 `__fixsfdi`, `__fixhfdi`, `__adddf3`, and `__subdf3`, moving the report to
 443 / 278 / 165. The extracted six-row object passes 75/75 frozen checks and
 Tier 2 passes 24/24. The conditional named-bitcast-select successor is skipped
-because the refreshed bodies already clear that form. Commit the capability,
-run its one cumulative Tier 3, then stop for periodic review #13 and the
-switch-PHI/EI program design discussion. Evidence:
-`docs/evidence/std_debug_hello_inbox51_select_immediate.summary`.
+because the refreshed bodies already clear that form. The cumulative Tier 3
+passes all 17 subgates against committed tree
+`02b0100c022ded30fe2c2b90e9d4159b2e12a49e`; actual wall time is 1,657.823
+seconds versus 2,363.022 seconds of summed child duration. Stop for periodic
+review #13 and the switch-PHI/EI program design discussion. INBOX-52 remains
+queued and has not started. Evidence:
+`docs/evidence/std_debug_hello_inbox51_select_immediate.summary` and
+`docs/evidence/distribution_all_after_inbox51_select_pipeline.summary`.
 
 INBOX-48 is complete and accepted. Commit `1c5ff956` adds exact fully defined
 f64x2 PHI destinations through the existing XMM/pair-spill value map and
