@@ -6,6 +6,10 @@ const state_data = @import("composed_selector_state_data.zig");
 const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const Diagnostic = inspection.Diagnostic;
 
+pub fn isFpToSignedI32Cast(cast: ir.CastInst) bool {
+    return cast.op == .fptosi and (cast.from_ty == .float or cast.from_ty == .double) and cast.to_ty.eql(.{ .int = 32 });
+}
+
 pub fn lowerIntToFpCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const from_bits = intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-int-fp-from-type" };
@@ -55,6 +59,25 @@ pub fn lowerIntToFpCast(selector: *ComposedBlockSelector, result: ?[]const u8, c
     selector_state.clobberXmmReg(selector, .xmm0) catch return .{ .no_spill_envelope = "composed-int-fp-xmm0" };
     try appendSignedConversion(selector, to_bits, use_i64_source);
     selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = to_bits } }) catch return .{ .no_spill_envelope = "composed-int-fp-result" };
+    return null;
+}
+
+pub fn lowerFpToSignedIntCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (!isFpToSignedI32Cast(cast)) return .{ .no_emitter = "composed-fp-int-type" };
+    const from_bits: u16 = if (cast.from_ty == .float)
+        32
+    else if (cast.from_ty == .double)
+        64
+    else
+        return .{ .no_emitter = "composed-fp-int-from-type" };
+    while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
+        if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
+    }
+    const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-fp-int-source" };
+    selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = .xmm0, .bits = from_bits } }) catch return .{ .unsupported_value = "composed-fp-int-source" };
+    try selector.machine.instructions.append(selector.allocator, if (from_bits == 32) .cvttss2si_xmm0_eax else .cvttsd2si_xmm0_eax);
+    try selector_state.bindEax(selector, result_name);
     return null;
 }
 

@@ -3794,6 +3794,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_i7_binary_phi_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox38_i7_phi.summary`.
 
+- 2026-07-13 (this commit, INBOX-38 pre-authorized successor) Item 12 scalar
+  conversion capability: exact `fptosi float|double -> i32` now preserves live
+  EAX values and reuses the existing SSE conversion operations through the
+  XMM value-location authority. Eight permanent defined-domain cases cover
+  zeros, subnormals, signed fractional truncation, and both i32 boundaries;
+  three nearby forms remain fail-closed. `exp` and `expf` both advance to the
+  excluded function-local constant-table GEP boundary, with no closures or
+  collateral report changes, so report-all remains 443 / 236 / 207. Tier 2 is
+  green and Tier 3 is not triggered. The INBOX-38 pipeline is exhausted; stop
+  for the next scalar-tranche directive. Evidence
+  `docs/evidence/std_debug_hello_fptosi_i32_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

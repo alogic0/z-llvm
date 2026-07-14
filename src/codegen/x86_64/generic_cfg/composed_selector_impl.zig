@@ -315,6 +315,8 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         .alloca => |alloca| selector_memory.lowerAlloca(selector, instruction.result, alloca) catch |err| return instructionValueError(selector, err, "stage2-alloca-value"),
         .cast => |cast| if (cast.op == .sitofp or cast.op == .uitofp)
             selector_conversion.lowerIntToFpCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-int-fp-cast-value")
+        else if (selector_conversion.isFpToSignedI32Cast(cast))
+            selector_conversion.lowerFpToSignedIntCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-fp-int-cast-value")
         else if (cast.op == .fpext or cast.op == .fptrunc or (cast.op == .bitcast and selector_fp.isFpIntBitcast(cast)))
             selector_fp.lowerFpCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-fp-cast-value")
         else

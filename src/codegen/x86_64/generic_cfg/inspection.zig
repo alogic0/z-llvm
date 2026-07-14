@@ -161,7 +161,8 @@ fn inspectCast(cast: ir.CastInst) ?Diagnostic {
             .int => |bits| if (bits >= 8 and bits <= 64 and (cast.to_ty == .float or cast.to_ty == .double)) null else .{ .unsupported_instruction = @tagName(cast.op) },
             else => .{ .unsupported_instruction = @tagName(cast.op) },
         },
-        .fptosi, .fptoui => .{ .unsupported_instruction = @tagName(cast.op) },
+        .fptosi => if ((cast.from_ty == .float or cast.from_ty == .double) and cast.to_ty.eql(.{ .int = 32 })) null else .{ .unsupported_instruction = @tagName(cast.op) },
+        .fptoui => .{ .unsupported_instruction = @tagName(cast.op) },
     };
 }
 

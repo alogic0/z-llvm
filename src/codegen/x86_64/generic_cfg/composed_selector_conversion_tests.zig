@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
+const x86_64_verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const inspection = @import("inspection.zig");
 const selector_impl = @import("composed_selector_impl.zig");
@@ -141,6 +142,91 @@ test "generic cfg selector keeps unsupported integer to FP shapes fail closed" {
         const result = inspection.inspectFunction(module.functions.items[0]);
         try std.testing.expect(result == .unsupported);
         try std.testing.expectEqual(case.tag, std.meta.activeTag(result.unsupported));
+        try std.testing.expectEqualStrings(case.detail, result.unsupported.detail());
+    }
+}
+
+test "generic cfg selector executes scalar FP to signed i32 conversions exactly" {
+    const input =
+        \\define i32 @convert(float %f, double %d) {
+        \\entry:
+        \\  %fi = fptosi float %f to i32
+        \\  %di = fptosi double %d to i32
+        \\  %sum = add i32 %fi, %di
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("convert", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    switch (try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("FP-to-i32 diagnostic={s}\n", .{diagnostic.detail()});
+            return error.TestUnexpectedResult;
+        },
+    }
+    try x86_64_verify.verifyFunction(machine);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const convert: *const fn (f32, f64) callconv(.c) i32 = @ptrCast(mapping.ptr);
+
+    const Case = struct { f: f32, d: f64, expected: i32 };
+    const cases = [_]Case{
+        .{ .f = 0.0, .d = -0.0, .expected = 0 },
+        .{ .f = 0.999, .d = -0.999, .expected = 0 },
+        .{ .f = 1.999, .d = -1.999, .expected = 0 },
+        .{ .f = 2147483520.0, .d = 0.0, .expected = 2147483520 },
+        .{ .f = 0.0, .d = 2147483647.0, .expected = 2147483647 },
+        .{ .f = -2147483648.0, .d = 0.0, .expected = -2147483648 },
+        .{ .f = 0.0, .d = -2147483648.0, .expected = -2147483648 },
+        .{ .f = @bitCast(@as(u32, 1)), .d = @bitCast(@as(u64, 0x8000_0000_0000_0001)), .expected = 0 },
+    };
+    for (cases) |case| {
+        try std.testing.expectEqual(case.expected, convert(case.f, case.d));
+    }
+}
+
+test "generic cfg selector keeps unadmitted FP to integer conversions fail closed" {
+    const Case = struct { ir_text: []const u8, detail: []const u8 };
+    const cases = [_]Case{
+        .{ .ir_text =
+        \\define i32 @bad(float %x) {
+        \\entry:
+        \\  %r = fptoui float %x to i32
+        \\  ret i32 %r
+        \\}
+        , .detail = "fptoui" },
+        .{ .ir_text =
+        \\define i64 @bad(double %x) {
+        \\entry:
+        \\  %r = fptosi double %x to i64
+        \\  ret i64 %r
+        \\}
+        , .detail = "fptosi" },
+        .{ .ir_text =
+        \\define i32 @bad(half %x) {
+        \\entry:
+        \\  %r = fptosi half %x to i32
+        \\  ret i32 %r
+        \\}
+        , .detail = "fptosi" },
+    };
+
+    for (cases) |case| {
+        var module = try ir.Module.parse(std.testing.allocator, case.ir_text);
+        defer module.deinit();
+        try module.verify();
+        const result = inspection.inspectFunction(module.functions.items[0]);
+        try std.testing.expect(result == .unsupported);
+        try std.testing.expectEqual(inspection.Diagnostic.unsupported_instruction, std.meta.activeTag(result.unsupported));
         try std.testing.expectEqualStrings(case.detail, result.unsupported.detail());
     }
 }
