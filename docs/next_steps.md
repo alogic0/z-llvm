@@ -37,22 +37,24 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-43 is complete. Exact scalar `llvm.maxnum.f32/f64` and the bounded
-four-lane float successor are accepted. The latter adds deliberate four-lane
-definedness, only the captured construction and shuffle masks, lane-2
-extraction, packed arithmetic/fabs/fcmp, canonical `<4 x i1>` masks, exact
-mask-to-i4 lowering, and the scalar `llvm.copysign.f32` prerequisite.
-`compiler_rt.mulsc3.__mulsc3` is the sole closure, advancing report-all to 443
-selected / 248 emitting / 195 failing with no collateral emissions or new
-failures. Permanent bit-exact execution, pinned-Zig native row execution, Tier
-2, and the single required Tier 3 are green.
+INBOX-44's read-only frontier ranking is complete at the accepted 443 selected
+/ 248 emitting / 195 failing baseline. The ten `icmp-form` rows split into
+normalized i6/i7 unsigned-immediate comparisons, a named-i16 predicate matrix,
+and the predicted `cttz.i64` successor; they are not one form. The seven
+switch-PHI rows split into six EI entry-switch/FP-return joins and the much
+broader fma switch population, both with zero immediate closure claims.
+`__divsc3` has an exact f32x2 canonical-mask select/copysign closing contract;
+`__divdc3` remains a separately reviewed vector-PHI planner capability with
+zero closure by itself. `__muldc3` remains deferred.
 
-The pipeline is exhausted and no successor is authorized. Stop for the
-periodic review and choose the next capability from the refreshed frontier;
-f64x4 and all broader vector forms remain outside this slice. Evidence:
-`docs/evidence/std_debug_hello_scalar_maxnum_acceptance.summary`,
-`docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.summary`, and
-`docs/evidence/distribution_all_after_inbox43_f32x4.summary`.
+The immediate next bounded contract is the user-authorized Phase 0-1
+infrastructure interlude: same-state fresh/cached timing and input evidence,
+canonical normalized-output equivalence, and diagnosis of the 14/17 uncached
+subgates. Do not begin Phase 2, concurrency, broader cache work, or a selector
+capability during that interlude. Afterward, the recommended first two
+capability pipelines are the scalar conversion frontier and scalar leaf
+frontier, each with provisional Tier-2/native closures and one cumulative Tier
+3. Evidence: `docs/evidence/inbox44_frontier_ranking.md`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

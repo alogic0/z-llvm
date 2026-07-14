@@ -3946,6 +3946,20 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox43_f32x4.summary`.
 
+- 2026-07-14 (this commit, INBOX-44) Item 12 read-only frontier ranking: the
+  ten `icmp-form` rows separate into narrow i6/i7 unsigned-immediate,
+  named-i16 predicate, and later `cttz.i64` capabilities; the seven switch-PHI
+  rows separate into six EI entry-switch joins and the broader fma population.
+  The complete `__divsc3` remainder supports an exact f32x2 canonical-mask
+  select/copysign closing contract, while `__divdc3` retains a separate
+  zero-closure vector-PHI planner boundary. I128 pair compare and byte swap are
+  ranked as operation-specific leaves; `__muldc3` remains at the deferred
+  256-bit checkpoint. No implementation or gate ran. The immediate next
+  bounded work is the authorized Phase 0-1 distribution-all infrastructure
+  interlude; two scalar capability pipelines follow under provisional
+  Tier-2/native closure batching with one cumulative Tier 3 each. Evidence
+  `docs/evidence/inbox44_frontier_ranking.md`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
