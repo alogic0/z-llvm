@@ -64,16 +64,25 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
 
 pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select: ir.SelectInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-select-result" };
-    const ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
+    const f32x2: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
+    const f64x2: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
+    const lane_type: VectorShape.LaneType = if (select.ty.eql(f32x2))
+        .float
+    else if (select.ty.eql(f64x2))
+        .double
+    else
+        return .{ .no_emitter = "composed-vector-select-form" };
     const mask_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 1 } } };
-    if (!select.ty.eql(ty) or !select.cond_ty.eql(mask_ty)) return .{ .no_emitter = "composed-vector-select-form" };
+    if (!select.cond_ty.eql(mask_ty)) return .{ .no_emitter = "composed-vector-select-form" };
+    const expected_shape = if (lane_type == .float) VectorShape.f32x2(0b11) else VectorShape.f64x2(0b11);
+    const expected_mask = if (lane_type == .float) VectorShape.mask32x2(0b11) else VectorShape.mask64x2(0b11);
 
     const condition = describeVectorValue(selector, select.cond, mask_ty) orelse return .{ .unsupported_value = "composed-vector-select-cond" };
-    const true_value = describeVectorValue(selector, select.true_value, ty) orelse return .{ .unsupported_value = "composed-vector-select-true" };
-    const false_value = describeVectorValue(selector, select.false_value, ty) orelse return .{ .unsupported_value = "composed-vector-select-false" };
-    if (!condition.shape.eql(VectorShape.mask32x2(0b11))) return .{ .unsupported_value = "composed-vector-select-cond" };
-    if (!true_value.shape.eql(VectorShape.f32x2(0b11))) return .{ .unsupported_value = "composed-vector-select-true" };
-    if (!false_value.shape.eql(VectorShape.f32x2(0b11))) return .{ .unsupported_value = "composed-vector-select-false" };
+    const true_value = describeVectorValue(selector, select.true_value, select.ty) orelse return .{ .unsupported_value = "composed-vector-select-true" };
+    const false_value = describeVectorValue(selector, select.false_value, select.ty) orelse return .{ .unsupported_value = "composed-vector-select-false" };
+    if (!condition.shape.eql(expected_mask)) return .{ .unsupported_value = "composed-vector-select-cond" };
+    if (!true_value.shape.eql(expected_shape)) return .{ .unsupported_value = "composed-vector-select-true" };
+    if (!false_value.shape.eql(expected_shape)) return .{ .unsupported_value = "composed-vector-select-false" };
 
     const false_initial = vectorValueReg(selector, select.false_value);
     const condition_initial = vectorValueReg(selector, select.cond);
@@ -100,12 +109,16 @@ pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select
         .{ .andps_xmm = .{ .dst = dst, .src = condition_reg } },
         .{ .pxor_xmm = .{ .dst = dst, .src = false_reg } },
     });
-    try bindVectorResult(selector, result_name, dst, VectorShape.f32x2(0b11));
+    try bindVectorResult(selector, result_name, dst, expected_shape);
     return null;
 }
 
 pub fn lowerCopySignV2F32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     return lowerCopySign(selector, result, call, .float);
+}
+
+pub fn lowerCopySignV2F64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    return lowerCopySign(selector, result, call, .double);
 }
 
 fn lowerCopySign(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, lane_type: VectorShape.LaneType) !?Diagnostic {
@@ -157,27 +170,31 @@ fn lowerCopySign(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
 }
 
 pub fn lowerFabsV2F32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
-    return lowerFabsF32(selector, result, call, 2);
+    return lowerFabs(selector, result, call, .float, 2);
 }
 
 pub fn lowerFabsV4F32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
-    return lowerFabsF32(selector, result, call, 4);
+    return lowerFabs(selector, result, call, .float, 4);
 }
 
-fn lowerFabsF32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, comptime lane_count: u32) !?Diagnostic {
+pub fn lowerFabsV2F64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    return lowerFabs(selector, result, call, .double, 2);
+}
+
+fn lowerFabs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, comptime lane_type: VectorShape.LaneType, comptime lane_count: u32) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-fabs-result" };
-    const ty: ir.Type = .{ .vector = .{ .len = lane_count, .elem_ty = .float } };
+    const ty: ir.Type = .{ .vector = .{ .len = lane_count, .elem_ty = if (lane_type == .float) .float else .double } };
     if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty) or call.inline_asm != null or call.callee_value != null) {
         return .{ .no_emitter = "composed-vector-fabs-form" };
     }
     const value = call.args.items[0].value;
     const operand = describeVectorValue(selector, value, ty) orelse return .{ .unsupported_value = "composed-vector-fabs-source" };
-    if (operand.shape.kind != .data or operand.shape.lane_type != .float) return .{ .unsupported_value = "composed-vector-fabs-source" };
+    if (operand.shape.kind != .data or operand.shape.lane_type != lane_type) return .{ .unsupported_value = "composed-vector-fabs-source" };
     const source_reg = vectorValueReg(selector, value);
     const dst = resultXmmReg(selector, result_name, value, null) orelse return .{ .no_spill_envelope = "composed-vector-fabs-dst" };
     if (try materializeVectorValue(selector, value, operand, dst, source_reg)) |diagnostic| return diagnostic;
     const mask = scratchXmmReg(selector, dst, null);
-    try materializeI32Splat(selector, 0x7fff_ffff, mask);
+    try materializeLaneSplat(selector, if (lane_type == .float) 0x7fff_ffff else 0x7fff_ffff_ffff_ffff, mask, operand.shape.lane_bits);
     try selector_state.clobberXmmReg(selector, dst);
     try selector.machine.instructions.append(selector.allocator, .{ .andps_xmm = .{ .dst = dst, .src = mask } });
     try bindVectorResult(selector, result_name, dst, operand.shape);
@@ -354,8 +371,17 @@ pub fn lowerShuffleVector(selector: *ComposedBlockSelector, result: ?[]const u8,
             try appendHighToLow(selector, source.shape.lane_type, dst);
             result_shape.defined_lanes = if ((source.shape.defined_lanes & 0b10) != 0) 0b01 else 0;
         },
+        .f64_swap_lanes => {
+            try selector.machine.instructions.append(selector.allocator, .{ .shufpd_xmm = .{ .dst = dst, .src = dst, .imm = 1 } });
+            result_shape.defined_lanes = ((source.shape.defined_lanes & 0b10) >> 1) |
+                ((source.shape.defined_lanes & 0b01) << 1);
+        },
+        .f64_splat_lane1 => {
+            try selector.machine.instructions.append(selector.allocator, .{ .shufpd_xmm = .{ .dst = dst, .src = dst, .imm = 3 } });
+            result_shape.defined_lanes = if ((source.shape.defined_lanes & 0b10) != 0) 0b11 else 0;
+        },
         .f64_lane0_lane3 => {
-            try selector.machine.instructions.append(selector.allocator, .{ .shufpd_lane0_lane3_xmm = .{ .dst = dst, .src = src.? } });
+            try selector.machine.instructions.append(selector.allocator, .{ .shufpd_xmm = .{ .dst = dst, .src = src.?, .imm = 2 } });
             result_shape.defined_lanes = (source.shape.defined_lanes & 0b01) |
                 (rhs.?.shape.defined_lanes & 0b10);
         },

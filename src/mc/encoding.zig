@@ -1338,9 +1338,9 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .movss_xmm => |mov| try encodeScalarXmmOp(&bytes, allocator, 0xf3, 0x10, mov.dst, mov.src),
             .unpcklpd_xmm => |mov| try encodeScalarXmmOp(&bytes, allocator, 0x66, 0x14, mov.dst, mov.src),
             .unpckhpd_xmm => |mov| try encodeScalarXmmOp(&bytes, allocator, 0x66, 0x15, mov.dst, mov.src),
-            .shufpd_lane0_lane3_xmm => |shuffle| {
+            .shufpd_xmm => |shuffle| {
                 try encodeScalarXmmOp(&bytes, allocator, 0x66, 0xc6, shuffle.dst, shuffle.src);
-                try bytes.append(allocator, 0x02);
+                try bytes.append(allocator, shuffle.imm);
             },
             .unpcklps_xmm => |mov| try bytes.appendSlice(allocator, &.{ 0x0f, 0x14, 0xc0 | (@as(u8, mov.dst.lowCode()) << 3) | @as(u8, mov.src.lowCode()) }),
             .shufps_high_f32_to_low => |reg| try bytes.appendSlice(allocator, &.{ 0x0f, 0xc6, 0xc0 | (@as(u8, reg.lowCode()) << 3) | @as(u8, reg.lowCode()), 0x55 }),
@@ -1966,7 +1966,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .subss_xmm1_xmm0 => 4,
         .divsd_xmm1_xmm0, .xorps_xmm1_xmm0 => 4,
         .movapd_xmm1_xmm0, .movapd_xmm, .addpd_xmm, .subpd_xmm, .mulpd_xmm, .movsd_xmm, .movss_xmm, .unpcklpd_xmm, .unpckhpd_xmm => 4,
-        .shufpd_lane0_lane3_xmm => 5,
+        .shufpd_xmm => 5,
         .addps_xmm, .subps_xmm, .mulps_xmm, .andps_xmm => 3,
         .pxor_xmm, .pcmpgtd_xmm, .movmskpd_xmm_eax => 4,
         .cmpeqps_xmm => 4,

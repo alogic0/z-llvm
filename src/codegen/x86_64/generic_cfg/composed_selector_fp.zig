@@ -195,9 +195,18 @@ pub fn lowerMaxNum(selector: *ComposedBlockSelector, result: ?[]const u8, call: 
 }
 
 pub fn lowerCopySignF32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    return lowerCopySign(selector, result, call, 32);
+}
+
+pub fn lowerCopySignF64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    return lowerCopySign(selector, result, call, 64);
+}
+
+fn lowerCopySign(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, comptime bits: u16) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-copysign-result" };
-    if (call.ret_ty != .float or call.args.items.len != 2 or
-        call.args.items[0].ty != .float or call.args.items[1].ty != .float or
+    const ty: ir.Type = if (bits == 32) .float else .double;
+    if (!call.ret_ty.eql(ty) or call.args.items.len != 2 or
+        !call.args.items[0].ty.eql(ty) or !call.args.items[1].ty.eql(ty) or
         call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
         call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null)
     {
@@ -209,35 +218,36 @@ pub fn lowerCopySignF32(selector: *ComposedBlockSelector, result: ?[]const u8, c
         }
     }
 
-    const lhs = fpValueReg(selector, call.args.items[0].value, 32) orelse blk: {
-        const rhs_reg = fpValueReg(selector, call.args.items[1].value, 32);
+    const lhs = fpValueReg(selector, call.args.items[0].value, bits) orelse blk: {
+        const rhs_reg = fpValueReg(selector, call.args.items[1].value, bits);
         break :blk firstXmmExcept(rhs_reg);
     };
-    if (try materializeFpValue(selector, call.args.items[0].value, lhs, 32)) |diagnostic| return diagnostic;
-    const rhs = fpValueReg(selector, call.args.items[1].value, 32) orelse blk: {
+    if (try materializeFpValue(selector, call.args.items[0].value, lhs, bits)) |diagnostic| return diagnostic;
+    const rhs = fpValueReg(selector, call.args.items[1].value, bits) orelse blk: {
         const scratch = firstXmmExcept(lhs);
-        if (try materializeFpValue(selector, call.args.items[1].value, scratch, 32)) |diagnostic| return diagnostic;
+        if (try materializeFpValue(selector, call.args.items[1].value, scratch, bits)) |diagnostic| return diagnostic;
         break :blk scratch;
     };
     const dst = firstXmmExceptTwo(lhs, rhs);
     const magnitude = firstXmmExceptThree(lhs, rhs, dst);
+    const mask = firstXmmExceptFour(lhs, rhs, dst, magnitude);
 
-    if (try materializeFpValue(selector, call.args.items[1].value, dst, 32)) |diagnostic| return diagnostic;
+    if (try materializeFpValue(selector, call.args.items[1].value, dst, bits)) |diagnostic| return diagnostic;
+    if (try materializeFpValue(selector, call.args.items[0].value, magnitude, bits)) |diagnostic| return diagnostic;
     try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.appendSlice(selector.allocator, &.{
-        .{ .movd_xmm_eax = dst },
-        .{ .and_eax_imm32 = @bitCast(@as(u32, 0x8000_0000)) },
-        .{ .movd_eax_xmm = dst },
-    });
-    if (try materializeFpValue(selector, call.args.items[0].value, magnitude, 32)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.appendSlice(selector.allocator, &.{
-        .{ .movd_xmm_eax = magnitude },
-        .{ .and_eax_imm32 = 0x7fff_ffff },
-        .{ .movd_eax_xmm = magnitude },
-    });
+    try selector_state.clobberXmmReg(selector, mask);
+    try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+        .{ .mov_imm32_xmm = .{ .reg = mask, .bits = 0x8000_0000 } }
+    else
+        .{ .mov_imm64_xmm = .{ .reg = mask, .bits = 0x8000_0000_0000_0000 } });
     try selector_state.clobberXmmReg(selector, dst);
-    try selector.machine.instructions.append(selector.allocator, .{ .pxor_xmm = .{ .dst = dst, .src = magnitude } });
-    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = 32 } });
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .pxor_xmm = .{ .dst = dst, .src = magnitude } },
+        .{ .andps_xmm = .{ .dst = dst, .src = mask } },
+    });
+    try selector_state.clobberXmmReg(selector, magnitude);
+    try selector.machine.instructions.append(selector.allocator, .{ .pxor_xmm = .{ .dst = magnitude, .src = dst } });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = magnitude, .bits = bits } });
     return null;
 }
 
@@ -251,6 +261,13 @@ fn firstXmmExceptTwo(first: XmmReg, second: XmmReg) XmmReg {
 fn firstXmmExceptThree(first: XmmReg, second: XmmReg, third: XmmReg) XmmReg {
     for (scalar_xmm_regs) |reg| {
         if (reg != first and reg != second and reg != third) return reg;
+    }
+    unreachable;
+}
+
+fn firstXmmExceptFour(first: XmmReg, second: XmmReg, third: XmmReg, fourth: XmmReg) XmmReg {
+    for (scalar_xmm_regs) |reg| {
+        if (reg != first and reg != second and reg != third and reg != fourth) return reg;
     }
     unreachable;
 }

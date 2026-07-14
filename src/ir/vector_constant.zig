@@ -88,6 +88,8 @@ pub fn isSplatMask(
 pub const Packed2ShuffleMask = enum {
     splat_lane0,
     lane1_to_lane0,
+    f64_swap_lanes,
+    f64_splat_lane1,
     f64_lane0_lane3,
 };
 
@@ -106,8 +108,11 @@ pub fn classifyPacked2ShuffleMask(shuffle: core.ShuffleVectorInst) ?Packed2Shuff
     const parsed = parseFixed(2, shuffle.mask, mask_ty) orelse return null;
     if (maskLaneEquals(parsed.lanes[0], 0) and maskLaneEquals(parsed.lanes[1], 0)) return .splat_lane0;
     if (maskLaneEquals(parsed.lanes[0], 1) and parsed.lanes[1] == .poison) return .lane1_to_lane0;
-    if (shuffle.lhs_ty.vector.elem_ty == .double and
-        maskLaneEquals(parsed.lanes[0], 0) and maskLaneEquals(parsed.lanes[1], 3)) return .f64_lane0_lane3;
+    if (shuffle.lhs_ty.vector.elem_ty == .double) {
+        if (maskLaneEquals(parsed.lanes[0], 1) and maskLaneEquals(parsed.lanes[1], 0)) return .f64_swap_lanes;
+        if (maskLaneEquals(parsed.lanes[0], 1) and maskLaneEquals(parsed.lanes[1], 1)) return .f64_splat_lane1;
+        if (maskLaneEquals(parsed.lanes[0], 0) and maskLaneEquals(parsed.lanes[1], 3)) return .f64_lane0_lane3;
+    }
     return null;
 }
 
@@ -216,6 +221,13 @@ test "fixed vector constants and typed splat masks are structured once" {
     lane_shift.lhs_ty.vector.elem_ty = .double;
     lane_shift.rhs_ty.vector.elem_ty = .double;
     try std.testing.expectEqual(Packed2ShuffleMask.f64_lane0_lane3, classifyPacked2ShuffleMask(lane_shift).?);
+    lane_shift.mask = .{ .vector = "<i32 1, i32 0>" };
+    try std.testing.expectEqual(Packed2ShuffleMask.f64_swap_lanes, classifyPacked2ShuffleMask(lane_shift).?);
+    lane_shift.mask = .{ .vector = "<i32 1, i32 1>" };
+    try std.testing.expectEqual(Packed2ShuffleMask.f64_splat_lane1, classifyPacked2ShuffleMask(lane_shift).?);
+    lane_shift.lhs_ty.vector.elem_ty = .float;
+    lane_shift.rhs_ty.vector.elem_ty = .float;
+    try std.testing.expect(classifyPacked2ShuffleMask(lane_shift) == null);
 }
 
 test "f32x4 shuffle masks are admitted exactly" {

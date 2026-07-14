@@ -260,7 +260,8 @@ fn inspectIcmp(icmp: ir.IcmpInst) ?Diagnostic {
 
 fn inspectSelect(select: ir.SelectInst) ?Diagnostic {
     const f32x2: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
-    if (select.ty.eql(f32x2)) {
+    const f64x2: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
+    if (select.ty.eql(f32x2) or select.ty.eql(f64x2)) {
         const mask2: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 1 } } };
         return if (select.cond_ty.eql(mask2) and
             isVectorOperand(select.true_value, select.ty) and
@@ -325,10 +326,19 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
         return if (call.ret_ty == .float and call.args.items.len == 2 and
             call.args.items[0].ty == .float and call.args.items[1].ty == .float) null else .{ .unsupported_type = "llvm.copysign.f32" };
     }
+    if (std.mem.eql(u8, call.callee, "llvm.copysign.f64")) {
+        return if (call.ret_ty == .double and call.args.items.len == 2 and
+            call.args.items[0].ty == .double and call.args.items[1].ty == .double) null else .{ .unsupported_type = "llvm.copysign.f64" };
+    }
     if (std.mem.eql(u8, call.callee, "llvm.copysign.v2f32")) {
         const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
         return if (call.ret_ty.eql(vector_ty) and call.args.items.len == 2 and
             call.args.items[0].ty.eql(vector_ty) and call.args.items[1].ty.eql(vector_ty)) null else .{ .unsupported_type = "llvm.copysign.v2f32" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.copysign.v2f64")) {
+        const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
+        return if (call.ret_ty.eql(vector_ty) and call.args.items.len == 2 and
+            call.args.items[0].ty.eql(vector_ty) and call.args.items[1].ty.eql(vector_ty)) null else .{ .unsupported_type = "llvm.copysign.v2f64" };
     }
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) {
         const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
@@ -337,6 +347,10 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v4f32")) {
         const vector_ty: ir.Type = .{ .vector = .{ .len = 4, .elem_ty = .float } };
         return if (call.ret_ty.eql(vector_ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(vector_ty)) null else .{ .unsupported_type = "llvm.fabs.v4f32" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f64")) {
+        const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
+        return if (call.ret_ty.eql(vector_ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(vector_ty)) null else .{ .unsupported_type = "llvm.fabs.v2f64" };
     }
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) {
         return if (call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 2 and

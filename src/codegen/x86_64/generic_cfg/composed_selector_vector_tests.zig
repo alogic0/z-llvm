@@ -18,7 +18,9 @@ test "generic cfg selector encodes bounded packed double operations" {
     try machine.instructions.append(std.testing.allocator, .{ .movsd_xmm = .{ .dst = .xmm6, .src = .xmm7 } });
     try machine.instructions.append(std.testing.allocator, .{ .unpcklpd_xmm = .{ .dst = .xmm1, .src = .xmm2 } });
     try machine.instructions.append(std.testing.allocator, .{ .unpckhpd_xmm = .{ .dst = .xmm3, .src = .xmm4 } });
-    try machine.instructions.append(std.testing.allocator, .{ .shufpd_lane0_lane3_xmm = .{ .dst = .xmm2, .src = .xmm5 } });
+    try machine.instructions.append(std.testing.allocator, .{ .shufpd_xmm = .{ .dst = .xmm2, .src = .xmm5, .imm = 2 } });
+    try machine.instructions.append(std.testing.allocator, .{ .shufpd_xmm = .{ .dst = .xmm6, .src = .xmm6, .imm = 1 } });
+    try machine.instructions.append(std.testing.allocator, .{ .shufpd_xmm = .{ .dst = .xmm7, .src = .xmm7, .imm = 3 } });
     try machine.instructions.append(std.testing.allocator, .{ .addps_xmm = .{ .dst = .xmm2, .src = .xmm3 } });
     try machine.instructions.append(std.testing.allocator, .{ .subps_xmm = .{ .dst = .xmm6, .src = .xmm7 } });
     try machine.instructions.append(std.testing.allocator, .{ .mulps_xmm = .{ .dst = .xmm4, .src = .xmm5 } });
@@ -37,13 +39,15 @@ test "generic cfg selector encodes bounded packed double operations" {
         0x66, 0x0f, 0x14, 0xca,
         0x66, 0x0f, 0x15, 0xdc,
         0x66, 0x0f, 0xc6, 0xd5,
-        0x02, 0x0f, 0x58, 0xd3,
-        0x0f, 0x5c, 0xf7, 0x0f,
-        0x59, 0xe5, 0xf3, 0x0f,
-        0x10, 0xf7, 0x0f, 0x14,
-        0xca, 0x0f, 0xc6, 0xdb,
-        0x55, 0x0f, 0xc6, 0xea,
-        0x14, 0xc3,
+        0x02, 0x66, 0x0f, 0xc6,
+        0xf6, 0x01, 0x66, 0x0f,
+        0xc6, 0xff, 0x03, 0x0f,
+        0x58, 0xd3, 0x0f, 0x5c,
+        0xf7, 0x0f, 0x59, 0xe5,
+        0xf3, 0x0f, 0x10, 0xf7,
+        0x0f, 0x14, 0xca, 0x0f,
+        0xc6, 0xdb, 0x55, 0x0f,
+        0xc6, 0xea, 0x14, 0xc3,
     }, bytes);
 
     var spill_machine = x86_64_machine.MachineFunction.init("packed-spill", .void);
@@ -326,7 +330,44 @@ test "generic cfg selector lowers exact f64x2 lane zero-three shuffle" {
     try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "cross", shuffle)) == null);
     const cross = selector_state.valueLoc(&selector, "cross").?.xmm;
     try std.testing.expectEqual(@as(u4, 0b11), cross.vectorShape().?.defined_lanes);
-    try std.testing.expectEqual(x86_64_machine.Instruction{ .shufpd_lane0_lane3_xmm = .{ .dst = cross.reg, .src = .xmm3 } }, machine.instructions.items[machine.instructions.items.len - 1]);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .shufpd_xmm = .{ .dst = cross.reg, .src = .xmm3, .imm = 2 } }, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "generic cfg selector propagates exact f64x2 self-shuffle lanes" {
+    const Case = struct {
+        mask: []const u8,
+        expected_lanes: u4,
+        immediate: u8,
+    };
+    inline for ([_]Case{
+        .{ .mask = "<i32 1, i32 0>", .expected_lanes = 0b01, .immediate = 1 },
+        .{ .mask = "<i32 1, i32 1>", .expected_lanes = 0b11, .immediate = 3 },
+    }) |case| {
+        var machine = x86_64_machine.MachineFunction.init("vector-self-shuffle", .void);
+        defer machine.deinit(std.testing.allocator);
+        var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "source", .{ .xmm = .{
+            .reg = .xmm2,
+            .bits = 128,
+            .shape = .{ .vector = selector_types.VectorShape.f64x2(0b10) },
+        } });
+        const shuffle: ir.ShuffleVectorInst = .{
+            .lhs_ty = .{ .vector = .{ .len = 2, .elem_ty = .double } },
+            .lhs = .{ .named = "source" },
+            .rhs_ty = .{ .vector = .{ .len = 2, .elem_ty = .double } },
+            .rhs = .poison,
+            .mask_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 32 } } },
+            .mask = .{ .vector = case.mask },
+        };
+        try std.testing.expect((try selector_vector.lowerShuffleVector(&selector, "result", shuffle)) == null);
+        const result = selector_state.valueLoc(&selector, "result").?.xmm;
+        try std.testing.expectEqual(case.expected_lanes, result.vectorShape().?.defined_lanes);
+        try std.testing.expectEqual(
+            x86_64_machine.Instruction{ .shufpd_xmm = .{ .dst = result.reg, .src = result.reg, .imm = case.immediate } },
+            machine.instructions.items[machine.instructions.items.len - 1],
+        );
+    }
 }
 
 test "generic cfg selector executes exact f64x2 lane zero-three shuffle bit exactly" {
@@ -1003,6 +1044,147 @@ test "generic cfg selector executes canonical f32x2 select and copysign bit exac
     }
 }
 
+test "generic cfg selector executes f64x2 parity operations bit exactly" {
+    const input =
+        \\declare <2 x double> @llvm.fabs.v2f64(<2 x double>)
+        \\declare <2 x double> @llvm.copysign.v2f64(<2 x double>, <2 x double>)
+        \\declare double @llvm.copysign.f64(double, double)
+        \\define i64 @swap_low(double %ca0, double %ca1, double %cb0, double %cb1, double %m0, double %m1, double %s0, double %s1) {
+        \\entry:
+        \\  %ca.seed = insertelement <2 x double> poison, double %ca0, i64 0
+        \\  %ca = insertelement <2 x double> %ca.seed, double %ca1, i64 1
+        \\  %cb.seed = insertelement <2 x double> poison, double %cb0, i64 0
+        \\  %cb = insertelement <2 x double> %cb.seed, double %cb1, i64 1
+        \\  %mask = fcmp oeq <2 x double> %ca, %cb
+        \\  %m.seed = insertelement <2 x double> poison, double %m0, i64 0
+        \\  %m = insertelement <2 x double> %m.seed, double %m1, i64 1
+        \\  %selected = select <2 x i1> %mask, <2 x double> %m, <2 x double> splat (double 1.000000e+00)
+        \\  %absolute = call <2 x double> @llvm.fabs.v2f64(<2 x double> %selected)
+        \\  %s.seed = insertelement <2 x double> poison, double %s0, i64 0
+        \\  %s = insertelement <2 x double> %s.seed, double %s1, i64 1
+        \\  %signed = tail call <2 x double> @llvm.copysign.v2f64(<2 x double> %absolute, <2 x double> %s)
+        \\  %swap = shufflevector <2 x double> %signed, <2 x double> poison, <2 x i32> <i32 1, i32 0>
+        \\  %lane = extractelement <2 x double> %swap, i64 0
+        \\  %bits = bitcast double %lane to i64
+        \\  ret i64 %bits
+        \\}
+        \\define i64 @swap_high(double %ca0, double %ca1, double %cb0, double %cb1, double %m0, double %m1, double %s0, double %s1) {
+        \\entry:
+        \\  %ca.seed = insertelement <2 x double> poison, double %ca0, i64 0
+        \\  %ca = insertelement <2 x double> %ca.seed, double %ca1, i64 1
+        \\  %cb.seed = insertelement <2 x double> poison, double %cb0, i64 0
+        \\  %cb = insertelement <2 x double> %cb.seed, double %cb1, i64 1
+        \\  %mask = fcmp oeq <2 x double> %ca, %cb
+        \\  %m.seed = insertelement <2 x double> poison, double %m0, i64 0
+        \\  %m = insertelement <2 x double> %m.seed, double %m1, i64 1
+        \\  %selected = select <2 x i1> %mask, <2 x double> %m, <2 x double> splat (double 1.000000e+00)
+        \\  %absolute = call <2 x double> @llvm.fabs.v2f64(<2 x double> %selected)
+        \\  %s.seed = insertelement <2 x double> poison, double %s0, i64 0
+        \\  %s = insertelement <2 x double> %s.seed, double %s1, i64 1
+        \\  %signed = tail call <2 x double> @llvm.copysign.v2f64(<2 x double> %absolute, <2 x double> %s)
+        \\  %swap = shufflevector <2 x double> %signed, <2 x double> poison, <2 x i32> <i32 1, i32 0>
+        \\  %lane = extractelement <2 x double> %swap, i64 1
+        \\  %bits = bitcast double %lane to i64
+        \\  ret i64 %bits
+        \\}
+        \\define i64 @splat_high(double %ca0, double %ca1, double %cb0, double %cb1, double %m0, double %m1, double %s0, double %s1) {
+        \\entry:
+        \\  %ca.seed = insertelement <2 x double> poison, double %ca0, i64 0
+        \\  %ca = insertelement <2 x double> %ca.seed, double %ca1, i64 1
+        \\  %cb.seed = insertelement <2 x double> poison, double %cb0, i64 0
+        \\  %cb = insertelement <2 x double> %cb.seed, double %cb1, i64 1
+        \\  %mask = fcmp oeq <2 x double> %ca, %cb
+        \\  %m.seed = insertelement <2 x double> poison, double %m0, i64 0
+        \\  %m = insertelement <2 x double> %m.seed, double %m1, i64 1
+        \\  %selected = select <2 x i1> %mask, <2 x double> %m, <2 x double> splat (double 1.000000e+00)
+        \\  %absolute = call <2 x double> @llvm.fabs.v2f64(<2 x double> %selected)
+        \\  %s.seed = insertelement <2 x double> poison, double %s0, i64 0
+        \\  %s = insertelement <2 x double> %s.seed, double %s1, i64 1
+        \\  %signed = tail call <2 x double> @llvm.copysign.v2f64(<2 x double> %absolute, <2 x double> %s)
+        \\  %splat = shufflevector <2 x double> %signed, <2 x double> poison, <2 x i32> <i32 1, i32 1>
+        \\  %lane = extractelement <2 x double> %splat, i64 1
+        \\  %bits = bitcast double %lane to i64
+        \\  ret i64 %bits
+        \\}
+        \\define i64 @scalar(double %magnitude, double %sign) {
+        \\entry:
+        \\  %value = tail call double @llvm.copysign.f64(double %magnitude, double %sign)
+        \\  %bits = bitcast double %value to i64
+        \\  ret i64 %bits
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machines: [4]x86_64_machine.MachineFunction = .{
+        x86_64_machine.MachineFunction.init("swap_low", .{ .int = 64 }),
+        x86_64_machine.MachineFunction.init("swap_high", .{ .int = 64 }),
+        x86_64_machine.MachineFunction.init("splat_high", .{ .int = 64 }),
+        x86_64_machine.MachineFunction.init("scalar", .{ .int = 64 }),
+    };
+    defer for (&machines) |*machine| machine.deinit(std.testing.allocator);
+    var mappings: [4]?[]align(std.heap.page_size_min) u8 = .{ null, null, null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (&machines, module.functions.items, &mappings) |*machine, function, *mapping| {
+        switch (try selector_impl.tryLowerComposedCfg(std.testing.allocator, machine, function)) {
+            .selected => {},
+            .unsupported => |diagnostic| {
+                std.debug.print("f64x2 parity canary {s}: {s}/{s}\n", .{ function.name, diagnostic.tagName(), diagnostic.detail() });
+                return error.TestUnexpectedResult;
+            },
+        }
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine.*);
+        defer std.testing.allocator.free(bytes);
+        mapping.* = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mapping.*.?, bytes);
+    }
+    const VectorFn = *const fn (f64, f64, f64, f64, f64, f64, f64, f64) callconv(.c) u64;
+    const swap_low: VectorFn = @ptrCast(mappings[0].?.ptr);
+    const swap_high: VectorFn = @ptrCast(mappings[1].?.ptr);
+    const splat_high: VectorFn = @ptrCast(mappings[2].?.ptr);
+    const scalar: *const fn (f64, f64) callconv(.c) u64 = @ptrCast(mappings[3].?.ptr);
+
+    const Case = struct {
+        equal0: bool,
+        equal1: bool,
+        magnitude0: u64,
+        magnitude1: u64,
+        sign0: u64,
+        sign1: u64,
+    };
+    const cases = [_]Case{
+        .{ .equal0 = false, .equal1 = false, .magnitude0 = 0x8000_0000_0000_0000, .magnitude1 = 0x8000_0000_0000_0001, .sign0 = 0x8000_0000_0000_0000, .sign1 = 0 },
+        .{ .equal0 = true, .equal1 = false, .magnitude0 = 0x8000_0000_0000_0001, .magnitude1 = 0x7ff0_0000_0000_0000, .sign0 = 0x8000_0000_0000_0000, .sign1 = 0xfff0_0000_0000_0000 },
+        .{ .equal0 = false, .equal1 = true, .magnitude0 = 0xfff0_0000_0000_0000, .magnitude1 = 0xfff8_1234_5678_9abc, .sign0 = 0, .sign1 = 0x3ff0_0000_0000_0000 },
+        .{ .equal0 = true, .equal1 = true, .magnitude0 = 0x7ff0_0000_0000_0042, .magnitude1 = 0xfff0_0000_0000_0042, .sign0 = 0xbff0_0000_0000_0000, .sign1 = 0 },
+    };
+    for (cases) |case| {
+        const ca0: f64 = 2.0;
+        const ca1: f64 = 3.0;
+        const cb0: f64 = if (case.equal0) ca0 else 4.0;
+        const cb1: f64 = if (case.equal1) ca1 else 5.0;
+        const args: [8]f64 = .{ ca0, ca1, cb0, cb1, @bitCast(case.magnitude0), @bitCast(case.magnitude1), @bitCast(case.sign0), @bitCast(case.sign1) };
+        const selected0 = if (case.equal0) case.magnitude0 else @as(u64, 0x3ff0_0000_0000_0000);
+        const selected1 = if (case.equal1) case.magnitude1 else @as(u64, 0x3ff0_0000_0000_0000);
+        const expected0 = (selected0 & 0x7fff_ffff_ffff_ffff) | (case.sign0 & 0x8000_0000_0000_0000);
+        const expected1 = (selected1 & 0x7fff_ffff_ffff_ffff) | (case.sign1 & 0x8000_0000_0000_0000);
+        try std.testing.expectEqual(expected1, swap_low(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]));
+        try std.testing.expectEqual(expected0, swap_high(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]));
+        try std.testing.expectEqual(expected1, splat_high(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]));
+    }
+
+    inline for ([_]struct { magnitude: u64, sign: u64, expected: u64 }{
+        .{ .magnitude = 0x8000_0000_0000_0000, .sign = 0, .expected = 0 },
+        .{ .magnitude = 1, .sign = 0x8000_0000_0000_0000, .expected = 0x8000_0000_0000_0001 },
+        .{ .magnitude = 0x7ff0_0000_0000_0000, .sign = 0xfff0_0000_0000_0000, .expected = 0xfff0_0000_0000_0000 },
+        .{ .magnitude = 0xfff8_1234_5678_9abc, .sign = 0x3ff0_0000_0000_0000, .expected = 0x7ff8_1234_5678_9abc },
+        .{ .magnitude = 0x7ff0_0000_0000_0042, .sign = 0xbff0_0000_0000_0000, .expected = 0xfff0_0000_0000_0042 },
+    }) |case| {
+        try std.testing.expectEqual(case.expected, scalar(@bitCast(case.magnitude), @bitCast(case.sign)));
+    }
+}
+
 test "generic cfg selector rejects partial and noncanonical f32x2 selects" {
     var machine = x86_64_machine.MachineFunction.init("bad-vector-select", .void);
     defer machine.deinit(std.testing.allocator);
@@ -1023,7 +1205,7 @@ test "generic cfg selector rejects partial and noncanonical f32x2 selects" {
         .bits = 128,
         .shape = .{ .vector = selector_types.VectorShape.f32x2(0b11) },
     } });
-    const select: ir.SelectInst = .{
+    var select: ir.SelectInst = .{
         .cond_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 1 } } },
         .cond = .{ .named = "mask" },
         .ty = .{ .vector = .{ .len = 2, .elem_ty = .float } },
@@ -1050,6 +1232,31 @@ test "generic cfg selector rejects partial and noncanonical f32x2 selects" {
         .shape = .{ .vector = selector_types.VectorShape.f32x2(0b01) },
     } });
     try std.testing.expect((try selector_vector.lowerSelect(&selector, "partial-data", select)) != null);
+
+    select.ty = .{ .vector = .{ .len = 2, .elem_ty = .double } };
+    try selector_state.bindValueLoc(&selector, "mask", .{ .xmm = .{
+        .reg = .xmm2,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.mask64x2(0b01) },
+    } });
+    try selector_state.bindValueLoc(&selector, "true", .{ .xmm = .{
+        .reg = .xmm3,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f64x2(0b11) },
+    } });
+    try selector_state.bindValueLoc(&selector, "false", .{ .xmm = .{
+        .reg = .xmm4,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.f64x2(0b11) },
+    } });
+    try std.testing.expect((try selector_vector.lowerSelect(&selector, "partial-f64-mask", select)) != null);
+
+    try selector_state.bindValueLoc(&selector, "mask", .{ .xmm = .{
+        .reg = .xmm2,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.mask32x2(0b11) },
+    } });
+    try std.testing.expect((try selector_vector.lowerSelect(&selector, "wrong-f64-mask-width", select)) != null);
 }
 
 test "generic cfg selector fails closed outside the bounded vector slice" {

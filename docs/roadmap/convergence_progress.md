@@ -4071,6 +4071,21 @@ One line per completed cycle, append-only, newest last. This is the
   cumulative gate. Evidence
   `docs/evidence/std_debug_hello_inbox47_f32x2_select_copysign.summary`.
 
+- 2026-07-14 (this commit, INBOX-47 Part 2) Item 12 f64x2 parity capability:
+  packed canonical-mask select, fabs, and copysign now share shape-driven
+  implementations with f32x2; scalar `copysign.f32/f64` shares one
+  width-parametric bitwise implementation. Exact f64x2 `[1,0]` and `[1,1]`
+  masks extend the typed decoder and generalize the existing `shufpd` machine
+  form without broadening selector admission. Permanent raw-bit execution
+  covers both select lanes, zeros, subnormals, infinities, NaN payloads,
+  shuffle definedness, and scalar/vector copysign. Report-all remains exactly
+  443 / 261 / 182 with zero closures, collateral emissions, or new failures;
+  `compiler_rt.divdc3.__divdc3` remains honestly blocked at its earlier
+  `stage2-phi-dst` boundary. Tier 2 is green at 24/24 steps and 988/988 tests.
+  No Tier 3 ran; commit this slice, then run the single cumulative INBOX-47
+  gate and stop for the f64x2 PHI review. Evidence
+  `docs/evidence/std_debug_hello_inbox47_f64x2_parity.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
