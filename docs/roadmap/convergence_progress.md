@@ -3682,6 +3682,16 @@ One line per completed cycle, append-only, newest last. This is the
   and
   `docs/evidence/distribution_all_after_inbox34_named_integer_inequality.summary`.
 
+- 2026-07-13 (this commit, INBOX-34 evidence fix-forward) Item 12 acceptance
+  correction: the first named-inequality native harness incorrectly used a
+  returning function as the ELF entrypoint and therefore could not prove row
+  semantics. The corrected `-fno-lld` executable enters through Zig `_start`,
+  runs the same 80 precomputed-result wrapper calls from `main`, traps on a
+  mismatch, and exits successfully. Production, permanent tests, the exact row
+  object, and gate inputs are unchanged; the acceptance artifact hash is
+  corrected in
+  `docs/evidence/std_debug_hello_named_integer_inequality_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

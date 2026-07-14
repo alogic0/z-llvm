@@ -23,6 +23,14 @@ results. The matrix covers both zero signs, subnormals, finite ordering in both
 directions and equality, finite extrema, infinities, and quiet/signaling NaNs
 in both operand positions.
 
+Fix-forward note: the first recorded executable placed `canary_main` directly
+in the ELF entry field, so its final `ret` had no startup return address and
+segfaulted independently of row semantics. The corrected harness uses Zig's
+normal `_start`, calls the same 80 checks from `main`, and traps on any
+mismatch. It native-links with `-fno-lld` and exits successfully. The object,
+expected-result matrix, Tier 2, and Tier 3 inputs are unchanged; no gate rerun
+is required for this evidence-only harness correction.
+
 Fresh report-all advances from the corrected prerequisite baseline 443
 selected / 226 emitting / 217 failing to 443 selected / 230 emitting / 213
 failing. The four directed rows are the only new emissions.
@@ -48,7 +56,7 @@ Logs and artifacts:
 - `tmp/inbox34_compare_rows_readelf.log`, sha256
   `605023554a0eab522eb75d009ebdc5aaeb827bf01cc47c7dda7ca7826ed4dd23`;
 - `tmp/inbox34_compare_rows_acceptance`, sha256
-  `819b0585b6be4d22136b11115c4d07e6d840cd96fa618db7fc308c846a70475d`.
+  `aae6c1bc2ce816ea088309e5f23759ca30451562abeae5c7f08cc149cd9132dc`.
 
 Tier 3 acceptance is recorded separately in
 `docs/evidence/distribution_all_after_inbox34_named_integer_inequality.summary`.
