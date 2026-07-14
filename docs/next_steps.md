@@ -62,6 +62,13 @@ forms stay out of scope. Continue at exact named i64 `ult`, targeting
 `__truncdfsf2` and `__truncdfhf2`, then run the pipeline's cumulative Tier 3.
 Evidence: `docs/evidence/std_debug_hello_inbox50_i16_negative_literal.summary`.
 
+Comparison cycle 2 is complete provisionally. Exact plain named i64 `ult`
+closes `__truncdfsf2` and `__truncdfhf2` through 46 frozen bit-exact native
+calls, moving the report to 443 / 272 / 171 with no collateral change. Commit
+the cycle and run the pipeline's one cumulative Tier 3; it accepts two total
+closures because cycle 1 advanced rather than closed its half rows. Evidence:
+`docs/evidence/std_debug_hello_inbox50_named_i64_ult.summary`.
+
 INBOX-48 is complete and accepted. Commit `1c5ff956` adds exact fully defined
 f64x2 PHI destinations through the existing XMM/pair-spill value map and
 parallel edge-copy authority. The single Tier 3 passed all 17 subgates against

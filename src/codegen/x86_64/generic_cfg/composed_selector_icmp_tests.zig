@@ -127,6 +127,83 @@ test "generic cfg selector executes unsigned i16 negative-literal boundaries" {
     }
 }
 
+test "generic cfg selector lowers exact named i64 unsigned less-than" {
+    var machine = MachineFunction.init("named-i64-ult", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg64 = .rsi });
+
+    const diagnostic = try selector_icmp.lowerIcmp(&selector, "cmp", .{
+        .predicate = .ult,
+        .operand_ty = .{ .int = 64 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    });
+
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rdi } },
+        .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rsi } },
+        .{ .cmp_rcx_arg64 = .r8 },
+        .setb_eax,
+    }, machine.instructions.items);
+
+    var near_miss_machine = MachineFunction.init("named-i64-ult-samesign", .{ .int = 1 });
+    defer near_miss_machine.deinit(std.testing.allocator);
+    var near_miss_selector = ComposedBlockSelector.init(std.testing.allocator, &near_miss_machine);
+    defer near_miss_selector.deinit();
+    try selector_state.bindValueLoc(&near_miss_selector, "lhs", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&near_miss_selector, "rhs", .{ .arg64 = .rsi });
+    const near_miss = (try selector_icmp.lowerIcmp(&near_miss_selector, "cmp", .{
+        .predicate = .ult,
+        .samesign = true,
+        .operand_ty = .{ .int = 64 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })).?;
+    try std.testing.expectEqualStrings("composed-block-icmp-rhs", near_miss.detail());
+}
+
+test "generic cfg selector executes named i64 unsigned less-than operand order" {
+    const input =
+        \\define i32 @named_i64_ult(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %comparison = icmp ult i64 %lhs, %rhs
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("named_i64_ult", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const less: *const fn (u64, u64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    const cases = [_]struct { lhs: u64, rhs: u64 }{
+        .{ .lhs = 0, .rhs = 0 },
+        .{ .lhs = 0, .rhs = 1 },
+        .{ .lhs = 1, .rhs = 0 },
+        .{ .lhs = 1, .rhs = 2 },
+        .{ .lhs = 2, .rhs = 1 },
+        .{ .lhs = std.math.maxInt(i64), .rhs = @as(u64, 1) << 63 },
+        .{ .lhs = @as(u64, 1) << 63, .rhs = std.math.maxInt(i64) },
+        .{ .lhs = @as(u64, 1) << 63, .rhs = std.math.maxInt(u64) },
+        .{ .lhs = std.math.maxInt(u64), .rhs = @as(u64, 1) << 63 },
+        .{ .lhs = std.math.maxInt(u64), .rhs = std.math.maxInt(u64) },
+    };
+    for (cases) |case| try std.testing.expectEqual(@intFromBool(case.lhs < case.rhs), less(case.lhs, case.rhs));
+}
+
 test "generic cfg selector lowers exact named i16 comparisons" {
     inline for (.{ ir.IcmpPredicate.slt, ir.IcmpPredicate.sgt, ir.IcmpPredicate.ne }) |predicate| {
         var machine = MachineFunction.init("named-i16", .{ .int = 1 });

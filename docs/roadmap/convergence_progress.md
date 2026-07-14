@@ -4241,6 +4241,20 @@ One line per completed cycle, append-only, newest last. This is the
   for the comparison pipeline's cumulative Tier 3. Evidence
   `docs/evidence/std_debug_hello_inbox50_i16_negative_literal.summary`.
 
+- 2026-07-14 (this commit, INBOX-50 comparison cycle 2) Item 12 exact named
+  i64 unsigned less-than: plain named operands now reuse the existing two-
+  scratch compare path with structurally fixed LHS/RHS order; samesign and
+  neighboring forms remain fail-closed. Ten unsigned execution cases cover
+  both asymmetric orders and the high-bit boundary. The report moves exactly
+  from 443 / 270 / 173 to 443 / 272 / 171, provisionally closing
+  `__truncdfsf2` and `__truncdfhf2`. A relocation-free extracted object passes
+  46 frozen bit-exact float/half conversion calls across zeros, subnormals,
+  rounding and overflow boundaries, infinities, and NaN payloads. Tier 2
+  passes 24/24 steps and 1010/1010 tests. Commit, then run the comparison
+  pipeline's one cumulative Tier 3; only these two closures are pending
+  acceptance. Evidence
+  `docs/evidence/std_debug_hello_inbox50_named_i64_ult.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
