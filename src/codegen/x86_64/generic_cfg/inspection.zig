@@ -84,9 +84,16 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
 
 fn inspectFcmp(fcmp: ir.FcmpInst) ?Diagnostic {
     if (fcmp.operand_ty == .float or fcmp.operand_ty == .double) return null;
-    if (fcmp.operand_ty != .half or fcmp.predicate != .oeq) return .{ .unsupported_type = "fcmp" };
-    if (valueIsNamed(fcmp.lhs) and valueIsHalfZeroLiteral(fcmp.rhs)) return null;
-    if (valueIsNamed(fcmp.rhs) and valueIsHalfZeroLiteral(fcmp.lhs)) return null;
+    if (fcmp.operand_ty != .half) return .{ .unsupported_type = "fcmp" };
+    if (fcmp.predicate == .oeq) {
+        if (valueIsNamed(fcmp.lhs) and valueIsHalfZeroLiteral(fcmp.rhs)) return null;
+        if (valueIsNamed(fcmp.rhs) and valueIsHalfZeroLiteral(fcmp.lhs)) return null;
+    }
+    if (fcmp.predicate == .uno or fcmp.predicate == .olt) {
+        const lhs_supported = valueIsNamed(fcmp.lhs) or valueIsHalfZeroLiteral(fcmp.lhs);
+        const rhs_supported = valueIsNamed(fcmp.rhs) or valueIsHalfZeroLiteral(fcmp.rhs);
+        if (lhs_supported and rhs_supported and (valueIsNamed(fcmp.lhs) or valueIsNamed(fcmp.rhs))) return null;
+    }
     return .{ .unsupported_type = "fcmp" };
 }
 

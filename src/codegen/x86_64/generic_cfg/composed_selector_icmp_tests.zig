@@ -11,6 +11,40 @@ const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
 const ValueLoc = selector_types.ValueLoc;
 
+test "generic cfg selector executes signed i16 less-than zero" {
+    const input =
+        \\define i32 @is_negative(i32 %raw) {
+        \\entry:
+        \\  %value = trunc i32 %raw to i16
+        \\  %negative = icmp slt i16 %value, 0
+        \\  %result = zext i1 %negative to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("is_negative", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const is_negative: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+
+    inline for (.{
+        .{ @as(u32, 0xffff_8000), @as(u32, 1) },
+        .{ @as(u32, 0x1234_ffff), @as(u32, 1) },
+        .{ @as(u32, 0xffff_0000), @as(u32, 0) },
+        .{ @as(u32, 0xabcd_0001), @as(u32, 0) },
+        .{ @as(u32, 0xffff_7fff), @as(u32, 0) },
+    }) |case| try std.testing.expectEqual(case[1], is_negative(case[0]));
+}
+
 test "generic cfg selector normalizes i6 before samesign unsigned immediate comparison" {
     var machine = MachineFunction.init("samesign-ult-i6-imm", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);

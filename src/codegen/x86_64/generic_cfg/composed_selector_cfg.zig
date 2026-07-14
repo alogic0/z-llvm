@@ -96,7 +96,7 @@ pub fn blockEndsInTrap(block: ir.BasicBlock) bool {
 pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select: ir.SelectInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (!select.cond_ty.eql(.{ .int = 1 })) return .{ .no_emitter = "composed-block-select-cond" };
-    if (select.ty == .float or select.ty == .double) return lowerFpSelect(selector, result_name, select);
+    if (select.ty == .half or select.ty == .float or select.ty == .double) return lowerFpSelect(selector, result_name, select);
     const bits: u16 = if (select.ty.eql(.ptr)) 64 else intBits(select.ty) orelse return .{ .no_emitter = "composed-block-select-type" };
     if (bits == 0 or (bits > 32 and bits != 64)) return .{ .no_emitter = "composed-block-select-width" };
 
@@ -125,7 +125,7 @@ pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select
 }
 
 fn lowerFpSelect(selector: *ComposedBlockSelector, result_name: []const u8, select: ir.SelectInst) !?Diagnostic {
-    const bits: u16 = if (select.ty == .float) 32 else if (select.ty == .double) 64 else return .{ .no_emitter = "composed-block-select-type" };
+    const bits: u16 = if (select.ty == .half) 16 else if (select.ty == .float) 32 else if (select.ty == .double) 64 else return .{ .no_emitter = "composed-block-select-type" };
     if (try emitBranchCondition(selector, select.cond)) |diagnostic| return diagnostic;
 
     const true_reg = fpValueReg(selector, select.true_value, bits);

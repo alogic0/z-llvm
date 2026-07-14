@@ -3836,6 +3836,20 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_half_to_double_fpext_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox39_half_double.summary`.
 
+- 2026-07-14 (this commit, INBOX-40 Part 1) Item 12 scalar FP comparison:
+  exact half `fcmp uno/olt` now widens named operands through the proven
+  `__extendhfsf2` helper and preserves two named operands through the existing
+  pair-spill frame authority. Exact i16 signed-zero comparison and bitwise half
+  select complete the captured min/max CFG. Permanent predicate, comparison,
+  and select execution plus 26 precomputed native row calls are green.
+  `compiler_rt.fmin.__fminh` and `compiler_rt.fmax.__fmaxh` are the two
+  directed closures. `__fixunshfdi` and `__fixunshfsi` emit collaterally
+  without semantic claims; no new failure appears. Report-all advances from
+  443 / 239 / 204 to 443 / 243 / 200. Tier 2 and the single row-closure/shared
+  selector Tier 3 are green. Continue with INBOX-40's pre-authorized half-add
+  successor. Evidence `docs/evidence/std_debug_hello_half_fcmp_acceptance.summary`
+  and `docs/evidence/distribution_all_after_inbox40_half_fcmp.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

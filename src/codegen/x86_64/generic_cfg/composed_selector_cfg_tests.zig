@@ -271,6 +271,12 @@ test "generic cfg selector stabilizes shared conditional phi sources before bran
 
 test "composed selector preserves scalar FP select values exactly" {
     const input =
+        \\define half @select_f16(i32 %flag, half %on_true, half %on_false) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %cond, half %on_true, half %on_false
+        \\  ret half %selected
+        \\}
         \\define float @select_f32(i32 %flag, float %on_true, float %on_false) {
         \\entry:
         \\  %cond = icmp ne i32 %flag, 0
@@ -301,6 +307,12 @@ test "composed selector preserves scalar FP select values exactly" {
         defer std.posix.munmap(mapping);
         @memcpy(mapping, bytes);
         if (index == 0) {
+            const select: *const fn (u32, f16, f16) callconv(.c) f16 = @ptrCast(mapping.ptr);
+            const true_bits: u16 = 0x7e45;
+            const false_bits: u16 = 0x8000;
+            try std.testing.expectEqual(true_bits, @as(u16, @bitCast(select(1, @bitCast(true_bits), @bitCast(false_bits)))));
+            try std.testing.expectEqual(false_bits, @as(u16, @bitCast(select(0, @bitCast(true_bits), @bitCast(false_bits)))));
+        } else if (index == 1) {
             const select: *const fn (u32, f32, f32) callconv(.c) f32 = @ptrCast(mapping.ptr);
             const true_bits: u32 = 0x7fc1_2345;
             const false_bits: u32 = 0x8000_0000;

@@ -225,6 +225,14 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         if (try selector_state.preserveCurrentEaxIntoScratch(selector)) |diagnostic| return diagnostic;
         try selector_state.emitValueIntoEax(selector, icmp.lhs);
         try selector.machine.instructions.append(selector.allocator, .{ .shr_eax_imm5 = 31 });
+    } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 16 }) and switch (icmp.rhs) {
+        .int => |int| try i64Value(int) == 0,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    }) {
+        selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, 16) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+        try selector_state.clobberAccumulator(selector);
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = 0 } });
+        try selector.machine.instructions.append(selector.allocator, .setl_eax);
     } else if (!icmp.samesign and icmp.predicate == .slt and icmp.rhs == .int and
         (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })))
     {

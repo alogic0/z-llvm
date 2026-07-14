@@ -37,22 +37,21 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-The INBOX-39 pipeline is complete. Part 1 closes `__powidf2` and `__powisf2`
-with exact signed i32 division-by-two semantics and a conditional-phi source
-stabilization repair. The pre-authorized successor composes exact half-to-double
-extension through `__extendhfsf2` plus `cvtss2sd`; exact `__fmah` execution
-drove implicit half-helper calls into the existing frame preplanning authority.
-The three expected rows are closed, report-all is 443 selected / 239 emitting /
-204 failing, and both cycles passed Tier 2 plus one closure/shared-surface Tier
-3 each.
+INBOX-40 Part 1 is complete. Half `fcmp uno/olt` widens through the proven
+`__extendhfsf2` path, preserving named operands across sequential helper calls.
+Exact i16 signed-zero comparison and bit-preserving half select close the two
+directed `__fminh`/`__fmaxh` rows. Two unsigned conversion rows emit
+collaterally without semantic claims; report-all is now 443 selected / 243
+emitting / 200 failing. Permanent execution, exact native row proof, Tier 2,
+and the single row-closure/shared-surface Tier 3 are green.
 
-Stop for the next directive. The agreed post-refresh order is half `fcmp
-uno/olt` before half `fadd`, followed by the lanes-canonical vector-mask slice
-as the bridge into aggregate-ABI review. Evidence:
-`docs/evidence/std_debug_hello_sdiv_i32_by_two_acceptance.summary`,
-`docs/evidence/distribution_all_after_inbox39_sdiv2.summary`,
-`docs/evidence/std_debug_hello_half_to_double_fpext_acceptance.summary`, and
-`docs/evidence/distribution_all_after_inbox39_half_double.summary`.
+Continue with INBOX-40's pre-authorized successor in a separate clean cycle:
+half `fadd` through extend/addss/truncate, targeting `__floorh` and `__ceilh`.
+Prove bit-exactness for the captured cases and fail closed where double
+rounding cannot be excluded. After that pipeline, stop before the reviewed
+lanes-canonical vector-mask bridge; it needs its own directive. Evidence:
+`docs/evidence/std_debug_hello_half_fcmp_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox40_half_fcmp.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

@@ -37,6 +37,72 @@ fn expectedFcmp(predicate: ir.FcmpPredicate, lhs: anytype, rhs: @TypeOf(lhs)) bo
     };
 }
 
+fn extendHalfForFcmpTest(value: f16) callconv(.c) f32 {
+    return value;
+}
+
+fn executeHalfFcmpPredicate(predicate: ir.FcmpPredicate) !void {
+    const input = try std.fmt.allocPrint(std.testing.allocator,
+        \\define i32 @compare(half %lhs, half %rhs) {{
+        \\entry:
+        \\  %condition = fcmp {s} half %lhs, %rhs
+        \\  %result = zext i1 %condition to i32
+        \\  ret i32 %result
+        \\}}
+        \\
+    , .{@tagName(predicate)});
+    defer std.testing.allocator.free(input);
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = x86_64_machine.MachineFunction.init("compare", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+
+    const stub_len = 12;
+    const mapping = try std.posix.mmap(null, bytes.len + stub_len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping[0..bytes.len], bytes);
+    const stub = mapping[bytes.len..][0..stub_len];
+    stub[0] = 0x48;
+    stub[1] = 0xb8;
+    std.mem.writeInt(u64, stub[2..10], @intFromPtr(&extendHalfForFcmpTest), .little);
+    stub[10] = 0xff;
+    stub[11] = 0xe0;
+
+    var offset: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        if (instruction == .direct_call) {
+            const next_ip = @intFromPtr(mapping.ptr) + offset + 5;
+            const displacement: i32 = @intCast(@intFromPtr(mapping.ptr + bytes.len) - next_ip);
+            std.mem.writeInt(i32, mapping[offset + 1 ..][0..4], displacement, .little);
+        }
+        offset += encoding.instructionSize(instruction);
+    }
+    const compare: *const fn (f16, f16) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    for ([_][2]u16{
+        .{ 0x7e01, 0x3c00 },
+        .{ 0x3c00, 0xfe55 },
+        .{ 0x7d01, 0x3c00 },
+        .{ 0x3c00, 0xfd55 },
+        .{ 0x3c00, 0x4000 },
+        .{ 0x4000, 0x3c00 },
+        .{ 0x0000, 0x8000 },
+        .{ 0x8000, 0x0000 },
+        .{ 0x0001, 0x0002 },
+        .{ 0x8002, 0x8001 },
+    }) |case| {
+        const lhs: f16 = @bitCast(case[0]);
+        const rhs: f16 = @bitCast(case[1]);
+        const expected = expectedFcmp(predicate, @as(f32, lhs), @as(f32, rhs));
+        try std.testing.expectEqual(@as(u32, @intFromBool(expected)), compare(lhs, rhs));
+    }
+}
+
 fn executeFloatFcmpPredicate(predicate: ir.FcmpPredicate) !void {
     const input = try std.fmt.allocPrint(std.testing.allocator,
         \\define i32 @compare(float %lhs, float %rhs) {{
@@ -460,14 +526,14 @@ test "generic cfg selector lowers only half oeq against literal zero as a bit te
     }, machine.instructions.items);
 
     for ([_]ir.FcmpInst{
-        .{ .predicate = .uno, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .fp = "0xH0000" } },
-        .{ .predicate = .olt, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .fp = "0xH0000" } },
+        .{ .predicate = .ogt, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .fp = "0xH0000" } },
+        .{ .predicate = .uno, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .fp = "0xH3c00" } },
         .{ .predicate = .oeq, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .fp = "0xH3c00" } },
         .{ .predicate = .oeq, .operand_ty = .half, .lhs = .{ .named = "value" }, .rhs = .{ .named = "other" } },
     }) |near_miss| {
         machine.instructions.clearRetainingCapacity();
         const diagnostic = (try selector_fp.lowerFcmp(&selector, "near_miss", near_miss)).?;
-        try std.testing.expectEqualStrings("composed-block-fcmp-type", diagnostic.no_emitter);
+        try std.testing.expect(std.mem.startsWith(u8, diagnostic.no_emitter, "composed-block-half-fcmp-"));
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     }
 }
@@ -517,6 +583,11 @@ test "generic cfg selector executes half zero bit tests in both operand orders" 
             .{ @as(u16, 0xfd55), @as(u32, 0) },
         }) |case| try std.testing.expectEqual(case[1], is_zero(@bitCast(case[0])));
     }
+}
+
+test "generic cfg selector executes widened half uno and olt predicates" {
+    try executeHalfFcmpPredicate(.uno);
+    try executeHalfFcmpPredicate(.olt);
 }
 
 test "generic cfg selector executes bit-exact scalar FP widening and narrowing" {

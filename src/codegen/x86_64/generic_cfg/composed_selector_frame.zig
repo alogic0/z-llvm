@@ -119,6 +119,8 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
                 if ((cast.op == .fpext and cast.from_ty == .half and (cast.to_ty == .float or cast.to_ty == .double)) or
                     (cast.op == .fptrunc and cast.from_ty == .float and cast.to_ty == .half)) saw_scalar_sse_call = true;
             }
+            if (instruction.kind == .fcmp and instruction.kind.fcmp.operand_ty == .half and
+                (instruction.kind.fcmp.predicate == .uno or instruction.kind.fcmp.predicate == .olt)) saw_scalar_sse_call = true;
             if (instruction.kind == .icmp and instruction.kind.icmp.operand_ty.eql(.{ .int = 128 })) saw_wide_icmp = true;
             if (instruction.kind == .cast and
                 (instruction.kind.cast.op == .sitofp or instruction.kind.cast.op == .uitofp)) saw_int_to_fp_cast = true;

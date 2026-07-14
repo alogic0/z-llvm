@@ -99,6 +99,7 @@ pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst
 pub fn lowerFcmp(selector: *ComposedBlockSelector, result: ?[]const u8, fcmp: ir.FcmpInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (halfOeqZeroSource(fcmp)) |source_value| return lowerHalfOeqZero(selector, result_name, source_value);
+    if (fcmp.operand_ty == .half) return lowerHalfFcmp(selector, result_name, fcmp);
     const bits = fpBits(fcmp.operand_ty) orelse return .{ .no_emitter = "composed-block-fcmp-type" };
 
     if (fcmp.predicate != .false and fcmp.predicate != .true) {
@@ -156,6 +157,43 @@ fn lowerHalfOeqZero(selector: *ComposedBlockSelector, result_name: []const u8, s
     try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 0x7fff });
     try selector.machine.instructions.append(selector.allocator, .test_eax_eax);
     try selector.machine.instructions.append(selector.allocator, .sete_eax);
+    try selector_state.bindEax(selector, result_name);
+    return null;
+}
+
+fn lowerHalfFcmp(selector: *ComposedBlockSelector, result_name: []const u8, fcmp: ir.FcmpInst) !?Diagnostic {
+    if (fcmp.predicate != .uno and fcmp.predicate != .olt) return .{ .no_emitter = "composed-block-half-fcmp-predicate" };
+    const lhs_named = fcmp.lhs == .named;
+    const rhs_named = fcmp.rhs == .named;
+    if ((!lhs_named and !isHalfZeroLiteral(fcmp.lhs)) or (!rhs_named and !isHalfZeroLiteral(fcmp.rhs)) or (!lhs_named and !rhs_named)) {
+        return .{ .no_emitter = "composed-block-half-fcmp-operands" };
+    }
+
+    var lhs_reg: XmmReg = undefined;
+    var rhs_reg: XmmReg = undefined;
+    if (lhs_named and rhs_named) {
+        const frames = selector_state.allocatePairSpillSlots(selector, result_name) orelse return .{ .no_spill_envelope = "composed-block-half-fcmp-spill" };
+        const rhs_source = selector_state.resolveValue(selector, fcmp.rhs) orelse return .{ .unsupported_value = "composed-block-half-fcmp-rhs" };
+        selector_state.materializeLocIntoLoc(selector, rhs_source, .{ .spill_fp = .{ .frame_index = frames.lo, .bits = 16 } }) catch return .{ .unsupported_value = "composed-block-half-fcmp-rhs" };
+        if (try lowerHalfValueToFloatXmm0(selector, fcmp.lhs)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm32_rsp = .{ .frame_index = frames.hi, .reg = .xmm0 } });
+        if (try lowerHalfLocToFloatXmm0(selector, .{ .spill_fp = .{ .frame_index = frames.lo, .bits = 16 } })) |diagnostic| return diagnostic;
+        selector_state.materializeLocIntoLoc(selector, .{ .spill_fp = .{ .frame_index = frames.hi, .bits = 32 } }, .{ .xmm = .{ .reg = .xmm1, .bits = 32 } }) catch return .{ .unsupported_value = "composed-block-half-fcmp-spill" };
+        lhs_reg = .xmm1;
+        rhs_reg = .xmm0;
+    } else {
+        const named_value = if (lhs_named) fcmp.lhs else fcmp.rhs;
+        if (try lowerHalfValueToFloatXmm0(selector, named_value)) |diagnostic| return diagnostic;
+        try selector_state.clobberAccumulator(selector);
+        try selector_state.clobberXmmReg(selector, .xmm1);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = .xmm1, .bits = 0 } });
+        lhs_reg = if (lhs_named) .xmm0 else .xmm1;
+        rhs_reg = if (rhs_named) .xmm0 else .xmm1;
+    }
+
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.append(selector.allocator, .{ .ucomiss = .{ .dst = lhs_reg, .src = rhs_reg } });
+    try selector.machine.instructions.append(selector.allocator, .{ .set_fcmp_eax = fcmp.predicate });
     try selector_state.bindEax(selector, result_name);
     return null;
 }
@@ -250,15 +288,24 @@ fn lowerFloatToHalf(selector: *ComposedBlockSelector, result_name: []const u8, c
 
 fn lowerHalfExtension(selector: *ComposedBlockSelector, result_name: []const u8, cast: ir.CastInst) !?Diagnostic {
     if (cast.from_ty != .half or (cast.to_ty != .float and cast.to_ty != .double)) return .{ .no_emitter = "composed-block-fpext-type" };
+    if (try lowerHalfValueToFloatXmm0(selector, cast.value)) |diagnostic| return diagnostic;
+    if (cast.to_ty == .double) try selector.machine.instructions.append(selector.allocator, .{ .cvtss2sd_xmm = .{ .dst = .xmm0, .src = .xmm0 } });
+    try selector_state.bindValueLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = if (cast.to_ty == .double) 64 else 32 } });
+    return null;
+}
+
+fn lowerHalfValueToFloatXmm0(selector: *ComposedBlockSelector, value: ir.Value) !?Diagnostic {
     if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
-    const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-fpext-source" };
+    const source = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = "composed-block-fpext-source" };
+    return lowerHalfLocToFloatXmm0(selector, source);
+}
+
+fn lowerHalfLocToFloatXmm0(selector: *ComposedBlockSelector, source: selector_types.ValueLoc) !?Diagnostic {
     selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = .xmm0, .bits = 16 } }) catch return .{ .unsupported_value = "composed-block-fpext-source" };
 
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
     try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = "__extendhfsf2", .ret_ty = .float } });
     if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
-    if (cast.to_ty == .double) try selector.machine.instructions.append(selector.allocator, .{ .cvtss2sd_xmm = .{ .dst = .xmm0, .src = .xmm0 } });
-    try selector_state.bindValueLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = if (cast.to_ty == .double) 64 else 32 } });
     return null;
 }
