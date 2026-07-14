@@ -439,232 +439,291 @@ pub fn verifyFunction(function: MachineFunction) !void {
     };
 
     const returns_scalar_sse = sysv_abi.isScalarSseAbiType(function.ret_ty);
+    const aggregate_return_kind = sysv_abi.sseAggregateReturnKind(function.ret_ty);
     var eax_defined = function.ret_ty == .void or returns_scalar_sse or
         sysv_abi.aggregateReturnHasNoGpr(function.ret_ty);
     var eax_defined_before_label = eax_defined;
     var xmm0_defined = returns_scalar_sse;
     var xmm0_defined_before_label = xmm0_defined;
+    var xmm_defined_bits = function.entry_xmm_defined_bits;
+    var xmm_defined_bits_before_label = xmm_defined_bits;
     var saw_terminator = false;
     var preserve_eax_at_next_label = false;
     var rsp_mod16: u4 = 8;
-    for (function.instructions.items) |instruction| switch (instruction) {
-        .label => |label| {
-            eax_defined_before_label = eax_defined;
-            xmm0_defined_before_label = xmm0_defined;
-            if (preserve_eax_at_next_label) {
-                preserve_eax_at_next_label = false;
-            } else if (!std.mem.endsWith(u8, label, "generic_cfg_select_end") and
-                !std.mem.endsWith(u8, label, "generic_cfg_pointer_select_end") and
-                !std.mem.endsWith(u8, label, "conditional_slice_sum_skip"))
-            {
-                eax_defined = function.ret_ty == .void or sysv_abi.aggregateReturnHasNoGpr(function.ret_ty);
-                xmm0_defined = returns_scalar_sse;
-            }
-        },
-        .shl_eax_cl => eax_defined = true,
-        .shl_rax_cl => eax_defined = true,
-        .shr_rax_cl => eax_defined = true,
-        .sar_rax_cl => eax_defined = true,
-        .adc_rax_imm0 => eax_defined = true,
-        .movd_xmm_eax => eax_defined = true,
-        .movq_rax_xmm, .movd_eax_xmm => {},
-        .mulsd_xmm, .mulss_xmm, .subsd_xmm, .subss_xmm, .divsd_xmm, .divss_xmm, .addsd_xmm, .addss_xmm, .cvtsd2ss_xmm, .cvtss2sd_xmm, .addpd_xmm, .subpd_xmm, .mulpd_xmm, .addps_xmm, .subps_xmm, .mulps_xmm, .andps_xmm, .pxor_xmm, .pcmpgtd_xmm, .cmpeqps_xmm, .cmpeqpd_xmm, .movsd_xmm, .movss_xmm, .unpcklpd_xmm, .unpckhpd_xmm, .shufpd_lane0_lane3_xmm => {},
-        .movmskps_xmm_eax, .movmskpd_xmm_eax => eax_defined = true,
-        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .binary_arg_rax, .sbb_arg64_rax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .shr_eax_imm5, .sar_eax_imm5, .shr_eax_cl, .sar_eax_cl, .fshl_eax_arg32_imm5, .or_eax_imm32, .imul_eax_arg32, .imul_eax_imm32, .imul_rax_arg64, .imul_rax_rsp, .mul_rax_arg64_full, .imul_rax_arg64_full, .and_eax_imm32, .abs_i32_edi_eax, .abs_i64_rdi_rax, .clz_i128_rdi_rsi_eax, .clz_i64_rdi_eax, .clz_i32_edi_eax, .ctz_i32_edi_eax, .popcount_i32_edi_eax, .bit_reverse_i32_edi_eax, .ushl_sat_i32_edi_imm_eax, .bswap_eax, .bswap_rax, .rol_ax_imm8, .shr_rax_imm6, .shl_rax_imm6, .or_rdx_rax, .neg_rax, .neg_i128_rdi_rsi_rdx_rax, .abs_limb64_rdi_rsi_dx_rcx_rax, .ctz_i128_rdi_rsi_eax, .ctz_i64_rdi_eax, .ffs_i128_rdi_rsi_eax, .ffs_i64_rdi_eax, .ffs_i32_edi_eax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .bcmp_rdi_rsi_rdx_eax, .memcmp_rdi_rsi_rdx_eax, .memcpy_rdi_rsi_rdx_rax, .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax, .cmpxchg_ptr_expected_desired_i8_eax, .cmpxchg_ptr_expected_desired_i16_eax, .cmpxchg_ptr_expected_desired_i32_eax, .cmpxchg_ptr_expected_desired_i64_eax, .spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax, .xchg_ptr_value_i8_eax, .xchg_ptr_value_i16_eax, .xchg_ptr_value_i32_eax, .xchg_ptr_value_i64_rax, .spinlocked_xchg_i128_rdi_rsi_rdx_rax, .spinlocked_load_i128_rdi_rax_rdx, .spinlocked_fetch_umin_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_umax_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_nand_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_xor_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_or_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_and_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_sub_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_add_i128_rdi_rsi_rdx_rax_rdx, .memmove_rdi_rsi_rdx_rax, .guarded_memset_rdi_sil_rdx_rcx_rax, .guarded_memcpy_rdi_rsi_rdx_rcx_rax, .guarded_strncat_rdi_rsi_rdx_rcx_rax, .guarded_strcat_rdi_rsi_rdx_rax, .guarded_strncpy_rdi_rsi_rdx_rcx_rax, .guarded_strcpy_rdi_rsi_rdx_rax, .memset_rdi_sil_rdx_rax, .load_rdi_ptr_u8_eax, .load_rdi_ptr_u16_eax, .load_rdi_ptr_eax, .load_rdi_ptr_rax, .atomic_fetch_umin_i8_rdi_sil_eax, .atomic_fetch_umin_i16_rdi_si_eax, .atomic_fetch_umin_i32_rdi_esi_eax, .atomic_fetch_umin_i64_rdi_rsi_rax, .atomic_fetch_umax_i8_rdi_sil_eax, .atomic_fetch_umax_i16_rdi_si_eax, .atomic_fetch_umax_i32_rdi_esi_eax, .atomic_fetch_umax_i64_rdi_rsi_rax, .atomic_fetch_nand_i8_rdi_sil_eax, .atomic_fetch_nand_i16_rdi_si_eax, .atomic_fetch_nand_i32_rdi_esi_eax, .atomic_fetch_nand_i64_rdi_rsi_rax, .atomic_fetch_xor_i8_rdi_sil_eax, .atomic_fetch_xor_i16_rdi_si_eax, .atomic_fetch_xor_i32_rdi_esi_eax, .atomic_fetch_xor_i64_rdi_rsi_rax, .atomic_fetch_or_i8_rdi_sil_eax, .atomic_fetch_or_i16_rdi_si_eax, .atomic_fetch_or_i32_rdi_esi_eax, .atomic_fetch_or_i64_rdi_rsi_rax, .atomic_fetch_and_i8_rdi_sil_eax, .atomic_fetch_and_i16_rdi_si_eax, .atomic_fetch_and_i32_rdi_esi_eax, .atomic_fetch_and_i64_rdi_rsi_rax, .atomic_fetch_sub_i8_rdi_sil_eax, .atomic_fetch_sub_i16_rdi_si_eax, .atomic_fetch_sub_i32_rdi_esi_eax, .atomic_fetch_sub_i64_rdi_rsi_rax, .atomic_fetch_add_i8_rdi_sil_eax, .atomic_fetch_add_i16_rdi_si_eax, .atomic_fetch_add_i32_rdi_esi_eax, .atomic_fetch_add_i64_rdi_rsi_rax, .load_rcx_ptr_u8_eax, .load_rcx_ptr_u16_eax, .load_rcx_ptr_eax, .load_rcx_ptr_rax, .smin_i32_edi_esi_eax, .umin_i32_edi_esi_eax, .smax_i32_edi_esi_eax, .umax_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .ult_i8_dil_imm8_al, .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setl_eax, .load_stack_disp8_eax, .load_stack_disp32_eax, .load_stack_rcx4_disp8_eax, .load_stack_rcx4_disp32_eax, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_stack_disp8_u8_eax, .load_stack_disp32_u8_eax, .load_stack_disp8_u16_eax, .load_stack_disp32_u16_eax, .load_rax_ptr_disp8_rax, .load_rax_ptr_disp32_rax, .load_rax_ptr_disp8_u8_eax, .load_rax_ptr_disp8_u16_eax, .load_rax_ptr_disp8_eax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp32_rax, .load_arg_ptr_disp8_eax, .load_arg_ptr_disp8_u8_eax, .load_arg_ptr_disp8_u16_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .mulss_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .xorps_xmm1_xmm0, .movapd_xmm1_xmm0, .movapd_xmm, .unpcklps_xmm, .shufps_high_f32_to_low, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_stack_disp8_xmm0, .load_stack_disp32_xmm0, .load_stack_disp8_xmm0_f32, .load_stack_disp32_xmm0_f32, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al, .fneg_x86_fp80_stack8_st0, .fneg_fp128_xmm0 => eax_defined = true,
-        .mov_imm64_xmm => |load| {
-            if (load.reg == .xmm0) eax_defined = true;
-        },
-        .setne_eax, .set_fcmp_eax => eax_defined = true,
-        .mov_imm32_xmm => |load| {
-            if (load.reg == .xmm0) eax_defined = true;
-        },
-        .load_arg_ptr_disp8_xmm => |load| {
-            if (load.dst == .xmm0) xmm0_defined = true;
-        },
-        .load_arg_ptr_disp8_u16_arg => {},
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .mov_rax_rsi, .mov_eax_to_arg, .mov_rax_to_arg, .movsxd_arg32_arg64, .imul_arg64_arg64, .imul_arg64_rax, .div_arg32, .div_arg64, .add_arg64_imm32, .shr_arg_imm5, .shr_arg64_imm6, .sar_arg64_imm6, .mov_rsp_arg64, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .lea_global_arg64, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64, .spinlocked_var_xchg_edi_rsi_rdx_rcx, .spinlocked_var_store_edi_rsi_rdx => {},
-        .reload_rsp_eax, .reload_rsp_rax => {
-            if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
-            eax_defined = true;
-        },
-        .direct_call => |call| {
-            if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
-            const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(call.ret_ty);
-            eax_defined = function.ret_ty == .void or (!call_returns_scalar_sse and call.ret_ty != .void);
-            if (call_returns_scalar_sse) xmm0_defined = true;
-        },
-        .direct_jump => {},
-        .indirect_call_rax => |ret_ty| {
-            if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
-            const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(ret_ty);
-            eax_defined = function.ret_ty == .void or (!call_returns_scalar_sse and ret_ty != .void);
-            if (call_returns_scalar_sse) xmm0_defined = true;
-        },
-        .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
-        .push_imm32, .push_stack_disp8, .push_stack_disp32, .push_arg, .pop_arg, .push_rax, .push_xmm64, .push_byval_tail_arg_ptr, .push_byval_tail_stack_ptr => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
-        .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
-        .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
-        .sub_rsp_56, .add_rsp_56 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 56) % 16),
-        .sub_rsp_imm8 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
-        .sub_rsp_imm32 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
-        .add_rsp_imm8 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
-        .add_rsp_imm32 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
-        .spill_arg_rsp, .spill_arg64_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
-        .reload_arg_rsp, .reload_arg64_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
-        .spill_xmm32_rsp, .spill_xmm64_rsp, .spill_xmm128_rsp, .spill_xmm128ps_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
-        .reload_xmm32_rsp, .reload_xmm64_rsp, .reload_xmm128_rsp, .reload_xmm128ps_rsp => {
-            if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
-            eax_defined = true;
-        },
-        .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
-            if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
-        },
-        .spill_eax_rsp, .spill_rax_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
-        .store_eax_stack_disp8, .store_eax_stack_disp32, .store_al_stack_disp8, .store_al_stack_disp32, .store_eax_stack_rcx4_disp8, .store_eax_stack_rcx4_disp32 => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
-        .and_rsp_neg16 => rsp_mod16 = 0,
-        .noreturn_direct_call => {
-            if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .base64_decode4_from_table_rax => {
-            if (!function.ret_ty.eql(.{ .int = 64 })) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .mulo_limb64_rdi_rsi_rdx_cl_r8w_al => {
-            if (!function.ret_ty.eql(.{ .int = 1 })) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = function.ret_ty == .void;
-        },
-        .byteswap_limb64_rdi_rsi_dl_cx => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .shr_limb64_rdi_rsi_dx_cl_r8w => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .shlo_limb64_rdi_rsi_dx_cl_r8w_al => {
-            if (!function.ret_ty.eql(.{ .int = 1 })) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = function.ret_ty == .void;
-        },
-        .not_limb64_rdi_rsi_dl_cx => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .bitwise_limb64_rdi_rsi_rdx_cx => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .cmp_limb64_rdi_rsi_dl_cx_ax => {
-            if (!function.ret_ty.eql(.{ .int = 8 })) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .overflow_limb64_rdi_rsi_rdx_cl_r8w_al => {
-            if (!function.ret_ty.eql(.{ .int = 1 })) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = function.ret_ty == .void;
-        },
-        .bitreverse_limb64_rdi_rsi_dl_cx => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .popcount_limb64_rdi_si_ax => {
-            if (!function.ret_ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .ctz_limb64_rdi_si_ax => {
-            if (!function.ret_ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .clz_limb64_rdi_si_ax => {
-            if (!function.ret_ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .udivei4_before_intbytesize => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            rsp_mod16 = 0;
-            eax_defined = true;
-        },
-        .udivei4_between_intbytesize_and_memset => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
-            eax_defined = true;
-        },
-        .udivei4_after_memset => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
-            rsp_mod16 = 8;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .umodei5_before_intbytesize => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            rsp_mod16 = 0;
-            eax_defined = true;
-        },
-        .umodei5_between_intbytesize_and_memset => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
-            eax_defined = true;
-        },
-        .umodei5_after_memset_before_memcpy => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
-            eax_defined = true;
-        },
-        .umodei5_after_memcpy => {
-            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
-            if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
-            rsp_mod16 = 8;
-            saw_terminator = true;
-            eax_defined = true;
-        },
-        .mov_arg_arg, .mov_arg64_arg, .xor_edx_edx, .shl_rdx_imm6, .shl_rcx_imm6, .shl_r8_imm6, .or_rcx_rax, .or_rcx_rdx, .add_rcx_imm32, .add_r8_rcx, .sub_r8_rcx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .store_eax_rdi_rcx4_ptr, .store_al_rcx_ptr, .store_ax_rcx_ptr, .store_eax_rcx_ptr, .store_rax_rcx_ptr, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .stack_probe_rax_rcx_rsp, .spinlocked_memcpy_rsi_to_rdx_len_edi, .spinlocked_store_i128_rdi_rsi_rdx, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_al_arg_ptr_disp8, .store_al_arg_ptr_disp32, .store_ax_arg_ptr_disp8, .store_ax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_xmm0_f32_arg_ptr_disp8, .store_xmm0_f32_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .load_stack_disp8_xmm_f32, .load_stack_disp32_xmm_f32, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomiss, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .syscall, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => {},
-        .ret => {
-            if (returns_scalar_sse) {
-                if (!xmm0_defined) return error.ReturnRegisterUndefined;
-            } else if (!eax_defined) return error.ReturnRegisterUndefined;
-            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_terminator = true;
-            eax_defined = function.ret_ty == .void;
-            xmm0_defined = false;
-        },
-        .ud2 => {
-            saw_terminator = true;
-            eax_defined = eax_defined_before_label;
-            xmm0_defined = xmm0_defined_before_label;
-            preserve_eax_at_next_label = true;
-        },
-    };
+    for (function.instructions.items) |instruction| {
+        recordXmmDefinitions(instruction, &xmm_defined_bits);
+        switch (instruction) {
+            .label => |label| {
+                eax_defined_before_label = eax_defined;
+                xmm0_defined_before_label = xmm0_defined;
+                xmm_defined_bits_before_label = xmm_defined_bits;
+                if (preserve_eax_at_next_label) {
+                    preserve_eax_at_next_label = false;
+                } else if (!std.mem.endsWith(u8, label, "generic_cfg_select_end") and
+                    !std.mem.endsWith(u8, label, "generic_cfg_pointer_select_end") and
+                    !std.mem.endsWith(u8, label, "conditional_slice_sum_skip"))
+                {
+                    eax_defined = function.ret_ty == .void or sysv_abi.aggregateReturnHasNoGpr(function.ret_ty);
+                    xmm0_defined = returns_scalar_sse;
+                    xmm_defined_bits = function.entry_xmm_defined_bits;
+                }
+            },
+            .shl_eax_cl => eax_defined = true,
+            .shl_rax_cl => eax_defined = true,
+            .shr_rax_cl => eax_defined = true,
+            .sar_rax_cl => eax_defined = true,
+            .adc_rax_imm0 => eax_defined = true,
+            .movd_xmm_eax => eax_defined = true,
+            .movq_rax_xmm, .movd_eax_xmm => {},
+            .mulsd_xmm, .mulss_xmm, .subsd_xmm, .subss_xmm, .divsd_xmm, .divss_xmm, .addsd_xmm, .addss_xmm, .cvtsd2ss_xmm, .cvtss2sd_xmm, .addpd_xmm, .subpd_xmm, .mulpd_xmm, .addps_xmm, .subps_xmm, .mulps_xmm, .andps_xmm, .pxor_xmm, .pcmpgtd_xmm, .cmpeqps_xmm, .cmpeqpd_xmm, .movsd_xmm, .movss_xmm, .unpcklpd_xmm, .unpckhpd_xmm, .shufpd_lane0_lane3_xmm => {},
+            .movmskps_xmm_eax, .movmskpd_xmm_eax => eax_defined = true,
+            .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .binary_arg_rax, .sbb_arg64_rax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .shr_eax_imm5, .sar_eax_imm5, .shr_eax_cl, .sar_eax_cl, .fshl_eax_arg32_imm5, .or_eax_imm32, .imul_eax_arg32, .imul_eax_imm32, .imul_rax_arg64, .imul_rax_rsp, .mul_rax_arg64_full, .imul_rax_arg64_full, .and_eax_imm32, .abs_i32_edi_eax, .abs_i64_rdi_rax, .clz_i128_rdi_rsi_eax, .clz_i64_rdi_eax, .clz_i32_edi_eax, .ctz_i32_edi_eax, .popcount_i32_edi_eax, .bit_reverse_i32_edi_eax, .ushl_sat_i32_edi_imm_eax, .bswap_eax, .bswap_rax, .rol_ax_imm8, .shr_rax_imm6, .shl_rax_imm6, .or_rdx_rax, .neg_rax, .neg_i128_rdi_rsi_rdx_rax, .abs_limb64_rdi_rsi_dx_rcx_rax, .ctz_i128_rdi_rsi_eax, .ctz_i64_rdi_eax, .ffs_i128_rdi_rsi_eax, .ffs_i64_rdi_eax, .ffs_i32_edi_eax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .bcmp_rdi_rsi_rdx_eax, .memcmp_rdi_rsi_rdx_eax, .memcpy_rdi_rsi_rdx_rax, .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax, .cmpxchg_ptr_expected_desired_i8_eax, .cmpxchg_ptr_expected_desired_i16_eax, .cmpxchg_ptr_expected_desired_i32_eax, .cmpxchg_ptr_expected_desired_i64_eax, .spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax, .xchg_ptr_value_i8_eax, .xchg_ptr_value_i16_eax, .xchg_ptr_value_i32_eax, .xchg_ptr_value_i64_rax, .spinlocked_xchg_i128_rdi_rsi_rdx_rax, .spinlocked_load_i128_rdi_rax_rdx, .spinlocked_fetch_umin_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_umax_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_nand_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_xor_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_or_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_and_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_sub_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_add_i128_rdi_rsi_rdx_rax_rdx, .memmove_rdi_rsi_rdx_rax, .guarded_memset_rdi_sil_rdx_rcx_rax, .guarded_memcpy_rdi_rsi_rdx_rcx_rax, .guarded_strncat_rdi_rsi_rdx_rcx_rax, .guarded_strcat_rdi_rsi_rdx_rax, .guarded_strncpy_rdi_rsi_rdx_rcx_rax, .guarded_strcpy_rdi_rsi_rdx_rax, .memset_rdi_sil_rdx_rax, .load_rdi_ptr_u8_eax, .load_rdi_ptr_u16_eax, .load_rdi_ptr_eax, .load_rdi_ptr_rax, .atomic_fetch_umin_i8_rdi_sil_eax, .atomic_fetch_umin_i16_rdi_si_eax, .atomic_fetch_umin_i32_rdi_esi_eax, .atomic_fetch_umin_i64_rdi_rsi_rax, .atomic_fetch_umax_i8_rdi_sil_eax, .atomic_fetch_umax_i16_rdi_si_eax, .atomic_fetch_umax_i32_rdi_esi_eax, .atomic_fetch_umax_i64_rdi_rsi_rax, .atomic_fetch_nand_i8_rdi_sil_eax, .atomic_fetch_nand_i16_rdi_si_eax, .atomic_fetch_nand_i32_rdi_esi_eax, .atomic_fetch_nand_i64_rdi_rsi_rax, .atomic_fetch_xor_i8_rdi_sil_eax, .atomic_fetch_xor_i16_rdi_si_eax, .atomic_fetch_xor_i32_rdi_esi_eax, .atomic_fetch_xor_i64_rdi_rsi_rax, .atomic_fetch_or_i8_rdi_sil_eax, .atomic_fetch_or_i16_rdi_si_eax, .atomic_fetch_or_i32_rdi_esi_eax, .atomic_fetch_or_i64_rdi_rsi_rax, .atomic_fetch_and_i8_rdi_sil_eax, .atomic_fetch_and_i16_rdi_si_eax, .atomic_fetch_and_i32_rdi_esi_eax, .atomic_fetch_and_i64_rdi_rsi_rax, .atomic_fetch_sub_i8_rdi_sil_eax, .atomic_fetch_sub_i16_rdi_si_eax, .atomic_fetch_sub_i32_rdi_esi_eax, .atomic_fetch_sub_i64_rdi_rsi_rax, .atomic_fetch_add_i8_rdi_sil_eax, .atomic_fetch_add_i16_rdi_si_eax, .atomic_fetch_add_i32_rdi_esi_eax, .atomic_fetch_add_i64_rdi_rsi_rax, .load_rcx_ptr_u8_eax, .load_rcx_ptr_u16_eax, .load_rcx_ptr_eax, .load_rcx_ptr_rax, .smin_i32_edi_esi_eax, .umin_i32_edi_esi_eax, .smax_i32_edi_esi_eax, .umax_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .ult_i8_dil_imm8_al, .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setl_eax, .load_stack_disp8_eax, .load_stack_disp32_eax, .load_stack_rcx4_disp8_eax, .load_stack_rcx4_disp32_eax, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_stack_disp8_u8_eax, .load_stack_disp32_u8_eax, .load_stack_disp8_u16_eax, .load_stack_disp32_u16_eax, .load_rax_ptr_disp8_rax, .load_rax_ptr_disp32_rax, .load_rax_ptr_disp8_u8_eax, .load_rax_ptr_disp8_u16_eax, .load_rax_ptr_disp8_eax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp32_rax, .load_arg_ptr_disp8_eax, .load_arg_ptr_disp8_u8_eax, .load_arg_ptr_disp8_u16_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .mulss_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .xorps_xmm1_xmm0, .movapd_xmm1_xmm0, .movapd_xmm, .unpcklps_xmm, .shufps_high_f32_to_low, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_stack_disp8_xmm0, .load_stack_disp32_xmm0, .load_stack_disp8_xmm0_f32, .load_stack_disp32_xmm0_f32, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al, .fneg_x86_fp80_stack8_st0, .fneg_fp128_xmm0 => eax_defined = true,
+            .mov_imm64_xmm => |load| {
+                if (load.reg == .xmm0) eax_defined = true;
+            },
+            .setne_eax, .set_fcmp_eax => eax_defined = true,
+            .mov_imm32_xmm => |load| {
+                if (load.reg == .xmm0) eax_defined = true;
+            },
+            .load_arg_ptr_disp8_xmm => |load| {
+                if (load.dst == .xmm0) xmm0_defined = true;
+            },
+            .load_arg_ptr_disp8_u16_arg => {},
+            .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .mov_rax_rsi, .mov_eax_to_arg, .mov_rax_to_arg, .movsxd_arg32_arg64, .imul_arg64_arg64, .imul_arg64_rax, .div_arg32, .div_arg64, .add_arg64_imm32, .shr_arg_imm5, .shr_arg64_imm6, .sar_arg64_imm6, .mov_rsp_arg64, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .lea_global_arg64, .load_stack_disp8_arg32, .load_stack_disp8_arg64, .load_stack_disp32_arg32, .load_stack_disp32_arg64, .spinlocked_var_xchg_edi_rsi_rdx_rcx, .spinlocked_var_store_edi_rsi_rdx => {},
+            .reload_rsp_eax, .reload_rsp_rax => {
+                if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
+                eax_defined = true;
+            },
+            .direct_call => |call| {
+                if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
+                const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(call.ret_ty);
+                eax_defined = function.ret_ty == .void or (!call_returns_scalar_sse and call.ret_ty != .void);
+                if (call_returns_scalar_sse) xmm0_defined = true;
+            },
+            .direct_jump => {},
+            .indirect_call_rax => |ret_ty| {
+                if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
+                const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(ret_ty);
+                eax_defined = function.ret_ty == .void or (!call_returns_scalar_sse and ret_ty != .void);
+                if (call_returns_scalar_sse) xmm0_defined = true;
+            },
+            .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
+            .push_imm32, .push_stack_disp8, .push_stack_disp32, .push_arg, .pop_arg, .push_rax, .push_xmm64, .push_byval_tail_arg_ptr, .push_byval_tail_stack_ptr => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
+            .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
+            .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
+            .sub_rsp_56, .add_rsp_56 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 56) % 16),
+            .sub_rsp_imm8 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
+            .sub_rsp_imm32 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
+            .add_rsp_imm8 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
+            .add_rsp_imm32 => |bytes| rsp_mod16 = @intCast((@as(u8, rsp_mod16) + bytes) % 16),
+            .spill_arg_rsp, .spill_arg64_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+            .reload_arg_rsp, .reload_arg64_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+            .spill_xmm32_rsp, .spill_xmm64_rsp, .spill_xmm128_rsp, .spill_xmm128ps_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+            .reload_xmm32_rsp, .reload_xmm64_rsp, .reload_xmm128_rsp, .reload_xmm128ps_rsp => {
+                if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
+                eax_defined = true;
+            },
+            .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
+                if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
+            },
+            .spill_eax_rsp, .spill_rax_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+            .store_eax_stack_disp8, .store_eax_stack_disp32, .store_al_stack_disp8, .store_al_stack_disp32, .store_eax_stack_rcx4_disp8, .store_eax_stack_rcx4_disp32 => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+            .and_rsp_neg16 => rsp_mod16 = 0,
+            .noreturn_direct_call => {
+                if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .base64_decode4_from_table_rax => {
+                if (!function.ret_ty.eql(.{ .int = 64 })) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .mulo_limb64_rdi_rsi_rdx_cl_r8w_al => {
+                if (!function.ret_ty.eql(.{ .int = 1 })) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = function.ret_ty == .void;
+            },
+            .byteswap_limb64_rdi_rsi_dl_cx => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .shr_limb64_rdi_rsi_dx_cl_r8w => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .shlo_limb64_rdi_rsi_dx_cl_r8w_al => {
+                if (!function.ret_ty.eql(.{ .int = 1 })) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = function.ret_ty == .void;
+            },
+            .not_limb64_rdi_rsi_dl_cx => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .bitwise_limb64_rdi_rsi_rdx_cx => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .cmp_limb64_rdi_rsi_dl_cx_ax => {
+                if (!function.ret_ty.eql(.{ .int = 8 })) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .overflow_limb64_rdi_rsi_rdx_cl_r8w_al => {
+                if (!function.ret_ty.eql(.{ .int = 1 })) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = function.ret_ty == .void;
+            },
+            .bitreverse_limb64_rdi_rsi_dl_cx => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .popcount_limb64_rdi_si_ax => {
+                if (!function.ret_ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .ctz_limb64_rdi_si_ax => {
+                if (!function.ret_ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .clz_limb64_rdi_si_ax => {
+                if (!function.ret_ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .udivei4_before_intbytesize => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                rsp_mod16 = 0;
+                eax_defined = true;
+            },
+            .udivei4_between_intbytesize_and_memset => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
+                eax_defined = true;
+            },
+            .udivei4_after_memset => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
+                rsp_mod16 = 8;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .umodei5_before_intbytesize => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                rsp_mod16 = 0;
+                eax_defined = true;
+            },
+            .umodei5_between_intbytesize_and_memset => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
+                eax_defined = true;
+            },
+            .umodei5_after_memset_before_memcpy => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
+                eax_defined = true;
+            },
+            .umodei5_after_memcpy => {
+                if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+                if (rsp_mod16 != 0) return error.UnbalancedStackFrame;
+                rsp_mod16 = 8;
+                saw_terminator = true;
+                eax_defined = true;
+            },
+            .mov_arg_arg, .mov_arg64_arg, .xor_edx_edx, .shl_rdx_imm6, .shl_rcx_imm6, .shl_r8_imm6, .or_rcx_rax, .or_rcx_rdx, .add_rcx_imm32, .add_r8_rcx, .sub_r8_rcx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .store_eax_rdi_rcx4_ptr, .store_al_rcx_ptr, .store_ax_rcx_ptr, .store_eax_rcx_ptr, .store_rax_rcx_ptr, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .stack_probe_rax_rcx_rsp, .spinlocked_memcpy_rsi_to_rdx_len_edi, .spinlocked_store_i128_rdi_rsi_rdx, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_al_arg_ptr_disp8, .store_al_arg_ptr_disp32, .store_ax_arg_ptr_disp8, .store_ax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_xmm0_f32_arg_ptr_disp8, .store_xmm0_f32_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .load_stack_disp8_xmm_f32, .load_stack_disp32_xmm_f32, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomiss, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .syscall, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => {},
+            .ret => {
+                if (returns_scalar_sse) {
+                    if (!xmm0_defined) return error.ReturnRegisterUndefined;
+                } else if (aggregate_return_kind) |kind| {
+                    switch (kind) {
+                        .packed_f32x2 => if (xmm_defined_bits[0] < 64) return error.ReturnRegisterUndefined,
+                        .split_f64x2 => if (xmm_defined_bits[0] < 64 or xmm_defined_bits[1] < 64) return error.ReturnRegisterUndefined,
+                    }
+                } else if (!eax_defined) return error.ReturnRegisterUndefined;
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+                eax_defined = function.ret_ty == .void;
+                xmm0_defined = false;
+                xmm_defined_bits = [_]u16{0} ** 8;
+            },
+            .ud2 => {
+                saw_terminator = true;
+                eax_defined = eax_defined_before_label;
+                xmm0_defined = xmm0_defined_before_label;
+                xmm_defined_bits = xmm_defined_bits_before_label;
+                preserve_eax_at_next_label = true;
+            },
+        }
+    }
     if (!saw_terminator) return error.MissingMachineReturn;
+}
+
+fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u16) void {
+    switch (instruction) {
+        .mov_imm32_xmm0 => defined_bits[0] = 32,
+        .mov_imm32_xmm1 => defined_bits[1] = 32,
+        .mov_imm64_xmm0 => defined_bits[0] = 64,
+        .mov_imm64_xmm1 => defined_bits[1] = 64,
+        .mov_imm32_xmm => |move| defined_bits[@intFromEnum(move.reg)] = 32,
+        .mov_imm64_xmm => |move| defined_bits[@intFromEnum(move.reg)] = 64,
+        .movapd_xmm1_xmm0 => defined_bits[0] = defined_bits[1],
+        .movapd_xmm => |move| defined_bits[@intFromEnum(move.dst)] = defined_bits[@intFromEnum(move.src)],
+        .unpcklps_xmm => |unpack| {
+            const dst = @intFromEnum(unpack.dst);
+            const src = @intFromEnum(unpack.src);
+            defined_bits[dst] = if (defined_bits[dst] >= 32 and defined_bits[src] >= 32) 64 else 0;
+        },
+        .reload_xmm32_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 32,
+        .reload_xmm64_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 64,
+        .reload_xmm128_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 128,
+        .reload_xmm128ps_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 128,
+        .movd_xmm_eax => defined_bits[0] = 32,
+        .movq_xmm_rax => defined_bits[0] = 64,
+        .movss_xmm => |move| {
+            const dst = @intFromEnum(move.dst);
+            defined_bits[dst] = @max(defined_bits[dst], @as(u16, 32));
+        },
+        .movsd_xmm => |move| {
+            const dst = @intFromEnum(move.dst);
+            defined_bits[dst] = @max(defined_bits[dst], @as(u16, 64));
+        },
+        .addps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .subps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .mulps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .addpd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .subpd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .mulpd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .andps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .pxor_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .pcmpgtd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .cmpeqps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .cmpeqpd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        else => {},
+    }
 }
 
 fn hasLabel(function: MachineFunction, name: []const u8) bool {

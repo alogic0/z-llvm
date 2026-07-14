@@ -267,7 +267,7 @@ pub fn lowerUnsignedOverflowI32(selector: *ComposedBlockSelector, result: ?[]con
     const lhs_loc = selector_state.resolveValue(selector, lhs.value) orelse return .{ .unsupported_value = "composed-block-overflow-lhs" };
     const rhs_scratch: ArgReg = switch (lhs_loc) {
         .arg32, .arg64, .scratch32, .scratch64 => |reg| if (reg == .rcx) .rdx else .rcx,
-        .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector => .rcx,
+        .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => .rcx,
     };
     selector_state.emitValueIntoScratch(selector, rhs.value, rhs_scratch, 32) catch return .{ .unsupported_value = "composed-block-overflow-rhs" };
     switch (lhs_loc) {
@@ -669,7 +669,7 @@ pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, tar
         const disp = switch (loc) {
             .stack_scalar => |stack| stack.base_disp,
             .stack128 => |disp| disp,
-            .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-call-ptr-arg" },
+            .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-call-ptr-arg" },
         };
         try selector_state.clobberArgReg(selector, target);
         try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = target });
@@ -697,7 +697,7 @@ pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, tar
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = target, .frame_index = spill.lo } });
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = target_hi, .frame_index = spill.hi } });
             },
-            .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .xmm, .stack_scalar, .stack128, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-call-arg-loc" },
+            .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .xmm, .stack_scalar, .stack128, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-call-arg-loc" },
         }
         return null;
     }
@@ -734,7 +734,7 @@ pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, tar
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg_rsp = .{ .reg = target, .frame_index = frame_index } });
             } else return .{ .no_emitter = "composed-block-call-arg-width" };
         },
-        .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "composed-block-call-arg-loc" },
+        .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-call-arg-loc" },
     }
     return null;
 }

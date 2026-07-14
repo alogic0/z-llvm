@@ -3884,6 +3884,22 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_vector_mask_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox41_mask.summary`.
 
+- 2026-07-14 (this commit, INBOX-42 slice 1) Item 12 exact SSE aggregate
+  returns: the authoritative SysV classifier now admits only
+  `{ <2 x float> }` in packed low XMM0 and `{ double, double }` in XMM0/XMM1.
+  Typed terminal aggregate leaves reuse the existing value map, split returns
+  use an alias-safe parallel copy, and classifier-derived verifier checks
+  reject missing or partially defined return registers. A pinned-Zig
+  `callconv(.c)` executable checks 24 raw fields spanning zeros, subnormals,
+  finite values, infinities, and quiet/signaling NaN payloads. Report-all stays
+  at 443 / 247 / 196 with the required zero closures: `__divdc3` advances to
+  `llvm.maxnum.f64`, `__muldc3` to `<4 x double>` construction, and the f32
+  complex rows to aggregate allocas. Tier 2 and the single shared-ABI/verifier
+  Tier 3 are green. Continue with the pre-authorized aggregate stack-object
+  successor, then stop; no third cycle is authorized. Evidence
+  `docs/evidence/std_debug_hello_aggregate_sse_returns_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox42_aggregate_sse_returns.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

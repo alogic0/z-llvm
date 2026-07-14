@@ -15,6 +15,7 @@ const selector_vector = @import("composed_selector_vector.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 const selector_calls = @import("composed_selector_calls.zig");
 const selector_cfg = @import("composed_selector_cfg.zig");
+const selector_aggregate = @import("composed_selector_aggregate.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -157,6 +158,7 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
             const reg = XmmReg.fromIndex(xmm_index) catch return .{ .unsupported_value = "composed-block-param-xmm-reg" };
             const bits: u16 = if (param.ty == .half) 16 else if (param.ty == .float) 32 else 64;
             try selector_state.bindValueLoc(selector, param.name, .{ .xmm = .{ .reg = reg, .bits = bits } });
+            selector.machine.entry_xmm_defined_bits[@intFromEnum(reg)] = bits;
             xmm_index += 1;
             continue;
         }
@@ -190,6 +192,9 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
             const phi = instruction.kind.phi;
             const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
+            // Defer unsupported vector phis until their actual CFG edge so an
+            // earlier body instruction remains the reported frontier.
+            if (metadata.class == .vector_xmm) continue;
             if (metadata.class == .fp16 or metadata.class == .fp32 or metadata.class == .fp64) {
                 const assignment = selector.allocation_plan.?.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" };
                 const destination: ValueLoc = switch (assignment) {
@@ -211,7 +216,7 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
                 .gpr32 => @as(u16, 32),
                 .gpr64 => @as(u16, 64),
                 .gpr128 => @as(u16, 128),
-                .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
+                .fp16, .fp32, .fp64, .vector_xmm, .aggregate_sse, .stack_object, .stack_pointer => return .{ .no_emitter = "stage2-phi-width" },
             };
             const planned_spill = if (bits != 128 and selector.allocation_plan != null) switch (selector.allocation_plan.?.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" }) {
                 .spill => |index| selector_state.spillFrameIndexMaybe(index) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
@@ -246,7 +251,7 @@ fn stabilizeFramedParams(selector: *ComposedBlockSelector, function: ir.Function
                 if (try selector_state.spillPairValue(selector, param.name)) |diagnostic| return diagnostic;
             },
             .xmm => if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic,
-            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr => return .{ .unsupported_value = "stage2-param-home" },
+            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .unsupported_value = "stage2-param-home" },
         }
     }
     return null;
@@ -294,7 +299,7 @@ fn enterBlock(selector: *ComposedBlockSelector, block: ir.BasicBlock) !?Diagnost
         try selector_state.bindValueLoc(selector, result_name, loc);
         switch (loc) {
             .scratch32, .scratch64, .xmm, .spill64, .spill128, .spill_fp, .spill_vector => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;
@@ -337,6 +342,7 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         .gep => |gep| selector_memory.lowerGep(selector, instruction.result, gep) catch |err| return instructionValueError(selector, err, "stage2-gep-value"),
         .call => |call| selector_calls.lowerCall(selector, instruction.result, call) catch |err| return instructionValueError(selector, err, "stage2-call-value"),
         .extractvalue => |extract| selector_calls.lowerExtractValue(selector, instruction.result, extract) catch |err| return instructionValueError(selector, err, "stage2-extractvalue-value"),
+        .insertvalue => |insert| selector_aggregate.lowerInsertValue(selector, instruction.result, insert) catch |err| return instructionValueError(selector, err, "stage2-insertvalue-value"),
         .select => |select| selector_cfg.lowerSelect(selector, instruction.result, select) catch |err| return instructionValueError(selector, err, "stage2-select-value"),
         .extractelement => |extract| selector_vector.lowerExtractElement(selector, instruction.result, extract) catch |err| return instructionValueError(selector, err, "stage2-vector-extract-value"),
         .insertelement => |insert| selector_vector.lowerInsertElement(selector, instruction.result, insert) catch |err| return instructionValueError(selector, err, "stage2-vector-insert-value"),

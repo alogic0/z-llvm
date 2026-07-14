@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const selector_types = @import("selector_types.zig");
+const sysv_abi = @import("../sysv_abi.zig");
 
 const ArgReg = selector_types.ArgReg;
 const RegPair = selector_types.RegPair;
@@ -452,6 +453,7 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             var uses = NameSet.init(allocator);
             defer uses.deinit();
             try collectTerminatorNamedUses(&uses, terminator, pressure_exempt_values);
+            try collectAggregateReturnLeafUses(&uses, function, terminator, pressure_exempt_values);
             try recordSelectorIntervalUses(intervals.items, interval_indexes, uses, position);
             position += 1;
         }
@@ -629,6 +631,7 @@ fn allocateSelectorInterval(occupied: *SelectorRegisterOccupancy, interval: Sele
         .fp32 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp32 = reg } else .{ .spill = next_spill_slot },
         .fp64 => if (allocateSelectorXmm(occupied)) |reg| .{ .fp64 = reg } else .{ .spill = next_spill_slot },
         .vector_xmm => if (allocateSelectorXmm(occupied)) |reg| .{ .vector_xmm = reg } else .{ .spill = next_spill_slot },
+        .aggregate_sse => unreachable,
         .stack_object => .stack_object,
         .stack_pointer => if (allocateSelectorReg(occupied)) |reg| .{ .stack_pointer = reg } else .{ .spill = next_spill_slot },
     };
@@ -703,6 +706,12 @@ fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !
                             changed = true;
                         }
                     },
+                    .insertvalue => |insert| {
+                        if (sysv_abi.sseAggregateReturnKind(insert.aggregate_ty) != null and !exempt_values.contains(result)) {
+                            try exemptValuesPut(exempt_values, result);
+                            changed = true;
+                        }
+                    },
                     .gep => |gep| {
                         const ptr_name = namedValue(gep.ptr) orelse continue;
                         if (exempt_values.contains(ptr_name) and !exempt_values.contains(result)) {
@@ -725,6 +734,40 @@ fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !
             }
         }
     }
+}
+
+fn collectAggregateReturnLeafUses(
+    uses: *NameSet,
+    function: ir.Function,
+    terminator: ir.Terminator,
+    pressure_exempt_values: NameSet,
+) !void {
+    const ret = switch (terminator) {
+        .ret => |ret| ret,
+        else => return,
+    };
+    if (sysv_abi.sseAggregateReturnKind(ret.ty) == null) return;
+    var aggregate = ret.value orelse return;
+    var depth: usize = 0;
+    while (depth < 2) : (depth += 1) {
+        const name = namedValue(aggregate) orelse return;
+        const instruction = findInstruction(function, name) orelse return;
+        const insert = switch (instruction.kind) {
+            .insertvalue => |insert| insert,
+            else => return,
+        };
+        try addNamedPressureUse(uses, insert.value, pressure_exempt_values);
+        aggregate = insert.aggregate;
+    }
+}
+
+fn findInstruction(function: ir.Function, name: []const u8) ?ir.Instruction {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.result) |result| if (std.mem.eql(u8, result, name)) return instruction;
+        }
+    }
+    return null;
 }
 
 fn exemptValuesPut(exempt_values: *NameSet, name: []const u8) !void {
@@ -890,6 +933,15 @@ fn collectInstructionNamedUses(uses: *NameSet, instruction: ir.Instruction, pres
     }
 }
 
+pub fn instructionUsesName(allocator: std.mem.Allocator, instruction: ir.Instruction, name: []const u8) !bool {
+    var uses = NameSet.init(allocator);
+    defer uses.deinit();
+    var exemptions = NameSet.init(allocator);
+    defer exemptions.deinit();
+    try collectInstructionNamedUses(&uses, instruction, exemptions);
+    return uses.contains(name);
+}
+
 fn collectTerminatorNamedUses(uses: *NameSet, terminator: ir.Terminator, pressure_exempt_values: NameSet) !void {
     switch (terminator) {
         .ret => |ret| if (ret.value) |value| try addNamedPressureUse(uses, value, pressure_exempt_values),
@@ -902,6 +954,15 @@ fn collectTerminatorNamedUses(uses: *NameSet, terminator: ir.Terminator, pressur
         .indirectbr => |indirectbr| try addNamedPressureUse(uses, indirectbr.addr, pressure_exempt_values),
         .@"unreachable" => {},
     }
+}
+
+pub fn terminatorUsesName(allocator: std.mem.Allocator, terminator: ir.Terminator, name: []const u8) !bool {
+    var uses = NameSet.init(allocator);
+    defer uses.deinit();
+    var exemptions = NameSet.init(allocator);
+    defer exemptions.deinit();
+    try collectTerminatorNamedUses(&uses, terminator, exemptions);
+    return uses.contains(name);
 }
 
 fn instructionPressureBoundary(instruction: ir.Instruction) []const u8 {

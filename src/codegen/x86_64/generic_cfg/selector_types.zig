@@ -39,6 +39,22 @@ pub const ValueLoc = union(enum) {
     spill128: PairSpillLoc,
     spill_fp: FpSpillLoc,
     spill_vector: VectorSpillLoc,
+    aggregate_sse: SseAggregateLoc,
+};
+
+pub const SseAggregateLoc = union(enum) {
+    packed_f32x2: ?SseAggregateLeaf,
+    split_f64x2: [2]?SseAggregateLeaf,
+};
+
+pub const SseAggregateLeaf = struct {
+    name: []const u8,
+    kind: Kind,
+
+    pub const Kind = enum {
+        f32x2,
+        f64,
+    };
 };
 
 pub const ReadOnlyTablePtrLoc = struct {
@@ -61,6 +77,7 @@ pub const VirtualRegClass = enum {
     fp32,
     fp64,
     vector_xmm,
+    aggregate_sse,
     stack_object,
     stack_pointer,
 };

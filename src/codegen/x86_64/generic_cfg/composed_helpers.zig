@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const sysv_abi = @import("../sysv_abi.zig");
 const x86_64_types = @import("../types.zig");
 const selector_types = @import("selector_types.zig");
 
@@ -58,7 +59,7 @@ pub fn isCommutative(op: MachineBinaryOp) bool {
 pub fn locIsAccumulator(loc: ValueLoc) bool {
     return switch (loc) {
         .eax, .rax => true,
-        .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector => false,
+        .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => false,
     };
 }
 
@@ -91,6 +92,7 @@ pub fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .spill_fp => |fp| fp.frame_index.eql(rhs.spill_fp.frame_index) and fp.bits == rhs.spill_fp.bits,
         .spill_vector => |vector| vector.frames.lo.eql(rhs.spill_vector.frames.lo) and
             vector.frames.hi.eql(rhs.spill_vector.frames.hi) and vector.shape.eql(rhs.spill_vector.shape),
+        .aggregate_sse => |aggregate| sseAggregateLocEql(aggregate, rhs.aggregate_sse),
     };
 }
 
@@ -102,8 +104,22 @@ pub fn locContainsReg(loc: ValueLoc, reg: ArgReg) bool {
             .reg => |value_reg| value_reg == reg,
             .spill => false,
         },
-        .eax, .rax, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128, .spill_fp, .spill_vector => false,
+        .eax, .rax, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => false,
     };
+}
+
+fn sseAggregateLocEql(lhs: selector_types.SseAggregateLoc, rhs: selector_types.SseAggregateLoc) bool {
+    if (std.meta.activeTag(lhs) != std.meta.activeTag(rhs)) return false;
+    return switch (lhs) {
+        .packed_f32x2 => |leaf| optionalSseLeafEql(leaf, rhs.packed_f32x2),
+        .split_f64x2 => |leaves| optionalSseLeafEql(leaves[0], rhs.split_f64x2[0]) and
+            optionalSseLeafEql(leaves[1], rhs.split_f64x2[1]),
+    };
+}
+
+fn optionalSseLeafEql(lhs: ?selector_types.SseAggregateLeaf, rhs: ?selector_types.SseAggregateLeaf) bool {
+    if (lhs == null or rhs == null) return lhs == null and rhs == null;
+    return lhs.?.kind == rhs.?.kind and std.mem.eql(u8, lhs.?.name, rhs.?.name);
 }
 
 pub fn valueIsInt(value: ir.Value) bool {
@@ -159,6 +175,7 @@ pub fn stack128FrameBytes() u32 {
 
 pub fn isComposedReturnType(ty: ir.Type) bool {
     if (ty == .void or ty == .half or ty == .float or ty == .double) return true;
+    if (sysv_abi.sseAggregateReturnKind(ty) != null) return true;
     const bits = intBits(ty) orelse return false;
     return bits == 32 or bits == 64 or bits == 128;
 }

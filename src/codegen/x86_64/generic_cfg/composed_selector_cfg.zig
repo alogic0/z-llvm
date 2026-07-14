@@ -9,6 +9,8 @@ const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_fp = @import("composed_selector_fp.zig");
+const selector_aggregate = @import("composed_selector_aggregate.zig");
+const sysv_abi = @import("../sysv_abi.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 const selector_calls = @import("composed_selector_calls.zig");
@@ -165,6 +167,12 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
         const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
         const bits: u16 = if (ret.ty == .half) 16 else if (ret.ty == .float) 32 else 64;
         selector_state.emitValueIntoFpReturn(selector, value, bits) catch return .{ .unsupported_value = "composed-block-fp-ret-value" };
+        try emitReturnEpilogue(selector);
+        return null;
+    }
+    if (sysv_abi.sseAggregateReturnKind(ret.ty)) |kind| {
+        const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
+        selector_aggregate.emitReturn(selector, value, kind) catch return .{ .unsupported_value = "composed-block-aggregate-ret-value" };
         try emitReturnEpilogue(selector);
         return null;
     }
@@ -499,7 +507,7 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         try selector_state.bindValueLoc(selector, result_name, dst);
         switch (dst) {
             .scratch32, .scratch64, .xmm, .spill64, .spill128, .spill_fp => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill_vector => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill_vector, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;
@@ -584,7 +592,7 @@ fn stabilizePhiEdgeSources(selector: *ComposedBlockSelector, target: ir.BasicBlo
             .arg128, .scratch128 => if (try selector_state.spillPairValue(selector, name)) |diagnostic| return diagnostic,
             .spill64, .spill128, .spill_fp, .spill_vector => {},
             .xmm => if (try selector_state.spillValue(selector, name)) |diagnostic| return diagnostic,
-            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr => return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) },
+            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) },
         }
     }
     return null;
@@ -661,7 +669,7 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
             },
             .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
         },
-        .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill_vector => return .{ .no_emitter = "stage2-phi-dst-loc" },
+        .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill_vector, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
     }
     return null;
 }
@@ -676,7 +684,7 @@ pub fn emitBranchCondition(selector: *ComposedBlockSelector, value: ir.Value) !?
             try selector.machine.instructions.append(selector.allocator, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
             try selector.machine.instructions.append(selector.allocator, .{ .test_arg8 = .rcx });
         },
-        .arg64, .scratch64, .arg128, .scratch128, .xmm, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector => return .{ .no_emitter = "stage2-cond-loc" },
+        .arg64, .scratch64, .arg128, .scratch128, .xmm, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "stage2-cond-loc" },
     }
     return null;
 }

@@ -43,6 +43,37 @@ pub const AggregateClassification = struct {
     }
 };
 
+pub const SseAggregateReturnKind = enum {
+    packed_f32x2,
+    split_f64x2,
+};
+
+pub fn sseAggregateReturnKind(ty: ir.Type) ?SseAggregateReturnKind {
+    if (ty != .aggregate) return null;
+    if (compactTypeTextEql(ty.aggregate, "{<2xfloat>}")) return .packed_f32x2;
+    const first = type_layout.fieldType(ty, 0) orelse return null;
+    const second = type_layout.fieldType(ty, 1);
+    if (second == null and type_layout.fieldType(ty, 2) == null and first == .vector) {
+        const vector = first.vector;
+        if (vector.len == 2 and vector.elem_ty == .float) return .packed_f32x2;
+        return null;
+    }
+    if (first == .double and second != null and second.? == .double and type_layout.fieldType(ty, 2) == null) {
+        return .split_f64x2;
+    }
+    return null;
+}
+
+fn compactTypeTextEql(text: []const u8, expected: []const u8) bool {
+    var expected_index: usize = 0;
+    for (text) |byte| {
+        if (std.ascii.isWhitespace(byte)) continue;
+        if (expected_index >= expected.len or byte != expected[expected_index]) return false;
+        expected_index += 1;
+    }
+    return expected_index == expected.len;
+}
+
 pub fn dataLayout() !target.DataLayout {
     return target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
 }
@@ -440,6 +471,12 @@ fn planCallWithFunction(allocator: std.mem.Allocator, function: ?ir.Function, ca
 }
 
 pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
+    if (sseAggregateReturnKind(ret_ty)) |kind| {
+        return .{ .sse_returns = switch (kind) {
+            .packed_f32x2 => 1,
+            .split_f64x2 => 2,
+        } };
+    }
     try rejectUnsupportedAbiType(ret_ty);
     if (ret_ty == .void) return .{};
     if (isScalarGprAbiType(ret_ty)) {
@@ -467,6 +504,29 @@ pub fn callHasScalarSseType(call: ir.CallInst) bool {
         if (isScalarSseAbiType(arg.ty)) return true;
     }
     return false;
+}
+
+pub fn entryXmmDefinedBits(function: ir.Function) [8]u16 {
+    var result = [_]u16{0} ** 8;
+    var xmm_index: usize = 0;
+    for (function.params.items) |param| {
+        if (isScalarSseAbiType(param.ty)) {
+            if (xmm_index < result.len) result[xmm_index] = if (param.ty == .half) 16 else if (param.ty == .float) 32 else 64;
+            xmm_index += 1;
+            continue;
+        }
+        if (param.ty != .aggregate) continue;
+        const classification = classifyAggregate(param.ty) catch continue;
+        if (classification.kind != .register) continue;
+        var class_index: usize = 0;
+        while (class_index < classification.eightbyte_count) : (class_index += 1) {
+            if (classification.eightbytes[class_index] == .sse) {
+                if (xmm_index < result.len) result[xmm_index] = 64;
+                xmm_index += 1;
+            }
+        }
+    }
+    return result;
 }
 
 pub fn rejectUnsupportedCallEnvelope(call: ir.CallInst) !void {

@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const fp_semantics = @import("../../../analysis/fp_semantics.zig");
+const sysv_abi = @import("../sysv_abi.zig");
 
 pub const Diagnostic = union(enum) {
     unsupported_control_flow: []const u8,
@@ -78,7 +79,7 @@ fn inspectInstruction(instruction: ir.Instruction) ?Diagnostic {
         .insertelement => |insert| inspectInsertElement(insert),
         .shufflevector => |shuffle| inspectShuffleVector(shuffle),
         .extractvalue => |extract| inspectExtractValue(extract),
-        .insertvalue => .{ .unsupported_instruction = "insertvalue" },
+        .insertvalue => |insert| if (sysv_abi.sseAggregateReturnKind(insert.aggregate_ty) != null) null else .{ .unsupported_instruction = "insertvalue" },
     };
 }
 
@@ -352,7 +353,7 @@ fn blockEndsInTrap(block: ir.BasicBlock) bool {
 }
 
 fn isScalarReturnType(ty: ir.Type) bool {
-    return ty == .void or isSelectorScalarType(ty);
+    return ty == .void or isSelectorScalarType(ty) or sysv_abi.sseAggregateReturnKind(ty) != null;
 }
 
 fn isSelectorScalarType(ty: ir.Type) bool {

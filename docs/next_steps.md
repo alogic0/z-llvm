@@ -37,24 +37,22 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-41 is complete. The existing XMM vector location now owns canonical
-two-lane masks with 32/64-bit source widths, static definedness, and all-zero /
-all-one lane invariants. Packed fabs, exact FP-to-integer vector retagging,
-packed oeq and unsigned comparison, movmsk scalar extraction, pair spilling,
-and their machine/encoder/verifier forms close exactly `__unordsf2`.
-Report-all is now 443 selected / 247 emitting / 196 failing, with no collateral
-emissions or new failures. Permanent bit-exact execution, extracted-object
-inspection, native `-fno-lld` execution, Tier 2, and the single Tier 3 are
-green.
+INBOX-42 slice 1 is complete. `sysv_abi.zig` now exactly classifies
+`{ <2 x float> }` into packed low XMM0 and `{ double, double }` into XMM0/XMM1.
+Typed terminal aggregate leaves, alias-safe return materialization, verifier
+definedness, and a pinned-Zig `callconv(.c)` canary are green through Tier 3.
+Report-all remains honestly at 443 selected / 247 emitting / 196 failing with
+zero closures; the four complex rows advance to their reviewed body or
+aggregate-object frontiers.
 
-Stop for the mandatory aggregate-ABI architectural review. The next boundary
-is complex `{ float, float }` / `{ double, double }` returns and aggregate
-allocas, with `sysv_abi.zig` remaining the classification authority. Decide
-the bounded return/alloca slice and how it composes with the now-proven mask
-shape before authorizing vector selects or any successor capability. Current
-cycle evidence:
-`docs/evidence/std_debug_hello_vector_mask_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox41_mask.summary`.
+Continue immediately with INBOX-42's pre-authorized aggregate stack-object
+slice: one exact 8-byte, 4-aligned f32-pair object through the existing frame
+authority; bounds-checked constant field offsets; pointer PHIs through the
+existing edge path; and captured f32 store/load/merge forms. Expected closures
+remain zero. Commit that successor separately, then stop for review; no third
+cycle is authorized. Slice-1 evidence:
+`docs/evidence/std_debug_hello_aggregate_sse_returns_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox42_aggregate_sse_returns.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

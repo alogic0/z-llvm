@@ -254,6 +254,7 @@ pub fn lowerFunctionWithOptions(
     if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) return error.UnsupportedTarget;
 
     var machine = MachineFunction.init(symbolName(function.name), function.ret_ty);
+    machine.entry_xmm_defined_bits = sysv_abi.entryXmmDefinedBits(function);
     errdefer machine.deinit(allocator);
 
     if (options.generic_cfg_selector) {
