@@ -55,6 +55,13 @@ then operand-order-safe named i64 `ult`. Hold the four expected closures
 provisional until one cumulative Tier 3 at the end. No third pipeline is
 authorized.
 
+Comparison cycle 1 is complete with zero provisional closures. Exact modulo-
+i16 negative literals advance `__mulhf3` to `composed-block-binary-width` and
+`__addhf3` to `composed-block-icmp-form`; both remain failing and those later
+forms stay out of scope. Continue at exact named i64 `ult`, targeting
+`__truncdfsf2` and `__truncdfhf2`, then run the pipeline's cumulative Tier 3.
+Evidence: `docs/evidence/std_debug_hello_inbox50_i16_negative_literal.summary`.
+
 INBOX-48 is complete and accepted. Commit `1c5ff956` adds exact fully defined
 f64x2 PHI destinations through the existing XMM/pair-spill value map and
 parallel edge-copy authority. The single Tier 3 passed all 17 subgates against

@@ -12,6 +12,7 @@ const pair_b = selector_types.pair_b;
 const intBits = composed_helpers.intBits;
 const i32Value = composed_helpers.i32Value;
 const i64Value = composed_helpers.i64Value;
+const u16BitPattern = composed_helpers.u16BitPattern;
 
 pub const Diagnostic = inspection.Diagnostic;
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
@@ -156,11 +157,10 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector_state.clobberAccumulator(selector);
         try selector.machine.instructions.append(selector.allocator, .sete_eax);
     } else if ((icmp.predicate == .ult or icmp.predicate == .ugt) and icmp.operand_ty.eql(.{ .int = 16 }) and icmp.rhs == .int) {
-        const imm = try i64Value(icmp.rhs.int);
-        if (imm < 0 or imm > std.math.maxInt(u16)) return .{ .no_emitter = "composed-block-icmp-rhs" };
+        const imm = u16BitPattern(icmp.rhs.int) catch return .{ .no_emitter = "composed-block-icmp-rhs" };
         selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, 16) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
         try selector_state.clobberAccumulator(selector);
-        try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = @intCast(imm) } });
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = imm } });
         try selector.machine.instructions.append(selector.allocator, if (icmp.predicate == .ult) .setb_eax else .seta_eax);
     } else if (icmp.predicate == .ugt and (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })) and icmp.rhs == .named) {
         const bits: u16 = if (icmp.operand_ty.eql(.{ .int = 32 })) 32 else 64;

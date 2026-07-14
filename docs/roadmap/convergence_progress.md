@@ -4229,6 +4229,18 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence `docs/evidence/std_debug_hello_inbox50_frame_repair.summary` and
   `docs/evidence/distribution_all_after_inbox50_frame_repair.summary`.
 
+- 2026-07-14 (this commit, INBOX-50 comparison cycle 1) Item 12 exact i16
+  unsigned negative-literal comparison: LLVM constants in the signed-i16 to
+  unsigned-i16 textual envelope now materialize as exact modulo-16-bit
+  patterns for `ult`/`ugt`, with out-of-range constants and neighboring forms
+  fail-closed. Permanent execution covers 22 threshold cases. Tier 2 passes
+  24/24 steps and 1008/1008 tests. The report remains 443 / 270 / 173:
+  `__mulhf3` advances to `composed-block-binary-width` and `__addhf3` advances
+  to `composed-block-icmp-form`, so neither expected closure is claimed.
+  Continue with the pre-authorized named i64 `ult` cycle and hold any closures
+  for the comparison pipeline's cumulative Tier 3. Evidence
+  `docs/evidence/std_debug_hello_inbox50_i16_negative_literal.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

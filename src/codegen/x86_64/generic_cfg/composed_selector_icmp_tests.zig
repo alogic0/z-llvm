@@ -45,6 +45,88 @@ test "generic cfg selector executes signed i16 less-than zero" {
     }) |case| try std.testing.expectEqual(case[1], is_negative(case[0]));
 }
 
+test "generic cfg selector admits signed textual i16 constants as unsigned bit patterns" {
+    inline for (.{
+        .{ .predicate = ir.IcmpPredicate.ult, .literal = @as(i128, -30), .bits = @as(u16, 0xffe2), .set = x86_64_machine.Instruction.setb_eax },
+        .{ .predicate = ir.IcmpPredicate.ugt, .literal = @as(i128, -31743), .bits = @as(u16, 0x8401), .set = x86_64_machine.Instruction.seta_eax },
+    }) |case| {
+        var machine = MachineFunction.init("i16-negative-literal", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+
+        const diagnostic = try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = case.predicate,
+            .operand_ty = .{ .int = 16 },
+            .lhs = .{ .named = "value" },
+            .rhs = .{ .int = case.literal },
+        });
+
+        try std.testing.expect(diagnostic == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+            .{ .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = case.bits } },
+            case.set,
+        }, machine.instructions.items);
+    }
+
+    inline for (.{ @as(i128, -32769), @as(i128, 65536) }) |literal| {
+        var machine = MachineFunction.init("i16-negative-literal-near-miss", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .ult,
+            .operand_ty = .{ .int = 16 },
+            .lhs = .{ .named = "value" },
+            .rhs = .{ .int = literal },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-rhs", diagnostic.detail());
+    }
+}
+
+test "generic cfg selector executes unsigned i16 negative-literal boundaries" {
+    const input =
+        \\define i32 @below_neg30(i32 %raw) {
+        \\entry:
+        \\  %value = trunc i32 %raw to i16
+        \\  %comparison = icmp ult i16 %value, -30
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\define i32 @above_neg31743(i32 %raw) {
+        \\entry:
+        \\  %value = trunc i32 %raw to i16
+        \\  %comparison = icmp ugt i16 %value, -31743
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const values = [_]u16{ 0, 1, 0x7fff, 0x8000, 0x8400, 0x8401, 0x8402, 0xffe1, 0xffe2, 0xffe3, 0xffff };
+    for (module.functions.items, 0..) |function_ir, function_index| {
+        var machine = MachineFunction.init(function_ir.name, .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        const function: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+        for (values) |value| {
+            const expected = if (function_index == 0) value < 0xffe2 else value > 0x8401;
+            try std.testing.expectEqual(@intFromBool(expected), function(value));
+        }
+    }
+}
+
 test "generic cfg selector lowers exact named i16 comparisons" {
     inline for (.{ ir.IcmpPredicate.slt, ir.IcmpPredicate.sgt, ir.IcmpPredicate.ne }) |predicate| {
         var machine = MachineFunction.init("named-i16", .{ .int = 1 });
