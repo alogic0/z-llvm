@@ -199,9 +199,26 @@ fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Dia
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
             const phi = instruction.kind.phi;
             const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
-            // Defer unsupported vector phis until their actual CFG edge so an
-            // earlier body instruction remains the reported frontier.
-            if (metadata.class == .vector_xmm) continue;
+            if (metadata.class == .vector_xmm) {
+                const shape = supportedPhiVectorShape(phi.ty) orelse continue;
+                const assignment = selector.allocation_plan.?.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" };
+                const destination: ValueLoc = switch (assignment) {
+                    .vector_xmm => |reg| .{ .xmm = .{
+                        .reg = reg,
+                        .bits = 128,
+                        .shape = .{ .vector = shape },
+                    } },
+                    .spill => |index| .{ .spill_vector = .{
+                        .frames = selector_state.pairSpillFrameIndexMaybe(index) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
+                        .shape = shape,
+                    } },
+                    else => return .{ .no_emitter = "stage2-phi-width" },
+                };
+                try selector.phi_results.put(result_name, {});
+                try selector.phi_destinations.put(result_name, destination);
+                try selector_state.bindValueLoc(selector, result_name, destination);
+                continue;
+            }
             if (metadata.class == .fp16 or metadata.class == .fp32 or metadata.class == .fp64) {
                 const assignment = selector.allocation_plan.?.assignment(result_name) orelse return .{ .unsupported_value = "stage2-phi-plan" };
                 const destination: ValueLoc = switch (assignment) {
@@ -275,6 +292,14 @@ fn stabilizeFramedPhiDestinations(selector: *ComposedBlockSelector) !?Diagnostic
                     .frame_index = selector_state.allocateSpillSlot(selector, entry.key_ptr.*) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
                     .bits = fp.bits,
                 } }
+            else if (fp.vectorShape()) |shape|
+                if (supportedPhiVectorShapeFromLoc(fp))
+                    .{ .spill_vector = .{
+                        .frames = selector_state.allocatePairSpillSlots(selector, entry.key_ptr.*) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
+                        .shape = shape,
+                    } }
+                else
+                    continue
             else
                 continue,
             else => continue,
@@ -283,6 +308,16 @@ fn stabilizeFramedPhiDestinations(selector: *ComposedBlockSelector) !?Diagnostic
         try selector_state.bindValueLoc(selector, entry.key_ptr.*, destination);
     }
     return null;
+}
+
+fn supportedPhiVectorShape(ty: ir.Type) ?selector_types.VectorShape {
+    if (ty != .vector or ty.vector.len != 2 or ty.vector.elem_ty != .double) return null;
+    return .f64x2(0b11);
+}
+
+fn supportedPhiVectorShapeFromLoc(loc: selector_types.XmmValueLoc) bool {
+    const shape = loc.vectorShape() orelse return false;
+    return loc.bits == 128 and shape.eql(selector_types.VectorShape.f64x2(0b11));
 }
 
 fn nextPhiReg(used_in_block: *[phi_regs.len]bool) ?ArgReg {

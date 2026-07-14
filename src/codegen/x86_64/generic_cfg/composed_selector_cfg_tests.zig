@@ -425,22 +425,194 @@ test "composed selector carries scalar FP phi values around loops" {
     }
 }
 
-test "composed selector keeps vector selects and phis fail closed" {
+test "composed selector executes crossed fully defined f64x2 phis through pair spills" {
     const input =
-        \\define float @vector_select(i32 %flag) {
+        \\define { double, double } @crossed_phi(i32 %count, double %a, double %b, double %c, double %d) {
         \\entry:
-        \\  %cond = icmp ne i32 %flag, 0
-        \\  %selected = select i1 %cond, <2 x float> <float 1.000000e+00, float 2.000000e+00>, <2 x float> zeroinitializer
-        \\  %lane = extractelement <2 x float> %selected, i64 0
+        \\  %left0 = insertelement <2 x double> poison, double %a, i64 0
+        \\  %left1 = insertelement <2 x double> %left0, double %b, i64 1
+        \\  %right0 = insertelement <2 x double> poison, double %c, i64 0
+        \\  %right1 = insertelement <2 x double> %right0, double %d, i64 1
+        \\  br label %loop
+        \\loop:
+        \\  %index = phi i32 [ 0, %entry ], [ %next, %loop ]
+        \\  %left = phi <2 x double> [ %left1, %entry ], [ %right, %loop ]
+        \\  %right = phi <2 x double> [ %right1, %entry ], [ %left, %loop ]
+        \\  %next = add i32 %index, 1
+        \\  %again = icmp ult i32 %next, %count
+        \\  br i1 %again, label %loop, label %exit
+        \\exit:
+        \\  %low = extractelement <2 x double> %left, i64 0
+        \\  %high = extractelement <2 x double> %left, i64 1
+        \\  %result0 = insertvalue { double, double } poison, double %low, 0
+        \\  %result1 = insertvalue { double, double } %result0, double %high, 1
+        \\  ret { double, double } %result1
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("crossed_phi", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (selection) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("crossed f64x2 phi diagnostic={s}/{s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+            return error.TestUnexpectedResult;
+        },
+    }
+    try x86_64_verify.verifyFunction(machine);
+
+    var vector_spills: usize = 0;
+    var vector_reloads: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_xmm128_rsp => vector_spills += 1,
+        .reload_xmm128_rsp => vector_reloads += 1,
+        else => {},
+    };
+    try std.testing.expect(vector_spills >= 2);
+    try std.testing.expect(vector_reloads >= 2);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const DoublePair = extern struct { low: f64, high: f64 };
+    const crossed: *const fn (u32, f64, f64, f64, f64) callconv(.c) DoublePair = @ptrCast(mapping.ptr);
+
+    const left = [2]u64{ 0x7ff8_1234_5678_9abc, 0x8000_0000_0000_0001 };
+    const right = [2]u64{ 0xfff0_0000_0000_0000, 0x000f_ffff_ffff_ffff };
+    const output1 = crossed(1, @bitCast(left[0]), @bitCast(left[1]), @bitCast(right[0]), @bitCast(right[1]));
+    try std.testing.expectEqual(left, [2]u64{ @bitCast(output1.low), @bitCast(output1.high) });
+    const output2 = crossed(2, @bitCast(left[0]), @bitCast(left[1]), @bitCast(right[0]), @bitCast(right[1]));
+    try std.testing.expectEqual(right, [2]u64{ @bitCast(output2.low), @bitCast(output2.high) });
+    const output3 = crossed(3, @bitCast(left[0]), @bitCast(left[1]), @bitCast(right[0]), @bitCast(right[1]));
+    try std.testing.expectEqual(left, [2]u64{ @bitCast(output3.low), @bitCast(output3.high) });
+}
+
+test "generic cfg selector preserves equal and overlapping f64x2 phi locations" {
+    const shape = selector_types.VectorShape.f64x2(0b11);
+    var machine = MachineFunction.init("f64x2-phi-locations", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 32;
+
+    const same: ValueLoc = .{ .xmm = .{ .reg = .xmm2, .bits = 128, .shape = .{ .vector = shape } } };
+    try selector_state.bindValueLoc(&selector, "same", same);
+    try std.testing.expect((try selector_cfg.emitValueIntoLoc(&selector, .{ .named = "same" }, same, "same-result", 128)) == null);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    const source: ValueLoc = .{ .spill_vector = .{ .frames = .{ .lo = .slot0, .hi = .slot2 }, .shape = shape } };
+    const destination: ValueLoc = .{ .spill_vector = .{ .frames = .{ .lo = .slot2, .hi = .slot4 }, .shape = shape } };
+    try selector_state.bindValueLoc(&selector, "spilled", source);
+    try std.testing.expect((try selector_cfg.emitValueIntoLoc(&selector, .{ .named = "spilled" }, destination, "spill-result", 128)) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .reload_xmm128_rsp = .{ .frame_index = .slot0, .reg = .xmm0 } },
+        .{ .spill_xmm128_rsp = .{ .frame_index = .slot2, .reg = .xmm0 } },
+    }, machine.instructions.items);
+}
+
+test "composed selector preserves a duplicated f64x2 phi source on either selected edge" {
+    const input =
+        \\define { double, double } @duplicate_phi(i32 %flag, double %low, double %high) {
+        \\entry:
+        \\  %v0 = insertelement <2 x double> poison, double %low, i64 0
+        \\  %v1 = insertelement <2 x double> %v0, double %high, i64 1
+        \\  %condition = icmp ne i32 %flag, 0
+        \\  br i1 %condition, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %joined = phi <2 x double> [ %v1, %left ], [ %v1, %right ]
+        \\  %lane0 = extractelement <2 x double> %joined, i64 0
+        \\  %lane1 = extractelement <2 x double> %joined, i64 1
+        \\  %result0 = insertvalue { double, double } poison, double %lane0, 0
+        \\  %result1 = insertvalue { double, double } %result0, double %lane1, 1
+        \\  ret { double, double } %result1
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("duplicate_phi", module.functions.items[0].ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const DoublePair = extern struct { low: f64, high: f64 };
+    const duplicate: *const fn (u32, f64, f64) callconv(.c) DoublePair = @ptrCast(mapping.ptr);
+    const expected = [2]u64{ 0x7ff0_0000_0000_0042, 0x8000_0000_0000_0000 };
+    inline for (.{ @as(u32, 0), @as(u32, 1) }) |flag| {
+        const result = duplicate(flag, @bitCast(expected[0]), @bitCast(expected[1]));
+        try std.testing.expectEqual(expected, [2]u64{ @bitCast(result.low), @bitCast(result.high) });
+    }
+}
+
+test "composed selector keeps excluded vector phis fail closed" {
+    const input =
+        \\define double @partial_f64x2_phi(double %value) {
+        \\entry:
+        \\  %partial = insertelement <2 x double> poison, double %value, i64 0
+        \\  br label %merge
+        \\merge:
+        \\  %vector = phi <2 x double> [ %partial, %entry ]
+        \\  %lane = extractelement <2 x double> %vector, i64 0
+        \\  ret double %lane
+        \\}
+        \\define float @f32x2_phi(float %a, float %b) {
+        \\entry:
+        \\  %v0 = insertelement <2 x float> poison, float %a, i64 0
+        \\  %v1 = insertelement <2 x float> %v0, float %b, i64 1
+        \\  br label %merge
+        \\merge:
+        \\  %vector = phi <2 x float> [ %v1, %entry ]
+        \\  %lane = extractelement <2 x float> %vector, i64 0
         \\  ret float %lane
         \\}
-        \\define float @vector_phi() {
+        \\define i32 @mask_phi(double %a, double %b) {
+        \\entry:
+        \\  %v0 = insertelement <2 x double> poison, double %a, i64 0
+        \\  %v1 = insertelement <2 x double> %v0, double %b, i64 1
+        \\  %mask = fcmp oeq <2 x double> %v1, zeroinitializer
+        \\  br label %merge
+        \\merge:
+        \\  %joined = phi <2 x i1> [ %mask, %entry ]
+        \\  %lane = extractelement <2 x i1> %joined, i64 0
+        \\  %result = zext i1 %lane to i32
+        \\  ret i32 %result
+        \\}
+        \\define float @f32x4_phi(float %a, float %b, float %c, float %d) {
+        \\entry:
+        \\  %v0 = insertelement <4 x float> poison, float %a, i64 0
+        \\  %v1 = insertelement <4 x float> %v0, float %b, i64 1
+        \\  %v2 = insertelement <4 x float> %v1, float %c, i64 2
+        \\  %v3 = insertelement <4 x float> %v2, float %d, i64 3
+        \\  br label %merge
+        \\merge:
+        \\  %vector = phi <4 x float> [ %v3, %entry ]
+        \\  %lane = extractelement <4 x float> %vector, i64 0
+        \\  ret float %lane
+        \\}
+        \\define double @constant_f64x2_phi() {
         \\entry:
         \\  br label %merge
         \\merge:
-        \\  %value = phi <2 x float> [ zeroinitializer, %entry ]
-        \\  %lane = extractelement <2 x float> %value, i64 0
-        \\  ret float %lane
+        \\  %vector = phi <2 x double> [ zeroinitializer, %entry ]
+        \\  %lane = extractelement <2 x double> %vector, i64 0
+        \\  ret double %lane
         \\}
         \\
     ;
@@ -457,6 +629,15 @@ test "composed selector keeps vector selects and phis fail closed" {
             .selected => return error.TestUnexpectedResult,
         }
     }
+
+    const shape = selector_types.VectorShape.f64x2(0b11);
+    var machine = MachineFunction.init("non-vector-phi-spill", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+    try selector_state.bindValueLoc(&selector, "vector", .{ .xmm = .{ .reg = .xmm1, .bits = 128, .shape = .{ .vector = shape } } });
+    try std.testing.expect((try selector_cfg.emitValueIntoLoc(&selector, .{ .named = "vector" }, .{ .spill64 = .slot0 }, "result", 128)) != null);
 }
 
 test "composed selector lowers typed i32 switches as compare chains" {

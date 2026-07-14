@@ -4099,6 +4099,22 @@ One line per completed cycle, append-only, newest last. This is the
   implementation successor is authorized. Evidence
   `docs/evidence/distribution_all_after_inbox47_vector_pipeline.summary`.
 
+- 2026-07-14 (this commit, INBOX-48) Item 12 bounded f64x2 PHI capability:
+  stage2 now assigns fully defined `<2 x double>` PHI destinations to the
+  existing XMM or pair-slot `.spill_vector` locations, and the existing
+  parallel edge-copy authority preserves complete XMM shapes across crossed,
+  duplicated, selected-edge, equal-location, and overlapping spill copies.
+  Partial f64x2, other vector shapes, masks, constants, and scalar spill
+  destinations remain fail-closed. Permanent raw-bit execution forces two
+  crossed pair-spilled PHIs; Tier 2 is green at 24/24 steps and 991/991 tests.
+  The fresh report stays 443 / 261 / 182 and differs only by advancing
+  `compiler_rt.divdc3.__divdc3` from `stage2-phi-dst` to the later unreviewed
+  `<2 x i64>` `composed-vector-extract-type` frontier. The expected closure
+  and pinned-row proof therefore do not occur, and no closure is claimed.
+  Run the required shared-CFG Tier 3 against this committed tree, then stop on
+  the unexpected later frontier before the pre-authorized successor. Evidence
+  `docs/evidence/std_debug_hello_inbox48_f64x2_phi.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

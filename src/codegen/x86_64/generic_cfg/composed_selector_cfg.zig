@@ -488,9 +488,9 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
     selector.preserve_current_position_values = true;
     defer selector.preserve_current_position_values = previous_preserve_current;
     if (try stabilizePhiEdgeSources(selector, target, predecessor)) |diagnostic| return diagnostic;
-    var fp_snapshots: std.ArrayList(FpPhiSnapshot) = .empty;
-    defer fp_snapshots.deinit(selector.allocator);
-    if (try snapshotFpPhiSources(selector, target, predecessor, &fp_snapshots)) |diagnostic| return diagnostic;
+    var xmm_snapshots: std.ArrayList(XmmPhiSnapshot) = .empty;
+    defer xmm_snapshots.deinit(selector.allocator);
+    if (try snapshotXmmPhiSources(selector, target, predecessor, &xmm_snapshots)) |diagnostic| return diagnostic;
     for (target.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const phi = switch (instruction.kind) {
@@ -501,29 +501,28 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
         const dst = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
-        if (fpPhiSnapshot(&fp_snapshots, result_name)) |snapshot| {
-            selector_state.materializeLocIntoLoc(selector, .{ .xmm = .{ .reg = snapshot.reg, .bits = snapshot.bits } }, dst) catch return .{ .unsupported_value = "stage2-phi-src" };
+        if (xmmPhiSnapshot(&xmm_snapshots, result_name)) |snapshot| {
+            selector_state.materializeLocIntoLoc(selector, .{ .xmm = snapshot.loc }, dst) catch return .{ .unsupported_value = "stage2-phi-src" };
         } else if (try emitValueIntoLoc(selector, incoming.value, dst, result_name, metadata.bits)) |diagnostic| return diagnostic;
         try selector_state.bindValueLoc(selector, result_name, dst);
         switch (dst) {
-            .scratch32, .scratch64, .xmm, .spill64, .spill128, .spill_fp => {},
-            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill_vector, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
+            .scratch32, .scratch64, .xmm, .spill64, .spill128, .spill_fp, .spill_vector => {},
+            .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
         }
     }
     return null;
 }
 
-const FpPhiSnapshot = struct {
+const XmmPhiSnapshot = struct {
     result_name: []const u8,
-    reg: x86_64_types.XmmReg,
-    bits: u16,
+    loc: selector_types.XmmValueLoc,
 };
 
-fn snapshotFpPhiSources(
+fn snapshotXmmPhiSources(
     selector: *ComposedBlockSelector,
     target: ir.BasicBlock,
     predecessor: []const u8,
-    snapshots: *std.ArrayList(FpPhiSnapshot),
+    snapshots: *std.ArrayList(XmmPhiSnapshot),
 ) !?Diagnostic {
     var unavailable = [_]bool{false} ** selector_types.selector_allocatable_xmm_regs.len;
     for (target.instructions.items) |instruction| {
@@ -551,7 +550,7 @@ fn snapshotFpPhiSources(
             else => break,
         };
         const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
-        if (metadata.class != .fp32 and metadata.class != .fp64) continue;
+        if (metadata.class != .fp32 and metadata.class != .fp64 and metadata.class != .vector_xmm) continue;
         const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
         const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
         if (incoming.value != .named) continue;
@@ -561,13 +560,27 @@ fn snapshotFpPhiSources(
             unavailable[index] = true;
             break candidate;
         } else return .{ .no_spill_envelope = "stage2-phi-fp-snapshot" };
-        if (try selector_fp.materializeFpValue(selector, incoming.value, reg, metadata.bits)) |diagnostic| return diagnostic;
-        try snapshots.append(selector.allocator, .{ .result_name = result_name, .reg = reg, .bits = metadata.bits });
+        const source = selector_state.resolveValue(selector, incoming.value) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) };
+        const snapshot_loc: selector_types.XmmValueLoc = switch (metadata.class) {
+            .fp32, .fp64 => .{ .reg = reg, .bits = metadata.bits },
+            .vector_xmm => blk: {
+                const shape = switch (source) {
+                    .xmm => |loc| loc.vectorShape() orelse return .{ .unsupported_value = "stage2-phi-src" },
+                    .spill_vector => |loc| loc.shape,
+                    else => return .{ .unsupported_value = "stage2-phi-src" },
+                };
+                if (!shape.eql(selector_types.VectorShape.f64x2(0b11))) return .{ .unsupported_value = "stage2-phi-src" };
+                break :blk .{ .reg = reg, .bits = 128, .shape = .{ .vector = shape } };
+            },
+            else => unreachable,
+        };
+        selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = snapshot_loc }) catch return .{ .unsupported_value = "stage2-phi-src" };
+        try snapshots.append(selector.allocator, .{ .result_name = result_name, .loc = snapshot_loc });
     }
     return null;
 }
 
-fn fpPhiSnapshot(snapshots: *const std.ArrayList(FpPhiSnapshot), result_name: []const u8) ?FpPhiSnapshot {
+fn xmmPhiSnapshot(snapshots: *const std.ArrayList(XmmPhiSnapshot), result_name: []const u8) ?XmmPhiSnapshot {
     for (snapshots.items) |snapshot| {
         if (std.mem.eql(u8, snapshot.result_name, result_name)) return snapshot;
     }
@@ -651,7 +664,7 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
             },
             .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
         },
-        .xmm, .spill_fp => switch (value) {
+        .xmm, .spill_fp, .spill_vector => switch (value) {
             .named => {
                 const actual = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, value) };
                 selector_state.materializeLocIntoLoc(selector, actual, dst) catch return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, value) };
@@ -660,6 +673,7 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
                 const scratch = switch (dst) {
                     .xmm => |fp| fp.reg,
                     .spill_fp => .xmm0,
+                    .spill_vector => return .{ .unsupported_value = "stage2-phi-src" },
                     else => unreachable,
                 };
                 if (try selector_fp.materializeFpValue(selector, value, scratch, bits)) |diagnostic| return diagnostic;
@@ -669,7 +683,7 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
             },
             .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
         },
-        .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill_vector, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
+        .arg32, .arg64, .arg128, .scratch128, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .no_emitter = "stage2-phi-dst-loc" },
     }
     return null;
 }
