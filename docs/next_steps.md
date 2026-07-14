@@ -45,21 +45,19 @@ tree `536f6a30e9c6f68ce2d1ea30174cf8fedf98db49`; strict real rows remain
 report remains 443 selected / 261 emitting / 182 failing. Evidence:
 `docs/evidence/distribution_all_after_inbox48_f64x2_phi.summary`.
 
-The expected `compiler_rt.divdc3.__divdc3` closure did not occur: it advanced
-from `stage2-phi-dst` to a later `<2 x i64>` constant extraction at
-`no_emitter` / `composed-vector-extract-type`. No pinned-row semantic claim was
-made. INBOX-48's pre-authorized bit-permutation successor is complete and
-cumulatively accepted. Exact `llvm.bswap.i128`, `llvm.bitreverse.i64`, and
-`llvm.bitreverse.i128` close `__bswapti2`, `__bitreversedi2`, and
-`__bitreverseti2`, making 443 / 264 / 179 the accepted report state with no
-collateral change. The single Tier 3 passed all 17 subgates against tree
-`23bf5cbdba0d9296c15f9baf7121527022c68a86`; evidence:
-`docs/evidence/distribution_all_after_inbox48_bit_permutation.summary`.
+INBOX-49 Part 1 is Tier-2/native-proven. Exact full-defined `<2 x i64>` lane
+0/1 extraction closes `compiler_rt.divdc3.__divdc3` provisionally, moving the
+report from the accepted 443 / 264 / 179 baseline to 443 / 265 / 178 with no
+collateral change. The pinned-Zig five-edge proof passes 5/5 literal expected
+bit cases. Evidence:
+`docs/evidence/std_debug_hello_inbox49_i64x2_extract.summary`.
 
-No implementation successor is authorized after this pipeline. The nearest
-recorded later frontier is `__divdc3` constant extraction from `<2 x i64>`;
-it remains a separate capability needing fresh direction. `__muldc3` remains
-deferred at the 256-bit/AVX checkpoint.
+Continue with the pre-authorized INBOX-49 Part 2: audit accepted i32 popcount
+use against the captured `-popcnt` baseline, repair it as a standalone P0 if
+the audit confirms wrong-code exposure, then admit exact range-attributed
+`llvm.ctpop.i64/i128` through baseline-safe software lowering. One cumulative
+Tier 3 accepts the complete INBOX-49 pipeline. `__muldc3` remains deferred at
+the 256-bit/AVX checkpoint.
 
 The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
 comparison matched 1,258 semantic records across all 17 gates. The historical

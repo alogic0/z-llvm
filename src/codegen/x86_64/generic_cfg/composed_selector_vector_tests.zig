@@ -224,6 +224,105 @@ test "generic cfg selector records canonical mask definedness through pair spill
     try std.testing.expectEqual(x86_64_machine.Instruction{ .spill_xmm128ps_rsp = .{ .frame_index = .slot0, .reg = .xmm2 } }, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "generic cfg selector executes exact i64x2 constant lane extraction" {
+    const input =
+        \\define i64 @lane0(double %low, double %high) {
+        \\entry:
+        \\  %v0 = insertelement <2 x double> poison, double %low, i64 0
+        \\  %v1 = insertelement <2 x double> %v0, double %high, i64 1
+        \\  %bits = bitcast <2 x double> %v1 to <2 x i64>
+        \\  %result = extractelement <2 x i64> %bits, i64 0
+        \\  ret i64 %result
+        \\}
+        \\define i64 @lane1(double %low, double %high) {
+        \\entry:
+        \\  %v0 = insertelement <2 x double> poison, double %low, i64 0
+        \\  %v1 = insertelement <2 x double> %v0, double %high, i64 1
+        \\  %bits = bitcast <2 x double> %v1 to <2 x i64>
+        \\  %result = extractelement <2 x i64> %bits, i64 1
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var mappings: [2]?[]align(std.heap.page_size_min) u8 = .{ null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (module.functions.items, 0..) |function_ir, index| {
+        var machine = x86_64_machine.MachineFunction.init(function_ir.name, function_ir.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        mappings[index] = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mappings[index].?, bytes);
+    }
+
+    const lane0: *const fn (f64, f64) callconv(.c) u64 = @ptrCast(mappings[0].?.ptr);
+    const lane1: *const fn (f64, f64) callconv(.c) u64 = @ptrCast(mappings[1].?.ptr);
+    const cases = [_][2]u64{
+        .{ 0, 0x8000_0000_0000_0000 },
+        .{ 0x0000_0000_0000_0001, 0x000f_ffff_ffff_ffff },
+        .{ 0x7ff0_0000_0000_0000, 0xfff0_0000_0000_0000 },
+        .{ 0x7ff8_1234_5678_9abc, 0xfff0_0000_0000_0042 },
+    };
+    for (cases) |case| {
+        const low: f64 = @bitCast(case[0]);
+        const high: f64 = @bitCast(case[1]);
+        try std.testing.expectEqual(case[0], lane0(low, high));
+        try std.testing.expectEqual(case[1], lane1(low, high));
+    }
+}
+
+test "generic cfg selector keeps partial and non-i64x2 extraction fail closed" {
+    var machine = x86_64_machine.MachineFunction.init("i64x2-extract-near-miss", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "partial", .{ .xmm = .{
+        .reg = .xmm2,
+        .bits = 128,
+        .shape = .{ .vector = selector_types.VectorShape.i64x2(0b01) },
+    } });
+    try std.testing.expect((try selector_vector.lowerExtractElement(&selector, "partial-result", .{
+        .vector_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } },
+        .vector = .{ .named = "partial" },
+        .index_ty = .{ .int = 64 },
+        .index = .{ .int = 0 },
+    })) != null);
+    try std.testing.expect((try selector_vector.lowerExtractElement(&selector, "dynamic-result", .{
+        .vector_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } },
+        .vector = .{ .named = "partial" },
+        .index_ty = .{ .int = 64 },
+        .index = .{ .named = "lane" },
+    })) != null);
+    try std.testing.expect((try selector_vector.lowerExtractElement(&selector, "wrong-width-result", .{
+        .vector_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 32 } } },
+        .vector = .{ .named = "partial" },
+        .index_ty = .{ .int = 64 },
+        .index = .{ .int = 0 },
+    })) != null);
+
+    selector.stack_frame_bytes = 32;
+    try selector_state.bindValueLoc(&selector, "spilled", .{ .spill_vector = .{
+        .frames = .{ .lo = .slot0, .hi = .slot2 },
+        .shape = selector_types.VectorShape.i64x2(0b11),
+    } });
+    try std.testing.expect((try selector_vector.lowerExtractElement(&selector, "spilled-result", .{
+        .vector_ty = .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } },
+        .vector = .{ .named = "spilled" },
+        .index_ty = .{ .int = 64 },
+        .index = .{ .int = 1 },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .reload_xmm128_rsp = .{ .frame_index = .slot0, .reg = .xmm1 } },
+        .{ .unpckhpd_xmm = .{ .dst = .xmm1, .src = .xmm1 } },
+        .{ .movq_xmm_rax = .xmm1 },
+    }, machine.instructions.items[machine.instructions.items.len - 3 ..]);
+}
+
 test "generic cfg selector executes packed unsigned less-than without signed substitution" {
     const input =
         \\define i32 @packed_ult(i32 %lhs, i32 %rhs) {

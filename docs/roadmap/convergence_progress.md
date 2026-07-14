@@ -4153,6 +4153,20 @@ One line per completed cycle, append-only, newest last. This is the
   effectively unchanged from the INBOX-48 PHI gate. Evidence
   `docs/evidence/distribution_all_after_inbox48_bit_permutation.summary`.
 
+- 2026-07-14 (this commit, INBOX-49 Part 1) Item 12 exact i64x2 extraction:
+  constant lanes 0 and 1 from fully defined `<2 x i64>` values now reuse the
+  existing XMM/pair-spill shape, `unpckhpd`, and register-parametric `movq`
+  paths. Permanent raw-bit execution covers both lanes and pair spills while
+  partial, dynamic, wrong-width, and unrelated vector forms remain
+  fail-closed. The fresh report moves exactly from 443 / 264 / 179 to
+  443 / 265 / 178, provisionally closing `compiler_rt.divdc3.__divdc3` with
+  no collateral change. Its extracted pinned-Zig native proof passes all five
+  precomputed normal, scaled, zero-denominator, infinite-numerator, and
+  finite-over-infinite cases through the five-edge return join. Tier 2 passes
+  24/24 steps and 997/997 tests. No Tier 3 ran; continue with INBOX-49 Part 2
+  and accept the complete pipeline with one cumulative gate. Evidence
+  `docs/evidence/std_debug_hello_inbox49_i64x2_extract.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

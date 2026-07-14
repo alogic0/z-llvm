@@ -146,7 +146,8 @@ fn inspectExtractElement(extract: ir.ExtractElementInst) ?Diagnostic {
         if (!extract.index_ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "extractelement-index" };
         return inspectF32x4ExtractLane(extract.index);
     }
-    if (!isPackedFp2(extract.vector_ty) and !isMask2(extract.vector_ty)) return .{ .unsupported_type = "extractelement" };
+    const is_i64x2 = extract.vector_ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } });
+    if (!isPackedFp2(extract.vector_ty) and !isMask2(extract.vector_ty) and !is_i64x2) return .{ .unsupported_type = "extractelement" };
     if (!extract.index_ty.eql(.{ .int = 64 })) return .{ .unsupported_type = "extractelement-index" };
     return inspectLaneIndex(extract.index, "extractelement");
 }

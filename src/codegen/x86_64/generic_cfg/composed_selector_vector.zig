@@ -417,6 +417,9 @@ fn lowerF32x4Shuffle(selector: *ComposedBlockSelector, result_name: []const u8, 
 pub fn lowerExtractElement(selector: *ComposedBlockSelector, result: ?[]const u8, extract: ir.ExtractElementInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-missing-result" };
     if (isMask2(extract.vector_ty)) return lowerMaskExtractElement(selector, result_name, extract);
+    if (extract.vector_ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } })) {
+        return lowerI64x2ExtractElement(selector, result_name, extract);
+    }
     if (!isPackedFp(extract.vector_ty)) return .{ .no_emitter = "composed-vector-extract-type" };
     const lane = constantExtractLane(extract.index, extract.vector_ty) orelse return .{ .no_emitter = "composed-vector-extract-index" };
     const source = describeVectorValue(selector, extract.vector, extract.vector_ty) orelse return .{ .unsupported_value = "composed-vector-extract-source" };
@@ -431,6 +434,27 @@ pub fn lowerExtractElement(selector: *ComposedBlockSelector, result: ?[]const u8
         .integer => unreachable,
     };
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = source.shape.lane_bits } });
+    return null;
+}
+
+fn lowerI64x2ExtractElement(selector: *ComposedBlockSelector, result_name: []const u8, extract: ir.ExtractElementInst) !?Diagnostic {
+    const lane = constantLane(extract.index) orelse return .{ .no_emitter = "composed-vector-extract-index" };
+    const source = describeVectorValue(selector, extract.vector, extract.vector_ty) orelse return .{ .unsupported_value = "composed-vector-extract-source" };
+    if (!source.shape.eql(VectorShape.i64x2(0b11))) return .{ .unsupported_value = "composed-vector-extract-shape" };
+
+    const source_reg = vectorValueReg(selector, extract.vector);
+    const reg = if (lane == 0 and source_reg != null) source_reg.? else blk: {
+        const scratch = scratchXmmReg(selector, source_reg orelse .xmm0, source_reg);
+        if (try materializeVectorValue(selector, extract.vector, source, scratch, source_reg)) |diagnostic| return diagnostic;
+        break :blk scratch;
+    };
+    if (lane == 1) {
+        try selector_state.clobberXmmReg(selector, reg);
+        try selector.machine.instructions.append(selector.allocator, .{ .unpckhpd_xmm = .{ .dst = reg, .src = reg } });
+    }
+    selector_state.clobberAccumulator(selector) catch return .{ .no_spill_envelope = "composed-vector-extract-accumulator" };
+    try selector.machine.instructions.append(selector.allocator, .{ .movq_xmm_rax = reg });
+    try selector_state.bindRax(selector, result_name);
     return null;
 }
 
