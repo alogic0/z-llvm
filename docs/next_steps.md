@@ -37,17 +37,22 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-37 is acknowledged. Part 1 closes exactly
-`compiler_rt.floatunsisf.__floatunsisf` and
-`compiler_rt.floatsisf.__floatsisf` through exact typed `llvm.cttz.i32`, with
-zero-defined permanent execution and 23 precomputed-result exact-row calls.
-Report-all is now 443 selected / 235 emitting / 208 failing; Tier 2 and the
-single row-closure Tier 3 are green. Continue with the pre-authorized exact
-typed `llvm.ctlz.i64` successor, refresh all eight directed arithmetic and
-conversion rows, and claim closures only where the refreshed report proves
-them. Do not start `llvm.cttz.i64`; it requires its own directive. Evidence:
-`docs/evidence/std_debug_hello_cttz_i32_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox37_cttz_i32.summary`.
+INBOX-37 and its pre-authorized successor are complete. Exact typed
+`llvm.cttz.i32` closes `compiler_rt.floatunsisf.__floatunsisf` and
+`compiler_rt.floatsisf.__floatsisf`; exact typed `llvm.ctlz.i64` then advances
+the four directed arithmetic and four conversion rows from
+`composed-block-llvm-intrinsic` to `composed-block-binary-width`. A full report
+diff proves those are the only successor changes. Report-all remains 443
+selected / 235 emitting / 208 failing after the successor. Part 1 passed Tier
+2 plus the single closure-triggered Tier 3; the no-closure successor passed
+Tier 2 and did not trigger another Tier 3.
+
+Stop for the next directive in the recorded scalar tranche. The expected next
+capability is exact typed `llvm.cttz.i64`, but INBOX-37 explicitly reserves it
+for a separate directive, so it is not authorized by this pipeline. Evidence:
+`docs/evidence/std_debug_hello_cttz_i32_acceptance.summary`,
+`docs/evidence/distribution_all_after_inbox37_cttz_i32.summary`, and
+`docs/evidence/std_debug_hello_ctlz_i64_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

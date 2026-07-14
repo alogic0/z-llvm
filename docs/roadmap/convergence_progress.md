@@ -3766,6 +3766,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_cttz_i32_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox37_cttz_i32.summary`.
 
+- 2026-07-13 (this commit, INBOX-37 pre-authorized successor) Item 12 typed
+  leading-zero capability: exact `llvm.ctlz.i64` now reuses the existing
+  zero-defined machine/verifier form and records its i64 result in RAX.
+  Permanent execution covers zero, single-bit, and all-ones inputs; malformed
+  widths remain fail-closed. A full report diff advances exactly the four
+  directed arithmetic and four conversion rows from the intrinsic boundary to
+  `composed-block-binary-width`, with no closures or collateral changes;
+  report-all remains 443 selected / 235 emitting / 208 failing. Tier 2 is
+  green and Tier 3 is not triggered. The INBOX-37 pipeline is exhausted;
+  `llvm.cttz.i64` requires its own directive. Evidence
+  `docs/evidence/std_debug_hello_ctlz_i64_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

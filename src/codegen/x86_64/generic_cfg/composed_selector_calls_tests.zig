@@ -124,6 +124,83 @@ test "generic cfg selector lowers only exact i32 count-trailing-zeros forms" {
     try std.testing.expectEqual(@as(usize, 0), bad_machine.instructions.items.len);
 }
 
+test "generic cfg selector lowers only exact i64 count-leading-zeros forms" {
+    inline for (.{ 0, 1 }) |zero_is_poison| {
+        var machine = MachineFunction.init("ctlz-i64", .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rsi });
+
+        var call = ir.CallInst{
+            .ret_ty = .{ .int = 64 },
+            .callee = "llvm.ctlz.i64",
+            .tail_kind = "tail",
+            .args = .empty,
+        };
+        defer call.deinit(std.testing.allocator);
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = "value" } });
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = zero_is_poison } });
+
+        try std.testing.expect((try selector_calls.lowerCtlzI64(&selector, "count", call)) == null);
+        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "count").?);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rsi } },
+            .clz_i64_rdi_eax,
+        }, machine.instructions.items);
+    }
+
+    var bad_machine = MachineFunction.init("bad-ctlz-i64", .{ .int = 64 });
+    defer bad_machine.deinit(std.testing.allocator);
+    var bad_selector = ComposedBlockSelector.init(std.testing.allocator, &bad_machine);
+    defer bad_selector.deinit();
+    try selector_state.bindValueLoc(&bad_selector, "value", .{ .arg64 = .rdi });
+    var bad_call = ir.CallInst{
+        .ret_ty = .{ .int = 64 },
+        .callee = "llvm.ctlz.i64",
+        .args = .empty,
+    };
+    defer bad_call.deinit(std.testing.allocator);
+    try bad_call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "value" } });
+    try bad_call.args.append(std.testing.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } });
+    const diagnostic = (try selector_calls.lowerCtlzI64(&bad_selector, "count", bad_call)).?;
+    try std.testing.expectEqualStrings("composed-block-ctlz-args", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), bad_machine.instructions.items.len);
+}
+
+test "generic cfg selector executes zero-defined i64 count-leading-zeros" {
+    const input =
+        \\declare i64 @llvm.ctlz.i64(i64, i1 immarg)
+        \\define i64 @ctlz_defined(i64 %value) {
+        \\entry:
+        \\  %count = call i64 @llvm.ctlz.i64(i64 %value, i1 false)
+        \\  ret i64 %count
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("ctlz_defined", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const ctlz: *const fn (u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+    inline for (.{
+        .{ @as(u64, 0), @as(u64, 64) },
+        .{ @as(u64, 1), @as(u64, 63) },
+        .{ @as(u64, 0x8000_0000_0000_0000), @as(u64, 0) },
+        .{ @as(u64, 0x0000_0001_0000_0000), @as(u64, 31) },
+        .{ @as(u64, 0xffff_ffff_ffff_ffff), @as(u64, 0) },
+    }) |case| try std.testing.expectEqual(case[1], ctlz(case[0]));
+}
+
 test "generic cfg selector executes zero-defined i32 count-trailing-zeros" {
     const input =
         \\declare i32 @llvm.cttz.i32(i32, i1 immarg)
