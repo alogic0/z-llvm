@@ -87,7 +87,7 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         if (binary.op != .@"and" or !valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
         return try lowerBinaryImmediateRhs(selector, result_name, binary);
     }
-    if (bits != 6 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-binary-width" };
+    if (bits != 6 and bits != 7 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-binary-width" };
 
     if (valueIsInt(binary.rhs)) {
         return try lowerBinaryImmediateRhs(selector, result_name, binary);

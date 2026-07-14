@@ -3778,6 +3778,22 @@ One line per completed cycle, append-only, newest last. This is the
   `llvm.cttz.i64` requires its own directive. Evidence
   `docs/evidence/std_debug_hello_ctlz_i64_acceptance.summary`.
 
+- 2026-07-13 (this commit, INBOX-38 Part 1) Item 12 narrow binary and CFG
+  correctness capability: exact scalar i7 binary operations now cover the
+  shared width exposed by four arithmetic and four conversion rows. Exact
+  `__divdf3` execution caught a stale framed backward-phi register home before
+  acceptance; framed scalar integer phi destinations now stabilize through
+  the single frame authority before block emission. Permanent modulo-128 and
+  backward-edge regressions are green. `compiler_rt.divdf3.__divdf3` closes,
+  while the other seven directed rows advance to later typed frontiers with no
+  collateral changes; report-all advances from 443 / 235 / 208 to 443 / 236 /
+  207. Tier 2 and the single row-closure Tier 3 are green. Continue with the
+  pre-authorized scalar `fptosi`-to-i32 successor, selected over signed i32
+  divide-by-two because `exp` and `expf` share the exact existing SSE-shaped
+  conversion frontier. Evidence
+  `docs/evidence/std_debug_hello_i7_binary_phi_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox38_i7_phi.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

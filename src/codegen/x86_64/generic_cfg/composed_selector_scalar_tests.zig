@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
+const x86_64_verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
@@ -1694,4 +1695,54 @@ test "generic cfg selector keeps unadmitted narrow or forms fail closed" {
         .rhs = .{ .named = "rhs" },
     })).?;
     try std.testing.expectEqualStrings("composed-block-binary-width", i8_named.detail());
+}
+
+test "generic cfg selector executes i7 immediate binary operations modulo 128" {
+    const input =
+        \\define i32 @narrow_binary(i64 %input) {
+        \\entry:
+        \\  %narrow = trunc i64 %input to i7
+        \\  %adjusted = add i7 %narrow, -11
+        \\  %flipped = xor i7 %adjusted, 63
+        \\  %wide = zext i7 %flipped to i32
+        \\  ret i32 %wide
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("narrow_binary", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const narrow_binary: *const fn (u64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    inline for (.{
+        .{ @as(u64, 0), @as(u32, 74) },
+        .{ @as(u64, 10), @as(u32, 64) },
+        .{ @as(u64, 11), @as(u32, 63) },
+        .{ @as(u64, 64), @as(u32, 10) },
+        .{ @as(u64, 127), @as(u32, 75) },
+        .{ @as(u64, 128), @as(u32, 74) },
+    }) |case| try std.testing.expectEqual(case[1], narrow_binary(case[0]));
+
+    var rejected_machine = MachineFunction.init("rejected-narrow-binary", .{ .int = 5 });
+    defer rejected_machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &rejected_machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+    const diagnostic = (try selector_scalar.lowerBinary(&selector, "result", .{
+        .op = .xor,
+        .ty = .{ .int = 5 },
+        .lhs = .{ .named = "value" },
+        .rhs = .{ .int = 15 },
+    })).?;
+    try std.testing.expectEqualStrings("composed-block-binary-width", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), rejected_machine.instructions.items.len);
 }

@@ -182,6 +182,53 @@ test "generic cfg selector makes framed boundary-spilled phi destinations stable
     }, machine.instructions.items);
 }
 
+test "generic cfg selector executes framed backward phi edges from stable homes" {
+    const input =
+        \\define i32 @backward_phi(i32 %value, i32 %flag) {
+        \\entry:
+        \\  %slot = alloca double, align 8
+        \\  store double 0.000000e+00, ptr %slot, align 8
+        \\  %condition = icmp ne i32 %flag, 0
+        \\  br i1 %condition, label %pred, label %other
+        \\merge:
+        \\  %merged = phi i32 [ %incremented, %pred ], [ %value, %other ]
+        \\  %result = add i32 %merged, 100
+        \\  ret i32 %result
+        \\pred:
+        \\  %incremented = add i32 %value, 1
+        \\  br label %merge
+        \\other:
+        \\  br label %merge
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("backward_phi", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (selection) {
+        .selected => {},
+        .unsupported => |diagnostic| {
+            std.debug.print("backward phi diagnostic={s}\n", .{diagnostic.detail()});
+            return error.TestUnexpectedResult;
+        },
+    }
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const backward_phi: *const fn (u32, u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u32, 107), backward_phi(7, 0));
+    try std.testing.expectEqual(@as(u32, 108), backward_phi(7, 1));
+    try std.testing.expectEqual(@as(u32, 100), backward_phi(0, 0));
+    try std.testing.expectEqual(@as(u32, 101), backward_phi(0, 1));
+}
+
 test "composed selector preserves scalar FP select values exactly" {
     const input =
         \\define float @select_f32(i32 %flag, float %on_true, float %on_false) {

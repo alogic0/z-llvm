@@ -37,22 +37,23 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-37 and its pre-authorized successor are complete. Exact typed
-`llvm.cttz.i32` closes `compiler_rt.floatunsisf.__floatunsisf` and
-`compiler_rt.floatsisf.__floatsisf`; exact typed `llvm.ctlz.i64` then advances
-the four directed arithmetic and four conversion rows from
-`composed-block-llvm-intrinsic` to `composed-block-binary-width`. A full report
-diff proves those are the only successor changes. Report-all remains 443
-selected / 235 emitting / 208 failing after the successor. Part 1 passed Tier
-2 plus the single closure-triggered Tier 3; the no-closure successor passed
-Tier 2 and did not trigger another Tier 3.
+INBOX-38 Part 1 is complete. Exact scalar i7 binary operations clear the
+shared width in all eight directed rows. Exact captured-row execution found
+and repaired a stale framed backward-phi register home before acceptance;
+framed scalar integer phi destinations now stabilize through the existing
+single frame authority before block emission. `compiler_rt.divdf3.__divdf3`
+closes, and the other seven rows advance to later typed frontiers with no
+collateral changes. Report-all is 443 selected / 236 emitting / 207 failing.
+Tier 2 and the single closure-triggered Tier 3 are green.
 
-Stop for the next directive in the recorded scalar tranche. The expected next
-capability is exact typed `llvm.cttz.i64`, but INBOX-37 explicitly reserves it
-for a separate directive, so it is not authorized by this pipeline. Evidence:
-`docs/evidence/std_debug_hello_cttz_i32_acceptance.summary`,
-`docs/evidence/distribution_all_after_inbox37_cttz_i32.summary`, and
-`docs/evidence/std_debug_hello_ctlz_i64_acceptance.summary`.
+Continue with INBOX-38's pre-authorized scalar `fptosi`-to-i32 successor. The
+refreshed report has two exact candidates, `compiler_rt.exp.__exp` and
+`compiler_rt.exp.__expf`, both stopped at `unsupported_instruction fptosi`.
+This ranks ahead of the two signed i32 divide-by-two candidates because the
+machine layer already owns scalar SSE conversion forms and the admission can
+remain exact and type-driven. Evidence:
+`docs/evidence/std_debug_hello_i7_binary_phi_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox38_i7_phi.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

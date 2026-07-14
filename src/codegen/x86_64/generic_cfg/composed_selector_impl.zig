@@ -110,7 +110,7 @@ pub fn tryLowerComposedCfgWithContext(
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindPhiResults(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
-    if (try stabilizeFramedFpPhiDestinations(&composed)) |diagnostic| return unsupported(diagnostic);
+    if (try stabilizeFramedPhiDestinations(&composed)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (composed.stack_frame_bytes != 0) {
         composed.return_epilogue_label = try selector_cfg.ownedReturnEpilogueLabel(&composed);
@@ -252,19 +252,21 @@ fn stabilizeFramedParams(selector: *ComposedBlockSelector, function: ir.Function
     return null;
 }
 
-fn stabilizeFramedFpPhiDestinations(selector: *ComposedBlockSelector) !?Diagnostic {
+fn stabilizeFramedPhiDestinations(selector: *ComposedBlockSelector) !?Diagnostic {
     if (selector.stack_frame_bytes == 0) return null;
     var it = selector.phi_destinations.iterator();
     while (it.next()) |entry| {
-        const fp = switch (entry.value_ptr.*) {
-            .xmm => |fp| fp,
+        const destination: ValueLoc = switch (entry.value_ptr.*) {
+            .scratch32, .scratch64 => .{ .spill64 = selector_state.allocateSpillSlot(selector, entry.key_ptr.*) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" } },
+            .xmm => |fp| if (fp.vectorShape() == null and (fp.bits == 16 or fp.bits == 32 or fp.bits == 64))
+                .{ .spill_fp = .{
+                    .frame_index = selector_state.allocateSpillSlot(selector, entry.key_ptr.*) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
+                    .bits = fp.bits,
+                } }
+            else
+                continue,
             else => continue,
         };
-        if (fp.vectorShape() != null or (fp.bits != 16 and fp.bits != 32 and fp.bits != 64)) continue;
-        const destination: ValueLoc = .{ .spill_fp = .{
-            .frame_index = selector_state.allocateSpillSlot(selector, entry.key_ptr.*) orelse return .{ .no_spill_envelope = "stage2-phi-spill-slots" },
-            .bits = fp.bits,
-        } };
         entry.value_ptr.* = destination;
         try selector_state.bindValueLoc(selector, entry.key_ptr.*, destination);
     }
