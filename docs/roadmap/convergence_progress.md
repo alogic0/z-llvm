@@ -4267,6 +4267,24 @@ One line per completed cycle, append-only, newest last. This is the
   authorized. Evidence
   `docs/evidence/distribution_all_after_inbox50_comparison.summary`.
 
+- 2026-07-14 (this commit, self-declared P0 during INBOX-51) Item 12 scalar
+  fneg correctness: executable `__subdf3` evidence proved the composed
+  selector lowered parser-normalized fneg as arithmetic `-0 - value`, losing
+  exact NaN sign/payload semantics. Exact f32/f64 negative-zero forms now use
+  the existing parameterized XMM XOR operation; ordinary subtraction remains
+  unchanged. Permanent execution covers zeros, subnormals, normals,
+  infinities, and both quiet/signaling NaN signs. The accepted-row audit found
+  one prior hit, collateral `__subsf3`, and its extracted row is re-proven
+  alongside the unaffected single-block negation controls in 34/34 pinned-Zig
+  calls. The clean report remains 443 / 272 / 171; full unit passes 1005/1005
+  and Tier 2 passes 24/24 steps with 1013/1013 tests. The mandatory immediate
+  Tier 3 passes all 17 subgates against standalone staged tree
+  `30c201aed2c45bf782e548205a948193408b9310`. Actual wall time is approximately
+  1,682 seconds; summed concurrent child duration is 2,380.478 seconds. Commit
+  the isolated repair, then resume the preserved INBOX-51 select cycle.
+  Evidence `docs/evidence/std_debug_hello_inbox51_scalar_fneg_p0.summary` and
+  `docs/evidence/distribution_all_after_inbox51_fneg_p0.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

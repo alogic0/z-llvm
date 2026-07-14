@@ -77,6 +77,17 @@ cycle is accepted with zero closures and its two later half frontiers remain
 open. Stop for review: no third pipeline is authorized. Evidence:
 `docs/evidence/distribution_all_after_inbox50_comparison.summary`.
 
+The self-declared INBOX-51 scalar-fneg P0 is accepted. Its native `__subdf3`
+proof confirmed that composed scalar fneg used arithmetic subtraction and
+failed to toggle RHS NaN signs exactly. The standalone XOR repair re-proves
+accepted collateral `__subsf3`; its immediate Tier 3 passes all 17 subgates
+against staged tree `30c201aed2c45bf782e548205a948193408b9310`. Actual wall
+time is approximately 1,682 seconds versus 2,380.478 seconds of summed child
+duration. Commit the repair alone, restore the INBOX-51 stash, and resume its
+focused validation. Evidence:
+`docs/evidence/std_debug_hello_inbox51_scalar_fneg_p0.summary` and
+`docs/evidence/distribution_all_after_inbox51_fneg_p0.summary`.
+
 INBOX-48 is complete and accepted. Commit `1c5ff956` adds exact fully defined
 f64x2 PHI destinations through the existing XMM/pair-spill value map and
 parallel edge-copy authority. The single Tier 3 passed all 17 subgates against

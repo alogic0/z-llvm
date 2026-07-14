@@ -449,6 +449,66 @@ test "generic cfg selector preserves scalar FP subtraction and division operand 
     }
 }
 
+test "generic cfg selector preserves scalar fneg bits" {
+    const input =
+        \\define float @neg_f32(float %value) {
+        \\entry:
+        \\  %result = fneg float %value
+        \\  ret float %result
+        \\}
+        \\define double @neg_f64(double %value) {
+        \\entry:
+        \\  %result = fneg double %value
+        \\  ret double %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const f32_cases = [_]u32{
+        0x0000_0000, 0x8000_0000, 0x0000_0001, 0x3f80_0000,
+        0x7f80_0000, 0x7fc1_2345, 0x7f81_2345,
+    };
+    const f64_cases = [_]u64{
+        0x0000_0000_0000_0000, 0x8000_0000_0000_0000,
+        0x0000_0000_0000_0001, 0x3ff0_0000_0000_0000,
+        0x7ff0_0000_0000_0000, 0x7ff8_1234_5678_9abc,
+        0x7ff0_1234_5678_9abc,
+    };
+
+    for (module.functions.items, 0..) |function, index| {
+        var machine = x86_64_machine.MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+
+        var saw_bitwise_negation = false;
+        var saw_arithmetic_subtraction = false;
+        for (machine.instructions.items) |instruction| switch (instruction) {
+            .pxor_xmm => saw_bitwise_negation = true,
+            .subss_xmm, .subsd_xmm => saw_arithmetic_subtraction = true,
+            else => {},
+        };
+        try std.testing.expect(saw_bitwise_negation);
+        try std.testing.expect(!saw_arithmetic_subtraction);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (index == 0) {
+            const negate: *const fn (f32) callconv(.c) f32 = @ptrCast(mapping.ptr);
+            for (f32_cases) |bits| try std.testing.expectEqual(bits ^ 0x8000_0000, @as(u32, @bitCast(negate(@bitCast(bits)))));
+        } else {
+            const negate: *const fn (f64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+            for (f64_cases) |bits| try std.testing.expectEqual(bits ^ 0x8000_0000_0000_0000, @as(u64, @bitCast(negate(@bitCast(bits)))));
+        }
+    }
+}
+
 test "generic cfg selector materializes scalar FP compare operands without clobbering" {
     var machine = x86_64_machine.MachineFunction.init("fp-compare-operands", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

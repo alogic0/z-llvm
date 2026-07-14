@@ -87,6 +87,9 @@ fn halfLiteralFloatBits(value: ir.Value) ?u32 {
 }
 
 fn lowerFpRegisterBinary(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
+    if (binary.op == .fsub and isScalarFneg(binary.lhs, bits)) {
+        return lowerScalarFneg(selector, result_name, binary, bits);
+    }
     const dst = fpValueReg(selector, binary.lhs, bits) orelse blk: {
         const rhs_reg = fpValueReg(selector, binary.rhs, bits);
         break :blk firstXmmExcept(rhs_reg);
@@ -119,6 +122,27 @@ fn lowerFpRegisterBinary(selector: *ComposedBlockSelector, result_name: []const 
     }
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
     return null;
+}
+
+fn lowerScalarFneg(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
+    const dst = fpValueReg(selector, binary.rhs, bits) orelse firstXmmExcept(null);
+    if (try materializeFpValue(selector, binary.rhs, dst, bits)) |diagnostic| return diagnostic;
+    const sign = firstXmmExcept(dst);
+    if (try materializeFpValue(selector, binary.lhs, sign, bits)) |diagnostic| return diagnostic;
+    try selector_state.clobberXmmReg(selector, dst);
+    try selector.machine.instructions.append(selector.allocator, .{ .pxor_xmm = .{ .dst = dst, .src = sign } });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
+    return null;
+}
+
+fn isScalarFneg(value: ir.Value, bits: u16) bool {
+    const sign_bit: u64 = @as(u64, 1) << @intCast(bits - 1);
+    const literal_bits: u64 = switch (bits) {
+        32 => @as(u64, x86_64_match.fp32TextBits(value) catch return false),
+        64 => x86_64_match.fp64TextBits(value) catch return false,
+        else => return false,
+    };
+    return literal_bits == sign_bit;
 }
 
 fn fpValueReg(selector: *ComposedBlockSelector, value: ir.Value, bits: u16) ?XmmReg {
