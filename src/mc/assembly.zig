@@ -112,7 +112,20 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .clz_i64_rdi_eax => try writer.writeAll("\tmovl $64, %eax\n\ttestq %rdi, %rdi\n\tje 1f\n\tbsrq %rdi, %rax\n\txorl $63, %eax\n1:\n"),
             .clz_i32_edi_eax => try writer.writeAll("\tmovl $32, %eax\n\ttestl %edi, %edi\n\tje 1f\n\tbsrl %edi, %eax\n\txorl $31, %eax\n1:\n"),
             .ctz_i32_edi_eax => try writer.writeAll("\tmovl $32, %eax\n\ttestl %edi, %edi\n\tje 1f\n\tbsfl %edi, %eax\n1:\n"),
-            .popcount_i32_edi_eax => try writer.writeAll("\tpopcntl %edi, %eax\n"),
+            .popcount_i32_edi_eax => try writer.writeAll(
+                "\tmovl %edi, %eax\n" ++
+                    "\txorl %edx, %edx\n" ++
+                    "1:\n" ++
+                    "\ttestl %eax, %eax\n" ++
+                    "\tje 2f\n" ++
+                    "\tmovl %eax, %ecx\n" ++
+                    "\tsubl $1, %ecx\n" ++
+                    "\tandl %ecx, %eax\n" ++
+                    "\tincl %edx\n" ++
+                    "\tjmp 1b\n" ++
+                    "2:\n" ++
+                    "\tmovl %edx, %eax\n",
+            ),
             .bit_reverse_i32_edi_eax => try writer.writeAll(
                 "\tmovl %edi, %eax\n" ++
                     "\tbswapl %eax\n" ++

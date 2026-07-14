@@ -59,6 +59,15 @@ the audit confirms wrong-code exposure, then admit exact range-attributed
 Tier 3 accepts the complete INBOX-49 pipeline. `__muldc3` remains deferred at
 the 256-bit/AVX checkpoint.
 
+The audit confirmed a P0 baseline-ISA violation in both accepted
+`frontier_popcount_u32` and `compiler_rt.limb64.__popcount_limb64` paths.
+The standalone software repair and row-exact re-proofs are accepted; its
+mandatory immediate Tier 3 passed all 17 subgates. Evidence:
+`docs/evidence/std_debug_hello_inbox49_popcount_baseline_p0.summary`. Keep the
+new range-attributed i64/i128 capability out of this repair commit; resume it
+after the P0 commit is clean. Full-gate evidence:
+`docs/evidence/distribution_all_after_inbox49_popcount_p0.summary`.
+
 The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
 comparison matched 1,258 semantic records across all 17 gates. The historical
 14/17 `cache_status=none` population is now correctly classified as 14 gates

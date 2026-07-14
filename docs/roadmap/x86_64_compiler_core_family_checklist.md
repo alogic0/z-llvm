@@ -977,15 +977,17 @@ Layer: semantic lowering and backend.
   `@popCount(u32)` through the typed-v2 `zllvm-popcount-v1` `ty_op` contract
   and the shared bit-count scalar lowering path. The Zig result is `u6`, so
   z_llvm preserves the typed `llvm.ctpop.i32` / `trunc` / `zext` chain used by
-  the source row. x86_64 emits a reusable `popcount_i32_edi_eax` sequence using
-  `popcntl`; the validation host advertises the `popcnt` CPU feature. The C
+  the source row. x86_64 emits a reusable baseline-safe
+  `popcount_i32_edi_eax` software sequence without requiring POPCNT. The C
   harness checks zero, all-bits, sparse, and mixed-pattern values. Strict
   frontier evidence in `tmp/frontier_popcount_u32.log` reports ReleaseFast,
   ReleaseSafe, and ReleaseSmall at `source_rows=14`,
   `discovered_functions=745`, `generic_cfg_functions=745`,
   `object_emitted_functions=745`, `executable_ok_rows=14`, and `local_fail=0`.
-  Wider widths, feature-policy modeling for non-POPCNT x86_64 baselines, vector
-  forms, and `bit_reverse` remain separate scalar-transform work.
+  Wider widths, vector forms, and `bit_reverse` remain separate
+  scalar-transform work. INBOX-49's baseline audit invalidated and re-proved
+  this row after confirming that its earlier POPCNT encoding violated the
+  captured `-popcnt` target attributes.
 - [x] Lower `bit_reverse`.
   Added `frontier_mixed_numeric.frontier_bit_reverse_u32`, which lowers scalar
   `@bitReverse(u32)` through the typed-v2 `zllvm-bit-reverse-v1` `ty_op`

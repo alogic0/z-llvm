@@ -3,6 +3,7 @@ const common = @import("codegen_x86_64_common.zig");
 const std = common.std;
 const codegen = common.codegen;
 const ir = common.ir;
+const mc = common.mc;
 const selector = @import("../codegen/x86_64/generic_cfg_selector.zig");
 
 fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected: codegen.x86_64.Instruction) !void {
@@ -588,6 +589,20 @@ test "generic cfg selector emits limb64 popcount envelope through opt-in selecto
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(.popcount_limb64_rdi_si_ax, machine.instructions.items[0]);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expect(std.mem.indexOf(u8, bytes, &.{ 0xf3, 0x48, 0x0f, 0xb8 }) == null);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const popcount: *const fn ([*]const u64, u16) callconv(.c) u16 = @ptrCast(mapping.ptr);
+    const values = [_]u64{ 0xf0f0_0000_ffff_5555, 0x8000_0000_0000_0001 };
+    try std.testing.expectEqual(@as(u16, 0), popcount(&values, 0));
+    try std.testing.expectEqual(@as(u16, 1), popcount(&values, 1));
+    try std.testing.expectEqual(@as(u16, 32), popcount(&values, 64));
+    try std.testing.expectEqual(@as(u16, 33), popcount(&values, 65));
+    try std.testing.expectEqual(@as(u16, 33), popcount(&values, 127));
 }
 
 test "generic cfg selector keeps limb64 popcount near miss fail-closed" {

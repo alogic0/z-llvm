@@ -76,6 +76,29 @@ test "x86_64 encoding emits i64 bit reversal" {
     try std.testing.expectEqualSlices(u8, &.{ 0x48, 0x09, 0xd0, 0xc3 }, bytes[bytes.len - 4 ..]);
 }
 
+test "x86_64 encoding executes baseline i32 popcount without POPCNT" {
+    var machine = codegen.x86_64.MachineFunction.init("popcount_i32", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{ .popcount_i32_edi_eax, .ret });
+
+    try std.testing.expectEqual(@as(u32, 21), mc.encoding.instructionSize(.popcount_i32_edi_eax));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expect(std.mem.indexOf(u8, bytes, &.{ 0xf3, 0x0f, 0xb8 }) == null);
+
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const popcount: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    inline for (.{
+        .{ @as(u32, 0), @as(u32, 0) },
+        .{ @as(u32, 1), @as(u32, 1) },
+        .{ @as(u32, 0x8000_0000), @as(u32, 1) },
+        .{ @as(u32, 0xffff_ffff), @as(u32, 32) },
+        .{ @as(u32, 0x5555_aaaa), @as(u32, 16) },
+    }) |case| try std.testing.expectEqual(case[1], popcount(case[0]));
+}
+
 test "x86_64 encoding sizes i64 add before direct call relocation" {
     var machine = codegen.x86_64.MachineFunction.init("add64_call", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

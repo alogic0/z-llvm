@@ -4167,6 +4167,22 @@ One line per completed cycle, append-only, newest last. This is the
   and accept the complete pipeline with one cumulative gate. Evidence
   `docs/evidence/std_debug_hello_inbox49_i64x2_extract.summary`.
 
+- 2026-07-14 (this commit, self-declared P0 during INBOX-49 Part 2) Item 12
+  baseline-safe population count: the required audit confirmed that accepted
+  `frontier_popcount_u32` and `compiler_rt.limb64.__popcount_limb64` objects
+  emitted POPCNT despite captured `-popcnt` target attributes. The i32 machine
+  operation and limb64 terminal routine now use software Kernighan loops; the
+  latter retains all outer offsets by calling an appended helper through two
+  same-width relative calls. Permanent execution, the existing mixed-numeric
+  source harness, and an exact extracted limb64 object re-prove both accepted
+  paths without POPCNT. Full unit passes 991/991 and Tier 2 passes 24/24 steps
+  with 999/999 tests. The mandatory immediate wrong-code Tier 3 passes all 17
+  subgates against staged tree `a938272b6c22a4cb07393de498cfc0d53223f498`.
+  No closure or report movement is claimed. Commit the repair standalone,
+  then resume the preserved INBOX-49 Part 2 capability. Evidence
+  `docs/evidence/std_debug_hello_inbox49_popcount_baseline_p0.summary` and
+  `docs/evidence/distribution_all_after_inbox49_popcount_p0.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
