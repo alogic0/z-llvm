@@ -37,15 +37,22 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-44's read-only frontier ranking is complete at the accepted 443 selected
-/ 248 emitting / 195 failing baseline. The ten `icmp-form` rows split into
-normalized i6/i7 unsigned-immediate comparisons, a named-i16 predicate matrix,
-and the predicted `cttz.i64` successor; they are not one form. The seven
-switch-PHI rows split into six EI entry-switch/FP-return joins and the much
-broader fma switch population, both with zero immediate closure claims.
-`__divsc3` has an exact f32x2 canonical-mask select/copysign closing contract;
-`__divdc3` remains a separately reviewed vector-PHI planner capability with
-zero closure by itself. `__muldc3` remains deferred.
+INBOX-45 Pipeline A is complete and cumulatively accepted by `c4956e36`.
+Exact normalized i6/i7 unsigned-immediate comparisons close `__floatunsihf`
+and `__floatsihf`; exact typed `llvm.cttz.i64` closes the six signed/unsigned
+i64-to-double, -float, and -half conversion rows. The accepted compiler_rt
+report is now 443 selected / 256 emitting / 187 failing. The single cumulative
+Tier 3 passed all 17 subgates against tree
+`1d90ef75d73149eaa8aeb062e8640daee8330a3b`; strict real rows remain
+100/100/100 and integrated executables remain 6/6. Evidence:
+`docs/evidence/distribution_all_after_inbox45_narrow_cmp_cttz_i64.summary`.
+
+No successor is authorized after INBOX-45. The next ranked bounded pipeline
+from `docs/evidence/inbox44_frontier_ranking.md` is the named-i16 predicate
+matrix followed by i128 pair comparison, under the same provisional-closure
+batching policy. It requires a new implementation directive. The switch-PHI,
+`__divsc3`, and separately reviewed `__divdc3` vector-PHI populations remain
+later candidates; `__muldc3` remains deferred at the 256-bit/AVX checkpoint.
 
 The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
 comparison matched 1,258 semantic records across all 17 gates. The historical
@@ -57,14 +64,6 @@ concurrent real-row gates. Phase 1 compiled-tool reuse remains a no-go because
 compilation/startup is not isolated at the required 10% threshold. Do not
 begin Phase 1, Phase 2, broader caching, or concurrency work from this result.
 Evidence: `docs/evidence/distribution_all_phase0_1_observability.summary`.
-
-The recommended next bounded implementation is INBOX-44 Pipeline 1:
-normalized i6/i7 unsigned-immediate comparisons, then exact `llvm.cttz.i64`
-only if the refreshed six-row frontier confirms it, with provisional Tier-2
-closures and one cumulative Tier 3. Pipeline 2 remains the named-i16 predicate
-matrix followed by i128 pair comparison. Both await the next implementation
-directive; `__muldc3` remains deferred. Ranking evidence:
-`docs/evidence/inbox44_frontier_ranking.md`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.
