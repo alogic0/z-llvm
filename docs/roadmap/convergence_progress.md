@@ -4086,6 +4086,19 @@ One line per completed cycle, append-only, newest last. This is the
   gate and stop for the f64x2 PHI review. Evidence
   `docs/evidence/std_debug_hello_inbox47_f64x2_parity.summary`.
 
+- 2026-07-14 (this commit, INBOX-47 cumulative acceptance) Item 12 vector
+  pipeline close: the single required Tier 3 passes all 17 subgates against
+  committed tree `6817bd3a46c4950e73945af7090c930f27bf768c`. It accepts the
+  provisional `compiler_rt.divsc3.__divsc3` closure from Part 1; Part 2
+  correctly contributes zero closures, making 443 / 261 / 182 the accepted
+  compiler_rt report state. Integrated objects remain 146/146 in all three
+  pipelines, strict real rows remain 100/100/100, integrated executables
+  remain 6/6, and release-source object/link/probe boundaries remain 100/100
+  each. Total reported duration is 2,274,150 ms, effectively unchanged from
+  INBOX-46. Stop for the separately reviewed f64x2 PHI architecture; no
+  implementation successor is authorized. Evidence
+  `docs/evidence/distribution_all_after_inbox47_vector_pipeline.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

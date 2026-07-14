@@ -37,23 +37,21 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-46 Pipeline B is complete and cumulatively accepted by `3d835a83`.
-Part 1 (`ad9bcbef`) closes `__gehf2` and `__cmphf2` through exact named i16
-`slt` / `sgt` / `ne`; Part 2 (`c6380425`) closes `__ucmpti2` and `__cmpti2`
-through exact signed and unsigned i128 pair comparisons. The accepted
-compiler_rt report is now 443 selected / 260 emitting / 183 failing. The
-single cumulative Tier 3 passed all 17 subgates against tree
-`03c824c377765ac01cb1f53a47494f4ff602b12e`; strict real rows remain
-100/100/100 and integrated executables remain 6/6. Its reported total runtime
-is materially unchanged from INBOX-45. Evidence:
-`docs/evidence/distribution_all_after_inbox46_named_i16_i128_compare.summary`.
+INBOX-47 is complete and cumulatively accepted by this stop-state commit.
+Part 1 (`84bd7111`) closes `compiler_rt.divsc3.__divsc3` through exact
+canonical f32x2 select/copysign and packed unsigned comparison forms. Part 2
+(`39cc18d5`) adds the reviewed f64x2 parity forms with an honest zero-closure
+result. The accepted compiler_rt report is now 443 selected / 261 emitting /
+182 failing. The single cumulative Tier 3 passed all 17 subgates against tree
+`6817bd3a46c4950e73945af7090c930f27bf768c`; strict real rows remain
+100/100/100 and integrated executables remain 6/6. Evidence:
+`docs/evidence/distribution_all_after_inbox47_vector_pipeline.summary`.
 
-No implementation successor is explicitly authorized after INBOX-46. The
-next planned bounded contract is canonical-mask f32x2 vector select plus
-`llvm.copysign.v2f32`, batched with a compatible vector cycle, to target
-`__divsc3`. The `__divdc3` vector-PHI requirement remains a separate review
-boundary, and `__muldc3` remains deferred at the 256-bit/AVX checkpoint.
-Request the next directive before implementation.
+No implementation successor is authorized. Request the bounded f64x2
+vector-PHI architectural review for `compiler_rt.divdc3.__divdc3`, which still
+fails first at `unsupported_value` / `stage2-phi-dst`. The review must decide
+the typed PHI destination/edge model and alias-safe materialization before any
+implementation. `__muldc3` remains deferred at the 256-bit/AVX checkpoint.
 
 The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
 comparison matched 1,258 semantic records across all 17 gates. The historical
