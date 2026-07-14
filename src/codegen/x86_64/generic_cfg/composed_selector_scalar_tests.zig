@@ -1834,6 +1834,45 @@ test "generic cfg selector executes i7 immediate binary operations modulo 128" {
     try std.testing.expectEqual(@as(usize, 0), rejected_machine.instructions.items.len);
 }
 
+test "generic cfg selector preserves every live accumulator alias across immediate binary operations" {
+    const input =
+        \\declare i32 @llvm.ctlz.i32(i32, i1 immarg)
+        \\
+        \\define i32 @trunc_alias(i32 %input) {
+        \\entry:
+        \\  %leading = call i32 @llvm.ctlz.i32(i32 %input, i1 true)
+        \\  %narrow = trunc i32 %leading to i6
+        \\  %flipped = xor i6 %narrow, 31
+        \\  %sum = add i6 %narrow, %flipped
+        \\  %sum_wide = zext i6 %sum to i32
+        \\  %leading_shifted = shl i32 %leading, 12
+        \\  %combined = or i32 %leading_shifted, %sum_wide
+        \\  ret i32 %combined
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("trunc_alias", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const trunc_alias: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    inline for (.{
+        .{ @as(u32, 1), @as(u32, 127007) },
+        .{ @as(u32, 2), @as(u32, 122911) },
+        .{ @as(u32, 0x10000), @as(u32, 61471) },
+        .{ @as(u32, 0x80000000), @as(u32, 31) },
+    }) |case| try std.testing.expectEqual(case[1], trunc_alias(case[0]));
+}
+
 test "generic cfg selector executes signed i32 division by two toward zero" {
     const input =
         \\define i32 @divide_by_two(i32 %value) {

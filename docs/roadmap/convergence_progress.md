@@ -3960,6 +3960,20 @@ One line per completed cycle, append-only, newest last. This is the
   Tier-2/native closure batching with one cumulative Tier 3 each. Evidence
   `docs/evidence/inbox44_frontier_ranking.md`.
 
+- 2026-07-14 (this commit, self-declared P0 during INBOX-45) Item 12
+  accumulator-alias correctness repair: focused native proof found that a
+  destructive immediate binary operation preserved only one of multiple live
+  EAX bindings created by a no-op truncation, silently changing another live
+  value. Immediate scalar binary lowering now preserves every live accumulator
+  binding using the existing liveness authority. The permanent regression
+  fails on the accepted baseline (`expected 127007, found 126976`) and passes
+  four exact cases after the repair. Tier 2 is green at 24/24 steps and 975/975
+  tests; the mandatory P0 Tier 3 is green across all 17 subgates. No row closure
+  is claimed. Resume and revalidate the preserved INBOX-45 comparison cycle
+  against this repaired baseline. Evidence
+  `docs/evidence/std_debug_hello_accumulator_alias_p0_repair.summary` and
+  `docs/evidence/distribution_all_after_inbox45_accumulator_alias_p0.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

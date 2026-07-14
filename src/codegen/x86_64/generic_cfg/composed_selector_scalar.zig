@@ -215,7 +215,9 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
         return null;
     }
     if (bits <= 32) switch (binary.op) {
-        .shl, .ashr, .@"and", .@"or", .add, .sub, .xor => if (try selector_state.preserveCurrentEaxIntoScratch(selector)) |diagnostic| return diagnostic,
+        .shl, .ashr, .@"and", .@"or", .add, .sub, .xor => while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
+            if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
+        },
         else => {},
     };
     switch (binary.op) {
