@@ -1,0 +1,79 @@
+# Typed I64 Count-Trailing-Zeros Evidence
+
+schema_version: 1
+directive: `INBOX-45 Part 2`
+target: `x86_64-linux`
+validation_tier: 2
+closure_status: `provisional pending cumulative pipeline Tier 3`
+result: pass
+
+The cycle baseline is `8cc48e46`, whose two narrow-comparison closures remain
+provisional. Captured compiler_rt IR md5 is
+`b0eda7a6427c3084fdf096a68696f19c`; the stage4 Zig pin is
+`bdee02bc0c7f227c0f11bc9a449df673fe803540`. The production and permanent-test
+diff has sha256
+`915ed4ab53aa1969902964bf2048f837163ec85881201dbbbc988d99cfbc31a4`.
+
+The composed selector now admits only the exact
+`llvm.cttz.i64(i64, i1 immarg)` signature with a literal zero-is-poison flag of
+zero or one. It materializes the named i64 operand into RDI, reuses the
+existing encoded and verified `ctz_i64_rdi_eax` machine operation, and binds
+the i64 result in RAX. Other signatures, invalid flags, unsupported values,
+and other intrinsics remain fail-closed. The machine, verifier, frame, ABI,
+and object-writer authorities are unchanged.
+
+Permanent coverage checks both legal flags, an invalid flag, the exact
+machine sequence, composed selection, machine verification, encoding, and
+five executable cases: zero, low/high single bits, an interior bit, and
+all-ones. The implementation deliberately defines zero as 64 even when the
+intrinsic flag permits poison, matching the existing i32 policy.
+
+Fresh report-all advances from the Part 1 state 443 / 250 / 193 to
+443 / 256 / 187. Exactly the six expected rows emit provisionally:
+
+- `compiler_rt.floatundidf.__floatundidf`;
+- `compiler_rt.floatundisf.__floatundisf`;
+- `compiler_rt.floatundihf.__floatundihf`;
+- `compiler_rt.floatdidf.__floatdidf`;
+- `compiler_rt.floatdisf.__floatdisf`;
+- `compiler_rt.floatdihf.__floatdihf`.
+
+A structured extraction containing exactly those six captured bodies emits a
+relocation-free ELF object with six global function symbols. A pinned-Zig
+`callconv(.c)` executable performs 75 calls against precomputed expected bits:
+12 unsigned and 13 signed i64 inputs, each through double, float, and half
+rows. Coverage includes zero, both signs, half overflow/rounding boundaries,
+the float 24-bit mantissa boundary, the double 53-bit mantissa boundary, and
+signed/unsigned i64 extrema. Every bit pattern matches exactly.
+
+```text
+summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=256 failed_functions=187 first_failing_function=compiler_rt.trunc.truncl first_failing_diagnostic=UnsupportedLongDoubleAbi first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
+native rows: symbols=6 relocations=0 bit_exact_calls=75/75
+tier2: pass; steps=24/24 tests=977/977
+```
+
+No Tier 3 ran in this commit. These six closures and the two Part 1 closures
+remain provisional until the single cumulative INBOX-45 pipeline Tier 3.
+
+Artifacts:
+
+- current-source z_llvm, sha256
+  `d3b8953cf696577340abd065268f36a3f34865becfd8e4e5a866f6c1a14db218`;
+- `tmp/inbox45_cttz_i64_report.log`, sha256
+  `fe83d5afb1d57bcd03cb7418701dbe5da3401cfba56caec8111b117bd04147b3`;
+- `tmp/inbox45_cttz_i64_rows.ll`, sha256
+  `289ae614dc07ddf4fb72680931d182e3ec29406a98f8b4917a49a7e55964ef14`;
+- `tmp/inbox45_cttz_i64_rows.o`, sha256
+  `b26e5af652db97a3817add16fdada884509103a1bf0af4d37e5ff7a81a4784ab`;
+- `tmp/inbox45_cttz_i64_readelf.log`, sha256
+  `bc471bf523728dd5ddf5cfdd7544a927388d17f41a10c17288275e302eda4a2b`;
+- `tmp/inbox45_cttz_i64_objdump.log`, sha256
+  `0d06b1b237ce4f673957f4d2151e50f60c603cb9d2492ef0eaac3538f0d497e5`;
+- `tmp/inbox45_cttz_i64_expected.log`, sha256
+  `8a914c0a1d6c375ef33e91a39a020d1bd2a77c73fa91acf3212a0ce9e49dbaa0`;
+- `tmp/inbox45_cttz_i64_start.zig`, sha256
+  `7da07e2ff8a7a374df3d4a52b2caf9b5b3013668852adc8da196394aef8057fc`;
+- `tmp/inbox45_cttz_i64_acceptance`, sha256
+  `6f24add53967dceb8c9f657a7e6a7e31f05b4d27836c7605cc4e56b3a9f97280`;
+- `tmp/inbox45_cttz_i64_tier2.log`, sha256
+  `d2c76cdbe1c87810b780f3bfeb1037d86b03e5598fa4c58b0a971f624c123bb1`.

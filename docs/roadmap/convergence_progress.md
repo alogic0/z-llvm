@@ -3998,6 +3998,18 @@ One line per completed cycle, append-only, newest last. This is the
   pipeline gate. Evidence
   `docs/evidence/std_debug_hello_inbox45_narrow_icmp.summary`.
 
+- 2026-07-14 (this commit, INBOX-45 Part 2) Item 12 exact i64
+  count-trailing-zeros: the composed selector now admits only
+  `llvm.cttz.i64(i64, i1 immarg)` with literal flags 0/1, reusing the existing
+  encoded and verified zero-defined machine operation. Exact extracted-row
+  execution provisionally closes all six signed/unsigned i64-to-double,
+  -float, and -half conversion rows with 75/75 precomputed bit-pattern calls.
+  The current report moves from 443 / 250 / 193 to 443 / 256 / 187 with no
+  collateral emissions. Tier 2 is green at 24/24 steps and 977/977 tests. No
+  Tier 3 ran; all eight INBOX-45 closures remain provisional pending the one
+  cumulative pipeline gate. Evidence
+  `docs/evidence/std_debug_hello_inbox45_cttz_i64.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

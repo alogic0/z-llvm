@@ -102,6 +102,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try lowerCtlzI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i64")) return try lowerCtlzI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i32")) return try lowerCttzI32(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
@@ -502,6 +503,25 @@ pub fn lowerCttzI32(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     try selector_state.clobberAccumulator(selector);
     try selector.machine.instructions.append(selector.allocator, .ctz_i32_edi_eax);
     try selector_state.bindEax(selector, result_name);
+    return null;
+}
+
+pub fn lowerCttzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (call.inline_asm != null or call.callee_value != null or call.raw_args != null or call.operand_bundle != null) {
+        return .{ .no_emitter = "composed-block-cttz-call-form" };
+    }
+    if (!call.ret_ty.eql(.{ .int = 64 }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-cttz-signature" };
+    const value_arg = call.args.items[0];
+    const undef_arg = call.args.items[1];
+    const valid_zero_flag = undef_arg.value.eql(.{ .int = 0 }) or undef_arg.value.eql(.{ .int = 1 });
+    if (!value_arg.ty.eql(.{ .int = 64 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
+        return .{ .no_emitter = "composed-block-cttz-args" };
+    }
+    selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 64) catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.append(selector.allocator, .ctz_i64_rdi_eax);
+    try selector_state.bindRax(selector, result_name);
     return null;
 }
 
