@@ -37,22 +37,23 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-45 Pipeline A is complete and cumulatively accepted by `c4956e36`.
-Exact normalized i6/i7 unsigned-immediate comparisons close `__floatunsihf`
-and `__floatsihf`; exact typed `llvm.cttz.i64` closes the six signed/unsigned
-i64-to-double, -float, and -half conversion rows. The accepted compiler_rt
-report is now 443 selected / 256 emitting / 187 failing. The single cumulative
-Tier 3 passed all 17 subgates against tree
-`1d90ef75d73149eaa8aeb062e8640daee8330a3b`; strict real rows remain
-100/100/100 and integrated executables remain 6/6. Evidence:
-`docs/evidence/distribution_all_after_inbox45_narrow_cmp_cttz_i64.summary`.
+INBOX-46 Pipeline B is complete and cumulatively accepted by `3d835a83`.
+Part 1 (`ad9bcbef`) closes `__gehf2` and `__cmphf2` through exact named i16
+`slt` / `sgt` / `ne`; Part 2 (`c6380425`) closes `__ucmpti2` and `__cmpti2`
+through exact signed and unsigned i128 pair comparisons. The accepted
+compiler_rt report is now 443 selected / 260 emitting / 183 failing. The
+single cumulative Tier 3 passed all 17 subgates against tree
+`03c824c377765ac01cb1f53a47494f4ff602b12e`; strict real rows remain
+100/100/100 and integrated executables remain 6/6. Its reported total runtime
+is materially unchanged from INBOX-45. Evidence:
+`docs/evidence/distribution_all_after_inbox46_named_i16_i128_compare.summary`.
 
-No successor is authorized after INBOX-45. The next ranked bounded pipeline
-from `docs/evidence/inbox44_frontier_ranking.md` is the named-i16 predicate
-matrix followed by i128 pair comparison, under the same provisional-closure
-batching policy. It requires a new implementation directive. The switch-PHI,
-`__divsc3`, and separately reviewed `__divdc3` vector-PHI populations remain
-later candidates; `__muldc3` remains deferred at the 256-bit/AVX checkpoint.
+No implementation successor is explicitly authorized after INBOX-46. The
+next planned bounded contract is canonical-mask f32x2 vector select plus
+`llvm.copysign.v2f32`, batched with a compatible vector cycle, to target
+`__divsc3`. The `__divdc3` vector-PHI requirement remains a separate review
+boundary, and `__muldc3` remains deferred at the 256-bit/AVX checkpoint.
+Request the next directive before implementation.
 
 The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
 comparison matched 1,258 semantic records across all 17 gates. The historical
