@@ -1260,6 +1260,91 @@ test "generic cfg selector preserves exact double fabs payload bits" {
     }) |case| try std.testing.expectEqual(case[1], @as(u64, @bitCast(function(@bitCast(case[0])))));
 }
 
+test "generic cfg selector executes exact scalar maxnum semantics" {
+    const input =
+        \\declare float @llvm.maxnum.f32(float, float)
+        \\declare double @llvm.maxnum.f64(double, double)
+        \\define float @max_float(float %lhs, float %rhs) {
+        \\entry:
+        \\  %result = tail call float @llvm.maxnum.f32(float %lhs, float %rhs)
+        \\  ret float %result
+        \\}
+        \\define double @max_double(double %lhs, double %rhs) {
+        \\entry:
+        \\  %result = tail call double @llvm.maxnum.f64(double %lhs, double %rhs)
+        \\  ret double %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var float_machine = x86_64_machine.MachineFunction.init("max_float", .float);
+    defer float_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &float_machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(float_machine);
+    const float_bytes = try encoding.encodeFunction(std.testing.allocator, float_machine);
+    defer std.testing.allocator.free(float_bytes);
+    const float_mapping = try std.posix.mmap(null, float_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(float_mapping);
+    @memcpy(float_mapping, float_bytes);
+    const max_float: *const fn (f32, f32) callconv(.c) f32 = @ptrCast(float_mapping.ptr);
+    inline for (.{
+        .{ @as(u32, 0x3f80_0000), @as(u32, 0x4000_0000), @as(u32, 0x4000_0000) },
+        .{ @as(u32, 0x4040_0000), @as(u32, 0xc080_0000), @as(u32, 0x4040_0000) },
+        .{ @as(u32, 0x0000_0000), @as(u32, 0x8000_0000), @as(u32, 0x0000_0000) },
+        .{ @as(u32, 0x8000_0000), @as(u32, 0x0000_0000), @as(u32, 0x0000_0000) },
+        .{ @as(u32, 0x8000_0000), @as(u32, 0x8000_0000), @as(u32, 0x8000_0000) },
+        .{ @as(u32, 0x7fc1_2345), @as(u32, 0x8000_0001), @as(u32, 0x8000_0001) },
+        .{ @as(u32, 0x7f80_0000), @as(u32, 0x7f81_2345), @as(u32, 0x7f80_0000) },
+    }) |case| {
+        try std.testing.expectEqual(case[2], @as(u32, @bitCast(max_float(@bitCast(case[0]), @bitCast(case[1])))));
+    }
+
+    var double_machine = x86_64_machine.MachineFunction.init("max_double", .double);
+    defer double_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &double_machine, module.functions.items[1]));
+    try x86_64_verify.verifyFunction(double_machine);
+    const double_bytes = try encoding.encodeFunction(std.testing.allocator, double_machine);
+    defer std.testing.allocator.free(double_bytes);
+    const double_mapping = try std.posix.mmap(null, double_bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(double_mapping);
+    @memcpy(double_mapping, double_bytes);
+    const max_double: *const fn (f64, f64) callconv(.c) f64 = @ptrCast(double_mapping.ptr);
+    inline for (.{
+        .{ @as(u64, 0x3ff0_0000_0000_0000), @as(u64, 0x4000_0000_0000_0000), @as(u64, 0x4000_0000_0000_0000) },
+        .{ @as(u64, 0x4008_0000_0000_0000), @as(u64, 0xc010_0000_0000_0000), @as(u64, 0x4008_0000_0000_0000) },
+        .{ @as(u64, 0x0000_0000_0000_0000), @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x0000_0000_0000_0000) },
+        .{ @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x0000_0000_0000_0000), @as(u64, 0x0000_0000_0000_0000) },
+        .{ @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x8000_0000_0000_0000), @as(u64, 0x8000_0000_0000_0000) },
+        .{ @as(u64, 0x7ff8_1234_5678_9abc), @as(u64, 0x8000_0000_0000_0001), @as(u64, 0x8000_0000_0000_0001) },
+        .{ @as(u64, 0x7ff0_0000_0000_0000), @as(u64, 0x7ff0_1234_5678_9abc), @as(u64, 0x7ff0_0000_0000_0000) },
+    }) |case| {
+        try std.testing.expectEqual(case[2], @as(u64, @bitCast(max_double(@bitCast(case[0]), @bitCast(case[1])))));
+    }
+}
+
+test "generic cfg selector keeps scalar minnum fail closed" {
+    const input =
+        \\declare float @llvm.minnum.f32(float, float)
+        \\define float @min_float(float %lhs, float %rhs) {
+        \\entry:
+        \\  %result = call float @llvm.minnum.f32(float %lhs, float %rhs)
+        \\  ret float %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("min_float", .float);
+    defer machine.deinit(std.testing.allocator);
+    const result = try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+    try std.testing.expect(result == .unsupported);
+    try std.testing.expectEqualStrings("composed-block-llvm-intrinsic", result.unsupported.detail());
+}
+
 test "generic cfg selector rejects unknown llvm intrinsics before direct calls" {
     const input =
         \\declare double @llvm.sqrt.f64(double)

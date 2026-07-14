@@ -37,18 +37,20 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-The INBOX-42 pipeline is complete. Its pre-authorized successor adds one exact
-8-byte, 4-aligned `{ float, float }` stack object through the existing frame
-authority, bounded constant field pointers, ordinary 64-bit pointer PHIs, f32
-stores, and an offset-zero packed load. Permanent executable and negative
-coverage are green through Tier 3. Report-all remains honestly at 443 selected
-/ 247 emitting / 196 failing with zero closures and zero collateral emissions:
-`__divsc3` advances to `llvm.maxnum.f32`, while `__mulsc3` advances to
-`<4 x float>` construction.
+INBOX-43 Part 1 is complete. Exact scalar `llvm.maxnum.f32/f64` uses existing
+XMM comparisons and branches with explicit one-NaN and signed-zero behavior;
+`minnum` remains fail-closed. Permanent raw-bit execution and Tier 2 are green.
+Report-all remains honestly at 443 selected / 247 emitting / 196 failing with
+zero closures and zero collateral emissions. `__divdc3` advances to its
+`stage2-phi-dst` vector join; `__divsc3` reaches the next captured intrinsic,
+scalar `llvm.copysign.f32`.
 
-Stop for review. No third INBOX-42 cycle is authorized. Review evidence:
-`docs/evidence/std_debug_hello_aggregate_object_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox42_aggregate_object.summary`.
+Continue with INBOX-43's pre-authorized complete `<4 x float>` successor for
+`__mulsc3`: deliberate four-lane definedness, the exact captured construction
+and shuffles, lane-2 extraction, packed arithmetic/fabs/fcmp, canonical
+`<4 x i1>` masks, and exact mask-to-i4 lowering. Expected closure is exactly
+`__mulsc3`; run one Tier 3 at acceptance. Evidence:
+`docs/evidence/std_debug_hello_scalar_maxnum_acceptance.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

@@ -277,6 +277,14 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f64")) {
         return if (call.ret_ty == .double and call.args.items.len == 1 and call.args.items[0].ty == .double) null else .{ .unsupported_type = "llvm.fabs.f64" };
     }
+    if (std.mem.eql(u8, call.callee, "llvm.maxnum.f32")) {
+        return if (call.ret_ty == .float and call.args.items.len == 2 and
+            call.args.items[0].ty == .float and call.args.items[1].ty == .float) null else .{ .unsupported_type = "llvm.maxnum.f32" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.maxnum.f64")) {
+        return if (call.ret_ty == .double and call.args.items.len == 2 and
+            call.args.items[0].ty == .double and call.args.items[1].ty == .double) null else .{ .unsupported_type = "llvm.maxnum.f64" };
+    }
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) {
         const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
         return if (call.ret_ty.eql(vector_ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(vector_ty)) null else .{ .unsupported_type = "llvm.fabs.v2f32" };

@@ -1,3 +1,4 @@
+const std = @import("std");
 const ir = @import("../../../ir.zig");
 const fp_semantics = @import("../../../analysis/fp_semantics.zig");
 const x86_64_match = @import("../match.zig");
@@ -137,6 +138,74 @@ fn firstXmmExcept(avoid: ?XmmReg) XmmReg {
 
 fn fpBits(ty: ir.Type) ?u16 {
     return if (ty == .float) 32 else if (ty == .double) 64 else null;
+}
+
+pub fn lowerMaxNum(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, bits: u16) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-maxnum-result" };
+    const ty: ir.Type = if (bits == 32) .float else if (bits == 64) .double else unreachable;
+    if (!call.ret_ty.eql(ty) or call.args.items.len != 2 or
+        !call.args.items[0].ty.eql(ty) or !call.args.items[1].ty.eql(ty) or
+        call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null)
+    {
+        return .{ .no_emitter = "composed-block-maxnum-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) {
+            return .{ .no_emitter = "composed-block-maxnum-tail-kind" };
+        }
+    }
+
+    const lhs = fpValueReg(selector, call.args.items[0].value, bits) orelse blk: {
+        const rhs_reg = fpValueReg(selector, call.args.items[1].value, bits);
+        break :blk firstXmmExcept(rhs_reg);
+    };
+    if (try materializeFpValue(selector, call.args.items[0].value, lhs, bits)) |diagnostic| return diagnostic;
+    const rhs = if (fpValueReg(selector, call.args.items[1].value, bits)) |reg| reg else blk: {
+        const scratch = firstXmmExcept(lhs);
+        if (try materializeFpValue(selector, call.args.items[1].value, scratch, bits)) |diagnostic| return diagnostic;
+        break :blk scratch;
+    };
+    const dst = firstXmmExceptTwo(lhs, rhs);
+    if (try materializeFpValue(selector, call.args.items[1].value, dst, bits)) |diagnostic| return diagnostic;
+
+    const lhs_at_least_rhs = try selector_state.allocateEdgeLabel(selector);
+    const choose_lhs = try selector_state.allocateEdgeLabel(selector);
+    const end = try selector_state.allocateEdgeLabel(selector);
+
+    try appendScalarCompare(selector, lhs, lhs, bits);
+    try selector.machine.instructions.append(selector.allocator, .{ .jp = end });
+    try appendScalarCompare(selector, rhs, rhs, bits);
+    try selector.machine.instructions.append(selector.allocator, .{ .jp = choose_lhs });
+    try appendScalarCompare(selector, lhs, rhs, bits);
+    try selector.machine.instructions.append(selector.allocator, .{ .jae = lhs_at_least_rhs });
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = end });
+
+    try selector.machine.instructions.append(selector.allocator, .{ .label = lhs_at_least_rhs });
+    try selector.machine.instructions.append(selector.allocator, .{ .jne = choose_lhs });
+    try selector_state.clobberXmmReg(selector, dst);
+    try selector.machine.instructions.append(selector.allocator, .{ .andps_xmm = .{ .dst = dst, .src = lhs } });
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = end });
+
+    try selector.machine.instructions.append(selector.allocator, .{ .label = choose_lhs });
+    if (try materializeFpValue(selector, call.args.items[0].value, dst, bits)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, .{ .label = end });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
+    return null;
+}
+
+fn firstXmmExceptTwo(first: XmmReg, second: XmmReg) XmmReg {
+    for (scalar_xmm_regs) |reg| {
+        if (reg != first and reg != second) return reg;
+    }
+    unreachable;
+}
+
+fn appendScalarCompare(selector: *ComposedBlockSelector, lhs: XmmReg, rhs: XmmReg, bits: u16) !void {
+    try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+        .{ .ucomiss = .{ .dst = lhs, .src = rhs } }
+    else
+        .{ .ucomisd = .{ .dst = lhs, .src = rhs } });
 }
 
 pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst: XmmReg, bits: u16) !?Diagnostic {

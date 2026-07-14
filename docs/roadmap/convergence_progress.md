@@ -3917,6 +3917,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_aggregate_object_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox42_aggregate_object.summary`.
 
+- 2026-07-14 (this commit, INBOX-43 Part 1) Item 12 scalar FP intrinsic
+  capability: exact `llvm.maxnum.f32/f64` now distinguishes either NaN before
+  ordered comparison and merges equal operands bitwise for correct signed-zero
+  ordering. The implementation reuses existing XMM comparisons, branches, and
+  copies without adding a machine or allocation class. Permanent mmap execution
+  covers 14 precomputed raw-bit cases; `minnum` remains fail-closed. Report-all
+  stays at 443 / 247 / 196 with zero closures and collateral emissions:
+  `__divdc3` advances to its vector-PHI destination and `__divsc3` to scalar
+  `llvm.copysign.f32`. Tier 2 is green. Continue with INBOX-43's pre-authorized
+  complete `<4 x float>` successor, which carries the single Tier 3 trigger.
+  Evidence `docs/evidence/std_debug_hello_scalar_maxnum_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
