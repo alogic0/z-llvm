@@ -114,6 +114,11 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
                 (std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i64") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128"))) saw_fixed_smul_overflow = true;
             if (instruction.kind == .call and sysv_abi.callHasScalarSseType(instruction.kind.call)) saw_scalar_sse_call = true;
+            if (instruction.kind == .cast) {
+                const cast = instruction.kind.cast;
+                if ((cast.op == .fpext and cast.from_ty == .half and (cast.to_ty == .float or cast.to_ty == .double)) or
+                    (cast.op == .fptrunc and cast.from_ty == .float and cast.to_ty == .half)) saw_scalar_sse_call = true;
+            }
             if (instruction.kind == .icmp and instruction.kind.icmp.operand_ty.eql(.{ .int = 128 })) saw_wide_icmp = true;
             if (instruction.kind == .cast and
                 (instruction.kind.cast.op == .sitofp or instruction.kind.cast.op == .uitofp)) saw_int_to_fp_cast = true;

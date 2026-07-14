@@ -3821,6 +3821,21 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_sdiv_i32_by_two_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox39_sdiv2.summary`.
 
+- 2026-07-13 (this commit, INBOX-39 pre-authorized successor) Item 12 scalar
+  FP composition: exact `fpext half -> double` now calls the proven
+  `__extendhfsf2` helper and applies the existing `cvtss2sd` operation to its
+  XMM0 result. The first report honestly exposed a spill-frame boundary:
+  admitted half casts synthesize scalar-SSE calls but frame preplanning only
+  recognized explicit IR calls. These casts now reserve call-spill space
+  through the existing frame authority. A permanent three-call preservation
+  regression and 20 precomputed raw-half `__fmah` cases are green.
+  `compiler_rt.fma.__fmah` is the sole closure, advancing report-all from
+  443 / 238 / 205 to 443 / 239 / 204. Tier 2 and the row-closure/shared-frame
+  Tier 3 are green. The INBOX-39 pipeline is exhausted; stop at the refreshed
+  frontier before the agreed half-fcmp tranche. Evidence
+  `docs/evidence/std_debug_hello_half_to_double_fpext_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox39_half_double.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

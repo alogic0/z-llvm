@@ -37,19 +37,22 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-39 Part 1 is complete. Exact `sdiv i32 %named, 2` now rounds negative
-odd values toward zero, and exact powi execution drove a shared conditional-phi
-source-stabilization repair before acceptance. `__powidf2` and `__powisf2` are
-the only closures, advancing report-all to 443 selected / 238 emitting / 205
-failing. Permanent execution, exact native row proof, Tier 2, and the single
-closure/shared-CFG Tier 3 are green.
+The INBOX-39 pipeline is complete. Part 1 closes `__powidf2` and `__powisf2`
+with exact signed i32 division-by-two semantics and a conditional-phi source
+stabilization repair. The pre-authorized successor composes exact half-to-double
+extension through `__extendhfsf2` plus `cvtss2sd`; exact `__fmah` execution
+drove implicit half-helper calls into the existing frame preplanning authority.
+The three expected rows are closed, report-all is 443 selected / 239 emitting /
+204 failing, and both cycles passed Tier 2 plus one closure/shared-surface Tier
+3 each.
 
-Continue with INBOX-39's pre-authorized successor: exact half-to-double `fpext`
-composed through the proven half-to-float helper and existing scalar
-float-to-double conversion, targeting `compiler_rt.fma.__fmah`. Keep unrelated
-half operations fail-closed and commit the successor separately. Evidence:
-`docs/evidence/std_debug_hello_sdiv_i32_by_two_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox39_sdiv2.summary`.
+Stop for the next directive. The agreed post-refresh order is half `fcmp
+uno/olt` before half `fadd`, followed by the lanes-canonical vector-mask slice
+as the bridge into aggregate-ABI review. Evidence:
+`docs/evidence/std_debug_hello_sdiv_i32_by_two_acceptance.summary`,
+`docs/evidence/distribution_all_after_inbox39_sdiv2.summary`,
+`docs/evidence/std_debug_hello_half_to_double_fpext_acceptance.summary`, and
+`docs/evidence/distribution_all_after_inbox39_half_double.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

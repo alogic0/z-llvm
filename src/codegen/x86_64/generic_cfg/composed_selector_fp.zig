@@ -166,7 +166,7 @@ pub fn lowerFpCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: 
         .fpext => if (cast.from_ty == .float and cast.to_ty == .double)
             lowerScalarFpCast(selector, result_name, cast, 32, 64)
         else
-            lowerHalfToFloat(selector, result_name, cast),
+            lowerHalfExtension(selector, result_name, cast),
         .fptrunc => if (cast.from_ty == .double and cast.to_ty == .float)
             lowerScalarFpCast(selector, result_name, cast, 64, 32)
         else
@@ -248,8 +248,8 @@ fn lowerFloatToHalf(selector: *ComposedBlockSelector, result_name: []const u8, c
     return null;
 }
 
-fn lowerHalfToFloat(selector: *ComposedBlockSelector, result_name: []const u8, cast: ir.CastInst) !?Diagnostic {
-    if (cast.from_ty != .half or cast.to_ty != .float) return .{ .no_emitter = "composed-block-fpext-type" };
+fn lowerHalfExtension(selector: *ComposedBlockSelector, result_name: []const u8, cast: ir.CastInst) !?Diagnostic {
+    if (cast.from_ty != .half or (cast.to_ty != .float and cast.to_ty != .double)) return .{ .no_emitter = "composed-block-fpext-type" };
     if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-fpext-source" };
     selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = .xmm0, .bits = 16 } }) catch return .{ .unsupported_value = "composed-block-fpext-source" };
@@ -258,6 +258,7 @@ fn lowerHalfToFloat(selector: *ComposedBlockSelector, result_name: []const u8, c
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
     try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = "__extendhfsf2", .ret_ty = .float } });
     if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
-    try selector_state.bindValueLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 32 } });
+    if (cast.to_ty == .double) try selector.machine.instructions.append(selector.allocator, .{ .cvtss2sd_xmm = .{ .dst = .xmm0, .src = .xmm0 } });
+    try selector_state.bindValueLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = if (cast.to_ty == .double) 64 else 32 } });
     return null;
 }

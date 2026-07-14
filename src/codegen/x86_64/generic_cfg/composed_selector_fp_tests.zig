@@ -4,6 +4,7 @@ const encoding = @import("../../../mc/encoding.zig");
 const selector_impl = @import("composed_selector_impl.zig");
 const selector_calls = @import("composed_selector_calls.zig");
 const x86_64_machine = @import("../machine.zig");
+const x86_64_verify = @import("../verify.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_fp = @import("composed_selector_fp.zig");
 const state_data = @import("composed_selector_state_data.zig");
@@ -155,6 +156,56 @@ test "generic cfg selector aligns frameless half extension calls" {
         .{ .direct_call = .{ .symbol = "__extendhfsf2", .ret_ty = .float } },
         .add_rsp_8,
     }, machine.instructions.items);
+}
+
+test "generic cfg selector composes half to double extension" {
+    var machine = x86_64_machine.MachineFunction.init("extend-half-double", .double);
+    defer machine.deinit(std.testing.allocator);
+    var selector = state_data.ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "input", .{ .xmm = .{ .reg = .xmm2, .bits = 16 } });
+
+    try std.testing.expect((try selector_fp.lowerFpCast(&selector, "wide", .{
+        .op = .fpext,
+        .from_ty = .half,
+        .value = .{ .named = "input" },
+        .to_ty = .double,
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .movapd_xmm = .{ .dst = .xmm0, .src = .xmm2 } },
+        .sub_rsp_8,
+        .{ .direct_call = .{ .symbol = "__extendhfsf2", .ret_ty = .float } },
+        .add_rsp_8,
+        .{ .cvtss2sd_xmm = .{ .dst = .xmm0, .src = .xmm0 } },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(@as(u16, 64), selector_state.valueLoc(&selector, "wide").?.xmm.bits);
+}
+
+test "generic cfg selector reserves call spills for composed half extensions" {
+    const input =
+        \\define double @extend_three(half %x, half %y, half %z) {
+        \\entry:
+        \\  %wide_x = fpext half %x to double
+        \\  %wide_y = fpext half %y to double
+        \\  %sum = fadd double %wide_x, %wide_y
+        \\  %wide_z = fpext half %z to double
+        \\  %result = fadd double %sum, %wide_z
+        \\  ret double %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = x86_64_machine.MachineFunction.init("extend_three", .double);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    try std.testing.expect(switch (machine.instructions.items[0]) {
+        .sub_rsp_imm8, .sub_rsp_imm32, .sub_rsp_24, .sub_rsp_40, .sub_rsp_56 => true,
+        else => false,
+    });
 }
 
 test "generic cfg selector legalizes fptrunc float to half through nonrecursive libcall" {

@@ -156,7 +156,7 @@ fn inspectCast(cast: ir.CastInst) ?Diagnostic {
     }
     return switch (cast.op) {
         .trunc, .zext, .sext, .bitcast, .ptrtoint, .inttoptr => null,
-        .fpext => if ((cast.from_ty == .half and cast.to_ty == .float) or (cast.from_ty == .float and cast.to_ty == .double)) null else .{ .unsupported_instruction = @tagName(cast.op) },
+        .fpext => if ((cast.from_ty == .half and (cast.to_ty == .float or cast.to_ty == .double)) or (cast.from_ty == .float and cast.to_ty == .double)) null else .{ .unsupported_instruction = @tagName(cast.op) },
         .fptrunc => if ((cast.from_ty == .float and cast.to_ty == .half) or (cast.from_ty == .double and cast.to_ty == .float)) null else .{ .unsupported_instruction = @tagName(cast.op) },
         .sitofp, .uitofp => switch (cast.from_ty) {
             .int => |bits| if (bits >= 8 and bits <= 64 and (cast.to_ty == .float or cast.to_ty == .double)) null else .{ .unsupported_instruction = @tagName(cast.op) },
