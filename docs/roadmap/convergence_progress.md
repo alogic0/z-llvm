@@ -3668,6 +3668,20 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_llvm_intrinsic_boundary_repair.summary` and
   `docs/evidence/distribution_all_after_inbox34_llvm_intrinsic_boundary_repair.summary`.
 
+- 2026-07-13 (this commit, INBOX-34) Item 12 named integer inequality:
+  exact plain named `icmp ne` for i32/i64 now lowers through the existing typed
+  scratch, compare, and `setne` paths. Branch and select consumers execute at
+  both widths; i16 and `samesign` near misses remain fail-closed. Eighty
+  precomputed-result native calls close `__gedf2`, `__gesf2`, `__cmpdf2`, and
+  `__cmpsf2` from one relocation-free object. Against the corrected intrinsic
+  baseline, report-all advances from 443 selected / 226 emitting / 217 failing
+  to 443 selected / 230 emitting / 213 failing with no collateral emissions.
+  Tier 2 and the row-closure Tier 3 are green. Continue with the pre-authorized
+  exact immediate-left i32 shift successor. Evidence
+  `docs/evidence/std_debug_hello_named_integer_inequality_acceptance.summary`
+  and
+  `docs/evidence/distribution_all_after_inbox34_named_integer_inequality.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

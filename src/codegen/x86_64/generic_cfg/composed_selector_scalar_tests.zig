@@ -1216,6 +1216,133 @@ test "generic cfg selector executes plain named signed comparison boundaries" {
     }
 }
 
+test "generic cfg selector lowers exact plain named integer inequality" {
+    inline for (.{ 32, 64 }) |bits| {
+        var machine = MachineFunction.init("named-ne", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "lhs", if (bits == 32) .{ .arg32 = .rdi } else .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "rhs", if (bits == 32) .{ .arg32 = .rsi } else .{ .arg64 = .rsi });
+
+        const diagnostic = try selector_scalar.lowerIcmp(&selector, "cmp", .{
+            .predicate = .ne,
+            .operand_ty = .{ .int = bits },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "rhs" },
+        });
+
+        try std.testing.expect(diagnostic == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+        try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
+        try std.testing.expectEqual(if (bits == 32)
+            x86_64_machine.Instruction{ .cmp_ecx_arg32 = .r8 }
+        else
+            x86_64_machine.Instruction{ .cmp_rcx_arg64 = .r8 }, machine.instructions.items[2]);
+        try std.testing.expectEqual(x86_64_machine.Instruction.setne_eax, machine.instructions.items[3]);
+    }
+
+    inline for (.{
+        .{ .bits = 16, .samesign = false },
+        .{ .bits = 32, .samesign = true },
+    }) |case| {
+        var machine = MachineFunction.init("named-ne-near-miss", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+        const diagnostic = (try selector_scalar.lowerIcmp(&selector, "cmp", .{
+            .predicate = .ne,
+            .samesign = case.samesign,
+            .operand_ty = .{ .int = case.bits },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "rhs" },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-form", diagnostic.detail());
+    }
+}
+
+test "generic cfg selector executes named integer inequality branch and select" {
+    const input =
+        \\define i32 @branch_ne_i32(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %comparison = icmp ne i32 %lhs, %rhs
+        \\  br i1 %comparison, label %unequal, label %equal
+        \\unequal:
+        \\  ret i32 11
+        \\equal:
+        \\  ret i32 22
+        \\}
+        \\define i32 @select_ne_i32(i32 %lhs, i32 %rhs) {
+        \\entry:
+        \\  %comparison = icmp ne i32 %lhs, %rhs
+        \\  %result = select i1 %comparison, i32 33, i32 44
+        \\  ret i32 %result
+        \\}
+        \\define i32 @branch_ne_i64(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %comparison = icmp ne i64 %lhs, %rhs
+        \\  br i1 %comparison, label %unequal, label %equal
+        \\unequal:
+        \\  ret i32 55
+        \\equal:
+        \\  ret i32 66
+        \\}
+        \\define i32 @select_ne_i64(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %comparison = icmp ne i64 %lhs, %rhs
+        \\  %result = select i1 %comparison, i32 77, i32 88
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const i32_cases = [_]struct { lhs: i32, rhs: i32 }{
+        .{ .lhs = std.math.minInt(i32), .rhs = std.math.minInt(i32) },
+        .{ .lhs = std.math.minInt(i32), .rhs = std.math.maxInt(i32) },
+        .{ .lhs = std.math.maxInt(i32), .rhs = std.math.minInt(i32) },
+        .{ .lhs = std.math.maxInt(i32), .rhs = std.math.maxInt(i32) },
+    };
+    const i64_cases = [_]struct { lhs: i64, rhs: i64 }{
+        .{ .lhs = std.math.minInt(i64), .rhs = std.math.minInt(i64) },
+        .{ .lhs = std.math.minInt(i64), .rhs = std.math.maxInt(i64) },
+        .{ .lhs = std.math.maxInt(i64), .rhs = std.math.minInt(i64) },
+        .{ .lhs = std.math.maxInt(i64), .rhs = std.math.maxInt(i64) },
+    };
+
+    for (module.functions.items, 0..) |function_ir, function_index| {
+        var machine = MachineFunction.init(function_ir.name, function_ir.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (function_index < 2) {
+            const function: *const fn (i32, i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+            for (i32_cases) |case| {
+                const expected: i32 = if (function_index == 0)
+                    if (case.lhs != case.rhs) 11 else 22
+                else if (case.lhs != case.rhs) 33 else 44;
+                try std.testing.expectEqual(expected, function(case.lhs, case.rhs));
+            }
+        } else {
+            const function: *const fn (i64, i64) callconv(.c) i32 = @ptrCast(mapping.ptr);
+            for (i64_cases) |case| {
+                const expected: i32 = if (function_index == 2)
+                    if (case.lhs != case.rhs) 55 else 66
+                else if (case.lhs != case.rhs) 77 else 88;
+                try std.testing.expectEqual(expected, function(case.lhs, case.rhs));
+            }
+        }
+    }
+}
+
 test "generic cfg selector lowers unsigned i32 less-than immediate" {
     var machine = MachineFunction.init("ult-i32-imm", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);
