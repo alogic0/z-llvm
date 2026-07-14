@@ -69,6 +69,14 @@ the cycle and run the pipeline's one cumulative Tier 3; it accepts two total
 closures because cycle 1 advanced rather than closed its half rows. Evidence:
 `docs/evidence/std_debug_hello_inbox50_named_i64_ult.summary`.
 
+INBOX-50 comparison acceptance is complete. The cumulative Tier 3 passes all
+17 subgates against committed tree
+`b55085f16351d6af65d686b262798374294525dc`, accepting `__truncdfsf2` and
+`__truncdfhf2` and making 443 / 272 / 171 the accepted report state. The i16
+cycle is accepted with zero closures and its two later half frontiers remain
+open. Stop for review: no third pipeline is authorized. Evidence:
+`docs/evidence/distribution_all_after_inbox50_comparison.summary`.
+
 INBOX-48 is complete and accepted. Commit `1c5ff956` adds exact fully defined
 f64x2 PHI destinations through the existing XMM/pair-spill value map and
 parallel edge-copy authority. The single Tier 3 passed all 17 subgates against

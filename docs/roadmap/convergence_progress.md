@@ -4255,6 +4255,18 @@ One line per completed cycle, append-only, newest last. This is the
   acceptance. Evidence
   `docs/evidence/std_debug_hello_inbox50_named_i64_ult.summary`.
 
+- 2026-07-14 (this commit, INBOX-50 comparison acceptance) Item 12 pipeline
+  close: the one cumulative Tier 3 passes all 17 subgates against committed
+  tree `b55085f16351d6af65d686b262798374294525dc`. This accepts
+  `__truncdfsf2` and `__truncdfhf2`, making 443 / 272 / 171 the accepted
+  compiler_rt report state. The modulo-i16 cycle is accepted as a reusable
+  capability with zero closures; `__mulhf3` and `__addhf3` remain at their
+  later frontiers. Integrated objects remain 146/146 in all three pipelines,
+  strict real rows remain 100/100/100, and release-source object/link/probe
+  boundaries remain 100/100 each. Stop for review; no third pipeline is
+  authorized. Evidence
+  `docs/evidence/distribution_all_after_inbox50_comparison.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
