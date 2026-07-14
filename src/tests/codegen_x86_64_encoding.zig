@@ -61,6 +61,21 @@ test "x86_64 encoding emits expected add args bytes" {
     try std.testing.expectEqualSlices(u8, &.{ 0x89, 0xf8, 0x01, 0xf0, 0xc3 }, bytes);
 }
 
+test "x86_64 encoding emits i64 bit reversal" {
+    var machine = codegen.x86_64.MachineFunction.init("bit_reverse_i64", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+    try machine.instructions.append(std.testing.allocator, .bit_reverse_rax);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 93), mc.encoding.instructionSize(.bit_reverse_rax));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqual(@as(usize, 97), bytes.len);
+    try std.testing.expectEqualSlices(u8, &.{ 0x48, 0x8b, 0xc7, 0x48, 0x0f, 0xc8 }, bytes[0..6]);
+    try std.testing.expectEqualSlices(u8, &.{ 0x48, 0x09, 0xd0, 0xc3 }, bytes[bytes.len - 4 ..]);
+}
+
 test "x86_64 encoding sizes i64 add before direct call relocation" {
     var machine = codegen.x86_64.MachineFunction.init("add64_call", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

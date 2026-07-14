@@ -266,6 +266,24 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xe2, 0x02, 0x09, 0xd0, 0x89, 0xc2, 0xd1, 0xe8, 0x25, 0x55, 0x55, 0x55, 0x55, 0x81,
                 0xe2, 0x55, 0x55, 0x55, 0x55, 0xd1, 0xe2, 0x09, 0xd0,
             }),
+            .bit_reverse_rax => {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x0f, 0xc8 });
+                inline for (.{
+                    .{ @as(u64, 0x0f0f_0f0f_0f0f_0f0f), @as(u8, 4) },
+                    .{ @as(u64, 0x3333_3333_3333_3333), @as(u8, 2) },
+                    .{ @as(u64, 0x5555_5555_5555_5555), @as(u8, 1) },
+                }) |stage| {
+                    try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0xc2, 0x48, 0xb9 });
+                    try appendU64(&bytes, allocator, stage[0]);
+                    try bytes.appendSlice(allocator, &.{
+                        0x48, 0xc1,     0xe8, stage[1],
+                        0x48, 0x21,     0xc8, 0x48,
+                        0x21, 0xca,     0x48, 0xc1,
+                        0xe2, stage[1], 0x48, 0x09,
+                        0xd0,
+                    });
+                }
+            },
             .ushl_sat_i32_edi_imm_eax => |amount| {
                 try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0xc1, 0xe0, amount, 0x81, 0xff });
                 try appendU32(&bytes, allocator, @as(u32, std.math.maxInt(u32)) >> amount);
@@ -1800,6 +1818,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .ctz_i32_edi_eax => 12,
         .popcount_i32_edi_eax => 4,
         .bit_reverse_i32_edi_eax => 65,
+        .bit_reverse_rax => 93,
         .ushl_sat_i32_edi_imm_eax => 20,
         .bswap_eax => 2,
         .bswap_rax => 3,

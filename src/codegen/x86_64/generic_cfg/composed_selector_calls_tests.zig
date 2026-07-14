@@ -650,3 +650,95 @@ test "generic cfg selector executes signed and unsigned i128 comparisons" {
         try std.testing.expectEqual(case.signed, signed_compare(@bitCast(case.lhs), @bitCast(case.rhs)));
     }
 }
+
+test "generic cfg selector keeps bit permutation near misses fail closed" {
+    inline for (.{
+        .{ .callee = "llvm.bswap.i128", .ret_bits = 64, .arg_bits = 128, .tail_kind = @as(?[]const u8, null) },
+        .{ .callee = "llvm.bitreverse.i64", .ret_bits = 64, .arg_bits = 32, .tail_kind = @as(?[]const u8, null) },
+        .{ .callee = "llvm.bitreverse.i128", .ret_bits = 128, .arg_bits = 128, .tail_kind = @as(?[]const u8, "musttail") },
+        .{ .callee = "llvm.bswap.i64", .ret_bits = 64, .arg_bits = 64, .tail_kind = @as(?[]const u8, null) },
+    }) |case| {
+        var machine = MachineFunction.init("bit-permutation-near-miss", .{ .int = case.ret_bits });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        var call = ir.CallInst{
+            .ret_ty = .{ .int = case.ret_bits },
+            .callee = case.callee,
+            .tail_kind = case.tail_kind,
+            .args = .empty,
+        };
+        defer call.deinit(std.testing.allocator);
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = case.arg_bits }, .value = .{ .named = "value" } });
+        try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) != null);
+    }
+}
+
+test "generic cfg selector executes exact i64 and i128 bit permutations" {
+    const input =
+        \\declare i128 @llvm.bswap.i128(i128)
+        \\declare i64 @llvm.bitreverse.i64(i64)
+        \\declare i128 @llvm.bitreverse.i128(i128)
+        \\define i128 @byte_swap_i128(i128 %value) {
+        \\entry:
+        \\  %result = tail call i128 @llvm.bswap.i128(i128 %value)
+        \\  ret i128 %result
+        \\}
+        \\define i64 @bit_reverse_i64(i64 %value) {
+        \\entry:
+        \\  %result = tail call i64 @llvm.bitreverse.i64(i64 %value)
+        \\  ret i64 %result
+        \\}
+        \\define i128 @bit_reverse_i128(i128 %value) {
+        \\entry:
+        \\  %result = tail call i128 @llvm.bitreverse.i128(i128 %value)
+        \\  ret i128 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var mappings: [3]?[]align(std.heap.page_size_min) u8 = .{ null, null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (module.functions.items, 0..) |function_ir, index| {
+        var machine = MachineFunction.init(function_ir.name, function_ir.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        mappings[index] = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mappings[index].?, bytes);
+    }
+
+    const byte_swap_i128: *const fn (u128) callconv(.c) u128 = @ptrCast(mappings[0].?.ptr);
+    const bit_reverse_i64: *const fn (u64) callconv(.c) u64 = @ptrCast(mappings[1].?.ptr);
+    const bit_reverse_i128: *const fn (u128) callconv(.c) u128 = @ptrCast(mappings[2].?.ptr);
+    inline for (.{
+        .{ @as(u64, 0), @as(u64, 0) },
+        .{ @as(u64, 1), @as(u64, 0x8000_0000_0000_0000) },
+        .{ @as(u64, 0x8000_0000_0000_0000), @as(u64, 1) },
+        .{ @as(u64, 0x0123_4567_89ab_cdef), @as(u64, 0xf7b3_d591_e6a2_c480) },
+        .{ std.math.maxInt(u64), std.math.maxInt(u64) },
+    }) |case| try std.testing.expectEqual(case[1], bit_reverse_i64(case[0]));
+    inline for (.{
+        .{ @as(u128, 0), @as(u128, 0) },
+        .{ @as(u128, 1), @as(u128, 1) << 120 },
+        .{
+            @as(u128, 0x0123_4567_89ab_cdef_fedc_ba98_7654_3210),
+            @as(u128, 0x1032_5476_98ba_dcfe_efcd_ab89_6745_2301),
+        },
+    }) |case| try std.testing.expectEqual(case[1], byte_swap_i128(case[0]));
+    inline for (.{
+        .{ @as(u128, 0), @as(u128, 0) },
+        .{ @as(u128, 1), @as(u128, 1) << 127 },
+        .{ @as(u128, 1) << 127, @as(u128, 1) },
+        .{
+            @as(u128, 0x0123_4567_89ab_cdef_fedc_ba98_7654_3210),
+            @as(u128, 0x084c_2a6e_195d_3b7f_f7b3_d591_e6a2_c480),
+        },
+        .{ std.math.maxInt(u128), std.math.maxInt(u128) },
+    }) |case| try std.testing.expectEqual(case[1], bit_reverse_i128(case[0]));
+}

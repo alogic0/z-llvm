@@ -352,6 +352,14 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
         const vector_ty: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
         return if (call.ret_ty.eql(vector_ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(vector_ty)) null else .{ .unsupported_type = "llvm.fabs.v2f64" };
     }
+    if (std.mem.eql(u8, call.callee, "llvm.bswap.i128") or std.mem.eql(u8, call.callee, "llvm.bitreverse.i128")) {
+        const ty: ir.Type = .{ .int = 128 };
+        return if (call.ret_ty.eql(ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(ty)) null else .{ .unsupported_type = "bit-permutation-i128" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) {
+        const ty: ir.Type = .{ .int = 64 };
+        return if (call.ret_ty.eql(ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(ty)) null else .{ .unsupported_type = "bit-permutation-i64" };
+    }
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) {
         return if (call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 2 and
             call.args.items[0].ty.eql(.{ .int = 16 }) and call.args.items[1].ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "llvm.ctlz.i16" };

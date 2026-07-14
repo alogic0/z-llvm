@@ -107,6 +107,9 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i64")) return try lowerCtlzI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i32")) return try lowerCttzI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.bswap.i128")) return try lowerBitPermutation(selector, result, call, 128, .byte_swap);
+    if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) return try lowerBitPermutation(selector, result, call, 64, .bit_reverse);
+    if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i128")) return try lowerBitPermutation(selector, result, call, 128, .bit_reverse);
     if (std.mem.eql(u8, call.callee, "llvm.ucmp.i32.i128")) return try lowerI128Compare(selector, result, call, false);
     if (std.mem.eql(u8, call.callee, "llvm.scmp.i32.i128")) return try lowerI128Compare(selector, result, call, true);
     if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
@@ -528,6 +531,69 @@ pub fn lowerCttzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     try selector_state.clobberAccumulator(selector);
     try selector.machine.instructions.append(selector.allocator, .ctz_i64_rdi_eax);
     try selector_state.bindRax(selector, result_name);
+    return null;
+}
+
+const BitPermutation = enum {
+    byte_swap,
+    bit_reverse,
+};
+
+fn lowerBitPermutation(
+    selector: *ComposedBlockSelector,
+    result: ?[]const u8,
+    call: ir.CallInst,
+    bits: u16,
+    operation: BitPermutation,
+) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-bit-permutation-result" };
+    if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null)
+    {
+        return .{ .no_emitter = "composed-block-bit-permutation-call-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-bit-permutation-tail-kind" };
+    }
+    const ty: ir.Type = .{ .int = bits };
+    if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty)) {
+        return .{ .no_emitter = "composed-block-bit-permutation-signature" };
+    }
+
+    if (bits == 64) {
+        if (operation != .bit_reverse) unreachable;
+        try selector_state.clobberArgReg(selector, .rcx);
+        try selector_state.clobberArgReg(selector, .rdx);
+        selector_state.emitValueIntoRax(selector, call.args.items[0].value) catch
+            return .{ .unsupported_value = "composed-block-bit-permutation-value" };
+        try selector.machine.instructions.append(selector.allocator, .bit_reverse_rax);
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
+
+    if (bits != 128) unreachable;
+    const source = selector_state.ensurePairSpill(selector, call.args.items[0].value) catch
+        return .{ .no_spill_envelope = "composed-block-bit-permutation-pair" };
+    try selector_state.clobberArgReg(selector, pair_b.lo);
+    try selector_state.clobberArgReg(selector, pair_b.hi);
+    if (operation == .bit_reverse) {
+        try selector_state.clobberArgReg(selector, .rcx);
+        try selector_state.clobberArgReg(selector, .rdx);
+    }
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source.hi });
+    try selector.machine.instructions.append(selector.allocator, switch (operation) {
+        .byte_swap => .bswap_rax,
+        .bit_reverse => .bit_reverse_rax,
+    });
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair_b.lo });
+    try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source.lo });
+    try selector.machine.instructions.append(selector.allocator, switch (operation) {
+        .byte_swap => .bswap_rax,
+        .bit_reverse => .bit_reverse_rax,
+    });
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair_b.hi });
+    try selector_state.bindPairScratch(selector, result_name, pair_b);
     return null;
 }
 

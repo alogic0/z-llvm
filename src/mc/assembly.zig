@@ -135,6 +135,30 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tshll $1, %edx\n" ++
                     "\torl %edx, %eax\n",
             ),
+            .bit_reverse_rax => try writer.writeAll(
+                "\tbswapq %rax\n" ++
+                    "\tmovq %rax, %rdx\n" ++
+                    "\tmovabsq $1085102592571150095, %rcx\n" ++
+                    "\tshrq $4, %rax\n" ++
+                    "\tandq %rcx, %rax\n" ++
+                    "\tandq %rcx, %rdx\n" ++
+                    "\tshlq $4, %rdx\n" ++
+                    "\torq %rdx, %rax\n" ++
+                    "\tmovq %rax, %rdx\n" ++
+                    "\tmovabsq $3689348814741910323, %rcx\n" ++
+                    "\tshrq $2, %rax\n" ++
+                    "\tandq %rcx, %rax\n" ++
+                    "\tandq %rcx, %rdx\n" ++
+                    "\tshlq $2, %rdx\n" ++
+                    "\torq %rdx, %rax\n" ++
+                    "\tmovq %rax, %rdx\n" ++
+                    "\tmovabsq $6148914691236517205, %rcx\n" ++
+                    "\tshrq $1, %rax\n" ++
+                    "\tandq %rcx, %rax\n" ++
+                    "\tandq %rcx, %rdx\n" ++
+                    "\tshlq $1, %rdx\n" ++
+                    "\torq %rdx, %rax\n",
+            ),
             .ushl_sat_i32_edi_imm_eax => |amount| try writer.print(
                 "\tmovl %edi, %eax\n" ++
                     "\tshll ${}, %eax\n" ++

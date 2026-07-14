@@ -48,9 +48,15 @@ report remains 443 selected / 261 emitting / 182 failing. Evidence:
 The expected `compiler_rt.divdc3.__divdc3` closure did not occur: it advanced
 from `stage2-phi-dst` to a later `<2 x i64>` constant extraction at
 `no_emitter` / `composed-vector-extract-type`. No pinned-row semantic claim was
-made. Continue with INBOX-48's pre-authorized exact bit-permutation leaves
-pipeline; the i64x2 extraction remains a separate future capability.
-`__muldc3` remains deferred at the 256-bit/AVX checkpoint.
+made. INBOX-48's pre-authorized bit-permutation successor is now implemented
+and Tier-2/native-proven: exact `llvm.bswap.i128`, `llvm.bitreverse.i64`, and
+`llvm.bitreverse.i128` close `__bswapti2`, `__bitreversedi2`, and
+`__bitreverseti2` provisionally, moving the report to 443 / 264 / 179 with no
+collateral change. Run the single cumulative Tier 3 against the committed
+slice before accepting those closures. Evidence:
+`docs/evidence/std_debug_hello_inbox48_bit_permutation.summary`. The i64x2
+extraction remains a separate future capability; `__muldc3` remains deferred
+at the 256-bit/AVX checkpoint.
 
 The user-authorized Phase 0-1 infrastructure interlude is complete. Schema-2
 comparison matched 1,258 semantic records across all 17 gates. The historical

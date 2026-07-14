@@ -4127,6 +4127,20 @@ One line per completed cycle, append-only, newest last. This is the
   INBOX-47. Continue with the pre-authorized bit-permutation leaves pipeline.
   Evidence `docs/evidence/distribution_all_after_inbox48_f64x2_phi.summary`.
 
+- 2026-07-14 (this commit, INBOX-48 successor) Item 12 exact bit-permutation
+  leaves: exact typed `llvm.bswap.i128`, `llvm.bitreverse.i64`, and
+  `llvm.bitreverse.i128` lowering reuses the existing pair spill/frame/value
+  authorities and adds one encoded, assembled, and verified 64-bit RAX bit
+  reversal operation. Wrong widths, unsupported call envelopes, other
+  intrinsics, and `musttail` remain fail-closed. Permanent execution and a
+  relocation-free extracted native object pass 14/14 precomputed cases. The
+  fresh report moves exactly from 443 / 261 / 182 to 443 / 264 / 179, closing
+  `__bswapti2`, `__bitreversedi2`, and `__bitreverseti2` provisionally with no
+  collateral emission or new failure. Tier 2 passes 24/24 steps and 995/995
+  tests. Commit the slice, then run one cumulative Tier 3 to accept the three
+  closures. Evidence
+  `docs/evidence/std_debug_hello_inbox48_bit_permutation.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

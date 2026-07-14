@@ -99,6 +99,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     var saw_array_alloca = false;
     var saw_fixed_smul_overflow = false;
     var saw_wide_icmp = false;
+    var saw_pair_bit_permutation = false;
     var saw_scalar_sse_call = false;
     var saw_int_to_fp_cast = false;
     if (selector.allocation_plan) |plan| selector.next_spill_slot = @max(selector.next_spill_slot, plan.spill_slots);
@@ -114,6 +115,9 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
             if (instruction.kind == .call and
                 (std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i64") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128"))) saw_fixed_smul_overflow = true;
+            if (instruction.kind == .call and
+                (std.mem.eql(u8, instruction.kind.call.callee, "llvm.bswap.i128") or
+                    std.mem.eql(u8, instruction.kind.call.callee, "llvm.bitreverse.i128"))) saw_pair_bit_permutation = true;
             if (instruction.kind == .call and sysv_abi.callHasScalarSseType(instruction.kind.call)) saw_scalar_sse_call = true;
             if (instruction.kind == .cast) {
                 const cast = instruction.kind.cast;
@@ -130,7 +134,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     }
 
     const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
-    const reserve_spill_area = saw_alloca or pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_scalar_sse_call or saw_int_to_fp_cast or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
+    const reserve_spill_area = saw_alloca or pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_pair_bit_permutation or saw_scalar_sse_call or saw_int_to_fp_cast or (selector.allocation_plan != null and selector.allocation_plan.?.spill_slots != 0);
     const spill_reserved_bytes = spillReservedBytes(selector, reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" };
     payload_bytes = if (saw_array_alloca) @max(spill_reserved_bytes, stage2SpillReservedBytes()) else 0;
 
@@ -188,7 +192,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     }
 
     if (payload_bytes == 0) {
-        if (pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_scalar_sse_call or saw_int_to_fp_cast) payload_bytes = spill_reserved_bytes;
+        if (pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_pair_bit_permutation or saw_scalar_sse_call or saw_int_to_fp_cast) payload_bytes = spill_reserved_bytes;
     }
 
     if (payload_bytes == 0) return null;
