@@ -934,6 +934,53 @@ test "generic cfg selector lowers signed i32 greater-than immediate" {
     }, machine.instructions.items);
 }
 
+test "generic cfg selector executes exact i16 greater-than negative one" {
+    const input =
+        \\define i32 @is_nonnegative_i16(i32 %wide_value) {
+        \\entry:
+        \\  %value = trunc i32 %wide_value to i16
+        \\  %comparison = icmp sgt i16 %value, -1
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("is_nonnegative_i16", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    const cases = [_]struct { input: u32, expected: u32 }{
+        .{ .input = 0x0000, .expected = 1 },
+        .{ .input = 0x0001, .expected = 1 },
+        .{ .input = 0x7fff, .expected = 1 },
+        .{ .input = 0x8000, .expected = 0 },
+        .{ .input = 0xffff, .expected = 0 },
+    };
+    for (cases) |case| try std.testing.expectEqual(case.expected, function(case.input));
+
+    var near_miss_machine = MachineFunction.init("i16-sgt-other-immediate", .{ .int = 1 });
+    defer near_miss_machine.deinit(std.testing.allocator);
+    var near_miss_selector = ComposedBlockSelector.init(std.testing.allocator, &near_miss_machine);
+    defer near_miss_selector.deinit();
+    try selector_state.bindValueLoc(&near_miss_selector, "value", .{ .arg32 = .rdi });
+    const diagnostic = (try selector_scalar.lowerIcmp(&near_miss_selector, "cmp", .{
+        .predicate = .sgt,
+        .operand_ty = .{ .int = 16 },
+        .lhs = .{ .named = "value" },
+        .rhs = .{ .int = 0 },
+    })).?;
+    try std.testing.expectEqualStrings("composed-block-icmp-form", diagnostic.detail());
+}
+
 test "generic cfg selector lowers plain signed i64 greater-than immediate" {
     var machine = MachineFunction.init("sgt-i64-imm", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);
@@ -1443,32 +1490,43 @@ test "generic cfg selector lowers i64 immediate-left variable lshr" {
     }, machine.instructions.items);
 }
 
-test "generic cfg selector lowers exact i32 immediate-left variable shl" {
-    var machine = MachineFunction.init("variable-i32-immediate-left-shl", .{ .int = 32 });
-    defer machine.deinit(std.testing.allocator);
-    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
-    defer selector.deinit();
-    try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rdi });
+test "generic cfg selector lowers exact i16 and i32 immediate-left variable shl" {
+    inline for (.{ 16, 32 }) |bits| {
+        var machine = MachineFunction.init("variable-immediate-left-shl", .{ .int = bits });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rdi });
 
-    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
-        .op = .shl,
-        .ty = .{ .int = 32 },
-        .lhs = .{ .int = -1 },
-        .rhs = .{ .named = "amount" },
-    })) == null);
-    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
-    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
-        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
-        .{ .mov_imm_eax = -1 },
-        .shl_eax_cl,
-    }, machine.instructions.items);
+        try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+            .op = .shl,
+            .ty = .{ .int = bits },
+            .lhs = .{ .int = -1 },
+            .rhs = .{ .named = "amount" },
+        })) == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+        if (bits == 16) {
+            try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+                .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+                .{ .mov_imm_eax = -1 },
+                .shl_eax_cl,
+                .{ .and_eax_imm32 = 0xffff },
+            }, machine.instructions.items);
+        } else {
+            try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+                .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+                .{ .mov_imm_eax = -1 },
+                .shl_eax_cl,
+            }, machine.instructions.items);
+        }
+    }
 
-    inline for (.{ 16, 64 }) |bits| {
+    inline for (.{64}) |bits| {
         var near_miss_machine = MachineFunction.init("variable-immediate-left-shl-near-miss", .{ .int = bits });
         defer near_miss_machine.deinit(std.testing.allocator);
         var near_miss_selector = ComposedBlockSelector.init(std.testing.allocator, &near_miss_machine);
         defer near_miss_selector.deinit();
-        try selector_state.bindValueLoc(&near_miss_selector, "amount", if (bits == 16) .{ .arg32 = .rdi } else .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&near_miss_selector, "amount", .{ .arg64 = .rdi });
         const diagnostic = (try selector_scalar.lowerBinary(&near_miss_selector, "result", .{
             .op = .shl,
             .ty = .{ .int = bits },
@@ -1476,6 +1534,35 @@ test "generic cfg selector lowers exact i32 immediate-left variable shl" {
             .rhs = .{ .named = "amount" },
         })).?;
         try std.testing.expectEqualStrings("composed-block-binary-imm-lhs", diagnostic.detail());
+    }
+}
+
+test "generic cfg selector executes i16 immediate-left variable shl boundaries" {
+    const input =
+        \\define i32 @shift_mask(i32 %amount) {
+        \\entry:
+        \\  %narrow_amount = trunc i32 %amount to i16
+        \\  %result = shl nsw i16 -1, %narrow_amount
+        \\  %wide_result = zext i16 %result to i32
+        \\  ret i32 %wide_result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("shift_mask", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    inline for (0..16) |amount| {
+        const expected: u32 = @as(u16, @truncate(@as(u32, 0xffff) << @intCast(amount)));
+        try std.testing.expectEqual(expected, function(amount));
     }
 }
 

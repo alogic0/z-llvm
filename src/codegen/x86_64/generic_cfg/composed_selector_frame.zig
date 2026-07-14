@@ -86,7 +86,7 @@ pub fn allocaAlignment(attrs: ?[]const u8, natural_alignment: u32) ?u32 {
 }
 
 fn stackFpBits(ty: ir.Type) ?u16 {
-    return if (ty == .float) 32 else if (ty == .double) 64 else null;
+    return if (ty == .half) 16 else if (ty == .float) 32 else if (ty == .double) 64 else null;
 }
 
 pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
@@ -121,6 +121,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
             }
             if (instruction.kind == .fcmp and instruction.kind.fcmp.operand_ty == .half and
                 (instruction.kind.fcmp.predicate == .uno or instruction.kind.fcmp.predicate == .olt)) saw_scalar_sse_call = true;
+            if (instruction.kind == .binary and instruction.kind.binary.ty == .half and instruction.kind.binary.op == .fadd) saw_scalar_sse_call = true;
             if (instruction.kind == .icmp and instruction.kind.icmp.operand_ty.eql(.{ .int = 128 })) saw_wide_icmp = true;
             if (instruction.kind == .cast and
                 (instruction.kind.cast.op == .sitofp or instruction.kind.cast.op == .uitofp)) saw_int_to_fp_cast = true;
@@ -139,7 +140,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
             const result_name = instruction.result orelse return .{ .unsupported_value = "composed-block-missing-result" };
             const alloca = instruction.kind.alloca;
             if (alloca.allocated_ty_addrspace != null) return .{ .no_emitter = "composed-block-alloca-addrspace" };
-            const integer_bits = intBits(alloca.allocated_ty);
+            const integer_bits = if (alloca.allocated_ty == .ptr) @as(?u16, 64) else intBits(alloca.allocated_ty);
             const fp_bits = stackFpBits(alloca.allocated_ty);
             if (integer_bits orelse fp_bits) |bits| {
                 if (integer_bits != null and bits != 8 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-alloca-form" };

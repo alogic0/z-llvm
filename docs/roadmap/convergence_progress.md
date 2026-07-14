@@ -3850,6 +3850,23 @@ One line per completed cycle, append-only, newest last. This is the
   successor. Evidence `docs/evidence/std_debug_hello_half_fcmp_acceptance.summary`
   and `docs/evidence/distribution_all_after_inbox40_half_fcmp.summary`.
 
+- 2026-07-14 (this commit, INBOX-40 pre-authorized successor) Item 12 scalar
+  FP addition: exact half `fadd` now widens through `__extendhfsf2`, adds with
+  `addss`, and truncates through `__truncsfhf2`. A finite-precision proof rules
+  out double rounding: sums close enough to affect binary16 rounding fit
+  exactly in binary32, while farther addends cannot reach a binary16 midpoint.
+  The captured local half/pointer memory barrier, exact i16 immediate-left
+  shift/sign predicates, and raw half literals complete the floor/ceil CFG.
+  Permanent execution and 48 precomputed native row calls are green.
+  `compiler_rt.floor_ceil.__floorh` and `__ceilh` are the two directed
+  closures; `__fixhfsi` emits collaterally without a semantic claim. Report-all
+  advances from 443 / 243 / 200 to 443 / 246 / 197. Tier 2 and the single
+  row-closure/shared-frame Tier 3 are green. The INBOX-40 pipeline is exhausted;
+  stop before the lanes-canonical vector-mask bridge, which requires its own
+  directive. Evidence
+  `docs/evidence/std_debug_hello_half_fadd_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox40_half_fadd.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

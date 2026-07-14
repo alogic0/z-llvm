@@ -328,6 +328,43 @@ test "composed selector preserves scalar FP select values exactly" {
     }
 }
 
+test "composed selector materializes exact half literals in selects" {
+    const input =
+        \\define half @select_negative_one(i32 %flag, half %value) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %cond, half %value, half 0xHBC00
+        \\  ret half %selected
+        \\}
+        \\define half @select_positive_one(i32 %flag, half %value) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %cond, half %value, half 0xH3C00
+        \\  ret half %selected
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items, 0..) |function, index| {
+        var machine = MachineFunction.init(function.name, .half);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        const select: *const fn (u32, f16) callconv(.c) f16 = @ptrCast(mapping.ptr);
+        const payload: u16 = 0x7e45;
+        try std.testing.expectEqual(payload, @as(u16, @bitCast(select(1, @bitCast(payload)))));
+        try std.testing.expectEqual(if (index == 0) @as(u16, 0xbc00) else 0x3c00, @as(u16, @bitCast(select(0, @bitCast(payload)))));
+    }
+}
+
 test "composed selector carries scalar FP phi values around loops" {
     const input =
         \\define float @phi_f32(i32 %count, float %first, float %second) {

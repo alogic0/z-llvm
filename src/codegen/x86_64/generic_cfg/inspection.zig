@@ -118,7 +118,8 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
         .sdiv => if (binary.ty.eql(.{ .int = 32 }) and valueIsNamed(binary.lhs) and binary.rhs == .int and binary.rhs.int == 2) null else .{ .unsupported_instruction = @tagName(binary.op) },
         .udiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
-        .fadd, .fsub, .fmul, .fdiv => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
+        .fadd => if (binary.ty == .half or binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
+        .fsub, .fmul, .fdiv => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
         .frem => .{ .unsupported_instruction = @tagName(binary.op) },
     };
 }
@@ -189,6 +190,10 @@ fn inspectSelect(select: ir.SelectInst) ?Diagnostic {
 
 fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (call.inline_asm) |inline_asm| {
+        const stack_memory_barrier = inline_asm.sideeffect and inline_asm.template.len == 0 and
+            std.mem.eql(u8, inline_asm.constraints, "m,~{memory},~{dirflag},~{fpsr},~{flags}") and
+            call.ret_ty == .void and call.args.items.len == 1 and call.args.items[0].ty == .ptr;
+        if (stack_memory_barrier) return null;
         if (!inline_asm.sideeffect or inline_asm.template.len != 0 or
             !std.mem.eql(u8, inline_asm.constraints, "rm,~{dirflag},~{fpsr},~{flags}") or
             call.ret_ty != .void or call.args.items.len != 1 or

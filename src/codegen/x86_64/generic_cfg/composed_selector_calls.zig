@@ -212,6 +212,16 @@ fn lowerFpAbs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
 fn lowerFpBarrier(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) ?Diagnostic {
     if (result != null) return .{ .unsupported_value = "composed-block-inline-asm-result" };
     const inline_asm = call.inline_asm orelse return .{ .no_emitter = "composed-block-inline-asm-call" };
+    if (inline_asm.sideeffect and inline_asm.template.len == 0 and
+        std.mem.eql(u8, inline_asm.constraints, "m,~{memory},~{dirflag},~{fpsr},~{flags}") and
+        call.ret_ty == .void and call.args.items.len == 1 and call.args.items[0].ty == .ptr)
+    {
+        const loc = selector_state.resolveValue(selector, call.args.items[0].value) orelse return .{ .unsupported_value = "composed-block-inline-asm-value" };
+        return switch (loc) {
+            .stack_scalar => |stack| if (stack.bits == 64 and stack.kind == .integer) null else .{ .unsupported_value = "composed-block-inline-asm-value" },
+            else => .{ .unsupported_value = "composed-block-inline-asm-value" },
+        };
+    }
     if (!inline_asm.sideeffect or inline_asm.template.len != 0 or
         !std.mem.eql(u8, inline_asm.constraints, "rm,~{dirflag},~{fpsr},~{flags}") or
         call.ret_ty != .void or call.args.items.len != 1 or

@@ -41,6 +41,18 @@ fn extendHalfForFcmpTest(value: f16) callconv(.c) f32 {
     return value;
 }
 
+fn truncateFloatForFaddTest(value: f32) callconv(.c) f16 {
+    return @floatCast(value);
+}
+
+fn writeAbsoluteJump(stub: []u8, target: usize) void {
+    stub[0] = 0x48;
+    stub[1] = 0xb8;
+    std.mem.writeInt(u64, stub[2..10], target, .little);
+    stub[10] = 0xff;
+    stub[11] = 0xe0;
+}
+
 fn executeHalfFcmpPredicate(predicate: ir.FcmpPredicate) !void {
     const input = try std.fmt.allocPrint(std.testing.allocator,
         \\define i32 @compare(half %lhs, half %rhs) {{
@@ -940,6 +952,96 @@ test "generic cfg selector executes type-driven scalar double addition" {
     try std.testing.expectEqual(std.math.inf(f64), add(std.math.inf(f64), 1.0));
 }
 
+test "generic cfg selector executes bit-exact widened half addition" {
+    const input =
+        \\define half @add(half %lhs, half %rhs) {
+        \\entry:
+        \\  %sum = fadd half %lhs, %rhs
+        \\  ret half %sum
+        \\}
+        \\define half @add_inf(half %value) {
+        \\entry:
+        \\  %pointer_slot = alloca ptr, align 8
+        \\  %value_slot = alloca half, align 2
+        \\  %sum = fadd half %value, 0xH7C00
+        \\  store half %sum, ptr %value_slot, align 2
+        \\  store ptr %value_slot, ptr %pointer_slot, align 8
+        \\  call void asm sideeffect "", "m,~{memory},~{dirflag},~{fpsr},~{flags}"(ptr %pointer_slot)
+        \\  ret half %sum
+        \\}
+        \\define half @reject_sub(half %lhs, half %rhs) {
+        \\entry:
+        \\  %difference = fsub half %lhs, %rhs
+        \\  ret half %difference
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items[0..2]) |function| {
+        var machine = x86_64_machine.MachineFunction.init(function.name, .half);
+        defer machine.deinit(std.testing.allocator);
+        const selection = try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, function);
+        switch (selection) {
+            .selected => {},
+            .unsupported => |diagnostic| {
+                std.debug.print("half add diagnostic={s}\n", .{diagnostic.detail()});
+                return error.TestUnexpectedResult;
+            },
+        }
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+
+        const stub_len = 12;
+        const mapping = try std.posix.mmap(null, bytes.len + 2 * stub_len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping[0..bytes.len], bytes);
+        writeAbsoluteJump(mapping[bytes.len..][0..stub_len], @intFromPtr(&extendHalfForFcmpTest));
+        writeAbsoluteJump(mapping[bytes.len + stub_len ..][0..stub_len], @intFromPtr(&truncateFloatForFaddTest));
+
+        var offset: usize = 0;
+        for (machine.instructions.items) |instruction| {
+            if (instruction == .direct_call) {
+                const target_offset = if (std.mem.eql(u8, instruction.direct_call.symbol, "__extendhfsf2")) bytes.len else bytes.len + stub_len;
+                const next_ip = @intFromPtr(mapping.ptr) + offset + 5;
+                const displacement: i32 = @intCast(@intFromPtr(mapping.ptr + target_offset) - next_ip);
+                std.mem.writeInt(i32, mapping[offset + 1 ..][0..4], displacement, .little);
+            }
+            offset += encoding.instructionSize(instruction);
+        }
+
+        if (std.mem.eql(u8, function.name, "add")) {
+            const add: *const fn (f16, f16) callconv(.c) f16 = @ptrCast(mapping.ptr);
+            for ([_][2]u16{
+                .{ 0x0000, 0x8000 }, .{ 0x8000, 0x8000 }, .{ 0x0001, 0x0001 },
+                .{ 0x03ff, 0x0001 }, .{ 0x3c00, 0x1000 }, .{ 0x3c00, 0x1001 },
+                .{ 0x3c00, 0x9400 }, .{ 0x7bff, 0x7bff }, .{ 0x7c00, 0xfc00 },
+                .{ 0x7e45, 0x3c00 }, .{ 0x7d01, 0x3c00 },
+            }) |case| {
+                const lhs: f16 = @bitCast(case[0]);
+                const rhs: f16 = @bitCast(case[1]);
+                const expected: f16 = lhs + rhs;
+                try std.testing.expectEqual(@as(u16, @bitCast(expected)), @as(u16, @bitCast(add(lhs, rhs))));
+            }
+        } else {
+            const add_inf: *const fn (f16) callconv(.c) f16 = @ptrCast(mapping.ptr);
+            inline for (.{ @as(u16, 0x0000), @as(u16, 0x8001), @as(u16, 0x3c00), @as(u16, 0x7bff), @as(u16, 0x7c00), @as(u16, 0xfc00), @as(u16, 0x7e45), @as(u16, 0x7d01) }) |bits| {
+                const value: f16 = @bitCast(bits);
+                const expected: f16 = value + std.math.inf(f16);
+                try std.testing.expectEqual(@as(u16, @bitCast(expected)), @as(u16, @bitCast(add_inf(value))));
+            }
+        }
+    }
+
+    var rejected = x86_64_machine.MachineFunction.init("reject_sub", .half);
+    defer rejected.deinit(std.testing.allocator);
+    const result = try selector_impl.tryLowerComposedCfg(std.testing.allocator, &rejected, module.functions.items[2]);
+    try std.testing.expect(result == .unsupported);
+}
+
 test "generic cfg selector preserves an fadd lhs resident in XMM1" {
     const input =
         \\define double @add_xmm1_lhs(float %skip, double %lhs) {
@@ -997,6 +1099,23 @@ test "generic cfg selector validates empty side-effect FP barriers" {
             .template = "",
             .constraints = "rm,~{dirflag},~{fpsr},~{flags}",
             .sideeffect = true,
+            .may_load = true,
+        },
+        .args = args,
+    })) == null);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    try selector_state.bindValueLoc(&selector, "stack_pointer", .{ .stack_scalar = .{ .base_disp = 8, .bits = 64 } });
+    args.clearRetainingCapacity();
+    try args.append(std.testing.allocator, .{ .ty = .ptr, .value = .{ .named = "stack_pointer" } });
+    try std.testing.expect((try selector_calls.lowerCall(&selector, null, .{
+        .ret_ty = .void,
+        .callee = "",
+        .inline_asm = .{
+            .template = "",
+            .constraints = "m,~{memory},~{dirflag},~{fpsr},~{flags}",
+            .sideeffect = true,
+            .has_memory_clobber = true,
             .may_load = true,
         },
         .args = args,

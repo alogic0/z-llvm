@@ -37,21 +37,23 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-40 Part 1 is complete. Half `fcmp uno/olt` widens through the proven
-`__extendhfsf2` path, preserving named operands across sequential helper calls.
-Exact i16 signed-zero comparison and bit-preserving half select close the two
-directed `__fminh`/`__fmaxh` rows. Two unsigned conversion rows emit
-collaterally without semantic claims; report-all is now 443 selected / 243
-emitting / 200 failing. Permanent execution, exact native row proof, Tier 2,
-and the single row-closure/shared-surface Tier 3 are green.
+INBOX-40 is complete. Half `fadd` widens through `__extendhfsf2`, adds with
+`addss`, and truncates through `__truncsfhf2`; the recorded precision proof
+rules out a binary32-to-binary16 double-rounding change. Exact captured
+stack-memory-barrier and i16 scalar prerequisites close the two directed
+`__floorh`/`__ceilh` rows. `__fixhfsi` emits collaterally without a semantic
+claim; report-all is now 443 selected / 246 emitting / 197 failing. Permanent
+execution, 48 precomputed native row calls, Tier 2, and the single
+row-closure/shared-frame Tier 3 are green.
 
-Continue with INBOX-40's pre-authorized successor in a separate clean cycle:
-half `fadd` through extend/addss/truncate, targeting `__floorh` and `__ceilh`.
-Prove bit-exactness for the captured cases and fail closed where double
-rounding cannot be excluded. After that pipeline, stop before the reviewed
-lanes-canonical vector-mask bridge; it needs its own directive. Evidence:
-`docs/evidence/std_debug_hello_half_fcmp_acceptance.summary` and
-`docs/evidence/distribution_all_after_inbox40_half_fcmp.summary`.
+Stop before vector-mask implementation. The next agreed capability is the
+lanes-canonical mask slice described by accepted inventory `e6c145f7` and
+`docs/evidence/vector_mask_checkpoint_inventory.md`, as the bridge into the
+aggregate-ABI review. INBOX-40 explicitly requires a new directive citing
+that reviewed architecture; no mask implementation is currently authorized.
+Current cycle evidence:
+`docs/evidence/std_debug_hello_half_fadd_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox40_half_fadd.summary`.
 
 `compiler_rt.mulo.__muloti4` is closed through exact object emission,
 native link, executable signed-overflow checks, and its pressure diagnostic.

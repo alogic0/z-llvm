@@ -665,11 +665,12 @@ pub fn lowerBinaryImmediateLhs(selector: *ComposedBlockSelector, result_name: []
         try selector_state.bindEax(selector, result_name);
         return null;
     }
-    if (binary.op == .shl and bits == 32) {
+    if (binary.op == .shl and (bits == 16 or bits == 32)) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
         try selector_state.clobberAccumulator(selector);
         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(lhs) });
         try selector.machine.instructions.append(selector.allocator, .shl_eax_cl);
+        if (bits == 16) try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 0xffff });
         try selector_state.bindEax(selector, result_name);
         return null;
     }

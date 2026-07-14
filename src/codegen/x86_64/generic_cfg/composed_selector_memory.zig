@@ -74,8 +74,8 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
     const loc = selector_state.valueLoc(selector, result_name) orelse return .{ .no_emitter = "composed-block-alloca-unplanned" };
     switch (loc) {
         .stack_scalar => |stack| {
-            const integer_bits = intBits(alloca.allocated_ty);
-            const fp_bits = scalarFpBits(alloca.allocated_ty);
+            const integer_bits = if (alloca.allocated_ty == .ptr) @as(?u16, 64) else intBits(alloca.allocated_ty);
+            const fp_bits = scalarFpStoreBits(alloca.allocated_ty);
             const bits = integer_bits orelse fp_bits orelse return .{ .no_emitter = "composed-block-alloca-plan-type" };
             const expected_kind: selector_types.StackScalarLoc.Kind = if (fp_bits != null) .fp else .integer;
             if (stack.bits != bits or stack.kind != expected_kind) return .{ .no_emitter = "composed-block-alloca-plan-type" };
@@ -148,6 +148,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
     if (scalarFpStoreBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
+    if (store.ty == .ptr) return lowerStoreStackPointer(selector, store);
     if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
     const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     const value_loc = switch (store.value) {
@@ -204,6 +205,30 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
     return null;
 }
 
+fn lowerStoreStackPointer(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
+    if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-store-stack-pointer-addrspace" };
+    const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+    const destination = switch (ptr) {
+        .stack_scalar => |stack| if (stack.bits == 64 and stack.kind == .integer) stack else return .{ .no_emitter = "composed-block-store-stack-pointer-width" },
+        else => return .{ .no_emitter = "composed-block-store-stack-pointer-ptr" },
+    };
+    const value = selector_state.resolveValue(selector, store.value) orelse return .{ .unsupported_value = "composed-block-store-stack-pointer-value" };
+    const source = switch (value) {
+        .stack_scalar => |stack| stack,
+        else => return .{ .no_emitter = "composed-block-store-stack-pointer-value" },
+    };
+
+    try selector_state.clobberArgReg(selector, .rcx);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = .rcx });
+    if (source.base_disp != 0) {
+        try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = @intCast(source.base_disp) } });
+    }
+    if (destination.base_disp % 4 != 0) return .{ .no_emitter = "composed-block-store-stack-pointer-align" };
+    const frame_index = x86_64_types.FrameIndex.fromSlot(destination.base_disp / 4) catch return .{ .no_emitter = "composed-block-store-stack-pointer-frame" };
+    try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = .rcx } });
+    return null;
+}
+
 fn scalarFpBits(ty: ir.Type) ?u16 {
     return if (ty == .float) 32 else if (ty == .double) 64 else null;
 }
@@ -243,10 +268,21 @@ fn lowerStoreFp(selector: *ComposedBlockSelector, store: ir.StoreInst, bits: u16
     if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-store-fp-addrspace" };
     const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     if (ptr == .stack_scalar) {
-        if (bits == 16) return .{ .no_emitter = "composed-block-store-fp-ptr" };
         const stack = ptr.stack_scalar;
         if (stack.kind != .fp or stack.bits != bits) return .{ .no_emitter = "composed-block-store-stack-width" };
         if (try selector_fp.materializeFpValue(selector, store.value, .xmm0, bits)) |diagnostic| return diagnostic;
+
+        if (bits == 16) {
+            try selector_state.clobberAccumulator(selector);
+            try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = .xmm0 });
+            try selector_state.clobberArgReg(selector, .rcx);
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = .rcx });
+            if (stack.base_disp != 0) {
+                try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = @intCast(stack.base_disp) } });
+            }
+            try selector.machine.instructions.append(selector.allocator, .store_ax_rcx_ptr);
+            return null;
+        }
 
         if (stack.base_disp % 4 != 0) return .{ .no_emitter = "composed-block-store-fp-align" };
         const frame_index = FrameIndex.fromSlot(stack.base_disp / 4) catch return .{ .no_spill_envelope = "composed-block-store-fp-frame" };

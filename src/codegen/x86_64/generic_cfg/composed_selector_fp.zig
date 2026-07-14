@@ -15,11 +15,74 @@ const scalar_xmm_regs = selector_types.selector_allocatable_xmm_regs;
 
 pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (binary.ty == .half) return lowerHalfFadd(selector, result_name, binary);
     const bits = fpBits(binary.ty) orelse return .{ .no_emitter = "composed-block-fp-binary-type" };
     return switch (binary.op) {
         .fadd, .fmul, .fsub, .fdiv => lowerFpRegisterBinary(selector, result_name, binary, bits),
         else => .{ .no_emitter = "composed-block-fp-binary-type" },
     };
+}
+
+fn lowerHalfFadd(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
+    if (binary.op != .fadd) return .{ .no_emitter = "composed-block-half-binary-op" };
+    const lhs_named = binary.lhs == .named;
+    const rhs_named = binary.rhs == .named;
+    if ((!lhs_named and halfLiteralFloatBits(binary.lhs) == null) or
+        (!rhs_named and halfLiteralFloatBits(binary.rhs) == null))
+    {
+        return .{ .no_emitter = "composed-block-half-fadd-operands" };
+    }
+
+    var sum_reg: XmmReg = undefined;
+    if (lhs_named and rhs_named) {
+        const frames = selector_state.allocatePairSpillSlots(selector, result_name) orelse return .{ .no_spill_envelope = "composed-block-half-fadd-spill" };
+        const rhs_source = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-half-fadd-rhs" };
+        selector_state.materializeLocIntoLoc(selector, rhs_source, .{ .spill_fp = .{ .frame_index = frames.lo, .bits = 16 } }) catch return .{ .unsupported_value = "composed-block-half-fadd-rhs" };
+        if (try lowerHalfValueToFloatXmm0(selector, binary.lhs)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm32_rsp = .{ .frame_index = frames.hi, .reg = .xmm0 } });
+        if (try lowerHalfLocToFloatXmm0(selector, .{ .spill_fp = .{ .frame_index = frames.lo, .bits = 16 } })) |diagnostic| return diagnostic;
+        selector_state.materializeLocIntoLoc(selector, .{ .spill_fp = .{ .frame_index = frames.hi, .bits = 32 } }, .{ .xmm = .{ .reg = .xmm1, .bits = 32 } }) catch return .{ .unsupported_value = "composed-block-half-fadd-spill" };
+        try selector_state.clobberXmmReg(selector, .xmm1);
+        try selector.machine.instructions.append(selector.allocator, .{ .addss_xmm = .{ .dst = .xmm1, .src = .xmm0 } });
+        sum_reg = .xmm1;
+    } else if (lhs_named or rhs_named) {
+        const named_value = if (lhs_named) binary.lhs else binary.rhs;
+        const literal_value = if (lhs_named) binary.rhs else binary.lhs;
+        if (try lowerHalfValueToFloatXmm0(selector, named_value)) |diagnostic| return diagnostic;
+        try selector_state.clobberXmmReg(selector, .xmm1);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = .xmm1, .bits = halfLiteralFloatBits(literal_value).? } });
+        try selector_state.clobberXmmReg(selector, .xmm0);
+        try selector.machine.instructions.append(selector.allocator, .{ .addss_xmm = .{ .dst = .xmm0, .src = .xmm1 } });
+        sum_reg = .xmm0;
+    } else {
+        try selector_state.clobberXmmReg(selector, .xmm0);
+        try selector_state.clobberXmmReg(selector, .xmm1);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = .xmm0, .bits = halfLiteralFloatBits(binary.lhs).? } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = .xmm1, .bits = halfLiteralFloatBits(binary.rhs).? } });
+        try selector.machine.instructions.append(selector.allocator, .{ .addss_xmm = .{ .dst = .xmm0, .src = .xmm1 } });
+        sum_reg = .xmm0;
+    }
+
+    if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    if (sum_reg != .xmm0) {
+        selector_state.materializeLocIntoLoc(selector, .{ .xmm = .{ .reg = sum_reg, .bits = 32 } }, .{ .xmm = .{ .reg = .xmm0, .bits = 32 } }) catch return .{ .unsupported_value = "composed-block-half-fadd-result" };
+    }
+    const needs_alignment = selector.stack_frame_bytes == 0;
+    if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
+    try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = "__truncsfhf2", .ret_ty = .half } });
+    if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
+    try selector_state.bindValueLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 16 } });
+    return null;
+}
+
+fn halfLiteralFloatBits(value: ir.Value) ?u32 {
+    const text = switch (value) {
+        .fp => |text| text,
+        else => return null,
+    };
+    const bits = fp_semantics.halfLiteralBits(text) catch return null;
+    const half: f16 = @bitCast(bits);
+    return @bitCast(@as(f32, half));
 }
 
 fn lowerFpRegisterBinary(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
@@ -86,6 +149,7 @@ pub fn materializeFpValue(selector: *ComposedBlockSelector, value: ir.Value, dst
             try selector_state.clobberAccumulator(selector);
             try selector_state.clobberXmmReg(selector, dst);
             switch (bits) {
+                16 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = dst, .bits = try fp_semantics.halfLiteralBits(value.fp) } }),
                 32 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = dst, .bits = try x86_64_match.fp32TextBits(value) } }),
                 64 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm64_xmm = .{ .reg = dst, .bits = try x86_64_match.fp64TextBits(value) } }),
                 else => return .{ .no_emitter = "composed-block-fp-immediate-width" },
