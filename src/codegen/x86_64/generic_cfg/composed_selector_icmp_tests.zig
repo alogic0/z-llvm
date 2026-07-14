@@ -45,38 +45,53 @@ test "generic cfg selector executes signed i16 less-than zero" {
     }) |case| try std.testing.expectEqual(case[1], is_negative(case[0]));
 }
 
-test "generic cfg selector normalizes i6 before samesign unsigned immediate comparison" {
-    var machine = MachineFunction.init("samesign-ult-i6-imm", .{ .int = 1 });
-    defer machine.deinit(std.testing.allocator);
+test "generic cfg selector normalizes i6 and i7 before samesign unsigned immediate comparisons" {
+    const Case = struct {
+        predicate: ir.IcmpPredicate,
+        bits: u16,
+        imm: i128,
+        mask: i32,
+    };
+    inline for ([_]Case{
+        .{ .predicate = .ult, .bits = 6, .imm = 11, .mask = 63 },
+        .{ .predicate = .ugt, .bits = 6, .imm = 15, .mask = 63 },
+        .{ .predicate = .ult, .bits = 7, .imm = 24, .mask = 127 },
+        .{ .predicate = .ugt, .bits = 7, .imm = 53, .mask = 127 },
+    }) |case| {
+        var machine = MachineFunction.init("samesign-narrow-unsigned-imm", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
 
-    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
-    defer selector.deinit();
-    try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
 
-    const diagnostic = try selector_icmp.lowerIcmp(&selector, "cmp", .{
-        .predicate = .ult,
-        .samesign = true,
-        .operand_ty = .{ .int = 6 },
-        .lhs = .{ .named = "value" },
-        .rhs = .{ .int = 24 },
-    });
+        const diagnostic = try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = case.predicate,
+            .samesign = true,
+            .operand_ty = .{ .int = case.bits },
+            .lhs = .{ .named = "value" },
+            .rhs = .{ .int = case.imm },
+        });
 
-    try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
-    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
-        .{ .mov_arg_eax = .rdi },
-        .{ .and_eax_imm32 = 63 },
-        .{ .cmp_eax_imm32 = 24 },
-        .setb_eax,
-    }, machine.instructions.items);
+        try std.testing.expect(diagnostic == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg_eax = .rdi },
+            .{ .and_eax_imm32 = case.mask },
+            .{ .cmp_eax_imm32 = @intCast(case.imm) },
+            if (case.predicate == .ult) .setb_eax else .seta_eax,
+        }, machine.instructions.items);
+    }
 }
 
 test "generic cfg selector keeps other narrow unsigned comparison forms fail closed" {
     const cases = [_]ir.IcmpInst{
         .{ .predicate = .ult, .operand_ty = .{ .int = 6 }, .lhs = .{ .named = "value" }, .rhs = .{ .int = 24 } },
-        .{ .predicate = .ugt, .samesign = true, .operand_ty = .{ .int = 6 }, .lhs = .{ .named = "value" }, .rhs = .{ .int = 24 } },
-        .{ .predicate = .ult, .samesign = true, .operand_ty = .{ .int = 7 }, .lhs = .{ .named = "value" }, .rhs = .{ .int = 24 } },
+        .{ .predicate = .uge, .samesign = true, .operand_ty = .{ .int = 6 }, .lhs = .{ .named = "value" }, .rhs = .{ .int = 24 } },
+        .{ .predicate = .ult, .samesign = true, .operand_ty = .{ .int = 5 }, .lhs = .{ .named = "value" }, .rhs = .{ .int = 24 } },
+        .{ .predicate = .ugt, .samesign = true, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "value" }, .rhs = .{ .int = 24 } },
         .{ .predicate = .ult, .samesign = true, .operand_ty = .{ .int = 6 }, .lhs = .{ .named = "value" }, .rhs = .{ .int = 64 } },
+        .{ .predicate = .ugt, .samesign = true, .operand_ty = .{ .int = 7 }, .lhs = .{ .named = "value" }, .rhs = .{ .int = 128 } },
         .{ .predicate = .ult, .samesign = true, .operand_ty = .{ .int = 6 }, .lhs = .{ .named = "value" }, .rhs = .{ .named = "rhs" } },
     };
 
@@ -93,20 +108,36 @@ test "generic cfg selector keeps other narrow unsigned comparison forms fail clo
     }
 }
 
-test "generic cfg selector executes normalized i6 samesign unsigned comparisons" {
+test "generic cfg selector executes normalized i6 and i7 samesign unsigned comparisons" {
     const input =
-        \\define i32 @compare_positive(i32 %raw) {
+        \\define i32 @ult_i6_11(i32 %raw) {
         \\entry:
         \\  %value = trunc i32 %raw to i6
-        \\  %comparison = icmp samesign ult i6 %value, 24
+        \\  %comparison = icmp samesign ult i6 %value, 11
         \\  %result = zext i1 %comparison to i32
         \\  ret i32 %result
         \\}
         \\
-        \\define i32 @compare_negative(i32 %raw) {
+        \\define i32 @ugt_i6_15(i32 %raw) {
         \\entry:
         \\  %value = trunc i32 %raw to i6
-        \\  %comparison = icmp samesign ult i6 %value, 63
+        \\  %comparison = icmp samesign ugt i6 %value, 15
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+        \\define i32 @ult_i7_24(i32 %raw) {
+        \\entry:
+        \\  %value = trunc i32 %raw to i7
+        \\  %comparison = icmp samesign ult i7 %value, 24
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+        \\define i32 @ugt_i7_53(i32 %raw) {
+        \\entry:
+        \\  %value = trunc i32 %raw to i7
+        \\  %comparison = icmp samesign ugt i7 %value, 53
         \\  %result = zext i1 %comparison to i32
         \\  ret i32 %result
         \\}
@@ -127,20 +158,13 @@ test "generic cfg selector executes normalized i6 samesign unsigned comparisons"
         @memcpy(mapping, bytes);
         const function: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
 
-        if (function_index == 0) {
-            for ([_]struct { input: u32, expected: u32 }{
-                .{ .input = 0, .expected = 1 },
-                .{ .input = 23, .expected = 1 },
-                .{ .input = 24, .expected = 0 },
-                .{ .input = 25, .expected = 0 },
-                .{ .input = 0xffff_ffd7, .expected = 1 },
-            }) |case| try std.testing.expectEqual(case.expected, function(case.input));
-        } else {
-            for ([_]struct { input: u32, expected: u32 }{
-                .{ .input = 62, .expected = 1 },
-                .{ .input = 63, .expected = 0 },
-                .{ .input = 0xffff_ffff, .expected = 0 },
-            }) |case| try std.testing.expectEqual(case.expected, function(case.input));
-        }
+        const cases = switch (function_index) {
+            0 => [_][2]u32{ .{ 0, 1 }, .{ 10, 1 }, .{ 11, 0 }, .{ 12, 0 }, .{ 0xffff_ffca, 1 } },
+            1 => [_][2]u32{ .{ 14, 0 }, .{ 15, 0 }, .{ 16, 1 }, .{ 31, 1 }, .{ 0xffff_ffd0, 1 } },
+            2 => [_][2]u32{ .{ 0, 1 }, .{ 23, 1 }, .{ 24, 0 }, .{ 25, 0 }, .{ 0xffff_ff97, 1 } },
+            3 => [_][2]u32{ .{ 52, 0 }, .{ 53, 0 }, .{ 54, 1 }, .{ 63, 1 }, .{ 0xffff_ffb6, 1 } },
+            else => unreachable,
+        };
+        for (cases) |case| try std.testing.expectEqual(case[1], function(case[0]));
     }
 }

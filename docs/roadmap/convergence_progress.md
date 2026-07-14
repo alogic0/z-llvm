@@ -3986,6 +3986,18 @@ One line per completed cycle, append-only, newest last. This is the
   preserved INBOX-45 comparison cycle may resume. Evidence
   `docs/evidence/inbox45_accumulator_alias_closure_audit.md`.
 
+- 2026-07-14 (this commit, INBOX-45 Part 1) Item 12 normalized narrow unsigned
+  comparisons: exact typed `samesign ult` and `samesign ugt` with i6/i7
+  operands and in-range immediates now mask the source to its declared width
+  before comparison; all other forms remain fail-closed. Exact native
+  raw-half execution provisionally closes `__floatunsihf` and `__floatsihf`,
+  moving the current report from 443 / 248 / 195 to 443 / 250 / 193. Tier 2 is
+  green at 24/24 steps and 975/975 tests. The six predicted i64 conversion
+  rows all advance to exact `llvm.cttz.i64`, authorizing INBOX-45 Part 2. No
+  Tier 3 ran; the two closures remain provisional until the cumulative
+  pipeline gate. Evidence
+  `docs/evidence/std_debug_hello_inbox45_narrow_icmp.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
