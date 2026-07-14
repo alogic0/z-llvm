@@ -103,6 +103,8 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i64")) return try lowerCtlzI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i32")) return try lowerCttzI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.ucmp.i32.i128")) return try lowerI128Compare(selector, result, call, false);
+    if (std.mem.eql(u8, call.callee, "llvm.scmp.i32.i128")) return try lowerI128Compare(selector, result, call, true);
     if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
@@ -522,6 +524,58 @@ pub fn lowerCttzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     try selector_state.clobberAccumulator(selector);
     try selector.machine.instructions.append(selector.allocator, .ctz_i64_rdi_eax);
     try selector_state.bindRax(selector, result_name);
+    return null;
+}
+
+fn lowerI128Compare(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, signed: bool) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-i128-compare-result" };
+    if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null)
+    {
+        return .{ .no_emitter = "composed-block-i128-compare-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) {
+            return .{ .no_emitter = "composed-block-i128-compare-tail-kind" };
+        }
+    }
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2 or
+        !call.args.items[0].ty.eql(.{ .int = 128 }) or !call.args.items[1].ty.eql(.{ .int = 128 }))
+    {
+        return .{ .no_emitter = "composed-block-i128-compare-signature" };
+    }
+
+    const lhs = selector_state.resolvePairValue(selector, call.args.items[0].value) orelse
+        return .{ .unsupported_value = "composed-block-i128-compare-lhs" };
+    const rhs = selector_state.resolvePairValue(selector, call.args.items[1].value) orelse
+        return .{ .unsupported_value = "composed-block-i128-compare-rhs" };
+    if (!lhs.eql(.{ .lo = .rdi, .hi = .rsi }) or !rhs.eql(.{ .lo = .rdx, .hi = .rcx })) {
+        return .{ .no_emitter = "composed-block-i128-compare-location" };
+    }
+
+    const high_diff = try selector_state.allocateEdgeLabel(selector);
+    const low_diff = try selector_state.allocateEdgeLabel(selector);
+    const done = try selector_state.allocateEaxJoinLabel(selector);
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.appendSlice(selector.allocator, &.{
+        .{ .cmp_rcx_arg64 = .rsi },
+        .{ .jne = high_diff },
+        .cmp_rdx_rdi,
+        .{ .jne = low_diff },
+        .{ .mov_imm_eax = 0 },
+        .{ .jmp = done },
+        .{ .label = high_diff },
+        if (signed) .setg_eax else .seta_eax,
+        .{ .shl_eax_imm5 = 1 },
+        .{ .add_eax_imm32 = -1 },
+        .{ .jmp = done },
+        .{ .label = low_diff },
+        .setb_eax,
+        .{ .shl_eax_imm5 = 1 },
+        .{ .add_eax_imm32 = -1 },
+        .{ .label = done },
+    });
+    try selector_state.bindEax(selector, result_name);
     return null;
 }
 

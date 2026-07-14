@@ -504,3 +504,149 @@ test "machine verifier assigns direct call results to their ABI register class" 
     });
     try std.testing.expectError(error.ReturnRegisterUndefined, x86_64_verify.verifyFunction(integer_machine));
 }
+
+test "generic cfg selector lowers exact i128 comparison intrinsics" {
+    inline for (.{
+        .{ .callee = "llvm.ucmp.i32.i128", .signed = false },
+        .{ .callee = "llvm.scmp.i32.i128", .signed = true },
+    }) |case| {
+        var machine = MachineFunction.init("i128-compare", .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .arg128 = .{ .lo = .rdx, .hi = .rcx } });
+
+        var call = ir.CallInst{
+            .ret_ty = .{ .int = 32 },
+            .callee = case.callee,
+            .tail_kind = "tail",
+            .args = .empty,
+        };
+        defer call.deinit(std.testing.allocator);
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 128 }, .value = .{ .named = "lhs" } });
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 128 }, .value = .{ .named = "rhs" } });
+
+        try std.testing.expect((try selector_calls.lowerCall(&selector, "comparison", call)) == null);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "comparison").?);
+        const expected_tags = [_]std.meta.Tag(x86_64_machine.Instruction){
+            .cmp_rcx_arg64,
+            .jne,
+            .cmp_rdx_rdi,
+            .jne,
+            .mov_imm_eax,
+            .jmp,
+            .label,
+            if (case.signed) .setg_eax else .seta_eax,
+            .shl_eax_imm5,
+            .add_eax_imm32,
+            .jmp,
+            .label,
+            .setb_eax,
+            .shl_eax_imm5,
+            .add_eax_imm32,
+            .label,
+        };
+        try std.testing.expectEqual(expected_tags.len, machine.instructions.items.len);
+        for (machine.instructions.items, expected_tags) |instruction, expected_tag| {
+            try std.testing.expectEqual(expected_tag, std.meta.activeTag(instruction));
+        }
+        try std.testing.expectEqualStrings("__zllvm_edge_0", machine.instructions.items[1].jne);
+        try std.testing.expectEqualStrings("__zllvm_edge_1", machine.instructions.items[3].jne);
+        try std.testing.expectEqualStrings("__zllvm_edge_2_generic_cfg_select_end", machine.instructions.items[5].jmp);
+        try std.testing.expectEqualStrings("__zllvm_edge_0", machine.instructions.items[6].label);
+        try std.testing.expectEqualStrings("__zllvm_edge_2_generic_cfg_select_end", machine.instructions.items[10].jmp);
+        try std.testing.expectEqualStrings("__zllvm_edge_1", machine.instructions.items[11].label);
+        try std.testing.expectEqualStrings("__zllvm_edge_2_generic_cfg_select_end", machine.instructions.items[15].label);
+    }
+}
+
+test "generic cfg selector keeps other integer comparison intrinsics fail closed" {
+    inline for (.{
+        .{ .callee = "llvm.ucmp.i32.i64", .ret_bits = 32, .arg_bits = 64 },
+        .{ .callee = "llvm.scmp.i32.i64", .ret_bits = 32, .arg_bits = 64 },
+        .{ .callee = "llvm.ucmp.i32.i128", .ret_bits = 64, .arg_bits = 128 },
+    }) |case| {
+        var machine = MachineFunction.init("i128-compare-near-miss", .{ .int = case.ret_bits });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "lhs", if (case.arg_bits == 128)
+            .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } }
+        else
+            .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "rhs", if (case.arg_bits == 128)
+            .{ .arg128 = .{ .lo = .rdx, .hi = .rcx } }
+        else
+            .{ .arg64 = .rsi });
+
+        var call = ir.CallInst{
+            .ret_ty = .{ .int = case.ret_bits },
+            .callee = case.callee,
+            .args = .empty,
+        };
+        defer call.deinit(std.testing.allocator);
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = case.arg_bits }, .value = .{ .named = "lhs" } });
+        try call.args.append(std.testing.allocator, .{ .ty = .{ .int = case.arg_bits }, .value = .{ .named = "rhs" } });
+
+        const diagnostic = (try selector_calls.lowerCall(&selector, "comparison", call)).?;
+        try std.testing.expect(std.mem.startsWith(u8, diagnostic.detail(), "composed-block-"));
+    }
+}
+
+test "generic cfg selector executes signed and unsigned i128 comparisons" {
+    const input =
+        \\declare i32 @llvm.ucmp.i32.i128(i128, i128)
+        \\declare i32 @llvm.scmp.i32.i128(i128, i128)
+        \\define i32 @unsigned_compare(i128 %lhs, i128 %rhs) {
+        \\entry:
+        \\  %comparison = call i32 @llvm.ucmp.i32.i128(i128 %lhs, i128 %rhs)
+        \\  ret i32 %comparison
+        \\}
+        \\define i32 @signed_compare(i128 %lhs, i128 %rhs) {
+        \\entry:
+        \\  %comparison = call i32 @llvm.scmp.i32.i128(i128 %lhs, i128 %rhs)
+        \\  ret i32 %comparison
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var mappings: [2]?[]align(std.heap.page_size_min) u8 = .{ null, null };
+    defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
+    for (module.functions.items, 0..) |function_ir, index| {
+        var machine = MachineFunction.init(function_ir.name, function_ir.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function_ir));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        mappings[index] = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        @memcpy(mappings[index].?, bytes);
+    }
+
+    const unsigned_compare: *const fn (u128, u128) callconv(.c) i32 = @ptrCast(mappings[0].?.ptr);
+    const signed_compare: *const fn (i128, i128) callconv(.c) i32 = @ptrCast(mappings[1].?.ptr);
+    const cases = [_]struct {
+        lhs: u128,
+        rhs: u128,
+        unsigned: i32,
+        signed: i32,
+    }{
+        .{ .lhs = 0, .rhs = 0, .unsigned = 0, .signed = 0 },
+        .{ .lhs = 1, .rhs = 0, .unsigned = 1, .signed = 1 },
+        .{ .lhs = 0, .rhs = 1, .unsigned = -1, .signed = -1 },
+        .{ .lhs = 0xffff_ffff_ffff_ffff, .rhs = 0xffff_ffff_ffff_fffe, .unsigned = 1, .signed = 1 },
+        .{ .lhs = 0xffff_ffff_ffff_fffe, .rhs = 0xffff_ffff_ffff_ffff, .unsigned = -1, .signed = -1 },
+        .{ .lhs = std.math.maxInt(u128), .rhs = 0, .unsigned = 1, .signed = -1 },
+        .{ .lhs = @as(u128, 1) << 127, .rhs = 0, .unsigned = 1, .signed = -1 },
+        .{ .lhs = (@as(u128, 1) << 127) - 1, .rhs = @as(u128, 1) << 127, .unsigned = -1, .signed = 1 },
+        .{ .lhs = (@as(u128, 7) << 64) | 3, .rhs = (@as(u128, 7) << 64) | 4, .unsigned = -1, .signed = -1 },
+        .{ .lhs = (@as(u128, 7) << 64) | 4, .rhs = (@as(u128, 7) << 64) | 3, .unsigned = 1, .signed = 1 },
+    };
+    for (cases) |case| {
+        try std.testing.expectEqual(case.unsigned, unsigned_compare(case.lhs, case.rhs));
+        try std.testing.expectEqual(case.signed, signed_compare(@bitCast(case.lhs), @bitCast(case.rhs)));
+    }
+}

@@ -112,6 +112,14 @@ pub fn allocateEdgeLabel(selector: *ComposedBlockSelector) ![]const u8 {
     return label;
 }
 
+pub fn allocateEaxJoinLabel(selector: *ComposedBlockSelector) ![]const u8 {
+    const label = try std.fmt.allocPrint(selector.allocator, "__zllvm_edge_{d}_generic_cfg_select_end", .{selector.edge_label_count});
+    errdefer selector.allocator.free(label);
+    try selector.machine.owned_labels.append(selector.allocator, label);
+    selector.edge_label_count += 1;
+    return label;
+}
+
 pub fn bindValueLoc(selector: *ComposedBlockSelector, name: []const u8, loc: ValueLoc) !void {
     const vreg = if (selector.values.get(name)) |binding|
         binding.vreg

@@ -4033,6 +4033,18 @@ One line per completed cycle, append-only, newest last. This is the
   gate after the pre-authorized i128 pair-comparison successor. Evidence
   `docs/evidence/std_debug_hello_inbox46_named_i16.summary`.
 
+- 2026-07-14 (this commit, INBOX-46 Part 2) Item 12 exact i128 pair
+  comparisons: `llvm.ucmp.i32.i128` and `llvm.scmp.i32.i128` now compare the
+  existing SysV argument pairs lexicographically, using signed high lanes and
+  unsigned low lanes where required, and materialize -1/0/1 in EAX through
+  existing machine forms. Exact extracted-row execution provisionally closes
+  `__ucmpti2` and `__cmpti2` with 24/24 precomputed calls, moving report-all
+  from 443 / 258 / 185 to 443 / 260 / 183 with no collateral emissions. Tier
+  2 is green at 24/24 steps and 983/983 tests. No Tier 3 ran; all four
+  INBOX-46 closures remain provisional pending the single cumulative pipeline
+  gate. Evidence
+  `docs/evidence/std_debug_hello_inbox46_i128_compare.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
