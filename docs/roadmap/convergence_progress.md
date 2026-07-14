@@ -3713,6 +3713,18 @@ One line per completed cycle, append-only, newest last. This is the
   directed narrow i6 unsigned-immediate comparison. Evidence
   `docs/evidence/inbox35_lower_icmp_ownership_split.summary`.
 
+- 2026-07-13 (this commit, INBOX-35) Item 12 narrow comparison capability:
+  exact `icmp samesign ult i6 %x, imm` now zero-extends the i6 source in EAX
+  with an explicit `and 63` before the existing unsigned compare and `setb`.
+  Eight permanent executable cases cover zero, the 24 boundary, the all-ones
+  i6 value, and contaminated upper source bits; five nearby unadmitted forms
+  remain fail-closed. The two expected conversion rows advance from
+  `composed-block-icmp-form` to their concrete later `llvm.cttz.i32` frontier,
+  so report-all remains 443 selected / 232 emitting / 211 failing and no row
+  closure is claimed. Tier 2 is green and Tier 3 is not triggered. Continue
+  with the pre-authorized half pointer-store successor. Evidence
+  `docs/evidence/std_debug_hello_i6_samesign_ult_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
