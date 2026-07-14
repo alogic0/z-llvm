@@ -117,13 +117,22 @@ pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select
             else => {},
         }
     }
-    selector_state.emitValueIntoAccumulator(selector, select.false_value, bits) catch return .{ .unsupported_value = "composed-block-select-false-value" };
+    emitScalarSelectValue(selector, select.false_value, bits) catch return .{ .unsupported_value = "composed-block-select-false-value" };
     const end_label = try ownedSelectEndLabel(selector);
     try selector.machine.instructions.append(selector.allocator, .{ .je = end_label });
-    selector_state.emitValueIntoAccumulator(selector, select.true_value, bits) catch return .{ .unsupported_value = "composed-block-select-true-value" };
+    emitScalarSelectValue(selector, select.true_value, bits) catch return .{ .unsupported_value = "composed-block-select-true-value" };
     try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
     try selector_state.bindAccumulator(selector, result_name, bits);
     return null;
+}
+
+fn emitScalarSelectValue(selector: *ComposedBlockSelector, value: ir.Value, bits: u16) !void {
+    if (bits == 64 and value == .int) {
+        try selector_state.clobberAccumulator(selector);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(value.int) });
+        return;
+    }
+    try selector_state.emitValueIntoAccumulator(selector, value, bits);
 }
 
 fn lowerFpSelect(selector: *ComposedBlockSelector, result_name: []const u8, select: ir.SelectInst) !?Diagnostic {

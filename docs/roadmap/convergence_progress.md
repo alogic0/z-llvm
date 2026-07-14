@@ -4285,6 +4285,21 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence `docs/evidence/std_debug_hello_inbox51_scalar_fneg_p0.summary` and
   `docs/evidence/distribution_all_after_inbox51_fneg_p0.summary`.
 
+- 2026-07-14 (this commit, INBOX-51 select-value pipeline) Item 12 exact i64
+  select literals: scalar selects now materialize exact i64 immediate arms
+  through a select-owned helper while preserving the existing accumulator
+  authority; i128 and unrelated widths remain fail-closed. The fresh report
+  moves exactly from 443 / 272 / 171 to 443 / 278 / 165, provisionally
+  closing `__floatsidf`, `__fixdfdi`, `__fixsfdi`, `__fixhfdi`, `__adddf3`,
+  and `__subdf3` with no collateral change. A relocation-free extracted
+  object passes 75/75 pinned-Zig checks across conversion boundaries and
+  bit-exact add/sub special values, including the post-P0 RHS-NaN cases. The
+  conditional named-bitcast-select successor is unnecessary because both
+  add/sub rows already clear that later form. Full unit passes 1005/1005 and
+  Tier 2 passes 24/24 steps with 1013/1013 tests. Commit, then run the one
+  cumulative Tier 3 for all six closures. Evidence
+  `docs/evidence/std_debug_hello_inbox51_select_immediate.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

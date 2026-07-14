@@ -328,6 +328,70 @@ test "composed selector preserves scalar FP select values exactly" {
     }
 }
 
+test "composed selector executes exact i64 immediate select values" {
+    const input =
+        \\define i64 @select_i64_immediate(i32 %flag) {
+        \\entry:
+        \\  %condition = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %condition, i64 -9223372036854775808, i64 9223372036854775807
+        \\  ret i64 %selected
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("select_i64_immediate", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+
+    var saw_min = false;
+    var saw_max = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .mov_imm_rax => |value| {
+            saw_min = saw_min or value == std.math.minInt(i64);
+            saw_max = saw_max or value == std.math.maxInt(i64);
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_min and saw_max);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const select: *const fn (u32) callconv(.c) i64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(std.math.maxInt(i64), select(0));
+    try std.testing.expectEqual(std.math.minInt(i64), select(1));
+    try std.testing.expectEqual(std.math.minInt(i64), select(std.math.maxInt(u32)));
+}
+
+test "composed selector keeps unsupported immediate select widths fail closed" {
+    const input =
+        \\define i128 @select_i128_immediate(i32 %flag) {
+        \\entry:
+        \\  %condition = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %condition, i128 1, i128 2
+        \\  ret i128 %selected
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("select_i128_immediate", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+    const diagnostic = switch (try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => return error.TestUnexpectedResult,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("composed-block-select-width", diagnostic.detail());
+}
+
 test "composed selector materializes exact half literals in selects" {
     const input =
         \\define half @select_negative_one(i32 %flag, half %value) {
