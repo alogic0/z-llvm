@@ -37,15 +37,18 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-53 phase 1 is complete. The read-only census accounts for all 29 rows
-as one fma row and 28 conversion rows, separates observed diagnostics from
-captured later shapes, and freezes bounded contracts for phases 2 through 4.
-The census confirms that fma's multiway PHIs are not its last blocker, so its
-`i11`/`i32` switches must not be admitted with the six scalar EI entry
-switches. Stop and request architectural review of the phase-2 captured
-scalar multiway-PHI contract before implementation. No phase-2 code, EI
-switch/loop work, fma widening, or preopt sharding is authorized. Evidence:
-`docs/evidence/inbox53_switch_phi_ei_census.md`.
+INBOX-53 phase 2 is implemented at its committed boundary with focused Tier 2
+green. Existing stage-two scalar PHI destinations now accept exact i128
+literals and the existing parallel edge-copy authority snapshots overlapping
+scalar sources before any destination write. The report remains 443 / 278 /
+165: six FP-to-i128 rows advance to cast/select-width blockers, with zero
+closures, collateral emissions, or new failures. The in-flight crossed-i128
+canary exposed a latent sequential-copy defect; the frozen-module audit found
+no previously accepted row hit. Run exactly one phase-boundary Tier 3 against
+the committed implementation, record acceptance, then stop for the phase-3
+review. EI switch/loop work, fma widening, and preopt sharding remain
+unauthorized. Evidence:
+`docs/evidence/std_debug_hello_inbox53_phase2_multiway_phi.summary`.
 
 INBOX-50 Part 1 is complete and accepted. Preservation demand now participates
 in the existing stage-two plan and shared frame reservation, with stable homes

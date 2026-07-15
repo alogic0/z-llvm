@@ -130,6 +130,238 @@ test "generic cfg selector copies overlapping pair-spilled phi source safely" {
     }, machine.instructions.items);
 }
 
+test "generic cfg selector materializes exact i128 phi literals into pair spills" {
+    var machine = MachineFunction.init("pair-phi-literal", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 16;
+
+    const dst: ValueLoc = .{ .spill128 = .{ .lo = .slot0, .hi = .slot2 } };
+    try std.testing.expect((try selector_cfg.emitValueIntoLoc(&selector, .{ .int = std.math.minInt(i128) }, dst, "result", 128)) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_imm_rax = 0 },
+        .{ .spill_rax_rsp = .slot0 },
+        .{ .mov_imm_rax = std.math.minInt(i64) },
+        .{ .spill_rax_rsp = .slot2 },
+    }, machine.instructions.items);
+
+    const diagnostic = (try selector_cfg.emitValueIntoLoc(&selector, .zero_initializer, dst, "rejected", 128)).?;
+    try std.testing.expectEqualStrings("stage2-phi-src", diagnostic.detail());
+}
+
+test "composed selector executes multiway and crossed i128 phi sources" {
+    const input =
+        \\define i128 @multiway_i128_phi(i32 %selector, i128 %named) {
+        \\entry:
+        \\  %is_zero = icmp eq i32 %selector, 0
+        \\  br i1 %is_zero, label %zero, label %check_one
+        \\zero:
+        \\  br label %merge
+        \\check_one:
+        \\  %is_one = icmp eq i32 %selector, 1
+        \\  br i1 %is_one, label %minus_one, label %check_two
+        \\minus_one:
+        \\  br label %merge
+        \\check_two:
+        \\  %is_two = icmp eq i32 %selector, 2
+        \\  br i1 %is_two, label %named_value, label %minimum
+        \\named_value:
+        \\  br label %merge
+        \\minimum:
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi i128 [ 0, %zero ], [ -1, %minus_one ], [ %named, %named_value ], [ -170141183460469231731687303715884105728, %minimum ]
+        \\  ret i128 %result
+        \\}
+        \\define i128 @crossed_i128_phi(i32 %count, i128 %left_arg, i128 %right_arg) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %index = phi i32 [ 0, %entry ], [ %next, %loop ]
+        \\  %left = phi i128 [ %left_arg, %entry ], [ %right, %loop ]
+        \\  %right = phi i128 [ %right_arg, %entry ], [ %left, %loop ]
+        \\  %next = add i32 %index, 1
+        \\  %again = icmp ult i32 %next, %count
+        \\  br i1 %again, label %loop, label %exit
+        \\exit:
+        \\  ret i128 %left
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items, 0..) |function, index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function);
+        switch (selection) {
+            .selected => {},
+            .unsupported => |diagnostic| {
+                std.debug.print("i128 phi diagnostic={s}/{s}\n", .{ diagnostic.tagName(), diagnostic.detail() });
+                return error.TestUnexpectedResult;
+            },
+        }
+        try x86_64_verify.verifyFunction(machine);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (index == 0) {
+            const multiway: *const fn (u32, i128) callconv(.c) i128 = @ptrCast(mapping.ptr);
+            const named = @as(i128, 0x1234_5678_9abc_def0) << 64 | 0x0fed_cba9_8765_4321;
+            try std.testing.expectEqual(@as(i128, 0), multiway(0, named));
+            try std.testing.expectEqual(@as(i128, -1), multiway(1, named));
+            try std.testing.expectEqual(named, multiway(2, named));
+            try std.testing.expectEqual(std.math.minInt(i128), multiway(3, named));
+            try std.testing.expectEqual(std.math.minInt(i128), multiway(std.math.maxInt(u32), named));
+        } else {
+            const crossed: *const fn (u32, i128, i128) callconv(.c) i128 = @ptrCast(mapping.ptr);
+            const left = @as(i128, 0x1111_2222_3333_4444) << 64 | 0x5555_6666_7777_8888;
+            const right: i128 = @bitCast(@as(u128, 0xaaaa_bbbb_cccc_dddd) << 64 | 0xeeee_ffff_0000_1111);
+            try std.testing.expectEqual(left, crossed(1, left, right));
+            try std.testing.expectEqual(right, crossed(2, left, right));
+            try std.testing.expectEqual(left, crossed(3, left, right));
+        }
+    }
+}
+
+test "composed selector executes captured multiway scalar phi shapes" {
+    const input =
+        \\define double @seven_way_f64_phi(i32 %which, double %v0, double %v1, double %v2, double %v3, double %v4, double %v5, double %v6) {
+        \\entry:
+        \\  %is0 = icmp eq i32 %which, 0
+        \\  br i1 %is0, label %p0, label %c1
+        \\c1:
+        \\  %is1 = icmp eq i32 %which, 1
+        \\  br i1 %is1, label %p1, label %c2
+        \\c2:
+        \\  %is2 = icmp eq i32 %which, 2
+        \\  br i1 %is2, label %p2, label %c3
+        \\c3:
+        \\  %is3 = icmp eq i32 %which, 3
+        \\  br i1 %is3, label %p3, label %c4
+        \\c4:
+        \\  %is4 = icmp eq i32 %which, 4
+        \\  br i1 %is4, label %p4, label %c5
+        \\c5:
+        \\  %is5 = icmp eq i32 %which, 5
+        \\  br i1 %is5, label %p5, label %p6
+        \\p0:
+        \\  br label %merge
+        \\p1:
+        \\  br label %merge
+        \\p2:
+        \\  br label %merge
+        \\p3:
+        \\  br label %merge
+        \\p4:
+        \\  br label %merge
+        \\p5:
+        \\  br label %merge
+        \\p6:
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi double [ %v0, %p0 ], [ %v1, %p1 ], [ %v2, %p2 ], [ %v3, %p3 ], [ %v4, %p4 ], [ %v5, %p5 ], [ %v6, %p6 ]
+        \\  ret double %result
+        \\}
+        \\define i64 @paired_integer_phis(i32 %which, i32 %a32, i32 %b32, i64 %a64, i64 %b64) {
+        \\entry:
+        \\  %low = and i32 %which, 3
+        \\  %is0 = icmp eq i32 %low, 0
+        \\  br i1 %is0, label %p0, label %c1
+        \\c1:
+        \\  %is1 = icmp eq i32 %low, 1
+        \\  br i1 %is1, label %p1, label %c2
+        \\c2:
+        \\  %is2 = icmp eq i32 %low, 2
+        \\  br i1 %is2, label %p2, label %p3
+        \\p0:
+        \\  br label %merge
+        \\p1:
+        \\  br label %merge
+        \\p2:
+        \\  br label %merge
+        \\p3:
+        \\  br label %merge
+        \\merge:
+        \\  %small = phi i32 [ %a32, %p0 ], [ %b32, %p1 ], [ %a32, %p2 ], [ -1, %p3 ]
+        \\  %large = phi i64 [ %a64, %p0 ], [ %a64, %p1 ], [ %b64, %p2 ], [ -1, %p3 ]
+        \\  %extended = zext i32 %small to i64
+        \\  %shifted = shl i64 %extended, 32
+        \\  %result = xor i64 %shifted, %large
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items, 0..) |function, index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        if (index == 0) {
+            const seven_way: *const fn (u32, f64, f64, f64, f64, f64, f64, f64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+            const values = [7]u64{
+                0x0000_0000_0000_0000,
+                0x8000_0000_0000_0000,
+                0x0000_0000_0000_0001,
+                0x3ff0_0000_0000_0000,
+                0xfff0_0000_0000_0000,
+                0x7ff8_1234_5678_9abc,
+                0xfff0_0000_0000_0001,
+            };
+            for (0..7) |which| {
+                const actual = seven_way(
+                    @intCast(which),
+                    @bitCast(values[0]),
+                    @bitCast(values[1]),
+                    @bitCast(values[2]),
+                    @bitCast(values[3]),
+                    @bitCast(values[4]),
+                    @bitCast(values[5]),
+                    @bitCast(values[6]),
+                );
+                try std.testing.expectEqual(values[which], @as(u64, @bitCast(actual)));
+            }
+            try std.testing.expectEqual(values[6], @as(u64, @bitCast(seven_way(
+                std.math.maxInt(u32),
+                @bitCast(values[0]),
+                @bitCast(values[1]),
+                @bitCast(values[2]),
+                @bitCast(values[3]),
+                @bitCast(values[4]),
+                @bitCast(values[5]),
+                @bitCast(values[6]),
+            ))));
+        } else {
+            const paired: *const fn (u32, u32, u32, u64, u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+            const a32: u32 = 0x1234_5678;
+            const b32: u32 = 0xfedc_ba98;
+            const a64: u64 = 0x0123_4567_89ab_cdef;
+            const b64: u64 = 0xfedc_ba98_7654_3210;
+            try std.testing.expectEqual((@as(u64, a32) << 32) ^ a64, paired(0, a32, b32, a64, b64));
+            try std.testing.expectEqual((@as(u64, b32) << 32) ^ a64, paired(1, a32, b32, a64, b64));
+            try std.testing.expectEqual((@as(u64, a32) << 32) ^ b64, paired(2, a32, b32, a64, b64));
+            try std.testing.expectEqual(@as(u64, 0x0000_0000_ffff_ffff), paired(3, a32, b32, a64, b64));
+        }
+    }
+}
+
 test "generic cfg selector restores only live displaced phi destinations" {
     var machine = MachineFunction.init("live-phi-restore", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
@@ -625,7 +857,7 @@ test "composed selector preserves a duplicated f64x2 phi source on either select
     }
 }
 
-test "composed selector keeps excluded vector phis fail closed" {
+test "composed selector keeps excluded phi forms fail closed" {
     const input =
         \\define double @partial_f64x2_phi(double %value) {
         \\entry:
@@ -677,6 +909,40 @@ test "composed selector keeps excluded vector phis fail closed" {
         \\  %vector = phi <2 x double> [ zeroinitializer, %entry ]
         \\  %lane = extractelement <2 x double> %vector, i64 0
         \\  ret double %lane
+        \\}
+        \\define i64 @pointer_phi(i1 %condition, ptr %a, ptr %b) {
+        \\entry:
+        \\  br i1 %condition, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %joined = phi ptr [ %a, %left ], [ %b, %right ]
+        \\  %result = ptrtoint ptr %joined to i64
+        \\  ret i64 %result
+        \\}
+        \\define i64 @poison_phi(i1 %condition) {
+        \\entry:
+        \\  br i1 %condition, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %joined = phi i64 [ poison, %left ], [ undef, %right ]
+        \\  ret i64 %joined
+        \\}
+        \\define double @nonzero_fp_constant_phi(i1 %condition) {
+        \\entry:
+        \\  br i1 %condition, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %joined = phi double [ 1.000000e+00, %left ], [ 2.000000e+00, %right ]
+        \\  ret double %joined
         \\}
         \\
     ;

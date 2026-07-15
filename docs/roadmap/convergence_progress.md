@@ -4338,6 +4338,20 @@ One line per completed cycle, append-only, newest last. This is the
   preopt sharding remains unauthorized. Evidence
   `docs/evidence/inbox53_switch_phi_ei_census.md`.
 
+- 2026-07-14 (this commit, INBOX-53 continuation phase 2) The frozen scalar
+  multiway-PHI foundation is implemented inside the existing stage-two
+  destination map and parallel edge-copy authority. Exact i128 literals now
+  materialize into pair spills, and overlapping scalar sources are
+  snapshotted before destination writes through the existing register/frame
+  envelope. Permanent canaries cover four- and seven-predecessor joins,
+  paired i32/i64 joins, exact FP bits, and crossed i128 copies. The crossed
+  canary exposed and repaired a latent sequential-copy defect; a frozen-module
+  audit found no accepted-row hit. Tier 2 passes 24/24 steps and 1016/1016
+  tests. The report remains 443 / 278 / 165 with zero closures and six honest
+  FP-to-i128 advances. One committed-tree Tier 3 remains required before the
+  phase boundary is accepted. Evidence
+  `docs/evidence/std_debug_hello_inbox53_phase2_multiway_phi.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

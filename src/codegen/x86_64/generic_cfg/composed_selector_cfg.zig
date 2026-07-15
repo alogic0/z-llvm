@@ -497,6 +497,9 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
     selector.preserve_current_position_values = true;
     defer selector.preserve_current_position_values = previous_preserve_current;
     if (try stabilizePhiEdgeSources(selector, target, predecessor)) |diagnostic| return diagnostic;
+    var scalar_snapshots: std.ArrayList(ScalarPhiSnapshot) = .empty;
+    defer scalar_snapshots.deinit(selector.allocator);
+    if (try snapshotScalarPhiSources(selector, target, predecessor, &scalar_snapshots)) |diagnostic| return diagnostic;
     var xmm_snapshots: std.ArrayList(XmmPhiSnapshot) = .empty;
     defer xmm_snapshots.deinit(selector.allocator);
     if (try snapshotXmmPhiSources(selector, target, predecessor, &xmm_snapshots)) |diagnostic| return diagnostic;
@@ -510,7 +513,9 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
         const dst = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
-        if (xmmPhiSnapshot(&xmm_snapshots, result_name)) |snapshot| {
+        if (scalarPhiSnapshot(&scalar_snapshots, result_name)) |snapshot| {
+            materializeScalarPhiSnapshot(selector, snapshot.loc, dst, metadata.bits) catch return .{ .unsupported_value = "stage2-phi-src" };
+        } else if (xmmPhiSnapshot(&xmm_snapshots, result_name)) |snapshot| {
             selector_state.materializeLocIntoLoc(selector, .{ .xmm = snapshot.loc }, dst) catch return .{ .unsupported_value = "stage2-phi-src" };
         } else if (try emitValueIntoLoc(selector, incoming.value, dst, result_name, metadata.bits)) |diagnostic| return diagnostic;
         try selector_state.bindValueLoc(selector, result_name, dst);
@@ -520,6 +525,174 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         }
     }
     return null;
+}
+
+const ScalarPhiSnapshot = struct {
+    result_name: []const u8,
+    loc: ValueLoc,
+};
+
+fn snapshotScalarPhiSources(
+    selector: *ComposedBlockSelector,
+    target: ir.BasicBlock,
+    predecessor: []const u8,
+    snapshots: *std.ArrayList(ScalarPhiSnapshot),
+) !?Diagnostic {
+    var unavailable = [_]bool{false} ** selector_allocatable_regs.len;
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
+        if (selector.phi_destinations.get(result_name)) |destination| markScalarLocRegsUnavailable(destination, &unavailable);
+        const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
+        if (selector_state.resolveValue(selector, incoming.value)) |source| markScalarLocRegsUnavailable(source, &unavailable);
+    }
+
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
+        if (metadata.class != .gpr128 or intBits(phi.ty) == null) continue;
+        const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
+        if (incoming.value != .named) continue;
+        const source = selector_state.resolveValue(selector, incoming.value) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) };
+        if (!scalarSourceOverlapsPhiDestination(selector, target, source)) continue;
+        const pair = for (selector_allocatable_pairs) |candidate| {
+            const lo = argRegIndex(candidate.lo);
+            const hi = argRegIndex(candidate.hi);
+            if (unavailable[lo] or unavailable[hi]) continue;
+            unavailable[lo] = true;
+            unavailable[hi] = true;
+            break candidate;
+        } else return .{ .no_spill_envelope = "stage2-phi-scalar-snapshot" };
+        const loc: ValueLoc = .{ .scratch128 = pair };
+        selector_state.materializeLocIntoLocWithBits(selector, source, loc, metadata.bits) catch return .{ .unsupported_value = "stage2-phi-src" };
+        try snapshots.append(selector.allocator, .{
+            .result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" },
+            .loc = loc,
+        });
+    }
+
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
+        if ((metadata.class != .gpr32 and metadata.class != .gpr64) or intBits(phi.ty) == null) continue;
+        const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
+        if (incoming.value != .named) continue;
+        const source = selector_state.resolveValue(selector, incoming.value) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) };
+        if (!scalarSourceOverlapsPhiDestination(selector, target, source)) continue;
+        const reg = for (selector_allocatable_regs) |candidate| {
+            const index = argRegIndex(candidate);
+            if (unavailable[index]) continue;
+            unavailable[index] = true;
+            break candidate;
+        } else return .{ .no_spill_envelope = "stage2-phi-scalar-snapshot" };
+        const loc: ValueLoc = if (metadata.class == .gpr64) .{ .scratch64 = reg } else .{ .scratch32 = reg };
+        selector_state.materializeLocIntoLocWithBits(selector, source, loc, metadata.bits) catch return .{ .unsupported_value = "stage2-phi-src" };
+        try snapshots.append(selector.allocator, .{
+            .result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" },
+            .loc = loc,
+        });
+    }
+    return null;
+}
+
+fn markScalarLocRegsUnavailable(loc: ValueLoc, unavailable: *[selector_allocatable_regs.len]bool) void {
+    switch (loc) {
+        .arg32, .arg64, .scratch32, .scratch64 => |reg| unavailable[argRegIndex(reg)] = true,
+        .arg128, .scratch128 => |pair| {
+            unavailable[argRegIndex(pair.lo)] = true;
+            unavailable[argRegIndex(pair.hi)] = true;
+        },
+        .readonly_table_ptr => |ptr| switch (ptr.storage) {
+            .reg => |reg| unavailable[argRegIndex(reg)] = true,
+            .spill => {},
+        },
+        .eax, .rax, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
+    }
+}
+
+fn scalarSourceOverlapsPhiDestination(selector: *ComposedBlockSelector, target: ir.BasicBlock, source: ValueLoc) bool {
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .phi => {},
+            else => break,
+        }
+        const result_name = instruction.result orelse continue;
+        const destination = selector.phi_destinations.get(result_name) orelse continue;
+        if (scalarLocsOverlap(source, destination)) return true;
+    }
+    return false;
+}
+
+fn scalarLocsOverlap(lhs: ValueLoc, rhs: ValueLoc) bool {
+    if (valueLocEql(lhs, rhs)) return true;
+    return switch (lhs) {
+        .arg32, .arg64, .scratch32, .scratch64 => |reg| locContainsReg(rhs, reg),
+        .arg128, .scratch128 => |pair| locContainsReg(rhs, pair.lo) or locContainsReg(rhs, pair.hi),
+        .eax, .rax => rhs == .eax or rhs == .rax,
+        .spill64 => |frame| switch (rhs) {
+            .spill64 => |other| frame.eql(other),
+            .spill128 => |pair| frame.eql(pair.lo) or frame.eql(pair.hi),
+            else => false,
+        },
+        .spill128 => |pair| switch (rhs) {
+            .spill64 => |frame| frame.eql(pair.lo) or frame.eql(pair.hi),
+            .spill128 => |other| pair.lo.eql(other.lo) or pair.lo.eql(other.hi) or pair.hi.eql(other.lo) or pair.hi.eql(other.hi),
+            else => false,
+        },
+        .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill_fp, .spill_vector, .aggregate_sse => false,
+    };
+}
+
+fn scalarPhiSnapshot(snapshots: *const std.ArrayList(ScalarPhiSnapshot), result_name: []const u8) ?ScalarPhiSnapshot {
+    for (snapshots.items) |snapshot| {
+        if (std.mem.eql(u8, snapshot.result_name, result_name)) return snapshot;
+    }
+    return null;
+}
+
+fn materializeScalarPhiSnapshot(selector: *ComposedBlockSelector, source: ValueLoc, destination: ValueLoc, bits: u16) !void {
+    switch (source) {
+        .scratch32 => |reg| switch (destination) {
+            .spill64 => |frame_index| {
+                try selector_state.clobberAccumulator(selector);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_eax = reg });
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_eax_rsp = frame_index });
+            },
+            else => try selector_state.materializeLocIntoLocWithBits(selector, source, destination, bits),
+        },
+        .scratch64 => |reg| switch (destination) {
+            .spill64 => |frame_index| {
+                try selector_state.clobberAccumulator(selector);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = reg });
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = frame_index });
+            },
+            else => try selector_state.materializeLocIntoLocWithBits(selector, source, destination, bits),
+        },
+        .scratch128 => |pair| switch (destination) {
+            .spill128 => |spill| {
+                try selector_state.clobberAccumulator(selector);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = pair.lo });
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.lo });
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = pair.hi });
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = spill.hi });
+            },
+            else => try selector_state.materializeLocIntoLocWithBits(selector, source, destination, bits),
+        },
+        else => return error.UnsupportedCodegenValue,
+    }
 }
 
 const XmmPhiSnapshot = struct {
@@ -671,7 +844,18 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
                 const actual = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, value) };
                 selector_state.materializeLocIntoLocWithBits(selector, actual, dst, bits) catch return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, value) };
             },
-            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
+            .int => |int| {
+                if (bits != 128) return .{ .unsupported_value = "stage2-phi-src" };
+                const raw: u128 = @bitCast(int);
+                const lo: i64 = @bitCast(@as(u64, @truncate(raw)));
+                const hi: i64 = @bitCast(@as(u64, @truncate(raw >> 64)));
+                try selector_state.clobberAccumulator(selector);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = lo });
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = dst.spill128.lo });
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = hi });
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = dst.spill128.hi });
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "stage2-phi-src" },
         },
         .xmm, .spill_fp, .spill_vector => switch (value) {
             .named => {
