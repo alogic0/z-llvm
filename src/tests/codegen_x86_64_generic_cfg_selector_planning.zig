@@ -64,6 +64,52 @@ fn makeBranchChainIr(allocator: std.mem.Allocator, block_count: usize) ![]u8 {
     return try text.toOwnedSlice(allocator);
 }
 
+const SeededMachineState = struct {
+    name: []const u8,
+    ret_ty: ir.Type,
+    instructions: [1]codegen.x86_64.Instruction,
+    owned_labels: [2][]const u8,
+    codegen_path: codegen.x86_64.CodegenPath,
+    entry_xmm_defined_bits: [8]u16,
+};
+
+fn seedMachineState(machine: *codegen.x86_64.MachineFunction) !SeededMachineState {
+    try machine.instructions.append(std.testing.allocator, .ud2);
+    var labels: [2][]const u8 = undefined;
+    for (&labels, [_][]const u8{ "retained-label-a", "retained-label-b" }) |*label_slot, text| {
+        const label = try std.testing.allocator.dupe(u8, text);
+        errdefer std.testing.allocator.free(label);
+        try machine.owned_labels.append(std.testing.allocator, label);
+        label_slot.* = label;
+    }
+    machine.codegen_path = .generic_cfg;
+    machine.entry_xmm_defined_bits = .{ 7, 11, 13, 17, 19, 23, 29, 31 };
+    return .{
+        .name = machine.name,
+        .ret_ty = machine.ret_ty,
+        .instructions = .{.ud2},
+        .owned_labels = labels,
+        .codegen_path = machine.codegen_path,
+        .entry_xmm_defined_bits = machine.entry_xmm_defined_bits,
+    };
+}
+
+fn expectSeededMachineState(machine: codegen.x86_64.MachineFunction, expected: SeededMachineState) !void {
+    try std.testing.expectEqualStrings(expected.name, machine.name);
+    try std.testing.expect(expected.ret_ty.eql(machine.ret_ty));
+    try std.testing.expectEqual(expected.instructions.len, machine.instructions.items.len);
+    for (expected.instructions, machine.instructions.items) |expected_instruction, actual_instruction| {
+        try std.testing.expect(std.meta.eql(expected_instruction, actual_instruction));
+    }
+    try std.testing.expectEqual(expected.owned_labels.len, machine.owned_labels.items.len);
+    for (expected.owned_labels, machine.owned_labels.items) |expected_label, actual_label| {
+        try std.testing.expectEqual(@intFromPtr(expected_label.ptr), @intFromPtr(actual_label.ptr));
+        try std.testing.expectEqualStrings(expected_label, actual_label);
+    }
+    try std.testing.expectEqual(expected.codegen_path, machine.codegen_path);
+    try std.testing.expectEqualSlices(u16, &expected.entry_xmm_defined_bits, &machine.entry_xmm_defined_bits);
+}
+
 test "generic cfg allocation places phi uses on predecessor edges" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -239,6 +285,66 @@ test "generic cfg selector reports composed diagnostic over skeleton fallback" {
     try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
     try std.testing.expectEqualStrings("composed-block-pair-binary-op", diagnostic.detail());
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "generic cfg selector transaction restores seeded state after unsupported mutation" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i128 @atomicity_unsupported(double %fp, i32 %flag) {
+        \\entry:
+        \\  %slot = alloca i64, align 8
+        \\  br label %next
+        \\next:
+        \\  %condition = icmp ne i32 %flag, 0
+        \\  %selected = select i1 %condition, i128 1, i128 2
+        \\  ret i128 %selected
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = codegen.x86_64.MachineFunction.init("seeded-unsupported", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+    const expected = try seedMachineState(&machine);
+
+    const diagnostic = switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("composed-block-select-width", diagnostic.detail());
+    try expectSeededMachineState(machine, expected);
+}
+
+test "generic cfg selector transaction restores seeded state after mapped error" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @atomicity_mapped_error(double %fp) {
+        \\entry:
+        \\  %slot = alloca i64, align 8
+        \\  br label %next
+        \\next:
+        \\  ret i32 2147483648
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = codegen.x86_64.MachineFunction.init("seeded-mapped-error", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    const expected = try seedMachineState(&machine);
+
+    const diagnostic = switch (try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0])) {
+        .selected => return error.TestExpectedUnsupported,
+        .unsupported => |diagnostic| diagnostic,
+    };
+    try std.testing.expectEqualStrings("stage2-unsupported-value", diagnostic.detail());
+    try expectSeededMachineState(machine, expected);
 }
 
 test "generic cfg selector stage two computes cross-block liveness" {

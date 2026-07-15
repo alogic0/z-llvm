@@ -58,16 +58,13 @@ pub fn tryLowerWithContext(
         if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
         return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context);
     }
-    const composed_start_len = machine.instructions.items.len;
     switch (try tryLowerComposedBlockFailClosed(allocator, machine, function, module_context)) {
         .selected => return .selected,
         .unsupported => |diagnostic| switch (diagnostic) {
             .no_emitter => {
-                machine.instructions.items.len = composed_start_len;
                 if (shouldReportComposedNoEmitter(inspected)) return .{ .unsupported = diagnostic };
             },
             else => {
-                machine.instructions.items.len = composed_start_len;
                 return .{ .unsupported = diagnostic };
             },
         },
@@ -85,23 +82,96 @@ fn shouldReportComposedNoEmitter(inspected: SelectionResult) bool {
     };
 }
 
+const SelectionTransaction = struct {
+    const State = enum {
+        active,
+        committed,
+        rolled_back,
+    };
+
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    snapshot: MachineFunction,
+    instruction_len: usize,
+    owned_labels_len: usize,
+    state: State = .active,
+
+    fn begin(allocator: std.mem.Allocator, machine: *MachineFunction) SelectionTransaction {
+        comptime assertMachineFunctionFieldsCovered();
+        return .{
+            .allocator = allocator,
+            .machine = machine,
+            .snapshot = machine.*,
+            .instruction_len = machine.instructions.items.len,
+            .owned_labels_len = machine.owned_labels.items.len,
+        };
+    }
+
+    fn commit(transaction: *SelectionTransaction) void {
+        std.debug.assert(transaction.state == .active);
+        transaction.state = .committed;
+    }
+
+    fn rollbackUnlessCommitted(transaction: *SelectionTransaction) void {
+        if (transaction.state == .active) transaction.rollback();
+    }
+
+    fn rollback(transaction: *SelectionTransaction) void {
+        if (transaction.state != .active) return;
+        std.debug.assert(transaction.machine.instructions.items.len >= transaction.instruction_len);
+        std.debug.assert(transaction.machine.owned_labels.items.len >= transaction.owned_labels_len);
+
+        transaction.machine.instructions.items.len = transaction.instruction_len;
+        for (transaction.machine.owned_labels.items[transaction.owned_labels_len..]) |label| {
+            transaction.allocator.free(label);
+        }
+        transaction.machine.owned_labels.items.len = transaction.owned_labels_len;
+        transaction.machine.name = transaction.snapshot.name;
+        transaction.machine.ret_ty = transaction.snapshot.ret_ty;
+        transaction.machine.codegen_path = transaction.snapshot.codegen_path;
+        transaction.machine.entry_xmm_defined_bits = transaction.snapshot.entry_xmm_defined_bits;
+        if (comptime @hasField(MachineFunction, "selection_owner")) {
+            @field(transaction.machine.*, "selection_owner") = @field(transaction.snapshot, "selection_owner");
+        }
+        transaction.state = .rolled_back;
+    }
+
+    fn assertMachineFunctionFieldsCovered() void {
+        comptime {
+            for (std.meta.fields(MachineFunction)) |field| {
+                if (!std.mem.eql(u8, field.name, "name") and
+                    !std.mem.eql(u8, field.name, "ret_ty") and
+                    !std.mem.eql(u8, field.name, "instructions") and
+                    !std.mem.eql(u8, field.name, "owned_labels") and
+                    !std.mem.eql(u8, field.name, "codegen_path") and
+                    !std.mem.eql(u8, field.name, "entry_xmm_defined_bits") and
+                    !std.mem.eql(u8, field.name, "selection_owner"))
+                {
+                    @compileError("SelectionTransaction must cover new MachineFunction field: " ++ field.name);
+                }
+            }
+        }
+    }
+};
+
 fn tryLowerComposedBlockFailClosed(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
-    const start_len = machine.instructions.items.len;
+    var transaction = SelectionTransaction.begin(allocator, machine);
+    defer transaction.rollbackUnlessCommitted();
+    errdefer transaction.rollback();
     const result = composed_selector.tryLowerComposedBlockWithContext(allocator, machine, function, module_context) catch |err| {
-        machine.instructions.items.len = start_len;
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "composed-block-unsupported-value" }),
             else => err,
         };
     };
     switch (result) {
-        .selected => {},
-        .unsupported => machine.instructions.items.len = start_len,
+        .selected => transaction.commit(),
+        .unsupported => {},
     }
     return result;
 }
@@ -112,17 +182,18 @@ fn tryLowerComposedCfgFailClosed(
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
-    const start_len = machine.instructions.items.len;
+    var transaction = SelectionTransaction.begin(allocator, machine);
+    defer transaction.rollbackUnlessCommitted();
+    errdefer transaction.rollback();
     const result = composed_selector.tryLowerComposedCfgWithContext(allocator, machine, function, module_context) catch |err| {
-        machine.instructions.items.len = start_len;
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "stage2-unsupported-value" }),
             else => err,
         };
     };
     switch (result) {
-        .selected => {},
-        .unsupported => machine.instructions.items.len = start_len,
+        .selected => transaction.commit(),
+        .unsupported => {},
     }
     return result;
 }

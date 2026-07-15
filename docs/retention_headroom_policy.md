@@ -30,16 +30,25 @@ serial_start_required     = serial_retention_reserve + projected_serial_incremen
 starting free bytes      >= serial_start_required
 ```
 
-For the current filesystem the retention reserve is about 49.1 GB (5%) and the
-provisional serial incremental peak is **8 GiB** (about 4 GiB for one AIR
-generation / cache-miss footprint plus about 4 GiB for serial scratch and
-temporary duplication), so `serial_start_required` is about 57.7 GB. Current
-free space is about 90-93 GB: **serial-ready**. The INBOX-56 fma cumulative
-Tier 3 completed cleanly at this level, proving feasibility for the present
-topology; it did not measure high-water disk use, so the next serial Tier 3
-records free space before each subgate and the minimum observed free, then
-replaces the provisional 8 GiB with
+For the current filesystem the retention reserve is about 49.1 GB (5%) and
+the initial provisional serial incremental peak was **8 GiB** (about 4 GiB
+for one AIR generation / cache-miss footprint plus about 4 GiB for serial
+scratch and temporary duplication), so the initial `serial_start_required`
+was about 57.7 GB. The INBOX-56 fma cumulative Tier 3 completed cleanly at
+this level, proving feasibility for the present topology; it did not measure
+high-water disk use, so the next serial Tier 3 records free space before each
+subgate and the minimum observed free, then replaces the provisional 8 GiB with
 `max(measured_serial_peak * 1.25, measured_serial_peak + 4 GiB)`.
+
+INBOX-63 supplied that measurement across the same 17-subgate topology, with
+the three real-row modes serialized: starting free `119978582016`, minimum
+sampled free `119854436352`, and final free `120229638144` bytes. The sampled
+serial peak was `124145664` bytes. The formula is therefore governed by the
+4-GiB additive margin and refines `projected_serial_incremental_peak` to
+`4419112960` bytes. With the current `49112001332`-byte reserve,
+`serial_start_required` is now `53531114292` bytes (about 53.5 GB). This is a
+topology estimate from child-boundary samples, not permission for parallel
+sharding or an unbounded cache-producing run.
 
 Serial operating rules:
 
