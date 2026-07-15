@@ -4314,6 +4314,19 @@ One line per completed cycle, append-only, newest last. This is the
   INBOX-52 remains queued. Evidence
   `docs/evidence/distribution_all_after_inbox51_select_pipeline.summary`.
 
+- 2026-07-14 (this commit, INBOX-52 artifact-reuse interlude) Distribution-all
+  infrastructure now produces the 100 release-source objects once in the
+  authoritative integrated release gate and reuses a deterministic, atomic,
+  manifest-verified bundle in object inspection, native-link, and linker
+  probe. Native-link still executes every row, and focused gates retain their
+  independent producer path. A same-state fresh/cached Tier-3 pair passes all
+  17 subgates; schema 2 matches 1,262 canonical records. Cached actual wall
+  time is 1,337.819 seconds versus the accepted 1,678.60-second baseline,
+  saving 340.781 seconds (20.30%). The separately reported summed
+  child duration is 2,021.645 seconds. Stop after this bounded slice; preopt
+  sharding remains a separate reviewed candidate. Evidence
+  `docs/evidence/distribution_all_inbox52_artifact_reuse.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

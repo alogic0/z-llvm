@@ -102,6 +102,20 @@ queued and has not started. Evidence:
 `docs/evidence/std_debug_hello_inbox51_select_immediate.summary` and
 `docs/evidence/distribution_all_after_inbox51_select_pipeline.summary`.
 
+INBOX-52 is complete and accepted. Commit `6d5d3ad6` makes the integrated
+release gate produce one atomic, manifest-verified 100-object bundle per
+`distribution-all` run; object inspection, native-link, and linker probe reuse
+that exact content while every native execution still runs. Focused gates
+remain independently invocable. The same-state fresh/cached Tier-3 pair passes
+all 17 subgates and schema 2 matches 1,262 canonical records. Cached actual
+wall time falls from the accepted 1,678.60-second baseline to 1,337.819
+seconds, saving 340.781 seconds (20.30%); summed child duration is
+2,021.645 seconds and is not wall time. Stop after this bounded slice.
+Preopt sharding or wider DAG/concurrency work requires a separate reviewed
+directive. The switch-PHI/EI program is also pending the architectural
+direction from periodic review #13. Evidence:
+`docs/evidence/distribution_all_inbox52_artifact_reuse.summary`.
+
 INBOX-48 is complete and accepted. Commit `1c5ff956` adds exact fully defined
 f64x2 PHI destinations through the existing XMM/pair-spill value map and
 parallel edge-copy authority. The single Tier 3 passed all 17 subgates against
