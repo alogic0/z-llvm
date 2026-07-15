@@ -658,12 +658,7 @@ fn scratchXmmRegAvoidingThree(selector: *const ComposedBlockSelector, first: Xmm
 }
 
 fn xmmRegAvailable(selector: *const ComposedBlockSelector, reg: XmmReg) bool {
-    var it = selector.values.iterator();
-    while (it.next()) |entry| switch (entry.value_ptr.loc) {
-        .xmm => |xmm| if (xmm.reg == reg and selector_state.valueMustSurviveClobber(selector, entry.key_ptr.*)) return false,
-        else => {},
-    };
-    return true;
+    return selector_state.xmmRegAvailable(selector, reg);
 }
 
 fn constantLane(value: ir.Value) ?u1 {

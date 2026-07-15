@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
+const x86_64_types = @import("../types.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
@@ -37,6 +38,40 @@ test "generic cfg selector virtual register metadata follows assignment class" {
     try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp16, .bits = 16 }, selector_state.virtualRegMetadata(.{ .xmm = .{ .reg = .xmm0, .bits = 16 } }));
     try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp32, .bits = 32 }, selector_state.virtualRegMetadata(.{ .xmm = .{ .reg = .xmm1, .bits = 32 } }));
     try std.testing.expectEqual(VirtualRegMetadata{ .class = .fp64, .bits = 64 }, selector_state.virtualRegMetadata(.{ .spill_fp = .{ .frame_index = .slot0, .bits = 64 } }));
+}
+
+test "generic cfg selector state authority owns scratch XMM and value-bit queries" {
+    var machine = MachineFunction.init("state-queries", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("source", 1);
+    try plan.interval_ends.put("live-alias", 3);
+    try plan.interval_ends.put("live-xmm", 3);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 2;
+    try selector_state.bindValueLoc(&selector, "source", .{ .scratch64 = .r8 });
+
+    try std.testing.expectEqual(
+        @as(?x86_64_types.ArgReg, .r8),
+        selector_state.reusableScratch64RegForInPlace(&selector, .{ .named = "source" }),
+    );
+    const spill_source = selector_state.spillScratch64SourceForInPlace(&selector, .{ .named = "source" }).?;
+    try std.testing.expectEqualStrings("source", spill_source.name);
+    try std.testing.expectEqual(x86_64_types.ArgReg.r8, spill_source.reg);
+    try std.testing.expectEqual(@as(?u16, 64), selector_state.valueBits(&selector, "source"));
+    try std.testing.expect(selector_state.valueBits(&selector, "missing") == null);
+
+    try selector_state.bindValueLoc(&selector, "live-alias", .{ .scratch32 = .r8 });
+    try std.testing.expect(selector_state.reusableScratch64RegForInPlace(&selector, .{ .named = "source" }) == null);
+    try std.testing.expect(selector_state.spillScratch64SourceForInPlace(&selector, .{ .named = "source" }) == null);
+
+    try selector_state.bindValueLoc(&selector, "live-xmm", .{ .xmm = .{ .reg = .xmm2, .bits = 64 } });
+    try std.testing.expect(!selector_state.xmmRegAvailable(&selector, .xmm2));
+    try std.testing.expect(selector_state.xmmRegAvailable(&selector, .xmm1));
 }
 
 test "generic cfg selector derives supported FP classes from types" {

@@ -901,6 +901,67 @@ pub fn valueLoc(selector: *const ComposedBlockSelector, name: []const u8) ?Value
     return binding.loc;
 }
 
+pub fn valueBits(selector: *const ComposedBlockSelector, name: []const u8) ?u16 {
+    const binding = selector.values.get(name) orelse return null;
+    return binding.vreg.bits;
+}
+
+pub const Scratch64InPlaceSource = struct {
+    name: []const u8,
+    reg: ArgReg,
+};
+
+pub fn reusableScratch64RegForInPlace(selector: *const ComposedBlockSelector, value: ir.Value) ?ArgReg {
+    const source = scratch64InPlaceSource(selector, value) orelse return null;
+    const plan = selector.allocation_plan orelse return null;
+    const end = plan.intervalEnd(source.name) orelse return null;
+    if (end > selector.current_position) return null;
+    if (!scratch64SourceHasNoLiveAliases(selector, source, plan)) return null;
+    return source.reg;
+}
+
+pub fn spillScratch64SourceForInPlace(selector: *const ComposedBlockSelector, value: ir.Value) ?Scratch64InPlaceSource {
+    const source = scratch64InPlaceSource(selector, value) orelse return null;
+    const plan = selector.allocation_plan orelse return null;
+    _ = plan.intervalEnd(source.name) orelse return null;
+    if (!scratch64SourceHasNoLiveAliases(selector, source, plan)) return null;
+    return source;
+}
+
+pub fn xmmRegAvailable(selector: *const ComposedBlockSelector, reg: XmmReg) bool {
+    var it = selector.values.iterator();
+    while (it.next()) |entry| switch (entry.value_ptr.loc) {
+        .xmm => |xmm| if (xmm.reg == reg and valueMustSurviveClobber(selector, entry.key_ptr.*)) return false,
+        else => {},
+    };
+    return true;
+}
+
+fn scratch64InPlaceSource(selector: *const ComposedBlockSelector, value: ir.Value) ?Scratch64InPlaceSource {
+    const name = namedValue(value) orelse return null;
+    const loc = resolveValue(selector, value) orelse return null;
+    const reg = switch (loc) {
+        .scratch64 => |reg| reg,
+        else => return null,
+    };
+    return .{ .name = name, .reg = reg };
+}
+
+fn scratch64SourceHasNoLiveAliases(
+    selector: *const ComposedBlockSelector,
+    source: Scratch64InPlaceSource,
+    plan: *const SelectorAllocationPlan,
+) bool {
+    var it = selector.values.iterator();
+    while (it.next()) |entry| {
+        if (!locContainsReg(entry.value_ptr.loc, source.reg)) continue;
+        if (std.mem.eql(u8, entry.key_ptr.*, source.name)) continue;
+        const other_end = plan.intervalEnd(entry.key_ptr.*) orelse return false;
+        if (other_end >= selector.current_position) return false;
+    }
+    return true;
+}
+
 pub fn virtualRegMetadata(loc: ValueLoc) VirtualRegMetadata {
     return switch (loc) {
         .arg32, .scratch32, .eax => .{ .class = .gpr32, .bits = 32 },

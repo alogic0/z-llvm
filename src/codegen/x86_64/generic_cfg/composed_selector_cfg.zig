@@ -818,7 +818,7 @@ pub fn restoreDisplacedPhiDestinations(selector: *ComposedBlockSelector) !?Diagn
         const destination = entry.value_ptr.*;
         const actual = selector_state.valueLoc(selector, name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         if (valueLocEql(actual, destination)) continue;
-        const bits = selector.values.get(name).?.vreg.bits;
+        const bits = selector_state.valueBits(selector, name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         selector_state.materializeLocIntoLocWithBits(selector, actual, destination, bits) catch return .{ .no_emitter = "stage2-phi-restore-loc" };
         try selector_state.bindValueLoc(selector, name, destination);
     }

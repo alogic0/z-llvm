@@ -53,7 +53,6 @@ const machineBinaryOp = composed_helpers.machineBinaryOp;
 const isCommutative = composed_helpers.isCommutative;
 const locIsAccumulator = composed_helpers.locIsAccumulator;
 const valueLocEql = composed_helpers.valueLocEql;
-const locContainsReg = composed_helpers.locContainsReg;
 const valueIsInt = composed_helpers.valueIsInt;
 const intBits = composed_helpers.intBits;
 const callArgRegisterCount = composed_helpers.callArgRegisterCount;
@@ -548,25 +547,7 @@ pub fn scratch64RegForUseAvoiding(selector: *const ComposedBlockSelector, avoid:
 }
 
 pub fn reusableScratch64RegForInPlace(selector: *const ComposedBlockSelector, value: ir.Value) ?ArgReg {
-    const name = namedValue(value) orelse return null;
-    const loc = selector_state.resolveValue(selector, value) orelse return null;
-    const reg: ArgReg = switch (loc) {
-        .scratch64 => |reg| reg,
-        else => return null,
-    };
-    const plan = selector.allocation_plan orelse return null;
-    const end = plan.intervalEnd(name) orelse return null;
-    if (end > selector.current_position) return null;
-
-    var it = selector.values.iterator();
-    while (it.next()) |entry| {
-        if (!locContainsReg(entry.value_ptr.loc, reg)) continue;
-        if (std.mem.eql(u8, entry.key_ptr.*, name)) continue;
-        const other_end = plan.intervalEnd(entry.key_ptr.*) orelse return null;
-        if (other_end >= selector.current_position) return null;
-    }
-
-    return reg;
+    return selector_state.reusableScratch64RegForInPlace(selector, value);
 }
 
 const SpillScratchForInPlaceResult = union(enum) {
@@ -575,25 +556,9 @@ const SpillScratchForInPlaceResult = union(enum) {
 };
 
 pub fn spillScratch64SourceForInPlace(selector: *ComposedBlockSelector, value: ir.Value) !?SpillScratchForInPlaceResult {
-    const name = namedValue(value) orelse return null;
-    const loc = selector_state.resolveValue(selector, value) orelse return null;
-    const reg: ArgReg = switch (loc) {
-        .scratch64 => |reg| reg,
-        else => return null,
-    };
-    const plan = selector.allocation_plan orelse return null;
-    _ = plan.intervalEnd(name) orelse return null;
-
-    var it = selector.values.iterator();
-    while (it.next()) |entry| {
-        if (!locContainsReg(entry.value_ptr.loc, reg)) continue;
-        if (std.mem.eql(u8, entry.key_ptr.*, name)) continue;
-        const other_end = plan.intervalEnd(entry.key_ptr.*) orelse return null;
-        if (other_end >= selector.current_position) return null;
-    }
-
-    if (try selector_state.spillValue(selector, name)) |diagnostic| return .{ .diagnostic = diagnostic };
-    return .{ .reg = reg };
+    const source = selector_state.spillScratch64SourceForInPlace(selector, value) orelse return null;
+    if (try selector_state.spillValue(selector, source.name)) |diagnostic| return .{ .diagnostic = diagnostic };
+    return .{ .reg = source.reg };
 }
 
 pub fn tryLowerLshr64SpillThroughRax(selector: *ComposedBlockSelector, result_name: []const u8, value: ir.Value, amount: u6) !?Diagnostic {
