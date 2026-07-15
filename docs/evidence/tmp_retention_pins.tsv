@@ -1,0 +1,16 @@
+# Live retention pins. Documentation references do not imply retention.
+# Remove or replace a row only in an explicitly authorized retention-policy cycle.
+path	class	pin_or_key	reason
+tools/clean_tmp.zig	active-cycle	INBOX-59	retention reporter implementation
+test/tools/clean_tmp_report_only_fixture	active-cycle	INBOX-59	report-only non-deletion fixture
+docs/retention_headroom_policy.md	active-cycle	INBOX-59	retention and headroom contract
+docs/evidence/inbox59_cache_inventory.md	active-cycle	INBOX-59	cache inventory evidence
+docs/evidence/inbox59_report_only_fixture.summary	active-cycle	INBOX-59	report-only non-deletion proof
+tmp/clean_tmp_inbox59	active-cycle	INBOX-59	compiled report-only reporter used for this cycle
+tmp/inbox56_phase1_install	latest-accepted-checkpoint	INBOX-56	accepted fma phase-1 install prefix
+tmp/inbox56_phase2_probe	latest-accepted-checkpoint	INBOX-56	accepted fma phase-2 proof cache
+tmp/udivmoddi4_ptr_null_cache	frozen-diagnostic	b0eda7a6427c3084fdf096a68696f19c	INBOX-57 ADR captured-IR source
+tmp/real_rows_air_export_cache/196f53065eb715990b6e24d04afcb875285675e5adb675a6a30bae4de6873192.meta	real-rows-air-export	bdee02bc0c7f227c0f11bc9a449df673fe803540/ReleaseSafe/3553582a0269368c84c6bbb3273c28fc307c7edcde0a02096d57f9fdeb1451de	current complete ReleaseSafe pair
+tmp/real_rows_air_export_cache/283ed9184522c06666973850c5c3a8158e1743a7076d17962281c70fcf34e8d8.meta	real-rows-air-export	bdee02bc0c7f227c0f11bc9a449df673fe803540/ReleaseSmall/3553582a0269368c84c6bbb3273c28fc307c7edcde0a02096d57f9fdeb1451de	current complete ReleaseSmall pair
+tmp/real_rows_air_export_cache/92de5d7dc23761e92d01694ca13470b6d3c34da543554791dfbe70fd15d6cb61.meta	real-rows-air-export	bdee02bc0c7f227c0f11bc9a449df673fe803540/ReleaseFast/3553582a0269368c84c6bbb3273c28fc307c7edcde0a02096d57f9fdeb1451de	current complete ReleaseFast pair
+../ziglang/.zig-cache	patched-zig-build-cache	bdee02bc0c7f227c0f11bc9a449df673fe803540	current accepted patched-Zig build generation

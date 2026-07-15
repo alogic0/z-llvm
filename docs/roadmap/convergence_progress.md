@@ -4483,6 +4483,19 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence `docs/evidence/std_debug_hello_inbox56_fma_acceptance.summary` and
   `docs/evidence/distribution_all_after_inbox56_fma_acceptance.summary`.
 
+- 2026-07-15 (this commit, INBOX-59) The non-destructive retention checkpoint
+  inventories the per-INBOX/per-run tmp population, the healthy three-mode
+  AIR-export cache, and the patched-Zig build-local cache. The deterministic
+  report protects explicit live pins and identifies 137 candidates with an
+  upper-bound logical reclaim estimate of 2,795,765,275 bytes. Even that
+  projection leaves free space below the ten-percent filesystem floor before
+  the conservative 16 GiB sharding peak, so sharding is not ready. The
+  report-only fixture preserves its forced-candidate sentinel byte-for-byte.
+  No cleanup or gate ran. Evidence
+  `docs/evidence/inbox59_cache_inventory.md`,
+  `docs/evidence/inbox59_would_remove.tsv`, and
+  `docs/evidence/inbox59_report_only_fixture.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
