@@ -24,8 +24,9 @@ stop; never needs task details because the docs carry all state):
 
 ```text
 Resume worker cycles per docs/working-cycle.md. Read docs/worker_inbox.md
-first and acknowledge any unacknowledged Active inbox entries by id. Work
-cycles automatically until blocked or complete.
+first and acknowledge any unacknowledged Active inbox entries by id. Perform
+only the action authorized by that entry or docs/next_steps.md; stop for review
+when it has no explicitly authorized successor.
 ```
 
 Model note: the session has run on `gpt-5.6-sol high`. If the pane shows
@@ -39,9 +40,9 @@ inside the Codex TUI — no nudge can land while requests error.
   and never edits it. Gitignored on purpose. Entries are INBOX-N, dated,
   acknowledged by id in a commit message or stop state, then archived by
   the supervisor.
-- `docs/next_steps.md` — the worker's stop states and blockers.
-- `docs/roadmap/convergence_progress.md` — goal tracker, ratchets,
-  progress log.
+- `docs/next_steps.md` — the authoritative current action and stop state.
+- `docs/roadmap/convergence_progress.md` — durable goal proposals, ratchets,
+  report topology, and historical progress; not an authorization source.
 - `docs/working-cycle.md` — the worker's operating rules, including the
   inbox-read step and the bounded inbox wait after a stop.
 - `docs/validation_tiers.md` — authoritative validation policy.

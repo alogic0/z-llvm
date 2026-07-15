@@ -173,7 +173,8 @@ Cycle 08 decision: stop this burn-down wave. The readiness gate passes, every
 remaining finish gap has a status, and no new measured cycle is active. Future
 work should be selected from the backlog or a new source-backed blocker.
 
-The active work queue is kept short in [next_steps.md](next_steps.md).
+The sole authoritative current-action entry is kept short in
+[next_steps.md](next_steps.md); roadmap queues are proposals and history.
 
 ## Completed Tooling Cycles
 
@@ -196,9 +197,10 @@ adds new slices to the LLVM-shaped stub replacement plan.
 
 ## Operating Rule
 
-Do not implement these as one giant milestone. Select one cycle, extract a
-day-sized slice into `next_steps.md` or the active next-steps file,
-then close that slice with fixtures, docs, and comparison notes.
+Do not implement these as one giant milestone. When an explicit directive
+authorizes a cycle, record that one bounded slice in `next_steps.md`, then close
+it with the required fixtures, docs, and comparison notes. This backlog does
+not authorize a slice by itself.
 
 For code-layout-only work, use
 [Refactoring Large Zig Files](refactoring_large_zig_files.md) as the local

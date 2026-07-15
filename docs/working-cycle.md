@@ -8,13 +8,15 @@ forward while preserving target boundaries.
 
 ## Cycle Mode
 
-Work in automatic short goal cycles until no clear goals remain or the user
-interrupts.
+Work in short goal cycles only while an Active worker-inbox directive or the
+authoritative current-action entry in `docs/next_steps.md` explicitly permits
+the work. A roadmap item, failing row, evidence summary, or recommended
+sequence is a prioritization input, not authorization.
 
 One cycle means:
 
-1.  Choose the next goal through the Goal Selection rules below (driven by
-    `docs/roadmap/convergence_progress.md`).
+1.  Confirm the explicitly authorized goal through the Goal Selection rules
+    below.
 2.  Implement only that checklist item.
 3.  Select and record the validation tier per the authoritative
     [`docs/validation_tiers.md`](validation_tiers.md), then run it:
@@ -27,7 +29,8 @@ One cycle means:
 6.  Commit the completed goal.
 7.  Confirm `git status --short` is clean.
 8.  Report the cycle result.
-9.  Start the next cycle automatically unless a stop condition applies.
+9.  Start a successor only when the same directive explicitly authorizes it;
+    otherwise record the stop state and request review.
 
 After a tier-3 run, inspect and record the result before starting another
 cycle. Do not launch another full run merely because the previous command
@@ -50,8 +53,10 @@ Do not revert mid-cycle work unless explicitly asked.
 ## Goal Selection
 
 The strategy reference is
-`docs/roadmap/end_to_end_convergence_plan.md`; the live tracker is
-`docs/roadmap/convergence_progress.md`.
+`docs/roadmap/end_to_end_convergence_plan.md`; the durable historical tracker
+is `docs/roadmap/convergence_progress.md`. The sole current-action authority is
+`docs/next_steps.md`, subject to a newer unacknowledged Active worker-inbox
+directive.
 
 At the start of every cycle:
 
@@ -60,17 +65,17 @@ At the start of every cycle:
     order below; acknowledge it by citing its id in your next stop state
     or cycle commit message. Never edit that file; it is gitignored and
     never counts against the clean-worktree rule.
-2.  Read `docs/roadmap/convergence_progress.md`.
-3.  Read `docs/next_steps.md` for active blocker notes.
+2.  Read `docs/next_steps.md` for the authoritative current action and stop
+    state.
+3.  Read `docs/roadmap/convergence_progress.md` for historical progress and
+    ranking context only.
 4.  Check the latest tracked evidence summaries under `docs/evidence/` (and
     saved logs under `tmp/` for the current cycle only).
-5.  Pick the cycle goal in this priority order:
-    1.  the first failing `distribution-real-rows` entry, when that gate
-        exists;
-    2.  the first failing real-program milestone gate
-        (`distribution-zig-integrated-exe`), when it exists;
-    3.  the first unchecked item in
-        `docs/roadmap/convergence_progress.md`, top to bottom.
+5.  Start only the action explicitly authorized by the controlling Active
+    inbox directive or `docs/next_steps.md`. If neither authorizes an action,
+    stop. A failing `distribution-real-rows` entry, a failing real-program
+    milestone gate, and the first unchecked convergence item may rank choices
+    only when the directive expressly delegates that bounded choice.
 
 When the selected goal directs family work, use
 `docs/roadmap/x86_64_compiler_core_family_checklist.md` as the tactic list
@@ -88,7 +93,8 @@ When ratchet counters move, update the Ratchet State table in
 `docs/roadmap/convergence_progress.md` in the same commit; never lower a
 counter without a ratchet-migration note in the cited evidence summary.
 
-Prefer goals in this order:
+When an explicit directive delegates a bounded goal choice, prefer goals in
+this order:
 
 1.  The first failing real row or real-program gate, then the first
     unchecked convergence-progress item.
@@ -99,7 +105,8 @@ Prefer goals in this order:
 5.  Expand object/native-link/executable proof after ownership improves.
 6.  Do docs-only cleanup only when it unblocks implementation clarity.
 
-Do not choose docs-only work while clear implementation debt remains.
+Do not choose docs-only work while clear implementation debt remains unless an
+explicit directive authorizes that documentation slice.
 Do not bundle unrelated goals into one commit.
 
 ## Inbox Wait

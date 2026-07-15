@@ -80,8 +80,10 @@ tmp/zig_ir/optimizer_discovery_07_releasesmall
 ## Future Work Rule (superseded)
 
 Historical rule for the optimizer/IR-layer milestone; superseded by the
-convergence plan. Active worker goal selection is defined in
-`docs/working-cycle.md` and `docs/roadmap/convergence_progress.md`.
+convergence plan. Worker mechanics are defined in `docs/working-cycle.md`, and
+the sole current-action authority is `docs/next_steps.md`, subject to a newer
+Active worker-inbox directive. The convergence tracker records progress and
+proposals but does not authorize work.
 
 Original text: Do not continue by default. Future work should start only from
 `docs/roadmap/future_optimizer_backlog.md` or from a new measured

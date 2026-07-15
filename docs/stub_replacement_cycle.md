@@ -7,6 +7,10 @@ stricter: the goal is to replace placeholders and local-conservative stubs with
 LLVM-shaped implementations one planned slice at a time until the replacement
 plan is finished.
 
+This workflow does not authorize a slice. Use it only when an Active
+worker-inbox directive or `docs/next_steps.md` explicitly authorizes the named
+slice; unchecked plan entries remain proposals.
+
 ## Scope
 
 The active source of planned work is:
@@ -15,7 +19,7 @@ The active source of planned work is:
 docs/roadmap/llvm_shaped_stub_replacement_plan.md
 ```
 
-Work through that file in order:
+For explicitly authorized stub-replacement work, use this order:
 
 ```text
 Slice 1 -> Slice 2 -> ... -> Slice 32

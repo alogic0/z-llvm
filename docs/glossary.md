@@ -168,21 +168,24 @@ self-host through z_llvm, no TargetMachine, no LLD), the phases, and the
 metric rules.
 
 **Tracker / progress checklist** —
-`docs/roadmap/convergence_progress.md`: the live list of numbered items
-the worker executes top to bottom, plus the progress sections below it.
+`docs/roadmap/convergence_progress.md`: the durable record of numbered items,
+ratchets, report topology, and historical progress. It proposes and ranks work
+but does not authorize execution.
 
-**Worker** — the coding agent (a Codex CLI session) that implements code
-cycles: picks a goal from the tracker, implements, validates, commits.
-Distinct from the docs/verification agent (Claude), which maintains the
-docs and audits the worker's commits but does not write project code.
+**Worker** — the coding agent (a Codex CLI session) that performs the action
+authorized by the current worker-inbox directive or `docs/next_steps.md`, then
+implements, validates as directed, and commits. Distinct from the
+docs/verification agent (Claude), which maintains the docs and audits the
+worker's commits but does not write project code.
 
 **Working cycle** — one unit of worker work as defined in
 `docs/working-cycle.md`: one goal, focused validation, evidence saved,
 docs updated, one commit, clean tree.
 
-**Goal selection** — the rule for choosing the next cycle: a failing real
-row outranks a failing program gate, which outranks the first unchecked
-tracker item.
+**Goal selection** — first obey the controlling Active worker-inbox directive
+or the authoritative current-action entry in `docs/next_steps.md`. Failing rows,
+program gates, and unchecked tracker items rank choices only when that
+directive explicitly delegates a bounded choice.
 
 **Stop state / stop report** — the record a stopping worker leaves in
 `docs/next_steps.md`: active item, first failing row and stage, current

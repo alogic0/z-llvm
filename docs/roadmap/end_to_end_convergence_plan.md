@@ -351,9 +351,11 @@ Only the goal selector and the evidence rule change; the cycle discipline
 
 ## Recommended First Cycle Sequence
 
-The live, checkbox-tracked version of this sequence and of every phase
-milestone is [`convergence_progress.md`](convergence_progress.md) — workers
-take their next goal from that file; this plan stays frozen as the strategy
+The durable, checkbox-tracked version of this historical sequence and of every
+phase milestone is [`convergence_progress.md`](convergence_progress.md). It
+records progress and proposed ordering but does not authorize a next goal;
+`docs/next_steps.md` is the sole current-action authority, subject to a newer
+Active worker-inbox directive. This plan stays frozen as the strategy
 reference.
 
 Concrete adoption order, each step one committable working cycle (docs,

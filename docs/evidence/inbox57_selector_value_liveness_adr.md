@@ -1,6 +1,6 @@
 # ADR: Selector, Value-Location, And Liveness Ownership
 
-status: proposed-for-review
+status: accepted-with-amendments
 directive: `INBOX-57`
 date: 2026-07-15
 baseline: `69461b73`
@@ -281,3 +281,67 @@ definition consolidation.
 
 INBOX-57 is acknowledged. Stop after this ADR and request review; no later
 checkpoint area or implementation slice has begun.
+
+## Accepted amendments (Reviewer, 2026-07-15)
+
+The Reviewer accepts this ADR with the following binding amendments. They
+refine and, where necessary, supersede the ownership and invariant wording
+above; the original review body remains intact as the decision record that was
+reviewed.
+
+### Canonical selector-state authority
+
+The canonical authority is the selector-state transaction API together with
+its allocation plan, not direct access to the raw `values` map. The API must
+own allocation, binding, resolution, use, definition, clobber, spill,
+materialization, and rollback as one state transition. The raw map is backing
+storage only and is not an independent source of authority.
+
+Two existing bypass scans must be closed progressively in O1:
+
+- `composed_selector_scalar.zig:561`, where scratch-register availability is
+  inferred by iterating the raw values map; and
+- `composed_selector_vector.zig:661`, where XMM availability is inferred the
+  same way.
+
+O1 may migrate those reads behind the transaction API in bounded steps, but
+must not add another raw-map access. This amendment does not authorize O1.
+
+### V3/V5: EAX and RAX are one alias and defined-bit domain
+
+V3 and V5 are strengthened: EAX and RAX are one physical-register alias
+domain and one defined-bit domain, never independently live locations. An EAX
+definition overwrites the low 32 bits and zero-extends them, thereby defining
+the full RAX value. An RAX definition defines the full domain. Every bind,
+definition, clobber, reuse, spill, and invalidation must account for both names
+and update or invalidate all affected bindings atomically. No selector route
+may retain separate live EAX and RAX occupants or preserve stale upper-bit
+knowledge across an EAX definition.
+
+### Explicit EFLAGS liveness
+
+Add an explicit EFLAGS use/definition/clobber invariant to selector state.
+Every flags consumer, including `setcc`, conditional branches, and related
+flag-dependent forms, must have a reaching flags definition with no intervening
+clobber. Accumulator preparation and all other flag-writing instructions must
+declare that clobber and cannot be inserted between a live EFLAGS definition
+and its use. Future ownership work must snapshot and validate EFLAGS liveness
+alongside register and memory state rather than infer it from instruction
+adjacency.
+
+### Fail-closed selection atomicity
+
+Selection is fail-closed only when an unsupported speculative attempt restores
+every externally visible `MachineFunction` field, not merely the instruction
+length. The snapshot boundary includes instructions, owned labels and other
+owned allocations, frame/ABI and entry metadata, selector/codegen owner state,
+and any future mutable field visible after the attempt. The current generic
+wrapper restores only `instructions.items.len`, while composed selection can
+append `owned_labels`; that partial rollback is not sufficient evidence of
+atomicity.
+
+O0 must therefore include a negative snapshot test that forces an unsupported
+result after label or selector-state mutation and compares instructions,
+labels, frame/ABI metadata, and owner state with the pre-attempt snapshot. If
+the test exposes leakage, stop and authorize a separate corrective slice before
+O1. O0 itself, O1-O6, and X1 remain proposed and unauthorized.

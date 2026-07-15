@@ -1,17 +1,25 @@
 # Convergence Progress Checklist
 
-Worker-facing tracker for
+Durable worker-facing tracker for
 [`end_to_end_convergence_plan.md`](end_to_end_convergence_plan.md). The plan
-is the frozen strategy reference; this file is the live "what to do next"
-list and the visible record of progress. Evidence summaries under
+is the frozen strategy reference; this file records historical progress,
+ratchets, report topology, and proposed work. It does not authorize an action.
+The sole current-action authority is `docs/next_steps.md`, subject to a newer
+unacknowledged Active entry in `docs/worker_inbox.md`. Evidence summaries under
 `docs/evidence/` are the proof layer.
+
+Historical Progress Log instructions such as "continue", "next", or
+"pre-authorized successor" record the directive in force when that entry was
+written. They are not current permission and cannot override the authoritative
+current-action entry.
 
 ## How To Use This File
 
-1. Work top to bottom: the next goal is the first unchecked item, with one
-   exception — once `distribution-real-rows` exists, a failing real row or a
-   failing real-program gate always outranks the next unchecked item here.
-2. One item per working cycle. Implement it, validate it, commit it, check
+1. Read `docs/next_steps.md` first and perform only its authorized action (or a
+   newer Active worker-inbox directive). Never start the first unchecked item
+   merely because it appears here.
+2. When an explicit directive authorizes a tracked item, use one item per
+   working cycle: implement it, validate it as authorized, commit it, and check
    it off in the same commit.
 3. An item is closed only by a pointer to a tracked evidence summary (or,
    for docs-only items, the commit that landed the change). No prose-only

@@ -1,6 +1,8 @@
 # Development Cycle
 
-Each implementation cycle uses `docs/next_steps.md` as the active checklist.
+Each implementation cycle uses `docs/next_steps.md` as the authoritative
+current-action entry. Plans and checklists can propose work but cannot populate
+that entry without an explicit directive.
 
 The development cycle exists to replace the LLVM library dependency used by
 Zig's distribution. Work should therefore be selected and closed by evidence
@@ -56,8 +58,10 @@ as the evidence and upstream behavior are documented.
 
 ## Empty Active Queue
 
-When `docs/next_steps.md` has no active slice, do not continue with generic
-pass parity probing. Start from replacement evidence:
+When `docs/next_steps.md` has no authorized action, stop; do not run discovery,
+validation, or generic pass-parity probing to manufacture one. If an explicit
+directive authorizes a bounded discovery cycle, start from replacement
+evidence:
 
 1.  Inspect the latest source-backed corpus, accepted-pipeline, readiness, and
     handoff records.
@@ -72,8 +76,8 @@ pass parity probing. Start from replacement evidence:
 
 ## Accepted Optimizer Triage
 
-When recent work may affect accepted optimizer behavior and there is no active
-slice, tighten discovery to this order:
+When an explicit directive authorizes optimizer triage because recent work may
+affect accepted behavior, tighten discovery to this order:
 
 1.  Check `ReleaseFast` first. It is the primary optimizer replacement row and
     the best signal for regressions in canonicalization passes such as

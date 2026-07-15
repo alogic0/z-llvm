@@ -1,5 +1,13 @@
 # x86_64 Soft-Float Selector Execution Plan
 
+status: historical-program-record; no current authorization
+
+All supervisor-authority, autonomous-continuation, and conditional
+pre-authorization wording below records the program that governed earlier
+cycles. It is inactive and cannot authorize a new cycle. The sole current-action
+authority is `docs/next_steps.md`, subject to a newer Active worker-inbox
+directive.
+
 ## Purpose
 
 This is the durable supervisor program for reducing the remaining x86_64
@@ -14,10 +22,10 @@ does not replace the repository's existing authorities:
   cycle mechanics, clean-worktree requirements, and inbox handling.
 - [`../validation_tiers.md`](../validation_tiers.md) controls validation scope
   and Tier 3 triggers.
-- [`convergence_progress.md`](convergence_progress.md) is the live progress
-  tracker.
-- [`../next_steps.md`](../next_steps.md) records only current blockers and
-  architectural handoffs.
+- [`convergence_progress.md`](convergence_progress.md) is the durable progress
+  and historical topology tracker, not an authorization source.
+- [`../next_steps.md`](../next_steps.md) is the authoritative current action
+  and stop state.
 
 If this plan conflicts with either `working-cycle.md` or
 `validation_tiers.md`, those documents win.
@@ -87,7 +95,8 @@ Those decisions require external architectural review.
 
 For an ordinary cycle, the supervisor should:
 
-1. Read the worker inbox, live tracker, current handoff, latest relevant
+1. Read the worker inbox, durable tracker, authoritative current-action entry,
+   and latest relevant
    evidence summary, and current-cycle logs.
 2. Select the first actionable non-boundary failure according to
    `working-cycle.md`.
