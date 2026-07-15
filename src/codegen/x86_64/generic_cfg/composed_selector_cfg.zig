@@ -291,9 +291,10 @@ fn lowerSwitch(
     }
 
     var case_values: [max_compare_chain_switch_cases]i32 = undefined;
+    var case_target_indices: [max_compare_chain_switch_cases]usize = undefined;
     const predecessor = function.blocks.items[block_index].name;
     const default_index = function.blockIndex(switch_term.default_target) orelse return .{ .unsupported_control_flow = "stage2-switch-target" };
-    if (blockHasPhiIncomingFrom(function.blocks.items[default_index], predecessor)) return .{ .no_emitter = "stage2-switch-phi-edge" };
+    var has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[default_index], predecessor);
 
     for (switch_term.cases.items, 0..) |case, case_index| {
         if (!case.value_ty.eql(switch_term.cond_ty) or case.value != .int) return .{ .no_emitter = "stage2-switch-case-type" };
@@ -303,7 +304,28 @@ fn lowerSwitch(
         }
         case_values[case_index] = value;
         const target_index = function.blockIndex(case.target) orelse return .{ .unsupported_control_flow = "stage2-switch-target" };
-        if (blockHasPhiIncomingFrom(function.blocks.items[target_index], predecessor)) return .{ .no_emitter = "stage2-switch-phi-edge" };
+        case_target_indices[case_index] = target_index;
+        has_phi_edge = has_phi_edge or blockHasPhiIncomingFrom(function.blocks.items[target_index], predecessor);
+    }
+
+    if (has_phi_edge) {
+        if (!isExactEiEntrySwitchPhiShape(
+            function,
+            block_index,
+            switch_term,
+            case_values[0..switch_term.cases.items.len],
+            case_target_indices[0..switch_term.cases.items.len],
+            default_index,
+        )) return .{ .no_emitter = "stage2-switch-phi-edge" };
+        return lowerExactEiEntrySwitchPhiEdges(
+            selector,
+            function,
+            block_index,
+            switch_term,
+            case_values[0..switch_term.cases.items.len],
+            case_target_indices[0..switch_term.cases.items.len],
+            default_index,
+        );
     }
 
     const exhaustive_case = maskedSwitchExhaustiveCaseIndex(function, switch_term, bits, case_values[0..switch_term.cases.items.len]);
@@ -324,6 +346,222 @@ fn lowerSwitch(
         switch_term.cases.items[case_index].target
     else
         switch_term.default_target });
+    return null;
+}
+
+fn isExactEiEntrySwitchPhiShape(
+    function: ir.Function,
+    block_index: usize,
+    switch_term: ir.SwitchTerminator,
+    case_values: []const i32,
+    case_target_indices: []const usize,
+    default_index: usize,
+) bool {
+    if (block_index != 0 or !switch_term.cond_ty.eql(.{ .int = 16 }) or case_values.len != 5 or case_target_indices.len != 5) return false;
+
+    var switch_count: usize = 0;
+    for (function.blocks.items) |block| {
+        switch (block.terminator orelse return false) {
+            .@"switch" => switch_count += 1,
+            .indirectbr => return false,
+            .ret, .br, .condbr, .@"unreachable" => {},
+        }
+    }
+    if (switch_count != 1) return false;
+
+    var ordered_targets: [5]?usize = .{ null, null, null, null, null };
+    for (case_values, case_target_indices) |value, target_index| {
+        if (value < 0 or value > 4) return false;
+        const value_index: usize = @intCast(value);
+        if (ordered_targets[value_index] != null) return false;
+        ordered_targets[value_index] = target_index;
+    }
+    for (ordered_targets) |target| if (target == null) return false;
+
+    for (ordered_targets, 0..) |target, index| {
+        if (target.? == default_index) return false;
+        for (ordered_targets[0..index]) |previous| {
+            if (previous.? == target.?) return false;
+        }
+    }
+
+    const predecessor = function.blocks.items[block_index].name;
+    const return_index = ordered_targets[0].?;
+    const return_block = function.blocks.items[return_index];
+    if (blockHasPhiIncomingFrom(function.blocks.items[default_index], predecessor)) return false;
+    for (ordered_targets[1..]) |target| {
+        if (blockHasPhiIncomingFrom(function.blocks.items[target.?], predecessor)) return false;
+    }
+
+    var return_phi: ?ir.PhiInst = null;
+    var return_result: ?[]const u8 = null;
+    var non_removed_instructions: usize = 0;
+    for (return_block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        non_removed_instructions += 1;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => return false,
+        };
+        if (return_phi != null) return false;
+        return_phi = phi;
+        return_result = instruction.result orelse return false;
+    }
+    if (non_removed_instructions != 1) return false;
+    const phi = return_phi orelse return false;
+    const result_name = return_result orelse return false;
+    if ((!phi.ty.eql(.half) and !phi.ty.eql(.float) and !phi.ty.eql(.double)) or
+        !function.ret_ty.eql(phi.ty) or phi.incoming.items.len != 6) return false;
+    const ret = switch (return_block.terminator orelse return false) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return false,
+    };
+    if (!ret.ty.eql(phi.ty) or ret.value == null or ret.value.? != .named or !std.mem.eql(u8, ret.value.?.named, result_name)) return false;
+
+    var six_way_scalar_phi_count: usize = 0;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed or instruction.kind != .phi) continue;
+            const candidate = instruction.kind.phi;
+            if (candidate.incoming.items.len == 6 and (candidate.ty.eql(.half) or candidate.ty.eql(.float) or candidate.ty.eql(.double))) {
+                six_way_scalar_phi_count += 1;
+            }
+        }
+    }
+    if (six_way_scalar_phi_count != 1) return false;
+
+    const entry_incoming = phiIncomingFrom(phi, predecessor) orelse return false;
+    if (!isExactPositiveFpZero(entry_incoming.value, phi.ty)) return false;
+
+    var known_predecessors: [5][]const u8 = undefined;
+    known_predecessors[0] = predecessor;
+    for (ordered_targets[1..], 1..) |target, index| {
+        const case_block = function.blocks.items[target.?];
+        known_predecessors[index] = case_block.name;
+        const incoming = phiIncomingFrom(phi, case_block.name) orelse return false;
+        if (incoming.value != .named) return false;
+        const terminator = case_block.terminator orelse return false;
+        if (terminator != .br or !std.mem.eql(u8, terminator.br.target, return_block.name)) return false;
+    }
+
+    var default_join_predecessor: ?usize = null;
+    for (phi.incoming.items, 0..) |incoming, incoming_index| {
+        _ = function.blockIndex(incoming.block) orelse return false;
+        for (phi.incoming.items[0..incoming_index]) |previous| {
+            if (std.mem.eql(u8, previous.block, incoming.block)) return false;
+        }
+        var known = false;
+        for (known_predecessors) |name| {
+            if (std.mem.eql(u8, name, incoming.block)) {
+                known = true;
+                break;
+            }
+        }
+        if (known) continue;
+        if (incoming.value != .named or default_join_predecessor != null) return false;
+        default_join_predecessor = function.blockIndex(incoming.block) orelse return false;
+    }
+    const default_predecessor_index = default_join_predecessor orelse return false;
+    const default_predecessor = function.blocks.items[default_predecessor_index];
+    const default_terminator = default_predecessor.terminator orelse return false;
+    if (default_terminator != .br or !std.mem.eql(u8, default_terminator.br.target, return_block.name)) return false;
+    if (blockIsPlainUnreachable(function.blocks.items[default_index])) return false;
+    return blockCanReachViaOwnedBranches(function, default_index, default_predecessor_index);
+}
+
+fn isExactPositiveFpZero(value: ir.Value, ty: ir.Type) bool {
+    if (value != .fp) return false;
+    if (ty.eql(.half)) return std.mem.eql(u8, value.fp, "0xH0000");
+    if (ty.eql(.float) or ty.eql(.double)) return std.mem.eql(u8, value.fp, "0.000000e+00");
+    return false;
+}
+
+fn blockCanReachViaOwnedBranches(function: ir.Function, start_index: usize, target_index: usize) bool {
+    if (function.blocks.items.len > stage2_max_blocks) return false;
+    var seen = [_]bool{false} ** stage2_max_blocks;
+    var queue: [stage2_max_blocks]usize = undefined;
+    var read_index: usize = 0;
+    var write_index: usize = 1;
+    queue[0] = start_index;
+    seen[start_index] = true;
+
+    while (read_index < write_index) : (read_index += 1) {
+        const block_index = queue[read_index];
+        if (block_index == target_index) return true;
+        const terminator = function.blocks.items[block_index].terminator orelse return false;
+        switch (terminator) {
+            .br => |br| {
+                const next = function.blockIndex(br.target) orelse return false;
+                if (!seen[next]) {
+                    if (write_index == queue.len) return false;
+                    seen[next] = true;
+                    queue[write_index] = next;
+                    write_index += 1;
+                }
+            },
+            .condbr => |condbr| {
+                const then_index = function.blockIndex(condbr.then_target) orelse return false;
+                const else_index = function.blockIndex(condbr.else_target) orelse return false;
+                inline for (.{ then_index, else_index }) |next| {
+                    if (!seen[next]) {
+                        if (write_index == queue.len) return false;
+                        seen[next] = true;
+                        queue[write_index] = next;
+                        write_index += 1;
+                    }
+                }
+            },
+            .ret, .@"unreachable" => {},
+            .@"switch", .indirectbr => return false,
+        }
+    }
+    return false;
+}
+
+fn lowerExactEiEntrySwitchPhiEdges(
+    selector: *ComposedBlockSelector,
+    function: ir.Function,
+    block_index: usize,
+    switch_term: ir.SwitchTerminator,
+    case_values: []const i32,
+    case_target_indices: []const usize,
+    default_index: usize,
+) !?Diagnostic {
+    const predecessor = function.blocks.items[block_index].name;
+    if (selector.stack_frame_bytes != 0) {
+        selector_state.spillLiveValuesForCfgBoundary(selector) catch return .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
+    }
+
+    const previous_preserve_current = selector.preserve_current_position_values;
+    selector.preserve_current_position_values = true;
+    defer selector.preserve_current_position_values = previous_preserve_current;
+    for (case_target_indices) |target_index| {
+        if (try stabilizePhiEdgeSources(selector, function.blocks.items[target_index], predecessor)) |diagnostic| return diagnostic;
+    }
+    if (try stabilizePhiEdgeSources(selector, function.blocks.items[default_index], predecessor)) |diagnostic| return diagnostic;
+
+    selector_state.emitValueIntoEax(selector, switch_term.cond) catch return .{ .unsupported_value = "stage2-switch-cond" };
+    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = switchValueMask(16) });
+
+    var case_edge_labels: [5][]const u8 = undefined;
+    for (&case_edge_labels) |*label| label.* = try ownedEdgeLabel(selector);
+    const default_edge_label = try ownedEdgeLabel(selector);
+    for (case_values, case_edge_labels) |value, edge_label| {
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = value });
+        try selector.machine.instructions.append(selector.allocator, .{ .je = edge_label });
+    }
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = default_edge_label });
+
+    for (case_target_indices, case_edge_labels) |target_index, edge_label| {
+        const target = function.blocks.items[target_index];
+        try selector.machine.instructions.append(selector.allocator, .{ .label = edge_label });
+        if (try emitPhiEdgeMoves(selector, target, predecessor)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .{ .jmp = target.name });
+    }
+    const default_target = function.blocks.items[default_index];
+    try selector.machine.instructions.append(selector.allocator, .{ .label = default_edge_label });
+    if (try emitPhiEdgeMoves(selector, default_target, predecessor)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = default_target.name });
     return null;
 }
 

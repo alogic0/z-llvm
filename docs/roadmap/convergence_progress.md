@@ -4362,6 +4362,19 @@ One line per completed cycle, append-only, newest last. This is the
   Phase 3 exact EI entry-switch-edge contract. Evidence
   `docs/evidence/distribution_all_after_inbox53_phase2.summary`.
 
+- 2026-07-14 (this commit, INBOX-53 continuation phase 3) Exact EI entry
+  switch edges now admit only the frozen i16 `0..4` plus live-default shape
+  with one half/float/double six-way return PHI. Six compare-chain-owned edge
+  stubs all invoke the existing parallel PHI-copy authority before jumping to
+  their real targets; jump tables, indirect branches, unproven defaults, and
+  broader switch/PHI shapes remain fail-closed. Tier 2 passes 24/24 steps and
+  1019/1019 tests. The report remains 443 / 278 / 165 with zero closures and
+  exactly six directed advances: four f32/f64 rows reach
+  `composed-block-load-ptr-width`, while two half rows reach
+  `composed-int-fp-to-type`. One committed-tree Tier 3 remains required before
+  the phase boundary is accepted. Evidence
+  `docs/evidence/std_debug_hello_inbox53_phase3_ei_switch_phi.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

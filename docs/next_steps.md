@@ -37,17 +37,16 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-53 phase 2 is complete and accepted. Commit `4fc11d68` extends only the
-existing stage-two scalar PHI source/copy authority; its Tier 3 passes all 17
-subgates against committed tree
-`2a5a2889f848521a7cb125ad1bc2390e696d68de`. The report remains 443 / 278 /
-165 with zero closures and six FP-to-i128 advances. The crossed-i128 canary
-found a latent sequential-copy defect, but the frozen-module audit found no
-accepted-row hit. Stop and request review of the frozen Phase 3 exact six-row
-EI entry-switch-edge contract before implementation. EI loop work, fma
-widening, and preopt sharding remain unauthorized. Evidence:
-`docs/evidence/std_debug_hello_inbox53_phase2_multiway_phi.summary` and
-`docs/evidence/distribution_all_after_inbox53_phase2.summary`.
+INBOX-53 phase 3 is implemented at its committed boundary with focused Tier 2
+green. The exact i16 `0..4` EI entry switches now use compare-chain-owned edge
+stubs, each delegating to the existing parallel PHI-copy authority. The report
+remains 443 / 278 / 165 with zero closures and exactly six advances: the four
+f32/f64 rows stop at `composed-block-load-ptr-width`, and the two half rows at
+`composed-int-fp-to-type`. Run exactly one phase-boundary Tier 3 against the
+committed implementation, record acceptance, then stop for review of the
+frozen Phase 4 loop/narrow-PHI contract against these refreshed diagnostics.
+Phase 4 implementation, fma widening, and preopt sharding remain unauthorized.
+Evidence: `docs/evidence/std_debug_hello_inbox53_phase3_ei_switch_phi.summary`.
 
 INBOX-50 Part 1 is complete and accepted. Preservation demand now participates
 in the existing stage-two plan and shared frame reservation, with stable homes

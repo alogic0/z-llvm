@@ -1038,6 +1038,288 @@ test "composed selector lowers typed i32 switches as compare chains" {
     }
 }
 
+test "composed selector executes exact EI entry switch phi edges" {
+    const input =
+        \\define half @choose_half(i32 %which, half %v1, half %v2, half %v3, half %v4, half %v5) {
+        \\entry:
+        \\  %key = trunc i32 %which to i16
+        \\  switch i16 %key, label %default [
+        \\    i16 0, label %merge
+        \\    i16 1, label %case1
+        \\    i16 2, label %case2
+        \\    i16 3, label %case3
+        \\    i16 4, label %case4
+        \\  ]
+        \\merge:
+        \\  %result = phi half [ 0xH0000, %entry ], [ %v1, %case1 ], [ %v2, %case2 ], [ %v3, %case3 ], [ %v4, %case4 ], [ %v5, %default.exit ]
+        \\  ret half %result
+        \\case1:
+        \\  br label %merge
+        \\case2:
+        \\  br label %merge
+        \\case3:
+        \\  br label %merge
+        \\case4:
+        \\  br label %merge
+        \\default:
+        \\  br label %default.exit
+        \\default.exit:
+        \\  br label %merge
+        \\}
+        \\define float @choose_float(i32 %which, float %v1, float %v2, float %v3, float %v4, float %v5) {
+        \\entry:
+        \\  %key = trunc i32 %which to i16
+        \\  switch i16 %key, label %default [
+        \\    i16 0, label %merge
+        \\    i16 1, label %case1
+        \\    i16 2, label %case2
+        \\    i16 3, label %case3
+        \\    i16 4, label %case4
+        \\  ]
+        \\merge:
+        \\  %result = phi float [ 0.000000e+00, %entry ], [ %v1, %case1 ], [ %v2, %case2 ], [ %v3, %case3 ], [ %v4, %case4 ], [ %v5, %default.exit ]
+        \\  ret float %result
+        \\case1:
+        \\  br label %merge
+        \\case2:
+        \\  br label %merge
+        \\case3:
+        \\  br label %merge
+        \\case4:
+        \\  br label %merge
+        \\default:
+        \\  br label %default.exit
+        \\default.exit:
+        \\  br label %merge
+        \\}
+        \\define double @choose_double(i32 %which, double %v1, double %v2, double %v3, double %v4, double %v5) {
+        \\entry:
+        \\  %key = trunc i32 %which to i16
+        \\  switch i16 %key, label %default [
+        \\    i16 0, label %merge
+        \\    i16 1, label %case1
+        \\    i16 2, label %case2
+        \\    i16 3, label %case3
+        \\    i16 4, label %case4
+        \\  ]
+        \\merge:
+        \\  %result = phi double [ 0.000000e+00, %entry ], [ %v1, %case1 ], [ %v2, %case2 ], [ %v3, %case3 ], [ %v4, %case4 ], [ %v5, %default.exit ]
+        \\  ret double %result
+        \\case1:
+        \\  br label %merge
+        \\case2:
+        \\  br label %merge
+        \\case3:
+        \\  br label %merge
+        \\case4:
+        \\  br label %merge
+        \\default:
+        \\  br label %default.exit
+        \\default.exit:
+        \\  br label %merge
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items, 0..) |function, function_index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        switch (function_index) {
+            0 => {
+                const switch_fn: *const fn (u32, f16, f16, f16, f16, f16) callconv(.c) f16 = @ptrCast(mapping.ptr);
+                const values = [5]u16{ 0x8000, 0x0001, 0x7c00, 0x7e55, 0xfc00 };
+                try std.testing.expectEqual(@as(u16, 0), @as(u16, @bitCast(switch_fn(0, @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4])))));
+                for (values, 1..) |expected, which| {
+                    const actual = switch_fn(@intCast(which), @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4]));
+                    try std.testing.expectEqual(expected, @as(u16, @bitCast(actual)));
+                }
+                try std.testing.expectEqual(values[4], @as(u16, @bitCast(switch_fn(99, @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4])))));
+            },
+            1 => {
+                const switch_fn: *const fn (u32, f32, f32, f32, f32, f32) callconv(.c) f32 = @ptrCast(mapping.ptr);
+                const values = [5]u32{ 0x8000_0000, 0x0000_0001, 0x7f80_0000, 0x7fc1_2345, 0xff80_0000 };
+                try std.testing.expectEqual(@as(u32, 0), @as(u32, @bitCast(switch_fn(0, @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4])))));
+                for (values, 1..) |expected, which| {
+                    const actual = switch_fn(@intCast(which), @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4]));
+                    try std.testing.expectEqual(expected, @as(u32, @bitCast(actual)));
+                }
+                try std.testing.expectEqual(values[4], @as(u32, @bitCast(switch_fn(99, @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4])))));
+            },
+            2 => {
+                const switch_fn: *const fn (u32, f64, f64, f64, f64, f64) callconv(.c) f64 = @ptrCast(mapping.ptr);
+                const values = [5]u64{ 0x8000_0000_0000_0000, 0x0000_0000_0000_0001, 0x7ff0_0000_0000_0000, 0x7ff8_1234_5678_9abc, 0xfff0_0000_0000_0000 };
+                try std.testing.expectEqual(@as(u64, 0), @as(u64, @bitCast(switch_fn(0, @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4])))));
+                for (values, 1..) |expected, which| {
+                    const actual = switch_fn(@intCast(which), @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4]));
+                    try std.testing.expectEqual(expected, @as(u64, @bitCast(actual)));
+                }
+                try std.testing.expectEqual(values[4], @as(u64, @bitCast(switch_fn(99, @bitCast(values[0]), @bitCast(values[1]), @bitCast(values[2]), @bitCast(values[3]), @bitCast(values[4])))));
+            },
+            else => unreachable,
+        }
+    }
+}
+
+test "composed selector keeps non-EI switch phi shapes fail closed" {
+    const input =
+        \\define double @wrong_width(i32 %which, double %v1, double %v2, double %v3, double %v4, double %v5) {
+        \\entry:
+        \\  switch i32 %which, label %default [
+        \\    i32 0, label %merge
+        \\    i32 1, label %case1
+        \\    i32 2, label %case2
+        \\    i32 3, label %case3
+        \\    i32 4, label %case4
+        \\  ]
+        \\merge:
+        \\  %result = phi double [ 0.000000e+00, %entry ], [ %v1, %case1 ], [ %v2, %case2 ], [ %v3, %case3 ], [ %v4, %case4 ], [ %v5, %default.exit ]
+        \\  ret double %result
+        \\case1:
+        \\  br label %merge
+        \\case2:
+        \\  br label %merge
+        \\case3:
+        \\  br label %merge
+        \\case4:
+        \\  br label %merge
+        \\default:
+        \\  br label %default.exit
+        \\default.exit:
+        \\  br label %merge
+        \\}
+        \\define float @incomplete_join(i32 %which, float %v1, float %v2, float %v3, float %v4) {
+        \\entry:
+        \\  %key = trunc i32 %which to i16
+        \\  switch i16 %key, label %case4 [
+        \\    i16 0, label %merge
+        \\    i16 1, label %case1
+        \\    i16 2, label %case2
+        \\    i16 3, label %case3
+        \\  ]
+        \\merge:
+        \\  %result = phi float [ 0.000000e+00, %entry ], [ %v1, %case1 ], [ %v2, %case2 ], [ %v3, %case3 ], [ %v4, %case4 ]
+        \\  ret float %result
+        \\case1:
+        \\  br label %merge
+        \\case2:
+        \\  br label %merge
+        \\case3:
+        \\  br label %merge
+        \\case4:
+        \\  br label %merge
+        \\}
+        \\define half @nonzero_entry(i32 %which, half %v1, half %v2, half %v3, half %v4, half %v5) {
+        \\entry:
+        \\  %key = trunc i32 %which to i16
+        \\  switch i16 %key, label %default [
+        \\    i16 0, label %merge
+        \\    i16 1, label %case1
+        \\    i16 2, label %case2
+        \\    i16 3, label %case3
+        \\    i16 4, label %case4
+        \\  ]
+        \\merge:
+        \\  %result = phi half [ 0xH3C00, %entry ], [ %v1, %case1 ], [ %v2, %case2 ], [ %v3, %case3 ], [ %v4, %case4 ], [ %v5, %default.exit ]
+        \\  ret half %result
+        \\case1:
+        \\  br label %merge
+        \\case2:
+        \\  br label %merge
+        \\case3:
+        \\  br label %merge
+        \\case4:
+        \\  br label %merge
+        \\default:
+        \\  br label %default.exit
+        \\default.exit:
+        \\  br label %merge
+        \\}
+        \\define double @unproven_default(i32 %which, double %v1, double %v2, double %v3, double %v4, double %v5) {
+        \\entry:
+        \\  %key = trunc i32 %which to i16
+        \\  switch i16 %key, label %default [
+        \\    i16 0, label %merge
+        \\    i16 1, label %case1
+        \\    i16 2, label %case2
+        \\    i16 3, label %case3
+        \\    i16 4, label %case4
+        \\  ]
+        \\merge:
+        \\  %result = phi double [ 0.000000e+00, %entry ], [ %v1, %case1 ], [ %v2, %case2 ], [ %v3, %case3 ], [ %v4, %case4 ], [ %v5, %dead ]
+        \\  ret double %result
+        \\case1:
+        \\  br label %merge
+        \\case2:
+        \\  br label %merge
+        \\case3:
+        \\  br label %merge
+        \\case4:
+        \\  br label %merge
+        \\default:
+        \\  unreachable
+        \\dead:
+        \\  br label %merge
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    for (module.functions.items) |function| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        switch (try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function)) {
+            .unsupported => {},
+            .selected => return error.TestUnexpectedResult,
+        }
+    }
+}
+
+test "composed selector rejects duplicate EI switch cases before phi admission" {
+    const input =
+        \\define double @duplicate(i32 %which) {
+        \\entry:
+        \\  %key = trunc i32 %which to i16
+        \\  switch i16 %key, label %default [
+        \\    i16 0, label %merge
+        \\    i16 0, label %other
+        \\    i16 2, label %other
+        \\    i16 3, label %other
+        \\    i16 4, label %other
+        \\  ]
+        \\merge:
+        \\  %result = phi double [ 0.000000e+00, %entry ]
+        \\  ret double %result
+        \\other:
+        \\  ret double 1.000000e+00
+        \\default:
+        \\  ret double 2.000000e+00
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    var machine = MachineFunction.init("duplicate", .double);
+    defer machine.deinit(std.testing.allocator);
+    const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+    switch (selection) {
+        .unsupported => |diagnostic| try std.testing.expectEqualStrings("stage2-switch-duplicate-case", diagnostic.detail()),
+        .selected => return error.TestUnexpectedResult,
+    }
+}
+
 test "composed selector rejects an unproven unreachable switch default" {
     const input =
         \\define i32 @missing_mask_case(i32 %input) {
