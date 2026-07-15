@@ -97,6 +97,10 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
     if (load.attrs.isBarrier()) return .{ .no_emitter = "composed-block-load-barrier" };
     if (selector_state.resolveValue(selector, load.ptr)) |ptr| if (ptr == .readonly_table_ptr)
         return lowerReadOnlyTableLoad(selector, result_name, load, ptr.readonly_table_ptr);
+    if (load.ptr == .named and selector.readonly_pointer_params.contains(load.ptr.named)) {
+        if (intBits(load.ty)) |bits| if (bits == 64 or bits == 96 or bits == 128)
+            return lowerReadOnlyPointerIntegerLoad(selector, result_name, load, bits);
+    }
     if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
     if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
@@ -150,6 +154,8 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
+    if (store.ptr == .named and selector.readonly_pointer_params.contains(store.ptr.named))
+        return .{ .no_emitter = "composed-block-store-readonly-param" };
     if (scalarFpStoreBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
     if (store.ty == .ptr) return lowerStoreStackPointer(selector, store);
     if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
@@ -205,6 +211,51 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
         .readonly_table_ptr => return .{ .no_emitter = "composed-block-store-readonly-table" },
         .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack128, .stack128_value, .stack_f32_pair_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-store-ptr" },
     }
+    return null;
+}
+
+fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name: []const u8, load: ir.LoadInst, bits: u16) !?Diagnostic {
+    if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-load-readonly-param-addrspace" };
+    const ptr_name = switch (load.ptr) {
+        .named => |name| name,
+        else => return .{ .no_emitter = "composed-block-load-readonly-param-provenance" },
+    };
+    if (!selector.readonly_pointer_params.contains(ptr_name)) return .{ .no_emitter = "composed-block-load-ptr-width" };
+    const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
+    var ptr_reg: ArgReg = switch (ptr) {
+        .arg64, .scratch64 => |reg| reg,
+        .spill64 => |frame_index| blk: {
+            selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rdi }) catch
+                return .{ .unsupported_value = "composed-block-load-readonly-param-spill" };
+            break :blk .rdi;
+        },
+        else => return .{ .no_emitter = "composed-block-load-readonly-param-provenance" },
+    };
+    try selector_state.clobberAccumulator(selector);
+    if (bits == 64) {
+        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 } });
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
+
+    const pair = selector_state.choosePairScratchForClobber(selector, null) orelse
+        return .{ .no_spill_envelope = "composed-block-load-readonly-param-pair" };
+    if (pair.contains(ptr_reg)) {
+        selector_state.materializeLocIntoLoc(selector, ptr, .{ .scratch64 = .rdi }) catch
+            return .{ .unsupported_value = "composed-block-load-readonly-param-alias" };
+        ptr_reg = .rdi;
+    }
+    try selector_state.clobberArgReg(selector, pair.lo);
+    try selector_state.clobberArgReg(selector, pair.hi);
+    try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 } });
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.lo });
+    if (bits == 96) {
+        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 8 } });
+    } else {
+        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 8 } });
+    }
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.hi });
+    try selector_state.bindResultLoc(selector, result_name, .{ .scratch128 = pair });
     return null;
 }
 

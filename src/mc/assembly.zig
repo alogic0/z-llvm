@@ -94,6 +94,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .and_eax_imm32 => |value| try writer.print("\tandl ${}, %eax\n", .{value}),
             .abs_i32_edi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tmovl %edi, %edx\n\tnegl %edx\n\ttestl %edi, %edi\n\tcmovsl %edx, %eax\n"),
             .abs_i64_rdi_rax => try writer.writeAll("\tmovq %rdi, %rax\n\tmovq %rdi, %rdx\n\tnegq %rdx\n\ttestq %rdi, %rdi\n\tcmovsq %rdx, %rax\n"),
+            .wide_int_to_fp_rdi_rsi_xmm0 => |conversion| try printWideIntToFp(writer, conversion.signed, conversion.to_bits),
             .clz_i128_rdi_rsi_eax => try writer.writeAll(
                 "\ttestq %rsi, %rsi\n" ++
                     "\tje 1f\n" ++
@@ -1685,6 +1686,54 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .ret => try writer.writeAll("\tretq\n"),
         }
     }
+}
+
+fn printWideIntToFp(writer: anytype, signed: bool, to_bits: u16) !void {
+    try writer.writeAll("\txorl %r9d, %r9d\n");
+    if (signed) {
+        try writer.writeAll("\ttestq %rsi, %rsi\n\tjns 91f\n");
+        if (to_bits == 32)
+            try writer.writeAll("\tmovl $0x80000000, %r9d\n")
+        else if (to_bits == 64)
+            try writer.writeAll("\tmovabsq $0x8000000000000000, %r9\n")
+        else
+            return error.InvalidMachineInstruction;
+        try writer.writeAll("\tnegq %rdi\n\tadcq $0, %rsi\n\tnegq %rsi\n91:\n");
+    } else if (to_bits != 32 and to_bits != 64) return error.InvalidMachineInstruction;
+    try writer.writeAll(
+        "\ttestq %rsi, %rsi\n\tje 97f\n" ++
+            "\tbsrq %rsi, %rcx\n\taddl $65, %ecx\n",
+    );
+    const retained_bits: u8 = if (to_bits == 32) 26 else 55;
+    try writer.print("\tsubl ${d}, %ecx\n", .{retained_bits});
+    try writer.writeAll(
+        "\tmovl %ecx, %r8d\n\tcmpl $64, %ecx\n\tjb 94f\n\tje 93f\n" ++
+            "\tsubl $64, %ecx\n\tmovq %rsi, %rax\n\tshrq %cl, %rsi\n\tnegl %ecx\n" ++
+            "\tshlq %cl, %rax\n\torq %rdi, %rax\n\tmovq %rsi, %rdi\n\tjmp 95f\n" ++
+            "93:\n\tmovq %rdi, %rax\n\tmovq %rsi, %rdi\n\tjmp 95f\n" ++
+            "94:\n\tmovq %rdi, %rax\n\tshrdq %cl, %rsi, %rdi\n\tnegl %ecx\n\tshlq %cl, %rax\n" ++
+            "95:\n\ttestq %rax, %rax\n\tsetne %al\n\tmovzbl %al, %eax\n\torq %rax, %rdi\n",
+    );
+    if (to_bits == 32) {
+        try writer.writeAll(
+            "\tcvtsi2ssq %rdi, %xmm0\n\tleal 127(%r8), %eax\n\tshll $23, %eax\n" ++
+                "\tmovd %eax, %xmm1\n\tmulss %xmm1, %xmm0\n\tjmp 98f\n",
+        );
+    } else {
+        try writer.writeAll(
+            "\tcvtsi2sdq %rdi, %xmm0\n\tleal 1023(%r8), %eax\n\tshlq $52, %rax\n" ++
+                "\tmovq %rax, %xmm1\n\tmulsd %xmm1, %xmm0\n\tjmp 98f\n",
+        );
+    }
+    try writer.writeAll("97:\n\ttestq %rdi, %rdi\n\tjs 96f\n");
+    try writer.writeAll(if (to_bits == 32) "\tcvtsi2ssq %rdi, %xmm0\n" else "\tcvtsi2sdq %rdi, %xmm0\n");
+    try writer.writeAll(
+        "\tjmp 98f\n96:\n\tmovq %rdi, %rax\n\tandl $1, %eax\n\tshrq $1, %rdi\n\torq %rax, %rdi\n",
+    );
+    if (to_bits == 32)
+        try writer.writeAll("\tcvtsi2ssq %rdi, %xmm0\n\taddss %xmm0, %xmm0\n98:\n\tmovd %xmm0, %eax\n\torl %r9d, %eax\n\tmovd %eax, %xmm0\n")
+    else
+        try writer.writeAll("\tcvtsi2sdq %rdi, %xmm0\n\taddsd %xmm0, %xmm0\n98:\n\tmovq %xmm0, %rax\n\torq %r9, %rax\n\tmovq %rax, %xmm0\n");
 }
 
 fn printFcmpResult(writer: anytype, predicate: ir.FcmpPredicate) !void {

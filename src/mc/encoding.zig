@@ -250,6 +250,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             },
             .abs_i32_edi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x89, 0xfa, 0xf7, 0xda, 0x85, 0xff, 0x0f, 0x48, 0xc2 }),
             .abs_i64_rdi_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0xf8, 0x48, 0x89, 0xfa, 0x48, 0xf7, 0xda, 0x48, 0x85, 0xff, 0x48, 0x0f, 0x48, 0xc2 }),
+            .wide_int_to_fp_rdi_rsi_xmm0 => |conversion| try bytes.appendSlice(allocator, switch (conversion.to_bits) {
+                32 => if (conversion.signed) &selector_bytes.wide_sitofp_i128_f32 else &selector_bytes.wide_uitofp_i128_f32,
+                64 => if (conversion.signed) &selector_bytes.wide_sitofp_i128_f64 else &selector_bytes.wide_uitofp_i128_f64,
+                else => return error.InvalidMachineInstruction,
+            }),
             .clz_i128_rdi_rsi_eax => try bytes.appendSlice(allocator, &.{
                 0x48, 0x85, 0xf6, 0x74, 0x09, 0x48, 0x0f, 0xbd, 0xc6, 0x83, 0xf0, 0x3f, 0xeb, 0x14,
                 0xb8, 0x80, 0x00, 0x00, 0x00, 0x48, 0x85, 0xff, 0x74, 0x0a, 0x48, 0x0f, 0xbd, 0xc7,
@@ -1835,6 +1840,11 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .and_eax_imm32 => 5,
         .abs_i32_edi_eax => 11,
         .abs_i64_rdi_rax => 16,
+        .wide_int_to_fp_rdi_rsi_xmm0 => |conversion| switch (conversion.to_bits) {
+            32 => if (conversion.signed) selector_bytes.wide_sitofp_i128_f32.len else selector_bytes.wide_uitofp_i128_f32.len,
+            64 => if (conversion.signed) selector_bytes.wide_sitofp_i128_f64.len else selector_bytes.wide_uitofp_i128_f64.len,
+            else => 0,
+        },
         .clz_i128_rdi_rsi_eax => 34,
         .clz_i64_rdi_eax => 17,
         .clz_i32_edi_eax => 15,

@@ -102,6 +102,237 @@ fn expectConversion(case: ConversionCase) !void {
     try std.testing.expectEqual(case.f64_bits, output[1]);
 }
 
+test "generic cfg selector executes readonly wide integer loads and FP conversion bit exactly" {
+    const input =
+        \\define i32 @u96f32(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i96, ptr %p, align 4
+        \\  %f = uitofp i96 %x to float
+        \\  %r = bitcast float %f to i32
+        \\  ret i32 %r
+        \\}
+        \\define i64 @u96f64(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i96, ptr %p, align 4
+        \\  %f = uitofp i96 %x to double
+        \\  %r = bitcast double %f to i64
+        \\  ret i64 %r
+        \\}
+        \\define i32 @s96f32(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i96, ptr %p, align 4
+        \\  %f = sitofp i96 %x to float
+        \\  %r = bitcast float %f to i32
+        \\  ret i32 %r
+        \\}
+        \\define i64 @s96f64(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i96, ptr %p, align 4
+        \\  %f = sitofp i96 %x to double
+        \\  %r = bitcast double %f to i64
+        \\  ret i64 %r
+        \\}
+        \\define i32 @u128f32(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i128, ptr %p, align 4
+        \\  %f = uitofp i128 %x to float
+        \\  %r = bitcast float %f to i32
+        \\  ret i32 %r
+        \\}
+        \\define i64 @u128f64(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i128, ptr %p, align 4
+        \\  %f = uitofp i128 %x to double
+        \\  %r = bitcast double %f to i64
+        \\  ret i64 %r
+        \\}
+        \\define i32 @s128f32(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i128, ptr %p, align 4
+        \\  %f = sitofp i128 %x to float
+        \\  %r = bitcast float %f to i32
+        \\  ret i32 %r
+        \\}
+        \\define i64 @s128f64(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i128, ptr %p, align 4
+        \\  %f = sitofp i128 %x to double
+        \\  %r = bitcast double %f to i64
+        \\  ret i64 %r
+        \\}
+        \\define i64 @u64loadf64(ptr nonnull readonly align 1 captures(none) %p) {
+        \\entry:
+        \\  %x = load i64, ptr %p, align 4
+        \\  %f = uitofp i64 %x to double
+        \\  %r = bitcast double %f to i64
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const UCase = struct { raw: u128, f32_bits: u32, f64_bits: u64 };
+    const unsigned96 = [_]UCase{
+        .{ .raw = 0, .f32_bits = 0x0000_0000, .f64_bits = 0x0000_0000_0000_0000 },
+        .{ .raw = 1, .f32_bits = 0x3f80_0000, .f64_bits = 0x3ff0_0000_0000_0000 },
+        .{ .raw = 0x0020_0000_0000_0001, .f32_bits = 0x5a00_0000, .f64_bits = 0x4340_0000_0000_0000 },
+        .{ .raw = 0x0020_0000_0000_0003, .f32_bits = 0x5a00_0000, .f64_bits = 0x4340_0000_0000_0002 },
+        .{ .raw = 0xffff_ffff_ffff_ffff, .f32_bits = 0x5f80_0000, .f64_bits = 0x43f0_0000_0000_0000 },
+        .{ .raw = 0x1_0000_0000_0000_0000, .f32_bits = 0x5f80_0000, .f64_bits = 0x43f0_0000_0000_0000 },
+        .{ .raw = 0x7fff_ffff_ffff_ffff_ffff_ffff, .f32_bits = 0x6f00_0000, .f64_bits = 0x45e0_0000_0000_0000 },
+        .{ .raw = 0xffff_ffff_ffff_ffff_ffff_ffff, .f32_bits = 0x6f80_0000, .f64_bits = 0x45f0_0000_0000_0000 },
+    };
+    const unsigned128 = unsigned96 ++ [_]UCase{
+        .{ .raw = 0x8000_0000_0000_0000_0000_0000_0000_0000, .f32_bits = 0x7f00_0000, .f64_bits = 0x47e0_0000_0000_0000 },
+        .{ .raw = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff, .f32_bits = 0x7f80_0000, .f64_bits = 0x47f0_0000_0000_0000 },
+    };
+    const SCase = struct { raw: u128, f32_bits: u32, f64_bits: u64 };
+    const signed96 = [_]SCase{
+        .{ .raw = 0, .f32_bits = 0x0000_0000, .f64_bits = 0x0000_0000_0000_0000 },
+        .{ .raw = 1, .f32_bits = 0x3f80_0000, .f64_bits = 0x3ff0_0000_0000_0000 },
+        .{ .raw = 0xffff_ffff_ffff_ffff_ffff_ffff, .f32_bits = 0xbf80_0000, .f64_bits = 0xbff0_0000_0000_0000 },
+        .{ .raw = 0x0020_0000_0000_0001, .f32_bits = 0x5a00_0000, .f64_bits = 0x4340_0000_0000_0000 },
+        .{ .raw = 0xffff_ffff_ffdf_ffff_ffff_ffff, .f32_bits = 0xda00_0000, .f64_bits = 0xc340_0000_0000_0000 },
+        .{ .raw = 0x7fff_ffff_ffff_ffff_ffff_ffff, .f32_bits = 0x6f00_0000, .f64_bits = 0x45e0_0000_0000_0000 },
+        .{ .raw = 0x8000_0000_0000_0000_0000_0000, .f32_bits = 0xef00_0000, .f64_bits = 0xc5e0_0000_0000_0000 },
+    };
+    const signed128 = [_]SCase{
+        .{ .raw = 0, .f32_bits = 0x0000_0000, .f64_bits = 0x0000_0000_0000_0000 },
+        .{ .raw = 1, .f32_bits = 0x3f80_0000, .f64_bits = 0x3ff0_0000_0000_0000 },
+        .{ .raw = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff, .f32_bits = 0xbf80_0000, .f64_bits = 0xbff0_0000_0000_0000 },
+        .{ .raw = 0x0020_0000_0000_0001, .f32_bits = 0x5a00_0000, .f64_bits = 0x4340_0000_0000_0000 },
+        .{ .raw = 0xffff_ffff_ffff_ffff_ffdf_ffff_ffff_ffff, .f32_bits = 0xda00_0000, .f64_bits = 0xc340_0000_0000_0000 },
+        .{ .raw = 0x7fff_ffff_ffff_ffff_ffff_ffff, .f32_bits = 0x6f00_0000, .f64_bits = 0x45e0_0000_0000_0000 },
+        .{ .raw = 0xffff_ffff_8000_0000_0000_0000_0000_0000, .f32_bits = 0xef00_0000, .f64_bits = 0xc5e0_0000_0000_0000 },
+        .{ .raw = 0x7fff_ffff_ffff_ffff_ffff_ffff_ffff_ffff, .f32_bits = 0x7f00_0000, .f64_bits = 0x47e0_0000_0000_0000 },
+        .{ .raw = 0x8000_0000_0000_0000_0000_0000_0000_0000, .f32_bits = 0xff00_0000, .f64_bits = 0xc7e0_0000_0000_0000 },
+    };
+
+    try expectWidePointerResults(u32, module.functions.items[0], unsigned96, "f32_bits");
+    try expectWidePointerResults(u64, module.functions.items[1], unsigned96, "f64_bits");
+    try expectWidePointerResults(u32, module.functions.items[2], signed96, "f32_bits");
+    try expectWidePointerResults(u64, module.functions.items[3], signed96, "f64_bits");
+    try expectWidePointerResults(u32, module.functions.items[4], unsigned128, "f32_bits");
+    try expectWidePointerResults(u64, module.functions.items[5], unsigned128, "f64_bits");
+    try expectWidePointerResults(u32, module.functions.items[6], signed128, "f32_bits");
+    try expectWidePointerResults(u64, module.functions.items[7], signed128, "f64_bits");
+    try expectWidePointerResults(u64, module.functions.items[8], unsigned96[4..5], "f64_bits");
+}
+
+fn expectWidePointerResults(comptime T: type, function: ir.Function, cases: anytype, comptime expected_field: []const u8) !void {
+    var machine = x86_64_machine.MachineFunction.init(function.name, function.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+    try x86_64_verify.verifyFunction(machine);
+    for (machine.instructions.items) |instruction| try std.testing.expect(std.meta.activeTag(instruction) != .direct_call);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const canary: *const fn (*const u128) callconv(.c) T = @ptrCast(mapping.ptr);
+    for (cases) |case| try std.testing.expectEqual(@field(case, expected_field), canary(&case.raw));
+}
+
+test "integer-to-half f32 composition is exact at every rounding and overflow boundary" {
+    const Case = struct { value: i128, bits: u16 };
+    const cases = [_]Case{
+        .{ .value = -65521, .bits = 0xfc00 }, .{ .value = -65520, .bits = 0xfc00 }, .{ .value = -65519, .bits = 0xfbff },
+        .{ .value = -65505, .bits = 0xfbff }, .{ .value = -65504, .bits = 0xfbff }, .{ .value = -65503, .bits = 0xfbff },
+        .{ .value = -2049, .bits = 0xe800 },  .{ .value = -2048, .bits = 0xe800 },  .{ .value = -2047, .bits = 0xe7ff },
+        .{ .value = 2047, .bits = 0x67ff },   .{ .value = 2048, .bits = 0x6800 },   .{ .value = 2049, .bits = 0x6800 },
+        .{ .value = 65503, .bits = 0x7bff },  .{ .value = 65504, .bits = 0x7bff },  .{ .value = 65505, .bits = 0x7bff },
+        .{ .value = 65519, .bits = 0x7bff },  .{ .value = 65520, .bits = 0x7c00 },  .{ .value = 65521, .bits = 0x7c00 },
+    };
+    for (cases) |case| {
+        const through_f32: f16 = @floatCast(@as(f32, @floatFromInt(case.value)));
+        try std.testing.expectEqual(case.bits, @as(u16, @bitCast(through_f32)));
+    }
+}
+
+test "generic cfg selector admits only nonrecursive integer-to-half composition" {
+    const admitted =
+        \\define half @wide_to_half(i128 %x) {
+        \\entry:
+        \\  %r = sitofp i128 %x to half
+        \\  ret half %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, admitted);
+    defer module.deinit();
+    try module.verify();
+    var machine = x86_64_machine.MachineFunction.init("wide_to_half", .half);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector_impl.SelectionResult.selected, try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    var trunc_calls: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            if (std.mem.eql(u8, call.symbol, "__truncsfhf2")) trunc_calls += 1;
+        },
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), trunc_calls);
+
+    const recursive =
+        \\define half @__truncsfhf2(i32 %x) {
+        \\entry:
+        \\  %r = sitofp i32 %x to half
+        \\  ret half %r
+        \\}
+        \\
+    ;
+    var recursive_module = try ir.Module.parse(std.testing.allocator, recursive);
+    defer recursive_module.deinit();
+    try recursive_module.verify();
+    var recursive_machine = x86_64_machine.MachineFunction.init("__truncsfhf2", .half);
+    defer recursive_machine.deinit(std.testing.allocator);
+    const selection = try selector_impl.tryLowerComposedCfg(std.testing.allocator, &recursive_machine, recursive_module.functions.items[0]);
+    try std.testing.expect(selection == .unsupported);
+    try std.testing.expectEqualStrings("composed-int-fp-half-recursive", selection.unsupported.detail());
+}
+
+test "readonly wide loads keep provenance widths and stores fail closed" {
+    const Case = struct { ir_text: []const u8, detail: []const u8 };
+    const cases = [_]Case{
+        .{ .ir_text =
+        \\define float @bad(ptr %p) {
+        \\entry:
+        \\  %x = load i96, ptr %p, align 4
+        \\  %r = uitofp i96 %x to float
+        \\  ret float %r
+        \\}
+        , .detail = "composed-block-load-width" },
+        .{ .ir_text =
+        \\define float @bad(ptr readonly %p) {
+        \\entry:
+        \\  %x = load i80, ptr %p, align 4
+        \\  %r = uitofp i80 %x to float
+        \\  ret float %r
+        \\}
+        , .detail = "composed-block-load-width" },
+        .{ .ir_text =
+        \\define void @bad(ptr readonly %p, i32 %x) {
+        \\entry:
+        \\  store i32 %x, ptr %p, align 4
+        \\  ret void
+        \\}
+        , .detail = "composed-block-store-readonly-param" },
+    };
+    for (cases) |case| {
+        var module = try ir.Module.parse(std.testing.allocator, case.ir_text);
+        defer module.deinit();
+        try module.verify();
+        var machine = x86_64_machine.MachineFunction.init("bad", module.functions.items[0].ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        const selection = try selector_impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+        try std.testing.expect(selection == .unsupported);
+        try std.testing.expectEqualStrings(case.detail, selection.unsupported.detail());
+    }
+}
+
 test "generic cfg selector keeps unsupported integer to FP shapes fail closed" {
     const Case = struct { ir_text: []const u8, tag: std.meta.Tag(inspection.Diagnostic), detail: []const u8 };
     const cases = [_]Case{

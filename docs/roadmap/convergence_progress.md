@@ -4385,6 +4385,19 @@ One line per completed cycle, append-only, newest last. This is the
   and narrow-integer-PHI contract. Evidence
   `docs/evidence/distribution_all_after_inbox53_phase3.summary`.
 
+- 2026-07-14 (this commit, INBOX-53 continuation phase 4 cycle 1) Direct
+  readonly-parameter i64/i96/i128 loads and exact signed/unsigned
+  i32/i64/i96/i128 conversion now clear all fixed EI switch cases. Wide
+  conversion uses one guard/sticky-aware rounding followed by exact binary
+  scaling; half composition has explicit no-double-rounding boundary proof.
+  Permanent executable and fail-closed canaries pass, and focused Tier 2 is
+  green at 24/24 steps and 1023/1023 tests. The report remains 443 / 278 / 165
+  with zero closures and exactly six advances to the common default-body
+  `composed-block-unknown-rhs` diagnostic. Continue with the approved Phase 4
+  cycle 2; cumulative Tier 3 remains deferred to the Phase 5 family boundary.
+  Evidence
+  `docs/evidence/std_debug_hello_inbox53_phase4_ei_fixed_cases.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

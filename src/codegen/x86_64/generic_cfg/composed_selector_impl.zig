@@ -172,6 +172,7 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
         const reg = ArgReg.fromIndex(gpr_index) catch return .{ .unsupported_value = "composed-block-param-reg" };
         if (param.ty == .ptr) {
             try selector.abi_pointer_params.put(param.name, {});
+            if (param.attrs) |attrs| if (hasAttrToken(attrs, "readonly")) try selector.readonly_pointer_params.put(param.name, {});
             try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg });
         } else {
             const bits = intBits(param.ty) orelse return .{ .no_emitter = "composed-block-param-not-scalar" };
@@ -189,6 +190,12 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
         gpr_index += 1;
     }
     return null;
+}
+
+fn hasAttrToken(attrs: []const u8, expected: []const u8) bool {
+    var tokens = std.mem.tokenizeAny(u8, attrs, " \t");
+    while (tokens.next()) |token| if (std.mem.eql(u8, token, expected)) return true;
+    return false;
 }
 
 fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {

@@ -120,6 +120,10 @@ pub const Instruction = union(enum) {
     and_eax_imm32: i32,
     abs_i32_edi_eax,
     abs_i64_rdi_rax,
+    wide_int_to_fp_rdi_rsi_xmm0: struct {
+        signed: bool,
+        to_bits: u16,
+    },
     clz_i128_rdi_rsi_eax,
     clz_i64_rdi_eax,
     clz_i32_edi_eax,
