@@ -37,6 +37,21 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
+INBOX-55 completes the read-only `compiler_rt.fma.fma` contract review from
+accepted commit `21aaf111`. The frozen body needs two bounded phases: exact
+`i11 {0,-1,default}` switch-owned edge stubs into the existing paired
+i32/i64 PHI-copy authority, with zero expected closures; then a type-driven
+normalized i52 operation set including `ctlz.i52`, with at most the one fma
+closure after a pinned-Zig bit-exact executable proof. Scalar copysign.f64,
+f64x2 insert/splat/arithmetic/extract, the later i32 switch, and the multiway
+PHIs already have accepted owners and must not be duplicated. The program is
+estimated at two Tier-3 boundaries. Because the serial 146-case preopt child
+uses about 562 seconds, roughly 41% of current full-gate wall time, the review
+recommends running the separately authorized preopt-sharding interlude before
+fma implementation. Stop for architectural review and user direction; neither
+fma nor sharding is authorized by this evidence commit. Evidence:
+`docs/evidence/inbox55_fma_architecture_contract.md`.
+
 INBOX-54 repairs the confirmed generated-index wrong-code in the accepted
 wide-division family. A local stack `i32` load wrote EAX without preserving an
 i64 value live only into a PHI edge; the shared load path now uses the existing

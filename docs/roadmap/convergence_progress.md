@@ -4447,6 +4447,19 @@ One line per completed cycle, append-only, newest last. This is the
   fma widening or preopt sharding. Evidence
   `docs/evidence/distribution_all_after_inbox53_phase5_ei_family.summary`.
 
+- 2026-07-15 (this commit, INBOX-55) The frozen `compiler_rt.fma.fma` body is
+  reviewed without selector changes or gate runs. Three identical named-i11
+  frexp switches need exact edge stubs into existing paired i32/i64 parallel
+  PHI copies; switch admission alone has zero expected closure. The next
+  missing typed family is normalized i52 equality/casts/shift/ctlz and its
+  modulo-i6 threshold comparison. Scalar copysign.f64, full-defined f64x2
+  arithmetic, the later i32 switch, and all scalar PHIs already have accepted
+  owners. The proposed two-phase program has at most one closure and two
+  Tier-3 boundaries. Stop for review; schedule the separately reviewed
+  preopt-sharding interlude first if authorized, because the serial preopt
+  child consumes about 562 seconds of each current full gate. Evidence
+  `docs/evidence/inbox55_fma_architecture_contract.md`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
