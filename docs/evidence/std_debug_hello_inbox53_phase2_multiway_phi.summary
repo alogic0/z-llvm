@@ -129,4 +129,3 @@ The committed implementation is `4fc11d68` with tree
 subgates. Phase 2 is accepted with zero closures and six advances. Stop for
 the Phase 3 exact EI entry-switch-edge review; no Phase 3 implementation is
 authorized by this record.
-
