@@ -6,25 +6,24 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-59 retention and headroom controls
+## INBOX-63 fail-closed selection atomicity repair
 
 | Field | Authoritative state |
 | --- | --- |
 | Accepted compiler-rt report | **443 selected / 285 emitting / 158 failing** |
-| Architecture decision | The [INBOX-57 selector/value-location/liveness ADR](evidence/inbox57_selector_value_liveness_adr.md) is **accepted with Reviewer amendments**. |
-| Proposed selector slices | **O0-O6 and X1 are proposed and unauthorized.** No slice may begin from the ADR or roadmap alone. |
-| Historical selector ledger | **165 composed / 17 legacy / 103 fallback** is historical acceptance accounting, pending O0 measurement. It is not the live route topology and must not drive implementation. |
-| Only authorized action | **INBOX-59 non-destructive retention inventory, policy, reporter, and report-only fixture through this commit.** No deletion, rename, rotation, pruning, sharding, or Tier 2/Tier 3/distribution gate is authorized. |
-| Cleanup state | **Unauthorized.** The would-remove manifest is a proposal only and requires explicit user authorization before any cleanup. |
-| Headroom state | **Not ready for sharding.** Current and projected post-cleanup free space do not satisfy the ten-percent floor plus the conservative 16 GiB peak. |
-| Terminal state | Stop after the report-only deliverables and request review plus explicit user authorization before cleanup. No successor becomes authorized automatically. |
+| Architecture decision | The [INBOX-57 selector/value-location/liveness ADR](evidence/inbox57_selector_value_liveness_adr.md) is **accepted with Reviewer amendments**; the [x87/fp128 ABI contract](evidence/inbox61_x87_fp128_abi_contract.md) is **accepted with Reviewer amendments**. |
+| Correctness finding | The INBOX-62 O0 atomicity snapshot exposed a **fail-closed selection leak**: on unsupported composed speculation the wrappers restore only `instructions.items.len`, leaking `owned_labels` and `entry_xmm_defined_bits`. Evidence: [atomicity stop](evidence/inbox62_selection_atomicity_stop.md). |
+| Only authorized action | **INBOX-63 fail-closed selection atomicity repair.** One transaction authority snapshots/restores instructions, `owned_labels` (speculative-only free), `entry_xmm_defined_bits`, `codegen_path`, and future owner state; rolls back on unsupported results and mapped errors; commits only on success. No `selection_owner`, owner manifest, capability admission, or row movement. |
+| Headroom / gate policy | **Serial Tier 3 is available** at current headroom under the revised [two-class retention/headroom policy](retention_headroom_policy.md) (serial required ~57.7 GB vs ~90 GB free). **Parallel sharding remains deferred** (needs ~115.4 GB). |
+| Acceptance | Exact 443/285/158, byte-identical accepted objects, strengthened Tier 2, and **one serial Tier 3** (repairs a confirmed shared selector correctness invariant). |
+| Terminal state | Stop after the repair is accepted and request review. O0 restarts only after this repair is accepted; O1, other O-slices, X1 implementation stages, and sharding remain unauthorized. |
 
-The post-compaction sequence remains an agreed sequence, not permission to
-start it: retention limits plus disk-headroom controls, then bounded preopt
-sharding, then the minimal ABI differential harness. The ABI harness must exist
-before O1 can be considered. O0 also remains a proposed prerequisite under the
-accepted ADR. Retention, sharding, the ABI harness, O0-O6, X1, and every later
-checkpoint step require a new explicit directive.
+Agreed sequence after this repair (each still needs its own directive): O0
+route observability, then O1 accumulator-definition transaction, then O2
+ordinary GPR/pointer materialization; the ABI differential harness promotion
+(a separate gate-infrastructure change) and the x87/fp128 X1 stages proceed
+under serial Tier 3; preopt sharding stays deferred under the higher parallel
+readiness bar until non-z_llvm disk is freed or a further reviewed revision.
 
 ## Current handoff and evidence
 

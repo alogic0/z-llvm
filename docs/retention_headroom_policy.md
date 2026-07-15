@@ -10,37 +10,67 @@ not authorize deletion, rename, rotation, pruning, sharding, or a gate run.
 Every cleanup requires a separate explicit user authorization after review of
 the current live-pin and would-remove manifests.
 
-## Sharding readiness
+## Readiness classes (revised 2026-07-15, user-directed)
 
-Sharding may start only when a fresh filesystem observation satisfies:
+There are two independent readiness classes. Serial single-process Tier 3 and
+parallel sharding have different storage risk and therefore different
+thresholds. A fresh `df` and a report-only retention inventory precede either.
+The policy reports six fields: `serial_ready`, `serial_required_start`,
+`serial_projected_peak`, `sharding_ready`, `sharding_required_start`,
+`sharding_projected_peak`.
+
+### Serial Tier-3 readiness
+
+A single-process serial `distribution-all` may start when a fresh observation
+satisfies:
 
 ```text
-starting free bytes >= ceil(filesystem bytes / 10) + projected sharding peak
+serial_retention_reserve = max(32 GiB, ceil(filesystem_size / 20))
+serial_start_required     = serial_retention_reserve + projected_serial_incremental_peak
+starting free bytes      >= serial_start_required
 ```
 
-The ten-percent floor must remain free at the projected peak; merely reaching
-the floor before starting is insufficient. Until a measured sharding run
-replaces it, the conservative incremental peak is **16 GiB**: at most four
-bounded shards, each with a 4 GiB scratch envelope. The per-shard envelope is
-the current healthy three-mode AIR-export footprint (about 4.01 GB) rounded
-up. A design proposing more concurrency or a larger shard must raise the peak
-before it can be considered ready.
+For the current filesystem the retention reserve is about 49.1 GB (5%) and the
+provisional serial incremental peak is **8 GiB** (about 4 GiB for one AIR
+generation / cache-miss footprint plus about 4 GiB for serial scratch and
+temporary duplication), so `serial_start_required` is about 57.7 GB. Current
+free space is about 90-93 GB: **serial-ready**. The INBOX-56 fma cumulative
+Tier 3 completed cleanly at this level, proving feasibility for the present
+topology; it did not measure high-water disk use, so the next serial Tier 3
+records free space before each subgate and the minimum observed free, then
+replaces the provisional 8 GiB with
+`max(measured_serial_peak * 1.25, measured_serial_peak + 4 GiB)`.
 
-At the INBOX-59 observation:
+Serial operating rules:
 
-- filesystem size: `982240026624` bytes;
-- free space: `93332955136` bytes;
-- ten-percent floor: `98224002663` bytes;
-- projected peak: `17179869184` bytes;
-- required starting free space: `115403871847` bytes.
+- only one Tier-3 process at a time; no concurrent sharding, AIR export,
+  patched-Zig rebuild, or other cache producer;
+- fresh `df` plus a report-only retention inventory before starting;
+- a tmp soft-limit excess remains a warning, not an automatic blocker;
+- if free space falls below the retention reserve, do not start another child
+  subgate and fail closed;
+- a cache-pin or topology change expected to create extra generations must
+  raise the projected peak before launch;
+- no cleanup is authorized implicitly.
 
-The system is **not ready for sharding**. The would-remove manifest estimates
-`2795765275` logical bytes as candidates, yielding projected free space of
-`96128720411` bytes after cleanup and `78948851227` bytes after the peak. Even
-that optimistic cleanup projection remains `19275151436` bytes short of the
-required starting headroom. Logical sizes can overstate filesystem blocks
-actually reclaimed, so readiness must always use a fresh `df` after an
-authorized cleanup, never the projection alone.
+One successful run proves feasibility for the present topology, not unlimited
+safety; each serial gate needs its own fresh preflight.
+
+### Parallel sharding readiness
+
+Parallel sharding retains the stronger condition and remains **deferred**:
+
+```text
+starting free bytes >= ceil(filesystem_size / 10) + projected_sharding_peak
+```
+
+The ten-percent floor (about 98.2 GB) must remain free at the projected peak;
+merely reaching it before starting is insufficient. The provisional parallel
+peak is **16 GiB** (at most four bounded shards, each a ~4 GiB envelope from the
+healthy three-mode AIR-export footprint), so `sharding_required_start` is about
+115.4 GB. Current free (~90-93 GB) is below that, so **sharding is not ready**;
+z_llvm-owned reclaimable (~2.8 GB) cannot close the gap. Freeing non-z_llvm
+space or a further reviewed revision is required before sharding.
 
 ## Per-INBOX and per-run `tmp/`
 

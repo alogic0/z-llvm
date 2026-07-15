@@ -341,9 +341,12 @@ retained as the reviewed decision record.
    model - changes ABI classification, register classes, call boundaries, or
    verifier state, so stage acceptance requires Tier 3 under
    `docs/validation_tiers.md`. Tier 3 is not optional merely because
-   distribution counters are unchanged. Current disk headroom therefore blocks
-   acceptance of X1-A and every later stage; focused development may still use
-   Tier 1/Tier 2.
+   distribution counters are unchanged. Tier-3 execution is governed by the
+   serial-gate threshold in `docs/retention_headroom_policy.md`, NOT the
+   parallel-sharding threshold (revised 2026-07-15): serial `distribution-all`
+   Tier 3 is available at the current headroom, so X1-A and later stages may be
+   accepted via serial Tier 3; focused development may still use Tier 1/Tier 2.
+   Only parallel sharding remains deferred.
 2. Harness-promotion inheritance. The executable differential strategy inherits
    the accepted INBOX-60 promotion requirements: an audited real-row cohort; a
    hook-produced object/build-identity manifest; exact symbol section, size,
