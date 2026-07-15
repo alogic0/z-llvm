@@ -110,6 +110,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.ctpop.i64")) return try lowerCtpop(selector, result, call, 64);
     if (std.mem.eql(u8, call.callee, "llvm.ctpop.i128")) return try lowerCtpop(selector, result, call, 128);
+    if (std.mem.eql(u8, call.callee, "llvm.usub.sat.i64")) return try lowerUsubSatI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.bswap.i128")) return try lowerBitPermutation(selector, result, call, 128, .byte_swap);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) return try lowerBitPermutation(selector, result, call, 64, .bit_reverse);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i128")) return try lowerBitPermutation(selector, result, call, 128, .bit_reverse);
@@ -152,6 +153,39 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         128 => {},
         else => unreachable,
     };
+    return null;
+}
+
+pub fn lowerUsubSatI64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-usub-sat-result" };
+    if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        !isDefaultOrFastcc(call.calling_conv) or call.raw_args != null or call.operand_bundle != null or
+        call.args.items.len != 2 or !call.ret_ty.eql(.{ .int = 64 }))
+    {
+        return .{ .no_emitter = "composed-block-usub-sat-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) {
+            return .{ .no_emitter = "composed-block-usub-sat-tail" };
+        }
+    }
+    const lhs = call.args.items[0];
+    const rhs = call.args.items[1];
+    if (!lhs.ty.eql(.{ .int = 64 }) or lhs.value != .named or
+        !rhs.ty.eql(.{ .int = 64 }) or rhs.value != .int or rhs.value.int < 0)
+    {
+        return .{ .no_emitter = "composed-block-usub-sat-args" };
+    }
+    if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, lhs.value)) |diagnostic| return diagnostic;
+    selector_state.emitValueIntoRax(selector, lhs.value) catch return .{ .unsupported_value = "composed-block-usub-sat-lhs" };
+    try selector_state.clobberArgReg(selector, .rcx);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs.value.int) });
+    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+    const no_borrow = try selector_state.allocateEdgeLabel(selector);
+    try selector.machine.instructions.append(selector.allocator, .{ .jae = no_borrow });
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = 0 });
+    try selector.machine.instructions.append(selector.allocator, .{ .label = no_borrow });
+    try selector_state.bindRax(selector, result_name);
     return null;
 }
 

@@ -98,8 +98,11 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
     if (selector_state.resolveValue(selector, load.ptr)) |ptr| if (ptr == .readonly_table_ptr)
         return lowerReadOnlyTableLoad(selector, result_name, load, ptr.readonly_table_ptr);
     if (load.ptr == .named and selector.readonly_pointer_params.contains(load.ptr.named)) {
-        if (intBits(load.ty)) |bits| if (bits == 64 or bits == 96 or bits == 128)
-            return lowerReadOnlyPointerIntegerLoad(selector, result_name, load, bits);
+        if (intBits(load.ty)) |bits| {
+            const exact_ei = if (selector.function) |function| stage2_planning.isExactEiScalarFamily(function.*) else false;
+            if (exact_ei or bits == 64 or bits == 96 or bits == 128)
+                return lowerReadOnlyPointerIntegerLoad(selector, result_name, load, bits);
+        }
     }
     if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
@@ -232,12 +235,38 @@ fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name
         else => return .{ .no_emitter = "composed-block-load-readonly-param-provenance" },
     };
     try selector_state.clobberAccumulator(selector);
+    if (bits == 8 or bits == 16 or bits == 32) {
+        try selector.machine.instructions.append(selector.allocator, switch (bits) {
+            8 => .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = ptr_reg, .offset = 0 } },
+            16 => .{ .load_arg_ptr_disp8_u16_eax = .{ .reg = ptr_reg, .offset = 0 } },
+            32 => .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 0 } },
+            else => unreachable,
+        });
+        try selector_state.bindEax(selector, result_name);
+        return null;
+    }
+    if (bits == 56) {
+        const scratch: ArgReg = if (ptr_reg == .rcx) .r8 else .rcx;
+        try selector_state.clobberArgReg(selector, scratch);
+        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_u16_eax = .{ .reg = ptr_reg, .offset = 4 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .shl_rax_imm6 = 32 });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = scratch });
+        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = ptr_reg, .offset = 6 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .shl_rax_imm6 = 48 });
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = scratch } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = scratch });
+        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 0 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = scratch } });
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
     if (bits == 64) {
         try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 } });
         try selector_state.bindRax(selector, result_name);
         return null;
     }
 
+    if (bits != 96 and bits != 128) return .{ .no_emitter = "composed-block-load-width" };
     const pair = selector_state.choosePairScratchForClobber(selector, null) orelse
         return .{ .no_spill_envelope = "composed-block-load-readonly-param-pair" };
     if (pair.contains(ptr_reg)) {
@@ -439,8 +468,18 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (gep.ptr == .named and std.mem.startsWith(u8, gep.ptr.named, "@"))
         return try lowerReadOnlyTableGep(selector, result_name, gep);
-    if (isBytePointerSource(gep.source_ty)) return try lowerBytePointerGep(selector, result_name, gep);
-    if (isI32ElementPointerSource(gep.source_ty)) return try lowerI32ElementPointerGep(selector, result_name, gep);
+    const exact_ei = if (selector.function) |function| stage2_planning.isExactEiScalarFamily(function.*) else false;
+    const readonly_base = exact_ei and gep.ptr == .named and selector.readonly_pointer_params.contains(gep.ptr.named);
+    if (isBytePointerSource(gep.source_ty)) {
+        const diagnostic = try lowerBytePointerGep(selector, result_name, gep);
+        if (diagnostic == null and readonly_base) try selector.readonly_pointer_params.put(result_name, {});
+        return diagnostic;
+    }
+    if (isI32ElementPointerSource(gep.source_ty)) {
+        const diagnostic = try lowerI32ElementPointerGep(selector, result_name, gep);
+        if (diagnostic == null and readonly_base) try selector.readonly_pointer_params.put(result_name, {});
+        return diagnostic;
+    }
     const len = parseI32ArrayType(gep.source_ty) orelse return .{ .no_emitter = "composed-block-gep-source" };
     const base = selector_state.resolveValue(selector, gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
     const stack_array = switch (base) {

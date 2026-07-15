@@ -4414,6 +4414,18 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/std_debug_hello_inbox53_intbytesize_p0.summary` and
   `docs/evidence/distribution_all_after_inbox53_intbytesize_p0.summary`.
 
+- 2026-07-14 (this commit, INBOX-53 continuation phase 4 cycle 2) The exact
+  EI `(readonly ptr, i64) -> half|float|double` family now plans simple scalar
+  self-loop forward values through the existing allocation and parallel
+  PHI-copy authorities, and admits only its captured readonly derived loads,
+  odd-width scalar operations/comparisons, saturating subtraction, and exact
+  i13/i14 half composition. The six extracted rows pass 78/78 frozen bit
+  checks. Tier 2 passes 24/24 steps and 1026/1026 tests. The report moves
+  exactly to 443 / 284 / 159, provisionally closing the six EI-to-FP rows
+  with no collateral movement. Run the family's one cumulative Tier 3 in
+  Phase 5 before accepting the closures, then re-rank `fma`. Evidence
+  `docs/evidence/std_debug_hello_inbox53_phase4_ei_default_bodies.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

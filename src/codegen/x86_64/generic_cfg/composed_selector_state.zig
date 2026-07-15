@@ -245,6 +245,7 @@ pub fn plannedResultLoc(selector: *const ComposedBlockSelector, name: []const u8
         },
     };
     const target = planned orelse return null;
+    if (plan.forwardValue(name) != null) return target;
     if (std.meta.activeTag(target) == .spill64 or std.meta.activeTag(target) == .spill128 or std.meta.activeTag(target) == .spill_fp or std.meta.activeTag(target) == .spill_vector) return target;
     if (valueLocEql(actual, target)) return target;
     return if (selector.enable_expired_plan_register_reuse and selector.expired_binding_this_position and targetLocHasOnlyExpiredConflicts(selector, target)) target else null;
@@ -1684,7 +1685,7 @@ pub fn resolvePairValue(selector: *const ComposedBlockSelector, value: ir.Value)
 pub fn resolveValue(selector: *const ComposedBlockSelector, value: ir.Value) ?ValueLoc {
     return switch (value) {
         .named => |name| {
-            const loc = valueLoc(selector, name) orelse return null;
+            const loc = valueLoc(selector, name) orelse resolveForwardValue(selector, name) orelse return null;
             return switch (loc) {
                 .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm => loc,
                 .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .spill64, .spill128, .spill_fp, .spill_vector => loc,
@@ -1692,5 +1693,23 @@ pub fn resolveValue(selector: *const ComposedBlockSelector, value: ir.Value) ?Va
             };
         },
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+    };
+}
+
+fn resolveForwardValue(selector: *const ComposedBlockSelector, name: []const u8) ?ValueLoc {
+    const plan = selector.allocation_plan orelse return null;
+    const forward = plan.forwardValue(name) orelse return null;
+    if (selector.current_position >= forward.definition_position) return null;
+    return switch (plan.assignment(name) orelse return null) {
+        .gpr32 => |reg| if (forward.metadata.class == .gpr32) .{ .scratch32 = reg } else null,
+        .gpr64 => |reg| if (forward.metadata.class == .gpr64) .{ .scratch64 = reg } else null,
+        .spill => |index| switch (forward.metadata.class) {
+            .gpr32, .gpr64 => if (spillFrameIndexMaybe(index)) |frame_index|
+                if (frameIndexFitsFrame(selector, frame_index)) .{ .spill64 = frame_index } else null
+            else
+                null,
+            .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .aggregate_sse, .stack_object, .stack_pointer => null,
+        },
+        .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer => null,
     };
 }

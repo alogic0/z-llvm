@@ -339,6 +339,12 @@ pub const SelectorValueInterval = struct {
     bits: u16,
     start: usize,
     end: usize,
+    earliest_use: ?usize = null,
+};
+
+pub const ForwardValuePlan = struct {
+    definition_position: usize,
+    metadata: VirtualRegMetadata,
 };
 
 pub const PlannedValueAssignment = union(enum) {
@@ -358,6 +364,7 @@ pub const SelectorAllocationPlan = struct {
     allocator: std.mem.Allocator,
     assignments: std.StringHashMap(PlannedValueAssignment),
     interval_ends: std.StringHashMap(usize),
+    forward_values: std.StringHashMap(ForwardValuePlan),
     preservation_values: std.StringHashMap(void),
     spill_slots: usize = 0,
     preservation_spill_slots: usize = 0,
@@ -368,12 +375,14 @@ pub const SelectorAllocationPlan = struct {
             .allocator = allocator,
             .assignments = std.StringHashMap(PlannedValueAssignment).init(allocator),
             .interval_ends = std.StringHashMap(usize).init(allocator),
+            .forward_values = std.StringHashMap(ForwardValuePlan).init(allocator),
             .preservation_values = std.StringHashMap(void).init(allocator),
         };
     }
 
     pub fn deinit(plan: *SelectorAllocationPlan) void {
         plan.preservation_values.deinit();
+        plan.forward_values.deinit();
         plan.interval_ends.deinit();
         plan.assignments.deinit();
     }
@@ -384,6 +393,10 @@ pub const SelectorAllocationPlan = struct {
 
     pub fn intervalEnd(plan: SelectorAllocationPlan, name: []const u8) ?usize {
         return plan.interval_ends.get(name);
+    }
+
+    pub fn forwardValue(plan: SelectorAllocationPlan, name: []const u8) ?ForwardValuePlan {
+        return plan.forward_values.get(name);
     }
 };
 
@@ -413,6 +426,10 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
 
     var preservation_barrier_positions: std.ArrayList(usize) = .empty;
     defer preservation_barrier_positions.deinit(allocator);
+
+    var simple_loop_backedge_values = NameSet.init(allocator);
+    defer simple_loop_backedge_values.deinit();
+    const admit_simple_loop_forward_values = isExactEiScalarFamily(function);
 
     var position: usize = 0;
     for (function.params.items) |param| {
@@ -446,6 +463,12 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             var uses = NameSet.init(allocator);
             defer uses.deinit();
             if (instruction.kind == .phi) {
+                if (admit_simple_loop_forward_values and isSimpleScalarSelfLoopPhi(block, instruction.kind.phi)) {
+                    for (instruction.kind.phi.incoming.items) |incoming| {
+                        if (!std.mem.eql(u8, incoming.block, block.name)) continue;
+                        if (namedValue(incoming.value)) |name| try simple_loop_backedge_values.put(name, {});
+                    }
+                }
                 for (instruction.kind.phi.incoming.items) |incoming| {
                     var incoming_use = NameSet.init(allocator);
                     defer incoming_use.deinit();
@@ -475,9 +498,78 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
         try recordSelectorIntervalUses(intervals.items, interval_indexes, block.live_out, terminator_positions.items[block_index]);
     }
 
+    var forward_values = std.StringHashMap(ForwardValuePlan).init(allocator);
+    defer forward_values.deinit();
+    var candidate_it = simple_loop_backedge_values.iterator();
+    while (candidate_it.next()) |entry| {
+        const index = interval_indexes.get(entry.key_ptr.*) orelse return error.UnsupportedCodegenValue;
+        const interval = &intervals.items[index];
+        const earliest_use = interval.earliest_use orelse continue;
+        if (earliest_use >= interval.start) continue;
+        try forward_values.put(interval.name, .{
+            .definition_position = interval.start,
+            .metadata = .{ .class = interval.class, .bits = interval.bits },
+        });
+        interval.start = earliest_use;
+    }
+
     var plan = try allocateSelectorIntervals(allocator, intervals.items);
+    var forward_it = forward_values.iterator();
+    while (forward_it.next()) |entry| try plan.forward_values.put(entry.key_ptr.*, entry.value_ptr.*);
     try recordPreservationDemands(&plan, intervals.items, preservation_barrier_positions.items);
     return plan;
+}
+
+pub fn isExactEiScalarFamily(function: ir.Function) bool {
+    if (function.blocks.items.len == 0 or
+        (!function.ret_ty.eql(.half) and !function.ret_ty.eql(.float) and !function.ret_ty.eql(.double))) return false;
+    if (function.params.items.len != 2 or function.params.items[0].ty != .ptr or
+        !function.params.items[1].ty.eql(.{ .int = 64 })) return false;
+    const pointer_attrs = function.params.items[0].attrs orelse return false;
+    if (!hasAttrToken(pointer_attrs, "readonly")) return false;
+    const entry_switch = switch (function.blocks.items[0].terminator orelse return false) {
+        .@"switch" => |switch_term| switch_term,
+        else => return false,
+    };
+    if (!entry_switch.cond_ty.eql(.{ .int = 16 }) or entry_switch.cases.items.len != 5) return false;
+    var seen: [5]bool = .{ false, false, false, false, false };
+    for (entry_switch.cases.items) |case| {
+        if (!case.value_ty.eql(.{ .int = 16 }) or case.value != .int or case.value.int < 0 or case.value.int > 4) return false;
+        const index: usize = @intCast(case.value.int);
+        if (seen[index]) return false;
+        seen[index] = true;
+    }
+    var switch_count: usize = 0;
+    for (function.blocks.items) |block| switch (block.terminator orelse return false) {
+        .@"switch" => switch_count += 1,
+        .indirectbr => return false,
+        .ret, .br, .condbr, .@"unreachable" => {},
+    };
+    return switch_count == 1;
+}
+
+fn hasAttrToken(attrs: []const u8, expected: []const u8) bool {
+    var tokens = std.mem.tokenizeAny(u8, attrs, " \t");
+    while (tokens.next()) |token| if (std.mem.eql(u8, token, expected)) return true;
+    return false;
+}
+
+fn isSimpleScalarSelfLoopPhi(block: ir.BasicBlock, phi: ir.PhiInst) bool {
+    if (phi.incoming.items.len != 2) return false;
+    const metadata = selectorValueMetadata(phi.ty) orelse return false;
+    if (metadata.class != .gpr32 and metadata.class != .gpr64) return false;
+    const condbr = switch (block.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    const then_self = std.mem.eql(u8, condbr.then_target, block.name);
+    const else_self = std.mem.eql(u8, condbr.else_target, block.name);
+    if (then_self == else_self) return false;
+    var self_incoming: usize = 0;
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, block.name)) self_incoming += 1;
+    }
+    return self_incoming == 1;
 }
 
 fn callRequiresPreservationFrame(call: ir.CallInst) bool {
@@ -586,6 +678,7 @@ fn recordSelectorIntervalDef(
         .bits = metadata.bits,
         .start = position,
         .end = position,
+        .earliest_use = null,
     });
     try interval_indexes.put(name, index);
 }
@@ -599,6 +692,11 @@ fn recordSelectorIntervalUses(
     var it = uses.iterator();
     while (it.next()) |entry| {
         const index = interval_indexes.get(entry.key_ptr.*) orelse return error.UnsupportedCodegenValue;
+        if (intervals[index].earliest_use) |earliest| {
+            intervals[index].earliest_use = @min(earliest, position);
+        } else {
+            intervals[index].earliest_use = position;
+        }
         intervals[index].end = @max(intervals[index].end, position);
     }
 }

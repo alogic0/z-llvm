@@ -5,6 +5,7 @@ const selector_frame = @import("composed_selector_frame.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_types = @import("selector_types.zig");
 const state_data = @import("composed_selector_state_data.zig");
+const stage2_planning = @import("stage2_planning.zig");
 
 const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const Diagnostic = inspection.Diagnostic;
@@ -18,7 +19,11 @@ pub fn lowerIntToFpCast(selector: *ComposedBlockSelector, result: ?[]const u8, c
     const from_bits = intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-int-fp-from-type" };
     const to_half = cast.to_ty == .half;
     const to_bits: u16 = if (cast.to_ty == .half or cast.to_ty == .float) 32 else if (cast.to_ty == .double) 64 else return .{ .no_emitter = "composed-int-fp-to-type" };
-    if (to_half and from_bits != 32 and from_bits != 64 and from_bits != 96 and from_bits != 128)
+    const exact_ei_half_narrow = if (selector.function) |function|
+        stage2_planning.isExactEiScalarFamily(function.*) and (from_bits == 13 or from_bits == 14)
+    else
+        false;
+    if (to_half and from_bits != 32 and from_bits != 64 and from_bits != 96 and from_bits != 128 and !exact_ei_half_narrow)
         return .{ .no_emitter = "composed-int-fp-half-width" };
     if ((from_bits < 8 or from_bits > 64) and from_bits != 96 and from_bits != 128)
         return .{ .no_emitter = "composed-int-fp-width" };

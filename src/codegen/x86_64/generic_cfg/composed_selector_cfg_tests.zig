@@ -25,6 +25,58 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+test "exact EI scalar family requires readonly pointer and i64 width" {
+    const input =
+        \\define double @exact(ptr readonly %input, i64 %bits) {
+        \\entry:
+        \\  %key = trunc i64 %bits to i16
+        \\  switch i16 %key, label %done [
+        \\    i16 0, label %done
+        \\    i16 1, label %done
+        \\    i16 2, label %done
+        \\    i16 3, label %done
+        \\    i16 4, label %done
+        \\  ]
+        \\done:
+        \\  ret double 0.000000e+00
+        \\}
+        \\define double @mutable(ptr %input, i64 %bits) {
+        \\entry:
+        \\  %key = trunc i64 %bits to i16
+        \\  switch i16 %key, label %done [
+        \\    i16 0, label %done
+        \\    i16 1, label %done
+        \\    i16 2, label %done
+        \\    i16 3, label %done
+        \\    i16 4, label %done
+        \\  ]
+        \\done:
+        \\  ret double 0.000000e+00
+        \\}
+        \\define double @wrong_width(ptr readonly %input, i32 %bits) {
+        \\entry:
+        \\  %key = trunc i32 %bits to i16
+        \\  switch i16 %key, label %done [
+        \\    i16 0, label %done
+        \\    i16 1, label %done
+        \\    i16 2, label %done
+        \\    i16 3, label %done
+        \\    i16 4, label %done
+        \\  ]
+        \\done:
+        \\  ret double 0.000000e+00
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expect(stage2_planning.isExactEiScalarFamily(module.functions.items[0]));
+    try std.testing.expect(!stage2_planning.isExactEiScalarFamily(module.functions.items[1]));
+    try std.testing.expect(!stage2_planning.isExactEiScalarFamily(module.functions.items[2]));
+}
+
 test "generic cfg selector preserves scalar half ABI values exactly" {
     const input =
         \\define half @identity(half %value) {

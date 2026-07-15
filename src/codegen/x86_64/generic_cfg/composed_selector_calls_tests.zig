@@ -48,6 +48,47 @@ test "generic cfg selector lowers lifetime markers as checked no-ops" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "generic cfg selector lowers exact i64 unsigned saturating subtraction" {
+    var machine = MachineFunction.init("usub-sat-i64", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rdi });
+
+    var call = ir.CallInst{
+        .ret_ty = .{ .int = 64 },
+        .callee = "llvm.usub.sat.i64",
+        .tail_kind = "tail",
+        .args = .empty,
+    };
+    defer call.deinit(std.testing.allocator);
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = "value" } });
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 55 } });
+
+    try std.testing.expect((try selector_calls.lowerCall(&selector, "difference", call)) == null);
+    try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "difference").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_rax = .rdi },
+        .{ .mov_imm_rcx = 55 },
+        .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } },
+    }, machine.instructions.items[0..3]);
+    try std.testing.expectEqualStrings("__zllvm_edge_0", machine.instructions.items[3].jae);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_imm_rax = 0 }, machine.instructions.items[4]);
+    try std.testing.expectEqualStrings("__zllvm_edge_0", machine.instructions.items[5].label);
+
+    var bad = ir.CallInst{
+        .ret_ty = .{ .int = 64 },
+        .callee = "llvm.usub.sat.i64",
+        .args = .empty,
+    };
+    defer bad.deinit(std.testing.allocator);
+    try bad.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = "value" } });
+    try bad.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = "other" } });
+    const diagnostic = (try selector_calls.lowerCall(&selector, "bad", bad)).?;
+    try std.testing.expectEqualStrings("composed-block-usub-sat-args", diagnostic.detail());
+}
+
 test "generic cfg selector normalizes narrow intByteSize call results" {
     const input =
         \\declare fastcc i16 @zig.target.intByteSize(i16)

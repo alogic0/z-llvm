@@ -87,7 +87,9 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         if (binary.op != .@"and" or !valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
         return try lowerBinaryImmediateRhs(selector, result_name, binary);
     }
-    if (bits != 6 and bits != 7 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-binary-width" };
+    const exact_ei_narrow = isExactEiNarrowBits(selector, bits);
+    if (bits != 6 and bits != 7 and bits != 16 and bits != 32 and bits != 64 and bits != 128 and !exact_ei_narrow)
+        return .{ .no_emitter = "composed-block-binary-width" };
 
     if (valueIsInt(binary.rhs)) {
         return try lowerBinaryImmediateRhs(selector, result_name, binary);
@@ -111,7 +113,7 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         try selector_state.bindEax(selector, result_name);
         return null;
     }
-    if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and (bits == 16 or bits == 32)) {
+    if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and (bits == 16 or bits == 32 or (exact_ei_narrow and bits < 32))) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
         try selector_state.emitValueIntoEax(selector, binary.lhs);
         try selector.machine.instructions.append(selector.allocator, switch (binary.op) {
@@ -123,16 +125,25 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         try selector_state.bindEax(selector, result_name);
         return null;
     }
-    if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and bits == 64) {
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+    if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and (bits == 64 or (exact_ei_narrow and bits > 32))) {
+        selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-ei-shift-rhs" };
         if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-        try selector_state.emitValueIntoRax(selector, binary.lhs);
+        selector_state.emitValueIntoRax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-ei-shift-lhs" };
         try selector.machine.instructions.append(selector.allocator, switch (binary.op) {
             .shl => .shl_rax_cl,
             .lshr => .shr_rax_cl,
             .ashr => .sar_rax_cl,
             else => unreachable,
         });
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
+    if (exact_ei_narrow and bits > 32) {
+        const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
+        selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-ei-binary-rhs" };
+        if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
+        selector_state.emitValueIntoRax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-ei-binary-lhs" };
+        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = op, .reg = .rcx } });
         try selector_state.bindRax(selector, result_name);
         return null;
     }
@@ -173,9 +184,9 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         try selector_state.emitValueIntoAccumulator(selector, binary.lhs, bits);
         const rhs_reg: ArgReg = switch (rhs) {
             .arg32, .scratch32 => |reg| if (bits <= 32) reg else return .{ .no_emitter = "composed-block-rhs-i32-for-i64" },
-            .arg64, .scratch64 => |reg| if (bits == 64) reg else return .{ .no_emitter = "composed-block-rhs-i64-for-i32" },
+            .arg64, .scratch64 => |reg| if (bits == 64 or (exact_ei_narrow and bits > 32)) reg else return .{ .no_emitter = "composed-block-rhs-i64-for-i32" },
             .arg128, .scratch128 => return .{ .no_emitter = "composed-block-rhs-width" },
-            .spill64 => |frame_index| if (bits == 64) blk: {
+            .spill64 => |frame_index| if (bits == 64 or (exact_ei_narrow and bits > 32)) blk: {
                 try selector_state.clobberArgReg(selector, .rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
                 break :blk .rcx;
@@ -738,14 +749,29 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
                 try selector_state.bindPairScratch(selector, result_name, dst);
                 return null;
             }
-            if (from_bits > 32 or (to_bits > 32 and to_bits != 64)) return .{ .no_emitter = "composed-block-zext-width" };
+            const exact_ei_narrow = isExactEiNarrowBits(selector, from_bits) or isExactEiNarrowBits(selector, to_bits);
+            if (from_bits > 32) {
+                if (!exact_ei_narrow or to_bits > 64) return .{ .no_emitter = "composed-block-zext-width" };
+                try selector_state.emitValueIntoRax(selector, cast.value);
+                const mask: u64 = (@as(u64, 1) << @intCast(from_bits)) - 1;
+                try selector_state.clobberArgReg(selector, .rcx);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = @bitCast(mask) });
+                try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
+                try selector_state.bindAccumulator(selector, result_name, to_bits);
+                return null;
+            }
+            if (to_bits > 32 and to_bits != 64 and !exact_ei_narrow) return .{ .no_emitter = "composed-block-zext-width" };
             try selector_state.emitValueIntoEax(selector, cast.value);
             if (from_bits < 32) {
                 const shift: u5 = @intCast(from_bits);
                 const mask = (@as(i32, 1) << shift) - 1;
                 try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = mask });
             }
-            try selector_state.bindAccumulator(selector, result_name, to_bits);
+            if (to_bits > 32) {
+                try selector_state.bindRax(selector, result_name);
+            } else {
+                try selector_state.bindEax(selector, result_name);
+            }
         },
         .sext => {
             if (from_bits != 32 or to_bits != 64) return .{ .no_emitter = "composed-block-sext-width" };
@@ -768,6 +794,15 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
         else => return .{ .no_emitter = "composed-block-cast-op" },
     }
     return null;
+}
+
+pub fn isExactEiNarrowBits(selector: *const ComposedBlockSelector, bits: u16) bool {
+    const function = selector.function orelse return false;
+    if (!stage2_planning.isExactEiScalarFamily(function.*)) return false;
+    return switch (bits) {
+        3, 4, 5, 13, 14, 26, 27, 55, 56 => true,
+        else => false,
+    };
 }
 
 pub fn lowerFreeze(selector: *ComposedBlockSelector, result: ?[]const u8, freeze: ir.FreezeInst) !?Diagnostic {

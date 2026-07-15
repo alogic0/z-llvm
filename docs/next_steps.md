@@ -37,7 +37,16 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-The INBOX-53 phase-4 cycle-2 audit found and repaired a standalone P0 in the
+INBOX-53 Phase 4 cycle 2 is provisionally complete. Exact EI loop-forward
+planning and captured readonly/narrow scalar forms close all six EI-to-FP
+rows, moving the report to 443 / 284 / 159 with no collateral movement. The
+extracted object passes 78/78 frozen bit checks and Tier 2 passes 24/24 steps
+with 1026/1026 tests. Begin Phase 5 with the family's one cumulative Tier 3,
+then re-rank `fma` against the refreshed frontier; no fma widening is yet
+authorized. Evidence:
+`docs/evidence/std_debug_hello_inbox53_phase4_ei_default_bodies.summary`.
+
+The phase-4 cycle-2 audit found and repaired a standalone P0 in the
 specialized `zig.target.intByteSize` call path: i16 returns were consumed with
 undefined upper EAX bits. The permanent hostile-return canary passes. The
 audit hit previously accepted `__udivei5` and `__umodei4`, whose historical
@@ -46,8 +55,9 @@ passes after the repair, but a general division case exposes a separate
 pre-existing generated-index miscompile. Both historical semantic closures
 remain invalidated pending that separate repair; do not count this P0 as
 their re-acceptance. The standalone immediate Tier 3 passes all 17 subgates
-against staged tree `6a2fb4a2b42f53f198aa67835b0239c26d3ea2a0`. Commit the
-P0, then restore and complete the preserved Phase 4 cycle-2 work. Evidence:
+against staged tree `6a2fb4a2b42f53f198aa67835b0239c26d3ea2a0`. The P0 is
+commit `17e01194`; its general-division defect remains separate from the Phase
+4 closures. Evidence:
 `docs/evidence/std_debug_hello_inbox53_intbytesize_p0.summary` and
 `docs/evidence/distribution_all_after_inbox53_intbytesize_p0.summary`.
 

@@ -3,6 +3,7 @@ const ir = @import("../../../ir.zig");
 const x86_64_types = @import("../types.zig");
 const inspection = @import("inspection.zig");
 const selector_types = @import("selector_types.zig");
+const stage2_planning = @import("stage2_planning.zig");
 const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 
@@ -22,6 +23,7 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
     while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
         if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
     }
+    if (isExactEiNarrowIcmp(selector, icmp)) return lowerExactEiNarrowIcmp(selector, result_name, icmp);
     const is_ne_zero_i16 = icmp.predicate == .ne and icmp.operand_ty.eql(.{ .int = 16 }) and switch (icmp.rhs) {
         .int => |int| try i64Value(int) == 0,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
@@ -300,6 +302,47 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = try i64Value(rhs) } });
         try selector.machine.instructions.append(selector.allocator, .setb_eax);
     } else return .{ .no_emitter = "composed-block-icmp-form" };
+    try selector_state.bindEax(selector, result_name);
+    return null;
+}
+
+fn isExactEiNarrowIcmp(selector: *const ComposedBlockSelector, icmp: ir.IcmpInst) bool {
+    const function = selector.function orelse return false;
+    if (!stage2_planning.isExactEiScalarFamily(function.*)) return false;
+    const bits = intBits(icmp.operand_ty) orelse return false;
+    return bits == 3 or bits == 4 or bits == 5 or bits == 13 or bits == 14 or bits == 26 or bits == 27 or bits == 55 or bits == 56;
+}
+
+fn lowerExactEiNarrowIcmp(selector: *ComposedBlockSelector, result_name: []const u8, icmp: ir.IcmpInst) !?Diagnostic {
+    const bits = intBits(icmp.operand_ty) orelse unreachable;
+    const rhs = switch (icmp.rhs) {
+        .int => |value| value,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-ei-narrow-icmp-rhs" },
+    };
+    if (bits > 32) return .{ .no_emitter = "composed-block-ei-narrow-icmp-width" };
+    const unsigned_mask: u32 = (@as(u32, 1) << @intCast(bits)) - 1;
+    const rhs_bits: u32 = @intCast(rhs & @as(i128, unsigned_mask));
+    try selector_state.emitValueIntoEax(selector, icmp.lhs);
+    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = @bitCast(unsigned_mask) });
+    const signed = icmp.predicate == .slt or icmp.predicate == .sle or icmp.predicate == .sgt or icmp.predicate == .sge;
+    var compare_rhs: i32 = @bitCast(rhs_bits);
+    if (signed) {
+        const shift: u5 = @intCast(32 - bits);
+        try selector.machine.instructions.append(selector.allocator, .{ .shl_eax_imm5 = shift });
+        try selector.machine.instructions.append(selector.allocator, .{ .sar_eax_imm5 = shift });
+        const shifted_rhs: i32 = @bitCast(rhs_bits << shift);
+        compare_rhs = shifted_rhs >> shift;
+    }
+    try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = compare_rhs });
+    try selector.machine.instructions.append(selector.allocator, switch (icmp.predicate) {
+        .eq => .sete_eax,
+        .ne => .setne_eax,
+        .ult => .setb_eax,
+        .ugt => .seta_eax,
+        .slt => .setl_eax,
+        .sgt => .setg_eax,
+        .ule, .uge, .sle, .sge => return .{ .no_emitter = "composed-block-ei-narrow-icmp-predicate" },
+    });
     try selector_state.bindEax(selector, result_name);
     return null;
 }
