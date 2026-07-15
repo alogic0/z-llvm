@@ -110,9 +110,12 @@ the ten-percent filesystem floor, and the minimum available-memory threshold
 is 8 GiB. The runner verifies three cache hits before launch, pins the shared
 AIR descriptors read-only, suspends pruning, gives each mode separate local and
 global Zig caches, and samples free space plus aggregate process-tree RSS while
-children run. Focused concurrency-three evidence refines the disk estimate by
-`max(measured_peak * 1.25, measured_peak + 4 GiB)` without authorizing a fourth
-worker or another parallel subgate.
+children run. The focused concurrency-three runs observed peak group-root disk
+usage of 539,158,368 bytes. The existing
+`max(measured_peak * 1.25, measured_peak + 4 GiB)` margin is governed by its
+additive branch, refining the projected peak to 4,834,125,664 bytes and the
+current required start to 103,058,128,327 bytes. This does not authorize a
+fourth worker or another parallel subgate.
 
 ## Per-INBOX and per-run `tmp/`
 

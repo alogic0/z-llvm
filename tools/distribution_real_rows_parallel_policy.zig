@@ -2,9 +2,9 @@ const std = @import("std");
 
 pub const schema_version: u32 = 1;
 pub const floor_fraction_denominator: u64 = 10;
-// Conservative initial authority. INBOX-69 acceptance evidence records the
-// focused concurrency-three measurement used to refine this bound.
-pub const projected_disk_peak_bytes: u64 = 8 * 1024 * 1024 * 1024;
+// Focused INBOX-69 concurrency-three peak: 539,158,368 bytes. The accepted
+// additive-margin branch is max(measured * 1.25, measured + 4 GiB).
+pub const projected_disk_peak_bytes: u64 = 4_834_125_664;
 pub const minimum_available_memory_bytes: u64 = 8 * 1024 * 1024 * 1024;
 pub const worker_count: usize = 3;
 
@@ -31,8 +31,8 @@ pub fn forFilesystem(filesystem_total_bytes: u64) Policy {
 test "real-row parallel policy uses its own ten-percent floor and projected peak" {
     const policy = forFilesystem(982_240_026_624);
     try std.testing.expectEqual(@as(u64, 98_224_002_663), policy.floor_bytes);
-    try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.projected_peak_bytes);
-    try std.testing.expectEqual(@as(u64, 106_813_937_255), policy.required_start_bytes);
+    try std.testing.expectEqual(@as(u64, 4_834_125_664), policy.projected_peak_bytes);
+    try std.testing.expectEqual(@as(u64, 103_058_128_327), policy.required_start_bytes);
     try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.minimum_available_memory_bytes);
     try std.testing.expectEqual(@as(usize, 3), worker_count);
 }
