@@ -787,7 +787,11 @@ pub fn lowerIntByteSizeCall(selector: *ComposedBlockSelector, result: ?[]const u
 
     if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     selector_state.emitValueIntoScratch(selector, arg.value, .rdi, 16) catch return .{ .unsupported_value = "composed-block-intbytesize-arg-value" };
+    const needs_alignment = selector.stack_frame_bytes == 0;
+    if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
     try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
+    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 0xffff });
     try selector_state.bindEax(selector, result_name);
     return null;
 }

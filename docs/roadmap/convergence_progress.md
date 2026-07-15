@@ -4398,6 +4398,22 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence
   `docs/evidence/std_debug_hello_inbox53_phase4_ei_fixed_cases.summary`.
 
+- 2026-07-14 (this commit, INBOX-53 continuation narrow-return P0) The
+  specialized `zig.target.intByteSize` path now normalizes its i16 ABI return
+  before any 32-bit use and aligns frameless calls. A permanent hostile stub
+  returns `0xdead0020` and proves the selected shift consumes only the low
+  i16. The accepted-row audit found the defective shape in `__udivei5` and
+  `__umodei4`; their historical executable evidence did not execute those
+  rows. An exact early-return quotient/remainder case passes, but a general
+  extracted-row division exposes a separate pre-existing generated-index
+  fault. The two historical semantic closures remain invalidated and require
+  a separate repair plus general-case re-proof. The Phase 4 cycle-2
+  capability is excluded from this P0 commit. The immediate Tier 3 passes all
+  17 subgates against staged tree
+  `6a2fb4a2b42f53f198aa67835b0239c26d3ea2a0`. Evidence
+  `docs/evidence/std_debug_hello_inbox53_intbytesize_p0.summary` and
+  `docs/evidence/distribution_all_after_inbox53_intbytesize_p0.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

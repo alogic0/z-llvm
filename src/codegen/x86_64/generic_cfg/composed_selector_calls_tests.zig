@@ -48,6 +48,48 @@ test "generic cfg selector lowers lifetime markers as checked no-ops" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "generic cfg selector normalizes narrow intByteSize call results" {
+    const input =
+        \\declare fastcc i16 @zig.target.intByteSize(i16)
+        \\define i64 @limb_count(i64 %wide_bits) {
+        \\entry:
+        \\  %bits = trunc i64 %wide_bits to i16
+        \\  %bytes = tail call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %limbs = lshr i16 %bytes, 2
+        \\  %result = zext i16 %limbs to i64
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("limb_count", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+
+    const stub = [_]u8{ 0xb8, 0x20, 0x00, 0xad, 0xde, 0xc3 };
+    const mapping = try std.posix.mmap(null, bytes.len + stub.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping[0..bytes.len], bytes);
+    @memcpy(mapping[bytes.len..], &stub);
+
+    var offset: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        if (instruction == .direct_call) {
+            const next_ip = @intFromPtr(mapping.ptr) + offset + 5;
+            const displacement: i32 = @intCast(@intFromPtr(mapping.ptr + bytes.len) - next_ip);
+            std.mem.writeInt(i32, mapping[offset + 1 ..][0..4], displacement, .little);
+        }
+        offset += encoding.instructionSize(instruction);
+    }
+    const limb_count: *const fn (u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u64, 8), limb_count(129));
+}
+
 test "generic cfg selector lowers i16 count-leading-zeros" {
     inline for (.{ 0, 1 }) |zero_is_poison| {
         var machine = MachineFunction.init("ctlz-i16", .{ .int = 16 });

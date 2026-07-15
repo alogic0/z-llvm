@@ -37,6 +37,20 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
+The INBOX-53 phase-4 cycle-2 audit found and repaired a standalone P0 in the
+specialized `zig.target.intByteSize` call path: i16 returns were consumed with
+undefined upper EAX bits. The permanent hostile-return canary passes. The
+audit hit previously accepted `__udivei5` and `__umodei4`, whose historical
+executable evidence did not execute those rows. A row-exact early-return case
+passes after the repair, but a general division case exposes a separate
+pre-existing generated-index miscompile. Both historical semantic closures
+remain invalidated pending that separate repair; do not count this P0 as
+their re-acceptance. The standalone immediate Tier 3 passes all 17 subgates
+against staged tree `6a2fb4a2b42f53f198aa67835b0239c26d3ea2a0`. Commit the
+P0, then restore and complete the preserved Phase 4 cycle-2 work. Evidence:
+`docs/evidence/std_debug_hello_inbox53_intbytesize_p0.summary` and
+`docs/evidence/distribution_all_after_inbox53_intbytesize_p0.summary`.
+
 INBOX-53 phase 4 cycle 1 is complete at its provisional Tier-2 boundary.
 Readonly i64/i96/i128 fixed-case loads and exact signed/unsigned conversion to
 half/float/double advance all six EI rows to the common default-body
