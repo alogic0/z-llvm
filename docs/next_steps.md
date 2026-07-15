@@ -37,6 +37,16 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
+INBOX-53 phase 1 is complete. The read-only census accounts for all 29 rows
+as one fma row and 28 conversion rows, separates observed diagnostics from
+captured later shapes, and freezes bounded contracts for phases 2 through 4.
+The census confirms that fma's multiway PHIs are not its last blocker, so its
+`i11`/`i32` switches must not be admitted with the six scalar EI entry
+switches. Stop and request architectural review of the phase-2 captured
+scalar multiway-PHI contract before implementation. No phase-2 code, EI
+switch/loop work, fma widening, or preopt sharding is authorized. Evidence:
+`docs/evidence/inbox53_switch_phi_ei_census.md`.
+
 INBOX-50 Part 1 is complete and accepted. Preservation demand now participates
 in the existing stage-two plan and shared frame reservation, with stable homes
 only for single-block parameters proven live across a preservation barrier.

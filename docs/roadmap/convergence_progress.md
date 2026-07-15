@@ -4327,6 +4327,17 @@ One line per completed cycle, append-only, newest last. This is the
   sharding remains a separate reviewed candidate. Evidence
   `docs/evidence/distribution_all_inbox52_artifact_reuse.summary`.
 
+- 2026-07-14 (this commit, INBOX-53 phase 1) Item 12 switch-PHI/EI program
+  census: the accepted 443 / 278 / 165 report and frozen captured IR account
+  for all 29 rows as one fma row and 28 conversion rows. The evidence records
+  exact switch case sets, PHI predecessor/type populations, loop structures,
+  observed versus predicted frontiers, and bounded phase-2 through phase-4
+  contracts. Fma is explicitly separated because multiway PHI support is not
+  its last blocker. This read-only cycle runs no gate and changes no code.
+  Stop for review of the phase-2 captured scalar multiway-PHI contract;
+  preopt sharding remains unauthorized. Evidence
+  `docs/evidence/inbox53_switch_phi_ei_census.md`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
