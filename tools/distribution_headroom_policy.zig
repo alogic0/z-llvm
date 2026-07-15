@@ -4,10 +4,19 @@ pub const schema_version: u32 = 1;
 pub const serial_reserve_floor_bytes: u64 = 32 * 1024 * 1024 * 1024;
 pub const serial_reserve_fraction_denominator: u64 = 20;
 pub const serial_projected_peak_bytes: u64 = 4_419_112_960;
+pub const sharding_floor_fraction_denominator: u64 = 10;
+pub const sharding_projected_peak_bytes: u64 = 16 * 1024 * 1024 * 1024;
 
 pub const Policy = struct {
     filesystem_total_bytes: u64,
     reserve_bytes: u64,
+    projected_peak_bytes: u64,
+    required_start_bytes: u64,
+};
+
+pub const ShardingPolicy = struct {
+    filesystem_total_bytes: u64,
+    floor_bytes: u64,
     projected_peak_bytes: u64,
     required_start_bytes: u64,
 };
@@ -46,6 +55,17 @@ pub fn forFilesystem(filesystem_total_bytes: u64) Policy {
     };
 }
 
+pub fn shardingForFilesystem(filesystem_total_bytes: u64) ShardingPolicy {
+    const floor = filesystem_total_bytes / sharding_floor_fraction_denominator +
+        @intFromBool(filesystem_total_bytes % sharding_floor_fraction_denominator != 0);
+    return .{
+        .filesystem_total_bytes = filesystem_total_bytes,
+        .floor_bytes = floor,
+        .projected_peak_bytes = sharding_projected_peak_bytes,
+        .required_start_bytes = floor +| sharding_projected_peak_bytes,
+    };
+}
+
 test "policy derives the accepted serial threshold from filesystem size" {
     const policy = forFilesystem(982_240_026_624);
     try std.testing.expectEqual(@as(u64, 49_112_001_332), policy.reserve_bytes);
@@ -61,4 +81,11 @@ test "tracker initializes minimum from the first sample without a sentinel" {
     tracker.observe(111_500);
     try std.testing.expectEqual(@as(u64, 111_500), tracker.minimum_free_bytes);
     try std.testing.expectEqual(@as(u64, 3_500), tracker.observedPeakBytes());
+}
+
+test "sharding policy derives the ten-percent floor plus projected peak" {
+    const policy = shardingForFilesystem(982_240_026_624);
+    try std.testing.expectEqual(@as(u64, 98_224_002_663), policy.floor_bytes);
+    try std.testing.expectEqual(@as(u64, 17_179_869_184), policy.projected_peak_bytes);
+    try std.testing.expectEqual(@as(u64, 115_403_871_847), policy.required_start_bytes);
 }

@@ -94,6 +94,13 @@ authorizes it. The stale ~90-93 GB figure is superseded; sharding remains
 deferred pending its own fresh preflight (and, if the observation regresses,
 freeing non-z_llvm space or a further reviewed revision).
 
+For the authorized INBOX-68 bounded preopt run, the machine-readable sharding
+authority is `tools/distribution_headroom_policy.zig`. It defines the ten-percent
+floor, the 16-GiB projected peak, and their required-start sum. The preopt
+orchestrator samples free space while workers are active and fails closed if
+runtime free space falls below the floor; this authority does not authorize
+general subgate parallelism or concurrency above two.
+
 ## Per-INBOX and per-run `tmp/`
 
 - A short-lived run directory is protected for two hours from its newest

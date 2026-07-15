@@ -49,6 +49,7 @@ const Options = struct {
     allocator: std.mem.Allocator,
     mode: ExecutionMode = .parallel,
     fresh_real_rows: bool = false,
+    preopt_concurrency: u8 = 1,
     serial_root: ?[]u8 = null,
 
     fn deinit(options: *Options) void {
@@ -100,7 +101,7 @@ pub fn main(init: std.process.Init) !void {
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
     const target = target_env orelse "x86_64-unknown-linux-gnu";
-    if (options.mode == .inventory) return writeInventory(io, target);
+    if (options.mode == .inventory) return writeInventory(io, target, options.preopt_concurrency);
     const target_assignment = try std.fmt.allocPrint(allocator, "TARGET={s}", .{target});
     defer allocator.free(target_assignment);
     if (options.mode == .serial) {
@@ -122,9 +123,9 @@ pub fn main(init: std.process.Init) !void {
     var tool_index: usize = 0;
     while (tool_index < tools.len) {
         if (tool_index == 9) {
-            var first = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index, fresh_real_rows });
-            var second = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index + 1, fresh_real_rows });
-            var third = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index + 2, fresh_real_rows });
+            var first = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index, fresh_real_rows, options.preopt_concurrency });
+            var second = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index + 1, fresh_real_rows, options.preopt_concurrency });
+            var third = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index + 2, fresh_real_rows, options.preopt_concurrency });
             var completed = [_]CompletedTool{
                 try first.await(io),
                 try second.await(io),
@@ -138,13 +139,14 @@ pub fn main(init: std.process.Init) !void {
                     &metrics,
                     target,
                     fresh_real_rows,
+                    options.preopt_concurrency,
                 );
                 common.freeRunResult(allocator, item.result);
             }
             tool_index += completed.len;
             continue;
         }
-        const completed = try runTool(allocator, io, target_assignment, bundle_assignment, tool_index, fresh_real_rows);
+        const completed = try runTool(allocator, io, target_assignment, bundle_assignment, tool_index, fresh_real_rows, options.preopt_concurrency);
         try recordTool(
             &stdout_writer.interface,
             tool_index,
@@ -152,6 +154,7 @@ pub fn main(init: std.process.Init) !void {
             &metrics,
             target,
             fresh_real_rows,
+            options.preopt_concurrency,
         );
         common.freeRunResult(allocator, completed.result);
         tool_index += 1;
@@ -289,6 +292,7 @@ const RealSampler = struct {
 const RealExecutor = struct {
     target_assignment: []const u8,
     bundle_assignment: []const u8,
+    preopt_concurrency: u8,
 
     fn interface(executor: *RealExecutor) ToolExecutor {
         return .{ .context = executor, .runFn = run };
@@ -309,6 +313,7 @@ const RealExecutor = struct {
             executor.bundle_assignment,
             tool_index,
             fresh_real_rows,
+            executor.preopt_concurrency,
         );
     }
 };
@@ -401,6 +406,7 @@ fn runSerial(
     var real_executor: RealExecutor = .{
         .target_assignment = target_assignment,
         .bundle_assignment = bundle_assignment,
+        .preopt_concurrency = options.preopt_concurrency,
     };
     var metrics: RunMetrics = .{};
     var bundle_evidence: BundleEvidence = .{};
@@ -411,6 +417,7 @@ fn runSerial(
         target,
         paths.scratch_path,
         options.fresh_real_rows,
+        options.preopt_concurrency,
         policy,
         &tracker,
         sampler,
@@ -456,6 +463,7 @@ fn executeSerialTools(
     target: []const u8,
     scratch_path: []const u8,
     fresh_real_rows: bool,
+    preopt_concurrency: u8,
     policy: headroom_policy.Policy,
     tracker: *headroom_policy.Tracker,
     sampler: FreeSpaceSampler,
@@ -472,11 +480,11 @@ fn executeSerialTools(
             .{ tool_index + 1, tool.id, sample.free_bytes, policy.reserve_bytes },
         );
         if (sample.free_bytes < policy.reserve_bytes) return error.SerialHeadroomReserveViolated;
-        try writeToolStart(writer, tool_index, target, fresh_real_rows);
+        try writeToolStart(writer, tool_index, target, fresh_real_rows, preopt_concurrency);
         const completed = try executor.run(allocator, io, tool_index, fresh_real_rows);
         defer common.freeRunResult(allocator, completed.result);
         try bundle_evidence.observe(tool_index, completed.result.stdout);
-        try recordToolCompletion(writer, tool_index, completed, metrics);
+        try recordToolCompletion(writer, tool_index, completed, metrics, preopt_concurrency);
     }
 }
 
@@ -512,7 +520,7 @@ fn fieldValue(line: []const u8, prefix: []const u8) ?[]const u8 {
     return null;
 }
 
-fn writeInventory(io: std.Io, target: []const u8) !void {
+fn writeInventory(io: std.Io, target: []const u8, preopt_concurrency: u8) !void {
     var buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &buffer);
     const writer = &stdout_writer.interface;
@@ -526,6 +534,7 @@ fn writeInventory(io: std.Io, target: []const u8) !void {
         if (tool.args.len != 0) {
             try writer.writeAll(" --");
             for (tool.args) |arg| try writer.print(" {s}", .{arg});
+            if (tool_index == 6) try writer.print(" --preopt-concurrency={}", .{preopt_concurrency});
         }
         try writer.writeAll("\n");
     }
@@ -539,9 +548,10 @@ fn recordTool(
     metrics: *RunMetrics,
     target: []const u8,
     fresh_real_rows: bool,
+    preopt_concurrency: u8,
 ) !void {
-    try writeToolStart(writer, tool_index, target, fresh_real_rows);
-    try recordToolCompletion(writer, tool_index, completed, metrics);
+    try writeToolStart(writer, tool_index, target, fresh_real_rows, preopt_concurrency);
+    try recordToolCompletion(writer, tool_index, completed, metrics, preopt_concurrency);
 }
 
 fn writeToolStart(
@@ -549,6 +559,7 @@ fn writeToolStart(
     tool_index: usize,
     target: []const u8,
     fresh_real_rows: bool,
+    preopt_concurrency: u8,
 ) !void {
     const tool = tools[tool_index];
     const cache_mode: []const u8 = if (fresh_real_rows and tool.cache_contract == .air_export_v1) "fresh" else "default";
@@ -557,12 +568,14 @@ fn writeToolStart(
         .{ tool.id, tool.path },
     );
     for (tool.args) |arg| try writer.print(" {s}", .{arg});
+    if (tool_index == 6) try writer.print(" --preopt-concurrency={}", .{preopt_concurrency});
     try writer.print(
         " target={s} runner=zig-run input_scope=runner-command cache_contract={s} cache_mode={s} artifact_contract={s}\n",
         .{ target, @tagName(tool.cache_contract), cache_mode, @tagName(tool.artifact_contract) },
     );
     try writer.print("gate-start id={s} tool={s}", .{ tool.id, tool.path });
     for (tool.args) |arg| try writer.print(" {s}", .{arg});
+    if (tool_index == 6) try writer.print(" --preopt-concurrency={}", .{preopt_concurrency});
     try writer.writeAll("\n");
     try writer.flush();
 }
@@ -572,6 +585,7 @@ fn recordToolCompletion(
     tool_index: usize,
     completed: CompletedTool,
     metrics: *RunMetrics,
+    preopt_concurrency: u8,
 ) !void {
     const tool = tools[tool_index];
     const cache_status = cacheStatus(completed.result.stdout);
@@ -594,6 +608,7 @@ fn recordToolCompletion(
     try writer.writeAll(completed.result.stdout);
     try writer.print("gate-end id={s} tool={s}", .{ tool.id, tool.path });
     for (tool.args) |arg| try writer.print(" {s}", .{arg});
+    if (tool_index == 6) try writer.print(" --preopt-concurrency={}", .{preopt_concurrency});
     try writer.print(" exit_status=0 duration_ms={} cache_status={s}\n", .{ completed.duration_ms, @tagName(cache_status) });
     try writer.flush();
 }
@@ -652,6 +667,7 @@ fn runTool(
     bundle_assignment: []const u8,
     tool_index: usize,
     fresh_real_rows: bool,
+    preopt_concurrency: u8,
 ) !CompletedTool {
     const tool = tools[tool_index];
     var argv: std.ArrayList([]const u8) = .empty;
@@ -664,6 +680,11 @@ fn runTool(
     if (tool.args.len != 0) {
         try argv.append(allocator, "--");
         try argv.appendSlice(allocator, tool.args);
+        if (tool_index == 6) {
+            const concurrency_arg = try std.fmt.allocPrint(allocator, "--preopt-concurrency={}", .{preopt_concurrency});
+            defer allocator.free(concurrency_arg);
+            try argv.append(allocator, concurrency_arg);
+        }
     }
     if (fresh_real_rows and std.mem.eql(u8, tool.path, "src/distribution_real_rows_gate.zig")) {
         if (tool.args.len == 0) try argv.append(allocator, "--");
@@ -691,6 +712,8 @@ fn parseArgs(allocator: std.mem.Allocator, init: std.process.Init) !Options {
         } else if (std.mem.eql(u8, arg, "--print-inventory")) {
             if (options.mode != .parallel) return error.ConflictingExecutionMode;
             options.mode = .inventory;
+        } else if (std.mem.startsWith(u8, arg, "--preopt-concurrency=")) {
+            options.preopt_concurrency = try std.fmt.parseUnsigned(u8, arg["--preopt-concurrency=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--serial-root=")) {
             if (options.serial_root != null) return error.DuplicateSerialRoot;
             const path = arg["--serial-root=".len..];
@@ -702,6 +725,9 @@ fn parseArgs(allocator: std.mem.Allocator, init: std.process.Init) !Options {
     }
     if (options.serial_root != null and options.mode != .serial) {
         return error.SerialRootRequiresSerialMode;
+    }
+    if (options.preopt_concurrency != 1 and options.preopt_concurrency != 2) {
+        return error.InvalidPreoptConcurrency;
     }
     if (options.mode == .inventory and options.fresh_real_rows) {
         return error.InventoryDoesNotRunGates;
@@ -902,6 +928,7 @@ test "bounded fake serial orchestration uses all 17 authoritative subgates in or
         "x86_64-unknown-linux-gnu",
         "fake-owned-scratch",
         false,
+        1,
         policy,
         &tracker,
         sampler_context.interface(),
@@ -922,6 +949,7 @@ test "bounded fake serial orchestration uses all 17 authoritative subgates in or
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "gate-start id="));
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "gate-end id="));
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "headroom-before index="));
+    try std.testing.expectEqual(@as(usize, 3), std.mem.count(u8, writer.buffered(), "--preopt-concurrency=1"));
 }
 
 test "generated serial paths are unique across repeated invocations" {

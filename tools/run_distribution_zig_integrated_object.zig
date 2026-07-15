@@ -7,6 +7,7 @@ const std = @import("std");
 
 const common = @import("tool_common.zig");
 const release_bundle = @import("release_source_object_bundle.zig");
+const preopt_sharding = @import("run_distribution_zig_integrated_object_sharding.zig");
 
 const expected_selected_ir_writer_rows = 146;
 
@@ -50,7 +51,7 @@ pub fn main(init: std.process.Init) !void {
 
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
-    _ = args.next();
+    const executable_path = args.next() orelse return error.MissingExecutablePath;
     var pipeline: Pipeline = .postopt;
     var mode_filter: ?[]const u8 = null;
     var case_filter: ?[]const u8 = null;
@@ -58,6 +59,16 @@ pub fn main(init: std.process.Init) !void {
     var broad_source_backed = false;
     var source_wrapper_dispatch = false;
     var release_source_owned = false;
+    var preopt_concurrency: u8 = 1;
+    var preopt_concurrency_explicit = false;
+    var preopt_sharding_root: ?[]const u8 = null;
+    var shard_index: ?usize = null;
+    var shard_start: ?usize = null;
+    var shard_end: ?usize = null;
+    var shard_root: ?[]const u8 = null;
+    var shard_result: ?[]const u8 = null;
+    var shard_log: ?[]const u8 = null;
+    var shard_stop: ?[]const u8 = null;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--pipeline=postopt")) {
             pipeline = .postopt;
@@ -82,10 +93,51 @@ pub fn main(init: std.process.Init) !void {
             mode_filter = arg["--mode=".len..];
         } else if (std.mem.startsWith(u8, arg, "--case=")) {
             case_filter = arg["--case=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--preopt-concurrency=")) {
+            preopt_concurrency = try std.fmt.parseUnsigned(u8, arg["--preopt-concurrency=".len..], 10);
+            preopt_concurrency_explicit = true;
+        } else if (std.mem.startsWith(u8, arg, "--preopt-sharding-root=")) {
+            preopt_sharding_root = arg["--preopt-sharding-root=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--preopt-shard-worker=")) {
+            shard_index = try std.fmt.parseUnsigned(usize, arg["--preopt-shard-worker=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--preopt-shard-start=")) {
+            shard_start = try std.fmt.parseUnsigned(usize, arg["--preopt-shard-start=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--preopt-shard-end=")) {
+            shard_end = try std.fmt.parseUnsigned(usize, arg["--preopt-shard-end=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--preopt-shard-root=")) {
+            shard_root = arg["--preopt-shard-root=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--preopt-shard-result=")) {
+            shard_result = arg["--preopt-shard-result=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--preopt-shard-log=")) {
+            shard_log = arg["--preopt-shard-log=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--preopt-shard-stop=")) {
+            shard_stop = arg["--preopt-shard-stop=".len..];
         } else {
             try common.validationError(io, "unexpected argument for integrated object runner: {s}\n", .{arg});
         }
     }
+
+    if (preopt_concurrency != 1 and preopt_concurrency != 2) return error.InvalidPreoptConcurrency;
+    const worker_field_count = @intFromBool(shard_index != null) +
+        @intFromBool(shard_start != null) + @intFromBool(shard_end != null) +
+        @intFromBool(shard_root != null) + @intFromBool(shard_result != null) +
+        @intFromBool(shard_log != null) + @intFromBool(shard_stop != null);
+    if (worker_field_count != 0 and worker_field_count != 7) return error.IncompletePreoptShardWorkerArguments;
+    const worker_options: ?preopt_sharding.WorkerOptions = if (worker_field_count == 7) .{
+        .shard_index = shard_index.?,
+        .range = .{ .start = shard_start.?, .end = shard_end.? },
+        .root_path = shard_root.?,
+        .result_path = shard_result.?,
+        .log_path = shard_log.?,
+        .stop_path = shard_stop.?,
+    } else null;
+    if (worker_options) |options| try preopt_sharding.validateWorkerOptions(options);
+    const plain_preopt = pipeline == .preopt and !use_ir_writer and !broad_source_backed and
+        !source_wrapper_dispatch and !release_source_owned and mode_filter == null and case_filter == null;
+    if ((preopt_concurrency_explicit or preopt_sharding_root != null or worker_options != null) and !plain_preopt) {
+        return error.PreoptShardingRequiresPlainPreoptGate;
+    }
+    if (worker_options != null and preopt_sharding_root != null) return error.ConflictingPreoptShardRoots;
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
@@ -108,13 +160,15 @@ pub fn main(init: std.process.Init) !void {
     const zig_emitter = zig_emitter_env orelse default_zig_emitter;
     const zllvm_exe = zllvm_env orelse "zig-out/bin/z_llvm";
 
-    const check_argv = [_][]const u8{ "zig", "run", "tools/check_zig_stage4_emitter.zig" };
-    const check_result = try common.runCapture(allocator, io, &check_argv, "tools/check_zig_stage4_emitter.zig");
-    common.freeRunResult(allocator, check_result);
+    if (worker_options == null) {
+        const check_argv = [_][]const u8{ "zig", "run", "tools/check_zig_stage4_emitter.zig" };
+        const check_result = try common.runCapture(allocator, io, &check_argv, "tools/check_zig_stage4_emitter.zig");
+        common.freeRunResult(allocator, check_result);
 
-    const build_argv = [_][]const u8{ "zig", "build" };
-    const build_result = try common.runCapture(allocator, io, &build_argv, "zig build");
-    common.freeRunResult(allocator, build_result);
+        const build_argv = [_][]const u8{ "zig", "build" };
+        const build_result = try common.runCapture(allocator, io, &build_argv, "zig build");
+        common.freeRunResult(allocator, build_result);
+    }
 
     var env_map = std.process.Environ.Map.init(allocator);
     defer env_map.deinit();
@@ -128,8 +182,24 @@ pub fn main(init: std.process.Init) !void {
     try env_map.put("ZLLVM_PIPELINE", pipelineName(pipeline));
     try env_map.put("ZLLVM_EXE", zllvm_exe);
 
-    const temp = try common.TempDir.init(allocator, io, "zig_integrated_object");
-    defer temp.deinit(allocator, io);
+    if (plain_preopt and worker_options == null) {
+        var stdout_buffer: [4096]u8 = undefined;
+        var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+        return preopt_sharding.runParent(allocator, io, .{
+            .executable_path = executable_path,
+            .target = target,
+            .zllvm_exe = zllvm_exe,
+            .concurrency = preopt_concurrency,
+            .explicit_root = preopt_sharding_root,
+            .environ_map = &env_map,
+        }, &stdout_writer.interface);
+    }
+
+    const temp = if (worker_options) |options|
+        common.TempDir{ .path = options.root_path }
+    else
+        try common.TempDir.init(allocator, io, "zig_integrated_object");
+    defer if (worker_options == null) temp.deinit(allocator, io);
     var bundle_publisher = if (release_bundle_env) |root|
         try release_bundle.Publisher.init(allocator, io, root, target)
     else
@@ -332,7 +402,16 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "base64-decode-exit-step" },
         .{ .name = "minimal-ret0" },
     };
-    for (cases) |case| {
+    for (cases, 0..) |case, case_index| {
+        if (worker_options) |options| {
+            if (case_index < options.range.start or case_index >= options.range.end) continue;
+            if (std.Io.Dir.cwd().access(io, options.stop_path, .{})) |_| {
+                return error.PreoptShardStopRequested;
+            } else |err| switch (err) {
+                error.FileNotFound => {},
+                else => return err,
+            }
+        }
         if (broad_source_backed and !isReleaseDistributionFixture(case.covered_fixture)) continue;
         if (release_source_owned and !isReleaseSourceOwnedCase(case)) continue;
         if (source_wrapper_dispatch and !isSourceWrapperDispatchCase(case)) continue;
