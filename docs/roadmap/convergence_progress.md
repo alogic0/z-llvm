@@ -4426,6 +4426,16 @@ One line per completed cycle, append-only, newest last. This is the
   Phase 5 before accepting the closures, then re-rank `fma`. Evidence
   `docs/evidence/std_debug_hello_inbox53_phase4_ei_default_bodies.summary`.
 
+- 2026-07-14 (this commit, INBOX-53 continuation phase 5 acceptance) The one
+  cumulative family Tier 3 passes all 17 subgates against commit `9e3f78fe` /
+  tree `97a7aa9451443a8a27f1e6850708991c9f39e243`. This accepts the six
+  EI-to-FP closures and 443 / 284 / 159 as the report state. The refreshed
+  `compiler_rt.fma.fma` frontier remains `stage2-switch-phi-edge`; its
+  separate i11/i32 switches precede `ctlz.i52`, copysign, and vector forms,
+  so implementation requires a bounded switch-contract review. Stop without
+  fma widening or preopt sharding. Evidence
+  `docs/evidence/distribution_all_after_inbox53_phase5_ei_family.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

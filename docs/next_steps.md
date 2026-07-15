@@ -37,14 +37,16 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
-INBOX-53 Phase 4 cycle 2 is provisionally complete. Exact EI loop-forward
-planning and captured readonly/narrow scalar forms close all six EI-to-FP
-rows, moving the report to 443 / 284 / 159 with no collateral movement. The
-extracted object passes 78/78 frozen bit checks and Tier 2 passes 24/24 steps
-with 1026/1026 tests. Begin Phase 5 with the family's one cumulative Tier 3,
-then re-rank `fma` against the refreshed frontier; no fma widening is yet
+INBOX-53 Phase 5 accepts the exact six-row EI family. The cumulative Tier 3
+passes all 17 subgates against commit `9e3f78fe` / tree
+`97a7aa9451443a8a27f1e6850708991c9f39e243`, accepting 443 / 284 / 159.
+`compiler_rt.fma.fma` remains at `stage2-switch-phi-edge`; its distinct
+i11/i32 switches still hide later `ctlz.i52`, copysign, and vector forms, so
+switch admission alone has zero expected closure. Stop and request the
+bounded fma switch-contract review. No fma widening or preopt sharding is
 authorized. Evidence:
-`docs/evidence/std_debug_hello_inbox53_phase4_ei_default_bodies.summary`.
+`docs/evidence/std_debug_hello_inbox53_phase4_ei_default_bodies.summary` and
+`docs/evidence/distribution_all_after_inbox53_phase5_ei_family.summary`.
 
 The phase-4 cycle-2 audit found and repaired a standalone P0 in the
 specialized `zig.target.intByteSize` call path: i16 returns were consumed with
