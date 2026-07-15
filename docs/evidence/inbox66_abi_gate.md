@@ -2,9 +2,9 @@
 
 Directive: `INBOX-66`
 
-Status: implementation and mandatory Tier 2 complete; serial Tier 3 stopped at
-the pre-existing stale linker-boundary usage assertion. INBOX-66 remains
-unaccepted pending review. See `inbox66_tier3_stop.md`.
+Status: implementation, mandatory Tier 2, and the INBOX-66C acceptance
+continuation are complete. Acceptance criteria are satisfied and Supervisor
+acceptance is requested. See `inbox66c_acceptance_continuation.summary`.
 
 ## Population and counter decision
 
