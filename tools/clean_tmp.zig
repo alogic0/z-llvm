@@ -1,5 +1,6 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
+const headroom_policy = @import("distribution_headroom_policy.zig");
 
 const default_tmp_dir = "tmp";
 const default_pin_file = "docs/evidence/ziglang_pin.txt";
@@ -642,6 +643,7 @@ fn runRetentionReport(
 
     const floor_bytes = (total_bytes + 9) / 10;
     const required_start_bytes = floor_bytes +| sharding_peak_bytes;
+    const serial_policy = headroom_policy.forFilesystem(total_bytes);
     const projected_free_after_cleanup = free_bytes +| total_reclaimable;
     const projected_free_after_sharding_peak = projected_free_after_cleanup -| sharding_peak_bytes;
 
@@ -652,6 +654,10 @@ fn runRetentionReport(
     try stdout.print(
         "# filesystem_total_bytes={} filesystem_free_bytes={} ten_percent_floor_bytes={} sharding_peak_bytes={} required_start_bytes={} ready_now={}\n",
         .{ total_bytes, free_bytes, floor_bytes, sharding_peak_bytes, required_start_bytes, free_bytes >= required_start_bytes },
+    );
+    try stdout.print(
+        "# serial_headroom schema={} reserve_bytes={} projected_peak_bytes={} required_start_bytes={} ready_now={} authority=tools/distribution_headroom_policy.zig\n",
+        .{ headroom_policy.schema_version, serial_policy.reserve_bytes, serial_policy.projected_peak_bytes, serial_policy.required_start_bytes, free_bytes >= serial_policy.required_start_bytes },
     );
     try stdout.print(
         "# tmp_apparent_bytes={} tmp_soft_limit_bytes={} tmp_soft_limit_exceeded={} policy_action=report-only\n",

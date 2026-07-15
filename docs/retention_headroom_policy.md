@@ -62,6 +62,14 @@ Serial operating rules:
   raise the projected peak before launch;
 - no cleanup is authorized implicitly.
 
+The machine-readable serial policy authority is
+`tools/distribution_headroom_policy.zig`. Both the tracked serial
+`distribution-all` runner and the report-only retention inventory consume that
+authority; reserve, projected-peak, and required-start values are not copied
+into the runner. The runner initializes its minimum-free measurement from the
+first real sample, then records preflight, every subgate boundary, final free
+space, and the observed peak.
+
 One successful run proves feasibility for the present topology, not unlimited
 safety; each serial gate needs its own fresh preflight.
 

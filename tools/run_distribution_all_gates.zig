@@ -1,5 +1,6 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
+const headroom_policy = @import("distribution_headroom_policy.zig");
 const release_bundle = @import("release_source_object_bundle.zig");
 
 const Tool = struct {
@@ -38,6 +39,38 @@ const CompletedTool = struct {
     duration_ms: i96,
 };
 
+const ExecutionMode = enum {
+    parallel,
+    serial,
+    inventory,
+};
+
+const Options = struct {
+    allocator: std.mem.Allocator,
+    mode: ExecutionMode = .parallel,
+    fresh_real_rows: bool = false,
+    serial_root: ?[]u8 = null,
+
+    fn deinit(options: *Options) void {
+        if (options.serial_root) |path| options.allocator.free(path);
+        options.* = undefined;
+    }
+};
+
+const FilesystemSample = struct {
+    total_bytes: u64,
+    free_bytes: u64,
+};
+
+const RunMetrics = struct {
+    measurements: [tools.len]Measurement = undefined,
+    total_duration_ms: i96 = 0,
+    cache_hits: usize = 0,
+    cache_misses: usize = 0,
+    cache_mixed: usize = 0,
+    cache_none: usize = 0,
+};
+
 const tools = [_]Tool{
     .{ .id = "selected-object-suite", .path = "tools/run_distribution_no_llvm_codegen_subset.zig" },
     .{ .id = "selected-object-inspection", .path = "tools/run_native_link_object_inspection.zig" },
@@ -61,13 +94,19 @@ const tools = [_]Tool{
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
-    const fresh_real_rows = try parseArgs(allocator, init);
+    var options = try parseArgs(allocator, init);
+    defer options.deinit();
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
     const target = target_env orelse "x86_64-unknown-linux-gnu";
+    if (options.mode == .inventory) return writeInventory(io, target);
     const target_assignment = try std.fmt.allocPrint(allocator, "TARGET={s}", .{target});
     defer allocator.free(target_assignment);
+    if (options.mode == .serial) {
+        return runSerial(allocator, io, target, target_assignment, options);
+    }
+    const fresh_real_rows = options.fresh_real_rows;
     const bundle_temp = try common.TempDir.init(allocator, io, "distribution_all_release_bundle");
     defer bundle_temp.deinit(allocator, io);
     const bundle_assignment = try std.fmt.allocPrint(allocator, "{s}={s}", .{ release_bundle.env_name, bundle_temp.path });
@@ -78,12 +117,7 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.print("distribution all gates target={s}\n", .{target});
     try stdout_writer.interface.flush();
 
-    var measurements: [tools.len]Measurement = undefined;
-    var total_duration_ms: i96 = 0;
-    var cache_hits: usize = 0;
-    var cache_misses: usize = 0;
-    var cache_mixed: usize = 0;
-    var cache_none: usize = 0;
+    var metrics: RunMetrics = .{};
 
     var tool_index: usize = 0;
     while (tool_index < tools.len) {
@@ -101,12 +135,7 @@ pub fn main(init: std.process.Init) !void {
                     &stdout_writer.interface,
                     completed_index,
                     item.*,
-                    &measurements,
-                    &total_duration_ms,
-                    &cache_hits,
-                    &cache_misses,
-                    &cache_mixed,
-                    &cache_none,
+                    &metrics,
                     target,
                     fresh_real_rows,
                 );
@@ -120,12 +149,7 @@ pub fn main(init: std.process.Init) !void {
             &stdout_writer.interface,
             tool_index,
             completed,
-            &measurements,
-            &total_duration_ms,
-            &cache_hits,
-            &cache_misses,
-            &cache_mixed,
-            &cache_none,
+            &metrics,
             target,
             fresh_real_rows,
         );
@@ -133,44 +157,396 @@ pub fn main(init: std.process.Init) !void {
         tool_index += 1;
     }
 
-    var ranked_indices: [tools.len]usize = undefined;
-    for (&ranked_indices, 0..) |*index, value| index.* = value;
-    sortSlowestFirst(&ranked_indices, &measurements);
-    const slowest_count = @min(@as(usize, 5), tools.len);
-    for (ranked_indices[0..slowest_count], 1..) |measurement_index, rank| {
-        const measurement = measurements[measurement_index];
-        const tool = tools[measurement.tool_index];
-        try stdout_writer.interface.print("summary distribution-all-slowest rank={} tool={s}", .{ rank, tool.path });
-        for (tool.args) |arg| try stdout_writer.interface.print(" {s}", .{arg});
-        try stdout_writer.interface.print(" duration_ms={} cache_status={s}\n", .{ measurement.duration_ms, @tagName(measurement.cache_status) });
-    }
-    const reported_cache_contracts = countCacheContracts(.air_export_v1);
-    const unreported_cache_contracts = countCacheContracts(.unreported);
-    const release_bundle_contracts = countArtifactContracts(.release_source_object_bundle_v1);
-    const no_artifact_contracts = countArtifactContracts(.none);
-    try stdout_writer.interface.print(
-        "summary distribution-all-gate-inventory schema_version=1 subgates={} runner=zig-run runner_input_scope=command target={s} reported_cache_contracts={} unreported_cache_contracts={} release_source_object_bundle_contracts={} no_artifact_contracts={} local_fail=0\n",
-        .{ tools.len, target, reported_cache_contracts, unreported_cache_contracts, release_bundle_contracts, no_artifact_contracts },
-    );
-    try stdout_writer.interface.print(
-        "summary distribution-all-timing subgates={} total_duration_ms={} cache_hit_subgates={} cache_miss_subgates={} cache_mixed_subgates={} cache_none_subgates={} cache_observation_unreported_subgates={} slowest_reported={} fresh_real_rows={} local_fail=0\n",
-        .{ tools.len, total_duration_ms, cache_hits, cache_misses, cache_mixed, cache_none, unreported_cache_contracts, slowest_count, fresh_real_rows },
-    );
-
+    try writeRunSummaries(&stdout_writer.interface, &metrics, target, fresh_real_rows);
     try stdout_writer.interface.writeAll("ok distribution all gates\n");
     try stdout_writer.interface.flush();
+}
+
+const OwnedSerialPaths = struct {
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    run_id: [32]u8,
+    scratch_path: []u8,
+    bundle_path: []u8,
+    owned: bool = true,
+
+    fn init(
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        explicit_scratch_path: ?[]const u8,
+    ) !OwnedSerialPaths {
+        var cwd = std.Io.Dir.cwd();
+        var random_bytes: [16]u8 = undefined;
+        io.random(&random_bytes);
+        var run_id = std.fmt.bytesToHex(random_bytes, .lower);
+
+        const scratch_path = if (explicit_scratch_path) |path| blk: {
+            const owned_path = try allocator.dupe(u8, path);
+            errdefer allocator.free(owned_path);
+            cwd.createDir(io, owned_path, .default_dir) catch |err| switch (err) {
+                error.PathAlreadyExists => return error.SerialScratchAlreadyExists,
+                else => return err,
+            };
+            break :blk owned_path;
+        } else blk: {
+            try cwd.createDirPath(io, "tmp");
+            var attempt: usize = 0;
+            while (attempt < 16) : (attempt += 1) {
+                io.random(&random_bytes);
+                const candidate_id = std.fmt.bytesToHex(random_bytes, .lower);
+                run_id = candidate_id;
+                const candidate = try std.fmt.allocPrint(allocator, "tmp/distribution_all_serial_{s}", .{&candidate_id});
+                cwd.createDir(io, candidate, .default_dir) catch |err| switch (err) {
+                    error.PathAlreadyExists => {
+                        allocator.free(candidate);
+                        continue;
+                    },
+                    else => {
+                        allocator.free(candidate);
+                        return err;
+                    },
+                };
+                break :blk candidate;
+            }
+            return error.SerialScratchCollisionLimit;
+        };
+        errdefer {
+            cwd.deleteTree(io, scratch_path) catch {};
+            allocator.free(scratch_path);
+        }
+
+        const bundle_path = try std.fs.path.join(allocator, &.{ scratch_path, "release_source_object_bundle" });
+        errdefer allocator.free(bundle_path);
+        cwd.createDir(io, bundle_path, .default_dir) catch |err| switch (err) {
+            error.PathAlreadyExists => return error.SerialBundleAlreadyExists,
+            else => return err,
+        };
+
+        return .{
+            .allocator = allocator,
+            .io = io,
+            .run_id = run_id,
+            .scratch_path = scratch_path,
+            .bundle_path = bundle_path,
+        };
+    }
+
+    fn deinit(paths: *OwnedSerialPaths) void {
+        if (paths.owned) {
+            std.Io.Dir.cwd().deleteTree(paths.io, paths.scratch_path) catch {};
+        }
+        paths.allocator.free(paths.bundle_path);
+        paths.allocator.free(paths.scratch_path);
+        paths.* = undefined;
+    }
+};
+
+const FreeSpaceSampler = struct {
+    context: *anyopaque,
+    sampleFn: *const fn (*anyopaque, std.mem.Allocator, std.Io, []const u8) anyerror!FilesystemSample,
+
+    fn sample(
+        sampler: FreeSpaceSampler,
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        path: []const u8,
+    ) !FilesystemSample {
+        return sampler.sampleFn(sampler.context, allocator, io, path);
+    }
+};
+
+const ToolExecutor = struct {
+    context: *anyopaque,
+    runFn: *const fn (*anyopaque, std.mem.Allocator, std.Io, usize, bool) anyerror!CompletedTool,
+
+    fn run(
+        executor: ToolExecutor,
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        tool_index: usize,
+        fresh_real_rows: bool,
+    ) !CompletedTool {
+        return executor.runFn(executor.context, allocator, io, tool_index, fresh_real_rows);
+    }
+};
+
+const RealSampler = struct {
+    fn interface(sampler: *RealSampler) FreeSpaceSampler {
+        return .{ .context = sampler, .sampleFn = sample };
+    }
+
+    fn sample(
+        context: *anyopaque,
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        path: []const u8,
+    ) !FilesystemSample {
+        _ = context;
+        return sampleFilesystem(allocator, io, path);
+    }
+};
+
+const RealExecutor = struct {
+    target_assignment: []const u8,
+    bundle_assignment: []const u8,
+
+    fn interface(executor: *RealExecutor) ToolExecutor {
+        return .{ .context = executor, .runFn = run };
+    }
+
+    fn run(
+        context: *anyopaque,
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        tool_index: usize,
+        fresh_real_rows: bool,
+    ) !CompletedTool {
+        const executor: *RealExecutor = @ptrCast(@alignCast(context));
+        return runTool(
+            allocator,
+            io,
+            executor.target_assignment,
+            executor.bundle_assignment,
+            tool_index,
+            fresh_real_rows,
+        );
+    }
+};
+
+const BundleEvidence = struct {
+    identity: [64]u8 = undefined,
+    identity_set: bool = false,
+    producer_count: usize = 0,
+    consumer_count: usize = 0,
+
+    fn observe(evidence: *BundleEvidence, tool_index: usize, output: []const u8) !void {
+        if (tools[tool_index].artifact_contract != .release_source_object_bundle_v1) return;
+        var matched_lines: usize = 0;
+        var lines = std.mem.splitScalar(u8, output, '\n');
+        while (lines.next()) |line| {
+            if (!std.mem.startsWith(u8, line, "summary release-source-object-bundle ")) continue;
+            matched_lines += 1;
+            const identity_text = fieldValue(line, "identity=") orelse return error.MissingBundleIdentity;
+            if (identity_text.len != evidence.identity.len) return error.InvalidBundleIdentity;
+            if (!evidence.identity_set) {
+                @memcpy(&evidence.identity, identity_text);
+                evidence.identity_set = true;
+            } else if (!std.mem.eql(u8, &evidence.identity, identity_text)) {
+                return error.BundleIdentityMismatch;
+            }
+
+            if (std.mem.eql(u8, tools[tool_index].id, "integrated-object-release")) {
+                if (std.mem.indexOf(u8, line, "status=produced") == null or
+                    std.mem.indexOf(u8, line, "atomic_publication=true") == null)
+                {
+                    return error.InvalidBundleProducerSummary;
+                }
+                evidence.producer_count += 1;
+            } else {
+                if (std.mem.indexOf(u8, line, "status=reused") == null or
+                    std.mem.indexOf(u8, line, "executions_cached=false") == null)
+                {
+                    return error.InvalidBundleConsumerSummary;
+                }
+                evidence.consumer_count += 1;
+            }
+        }
+        if (matched_lines != 1) return error.BundleSummaryCountMismatch;
+    }
+
+    fn finish(evidence: *const BundleEvidence) !void {
+        if (!evidence.identity_set or evidence.producer_count != 1 or evidence.consumer_count != 3) {
+            return error.BundleEvidenceIncomplete;
+        }
+    }
+};
+
+fn runSerial(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    target: []const u8,
+    target_assignment: []const u8,
+    options: Options,
+) !void {
+    var paths = try OwnedSerialPaths.init(allocator, io, options.serial_root);
+    defer paths.deinit();
+    const bundle_assignment = try std.fmt.allocPrint(allocator, "{s}={s}", .{ release_bundle.env_name, paths.bundle_path });
+    defer allocator.free(bundle_assignment);
+
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    const writer = &stdout_writer.interface;
+    try writer.print("distribution all gates target={s}\n", .{target});
+
+    var real_sampler: RealSampler = .{};
+    const sampler = real_sampler.interface();
+    const preflight = try sampler.sample(allocator, io, paths.scratch_path);
+    const policy = headroom_policy.forFilesystem(preflight.total_bytes);
+    var tracker = headroom_policy.Tracker.init(preflight.free_bytes);
+    try writer.print(
+        "summary distribution-all-serial-run schema_version=1 phase=preflight run_id={s} scratch_path={s} bundle_path={s} target={s} mode=serial fresh_real_rows={} local_fail=0\n",
+        .{ &paths.run_id, paths.scratch_path, paths.bundle_path, target, options.fresh_real_rows },
+    );
+    try writer.print(
+        "summary distribution-all-headroom-policy schema_version={} filesystem_total_bytes={} reserve_bytes={} projected_peak_bytes={} required_start_bytes={} authority=tools/distribution_headroom_policy.zig local_fail=0\n",
+        .{ headroom_policy.schema_version, policy.filesystem_total_bytes, policy.reserve_bytes, policy.projected_peak_bytes, policy.required_start_bytes },
+    );
+    try writer.print(
+        "headroom-preflight free_bytes={} required_start_bytes={} serial_ready={}\n",
+        .{ preflight.free_bytes, policy.required_start_bytes, preflight.free_bytes >= policy.required_start_bytes },
+    );
+    try writer.flush();
+    if (preflight.free_bytes < policy.required_start_bytes) return error.InsufficientSerialHeadroom;
+
+    var real_executor: RealExecutor = .{
+        .target_assignment = target_assignment,
+        .bundle_assignment = bundle_assignment,
+    };
+    var metrics: RunMetrics = .{};
+    var bundle_evidence: BundleEvidence = .{};
+    try executeSerialTools(
+        allocator,
+        io,
+        writer,
+        target,
+        paths.scratch_path,
+        options.fresh_real_rows,
+        policy,
+        &tracker,
+        sampler,
+        real_executor.interface(),
+        &metrics,
+        &bundle_evidence,
+    );
+    try bundle_evidence.finish();
+
+    const final_sample = try sampler.sample(allocator, io, paths.scratch_path);
+    if (final_sample.total_bytes != policy.filesystem_total_bytes) return error.FilesystemIdentityChanged;
+    tracker.observe(final_sample.free_bytes);
+    try writeRunSummaries(writer, &metrics, target, options.fresh_real_rows);
+    try writer.print(
+        "summary distribution-all-serial-bundle schema_version=1 produced={} consumers={} identity={s} executions_cached=false local_fail=0\n",
+        .{ bundle_evidence.producer_count, bundle_evidence.consumer_count, &bundle_evidence.identity },
+    );
+    try writer.print("headroom-final free_bytes={}\n", .{final_sample.free_bytes});
+    try writer.print(
+        "summary distribution-all-serial schema_version=1 run_id={s} scratch_path={s} bundle_path={s} target={s} mode=serial subgates={} starting_free_bytes={} minimum_observed_free_bytes={} final_free_bytes={} observed_peak_bytes={} reserve_bytes={} required_start_bytes={} local_fail=0\n",
+        .{
+            &paths.run_id,
+            paths.scratch_path,
+            paths.bundle_path,
+            target,
+            tools.len,
+            tracker.starting_free_bytes,
+            tracker.minimum_free_bytes,
+            final_sample.free_bytes,
+            tracker.observedPeakBytes(),
+            policy.reserve_bytes,
+            policy.required_start_bytes,
+        },
+    );
+    try writer.writeAll("ok distribution all gates\n");
+    try writer.flush();
+}
+
+fn executeSerialTools(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    writer: *std.Io.Writer,
+    target: []const u8,
+    scratch_path: []const u8,
+    fresh_real_rows: bool,
+    policy: headroom_policy.Policy,
+    tracker: *headroom_policy.Tracker,
+    sampler: FreeSpaceSampler,
+    executor: ToolExecutor,
+    metrics: *RunMetrics,
+    bundle_evidence: *BundleEvidence,
+) !void {
+    for (tools, 0..) |tool, tool_index| {
+        const sample = try sampler.sample(allocator, io, scratch_path);
+        if (sample.total_bytes != policy.filesystem_total_bytes) return error.FilesystemIdentityChanged;
+        tracker.observe(sample.free_bytes);
+        try writer.print(
+            "headroom-before index={} id={s} free_bytes={} reserve_bytes={}\n",
+            .{ tool_index + 1, tool.id, sample.free_bytes, policy.reserve_bytes },
+        );
+        if (sample.free_bytes < policy.reserve_bytes) return error.SerialHeadroomReserveViolated;
+        try writeToolStart(writer, tool_index, target, fresh_real_rows);
+        const completed = try executor.run(allocator, io, tool_index, fresh_real_rows);
+        defer common.freeRunResult(allocator, completed.result);
+        try bundle_evidence.observe(tool_index, completed.result.stdout);
+        try recordToolCompletion(writer, tool_index, completed, metrics);
+    }
+}
+
+fn sampleFilesystem(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+) !FilesystemSample {
+    const argv = [_][]const u8{ "df", "-B1", "--output=size,avail", path };
+    const result = try common.runCapture(allocator, io, &argv, "df serial headroom sample");
+    defer common.freeRunResult(allocator, result);
+    return parseFilesystemSample(result.stdout);
+}
+
+fn parseFilesystemSample(output: []const u8) !FilesystemSample {
+    var fields = std.mem.tokenizeAny(u8, output, " \t\r\n");
+    _ = fields.next() orelse return error.InvalidFilesystemSample;
+    _ = fields.next() orelse return error.InvalidFilesystemSample;
+    const total = fields.next() orelse return error.InvalidFilesystemSample;
+    const free = fields.next() orelse return error.InvalidFilesystemSample;
+    if (fields.next() != null) return error.InvalidFilesystemSample;
+    return .{
+        .total_bytes = try std.fmt.parseUnsigned(u64, total, 10),
+        .free_bytes = try std.fmt.parseUnsigned(u64, free, 10),
+    };
+}
+
+fn fieldValue(line: []const u8, prefix: []const u8) ?[]const u8 {
+    var fields = std.mem.tokenizeScalar(u8, line, ' ');
+    while (fields.next()) |field| {
+        if (std.mem.startsWith(u8, field, prefix)) return field[prefix.len..];
+    }
+    return null;
+}
+
+fn writeInventory(io: std.Io, target: []const u8) !void {
+    var buffer: [4096]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &buffer);
+    const writer = &stdout_writer.interface;
+    try writer.print("distribution-all-command-contract schema_version=1 subgates={} target={s}\n", .{ tools.len, target });
+    for (tools, 0..) |tool, tool_index| {
+        try writer.print("gate-contract index={} id={s} command=env TARGET={s}", .{ tool_index + 1, tool.id, target });
+        if (tool.artifact_contract == .release_source_object_bundle_v1) {
+            try writer.writeAll(" ZLLVM_RELEASE_SOURCE_OBJECT_BUNDLE=<runner-owned-bundle>");
+        }
+        try writer.print(" zig run {s}", .{tool.path});
+        if (tool.args.len != 0) {
+            try writer.writeAll(" --");
+            for (tool.args) |arg| try writer.print(" {s}", .{arg});
+        }
+        try writer.writeAll("\n");
+    }
+    try writer.flush();
 }
 
 fn recordTool(
     writer: *std.Io.Writer,
     tool_index: usize,
     completed: CompletedTool,
-    measurements: *[tools.len]Measurement,
-    total_duration_ms: *i96,
-    cache_hits: *usize,
-    cache_misses: *usize,
-    cache_mixed: *usize,
-    cache_none: *usize,
+    metrics: *RunMetrics,
+    target: []const u8,
+    fresh_real_rows: bool,
+) !void {
+    try writeToolStart(writer, tool_index, target, fresh_real_rows);
+    try recordToolCompletion(writer, tool_index, completed, metrics);
+}
+
+fn writeToolStart(
+    writer: *std.Io.Writer,
+    tool_index: usize,
     target: []const u8,
     fresh_real_rows: bool,
 ) !void {
@@ -188,28 +564,69 @@ fn recordTool(
     try writer.print("gate-start id={s} tool={s}", .{ tool.id, tool.path });
     for (tool.args) |arg| try writer.print(" {s}", .{arg});
     try writer.writeAll("\n");
+    try writer.flush();
+}
+
+fn recordToolCompletion(
+    writer: *std.Io.Writer,
+    tool_index: usize,
+    completed: CompletedTool,
+    metrics: *RunMetrics,
+) !void {
+    const tool = tools[tool_index];
     const cache_status = cacheStatus(completed.result.stdout);
     switch (tool.cache_contract) {
         .air_export_v1 => if (cache_status == .none) return error.MissingDeclaredCacheTelemetry,
         .unreported => if (cache_status != .none) return error.UnclassifiedCacheTelemetry,
     }
-    measurements[tool_index] = .{
+    metrics.measurements[tool_index] = .{
         .tool_index = tool_index,
         .duration_ms = completed.duration_ms,
         .cache_status = cache_status,
     };
-    total_duration_ms.* += completed.duration_ms;
+    metrics.total_duration_ms += completed.duration_ms;
     switch (cache_status) {
-        .hit => cache_hits.* += 1,
-        .miss => cache_misses.* += 1,
-        .mixed => cache_mixed.* += 1,
-        .none => cache_none.* += 1,
+        .hit => metrics.cache_hits += 1,
+        .miss => metrics.cache_misses += 1,
+        .mixed => metrics.cache_mixed += 1,
+        .none => metrics.cache_none += 1,
     }
     try writer.writeAll(completed.result.stdout);
     try writer.print("gate-end id={s} tool={s}", .{ tool.id, tool.path });
     for (tool.args) |arg| try writer.print(" {s}", .{arg});
     try writer.print(" exit_status=0 duration_ms={} cache_status={s}\n", .{ completed.duration_ms, @tagName(cache_status) });
     try writer.flush();
+}
+
+fn writeRunSummaries(
+    writer: *std.Io.Writer,
+    metrics: *const RunMetrics,
+    target: []const u8,
+    fresh_real_rows: bool,
+) !void {
+    var ranked_indices: [tools.len]usize = undefined;
+    for (&ranked_indices, 0..) |*index, value| index.* = value;
+    sortSlowestFirst(&ranked_indices, &metrics.measurements);
+    const slowest_count = @min(@as(usize, 5), tools.len);
+    for (ranked_indices[0..slowest_count], 1..) |measurement_index, rank| {
+        const measurement = metrics.measurements[measurement_index];
+        const tool = tools[measurement.tool_index];
+        try writer.print("summary distribution-all-slowest rank={} tool={s}", .{ rank, tool.path });
+        for (tool.args) |arg| try writer.print(" {s}", .{arg});
+        try writer.print(" duration_ms={} cache_status={s}\n", .{ measurement.duration_ms, @tagName(measurement.cache_status) });
+    }
+    const reported_cache_contracts = countCacheContracts(.air_export_v1);
+    const unreported_cache_contracts = countCacheContracts(.unreported);
+    const release_bundle_contracts = countArtifactContracts(.release_source_object_bundle_v1);
+    const no_artifact_contracts = countArtifactContracts(.none);
+    try writer.print(
+        "summary distribution-all-gate-inventory schema_version=1 subgates={} runner=zig-run runner_input_scope=command target={s} reported_cache_contracts={} unreported_cache_contracts={} release_source_object_bundle_contracts={} no_artifact_contracts={} local_fail=0\n",
+        .{ tools.len, target, reported_cache_contracts, unreported_cache_contracts, release_bundle_contracts, no_artifact_contracts },
+    );
+    try writer.print(
+        "summary distribution-all-timing subgates={} total_duration_ms={} cache_hit_subgates={} cache_miss_subgates={} cache_mixed_subgates={} cache_none_subgates={} cache_observation_unreported_subgates={} slowest_reported={} fresh_real_rows={} local_fail=0\n",
+        .{ tools.len, metrics.total_duration_ms, metrics.cache_hits, metrics.cache_misses, metrics.cache_mixed, metrics.cache_none, unreported_cache_contracts, slowest_count, fresh_real_rows },
+    );
 }
 
 fn countCacheContracts(contract: CacheContract) usize {
@@ -259,19 +676,37 @@ fn runTool(
     };
 }
 
-fn parseArgs(allocator: std.mem.Allocator, init: std.process.Init) !bool {
-    var fresh_real_rows = false;
+fn parseArgs(allocator: std.mem.Allocator, init: std.process.Init) !Options {
+    var options: Options = .{ .allocator = allocator };
+    errdefer options.deinit();
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
     _ = args.skip();
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--fresh-real-rows")) {
-            fresh_real_rows = true;
+            options.fresh_real_rows = true;
+        } else if (std.mem.eql(u8, arg, "--serial")) {
+            if (options.mode != .parallel) return error.ConflictingExecutionMode;
+            options.mode = .serial;
+        } else if (std.mem.eql(u8, arg, "--print-inventory")) {
+            if (options.mode != .parallel) return error.ConflictingExecutionMode;
+            options.mode = .inventory;
+        } else if (std.mem.startsWith(u8, arg, "--serial-root=")) {
+            if (options.serial_root != null) return error.DuplicateSerialRoot;
+            const path = arg["--serial-root=".len..];
+            if (path.len == 0) return error.InvalidSerialRoot;
+            options.serial_root = try allocator.dupe(u8, path);
         } else {
             return error.UnexpectedArgument;
         }
     }
-    return fresh_real_rows;
+    if (options.serial_root != null and options.mode != .serial) {
+        return error.SerialRootRequiresSerialMode;
+    }
+    if (options.mode == .inventory and options.fresh_real_rows) {
+        return error.InventoryDoesNotRunGates;
+    }
+    return options;
 }
 
 fn elapsedMs(io: std.Io, start: std.Io.Timestamp) i96 {
@@ -310,6 +745,94 @@ fn sortSlowestFirst(indices: []usize, measurements: []const Measurement) void {
     }
 }
 
+const FakeSamplerContext = struct {
+    samples: []const FilesystemSample,
+    index: usize = 0,
+
+    fn interface(context: *FakeSamplerContext) FreeSpaceSampler {
+        return .{ .context = context, .sampleFn = sample };
+    }
+
+    fn sample(
+        context_ptr: *anyopaque,
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        path: []const u8,
+    ) !FilesystemSample {
+        _ = allocator;
+        _ = io;
+        _ = path;
+        const context: *FakeSamplerContext = @ptrCast(@alignCast(context_ptr));
+        if (context.index >= context.samples.len) return error.FakeSampleExhausted;
+        defer context.index += 1;
+        return context.samples[context.index];
+    }
+};
+
+const FakeExecutorContext = struct {
+    call_order: [tools.len]usize = undefined,
+    call_count: usize = 0,
+
+    fn interface(context: *FakeExecutorContext) ToolExecutor {
+        return .{ .context = context, .runFn = run };
+    }
+
+    fn run(
+        context_ptr: *anyopaque,
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        tool_index: usize,
+        fresh_real_rows: bool,
+    ) !CompletedTool {
+        _ = io;
+        _ = fresh_real_rows;
+        const context: *FakeExecutorContext = @ptrCast(@alignCast(context_ptr));
+        if (context.call_count >= context.call_order.len) return error.FakeCallOverflow;
+        context.call_order[context.call_count] = tool_index;
+        context.call_count += 1;
+
+        const identity = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const stdout = if (std.mem.eql(u8, tools[tool_index].id, "integrated-object-release"))
+            try std.fmt.allocPrint(
+                allocator,
+                "fake bounded subgate {s}\nsummary release-source-object-bundle status=produced rows=100 identity={s} atomic_publication=true local_fail=0\n",
+                .{ tools[tool_index].id, identity },
+            )
+        else if (tools[tool_index].artifact_contract == .release_source_object_bundle_v1)
+            try std.fmt.allocPrint(
+                allocator,
+                "fake bounded subgate {s}\nsummary release-source-object-bundle status=reused consumer=fake rows=100 identity={s} executions_cached=false local_fail=0\n",
+                .{ tools[tool_index].id, identity },
+            )
+        else if (tools[tool_index].cache_contract == .air_export_v1)
+            try std.fmt.allocPrint(
+                allocator,
+                "fake bounded subgate {s}\nair-export-cache status=hit\n",
+                .{tools[tool_index].id},
+            )
+        else
+            try std.fmt.allocPrint(allocator, "fake bounded subgate {s}\n", .{tools[tool_index].id});
+        errdefer allocator.free(stdout);
+        const stderr = try allocator.dupe(u8, "");
+        return .{
+            .result = .{
+                .term = .{ .exited = 0 },
+                .stdout = stdout,
+                .stderr = stderr,
+            },
+            .duration_ms = @intCast(tool_index + 1),
+        };
+    }
+};
+
+fn pathExists(io: std.Io, path: []const u8) !bool {
+    std.Io.Dir.cwd().access(io, path, .{}) catch |err| switch (err) {
+        error.FileNotFound => return false,
+        else => return err,
+    };
+    return true;
+}
+
 test "cache status classifies hit miss mixed and absent output" {
     try std.testing.expectEqual(CacheStatus.hit, cacheStatus("air-export-cache status=hit\n"));
     try std.testing.expectEqual(CacheStatus.miss, cacheStatus("air-export-cache status=miss-export\n"));
@@ -337,4 +860,180 @@ test "cache contracts distinguish explicit telemetry from unreported gates" {
 test "artifact contracts identify the producer and three consumers" {
     try std.testing.expectEqual(@as(usize, 4), countArtifactContracts(.release_source_object_bundle_v1));
     try std.testing.expectEqual(@as(usize, 13), countArtifactContracts(.none));
+}
+
+test "filesystem sample parser reads df size and available bytes" {
+    const sample = try parseFilesystemSample(
+        "1B-blocks        Avail\n982240026624 115192393728\n",
+    );
+    try std.testing.expectEqual(@as(u64, 982_240_026_624), sample.total_bytes);
+    try std.testing.expectEqual(@as(u64, 115_192_393_728), sample.free_bytes);
+}
+
+test "bounded fake serial orchestration uses all 17 authoritative subgates in order" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const total_bytes = 1_000_000;
+    var samples: [tools.len]FilesystemSample = undefined;
+    for (&samples, 0..) |*sample, index| {
+        sample.* = .{
+            .total_bytes = total_bytes,
+            .free_bytes = 900_000 - @as(u64, @intCast(index * 1_000)),
+        };
+    }
+    var sampler_context: FakeSamplerContext = .{ .samples = &samples };
+    var executor_context: FakeExecutorContext = .{};
+    var tracker = headroom_policy.Tracker.init(901_000);
+    const policy: headroom_policy.Policy = .{
+        .filesystem_total_bytes = total_bytes,
+        .reserve_bytes = 100_000,
+        .projected_peak_bytes = 10_000,
+        .required_start_bytes = 110_000,
+    };
+    var output_buffer: [128 * 1024]u8 = undefined;
+    var writer = std.Io.Writer.fixed(&output_buffer);
+    var metrics: RunMetrics = .{};
+    var bundle_evidence: BundleEvidence = .{};
+
+    try executeSerialTools(
+        allocator,
+        io,
+        &writer,
+        "x86_64-unknown-linux-gnu",
+        "fake-owned-scratch",
+        false,
+        policy,
+        &tracker,
+        sampler_context.interface(),
+        executor_context.interface(),
+        &metrics,
+        &bundle_evidence,
+    );
+    try bundle_evidence.finish();
+
+    try std.testing.expectEqual(@as(usize, tools.len), executor_context.call_count);
+    try std.testing.expectEqual(@as(usize, tools.len), sampler_context.index);
+    for (executor_context.call_order, 0..) |actual, expected| {
+        try std.testing.expectEqual(expected, actual);
+    }
+    try std.testing.expectEqual(@as(usize, 1), bundle_evidence.producer_count);
+    try std.testing.expectEqual(@as(usize, 3), bundle_evidence.consumer_count);
+    try std.testing.expectEqual(@as(u64, 17_000), tracker.observedPeakBytes());
+    try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "gate-start id="));
+    try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "gate-end id="));
+    try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "headroom-before index="));
+}
+
+test "generated serial paths are unique across repeated invocations" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var first = try OwnedSerialPaths.init(allocator, io, null);
+    const first_path = try allocator.dupe(u8, first.scratch_path);
+    defer allocator.free(first_path);
+    first.deinit();
+
+    var second = try OwnedSerialPaths.init(allocator, io, null);
+    defer second.deinit();
+    try std.testing.expect(!std.mem.eql(u8, first_path, second.scratch_path));
+    try std.testing.expect(try pathExists(io, second.scratch_path));
+    try std.testing.expect(try pathExists(io, second.bundle_path));
+}
+
+test "explicit pre-existing serial path is refused without mutation" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    const existing = try std.fs.path.join(allocator, &.{ ".zig-cache", "tmp", &temp.sub_path });
+    defer allocator.free(existing);
+    const sentinel = try std.fs.path.join(allocator, &.{ existing, "sentinel" });
+    defer allocator.free(sentinel);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = sentinel, .data = "preserve" });
+
+    try std.testing.expectError(
+        error.SerialScratchAlreadyExists,
+        OwnedSerialPaths.init(allocator, io, existing),
+    );
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, sentinel, allocator, .limited(1024));
+    defer allocator.free(contents);
+    try std.testing.expectEqualStrings("preserve", contents);
+}
+
+test "partial bundle publication is cleaned only with its run-owned scratch" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var paths = try OwnedSerialPaths.init(allocator, io, null);
+    const scratch_copy = try allocator.dupe(u8, paths.scratch_path);
+    defer allocator.free(scratch_copy);
+    const source_object = try std.fs.path.join(allocator, &.{ paths.scratch_path, "partial.o" });
+    defer allocator.free(source_object);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = source_object, .data = "partial object" });
+
+    var publisher = try release_bundle.Publisher.init(
+        allocator,
+        io,
+        paths.bundle_path,
+        "x86_64-linux-gnu",
+    );
+    try publisher.publish(.{
+        .id = "partial",
+        .mode = "ReleaseFast",
+        .wrapper = "fake-wrapper",
+        .fixture = "fake-fixture",
+    }, source_object);
+    publisher.deinit();
+    try std.testing.expect(try pathExists(io, paths.bundle_path));
+
+    paths.deinit();
+    try std.testing.expect(!(try pathExists(io, scratch_copy)));
+}
+
+test "published run-owned bundle refuses a second publisher" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var paths = try OwnedSerialPaths.init(allocator, io, null);
+    defer paths.deinit();
+    const source_object = try std.fs.path.join(allocator, &.{ paths.scratch_path, "complete.o" });
+    defer allocator.free(source_object);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = source_object, .data = "complete object" });
+
+    var publisher = try release_bundle.Publisher.init(
+        allocator,
+        io,
+        paths.bundle_path,
+        "x86_64-linux-gnu",
+    );
+    try publisher.publish(.{
+        .id = "complete",
+        .mode = "ReleaseFast",
+        .wrapper = "fake-wrapper",
+        .fixture = "fake-fixture",
+    }, source_object);
+    _ = try publisher.finish(1);
+    publisher.deinit();
+
+    try std.testing.expectError(
+        error.BundleAlreadyPublished,
+        release_bundle.Publisher.init(
+            allocator,
+            io,
+            paths.bundle_path,
+            "x86_64-linux-gnu",
+        ),
+    );
+}
+
+test "bundle evidence rejects consumer identity movement" {
+    var evidence: BundleEvidence = .{};
+    try evidence.observe(
+        8,
+        "summary release-source-object-bundle status=produced rows=100 identity=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa atomic_publication=true local_fail=0\n",
+    );
+    try std.testing.expectError(
+        error.BundleIdentityMismatch,
+        evidence.observe(
+            13,
+            "summary release-source-object-bundle status=reused consumer=fake rows=100 identity=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb executions_cached=false local_fail=0\n",
+        ),
+    );
 }
