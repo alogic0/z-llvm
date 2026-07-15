@@ -32,6 +32,12 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&b.addRunArtifact(unit_tests).step);
 
+    const abi_diff_run = b.addSystemCommand(&.{ "bash", "tools/run_abi_differential.sh" });
+    abi_diff_run.step.dependOn(b.getInstallStep());
+    const abi_diff_step = b.step("abi-differential", "Run mandatory audited compiler-rt ABI differential gate");
+    abi_diff_step.dependOn(&abi_diff_run.step);
+    test_step.dependOn(&abi_diff_run.step);
+
     const structural_smoke_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/structural_smoke.zig"),

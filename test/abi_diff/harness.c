@@ -7,81 +7,148 @@
 
 struct result_bits { uint64_t lo, hi; };
 
-extern uint64_t probe_neg_u64(uint64_t, struct result_bits *);
-extern uint64_t probe_select_i32(int32_t, int32_t, uint8_t, struct result_bits *);
-extern uint64_t probe_identity_u8(uint8_t, struct result_bits *);
-extern uint64_t probe_identity_i16(int16_t, struct result_bits *);
-extern uint64_t probe_pointer_load_store(const uint32_t *, uint32_t *, struct result_bits *);
-extern uint64_t probe_load_u32(const uint32_t *, struct result_bits *);
-extern uint64_t probe_identity_ptr(const uint8_t *, struct result_bits *);
-extern uint64_t probe_neg_u128(unsigned __int128, struct result_bits *);
-extern uint64_t probe_add_f32(float, float, struct result_bits *);
-extern uint64_t probe_mul_f64(double, double, struct result_bits *);
+extern uint64_t probe_negsi2(int32_t, struct result_bits *);
+extern uint64_t probe_ashlsi3(int32_t, int32_t, struct result_bits *);
+extern uint64_t probe_fabsh(_Float16, struct result_bits *);
+extern uint64_t probe_neghf2(_Float16, struct result_bits *);
+extern uint64_t probe_mulosi4(int32_t, int32_t, int *, struct result_bits *);
+extern uint64_t probe_mulodi4(int64_t, int64_t, int *, struct result_bits *);
+extern uint64_t probe_negti2(__int128, struct result_bits *);
+extern uint64_t probe_ashlti3(__int128, int32_t, struct result_bits *);
+extern uint64_t probe_fabs(double, struct result_bits *);
+extern uint64_t probe_fmin(double, double, struct result_bits *);
 extern uint64_t probe_negative_clobber(struct result_bits *);
 extern void abi_negative_write(uint8_t *);
 extern void abi_negative_timeout(void);
+extern void abi_negative_signal(void);
+extern void abi_diff_controlled_panic(void) __attribute__((weak));
 
-static int emit(const char *id, uint64_t lo, uint64_t hi, uint64_t abi) {
-    if (abi != 0) return 0;
-    printf("case=%s lo=%016" PRIx64 " hi=%016" PRIx64 " abi=%016" PRIx64 " term=normal\n", id, lo, hi, abi);
-    return 1;
+static uint16_t f16_bits(_Float16 value) {
+    uint16_t bits;
+    __builtin_memcpy(&bits, &value, sizeof(bits));
+    return bits;
 }
 
-static int run_all(void) {
-    struct result_bits r;
-    unsigned passed = 0;
-    uint64_t abi;
-
-    abi = probe_neg_u64(0, &r); passed += emit("neg_u64/zero", r.lo, 0, abi);
-    abi = probe_neg_u64(UINT64_MAX, &r); passed += emit("neg_u64/max", r.lo, 0, abi);
-    abi = probe_select_i32(INT32_MIN, INT32_MAX, 0, &r); passed += emit("select_i32/false", (uint32_t)r.lo, 0, abi);
-    abi = probe_select_i32(INT32_MIN, INT32_MAX, 1, &r); passed += emit("select_i32/true", (uint32_t)r.lo, 0, abi);
-
-    abi = probe_identity_u8(0xff, &r);
-    fprintf(stderr, "diag=identity_u8 upper_rax=%014" PRIx64 "\n", r.hi >> 8);
-    passed += emit("identity_u8/max", (uint8_t)r.lo, 0, abi);
-    abi = probe_identity_i16(INT16_MIN, &r);
-    fprintf(stderr, "diag=identity_i16 upper_rax=%012" PRIx64 "\n", r.hi >> 16);
-    passed += emit("identity_i16/min", (uint16_t)r.lo, 0, abi);
-
-    struct { uint64_t left; uint32_t src; uint32_t dst; uint64_t right; } mem = {
-        0x13579bdf2468ace0ULL, 0xfffffff0U, 0x11223344U, 0x0eca8642fdb97531ULL
-    };
-    abi = probe_pointer_load_store(&mem.src, &mem.dst, &r);
-    if (mem.left != 0x13579bdf2468ace0ULL || mem.right != 0x0eca8642fdb97531ULL ||
-        mem.src != 0xfffffff0U || mem.dst != 0xfffffff7U) return 20;
-    passed += emit("pointer_load_store/wrap", (uint32_t)r.lo,
-        ((uint64_t)mem.src << 32) | mem.dst, abi);
-
-    const uint32_t load_value = 0x80000001U;
-    abi = probe_load_u32(&load_value, &r);
-    passed += emit("load_u32/boundary", (uint32_t)r.lo, load_value, abi);
-
-    const uint8_t ptr_bytes[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
-    abi = probe_identity_ptr(&ptr_bytes[3], &r);
-    const uintptr_t returned_address = (uintptr_t)r.lo;
-    const uintptr_t base_address = (uintptr_t)ptr_bytes;
-    if (base_address > UINTPTR_MAX - sizeof(ptr_bytes) || returned_address < base_address ||
-        returned_address > base_address + sizeof(ptr_bytes)) return 21;
-    const uintptr_t normalized = returned_address - base_address;
-    passed += emit("identity_ptr/offset3", normalized, 0, abi);
-
-    const unsigned __int128 wide = ((unsigned __int128)0x0123456789abcdefULL << 64) | 0xfedcba9876543210ULL;
-    abi = probe_neg_u128(0, &r); passed += emit("neg_u128/zero", r.lo, r.hi, abi);
-    abi = probe_neg_u128(wide, &r); passed += emit("neg_u128/mixed", r.lo, r.hi, abi);
-
-    abi = probe_add_f32(1.5f, 2.25f, &r); passed += emit("add_f32/exact", (uint32_t)r.lo, 0, abi);
-    abi = probe_add_f32(-8.0f, 0.5f, &r); passed += emit("add_f32/negative", (uint32_t)r.lo, 0, abi);
-    abi = probe_mul_f64(-3.5, 8.0, &r); passed += emit("mul_f64/exact", r.lo, 0, abi);
-    abi = probe_mul_f64(0.5, 0.25, &r); passed += emit("mul_f64/fraction", r.lo, 0, abi);
-
-    if (passed != 15) return 22;
-    printf("summary cases=15 status=pass\n");
+static int emit(const char *id, uint64_t lo, uint64_t hi, uint64_t abi) {
+    if (abi != 0) return 70;
+    printf("case=%s lo=%016" PRIx64 " hi=%016" PRIx64
+           " abi=%016" PRIx64 " term=normal\n", id, lo, hi, abi);
     return 0;
 }
 
+static int run_mulo_i32(const char *id, int32_t a, int32_t b) {
+    struct result_bits r = {0, 0};
+    struct {
+        uint64_t left;
+        int overflow;
+        uint32_t right_pad;
+        uint64_t right;
+    } guarded = {0x13579bdf2468ace0ULL, 0x11223344, 0xa55aa55aU,
+        0x0eca8642fdb97531ULL};
+    const uint64_t abi = probe_mulosi4(a, b, &guarded.overflow, &r);
+    if (guarded.left != 0x13579bdf2468ace0ULL ||
+        guarded.right_pad != 0xa55aa55aU ||
+        guarded.right != 0x0eca8642fdb97531ULL) return 71;
+    if (guarded.overflow != 0 && guarded.overflow != 1) return 72;
+    return emit(id, (uint32_t)r.lo, (uint32_t)guarded.overflow, abi);
+}
+
+static int run_mulo_i64(const char *id, int64_t a, int64_t b) {
+    struct result_bits r = {0, 0};
+    struct {
+        uint64_t left;
+        int overflow;
+        uint32_t right_pad;
+        uint64_t right;
+    } guarded = {0x13579bdf2468ace0ULL, 0x11223344, 0xa55aa55aU,
+        0x0eca8642fdb97531ULL};
+    const uint64_t abi = probe_mulodi4(a, b, &guarded.overflow, &r);
+    if (guarded.left != 0x13579bdf2468ace0ULL ||
+        guarded.right_pad != 0xa55aa55aU ||
+        guarded.right != 0x0eca8642fdb97531ULL) return 73;
+    if (guarded.overflow != 0 && guarded.overflow != 1) return 74;
+    return emit(id, r.lo, (uint32_t)guarded.overflow, abi);
+}
+
+static int run_case(unsigned index) {
+    struct result_bits r = {0, 0};
+    uint64_t abi;
+    const __int128 wide = ((__int128)0x0123456789abcdefULL << 64) |
+        (__int128)0x0edcba9876543210ULL;
+
+    switch (index) {
+    case 0:
+        abi = probe_negsi2(0, &r);
+        return emit("negsi2/zero", (uint32_t)r.lo, 0, abi);
+    case 1:
+        abi = probe_negsi2(1234567, &r);
+        return emit("negsi2/positive", (uint32_t)r.lo, 0, abi);
+    case 2:
+        abi = probe_ashlsi3(0x1234567, 4, &r);
+        return emit("ashlsi3/shift4", (uint32_t)r.lo, 0, abi);
+    case 3:
+        abi = probe_ashlsi3(-1, 17, &r);
+        return emit("ashlsi3/negative", (uint32_t)r.lo, 0, abi);
+    case 4: {
+        const _Float16 value = (_Float16)-3.5;
+        abi = probe_fabsh(value, &r);
+        return emit("fabsh/negative", (uint16_t)r.lo, f16_bits(value), abi);
+    }
+    case 5: {
+        const _Float16 value = (_Float16)-0.0;
+        abi = probe_fabsh(value, &r);
+        return emit("fabsh/negative-zero", (uint16_t)r.lo, f16_bits(value), abi);
+    }
+    case 6:
+        abi = probe_neghf2((_Float16)-3.5, &r);
+        return emit("neghf2/negative", (uint16_t)r.lo, 0, abi);
+    case 7:
+        abi = probe_neghf2((_Float16)0.0, &r);
+        return emit("neghf2/positive-zero", (uint16_t)r.lo, 0, abi);
+    case 8:
+        return run_mulo_i32("mulosi4/exact", 12345, -17);
+    case 9:
+        return run_mulo_i32("mulosi4/overflow", INT32_MAX, 2);
+    case 10:
+        return run_mulo_i64("mulodi4/exact", 123456789, 17);
+    case 11:
+        return run_mulo_i64("mulodi4/overflow", INT64_MAX, 2);
+    case 12:
+        abi = probe_negti2(0, &r);
+        return emit("negti2/zero", r.lo, r.hi, abi);
+    case 13:
+        abi = probe_negti2(wide, &r);
+        return emit("negti2/mixed", r.lo, r.hi, abi);
+    case 14:
+        abi = probe_ashlti3(wide, 13, &r);
+        return emit("ashlti3/shift13", r.lo, r.hi, abi);
+    case 15:
+        abi = probe_ashlti3((__int128)1, 64, &r);
+        return emit("ashlti3/shift64", r.lo, r.hi, abi);
+    case 16:
+        abi = probe_fabs(-3.5, &r);
+        return emit("fabs/negative", r.lo, 0, abi);
+    case 17:
+        abi = probe_fabs(-0.0, &r);
+        return emit("fabs/negative-zero", r.lo, 0, abi);
+    case 18:
+        abi = probe_fmin(-3.5, 2.0, &r);
+        return emit("fmin/ordered", r.lo, 0, abi);
+    case 19:
+        abi = probe_fmin(0.0, -0.0, &r);
+        return emit("fmin/signed-zero", r.lo, 0, abi);
+    default:
+        return 64;
+    }
+}
+
 int main(int argc, char **argv) {
-    if (argc == 1) return run_all();
+    if (argc == 3 && strcmp(argv[1], "--case") == 0) {
+        char *end = NULL;
+        const unsigned long index = strtoul(argv[2], &end, 10);
+        if (end == argv[2] || *end != '\0' || index >= 20) return 64;
+        return run_case((unsigned)index);
+    }
     if (argc == 2 && strcmp(argv[1], "--negative-clobber") == 0) {
         struct result_bits r = {0, 0};
         return probe_negative_clobber(&r) == 1 ? 0 : 31;
@@ -94,6 +161,15 @@ int main(int argc, char **argv) {
     if (argc == 2 && strcmp(argv[1], "--negative-timeout") == 0) {
         abi_negative_timeout();
         return 33;
+    }
+    if (argc == 2 && strcmp(argv[1], "--negative-signal") == 0) {
+        abi_negative_signal();
+        return 34;
+    }
+    if (argc == 2 && strcmp(argv[1], "--controlled-panic") == 0) {
+        if (abi_diff_controlled_panic == NULL) return 65;
+        abi_diff_controlled_panic();
+        return 35;
     }
     return 64;
 }

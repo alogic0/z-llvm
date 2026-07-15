@@ -264,12 +264,24 @@ mark: a row is not *executed* (only lowered/emitted/linked) until a
 selector version proves it pure. This is why `real_executed` is still 0 —
 correct behavior, not a failure.
 
-**Staged counters (`real_*`)** — the five ratcheted progress counters:
+**Staged counters (`real_*`)** — the compiler-core distribution-row counters
+under schema `distribution-real-rows-v2`:
 `real_functions_lowered` (typed lowering + CFG succeeded),
 `real_objects_emitted` (ELF object written), `real_native_linked` (native
-linker succeeded), `real_executed` (ran with verified results),
-`real_programs_ok` (whole programs built and run). Current strict values:
-25/25/25/0/0.
+linker succeeded), `real_executed` (paired behavioral verification; candidate-
+only zero exit does not qualify), and `real_programs_ok` (whole programs built
+and run). Current strict values are 100/100/100/0/0. These counters describe
+the separate 100-row compiler-core population, never the compiler-rt ABI
+cohort.
+
+**ABI differential counters (`abi_diff_*`)** — the compiler-rt-only paired-
+execution counters under schema `abi-diff-v2`. `abi_diff_cases_attempted`
+increments immediately before one reference/candidate input pair,
+`abi_diff_cases_matched` increments only after return bits, declared memory
+effects, ABI state, and termination agree, and
+`abi_diff_real_functions_matched` increments once per mode after every case
+for one audited real compiler-rt function matches. They are intentionally not
+copied into the compiler-core `real_*` summary.
 
 **Ratchet** — a counter that may only rise; a drop fails the gate.
 Prevents silent regression of proven coverage.

@@ -73,6 +73,8 @@ const Counters = struct {
     }
 };
 
+const counter_schema_version = "distribution-real-rows-v2";
+
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
@@ -669,18 +671,10 @@ fn runCandidate(
     }
     counters.real_native_linked += 1;
 
-    if (!executionQualified(candidate)) return;
-    const run_result = try helpers.runExecutable(allocator, io, exe_path);
-    defer {
-        allocator.free(run_result.stdout);
-        allocator.free(run_result.stderr);
-    }
-    counters.real_executed += 1;
-    if (helpers.termOk(run_result.term)) {
-        counters.real_programs_ok += 1;
-    } else {
-        try recordFailure(allocator, stdout, counters, mode, candidate, "execute", "execute-nonzero");
-    }
+    // This gate has no behavioral reference executable. A candidate-only zero
+    // exit proves neither an output match nor a whole-program match, so the v2
+    // counter schema deliberately ends at native-link evidence. The separate
+    // compiler-rt ABI differential gate owns its own paired-execution counters.
 }
 
 fn extractFunctionDescriptor(allocator: std.mem.Allocator, descriptor: []const u8, function_name: []const u8) ![]u8 {
@@ -802,12 +796,6 @@ fn recordFailure(
     try writer.flush();
 }
 
-fn executionQualified(candidate: Candidate) bool {
-    return std.mem.startsWith(u8, candidate.harnessable_reason, "harnessable:") and
-        !std.mem.eql(u8, candidate.determinism, "assumed_nondeterministic") and
-        std.mem.eql(u8, candidate.signature_class, "C-ABI-stable");
-}
-
 fn zigBuildOptimizeArg(mode: Mode) []const u8 {
     return switch (mode) {
         .ReleaseFast => "-Doptimize=ReleaseFast",
@@ -841,8 +829,9 @@ fn safeStem(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
 
 fn printSummary(writer: *std.Io.Writer, counters: Counters, candidate_hash: *const [64]u8) !void {
     try writer.print(
-        "summary distribution-real-rows mode={s} selector_version={s} candidate_file_hash={s} limit={} candidate_rows={} real_functions_lowered={} real_objects_emitted={} real_native_linked={} real_executed={} real_programs_ok={} first_failing_real_row={s} first_failing_stage={s} local_fail={}\n",
+        "summary distribution-real-rows counter_schema={s} mode={s} selector_version={s} candidate_file_hash={s} limit={} candidate_rows={} real_functions_lowered={} real_objects_emitted={} real_native_linked={} real_executed={} real_programs_ok={} first_failing_real_row={s} first_failing_stage={s} local_fail={}\n",
         .{
+            counter_schema_version,
             counters.mode.name(),
             selector_version,
             candidate_hash,

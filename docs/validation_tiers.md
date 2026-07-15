@@ -113,7 +113,11 @@ would have missed.
 
 The permanent, deterministic runtime checks; every tier-2 run executes
 them. Current members: the syscall hello (three modes), the compiler_rt
-i128 arithmetic program, and the setcc predicate program. Every
+i128 arithmetic program, the setcc predicate program, and the mandatory
+`abi-differential` gate over ten audited accepted compiler-rt functions in
+all three modes. The ABI gate's paired-execution counters belong only to the
+285-function compiler-rt population and do not describe the separate 100-row
+compiler-core distribution population. Every
 executable semantic case added under the INBOX-10 rule (each new
 arithmetic/comparison/branch/call/spill capability lands with one) joins
 this suite. Canaries are never removed, only extended; determinism is
