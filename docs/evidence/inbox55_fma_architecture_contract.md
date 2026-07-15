@@ -1,5 +1,16 @@
 # INBOX-55 Fma Architecture Contract Review
 
+> SUPERSEDED (2026-07-15, Supervisor/Reviewer amendment): the two-Tier-3
+> conclusion (below at "Phase 1 ends with one Tier 3" and "requires two
+> Tier-3 runs") and the "run preopt-sharding before fma" recommendation are
+> obsolete. The authorized and delivered pipeline ran the two phases as ONE
+> provisional pipeline with a SINGLE cumulative Tier 3 at fma acceptance
+> (Phase 1 guarded by strengthened whole-cohort Tier 2, no separate Phase 1
+> Tier 3). Preopt sharding is DEFERRED to a separate reviewed interlude
+> AFTER fma acceptance and is not authorized here. fma was accepted in
+> commit f6a85090 (report 443/285/158). The analysis below is retained
+> unaltered as the historical review record.
+
 INBOX-55 is acknowledged by this read-only evidence cycle.
 
 ## Baseline And Method
