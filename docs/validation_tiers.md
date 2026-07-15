@@ -108,6 +108,16 @@ would have missed.
 | ABI / frame / calls | all modes, native link, executable gates (tier 3) |
 | ELF / relocations | object inspection, linker boundary, full distribution (tier 3) |
 | Gate/cache infrastructure | full distribution plus fresh/cache comparison (tier 3) |
+| Public CLI surface: usage/help text, option parsing, the `Emit` enum, supported emit modes, or linker/CRT ownership wording | `zig build distribution-linker-boundary` before acceptance, even when the change is otherwise classified non-semantic |
+
+Validation-impact rule (2026-07-15, from the INBOX-66 boundary stop): a change
+that alters the public CLI surface above must run the focused
+`distribution-linker-boundary` gate before acceptance. O0 (INBOX-64) added the
+`selection-owner-manifest` emit mode to the help line and was accepted on
+strengthened Tier 2 with the Tier-3 waiver, but that gate is a serial-Tier-3
+subgate, so the stale boundary assertion was not caught until INBOX-66's Tier 3.
+The Tier-3 waiver was reasonable for non-semantic metadata; the omission was not
+running this focused boundary gate once the public CLI surface changed.
 
 ## Executable canary suite
 
