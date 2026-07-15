@@ -45,23 +45,24 @@ const SourceFixtureSkip = struct {
 
 const source_fixture_skips = [_]SourceFixtureSkip{};
 
-pub fn main(init: std.process.Init) !void {
-    const allocator = init.gpa;
-    const io = init.io;
+const ParsedArguments = struct {
+    executable_path: []const u8,
+    pipeline: Pipeline = .postopt,
+    mode_filter: ?[]const u8 = null,
+    case_filter: ?[]const u8 = null,
+    use_ir_writer: bool = false,
+    broad_source_backed: bool = false,
+    source_wrapper_dispatch: bool = false,
+    release_source_owned: bool = false,
+    preopt_concurrency: u8 = 1,
+    preopt_sharding_root: ?[]const u8 = null,
+    worker_options: ?preopt_sharding.WorkerOptions = null,
+};
 
-    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
-    defer args.deinit();
-    const executable_path = args.next() orelse return error.MissingExecutablePath;
-    var pipeline: Pipeline = .postopt;
-    var mode_filter: ?[]const u8 = null;
-    var case_filter: ?[]const u8 = null;
-    var use_ir_writer = false;
-    var broad_source_backed = false;
-    var source_wrapper_dispatch = false;
-    var release_source_owned = false;
-    var preopt_concurrency: u8 = 1;
+fn parseArguments(io: std.Io, raw_args: []const []const u8) !ParsedArguments {
+    if (raw_args.len == 0) return error.MissingExecutablePath;
+    var parsed: ParsedArguments = .{ .executable_path = raw_args[0] };
     var preopt_concurrency_explicit = false;
-    var preopt_sharding_root: ?[]const u8 = null;
     var shard_index: ?usize = null;
     var shard_start: ?usize = null;
     var shard_end: ?usize = null;
@@ -69,35 +70,35 @@ pub fn main(init: std.process.Init) !void {
     var shard_result: ?[]const u8 = null;
     var shard_log: ?[]const u8 = null;
     var shard_stop: ?[]const u8 = null;
-    while (args.next()) |arg| {
+    for (raw_args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--pipeline=postopt")) {
-            pipeline = .postopt;
+            parsed.pipeline = .postopt;
         } else if (std.mem.eql(u8, arg, "--pipeline=preopt")) {
-            pipeline = .preopt;
+            parsed.pipeline = .preopt;
         } else if (std.mem.eql(u8, arg, "--ir-writer")) {
-            use_ir_writer = true;
-            pipeline = .preopt;
+            parsed.use_ir_writer = true;
+            parsed.pipeline = .preopt;
         } else if (std.mem.eql(u8, arg, "--source-backed-broad")) {
-            use_ir_writer = true;
-            broad_source_backed = true;
-            pipeline = .preopt;
+            parsed.use_ir_writer = true;
+            parsed.broad_source_backed = true;
+            parsed.pipeline = .preopt;
         } else if (std.mem.eql(u8, arg, "--source-wrapper-dispatch")) {
-            use_ir_writer = true;
-            source_wrapper_dispatch = true;
-            pipeline = .preopt;
+            parsed.use_ir_writer = true;
+            parsed.source_wrapper_dispatch = true;
+            parsed.pipeline = .preopt;
         } else if (std.mem.eql(u8, arg, "--release-source-owned")) {
-            use_ir_writer = true;
-            release_source_owned = true;
-            pipeline = .preopt;
+            parsed.use_ir_writer = true;
+            parsed.release_source_owned = true;
+            parsed.pipeline = .preopt;
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
-            mode_filter = arg["--mode=".len..];
+            parsed.mode_filter = arg["--mode=".len..];
         } else if (std.mem.startsWith(u8, arg, "--case=")) {
-            case_filter = arg["--case=".len..];
+            parsed.case_filter = arg["--case=".len..];
         } else if (std.mem.startsWith(u8, arg, "--preopt-concurrency=")) {
-            preopt_concurrency = try std.fmt.parseUnsigned(u8, arg["--preopt-concurrency=".len..], 10);
+            parsed.preopt_concurrency = try std.fmt.parseUnsigned(u8, arg["--preopt-concurrency=".len..], 10);
             preopt_concurrency_explicit = true;
         } else if (std.mem.startsWith(u8, arg, "--preopt-sharding-root=")) {
-            preopt_sharding_root = arg["--preopt-sharding-root=".len..];
+            parsed.preopt_sharding_root = arg["--preopt-sharding-root=".len..];
         } else if (std.mem.startsWith(u8, arg, "--preopt-shard-worker=")) {
             shard_index = try std.fmt.parseUnsigned(usize, arg["--preopt-shard-worker=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--preopt-shard-start=")) {
@@ -117,13 +118,17 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    if (preopt_concurrency != 1 and preopt_concurrency != 2) return error.InvalidPreoptConcurrency;
-    const worker_field_count = @intFromBool(shard_index != null) +
-        @intFromBool(shard_start != null) + @intFromBool(shard_end != null) +
-        @intFromBool(shard_root != null) + @intFromBool(shard_result != null) +
-        @intFromBool(shard_log != null) + @intFromBool(shard_stop != null);
+    if (parsed.preopt_concurrency != 1 and parsed.preopt_concurrency != 2) return error.InvalidPreoptConcurrency;
+    var worker_field_count: usize = 0;
+    worker_field_count += @intFromBool(shard_index != null);
+    worker_field_count += @intFromBool(shard_start != null);
+    worker_field_count += @intFromBool(shard_end != null);
+    worker_field_count += @intFromBool(shard_root != null);
+    worker_field_count += @intFromBool(shard_result != null);
+    worker_field_count += @intFromBool(shard_log != null);
+    worker_field_count += @intFromBool(shard_stop != null);
     if (worker_field_count != 0 and worker_field_count != 7) return error.IncompletePreoptShardWorkerArguments;
-    const worker_options: ?preopt_sharding.WorkerOptions = if (worker_field_count == 7) .{
+    parsed.worker_options = if (worker_field_count == 7) .{
         .shard_index = shard_index.?,
         .range = .{ .start = shard_start.?, .end = shard_end.? },
         .root_path = shard_root.?,
@@ -131,13 +136,74 @@ pub fn main(init: std.process.Init) !void {
         .log_path = shard_log.?,
         .stop_path = shard_stop.?,
     } else null;
-    if (worker_options) |options| try preopt_sharding.validateWorkerOptions(options);
-    const plain_preopt = pipeline == .preopt and !use_ir_writer and !broad_source_backed and
-        !source_wrapper_dispatch and !release_source_owned and mode_filter == null and case_filter == null;
-    if ((preopt_concurrency_explicit or preopt_sharding_root != null or worker_options != null) and !plain_preopt) {
+    if (parsed.worker_options) |options| try preopt_sharding.validateWorkerOptions(options);
+    const plain_preopt = parsed.pipeline == .preopt and !parsed.use_ir_writer and !parsed.broad_source_backed and
+        !parsed.source_wrapper_dispatch and !parsed.release_source_owned and parsed.mode_filter == null and parsed.case_filter == null;
+    if ((preopt_concurrency_explicit or parsed.preopt_sharding_root != null or parsed.worker_options != null) and !plain_preopt) {
         return error.PreoptShardingRequiresPlainPreoptGate;
     }
-    if (worker_options != null and preopt_sharding_root != null) return error.ConflictingPreoptShardRoots;
+    if (parsed.worker_options != null and parsed.preopt_sharding_root != null) return error.ConflictingPreoptShardRoots;
+    return parsed;
+}
+
+test "production parser round-trips all seven preopt worker fields" {
+    const parsed = try parseArguments(std.testing.io, &.{
+        "integrated-object-runner",
+        "--pipeline=preopt",
+        "--preopt-shard-worker=1",
+        "--preopt-shard-start=73",
+        "--preopt-shard-end=146",
+        "--preopt-shard-root=owned/work",
+        "--preopt-shard-result=owned/result.txt",
+        "--preopt-shard-log=owned/worker.log",
+        "--preopt-shard-stop=owned/stop",
+    });
+    try std.testing.expectEqual(Pipeline.preopt, parsed.pipeline);
+    const worker = parsed.worker_options orelse return error.MissingParsedWorkerOptions;
+    try std.testing.expectEqual(@as(usize, 1), worker.shard_index);
+    try std.testing.expectEqual(preopt_sharding.Range{ .start = 73, .end = 146 }, worker.range);
+    try std.testing.expectEqualStrings("owned/work", worker.root_path);
+    try std.testing.expectEqualStrings("owned/result.txt", worker.result_path);
+    try std.testing.expectEqualStrings("owned/worker.log", worker.log_path);
+    try std.testing.expectEqualStrings("owned/stop", worker.stop_path);
+}
+
+test "production parser rejects partial preopt worker field sets" {
+    try std.testing.expectError(error.IncompletePreoptShardWorkerArguments, parseArguments(std.testing.io, &.{
+        "integrated-object-runner",
+        "--pipeline=preopt",
+        "--preopt-shard-worker=0",
+        "--preopt-shard-start=0",
+        "--preopt-shard-end=73",
+        "--preopt-shard-root=owned/work",
+        "--preopt-shard-result=owned/result.txt",
+        "--preopt-shard-log=owned/worker.log",
+    }));
+}
+
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
+
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+    var raw_args: std.ArrayList([]const u8) = .empty;
+    defer raw_args.deinit(allocator);
+    while (args.next()) |arg| try raw_args.append(allocator, arg);
+    const parsed = try parseArguments(io, raw_args.items);
+    const executable_path = parsed.executable_path;
+    const pipeline = parsed.pipeline;
+    const mode_filter = parsed.mode_filter;
+    const case_filter = parsed.case_filter;
+    const use_ir_writer = parsed.use_ir_writer;
+    const broad_source_backed = parsed.broad_source_backed;
+    const source_wrapper_dispatch = parsed.source_wrapper_dispatch;
+    const release_source_owned = parsed.release_source_owned;
+    const preopt_concurrency = parsed.preopt_concurrency;
+    const preopt_sharding_root = parsed.preopt_sharding_root;
+    const worker_options = parsed.worker_options;
+    const plain_preopt = pipeline == .preopt and !use_ir_writer and !broad_source_backed and
+        !source_wrapper_dispatch and !release_source_owned and mode_filter == null and case_filter == null;
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);

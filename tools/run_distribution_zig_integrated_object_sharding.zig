@@ -28,6 +28,35 @@ pub const ParentOptions = struct {
     concurrency: u8,
     explicit_root: ?[]const u8,
     environ_map: *const std.process.Environ.Map,
+    test_options: ?TestOptions = null,
+};
+
+const WorkerFixture = enum {
+    production,
+    first_child_fails,
+    all_sleep,
+};
+
+const BatchAudit = struct {
+    launched: [shard_count]usize = .{ 0, 0 },
+    wait_futures_started: [shard_count]usize = .{ 0, 0 },
+    termination_requests: [shard_count]usize = .{ 0, 0 },
+    reaped: [shard_count]usize = .{ 0, 0 },
+    descriptors_closed: [shard_count]usize = .{ 0, 0 },
+    close_after_reap: bool = true,
+    shared_stop_requests: usize = 0,
+    evidence_preserved_before_cleanup: bool = false,
+    failure_run_id: [32]u8 = undefined,
+    failure_run_id_recorded: bool = false,
+};
+
+const TestOptions = struct {
+    worker_fixture: WorkerFixture = .production,
+    fail_wait_future_before_index: ?usize = null,
+    monitor_interval_ns: i64 = monitor_interval_ns,
+    failure_evidence_dir: []const u8 = "tmp/preopt_sharding_failures",
+    filesystem_sample: ?FilesystemSample = null,
+    audit: *BatchAudit,
 };
 
 pub const WorkerOptions = struct {
@@ -249,13 +278,20 @@ fn waitWorker(
     };
 }
 
+const WorkerFuture = std.Io.Future(@typeInfo(@TypeOf(waitWorker)).@"fn".return_type.?);
+
 const SpawnedWorker = struct {
+    shard_index: usize,
     child: std.process.Child,
     pid: std.posix.pid_t,
     result_file: std.Io.File,
     log_file: std.Io.File,
     state: WaitState = .{},
     start: std.Io.Timestamp,
+    wait_future_started: bool = false,
+    termination_requested: bool = false,
+    reaped: bool = false,
+    descriptors_closed: bool = false,
 };
 
 fn spawnWorker(
@@ -304,7 +340,43 @@ fn spawnWorker(
     errdefer result_file.close(io);
     const log_file = try std.Io.Dir.cwd().createFile(io, shard.log, .{ .exclusive = true });
     errdefer log_file.close(io);
-    const child = try std.process.spawn(io, .{
+    const child = if (options.test_options) |test_options| switch (test_options.worker_fixture) {
+        .production => try std.process.spawn(io, .{
+            .argv = &argv,
+            .environ_map = &env_map,
+            .stdin = .ignore,
+            .stdout = .{ .file = result_file },
+            .stderr = .{ .file = log_file },
+            .request_resource_usage_statistics = true,
+            .pgid = 0,
+        }),
+        .first_child_fails => if (shard_index == 0)
+            try std.process.spawn(io, .{
+                .argv = &.{ "/bin/sh", "-c", "printf 'injected-original-child-failure\\n' >&2; exit 7" },
+                .stdin = .ignore,
+                .stdout = .{ .file = result_file },
+                .stderr = .{ .file = log_file },
+                .request_resource_usage_statistics = true,
+                .pgid = 0,
+            })
+        else
+            try std.process.spawn(io, .{
+                .argv = &.{ "/bin/sh", "-c", "sleep 30" },
+                .stdin = .ignore,
+                .stdout = .{ .file = result_file },
+                .stderr = .{ .file = log_file },
+                .request_resource_usage_statistics = true,
+                .pgid = 0,
+            }),
+        .all_sleep => try std.process.spawn(io, .{
+            .argv = &.{ "/bin/sh", "-c", "sleep 30" },
+            .stdin = .ignore,
+            .stdout = .{ .file = result_file },
+            .stderr = .{ .file = log_file },
+            .request_resource_usage_statistics = true,
+            .pgid = 0,
+        }),
+    } else try std.process.spawn(io, .{
         .argv = &argv,
         .environ_map = &env_map,
         .stdin = .ignore,
@@ -313,7 +385,9 @@ fn spawnWorker(
         .request_resource_usage_statistics = true,
         .pgid = 0,
     });
+    if (options.test_options) |test_options| test_options.audit.launched[shard_index] += 1;
     return .{
+        .shard_index = shard_index,
         .pid = child.id.?,
         .child = child,
         .result_file = result_file,
@@ -322,21 +396,55 @@ fn spawnWorker(
     };
 }
 
-fn closeWorkerFiles(io: std.Io, worker: *SpawnedWorker) void {
+fn closeWorkerFiles(io: std.Io, worker: *SpawnedWorker, options: ParentOptions) !void {
+    if (!worker.reaped) return error.PreoptShardDescriptorsClosedBeforeReap;
+    if (worker.child.id != null) return error.PreoptShardDescriptorsClosedBeforeChildCleanup;
+    if (worker.descriptors_closed) return error.PreoptShardDescriptorsClosedTwice;
     worker.result_file.close(io);
     worker.log_file.close(io);
+    worker.descriptors_closed = true;
+    if (options.test_options) |test_options| {
+        test_options.audit.descriptors_closed[worker.shard_index] += 1;
+        if (test_options.audit.reaped[worker.shard_index] == 0) test_options.audit.close_after_reap = false;
+    }
 }
 
-fn requestStop(io: std.Io, paths: *const OwnedPaths) void {
+const BatchControl = struct {
+    shared_stop_requested: bool = false,
+};
+
+fn requestSharedStop(
+    io: std.Io,
+    paths: *const OwnedPaths,
+    options: ParentOptions,
+    control: *BatchControl,
+) void {
+    if (control.shared_stop_requested) return;
+    control.shared_stop_requested = true;
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = paths.stop, .data = "stop\n" }) catch {};
+    if (options.test_options) |test_options| test_options.audit.shared_stop_requests += 1;
 }
 
-fn killWorkerGroup(worker: *const SpawnedWorker) void {
-    if (worker.state.done.load(.acquire)) return;
+fn requestWorkerTermination(worker: *SpawnedWorker, options: ParentOptions) void {
+    if (!worker.wait_future_started or worker.state.done.load(.acquire) or
+        worker.reaped or worker.termination_requested) return;
+    worker.termination_requested = true;
+    if (options.test_options) |test_options| test_options.audit.termination_requests[worker.shard_index] += 1;
     std.posix.kill(-worker.pid, .KILL) catch |err| switch (err) {
         error.ProcessNotFound => {},
         else => {},
     };
+}
+
+fn requestBatchTermination(
+    io: std.Io,
+    paths: *const OwnedPaths,
+    workers: []SpawnedWorker,
+    options: ParentOptions,
+    control: *BatchControl,
+) void {
+    requestSharedStop(io, paths, options, control);
+    for (workers) |*worker| requestWorkerTermination(worker, options);
 }
 
 fn allWorkersDone(workers: []const SpawnedWorker) bool {
@@ -349,31 +457,45 @@ fn anyWorkerFailed(workers: []const SpawnedWorker) bool {
     return false;
 }
 
+fn markWorkerReaped(worker: *SpawnedWorker, options: ParentOptions) void {
+    if (worker.reaped) return;
+    worker.reaped = true;
+    if (options.test_options) |test_options| test_options.audit.reaped[worker.shard_index] += 1;
+}
+
+fn directlyKillAndReapWorker(io: std.Io, worker: *SpawnedWorker, options: ParentOptions) void {
+    if (worker.reaped) return;
+    if (!worker.termination_requested) {
+        worker.termination_requested = true;
+        if (options.test_options) |test_options| test_options.audit.termination_requests[worker.shard_index] += 1;
+    }
+    worker.child.kill(io);
+    worker.state.done.store(true, .release);
+    markWorkerReaped(worker, options);
+}
+
 fn monitorBatch(
     allocator: std.mem.Allocator,
     io: std.Io,
     paths: *const OwnedPaths,
     workers: []SpawnedWorker,
     resource: *ResourceState,
+    options: ParentOptions,
+    control: *BatchControl,
 ) !void {
-    var stop_requested = false;
     while (true) {
         if (allWorkersDone(workers)) break;
-        const sample = try sampleFilesystem(allocator, io, paths.root);
+        const sample = try sampleFilesystemForRun(allocator, io, paths.root, options);
         if (sample.total_bytes != resource.filesystem_total_bytes) return error.PreoptShardingFilesystemChanged;
         resource.observeFree(sample.free_bytes) catch |err| {
-            requestStop(io, paths);
-            for (workers) |*worker| killWorkerGroup(worker);
+            requestBatchTermination(io, paths, workers, options, control);
             return err;
         };
         resource.observeDisk(try sampleDiskBytes(allocator, io, paths.root));
         resource.observeMemory(try sampleProcessTreeRssBytes(allocator, io, std.os.linux.getpid()));
-        if (anyWorkerFailed(workers) and !stop_requested) {
-            stop_requested = true;
-            requestStop(io, paths);
-            for (workers) |*worker| killWorkerGroup(worker);
-        }
-        try io.sleep(.fromNanoseconds(monitor_interval_ns), .awake);
+        if (anyWorkerFailed(workers)) requestBatchTermination(io, paths, workers, options, control);
+        const interval = if (options.test_options) |test_options| test_options.monitor_interval_ns else monitor_interval_ns;
+        try io.sleep(.fromNanoseconds(interval), .awake);
     }
 }
 
@@ -388,39 +510,79 @@ fn runBatch(
 ) !void {
     var workers: [shard_count]SpawnedWorker = undefined;
     var worker_count: usize = 0;
-    errdefer {
-        requestStop(io, paths);
-        for (workers[0..worker_count]) |*worker| {
-            worker.child.kill(io);
-            closeWorkerFiles(io, worker);
-        }
-    }
+    var primary_error: ?anyerror = null;
     for (shard_indices) |shard_index| {
-        workers[worker_count] = try spawnWorker(allocator, io, options, paths, shard_index);
+        workers[worker_count] = spawnWorker(allocator, io, options, paths, shard_index) catch |err| {
+            primary_error = err;
+            break;
+        };
         worker_count += 1;
     }
-    defer for (workers[0..worker_count]) |*worker| closeWorkerFiles(io, worker);
 
-    const WorkerFuture = std.Io.Future(@typeInfo(@TypeOf(waitWorker)).@"fn".return_type.?);
     var futures: [shard_count]WorkerFuture = undefined;
-    for (workers[0..worker_count], 0..) |*worker, index| {
-        futures[index] = try io.concurrent(waitWorker, .{ io, &worker.child, &worker.state, worker.start });
+    var future_count: usize = 0;
+    if (primary_error == null) {
+        for (workers[0..worker_count], 0..) |*worker, index| {
+            if (options.test_options) |test_options| {
+                if (test_options.fail_wait_future_before_index == index) {
+                    primary_error = error.InjectedPreoptWaitFutureSetupFailure;
+                    break;
+                }
+            }
+            futures[index] = io.concurrent(waitWorker, .{ io, &worker.child, &worker.state, worker.start }) catch |err| {
+                primary_error = err;
+                break;
+            };
+            worker.wait_future_started = true;
+            if (options.test_options) |test_options| test_options.audit.wait_futures_started[worker.shard_index] += 1;
+            future_count += 1;
+        }
     }
-    const monitor_result = monitorBatch(allocator, io, paths, workers[0..worker_count], resource);
+
+    var control: BatchControl = .{};
+    if (primary_error == null) {
+        monitorBatch(allocator, io, paths, workers[0..worker_count], resource, options, &control) catch |err| {
+            primary_error = err;
+            requestBatchTermination(io, paths, workers[0..worker_count], options, &control);
+        };
+        if (anyWorkerFailed(workers[0..worker_count])) {
+            requestBatchTermination(io, paths, workers[0..worker_count], options, &control);
+        }
+    } else {
+        requestBatchTermination(io, paths, workers[0..worker_count], options, &control);
+    }
+
     var first_wait_error: ?anyerror = null;
-    for (workers[0..worker_count], 0..) |*worker, index| {
+    for (workers[0..future_count], 0..) |*worker, index| {
         const result = futures[index].await(io) catch |err| {
             if (first_wait_error == null) first_wait_error = err;
+            worker.state.failed.store(true, .release);
+            if (worker.child.id != null) directlyKillAndReapWorker(io, worker, options) else markWorkerReaped(worker, options);
             continue;
         };
         waits[shard_indices[index]] = result;
         if (!common.termOk(result.term)) worker.state.failed.store(true, .release);
+        markWorkerReaped(worker, options);
     }
-    try monitor_result;
-    if (first_wait_error) |err| return err;
+
+    for (workers[future_count..worker_count]) |*worker| directlyKillAndReapWorker(io, worker, options);
+
+    if (primary_error == null) {
+        if (first_wait_error) |err| primary_error = err;
+    }
+    if (primary_error == null and anyWorkerFailed(workers[0..worker_count])) {
+        primary_error = error.PreoptShardChildFailed;
+    }
+    if (primary_error != null) requestSharedStop(io, paths, options, &control);
+
+    var first_close_error: ?anyerror = null;
     for (workers[0..worker_count]) |*worker| {
-        if (worker.state.failed.load(.acquire)) return error.PreoptShardChildFailed;
+        closeWorkerFiles(io, worker, options) catch |err| {
+            if (first_close_error == null) first_close_error = err;
+        };
     }
+    if (primary_error) |err| return err;
+    if (first_close_error) |err| return err;
 }
 
 pub fn writeNormalizedOutput(output: []const u8, writer: *std.Io.Writer) !void {
@@ -452,7 +614,7 @@ pub fn runParent(
     var paths = try OwnedPaths.init(allocator, io, options.explicit_root);
     defer paths.deinit();
 
-    const preflight = try sampleFilesystem(allocator, io, paths.root);
+    const preflight = try sampleFilesystemForRun(allocator, io, paths.root, options);
     const policy = headroom_policy.shardingForFilesystem(preflight.total_bytes);
     if (preflight.free_bytes < policy.required_start_bytes) return error.InsufficientPreoptShardingHeadroom;
     const starting_disk = try sampleDiskBytes(allocator, io, paths.root);
@@ -472,23 +634,23 @@ pub fn runParent(
     if (options.concurrency == 1) {
         const first = [_]usize{0};
         runBatch(allocator, io, options, &paths, &first, &resource, &waits) catch |err| {
-            try preserveFailureEvidence(allocator, io, &paths, waits, err);
+            try preserveFailureEvidence(allocator, io, options, &paths, waits, err);
             return err;
         };
         const second = [_]usize{1};
         runBatch(allocator, io, options, &paths, &second, &resource, &waits) catch |err| {
-            try preserveFailureEvidence(allocator, io, &paths, waits, err);
+            try preserveFailureEvidence(allocator, io, options, &paths, waits, err);
             return err;
         };
     } else {
         const both = [_]usize{ 0, 1 };
         runBatch(allocator, io, options, &paths, &both, &resource, &waits) catch |err| {
-            try preserveFailureEvidence(allocator, io, &paths, waits, err);
+            try preserveFailureEvidence(allocator, io, options, &paths, waits, err);
             return err;
         };
     }
 
-    const final_sample = try sampleFilesystem(allocator, io, paths.root);
+    const final_sample = try sampleFilesystemForRun(allocator, io, paths.root, options);
     try resource.observeFree(final_sample.free_bytes);
     resource.observeDisk(try sampleDiskBytes(allocator, io, paths.root));
     resource.observeMemory(try sampleProcessTreeRssBytes(allocator, io, std.os.linux.getpid()));
@@ -621,13 +783,17 @@ fn validateShardOutput(
 fn preserveFailureEvidence(
     allocator: std.mem.Allocator,
     io: std.Io,
+    options: ParentOptions,
     paths: *const OwnedPaths,
     waits: [shard_count]?WorkerWait,
     failure: anyerror,
 ) !void {
     var cwd = std.Io.Dir.cwd();
-    try cwd.createDirPath(io, "tmp/preopt_sharding_failures");
-    const manifest_path = try std.fmt.allocPrint(allocator, "tmp/preopt_sharding_failures/{s}.manifest", .{&paths.run_id});
+    const evidence_dir = if (options.test_options) |test_options| test_options.failure_evidence_dir else "tmp/preopt_sharding_failures";
+    try cwd.createDirPath(io, evidence_dir);
+    const manifest_name = try std.fmt.allocPrint(allocator, "{s}.manifest", .{&paths.run_id});
+    defer allocator.free(manifest_name);
+    const manifest_path = try std.fs.path.join(allocator, &.{ evidence_dir, manifest_name });
     defer allocator.free(manifest_path);
     var buffer: [2048]u8 = undefined;
     var writer = std.Io.Writer.fixed(&buffer);
@@ -640,14 +806,33 @@ fn preserveFailureEvidence(
         }
         const log = cwd.readFileAlloc(io, paths.shards[shard_index].log, allocator, .limited(64 * 1024)) catch continue;
         defer allocator.free(log);
-        const compact_path = try std.fmt.allocPrint(allocator, "tmp/preopt_sharding_failures/{s}.shard{}.log", .{ &paths.run_id, shard_index });
+        const compact_name = try std.fmt.allocPrint(allocator, "{s}.shard{}.log", .{ &paths.run_id, shard_index });
+        defer allocator.free(compact_name);
+        const compact_path = try std.fs.path.join(allocator, &.{ evidence_dir, compact_name });
         defer allocator.free(compact_path);
         try cwd.writeFile(io, .{ .sub_path = compact_path, .data = log });
     }
     try cwd.writeFile(io, .{ .sub_path = manifest_path, .data = writer.buffered() });
+    if (options.test_options) |test_options| {
+        test_options.audit.evidence_preserved_before_cleanup = try pathExists(io, paths.root);
+        test_options.audit.failure_run_id = paths.run_id;
+        test_options.audit.failure_run_id_recorded = true;
+    }
 }
 
 const FilesystemSample = struct { total_bytes: u64, free_bytes: u64 };
+
+fn sampleFilesystemForRun(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    options: ParentOptions,
+) !FilesystemSample {
+    if (options.test_options) |test_options| {
+        if (test_options.filesystem_sample) |sample| return sample;
+    }
+    return sampleFilesystem(allocator, io, path);
+}
 
 fn sampleFilesystem(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !FilesystemSample {
     const argv = [_][]const u8{ "df", "-B1", "--output=size,avail", path };
@@ -835,6 +1020,119 @@ test "child failure requests stop while cleanup still waits for every worker" {
     try std.testing.expect(allWorkersDone(&workers));
 }
 
+fn expectCompleteBatchAudit(audit: *const BatchAudit) !void {
+    try std.testing.expectEqual([2]usize{ 1, 1 }, audit.launched);
+    try std.testing.expectEqual([2]usize{ 1, 1 }, audit.reaped);
+    try std.testing.expectEqual([2]usize{ 1, 1 }, audit.descriptors_closed);
+    try std.testing.expect(audit.close_after_reap);
+    try std.testing.expectEqual(@as(usize, 1), audit.shared_stop_requests);
+    for (audit.termination_requests) |count| try std.testing.expect(count <= 1);
+    try std.testing.expect(audit.evidence_preserved_before_cleanup);
+    try std.testing.expect(audit.failure_run_id_recorded);
+}
+
+test "production parent preserves child failure and closes once after every worker is reaped" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    const base = try std.fs.path.join(allocator, &.{ ".zig-cache", "tmp", &temp.sub_path });
+    defer allocator.free(base);
+    const root = try std.fs.path.join(allocator, &.{ base, "owned-root" });
+    defer allocator.free(root);
+    const evidence_dir = try std.fs.path.join(allocator, &.{ base, "compact-evidence" });
+    defer allocator.free(evidence_dir);
+    var environ = std.process.Environ.Map.init(allocator);
+    defer environ.deinit();
+    var audit: BatchAudit = .{};
+    const test_options: TestOptions = .{
+        .worker_fixture = .first_child_fails,
+        .monitor_interval_ns = std.time.ns_per_ms,
+        .failure_evidence_dir = evidence_dir,
+        .filesystem_sample = .{ .total_bytes = 1_000_000_000_000, .free_bytes = 200_000_000_000 },
+        .audit = &audit,
+    };
+    var output_buffer: [4096]u8 = undefined;
+    var output = std.Io.Writer.fixed(&output_buffer);
+    try std.testing.expectError(error.PreoptShardChildFailed, runParent(allocator, io, .{
+        .executable_path = "unused-test-worker",
+        .target = "x86_64-unknown-linux-gnu",
+        .zllvm_exe = "zig-out/bin/z_llvm",
+        .concurrency = 2,
+        .explicit_root = root,
+        .environ_map = &environ,
+        .test_options = test_options,
+    }, &output));
+    try expectCompleteBatchAudit(&audit);
+    try std.testing.expectEqual([2]usize{ 1, 1 }, audit.wait_futures_started);
+    try std.testing.expect(!std.mem.containsAtLeast(u8, output.buffered(), 1, "summary zig-integrated-object"));
+    try std.testing.expect(!(try pathExists(io, root)));
+
+    const manifest_name = try std.fmt.allocPrint(allocator, "{s}.manifest", .{&audit.failure_run_id});
+    defer allocator.free(manifest_name);
+    const manifest_path = try std.fs.path.join(allocator, &.{ evidence_dir, manifest_name });
+    defer allocator.free(manifest_path);
+    const manifest = try std.Io.Dir.cwd().readFileAlloc(io, manifest_path, allocator, .limited(16 * 1024));
+    defer allocator.free(manifest);
+    try std.testing.expect(std.mem.containsAtLeast(u8, manifest, 1, "failure=PreoptShardChildFailed"));
+
+    const log_name = try std.fmt.allocPrint(allocator, "{s}.shard0.log", .{&audit.failure_run_id});
+    defer allocator.free(log_name);
+    const log_path = try std.fs.path.join(allocator, &.{ evidence_dir, log_name });
+    defer allocator.free(log_path);
+    const log = try std.Io.Dir.cwd().readFileAlloc(io, log_path, allocator, .limited(16 * 1024));
+    defer allocator.free(log);
+    try std.testing.expectEqualStrings("injected-original-child-failure\n", log);
+}
+
+test "partial wait-future setup signals future owner then directly kills and reaps remainder" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    const base = try std.fs.path.join(allocator, &.{ ".zig-cache", "tmp", &temp.sub_path });
+    defer allocator.free(base);
+    const root = try std.fs.path.join(allocator, &.{ base, "owned-root" });
+    defer allocator.free(root);
+    const evidence_dir = try std.fs.path.join(allocator, &.{ base, "compact-evidence" });
+    defer allocator.free(evidence_dir);
+    var environ = std.process.Environ.Map.init(allocator);
+    defer environ.deinit();
+    var audit: BatchAudit = .{};
+    const test_options: TestOptions = .{
+        .worker_fixture = .all_sleep,
+        .fail_wait_future_before_index = 1,
+        .monitor_interval_ns = std.time.ns_per_ms,
+        .failure_evidence_dir = evidence_dir,
+        .filesystem_sample = .{ .total_bytes = 1_000_000_000_000, .free_bytes = 200_000_000_000 },
+        .audit = &audit,
+    };
+    var output_buffer: [4096]u8 = undefined;
+    var output = std.Io.Writer.fixed(&output_buffer);
+    try std.testing.expectError(error.InjectedPreoptWaitFutureSetupFailure, runParent(allocator, io, .{
+        .executable_path = "unused-test-worker",
+        .target = "x86_64-unknown-linux-gnu",
+        .zllvm_exe = "zig-out/bin/z_llvm",
+        .concurrency = 2,
+        .explicit_root = root,
+        .environ_map = &environ,
+        .test_options = test_options,
+    }, &output));
+    try expectCompleteBatchAudit(&audit);
+    try std.testing.expectEqual([2]usize{ 1, 0 }, audit.wait_futures_started);
+    try std.testing.expectEqual([2]usize{ 1, 1 }, audit.termination_requests);
+    try std.testing.expect(!std.mem.containsAtLeast(u8, output.buffered(), 1, "summary zig-integrated-object"));
+    try std.testing.expect(!(try pathExists(io, root)));
+
+    const manifest_name = try std.fmt.allocPrint(allocator, "{s}.manifest", .{&audit.failure_run_id});
+    defer allocator.free(manifest_name);
+    const manifest_path = try std.fs.path.join(allocator, &.{ evidence_dir, manifest_name });
+    defer allocator.free(manifest_path);
+    const manifest = try std.Io.Dir.cwd().readFileAlloc(io, manifest_path, allocator, .limited(16 * 1024));
+    defer allocator.free(manifest);
+    try std.testing.expect(std.mem.containsAtLeast(u8, manifest, 1, "failure=InjectedPreoptWaitFutureSetupFailure"));
+}
+
 test "bounded fake child failure kills and reaps the active peer" {
     const io = std.testing.io;
     var failed_child = try std.process.spawn(io, .{
@@ -856,7 +1154,6 @@ test "bounded fake child failure kills and reaps the active peer" {
     const peer_pid = peer_child.id.?;
     var failed_state: WaitState = .{};
     var peer_state: WaitState = .{};
-    const WorkerFuture = std.Io.Future(@typeInfo(@TypeOf(waitWorker)).@"fn".return_type.?);
     var failed_future: WorkerFuture = try io.concurrent(waitWorker, .{ io, &failed_child, &failed_state, std.Io.Timestamp.now(io, .awake) });
     var peer_future: WorkerFuture = try io.concurrent(waitWorker, .{ io, &peer_child, &peer_state, std.Io.Timestamp.now(io, .awake) });
     const failed_wait = try failed_future.await(io);
