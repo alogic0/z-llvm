@@ -7,6 +7,7 @@ const stage2_planning = @import("stage2_planning.zig");
 const eflags = @import("composed_selector_eflags.zig");
 
 const MachineFunction = x86_64_machine.MachineFunction;
+const AccumulatorDomain = selector_types.AccumulatorDomain;
 const ValueBinding = selector_types.ValueBinding;
 const ValueLoc = selector_types.ValueLoc;
 const NameSet = stage2_planning.NameSet;
@@ -47,6 +48,7 @@ pub const ComposedBlockSelector = struct {
     spill_slots: std.StringHashMap(SpillSlotAssignment),
     next_spill_slot: usize = 0,
     eflags: eflags.Liveness = .{},
+    accumulator_domain: AccumulatorDomain = .{},
 
     pub fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
         return .{

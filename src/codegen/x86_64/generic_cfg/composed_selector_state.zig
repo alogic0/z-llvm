@@ -14,6 +14,7 @@ const ArgReg = x86_64_types.ArgReg;
 const FrameIndex = x86_64_types.FrameIndex;
 const XmmReg = x86_64_types.XmmReg;
 const MachineBinaryOp = x86_64_types.MachineBinaryOp;
+const AccumulatorDomain = selector_types.AccumulatorDomain;
 const PairSpillLoc = selector_types.PairSpillLoc;
 const RegPair = selector_types.RegPair;
 const StackArrayLoc = selector_types.StackArrayLoc;
@@ -75,6 +76,331 @@ const i64Value = composed_helpers.i64Value;
 pub const ComposedBlockSelector = state_data.ComposedBlockSelector;
 pub const EflagsEffect = eflags.Effect;
 pub const EflagsLiveness = eflags.Liveness;
+
+pub const AccumulatorPreparationEffect = enum {
+    preserve,
+    clobber,
+
+    fn eflagsEffect(effect: AccumulatorPreparationEffect) EflagsEffect {
+        return switch (effect) {
+            .preserve => .preserve,
+            .clobber => .clobber,
+        };
+    }
+};
+
+pub const AccumulatorDefinition = struct {
+    logical_bits: u16,
+    upper_bits: UpperBits,
+
+    pub const UpperBits = enum {
+        zero_extend,
+        fully_defined,
+        preserve,
+    };
+
+    pub fn zeroExtending(logical_bits: u16) AccumulatorDefinition {
+        return .{ .logical_bits = logical_bits, .upper_bits = .zero_extend };
+    }
+
+    pub fn fullRax() AccumulatorDefinition {
+        return .{ .logical_bits = 64, .upper_bits = .fully_defined };
+    }
+
+    pub fn preserving(logical_bits: u16) AccumulatorDefinition {
+        return .{ .logical_bits = logical_bits, .upper_bits = .preserve };
+    }
+
+    fn validate(definition: AccumulatorDefinition) !void {
+        switch (definition.logical_bits) {
+            8, 16, 32 => if (definition.upper_bits != .zero_extend) return error.AccumulatorStaleUpperBits,
+            64 => if (definition.upper_bits != .fully_defined) return error.AccumulatorStaleUpperBits,
+            else => return error.InvalidAccumulatorDefinitionWidth,
+        }
+    }
+
+    fn physicalLoc(definition: AccumulatorDefinition) ValueLoc {
+        return if (definition.logical_bits == 64) .rax else .eax;
+    }
+
+    fn virtualRegClass(definition: AccumulatorDefinition) VirtualRegClass {
+        return if (definition.logical_bits == 64) .gpr64 else .gpr32;
+    }
+};
+
+/// The sole state-transition authority for composed EAX/RAX definitions.
+///
+/// Commit 2 deliberately leaves production emitters on their accepted path;
+/// this transaction is exercised by its focused tests until emitter migration
+/// begins in a later authorized commit.
+pub const AccumulatorDefinitionTransaction = struct {
+    selector: *ComposedBlockSelector,
+    instruction_len: usize,
+    values: []ValueEntry,
+    spill_slots: []SpillEntry,
+    next_virtual_reg: usize,
+    next_spill_slot: usize,
+    accumulator_domain: AccumulatorDomain,
+    eflags_snapshot: EflagsLiveness.Snapshot,
+    phase: Phase = .begun,
+    pending: ?PendingDefinition = null,
+
+    const Phase = enum {
+        begun,
+        prepared,
+        defined,
+        committed,
+        rolled_back,
+    };
+
+    const ValueEntry = struct {
+        name: []const u8,
+        binding: ValueBinding,
+    };
+
+    const SpillEntry = struct {
+        name: []const u8,
+        assignment: SpillSlotAssignment,
+    };
+
+    const PendingDefinition = struct {
+        name: []const u8,
+        definition: AccumulatorDefinition,
+        binding: ValueBinding,
+    };
+
+    pub fn begin(selector: *ComposedBlockSelector) !AccumulatorDefinitionTransaction {
+        const values = try selector.allocator.alloc(ValueEntry, selector.values.count());
+        errdefer selector.allocator.free(values);
+        const spill_slots = try selector.allocator.alloc(SpillEntry, selector.spill_slots.count());
+        errdefer selector.allocator.free(spill_slots);
+
+        var value_index: usize = 0;
+        var value_it = selector.values.iterator();
+        while (value_it.next()) |entry| : (value_index += 1) {
+            values[value_index] = .{
+                .name = entry.key_ptr.*,
+                .binding = entry.value_ptr.*,
+            };
+        }
+
+        var spill_index: usize = 0;
+        var spill_it = selector.spill_slots.iterator();
+        while (spill_it.next()) |entry| : (spill_index += 1) {
+            spill_slots[spill_index] = .{
+                .name = entry.key_ptr.*,
+                .assignment = entry.value_ptr.*,
+            };
+        }
+
+        return .{
+            .selector = selector,
+            .instruction_len = selector.machine.instructions.items.len,
+            .values = values,
+            .spill_slots = spill_slots,
+            .next_virtual_reg = selector.next_virtual_reg,
+            .next_spill_slot = selector.next_spill_slot,
+            .accumulator_domain = selector.accumulator_domain,
+            .eflags_snapshot = selector.eflags.snapshot(),
+        };
+    }
+
+    pub fn deinit(transaction: *AccumulatorDefinitionTransaction) void {
+        switch (transaction.phase) {
+            .begun, .prepared, .defined => transaction.restore(.rolled_back),
+            .committed, .rolled_back => {},
+        }
+        transaction.selector.allocator.free(transaction.spill_slots);
+        transaction.selector.allocator.free(transaction.values);
+    }
+
+    pub fn prepare(transaction: *AccumulatorDefinitionTransaction, effect: AccumulatorPreparationEffect) !void {
+        switch (transaction.phase) {
+            .begun => {},
+            .prepared, .defined => return error.AccumulatorTransactionAlreadyPrepared,
+            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
+        }
+
+        // Validate the declared EFLAGS effect against a copy first.  A live
+        // flags rejection therefore cannot partially mutate accumulator or
+        // value state.
+        var next_eflags = transaction.selector.eflags;
+        try next_eflags.apply(effect.eflagsEffect());
+        transaction.selector.eflags = next_eflags;
+
+        errdefer transaction.restore(.rolled_back);
+        try clobberAccumulator(transaction.selector);
+        try transaction.requireAccumulatorUnbound();
+        transaction.selector.accumulator_domain.invalidate();
+        transaction.phase = .prepared;
+    }
+
+    pub fn materialize(
+        transaction: *AccumulatorDefinitionTransaction,
+        source: ValueLoc,
+        definition: AccumulatorDefinition,
+    ) !void {
+        try transaction.requirePrepared();
+        try definition.validate();
+        errdefer transaction.restore(.rolled_back);
+        try transaction.materializeIntoAccumulator(source, definition);
+    }
+
+    pub fn spill(transaction: *AccumulatorDefinitionTransaction, name: []const u8) !void {
+        try transaction.requirePrepared();
+        errdefer transaction.restore(.rolled_back);
+        if (try spillValue(transaction.selector, name)) |_| return error.AccumulatorSpillUnsupported;
+    }
+
+    pub fn define(
+        transaction: *AccumulatorDefinitionTransaction,
+        name: []const u8,
+        definition: AccumulatorDefinition,
+    ) !void {
+        switch (transaction.phase) {
+            .begun => return error.AccumulatorTransactionNotPrepared,
+            .prepared => {},
+            .defined => return error.AccumulatorAlreadyDefined,
+            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
+        }
+        try definition.validate();
+        if (transaction.selector.values.contains(name)) return error.AccumulatorDefinitionAlreadyBound;
+
+        const vreg: VirtualReg = .{
+            .index = transaction.selector.next_virtual_reg,
+            .class = definition.virtualRegClass(),
+            .bits = definition.logical_bits,
+        };
+        transaction.selector.next_virtual_reg += 1;
+        transaction.pending = .{
+            .name = name,
+            .definition = definition,
+            .binding = .{ .vreg = vreg, .loc = definition.physicalLoc() },
+        };
+        transaction.phase = .defined;
+    }
+
+    pub fn commit(transaction: *AccumulatorDefinitionTransaction) !void {
+        switch (transaction.phase) {
+            .begun, .prepared => return error.AccumulatorCommitWithoutDefinition,
+            .defined => {},
+            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
+        }
+        errdefer transaction.restore(.rolled_back);
+        try transaction.requireAccumulatorUnbound();
+
+        const pending = transaction.pending.?;
+        const physical = pending.definition.physicalLoc();
+        const target = plannedResultLoc(transaction.selector, pending.name, physical) orelse physical;
+        if (!valueLocEql(physical, target)) {
+            try materializeLocIntoLocWithBits(
+                transaction.selector,
+                physical,
+                target,
+                pending.definition.logical_bits,
+            );
+        }
+        try transaction.selector.values.put(pending.name, .{
+            .vreg = pending.binding.vreg,
+            .loc = target,
+        });
+
+        if (locIsAccumulator(target)) {
+            const binding = transaction.selector.values.get(pending.name).?;
+            transaction.selector.accumulator_domain = .{
+                .occupant = .{
+                    .binding = binding,
+                    .logical_bits = pending.definition.logical_bits,
+                },
+                // Any EAX write in this authority is a 32-bit zero-extending
+                // definition; RAX writes define all 64 bits directly.
+                .defined_bits = 64,
+            };
+        } else {
+            transaction.selector.accumulator_domain.invalidate();
+        }
+        transaction.phase = .committed;
+    }
+
+    pub fn rollback(transaction: *AccumulatorDefinitionTransaction) !void {
+        switch (transaction.phase) {
+            .begun, .prepared, .defined => transaction.restore(.rolled_back),
+            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
+        }
+    }
+
+    fn requirePrepared(transaction: *const AccumulatorDefinitionTransaction) !void {
+        switch (transaction.phase) {
+            .prepared => {},
+            .begun => return error.AccumulatorTransactionNotPrepared,
+            .defined => return error.AccumulatorAlreadyDefined,
+            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
+        }
+    }
+
+    fn requireAccumulatorUnbound(transaction: *const AccumulatorDefinitionTransaction) !void {
+        var it = transaction.selector.values.iterator();
+        while (it.next()) |entry| switch (entry.value_ptr.loc) {
+            .eax, .rax => return error.AccumulatorAliasConflict,
+            else => {},
+        };
+    }
+
+    fn materializeIntoAccumulator(
+        transaction: *AccumulatorDefinitionTransaction,
+        source: ValueLoc,
+        definition: AccumulatorDefinition,
+    ) !void {
+        const selector = transaction.selector;
+        switch (definition.physicalLoc()) {
+            .eax => switch (source) {
+                .arg32, .scratch32, .arg64, .scratch64 => |reg| try selector.machine.instructions.append(
+                    selector.allocator,
+                    .{ .mov_arg_eax = reg },
+                ),
+                .spill64 => |frame_index| try selector.machine.instructions.append(
+                    selector.allocator,
+                    .{ .reload_rsp_eax = frame_index },
+                ),
+                .eax, .rax => {},
+                else => return error.UnsupportedCodegenValue,
+            },
+            .rax => switch (source) {
+                .arg64, .scratch64 => |reg| try selector.machine.instructions.append(
+                    selector.allocator,
+                    .{ .mov_arg_rax = reg },
+                ),
+                .spill64 => |frame_index| try selector.machine.instructions.append(
+                    selector.allocator,
+                    .{ .reload_rsp_rax = frame_index },
+                ),
+                .eax, .rax => {},
+                else => return error.UnsupportedCodegenValue,
+            },
+            else => unreachable,
+        }
+    }
+
+    fn restore(transaction: *AccumulatorDefinitionTransaction, phase: Phase) void {
+        transaction.selector.machine.instructions.items.len = transaction.instruction_len;
+
+        transaction.selector.values.clearRetainingCapacity();
+        for (transaction.values) |entry| {
+            transaction.selector.values.putAssumeCapacity(entry.name, entry.binding);
+        }
+        transaction.selector.spill_slots.clearRetainingCapacity();
+        for (transaction.spill_slots) |entry| {
+            transaction.selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment);
+        }
+
+        transaction.selector.next_virtual_reg = transaction.next_virtual_reg;
+        transaction.selector.next_spill_slot = transaction.next_spill_slot;
+        transaction.selector.accumulator_domain = transaction.accumulator_domain;
+        transaction.selector.eflags.restore(transaction.eflags_snapshot);
+        transaction.pending = null;
+        transaction.phase = phase;
+    }
+};
 
 pub fn eflagsInstructionEffect(instruction: x86_64_machine.Instruction) EflagsEffect {
     return eflags.instructionEffect(instruction);

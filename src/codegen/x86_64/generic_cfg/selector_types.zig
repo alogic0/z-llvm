@@ -94,6 +94,33 @@ pub const ValueBinding = struct {
     loc: ValueLoc,
 };
 
+/// EAX and RAX are one physical accumulator alias.  This domain is the single
+/// selector-state representation of the value occupying that alias and of the
+/// bits defined by its most recent committed definition.
+pub const AccumulatorDomain = struct {
+    occupant: ?Occupant = null,
+    defined_bits: u16 = 0,
+
+    pub const Alias = enum {
+        eax,
+        rax,
+    };
+
+    pub const Occupant = struct {
+        binding: ValueBinding,
+        logical_bits: u16,
+    };
+
+    pub fn occupantFor(domain: AccumulatorDomain, alias: Alias) ?Occupant {
+        _ = alias;
+        return domain.occupant;
+    }
+
+    pub fn invalidate(domain: *AccumulatorDomain) void {
+        domain.* = .{};
+    }
+};
+
 pub const VirtualRegMetadata = struct {
     class: VirtualRegClass,
     bits: u16,
