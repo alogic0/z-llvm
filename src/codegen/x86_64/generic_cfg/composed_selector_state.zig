@@ -7,6 +7,7 @@ const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const composed_helpers = @import("composed_helpers.zig");
 const state_data = @import("composed_selector_state_data.zig");
+const eflags = @import("composed_selector_eflags.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -72,6 +73,21 @@ const i32BitPattern = composed_helpers.i32BitPattern;
 const i64Value = composed_helpers.i64Value;
 
 pub const ComposedBlockSelector = state_data.ComposedBlockSelector;
+pub const EflagsEffect = eflags.Effect;
+pub const EflagsLiveness = eflags.Liveness;
+
+pub fn eflagsInstructionEffect(instruction: x86_64_machine.Instruction) EflagsEffect {
+    return eflags.instructionEffect(instruction);
+}
+
+pub fn validateEflagsInstructions(
+    selector: *const ComposedBlockSelector,
+    instructions: []const x86_64_machine.Instruction,
+) !void {
+    const saved = selector.eflags.snapshot();
+    try eflags.validateInstructions(selector.allocator, instructions);
+    try selector.eflags.validateSnapshot(saved);
+}
 
 fn scratch64RegForUseAvoiding(selector: *const ComposedBlockSelector, avoid: ?ArgReg) ?ArgReg {
     for (selector_allocatable_regs) |reg| {

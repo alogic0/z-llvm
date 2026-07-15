@@ -1,4 +1,5 @@
 test {
+    _ = @import("composed_selector_eflags_tests.zig");
     _ = @import("composed_selector_state_tests.zig");
     _ = @import("composed_selector_frame_tests.zig");
     _ = @import("composed_selector_icmp_tests.zig");

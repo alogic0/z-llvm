@@ -4,6 +4,7 @@ const x86_64_types = @import("../types.zig");
 const ir = @import("../../../ir.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
+const eflags = @import("composed_selector_eflags.zig");
 
 const MachineFunction = x86_64_machine.MachineFunction;
 const ValueBinding = selector_types.ValueBinding;
@@ -45,6 +46,7 @@ pub const ComposedBlockSelector = struct {
     preserve_current_position_values: bool = false,
     spill_slots: std.StringHashMap(SpillSlotAssignment),
     next_spill_slot: usize = 0,
+    eflags: eflags.Liveness = .{},
 
     pub fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
         return .{
