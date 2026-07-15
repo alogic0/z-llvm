@@ -105,6 +105,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try lowerAbsI128(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) return try lowerCtlzI16(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try lowerCtlzI32(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.ctlz.i52")) return try lowerCtlzI52(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i64")) return try lowerCtlzI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i32")) return try lowerCttzI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
@@ -531,6 +532,45 @@ pub fn lowerCtlzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     try selector.machine.instructions.append(selector.allocator, .clz_i64_rdi_eax);
     try selector_state.bindRax(selector, result_name);
     return null;
+}
+
+pub fn lowerCtlzI52(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (!isExactCtlzI52Call(call)) return .{ .no_emitter = "composed-block-ctlz-i52-envelope" };
+    selector_state.emitValueIntoScratch(selector, call.args.items[0].value, .rdi, 64) catch
+        return .{ .unsupported_value = "composed-block-ctlz-value" };
+    try selector_state.clobberAccumulator(selector);
+    try selector.machine.instructions.append(selector.allocator, .clz_i64_rdi_eax);
+    try selector.machine.instructions.append(selector.allocator, .{ .add_eax_imm32 = -12 });
+    try selector_state.bindRax(selector, result_name);
+    return null;
+}
+
+pub fn isExactCtlzI52Call(call: ir.CallInst) bool {
+    if (!std.mem.eql(u8, call.callee, "llvm.ctlz.i52") or call.inline_asm != null or call.callee_value != null or
+        call.callee_function_ty != null or call.calling_conv != null or call.raw_args != null or call.operand_bundle != null)
+    {
+        return false;
+    }
+    if (call.tail_kind) |tail_kind| if (!std.mem.eql(u8, tail_kind, "tail")) return false;
+    if (call.attrs) |attrs| if (!isAttributeGroupReference(attrs)) return false;
+    if (!intrinsic_attrs.matchesIntegerRange(call.ret_attrs, 52, 0, 53) or
+        !call.ret_ty.eql(.{ .int = 52 }) or call.args.items.len != 2)
+    {
+        return false;
+    }
+    const value_arg = call.args.items[0];
+    const zero_undef_arg = call.args.items[1];
+    return value_arg.attrs == null and zero_undef_arg.attrs == null and
+        value_arg.ty.eql(.{ .int = 52 }) and zero_undef_arg.ty.eql(.{ .int = 1 }) and
+        zero_undef_arg.value.eql(.{ .int = 1 });
+}
+
+fn isAttributeGroupReference(attrs: []const u8) bool {
+    const trimmed = std.mem.trim(u8, attrs, " \t");
+    if (trimmed.len < 2 or trimmed[0] != '#') return false;
+    for (trimmed[1..]) |c| if (!std.ascii.isDigit(c)) return false;
+    return true;
 }
 
 pub fn lowerCttzI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {

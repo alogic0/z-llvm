@@ -1223,6 +1223,387 @@ test "composed selector executes exact EI entry switch phi edges" {
     }
 }
 
+test "composed selector executes exact frexp switch phi edge" {
+    const input =
+        \\define void @frexp_edge(i64 %bits, i32 %subnormal, ptr %out_exp, ptr %out_bits) {
+        \\entry:
+        \\  %high = lshr i64 %bits, 52
+        \\  %kind = trunc i64 %high to i11
+        \\  switch i11 %kind, label %default [
+        \\    i11 0, label %case_zero
+        \\    i11 -1, label %join
+        \\  ]
+        \\case_zero:
+        \\  %use_subnormal = icmp ne i32 %subnormal, 0
+        \\  br i1 %use_subnormal, label %subnormal_path, label %join
+        \\subnormal_path:
+        \\  %sub_exp = add i32 %subnormal, -1023
+        \\  %sub_bits = or i64 %bits, 4602678819172646912
+        \\  br label %join
+        \\default:
+        \\  %default_exp = add i32 %subnormal, 17
+        \\  %default_bits = xor i64 %bits, 4602678819172646912
+        \\  br label %join
+        \\join:
+        \\  %exp = phi i32 [ %default_exp, %default ], [ %sub_exp, %subnormal_path ], [ 0, %case_zero ], [ 0, %entry ]
+        \\  %result_bits = phi i64 [ %default_bits, %default ], [ %sub_bits, %subnormal_path ], [ %bits, %case_zero ], [ %bits, %entry ]
+        \\  store i32 %exp, ptr %out_exp, align 4
+        \\  store i64 %result_bits, ptr %out_bits, align 8
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("frexp_edge", .void);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    var saw_scalar_spill = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_arg64_rsp, .spill_rax_rsp => saw_scalar_spill = true,
+        else => {},
+    };
+    try std.testing.expect(saw_scalar_spill);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const frexp_edge: *const fn (u64, u32, *u32, *u64) callconv(.c) void = @ptrCast(mapping.ptr);
+    const Case = struct { bits: u64, subnormal: u32, exp: u32, result_bits: u64 };
+    const cases = [_]Case{
+        .{ .bits = 0, .subnormal = 0, .exp = 0, .result_bits = 0 },
+        .{ .bits = 1, .subnormal = 1, .exp = @bitCast(@as(i32, -1022)), .result_bits = 0x3fe0_0000_0000_0001 },
+        .{ .bits = 0x0010_0000_0000_0123, .subnormal = 2, .exp = 19, .result_bits = 0x3ff0_0000_0000_0123 },
+        .{ .bits = 0x7ff0_0000_0000_0456, .subnormal = 3, .exp = 0, .result_bits = 0x7ff0_0000_0000_0456 },
+    };
+    for (cases) |case| {
+        var exp: u32 = 0xdead_beef;
+        var result_bits: u64 = 0xdead_beef_dead_beef;
+        frexp_edge(case.bits, case.subnormal, &exp, &result_bits);
+        try std.testing.expectEqual(case.exp, exp);
+        try std.testing.expectEqual(case.result_bits, result_bits);
+    }
+}
+
+test "composed selector keeps near-miss frexp switch phi edges fail closed" {
+    const input =
+        \\define i64 @wrong_width(i64 %bits) {
+        \\entry:
+        \\  %high = lshr i64 %bits, 52
+        \\  %kind = trunc i64 %high to i12
+        \\  switch i12 %kind, label %default [
+        \\    i12 0, label %case_zero
+        \\    i12 -1, label %join
+        \\  ]
+        \\case_zero:
+        \\  br label %join
+        \\default:
+        \\  br label %join
+        \\join:
+        \\  %exp = phi i32 [ 1, %default ], [ 2, %case_zero ], [ 0, %entry ]
+        \\  %result = phi i64 [ %bits, %default ], [ %bits, %case_zero ], [ %bits, %entry ]
+        \\  ret i64 %result
+        \\}
+        \\define i64 @poison_source(i64 %bits) {
+        \\entry:
+        \\  %high = lshr i64 %bits, 52
+        \\  %kind = trunc i64 %high to i11
+        \\  switch i11 %kind, label %default [
+        \\    i11 0, label %case_zero
+        \\    i11 -1, label %join
+        \\  ]
+        \\case_zero:
+        \\  br label %join
+        \\subnormal:
+        \\  br label %join
+        \\default:
+        \\  br label %join
+        \\join:
+        \\  %exp = phi i32 [ 1, %default ], [ 2, %subnormal ], [ 0, %case_zero ], [ 0, %entry ]
+        \\  %result = phi i64 [ %bits, %default ], [ poison, %subnormal ], [ %bits, %case_zero ], [ %bits, %entry ]
+        \\  ret i64 %result
+        \\}
+        \\define i64 @second_phi_target(i64 %bits) {
+        \\entry:
+        \\  %high = lshr i64 %bits, 52
+        \\  %kind = trunc i64 %high to i11
+        \\  switch i11 %kind, label %default [
+        \\    i11 0, label %case_zero
+        \\    i11 -1, label %join
+        \\  ]
+        \\case_zero:
+        \\  %other = phi i64 [ %bits, %entry ]
+        \\  br label %join
+        \\subnormal:
+        \\  br label %join
+        \\default:
+        \\  br label %join
+        \\join:
+        \\  %exp = phi i32 [ 1, %default ], [ 2, %subnormal ], [ 0, %case_zero ], [ 0, %entry ]
+        \\  %result = phi i64 [ %bits, %default ], [ %bits, %subnormal ], [ %other, %case_zero ], [ %bits, %entry ]
+        \\  ret i64 %result
+        \\}
+        \\define i64 @wrong_cases(i64 %bits) {
+        \\entry:
+        \\  %high = lshr i64 %bits, 52
+        \\  %kind = trunc i64 %high to i11
+        \\  switch i11 %kind, label %default [
+        \\    i11 0, label %case_zero
+        \\    i11 -2, label %join
+        \\  ]
+        \\case_zero:
+        \\  br label %join
+        \\subnormal:
+        \\  br label %join
+        \\default:
+        \\  br label %join
+        \\join:
+        \\  %exp = phi i32 [ 1, %default ], [ 2, %subnormal ], [ 0, %case_zero ], [ 0, %entry ]
+        \\  %result = phi i64 [ %bits, %default ], [ %bits, %subnormal ], [ %bits, %case_zero ], [ %bits, %entry ]
+        \\  ret i64 %result
+        \\}
+        \\define i64 @wrong_phi_type(i64 %bits) {
+        \\entry:
+        \\  %high = lshr i64 %bits, 52
+        \\  %kind = trunc i64 %high to i11
+        \\  switch i11 %kind, label %default [
+        \\    i11 0, label %case_zero
+        \\    i11 -1, label %join
+        \\  ]
+        \\case_zero:
+        \\  br label %join
+        \\subnormal:
+        \\  br label %join
+        \\default:
+        \\  br label %join
+        \\join:
+        \\  %exp = phi i16 [ 1, %default ], [ 2, %subnormal ], [ 0, %case_zero ], [ 0, %entry ]
+        \\  %result = phi i64 [ %bits, %default ], [ %bits, %subnormal ], [ %bits, %case_zero ], [ %bits, %entry ]
+        \\  ret i64 %result
+        \\}
+        \\define i64 @wrong_phi_count(i64 %bits) {
+        \\entry:
+        \\  %high = lshr i64 %bits, 52
+        \\  %kind = trunc i64 %high to i11
+        \\  switch i11 %kind, label %default [
+        \\    i11 0, label %case_zero
+        \\    i11 -1, label %join
+        \\  ]
+        \\case_zero:
+        \\  br label %join
+        \\subnormal:
+        \\  br label %join
+        \\default:
+        \\  br label %join
+        \\join:
+        \\  %result = phi i64 [ %bits, %default ], [ %bits, %subnormal ], [ %bits, %case_zero ], [ %bits, %entry ]
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    for (module.functions.items) |function| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        switch (try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function)) {
+            .unsupported => |diagnostic| try std.testing.expectEqualStrings("stage2-switch-phi-edge", diagnostic.detail()),
+            .selected => return error.TestUnexpectedResult,
+        }
+    }
+}
+
+test "composed selector executes guarded i52 normalization family" {
+    const input =
+        \\declare i52 @llvm.ctlz.i52(i52, i1 immarg)
+        \\define void @normalize_i52(i64 %raw, ptr %out_shifted, ptr %out_count, ptr %out_predicate, ptr %out_shift) {
+        \\entry:
+        \\  %zero64 = and i64 %raw, 0
+        \\  %zero32 = trunc i64 %zero64 to i32
+        \\  %guard_count = add i32 %zero32, 52
+        \\  %fraction = trunc i64 %raw to i52
+        \\  %is_zero = icmp eq i52 %fraction, 0
+        \\  br i1 %is_zero, label %guard, label %nonzero
+        \\guard:
+        \\  store i64 %zero64, ptr %out_shifted, align 8
+        \\  store i32 %guard_count, ptr %out_count, align 4
+        \\  store i32 %zero32, ptr %out_predicate, align 4
+        \\  store i32 %zero32, ptr %out_shift, align 4
+        \\  br label %done
+        \\nonzero:
+        \\  %count = tail call range(i52 0, 53) i52 @llvm.ctlz.i52(i52 %fraction, i1 true)
+        \\  %count6 = trunc nuw i52 %count to i6
+        \\  %shift6 = add nuw i6 %count6, 1
+        \\  %in_range = icmp ult i6 %count6, -13
+        \\  %shift52 = zext i6 %shift6 to i52
+        \\  %shifted52 = shl i52 %fraction, %shift52
+        \\  %shifted64 = zext i52 %shifted52 to i64
+        \\  %selected = select i1 %in_range, i64 %shifted64, i64 0
+        \\  %count32 = trunc nuw nsw i52 %count to i32
+        \\  %predicate32 = zext i1 %in_range to i32
+        \\  %shift32 = zext i6 %shift6 to i32
+        \\  store i64 %selected, ptr %out_shifted, align 8
+        \\  store i32 %count32, ptr %out_count, align 4
+        \\  store i32 %predicate32, ptr %out_predicate, align 4
+        \\  store i32 %shift32, ptr %out_shift, align 4
+        \\  br label %done
+        \\done:
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("normalize_i52", .void);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const normalize: *const fn (u64, *u64, *u32, *u32, *u32) callconv(.c) void = @ptrCast(mapping.ptr);
+    const Case = struct { raw: u64, shifted: u64, count: u32, predicate: u32, shift: u32 };
+    const dense_cases = [_]Case{
+        .{ .raw = 0, .shifted = 0, .count = 52, .predicate = 0, .shift = 0 },
+        .{ .raw = 1, .shifted = 0, .count = 51, .predicate = 0, .shift = 52 },
+        .{ .raw = 2, .shifted = 0, .count = 50, .predicate = 1, .shift = 51 },
+        .{ .raw = 3, .shifted = 0x8000_0000_0000_0, .count = 50, .predicate = 1, .shift = 51 },
+        .{ .raw = 0xaaaa_aaaa_aaaa_a, .shifted = 0x5555_5555_5555_4, .count = 0, .predicate = 1, .shift = 1 },
+        .{ .raw = 0x5555_5555_5555_5, .shifted = 0x5555_5555_5555_4, .count = 1, .predicate = 1, .shift = 2 },
+        .{ .raw = 0xffff_ffff_ffff_f, .shifted = 0xffff_ffff_ffff_e, .count = 0, .predicate = 1, .shift = 1 },
+        .{ .raw = 0xf0f0_f0f0_f0f0_f, .shifted = 0xe1e1_e1e1_e1e1_e, .count = 0, .predicate = 1, .shift = 1 },
+        .{ .raw = 0xfff0_0000_0000_0000, .shifted = 0, .count = 52, .predicate = 0, .shift = 0 },
+        .{ .raw = 0xabc1_2345_6789_abcd, .shifted = 0x2345_6789_abcd_0, .count = 3, .predicate = 1, .shift = 4 },
+    };
+    for (dense_cases) |case| try expectI52Normalization(normalize, case.raw, case.shifted, case.count, case.predicate, case.shift);
+    for (0..52) |bit| {
+        const raw = @as(u64, 1) << @intCast(bit);
+        const count: u32 = @intCast(51 - bit);
+        try expectI52Normalization(normalize, raw, 0, count, @intFromBool(bit != 0), count + 1);
+    }
+}
+
+fn expectI52Normalization(
+    normalize: *const fn (u64, *u64, *u32, *u32, *u32) callconv(.c) void,
+    raw: u64,
+    expected_shifted: u64,
+    expected_count: u32,
+    expected_predicate: u32,
+    expected_shift: u32,
+) !void {
+    var shifted: u64 = 0xdead_beef_dead_beef;
+    var count: u32 = 0xdead_beef;
+    var predicate: u32 = 0xdead_beef;
+    var shift: u32 = 0xdead_beef;
+    normalize(raw, &shifted, &count, &predicate, &shift);
+    try std.testing.expectEqual(expected_shifted, shifted);
+    try std.testing.expectEqual(expected_count, count);
+    try std.testing.expectEqual(expected_predicate, predicate);
+    try std.testing.expectEqual(expected_shift, shift);
+}
+
+test "composed selector keeps excluded i52 forms fail closed" {
+    const input =
+        \\declare i52 @llvm.ctlz.i52(i52, i1 immarg)
+        \\define i64 @ctlz_false(i64 %raw) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i52
+        \\  %count = call range(i52 0, 53) i52 @llvm.ctlz.i52(i52 %fraction, i1 false)
+        \\  %result = zext i52 %count to i64
+        \\  ret i64 %result
+        \\}
+        \\define i64 @ctlz_wrong_range(i64 %raw) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i52
+        \\  %count = call range(i52 0, 52) i52 @llvm.ctlz.i52(i52 %fraction, i1 true)
+        \\  %result = zext i52 %count to i64
+        \\  ret i64 %result
+        \\}
+        \\define i64 @ctlz_nonliteral(i64 %raw, i1 %zero_is_poison) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i52
+        \\  %count = call range(i52 0, 53) i52 @llvm.ctlz.i52(i52 %fraction, i1 %zero_is_poison)
+        \\  %result = zext i52 %count to i64
+        \\  ret i64 %result
+        \\}
+        \\define i64 @ctlz_abi_attr(i64 %raw) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i52
+        \\  %count = call zeroext range(i52 0, 53) i52 @llvm.ctlz.i52(i52 %fraction, i1 true)
+        \\  %result = zext i52 %count to i64
+        \\  ret i64 %result
+        \\}
+        \\define i64 @other_odd_width(i64 %raw) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i51
+        \\  %result = zext i51 %fraction to i64
+        \\  ret i64 %result
+        \\}
+        \\define i64 @arbitrary_add(i64 %raw) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i52
+        \\  %sum = add i52 %fraction, 1
+        \\  %result = zext i52 %sum to i64
+        \\  ret i64 %result
+        \\}
+        \\define i1 @signed_compare(i64 %raw) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i52
+        \\  %result = icmp slt i52 %fraction, 0
+        \\  ret i1 %result
+        \\}
+        \\define i64 @unknown_shift(i64 %raw, i64 %amount) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i52
+        \\  %narrow_amount = trunc i64 %amount to i6
+        \\  %wide_amount = zext i6 %narrow_amount to i52
+        \\  %shifted = shl i52 %fraction, %wide_amount
+        \\  %result = zext i52 %shifted to i64
+        \\  ret i64 %result
+        \\}
+        \\define i52 @i52_return(i64 %raw) {
+        \\entry:
+        \\  %fraction = trunc i64 %raw to i52
+        \\  ret i52 %fraction
+        \\}
+        \\define i64 @i52_param(i52 %fraction) {
+        \\entry:
+        \\  %result = zext i52 %fraction to i64
+        \\  ret i64 %result
+        \\}
+        \\define i64 @i52_memory(i64 %raw) {
+        \\entry:
+        \\  %slot = alloca i52, align 8
+        \\  %fraction = trunc i64 %raw to i52
+        \\  store i52 %fraction, ptr %slot, align 8
+        \\  %loaded = load i52, ptr %slot, align 8
+        \\  %result = zext i52 %loaded to i64
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    for (module.functions.items) |function| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        switch (try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function)) {
+            .unsupported => {},
+            .selected => return error.TestUnexpectedResult,
+        }
+    }
+}
+
 test "composed selector keeps non-EI switch phi shapes fail closed" {
     const input =
         \\define double @wrong_width(i32 %which, double %v1, double %v2, double %v3, double %v4, double %v5) {

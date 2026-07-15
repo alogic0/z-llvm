@@ -309,6 +309,22 @@ fn lowerSwitch(
     }
 
     if (has_phi_edge) {
+        if (isExactFrexpSwitchPhiShape(
+            function,
+            block_index,
+            switch_term,
+            case_values[0..switch_term.cases.items.len],
+            case_target_indices[0..switch_term.cases.items.len],
+            default_index,
+        )) return lowerExactFrexpSwitchPhiEdge(
+            selector,
+            function,
+            block_index,
+            switch_term,
+            case_values[0..switch_term.cases.items.len],
+            case_target_indices[0..switch_term.cases.items.len],
+            default_index,
+        );
         if (!isExactEiEntrySwitchPhiShape(
             function,
             block_index,
@@ -346,6 +362,134 @@ fn lowerSwitch(
         switch_term.cases.items[case_index].target
     else
         switch_term.default_target });
+    return null;
+}
+
+fn isExactFrexpSwitchPhiShape(
+    function: ir.Function,
+    block_index: usize,
+    switch_term: ir.SwitchTerminator,
+    case_values: []const i32,
+    case_target_indices: []const usize,
+    default_index: usize,
+) bool {
+    if (!switch_term.cond_ty.eql(.{ .int = 11 }) or switch_term.cond != .named or
+        case_values.len != 2 or case_target_indices.len != 2)
+    {
+        return false;
+    }
+
+    var zero_index: ?usize = null;
+    var all_ones_index: ?usize = null;
+    for (case_values, 0..) |value, index| {
+        if (value == 0) {
+            if (zero_index != null) return false;
+            zero_index = index;
+        } else if (value == switchValueMask(11)) {
+            if (all_ones_index != null) return false;
+            all_ones_index = index;
+        } else return false;
+    }
+    const zero_target_index = case_target_indices[zero_index orelse return false];
+    const phi_target_index = case_target_indices[all_ones_index orelse return false];
+    if (zero_target_index == phi_target_index or zero_target_index == default_index or phi_target_index == default_index) return false;
+
+    const predecessor = function.blocks.items[block_index].name;
+    if (blockHasPhiIncomingFrom(function.blocks.items[zero_target_index], predecessor) or
+        blockHasPhiIncomingFrom(function.blocks.items[default_index], predecessor))
+    {
+        return false;
+    }
+
+    const target = function.blocks.items[phi_target_index];
+    var i32_phi: ?ir.PhiInst = null;
+    var i64_phi: ?ir.PhiInst = null;
+    var phi_count: usize = 0;
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => continue,
+        };
+        phi_count += 1;
+        if (phi.ty.eql(.{ .int = 32 })) {
+            if (i32_phi != null) return false;
+            i32_phi = phi;
+        } else if (phi.ty.eql(.{ .int = 64 })) {
+            if (i64_phi != null) return false;
+            i64_phi = phi;
+        } else return false;
+    }
+    if (phi_count != 2) return false;
+    const exponent_phi = i32_phi orelse return false;
+    const bits_phi = i64_phi orelse return false;
+    if (!sameFourFullDefinedPhiPredecessors(function, exponent_phi, bits_phi)) return false;
+
+    const exponent_incoming = phiIncomingFrom(exponent_phi, predecessor) orelse return false;
+    const bits_incoming = phiIncomingFrom(bits_phi, predecessor) orelse return false;
+    return exponent_incoming.value.eql(.{ .int = 0 }) and bits_incoming.value == .named;
+}
+
+fn sameFourFullDefinedPhiPredecessors(function: ir.Function, lhs: ir.PhiInst, rhs: ir.PhiInst) bool {
+    if (lhs.incoming.items.len != 4 or rhs.incoming.items.len != 4) return false;
+    for (lhs.incoming.items, 0..) |incoming, incoming_index| {
+        if (!isFullDefinedScalarPhiValue(incoming.value) or function.blockIndex(incoming.block) == null) return false;
+        for (lhs.incoming.items[0..incoming_index]) |previous| {
+            if (std.mem.eql(u8, previous.block, incoming.block)) return false;
+        }
+        const other = phiIncomingFrom(rhs, incoming.block) orelse return false;
+        if (!isFullDefinedScalarPhiValue(other.value)) return false;
+    }
+    for (rhs.incoming.items, 0..) |incoming, incoming_index| {
+        if (function.blockIndex(incoming.block) == null) return false;
+        for (rhs.incoming.items[0..incoming_index]) |previous| {
+            if (std.mem.eql(u8, previous.block, incoming.block)) return false;
+        }
+    }
+    return true;
+}
+
+fn isFullDefinedScalarPhiValue(value: ir.Value) bool {
+    return switch (value) {
+        .named, .int => true,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn lowerExactFrexpSwitchPhiEdge(
+    selector: *ComposedBlockSelector,
+    function: ir.Function,
+    block_index: usize,
+    switch_term: ir.SwitchTerminator,
+    case_values: []const i32,
+    case_target_indices: []const usize,
+    default_index: usize,
+) !?Diagnostic {
+    const predecessor = function.blocks.items[block_index].name;
+    const all_ones_case_index = for (case_values, 0..) |value, index| {
+        if (value == switchValueMask(11)) break index;
+    } else unreachable;
+    const phi_target = function.blocks.items[case_target_indices[all_ones_case_index]];
+
+    if (selector.stack_frame_bytes != 0) {
+        selector_state.spillLiveValuesForCfgBoundary(selector) catch return .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
+    }
+    const previous_preserve_current = selector.preserve_current_position_values;
+    selector.preserve_current_position_values = true;
+    defer selector.preserve_current_position_values = previous_preserve_current;
+    if (try stabilizePhiEdgeSources(selector, phi_target, predecessor)) |diagnostic| return diagnostic;
+
+    selector_state.emitValueIntoEax(selector, switch_term.cond) catch return .{ .unsupported_value = "stage2-switch-cond" };
+    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = switchValueMask(11) });
+    const phi_edge_label = try ownedEdgeLabel(selector);
+    for (switch_term.cases.items, case_values, 0..) |case, value, case_index| {
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = value });
+        try selector.machine.instructions.append(selector.allocator, .{ .je = if (case_index == all_ones_case_index) phi_edge_label else case.target });
+    }
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = function.blocks.items[default_index].name });
+    try selector.machine.instructions.append(selector.allocator, .{ .label = phi_edge_label });
+    if (try emitPhiEdgeMoves(selector, phi_target, predecessor)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = phi_target.name });
     return null;
 }
 

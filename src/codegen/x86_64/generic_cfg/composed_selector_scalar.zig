@@ -75,6 +75,7 @@ pub const lowerIcmp = selector_icmp.lowerIcmp;
 pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+    if (bits == 52) return lowerI52Binary(selector, result_name, binary);
     if (bits == 1) {
         if ((binary.op != .@"and" and binary.op != .@"or") or valueIsInt(binary.lhs) or valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
         selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
@@ -710,6 +711,7 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const from_bits = intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-block-cast-from-not-int" };
     const to_bits = intBits(cast.to_ty) orelse return .{ .no_emitter = "composed-block-cast-to-not-int" };
+    if (from_bits == 52 or to_bits == 52) return lowerI52Cast(selector, result_name, cast, from_bits, to_bits);
     if (from_bits > 128) return .{ .no_emitter = "composed-block-cast-width" };
     if (to_bits > 64 and !(cast.op == .zext and from_bits == 64 and to_bits == 128)) {
         return .{ .no_emitter = "composed-block-cast-width" };
@@ -794,6 +796,128 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
         else => return .{ .no_emitter = "composed-block-cast-op" },
     }
     return null;
+}
+
+fn lowerI52Cast(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    cast: ir.CastInst,
+    from_bits: u16,
+    to_bits: u16,
+) !?Diagnostic {
+    if (cast.value != .named) return .{ .no_emitter = "composed-block-i52-cast-value" };
+    if (cast.op == .trunc and from_bits == 64 and to_bits == 52) {
+        if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, cast.value)) |diagnostic| return diagnostic;
+        selector_state.emitValueIntoRax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+        try maskRaxToI52(selector);
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
+    if (cast.op == .zext and from_bits == 6 and to_bits == 52) {
+        selector_state.emitValueIntoEax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+        try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 63 });
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
+    if (cast.op == .zext and from_bits == 52 and to_bits == 64) {
+        selector_state.emitValueIntoRax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+        try selector_state.bindRax(selector, result_name);
+        return null;
+    }
+    if (cast.op == .trunc and from_bits == 52 and (to_bits == 6 or to_bits == 32)) {
+        selector_state.emitValueIntoEax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+        if (to_bits == 6) try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 63 });
+        try selector_state.bindEax(selector, result_name);
+        return null;
+    }
+    return .{ .no_emitter = "composed-block-i52-cast-form" };
+}
+
+fn lowerI52Binary(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
+    const function = selector.function orelse return .{ .no_emitter = "composed-block-i52-shift-provenance" };
+    if (binary.op != .shl or binary.lhs != .named or binary.rhs != .named or
+        !isExactI52ShiftCount(function.*, binary.rhs.named))
+    {
+        return .{ .no_emitter = "composed-block-i52-binary-form" };
+    }
+    if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
+    selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch
+        return .{ .unsupported_value = "composed-block-i52-shift-rhs" };
+    selector_state.emitValueIntoRax(selector, binary.lhs) catch
+        return .{ .unsupported_value = "composed-block-i52-shift-lhs" };
+    // Count 52 is poison in LLVM's i52 domain. The captured family keeps that
+    // value on the unselected side of its guarding select; x86 may compute any
+    // physical value here, and the low-52 mask preserves every defined case.
+    try selector.machine.instructions.append(selector.allocator, .shl_rax_cl);
+    try maskRaxToI52(selector);
+    try selector_state.bindRax(selector, result_name);
+    return null;
+}
+
+fn isExactI52ShiftCount(function: ir.Function, count_name: []const u8) bool {
+    const widened = instructionByResult(function, count_name) orelse return false;
+    const zext = switch (widened.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 6 }) or !zext.to_ty.eql(.{ .int = 52 }) or zext.value != .named) return false;
+
+    const added = instructionByResult(function, zext.value.named) orelse return false;
+    const add = switch (added.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.flags.nuw or !add.ty.eql(.{ .int = 6 }) or add.lhs != .named or !add.rhs.eql(.{ .int = 1 })) return false;
+
+    const narrowed = instructionByResult(function, add.lhs.named) orelse return false;
+    const trunc = switch (narrowed.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 52 }) or !trunc.to_ty.eql(.{ .int = 6 }) or trunc.value != .named) return false;
+
+    const counted = instructionByResult(function, trunc.value.named) orelse return false;
+    const call = switch (counted.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    return isExactCtlzI52Envelope(call);
+}
+
+fn isExactCtlzI52Envelope(call: ir.CallInst) bool {
+    if (!std.mem.eql(u8, call.callee, "llvm.ctlz.i52") or call.inline_asm != null or call.callee_value != null or
+        call.callee_function_ty != null or call.calling_conv != null or call.raw_args != null or call.operand_bundle != null or
+        !call.ret_ty.eql(.{ .int = 52 }) or call.args.items.len != 2)
+    {
+        return false;
+    }
+    if (call.tail_kind) |tail_kind| if (!std.mem.eql(u8, tail_kind, "tail")) return false;
+    if (call.attrs) |attrs| {
+        const trimmed = std.mem.trim(u8, attrs, " \t");
+        if (trimmed.len < 2 or trimmed[0] != '#') return false;
+        for (trimmed[1..]) |c| if (!std.ascii.isDigit(c)) return false;
+    }
+    const ret_attrs = std.mem.trim(u8, call.ret_attrs orelse return false, " \t");
+    if (!std.mem.eql(u8, ret_attrs, "range(i52 0, 53)")) return false;
+    return call.args.items[0].attrs == null and call.args.items[1].attrs == null and
+        call.args.items[0].ty.eql(.{ .int = 52 }) and call.args.items[1].ty.eql(.{ .int = 1 }) and
+        call.args.items[1].value.eql(.{ .int = 1 });
+}
+
+fn instructionByResult(function: ir.Function, name: []const u8) ?ir.Instruction {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |result| if (std.mem.eql(u8, result, name)) return instruction;
+        }
+    }
+    return null;
+}
+
+fn maskRaxToI52(selector: *ComposedBlockSelector) !void {
+    try selector_state.clobberArgReg(selector, .rcx);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = (1 << 52) - 1 });
+    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
 }
 
 pub fn isExactEiNarrowBits(selector: *const ComposedBlockSelector, bits: u16) bool {

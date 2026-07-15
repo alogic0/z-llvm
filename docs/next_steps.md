@@ -37,6 +37,19 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
+INBOX-56 is complete and cumulatively accepted. The exact frexp switch-edge
+and normalized i52 phases ran as one provisional pipeline with no separate
+Phase 1 Tier 3. The final single Tier 3 passes all 17 subgates. The frozen
+report is now 443 selected / 285 emitting / 158 failing, with
+`compiler_rt.fma.fma` as the sole closure. Its permanent native proof checks
+25 exact fma rows and directly exercises the frozen `ldexp` and
+`add_and_denorm` helpers; object inspection and `-fno-compiler-rt` enforce no
+host or recursive fma fallback. `fmal`, `fmaq`, and `__fixdfei` remain at
+their prior boundaries. Stop and request review before any preopt-sharding
+interlude. Evidence:
+`docs/evidence/std_debug_hello_inbox56_fma_acceptance.summary` and
+`docs/evidence/distribution_all_after_inbox56_fma_acceptance.summary`.
+
 INBOX-55 completes the read-only `compiler_rt.fma.fma` contract review from
 accepted commit `21aaf111`. The frozen body needs two bounded phases: exact
 `i11 {0,-1,default}` switch-owned edge stubs into the existing paired

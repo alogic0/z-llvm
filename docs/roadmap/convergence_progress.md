@@ -4460,6 +4460,21 @@ One line per completed cycle, append-only, newest last. This is the
   child consumes about 562 seconds of each current full gate. Evidence
   `docs/evidence/inbox55_fma_architecture_contract.md`.
 
+- 2026-07-15 (this commit, INBOX-56) The amended two-phase fma program is
+  cumulatively accepted with one Tier 3. Exact named-i11 frexp switch edges
+  use owned stubs and the existing paired i32/i64 PHI-copy authority; the
+  bounded typed i52 family preserves normalized low-52-bit values, pins
+  `ctlz.i52(true)` to `range(i52 0, 53)`, and treats shift count 52 as poison
+  only on the unselected select side. A 25-row exact-bit native fma matrix
+  plus four direct helper calls proves the emitted internal fma body and both
+  frozen `ldexp`/`add_and_denorm` helpers with no host fallback. The proof also
+  repairs LLVM short raw-hex f64 bit-pattern decoding. `compiler_rt.fma.fma`
+  is the sole closure, moving report-all from 443 / 284 / 159 to
+  443 / 285 / 158; `fmal`, `fmaq`, and `__fixdfei` remain unchanged. All 17
+  Tier-3 subgates pass. Stop for review; preopt sharding was not started.
+  Evidence `docs/evidence/std_debug_hello_inbox56_fma_acceptance.summary` and
+  `docs/evidence/distribution_all_after_inbox56_fma_acceptance.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the

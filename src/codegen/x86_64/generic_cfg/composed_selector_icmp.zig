@@ -95,6 +95,13 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = temp });
         try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = temp, .imm = 0 } });
         try selector.machine.instructions.append(selector.allocator, .sete_eax);
+    } else if (!icmp.samesign and icmp.predicate == .eq and icmp.operand_ty.eql(.{ .int = 52 }) and
+        icmp.lhs == .named and icmp.rhs.eql(.{ .int = 0 }))
+    {
+        selector_state.emitValueIntoScratch(selector, icmp.lhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+        try selector_state.clobberAccumulator(selector);
+        try selector.machine.instructions.append(selector.allocator, .{ .test_arg64 = .rcx });
+        try selector.machine.instructions.append(selector.allocator, .sete_eax);
     } else if (icmp.predicate == .eq) {
         const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };
         if (icmp.rhs == .named) {
@@ -276,6 +283,15 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = mask });
         try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = @intCast(imm) });
         try selector.machine.instructions.append(selector.allocator, if (icmp.predicate == .ult) .setb_eax else .seta_eax);
+    } else if (!icmp.samesign and icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 6 }) and
+        icmp.lhs == .named and switch (icmp.rhs) {
+        .int => |value| (value & 63) == 51,
+        else => false,
+    }) {
+        try selector_state.emitValueIntoEax(selector, icmp.lhs);
+        try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 63 });
+        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = 51 });
+        try selector.machine.instructions.append(selector.allocator, .setb_eax);
     } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 32 }) and icmp.rhs == .named) {
         selector_state.emitValueIntoScratch(selector, icmp.lhs, .r8, 32) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
         selector_state.emitValueIntoScratch(selector, icmp.rhs, .rcx, 32) catch return .{ .unsupported_value = "composed-block-icmp-rhs" };

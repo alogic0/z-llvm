@@ -116,7 +116,7 @@ pub fn fp32TextBits(value: ir.Value) !u32 {
 }
 
 fn rawHexFpBits(text: []const u8) ?u64 {
-    if (!std.mem.startsWith(u8, text, "0x") or text.len != 18) return null;
+    if (!std.mem.startsWith(u8, text, "0x") or text.len <= 2 or text.len > 18) return null;
     return std.fmt.parseInt(u64, text[2..], 16) catch null;
 }
 
@@ -134,4 +134,10 @@ pub fn isCalleeName(actual: []const u8, expected: []const u8) bool {
     const actual_name = symbolName(actual);
     if (std.mem.eql(u8, actual_name, expected)) return true;
     return false;
+}
+
+test "LLVM short raw-hex f64 literals retain their bit pattern" {
+    try std.testing.expectEqual(@as(u64, 0x0010000000000000), try fp64TextBits(.{ .fp = "0x10000000000000" }));
+    try std.testing.expectEqual(@as(u64, 1), try fp64TextBits(.{ .fp = "0x1" }));
+    try std.testing.expectEqual(@as(u64, 0x41a0000002000000), try fp64TextBits(.{ .fp = "0x41A0000002000000" }));
 }
