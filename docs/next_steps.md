@@ -6,7 +6,7 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-64 O0 route-observability ownership-movement stop
+## INBOX-65 O0 validation-only continuation
 
 | Field | Authoritative state |
 | --- | --- |
@@ -17,9 +17,10 @@ after that, this entry controls until another explicit directive replaces it.
 | Historical ledger | 165 / 17 / 103 (composed / legacy / fallback) is **historical accounting, not an acceptance target**. If live owner counts disagree, stop and explain the movement; do not reorder precedence to force the split. |
 | Live topology | `composed_block=40`, `composed_cfg=127`, `legacy_envelope=17`, `structural_fallback=101`, `unassigned=0`; the four successful tags sum to 285. The aggregate live split is **167 / 17 / 101**, so the directive's stop condition fired. |
 | Movement evidence | Seven rows from the older 120-row cohort are now composed while five of the later 165 net acceptances are structural fallback, explaining the `+2 / 0 / -2` movement without an O0 precedence change. Full row evidence: [INBOX-64 stop record](evidence/inbox64_selection_owner_stop.md). |
-| Validation boundary | The focused atomicity negatives, compilation, and two deterministic manifest runs completed. **Strengthened Tier 2 and serial Tier 3 were not run** after the required ownership-movement stop. The exact 443/285/158 report was observed during both optional manifest runs, but accepted-object SHA `061a64e4`, the complete cohort, permanent canaries, and real-program boundary were not re-accepted for O0. |
-| Only authorized action | **Stop and return INBOX-64 ownership-movement evidence for review.** No implementation or gate successor is authorized. |
-| Terminal state | INBOX-64 is provisional and unaccepted. O1, other O-slices, X1 implementation stages, harness promotion, and sharding remain unauthorized. |
+| Movement reviewed | The Supervisor and Reviewer reviewed the `+2/0/-2` movement and found it **benign** — a historical ledger-estimation correction, not a routing change: no precedence change, owner metadata is not emitted, manifest sorting occurs only in the manifest path (which returns before object emission), and the report stream is byte-identical to the accepted INBOX-63 report (`49a19f04`). No further row investigation is required before Tier 2. |
+| Only authorized action | **INBOX-65 O0 validation-only continuation.** Run the strengthened Tier 2 at `6ee8bd4e` — exact 443/285/158, unchanged first failure, full captured cohort, permanent canaries, real-program boundary; require accepted-object SHA-256 `061a64e4…` byte-for-byte; confirm the manifest stays 40/127/17/101, zero unassigned, total 285 (preferably SHA `5d91960e…`). **No implementation or fix-forward change**; any mismatch is another stop for diagnosis. **No Tier 3** (non-semantic metadata, manifest outside gate infrastructure). |
+| Acceptance | On a clean pass O0 is **accepted** and **167 / 17 / 101 becomes the corrected canonical live owner ledger**, superseding the historical 165 / 17 / 103 estimate. |
+| Terminal state | Stop after the validation result and request review. O1, other O-slices, X1 implementation stages, harness promotion, and sharding remain unauthorized. |
 
 Agreed sequence after O0 (each still needs its own directive): O1
 accumulator-definition transaction, then O2 ordinary GPR/pointer
