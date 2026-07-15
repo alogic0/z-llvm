@@ -7,6 +7,7 @@ const XmmReg = types.XmmReg;
 const MachineBinaryOp = types.MachineBinaryOp;
 const FrameIndex = types.FrameIndex;
 const CodegenPath = types.CodegenPath;
+pub const SelectionOwner = types.SelectionOwner;
 pub const ReadOnlyModuleContext = types.ReadOnlyModuleContext;
 
 pub const Instruction = union(enum) {
@@ -774,6 +775,7 @@ pub const MachineFunction = struct {
     instructions: std.ArrayList(Instruction),
     owned_labels: std.ArrayList([]const u8),
     codegen_path: CodegenPath,
+    selection_owner: SelectionOwner,
     entry_xmm_defined_bits: [8]u16,
 
     pub fn init(name: []const u8, ret_ty: ir.Type) MachineFunction {
@@ -783,6 +785,7 @@ pub const MachineFunction = struct {
             .instructions = .empty,
             .owned_labels = .empty,
             .codegen_path = .structural_matcher,
+            .selection_owner = .unassigned,
             .entry_xmm_defined_bits = [_]u16{0} ** 8,
         };
     }

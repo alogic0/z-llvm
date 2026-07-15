@@ -245,6 +245,14 @@ pub const CodegenPath = enum {
     generic_cfg,
 };
 
+pub const SelectionOwner = enum {
+    unassigned,
+    composed_block,
+    composed_cfg,
+    legacy_envelope,
+    structural_fallback,
+};
+
 pub const CodegenOptions = struct {
     generic_cfg_selector: bool = false,
     generic_cfg_selector_diagnostic_tag: ?*?[]const u8 = null,

@@ -83,6 +83,7 @@ pub const Emit = enum {
     obj,
     ir_writer,
     semantic_descriptor,
+    selection_owner_manifest,
 };
 
 pub const CodegenEmitOptions = struct {
@@ -510,6 +511,17 @@ pub fn emitCodegenModule(
         errdefer machine.deinit(allocator);
         try machines.append(allocator, machine);
     }
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    if (emit == .selection_owner_manifest) {
+        std.mem.sort(codegen.x86_64.MachineFunction, machines.items, {}, machineNameLessThan);
+        try stdout_writer.interface.writeAll("row_identity\tselection_owner\n");
+        for (machines.items) |machine| {
+            if (machine.selection_owner == .unassigned) return error.UnassignedSelectionOwner;
+            try stdout_writer.interface.print("{s}\t{s}\n", .{ machine.name, @tagName(machine.selection_owner) });
+        }
+        try stdout_writer.interface.flush();
+    }
     if (options.report_all_failures) {
         try stderr_writer.interface.print(
             "summary zllvm-codegen-report-all target={s} selected_functions={} emitted_functions={} failed_functions={} first_failing_function={s} first_failing_diagnostic={s} first_failing_selector_tag={s} first_failing_selector_detail={s} local_fail={}\n",
@@ -529,8 +541,8 @@ pub fn emitCodegenModule(
         if (failed_functions != 0) std.process.exit(1);
     }
 
-    var stdout_buffer: [4096]u8 = undefined;
-    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    if (emit == .selection_owner_manifest) return;
+
     var discard_buffer: [4096]u8 = undefined;
     var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
     const stdout = if (options.quiet) &discard_writer.writer else &stdout_writer.interface;
@@ -540,6 +552,10 @@ pub fn emitCodegenModule(
         try mc.elf.writeObjectWithModuleContext(allocator, machines.items, module.aliases.items, module_context, stdout);
     }
     try stdout.flush();
+}
+
+fn machineNameLessThan(_: void, lhs: codegen.x86_64.MachineFunction, rhs: codegen.x86_64.MachineFunction) bool {
+    return std.mem.lessThan(u8, lhs.name, rhs.name);
 }
 
 fn shouldLowerCodegenFunction(module: ir.Module, function: ir.Function) bool {

@@ -30,7 +30,11 @@ pub fn tryLowerWithContext(
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
     const inspected = inspection.inspectFunctionWithContext(function, module_context);
-    if (try legacy_lowering.tryLower(allocator, machine, function)) return .selected;
+    if (try legacy_lowering.tryLower(allocator, machine, function)) {
+        if (machine.selection_owner != .unassigned) return error.SelectionOwnerAlreadyAssigned;
+        machine.selection_owner = .legacy_envelope;
+        return .selected;
+    }
     switch (inspected) {
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {
@@ -107,8 +111,11 @@ const SelectionTransaction = struct {
         };
     }
 
-    fn commit(transaction: *SelectionTransaction) void {
+    fn commit(transaction: *SelectionTransaction, owner: x86_64_machine.SelectionOwner) !void {
         std.debug.assert(transaction.state == .active);
+        if (transaction.machine.selection_owner != .unassigned) return error.SelectionOwnerAlreadyAssigned;
+        std.debug.assert(owner == .composed_block or owner == .composed_cfg);
+        transaction.machine.selection_owner = owner;
         transaction.state = .committed;
     }
 
@@ -130,9 +137,7 @@ const SelectionTransaction = struct {
         transaction.machine.ret_ty = transaction.snapshot.ret_ty;
         transaction.machine.codegen_path = transaction.snapshot.codegen_path;
         transaction.machine.entry_xmm_defined_bits = transaction.snapshot.entry_xmm_defined_bits;
-        if (comptime @hasField(MachineFunction, "selection_owner")) {
-            @field(transaction.machine.*, "selection_owner") = @field(transaction.snapshot, "selection_owner");
-        }
+        transaction.machine.selection_owner = transaction.snapshot.selection_owner;
         transaction.state = .rolled_back;
     }
 
@@ -170,7 +175,7 @@ fn tryLowerComposedBlockFailClosed(
         };
     };
     switch (result) {
-        .selected => transaction.commit(),
+        .selected => try transaction.commit(.composed_block),
         .unsupported => {},
     }
     return result;
@@ -192,7 +197,7 @@ fn tryLowerComposedCfgFailClosed(
         };
     };
     switch (result) {
-        .selected => transaction.commit(),
+        .selected => try transaction.commit(.composed_cfg),
         .unsupported => {},
     }
     return result;

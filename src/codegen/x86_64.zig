@@ -11,6 +11,7 @@ pub const XmmReg = x86_64_types.XmmReg;
 pub const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 pub const FrameIndex = x86_64_types.FrameIndex;
 pub const CodegenPath = x86_64_types.CodegenPath;
+pub const SelectionOwner = x86_64_types.SelectionOwner;
 pub const CodegenOptions = x86_64_types.CodegenOptions;
 pub const ReadOnlyModuleContext = x86_64_types.ReadOnlyModuleContext;
 pub const SysVAggregateEightbyteClass = sysv_abi.AggregateEightbyteClass;

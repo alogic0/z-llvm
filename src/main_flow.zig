@@ -23,7 +23,7 @@ const fatal = main_flow_writer.fatal;
 const Emit = main_flow_writer.Emit;
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--report-all-codegen-failures] [--generic-cfg-selector] [--pass-limit=N] [--input-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor|selection-owner-manifest] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--report-all-codegen-failures] [--generic-cfg-selector] [--pass-limit=N] [--input-limit=N] <input.ll>
     \\       z_llvm --emit=ir-writer
     \\       z_llvm --emit=semantic-descriptor
     \\
@@ -89,6 +89,8 @@ pub fn main(init: std.process.Init) !void {
                 emit = .ir_writer;
             } else if (std.mem.eql(u8, emit_text, "semantic-descriptor")) {
                 emit = .semantic_descriptor;
+            } else if (std.mem.eql(u8, emit_text, "selection-owner-manifest")) {
+                emit = .selection_owner_manifest;
             } else {
                 return error.UnsupportedEmitMode;
             }
@@ -245,7 +247,7 @@ pub fn main(init: std.process.Init) !void {
     var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
     const stdout = if (quiet) &discard_writer.writer else &stdout_writer.interface;
 
-    if (emit == .@"asm" or emit == .obj) {
+    if (emit == .@"asm" or emit == .obj or emit == .selection_owner_manifest) {
         try emitCodegenModule(allocator, io, module, emit, target_triple, .{
             .quiet = quiet,
             .report_all_failures = report_all_codegen_failures,

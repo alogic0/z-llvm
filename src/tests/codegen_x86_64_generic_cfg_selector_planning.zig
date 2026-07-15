@@ -70,6 +70,7 @@ const SeededMachineState = struct {
     instructions: [1]codegen.x86_64.Instruction,
     owned_labels: [2][]const u8,
     codegen_path: codegen.x86_64.CodegenPath,
+    selection_owner: codegen.x86_64.SelectionOwner,
     entry_xmm_defined_bits: [8]u16,
 };
 
@@ -83,6 +84,7 @@ fn seedMachineState(machine: *codegen.x86_64.MachineFunction) !SeededMachineStat
         label_slot.* = label;
     }
     machine.codegen_path = .generic_cfg;
+    machine.selection_owner = .legacy_envelope;
     machine.entry_xmm_defined_bits = .{ 7, 11, 13, 17, 19, 23, 29, 31 };
     return .{
         .name = machine.name,
@@ -90,6 +92,7 @@ fn seedMachineState(machine: *codegen.x86_64.MachineFunction) !SeededMachineStat
         .instructions = .{.ud2},
         .owned_labels = labels,
         .codegen_path = machine.codegen_path,
+        .selection_owner = machine.selection_owner,
         .entry_xmm_defined_bits = machine.entry_xmm_defined_bits,
     };
 }
@@ -107,6 +110,7 @@ fn expectSeededMachineState(machine: codegen.x86_64.MachineFunction, expected: S
         try std.testing.expectEqualStrings(expected_label, actual_label);
     }
     try std.testing.expectEqual(expected.codegen_path, machine.codegen_path);
+    try std.testing.expectEqual(expected.selection_owner, machine.selection_owner);
     try std.testing.expectEqualSlices(u16, &expected.entry_xmm_defined_bits, &machine.entry_xmm_defined_bits);
 }
 

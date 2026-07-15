@@ -9,6 +9,7 @@ pub const XmmReg = impl.XmmReg;
 pub const MachineBinaryOp = impl.MachineBinaryOp;
 pub const FrameIndex = impl.FrameIndex;
 pub const CodegenPath = impl.CodegenPath;
+pub const SelectionOwner = impl.SelectionOwner;
 pub const CodegenOptions = impl.CodegenOptions;
 pub const SysVAggregateEightbyteClass = impl.SysVAggregateEightbyteClass;
 pub const SysVAggregateKind = impl.SysVAggregateKind;

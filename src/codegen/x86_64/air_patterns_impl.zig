@@ -20,6 +20,7 @@ pub const XmmReg = x86_64_types.XmmReg;
 pub const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 pub const FrameIndex = x86_64_types.FrameIndex;
 pub const CodegenPath = x86_64_types.CodegenPath;
+pub const SelectionOwner = x86_64_types.SelectionOwner;
 pub const CodegenOptions = x86_64_types.CodegenOptions;
 pub const SysVAggregateEightbyteClass = sysv_abi.AggregateEightbyteClass;
 pub const SysVAggregateKind = sysv_abi.AggregateKind;
@@ -261,6 +262,7 @@ pub fn lowerFunctionWithOptions(
         switch (try x86_64_generic_cfg_selector.tryLowerWithContext(allocator, &machine, function, options.module_context)) {
             .selected => {
                 machine.codegen_path = .generic_cfg;
+                if (machine.selection_owner == .unassigned) return error.UnassignedSelectionOwner;
                 try verifyFunction(machine);
                 return machine;
             },
@@ -272,858 +274,697 @@ pub fn lowerFunctionWithOptions(
     }
 
     if (try lowerSingleStackSlotCallFunction(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockSliceLen(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (functionHasCall(function, "llvm.ushl.sat.i32")) {
         if (try lowerGenericCfgSingleBlockScalar(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
     }
 
     if (try lowerVolatileAbsoluteStore(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerUnreachableStub(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerReleaseSmallStrFromFloatHelp(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerReleaseSmallStrFromFloatSupportFunction(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerDebugLogicalPointerCompileError(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerDebugSpirvMergeLogicalPointers(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerI64PassThroughFunctionFamily(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerI64SaturatingHelperFunctionFamily(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiF128Sret(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiF128AggregateReturn(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiF128ScalarReturn(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiAssertPDReturnCode(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetPD(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetCFF(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiAssertCFFReturnCode(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetDC(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiAssertDCReturnCode(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetSplitStructMixed(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetMedStructMixed(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetMedStructInts(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetSmallStructInts(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructU32Union(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructU64U64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructF32F32F32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructF32A8F32A8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructF32A8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructF64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructF32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructU64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructU32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructU16(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetStructU8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetI64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetU64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetU32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetI16(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetI8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetU16(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetU8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiRetBool(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiMultipleStructFloats(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiMultipleStructInts(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiBigStructBoth(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiSplitStructMixed(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiSplitStructInts(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiBigPackedStruct(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiSmallPackedStruct(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiMedStructInts(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiSmallStructInts(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiMedStructMixed(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiBigUnion(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiBigStruct(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructI32I32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU32Union(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructF32F32F32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructF32A8F32A8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructF32A8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructF64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiCmultdComp(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiCmultfComp(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiCmultf(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructF32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U648(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U647(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U646(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U645(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U644(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U643(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U642(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U641(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64U640(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU16(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiBool(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiPtr(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiF64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiF32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiFiveFloats(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructU128(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiStructI128(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiI64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiI32(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiI16(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiI8(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiFiveIntegers(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCAbiPanic(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerStartTrampoline(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGetauxvalImpl(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerSelectedInfiniteLoop(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerSelectedLibfuzzerDebugO0(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try air_patterns_global_tls_rows.lowerSelectedMixCFilesAddZigDebugO0(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try air_patterns_global_tls_rows.lowerSelectedMixCFilesAddMayPanicDebugO0(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerSelectedIssue339TestFoo(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerRuntimeOptionalPayloadPreoptHelper(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerRuntimeErrorUnionPayloadPreoptHelper(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgMultiBlockCallGlobalCheckMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgMultiBlockTwoCallCheckMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerRuntimePointerLoadStorePreoptMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerBase64DecodeBase64FullMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockByteSwap(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockFp(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockAggregateAbi(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockPackedBits(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockI64(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockPtr(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockPointerLoadStore(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockEffectBarrier(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockVoidCallMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockDirectCallMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockCallChainMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockUpdateGetMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockCallCheckMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockVoid(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerGenericCfgSingleBlockScalar(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicExchangeFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicStoreFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicLoadFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicFetchUminFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicFetchUmaxFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicFetchNandFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicFetchXorFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicFetchOrFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicFetchAndFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicFetchSubFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerAtomicFetchAddFamily(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerValgrindDiscardTranslationsClientRequest(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerLimbAbsTwosComplementBody(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try air_patterns_cfg.lowerIntegerSwitchReturn(allocator, &machine, function)) {
         machine.codegen_path = .generic_cfg;
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try x86_64_generic_cfg.lowerGenericCfgFunction(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try air_patterns_global_tls_rows.lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (function.blocks.items.len == 3) {
         if (try air_patterns_global_tls_rows.lowerSelectedDebugScopeBranch(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try air_patterns_global_tls_rows.lowerSelectedCheckedAddRuntimeBoundaryMain(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try lowerCheckedGlobalUpdateMain(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try lowerCheckedSingleParamAddFunction(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try lowerFpExponentRuntimeBoundaryMain(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try air_patterns_optional_pointer.lowerRuntimeOptionalPointerPreoptMain(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try air_patterns_optional_pointer.lowerRuntimeOptionalPointerMain(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try air_patterns_cfg.lowerConditionalReturn(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try air_patterns_cfg.lowerErrorSwitchReturn(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try air_patterns_optional_pointer.lowerOptionalPointerLoadReturn(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
     }
 
     if (function.blocks.items.len == 4) {
         if (try lowerDescriptorTableLoopMain(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
         if (try air_patterns_cfg.lowerDenseSwitchReturn(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
+            return try finishStructuralFallback(&machine);
         }
     }
 
     if (try lowerBase64LoopAdvanceStep(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerBase64ResidualGuardStep(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerBase64PaddingLoopStep(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerBase64DecodeBase64FullBoundary(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (x86_64_generic_cfg.genericCfgLoopSumPlan(function) != null) return error.GenericCfgFallback;
     if (try lowerControlFlowLoopSum(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerRuntimeSliceSumPreoptHelper(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerSliceSumLoop(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedStructSum(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedArraySum(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedDebugLocation(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedCallChain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedComptimeConst(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedGlobalUpdate(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedPointerLoadStore(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedBranchMix(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedAddRuntimeBoundaryMain(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedTinyAdd(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedTlsBump(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedIntFromFloat(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     if (try lowerCheckedTableLookup(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
+        return try finishStructuralFallback(&machine);
     }
 
     return error.UnsupportedCodegenControlFlow;
+}
+
+fn finishStructuralFallback(machine: *MachineFunction) !MachineFunction {
+    if (machine.selection_owner != .unassigned) return error.SelectionOwnerAlreadyAssigned;
+    machine.selection_owner = .structural_fallback;
+    try verifyFunction(machine.*);
+    return machine.*;
 }
 
 pub fn verifyFunction(function: MachineFunction) !void {
