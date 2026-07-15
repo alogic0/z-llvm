@@ -2,8 +2,9 @@
 
 Directive: `INBOX-66`
 
-Status: implementation complete; acceptance validation evidence is recorded
-in `inbox66_abi_gate_acceptance.summary`.
+Status: implementation and mandatory Tier 2 complete; serial Tier 3 stopped at
+the pre-existing stale linker-boundary usage assertion. INBOX-66 remains
+unaccepted pending review. See `inbox66_tier3_stop.md`.
 
 ## Population and counter decision
 
