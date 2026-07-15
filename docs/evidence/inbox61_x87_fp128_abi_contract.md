@@ -1,6 +1,6 @@
 # ADR: x86_fp80 And fp128 SysV ABI / Register-Class Contract
 
-status: provisional; stop and request review
+status: accepted-with-amendments (Supervisor/Reviewer, 2026-07-15)
 directive: `INBOX-61`
 date: 2026-07-15
 baseline: `a1b739b7501d46a66034936e5253139524c78bcf`
@@ -330,6 +330,40 @@ termination class, or semantically unqualified case fails closed.
 Promotion into mandatory Tier 2 is a later decision. At promotion, Tier 2 must
 cover the whole frozen captured-row cohort and exact expected topology delta;
 Tier 3 follows only the separately accepted milestone trigger.
+
+## Accepted amendments (Reviewer, 2026-07-15)
+
+The Reviewer accepts this contract with the following binding amendments. They
+refine the forward-looking implementation wording; the analysis body above is
+retained as the reviewed decision record.
+
+1. Validation routing. Every implementation stage - including X1-A the shared
+   model - changes ABI classification, register classes, call boundaries, or
+   verifier state, so stage acceptance requires Tier 3 under
+   `docs/validation_tiers.md`. Tier 3 is not optional merely because
+   distribution counters are unchanged. Current disk headroom therefore blocks
+   acceptance of X1-A and every later stage; focused development may still use
+   Tier 1/Tier 2.
+2. Harness-promotion inheritance. The executable differential strategy inherits
+   the accepted INBOX-60 promotion requirements: an audited real-row cohort; a
+   hook-produced object/build-identity manifest; exact symbol section, size,
+   and body proof; the counters `abi_diff_cases_attempted` /
+   `abi_diff_cases_matched` plus a per-mode real-function counter; controlled
+   ReleaseSafe termination equivalence; and the current candidate build
+   supplied through the gate identity. This supersedes the
+   `real_execution_attempted`/`real_execution_matches` naming used above.
+3. Deterministic fp80 padding. Bytes 10-15 remain semantically undefined and
+   excluded from comparisons, but compiler-emitted fp80 constants and objects
+   must use deterministic padding (normally zero) so build output is
+   reproducible; semantic-undefined must not become nondeterministic bytes.
+4. Helpers and MIX sequencing. Recursion analysis is a mandatory fail-closed
+   prerequisite operating on the complete helper dependency graph, including
+   aliases and equivalent-operation cycles, before emission - a
+   function-name-only self-check is insufficient. MIX must wait for both scalar
+   ABI/return/transport foundations plus whatever homes/call support its
+   selected implementation uses, but need not wait for every unrelated F80-3 or
+   Q128-3 arithmetic family; neither mixed conversion may bootstrap through
+   `__trunctfxf2`, `__extendxftf2`, an alias, or a cycle containing them.
 
 ## Handoff And Stop State
 
