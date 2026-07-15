@@ -14,6 +14,7 @@ const Mode = helpers.Mode;
 
 const TempDir = struct {
     path: []const u8,
+    owned: bool = true,
 
     fn init(allocator: std.mem.Allocator, io: std.Io, prefix: []const u8) !TempDir {
         var cwd = std.Io.Dir.cwd();
@@ -25,8 +26,13 @@ const TempDir = struct {
         return .{ .path = path };
     }
 
+    fn useRunnerOwned(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !TempDir {
+        try std.Io.Dir.cwd().access(io, path, .{});
+        return .{ .path = try allocator.dupe(u8, path), .owned = false };
+    }
+
     fn deinit(temp: TempDir, allocator: std.mem.Allocator, io: std.Io) void {
-        std.Io.Dir.cwd().deleteTree(io, temp.path) catch {};
+        if (temp.owned) std.Io.Dir.cwd().deleteTree(io, temp.path) catch {};
         allocator.free(temp.path);
     }
 
@@ -41,6 +47,9 @@ const Options = struct {
     candidate_path: []const u8 = default_candidate_path,
     mode: ?Mode = null,
     fresh_export: bool = false,
+    require_cache_hit: bool = false,
+    cache_probe_only: bool = false,
+    runner_temp_root: ?[]const u8 = null,
 };
 
 const Candidate = struct {
@@ -106,7 +115,14 @@ pub fn main(init: std.process.Init) !void {
             if (counters.first_failing_stage) |value| allocator.free(value);
         }
         any_failure = any_failure or counters.hasFailure();
-        try printSummary(&stdout_writer.interface, counters, &candidate_hash);
+        if (options.cache_probe_only) {
+            try stdout_writer.interface.print(
+                "summary distribution-real-rows-cache-probe schema_version=1 mode={s} cache_status=hit pruning=suspended local_fail=0\n",
+                .{mode.name()},
+            );
+        } else {
+            try printSummary(&stdout_writer.interface, counters, &candidate_hash);
+        }
         try stdout_writer.interface.flush();
     }
 
@@ -118,24 +134,68 @@ fn parseOptions(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init
     defer args.deinit();
     _ = args.next();
 
+    var raw: std.ArrayList([]const u8) = .empty;
+    defer raw.deinit(allocator);
+    while (args.next()) |arg| try raw.append(allocator, arg);
+    return parseRawOptions(io, raw.items);
+}
+
+fn parseRawOptions(io: std.Io, raw_args: []const []const u8) !Options {
     var options: Options = .{};
-    while (args.next()) |arg| {
+    for (raw_args) |arg| {
         if (std.mem.eql(u8, arg, "--strict")) {
             options.strict = true;
         } else if (std.mem.eql(u8, arg, "--fresh-export")) {
             options.fresh_export = true;
+        } else if (std.mem.eql(u8, arg, "--require-cache-hit")) {
+            options.require_cache_hit = true;
+        } else if (std.mem.eql(u8, arg, "--cache-probe-only")) {
+            options.cache_probe_only = true;
         } else if (std.mem.startsWith(u8, arg, "--limit=")) {
             options.limit = try std.fmt.parseUnsigned(usize, arg["--limit=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
             options.mode = try parseMode(io, arg["--mode=".len..]);
         } else if (std.mem.startsWith(u8, arg, "--candidate-file=")) {
             options.candidate_path = arg["--candidate-file=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--runner-temp-root=")) {
+            options.runner_temp_root = arg["--runner-temp-root=".len..];
         } else {
             try validationError(io, "unexpected argument: {s}\n", .{arg});
         }
     }
     if (options.limit == 0) try validationError(io, "--limit must be greater than zero\n", .{});
+    if (options.fresh_export and options.require_cache_hit) {
+        return error.FreshExportConflictsWithRequiredCacheHit;
+    }
+    if (options.cache_probe_only and (!options.require_cache_hit or options.mode == null)) {
+        return error.CacheProbeRequiresModeAndRequiredHit;
+    }
+    if (options.runner_temp_root) |path| if (path.len == 0) {
+        return error.EmptyRunnerTempRoot;
+    };
     return options;
+}
+
+test "parallel worker arguments round-trip through the production parser" {
+    const mode_names = [_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" };
+    const expected_modes = [_]Mode{ .ReleaseFast, .ReleaseSafe, .ReleaseSmall };
+    for (mode_names, expected_modes) |name, expected| {
+        var mode_buffer: [64]u8 = undefined;
+        const mode_arg = try std.fmt.bufPrint(&mode_buffer, "--mode={s}", .{name});
+        const parsed = try parseRawOptions(std.testing.io, &.{ mode_arg, "--strict", "--limit=100", "--require-cache-hit", "--runner-temp-root=owned/work" });
+        try std.testing.expectEqual(expected, parsed.mode.?);
+        try std.testing.expect(parsed.strict);
+        try std.testing.expectEqual(@as(usize, 100), parsed.limit);
+        try std.testing.expect(parsed.require_cache_hit);
+        try std.testing.expectEqualStrings("owned/work", parsed.runner_temp_root.?);
+    }
+}
+
+test "cache probe parser is fail-closed and rejects partial cache authority" {
+    const parsed = try parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--require-cache-hit", "--cache-probe-only", "--runner-temp-root=owned/work" });
+    try std.testing.expect(parsed.cache_probe_only);
+    try std.testing.expectError(error.CacheProbeRequiresModeAndRequiredHit, parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--cache-probe-only" }));
+    try std.testing.expectError(error.FreshExportConflictsWithRequiredCacheHit, parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--fresh-export", "--require-cache-hit" }));
 }
 
 fn parseMode(io: std.Io, text: []const u8) !Mode {
@@ -210,7 +270,10 @@ fn runMode(
         .candidate_rows = candidates.len,
     };
 
-    const temp = try TempDir.init(allocator, io, "distribution_real_rows");
+    const temp = if (options.runner_temp_root) |path|
+        try TempDir.useRunnerOwned(allocator, io, path)
+    else
+        try TempDir.init(allocator, io, "distribution_real_rows");
     defer temp.deinit(allocator, io);
     const descriptor_path = try temp.join(allocator, "compiler.air");
     defer allocator.free(descriptor_path);
@@ -231,10 +294,12 @@ fn runMode(
         zig_cache_path,
         zig_emitter,
     ) orelse {
+        if (options.require_cache_hit) return error.RealRowsCacheHitRequired;
         for (candidates) |candidate| try setFirstFailure(allocator, &counters, candidate, "air-export");
         return counters;
     };
     defer allocator.free(descriptor);
+    if (options.cache_probe_only) return counters;
     for (candidates) |candidate| {
         try runCandidate(allocator, io, init, stdout, mode, temp, descriptor, candidate, candidate_hash, &counters, zig_emitter);
     }
@@ -273,6 +338,10 @@ fn loadOrExportDescriptor(
         if (try loadCachedDescriptor(allocator, io, &cache_key, cache_key_text, mode, candidates)) |descriptor| {
             try printCacheEvent(stdout, mode, "hit", elapsedMs(io, cache_start), &cache_key, descriptor.len);
             return descriptor;
+        }
+        if (options.require_cache_hit) {
+            try printCacheEvent(stdout, mode, "miss-read-only", elapsedMs(io, cache_start), &cache_key, 0);
+            return null;
         }
         try pruneOldPinCacheEntries(allocator, io, ziglang_pin);
     }

@@ -101,6 +101,19 @@ orchestrator samples free space while workers are active and fails closed if
 runtime free space falls below the floor; this authority does not authorize
 general subgate parallelism or concurrency above two.
 
+INBOX-69 supersedes that activation: tracked gate 7 is unsharded again. The
+only authorized parallel topology is the fixed ReleaseFast/ReleaseSafe/
+ReleaseSmall real-row group. Its independent machine-readable authority is
+`tools/distribution_real_rows_parallel_policy.zig`; it does not reuse the
+preopt 16-GiB estimate. The initial projected disk peak is 8 GiB, combined with
+the ten-percent filesystem floor, and the minimum available-memory threshold
+is 8 GiB. The runner verifies three cache hits before launch, pins the shared
+AIR descriptors read-only, suspends pruning, gives each mode separate local and
+global Zig caches, and samples free space plus aggregate process-tree RSS while
+children run. Focused concurrency-three evidence refines the disk estimate by
+`max(measured_peak * 1.25, measured_peak + 4 GiB)` without authorizing a fourth
+worker or another parallel subgate.
+
 ## Per-INBOX and per-run `tmp/`
 
 - A short-lived run directory is protected for two hours from its newest
