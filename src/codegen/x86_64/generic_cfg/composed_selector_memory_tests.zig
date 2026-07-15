@@ -27,6 +27,39 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+test "stack i32 loads preserve accumulator values used only by phi edges" {
+    const input =
+        \\define i64 @phi_edge_live_across_stack_load(i64 %m, i64 %n) {
+        \\Entry:
+        \\  %slot = alloca [1 x i32], align 4
+        \\  store i32 -2147483648, ptr %slot, align 4
+        \\  %difference = sub i64 %m, %n
+        \\  %loaded = load i32, ptr %slot, align 4
+        \\  br label %Join
+        \\Join:
+        \\  %result = phi i64 [ %difference, %Entry ]
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("phi_edge_live_across_stack_load", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u64, 2), function(5, 3));
+}
+
 test "generic cfg selector stores i64 through a spilled pointer" {
     var machine = MachineFunction.init("store-i64-spilled-ptr", .void);
     defer machine.deinit(std.testing.allocator);

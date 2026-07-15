@@ -189,9 +189,18 @@ pub fn main(init: std.process.Init) !void {
             errdefer allocator.free(builtins_obj);
             const helper_obj = try common.allocTempFile(allocator, temp, case.id, ".helper.o");
             errdefer allocator.free(helper_obj);
+            const wide_division_obj = try common.allocTempFile(allocator, temp, case.id, ".wide-division.o");
+            errdefer allocator.free(wide_division_obj);
+            const signed_division_obj = try common.allocTempFile(allocator, temp, case.id, ".signed-division.o");
+            errdefer allocator.free(signed_division_obj);
+            const signed_remainder_obj = try common.allocTempFile(allocator, temp, case.id, ".signed-remainder.o");
+            errdefer allocator.free(signed_remainder_obj);
             try emitFocusedCompilerRtI128Builtins(allocator, io, zllvm_exe, target, builtins_obj, &focused_env);
+            try emitFocusedCompilerRtObject(allocator, io, zllvm_exe, target, wide_division_obj, "test/zig/integrated/compiler_rt_udivei5_umodei4.ll", "wide division", &focused_env);
+            try emitFocusedCompilerRtObject(allocator, io, zllvm_exe, target, signed_division_obj, "test/zig/integrated/compiler_rt_signed_division.ll", "signed division", &focused_env);
+            try emitFocusedCompilerRtObject(allocator, io, zllvm_exe, target, signed_remainder_obj, "test/zig/integrated/compiler_rt_signed_remainder.ll", "signed remainder", &focused_env);
             try buildCompilerRtI128Helper(allocator, io, zig_emitter, target, helper_obj);
-            try extra_objects.appendSlice(allocator, &.{ builtins_obj, helper_obj });
+            try extra_objects.appendSlice(allocator, &.{ builtins_obj, wide_division_obj, signed_division_obj, signed_remainder_obj, helper_obj });
         } else if (case.setcc_semantic_object) {
             const predicate_obj = try common.allocTempFile(allocator, temp, case.id, ".predicates.o");
             errdefer allocator.free(predicate_obj);
@@ -368,6 +377,32 @@ fn emitFocusedCompilerRtI128Builtins(
         "test/zig/integrated/compiler_rt_i128_builtins.ll",
     };
     const result = try common.runCaptureEnv(allocator, io, &argv, "z_llvm focused compiler_rt i128 builtins", env_map);
+    defer common.freeRunResult(allocator, result);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = result.stdout });
+}
+
+fn emitFocusedCompilerRtObject(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zllvm_exe: []const u8,
+    target: []const u8,
+    object_path: []const u8,
+    input_path: []const u8,
+    description: []const u8,
+    env_map: *const std.process.Environ.Map,
+) !void {
+    const target_arg = try std.fmt.allocPrint(allocator, "--target={s}", .{zllvmTarget(target)});
+    defer allocator.free(target_arg);
+    const argv = [_][]const u8{
+        zllvm_exe,
+        "--emit=obj",
+        target_arg,
+        "--input-limit=1048576",
+        input_path,
+    };
+    const label = try std.fmt.allocPrint(allocator, "z_llvm focused compiler_rt {s}", .{description});
+    defer allocator.free(label);
+    const result = try common.runCaptureEnv(allocator, io, &argv, label, env_map);
     defer common.freeRunResult(allocator, result);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = result.stdout });
 }

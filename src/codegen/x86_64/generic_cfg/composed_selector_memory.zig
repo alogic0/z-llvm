@@ -753,6 +753,7 @@ pub fn isBytePointerSource(ty: ir.Type) bool {
 }
 
 pub fn appendLoadStackI32(selector: *ComposedBlockSelector, stack_ptr: StackPtrLoc) !void {
+    try selector_state.clobberAccumulator(selector);
     try materializeStackIndex(selector, stack_ptr);
     if (stack_ptr.index != null) {
         if (stack_ptr.disp <= std.math.maxInt(u8)) {

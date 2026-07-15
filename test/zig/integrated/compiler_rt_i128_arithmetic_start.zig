@@ -2,6 +2,12 @@ extern fn __multi3(i128, i128) callconv(.c) i128;
 extern fn __modti3(i128, i128) callconv(.c) i128;
 extern fn __umoddi3(u64, u64) callconv(.c) u64;
 extern fn __moddi3(i64, i64) callconv(.c) i64;
+extern fn @"compiler_rt.udivmodei4.__udivei5"([*]u8, [*]const u8, [*]const u8, [*]u8, usize) callconv(.c) void;
+extern fn @"compiler_rt.udivmodei4.__umodei4"([*]u8, [*]const u8, [*]const u8, usize) callconv(.c) void;
+extern fn @"compiler_rt.divmodei4.__divei4"([*]u8, [*]u8, [*]u8, usize) callconv(.c) void;
+extern fn @"compiler_rt.divmodei4.__divei5"([*]u8, [*]const u8, [*]const u8, [*]u8, usize) callconv(.c) void;
+extern fn @"compiler_rt.divmodei4.__modei4"([*]u8, [*]u8, [*]u8, usize) callconv(.c) void;
+extern fn @"compiler_rt.divmodei4.__modei5"([*]u8, [*]const u8, [*]const u8, [*]u8, usize) callconv(.c) void;
 extern fn zllvm_freeze_i128(i128) callconv(.c) i128;
 extern fn zllvm_i128_phi(u32, i128, i128) callconv(.c) i128;
 extern fn zllvm_variable_lshr_i64(u64, u64) callconv(.c) u64;
@@ -98,6 +104,101 @@ const expected_product: i128 = -36893488194663743503;
 const expected_remainder: i128 = 123456789;
 const max_i128: i128 = 170141183460469231731687303715884105727;
 const min_i128: i128 = -170141183460469231731687303715884105728;
+
+const WideDivisionCase = struct {
+    dividend: [4]u32,
+    divisor: [4]u32,
+    quotient: [4]u32,
+    remainder: [4]u32,
+};
+
+const wide_division_cases = [_]WideDivisionCase{
+    .{ .dividend = .{ 0x0, 0x0, 0x0, 0x0 }, .divisor = .{ 0x11, 0x0, 0x0, 0x0 }, .quotient = .{ 0x0, 0x0, 0x0, 0x0 }, .remainder = .{ 0x0, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0x3039, 0x0, 0x0, 0x0 }, .divisor = .{ 0x11, 0x0, 0x0, 0x10 }, .quotient = .{ 0x0, 0x0, 0x0, 0x0 }, .remainder = .{ 0x3039, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0x11, 0x0, 0x0, 0x10 }, .divisor = .{ 0x11, 0x0, 0x0, 0x10 }, .quotient = .{ 0x1, 0x0, 0x0, 0x0 }, .remainder = .{ 0x0, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0x3039, 0x2000000, 0x0, 0x10 }, .divisor = .{ 0x11, 0x100, 0x0, 0x0 }, .quotient = .{ 0xfef20000, 0xfffffff, 0x0, 0x0 }, .remainder = .{ 0x11ee3039, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0x80000000, 0x0, 0x0, 0x80000001 }, .divisor = .{ 0x1, 0x0, 0x1, 0x0 }, .quotient = .{ 0xffffffff, 0x80000000, 0x0, 0x0 }, .remainder = .{ 0x80000001, 0x7fffffff, 0x0, 0x0 } },
+    .{ .dividend = .{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }, .divisor = .{ 0xffffffff, 0x0, 0x0, 0x0 }, .quotient = .{ 0x1, 0x1, 0x1, 0x1 }, .remainder = .{ 0x0, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }, .divisor = .{ 0x0, 0x1, 0x0, 0x0 }, .quotient = .{ 0xffffffff, 0xffffffff, 0xffffffff, 0x0 }, .remainder = .{ 0xffffffff, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }, .divisor = .{ 0x1, 0x1, 0x0, 0x0 }, .quotient = .{ 0xffffffff, 0x0, 0xffffffff, 0x0 }, .remainder = .{ 0x0, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }, .divisor = .{ 0x0, 0x0, 0x1, 0x0 }, .quotient = .{ 0xffffffff, 0xffffffff, 0x0, 0x0 }, .remainder = .{ 0xffffffff, 0xffffffff, 0x0, 0x0 } },
+    .{ .dividend = .{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }, .divisor = .{ 0x1, 0x0, 0x1, 0x0 }, .quotient = .{ 0xffffffff, 0xffffffff, 0x0, 0x0 }, .remainder = .{ 0x0, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }, .divisor = .{ 0x1, 0x80000000, 0x0, 0x80000000 }, .quotient = .{ 0x1, 0x0, 0x0, 0x0 }, .remainder = .{ 0xfffffffe, 0x7fffffff, 0xffffffff, 0x7fffffff } },
+    .{ .dividend = .{ 0x7fffffff, 0x80000000, 0x80000000, 0x1 }, .divisor = .{ 0x80000001, 0x0, 0x1, 0x0 }, .quotient = .{ 0x7fffffff, 0x1, 0x0, 0x0 }, .remainder = .{ 0x80000000, 0xbfffffff, 0x0, 0x0 } },
+    .{ .dividend = .{ 0x7fffffff, 0x80000000, 0xffffffff, 0xffffffff }, .divisor = .{ 0xffffffff, 0x80000000, 0x0, 0x0 }, .quotient = .{ 0xa, 0xfffffffc, 0x1, 0x0 }, .remainder = .{ 0x80000009, 0x7ffffff2, 0x0, 0x0 } },
+};
+
+const signed_division_cases = [_]WideDivisionCase{
+    .{ .dividend = .{ 0x3039, 0x2000000, 0x0, 0x10 }, .divisor = .{ 0x11, 0x100, 0x0, 0x0 }, .quotient = .{ 0xfef20000, 0xfffffff, 0x0, 0x0 }, .remainder = .{ 0x11ee3039, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0xffffcfc7, 0xfdffffff, 0xffffffff, 0xffffffef }, .divisor = .{ 0x11, 0x100, 0x0, 0x0 }, .quotient = .{ 0x10e0000, 0xf0000000, 0xffffffff, 0xffffffff }, .remainder = .{ 0xee11cfc7, 0xffffffff, 0xffffffff, 0xffffffff } },
+    .{ .dividend = .{ 0x3039, 0x2000000, 0x0, 0x10 }, .divisor = .{ 0xffffffef, 0xfffffeff, 0xffffffff, 0xffffffff }, .quotient = .{ 0x10e0000, 0xf0000000, 0xffffffff, 0xffffffff }, .remainder = .{ 0x11ee3039, 0x0, 0x0, 0x0 } },
+    .{ .dividend = .{ 0xffffcfc7, 0xfdffffff, 0xffffffff, 0xffffffef }, .divisor = .{ 0xffffffef, 0xfffffeff, 0xffffffff, 0xffffffff }, .quotient = .{ 0xfef20000, 0xfffffff, 0x0, 0x0 }, .remainder = .{ 0xee11cfc7, 0xffffffff, 0xffffffff, 0xffffffff } },
+    .{ .dividend = .{ 0x0, 0x0, 0x0, 0x80000000 }, .divisor = .{ 0x3, 0x0, 0x0, 0x0 }, .quotient = .{ 0x55555556, 0x55555555, 0x55555555, 0xd5555555 }, .remainder = .{ 0xfffffffe, 0xffffffff, 0xffffffff, 0xffffffff } },
+    .{ .dividend = .{ 0xffffffff, 0xffffffff, 0xffffffff, 0x7fffffff }, .divisor = .{ 0xffffffff, 0xffffffff, 0xfffffffe, 0xffffffff }, .quotient = .{ 0x1, 0x80000000, 0xffffffff, 0xffffffff }, .remainder = .{ 0x0, 0x80000000, 0x0, 0x0 } },
+    .{ .dividend = .{ 0x7fffffff, 0x0, 0x80000000, 0xffffffff }, .divisor = .{ 0xffffffff, 0x80000000, 0x0, 0x0 }, .quotient = .{ 0x2, 0xffffffff, 0xffffffff, 0xffffffff }, .remainder = .{ 0x80000001, 0xfffffffd, 0xffffffff, 0xffffffff } },
+};
+
+var wide_dividend: [4]u32 align(16) = @splat(0);
+var wide_divisor: [4]u32 align(16) = @splat(0);
+var wide_quotient: [4]u32 align(16) = @splat(0);
+var wide_remainder: [4]u32 align(16) = @splat(0);
+var wide_temporary: [32]u8 align(16) = @splat(0);
+
+fn wideDivisionMatrixFails() bool {
+    var failed = false;
+    inline for (wide_division_cases) |case| {
+        wide_dividend = case.dividend;
+        wide_divisor = case.divisor;
+        wide_quotient = @splat(0);
+        wide_remainder = @splat(0);
+        wide_temporary = @splat(0);
+        @"compiler_rt.udivmodei4.__udivei5"(@ptrCast(&wide_quotient), @ptrCast(&wide_dividend), @ptrCast(&wide_divisor), &wide_temporary, 128);
+        @"compiler_rt.udivmodei4.__umodei4"(@ptrCast(&wide_remainder), @ptrCast(&wide_dividend), @ptrCast(&wide_divisor), 128);
+        for (wide_quotient, case.quotient, wide_remainder, case.remainder) |actual_q, expected_q, actual_r, expected_r| {
+            failed = failed or actual_q != expected_q or actual_r != expected_r;
+        }
+    }
+    return failed;
+}
+
+fn limbsDiffer(actual: [4]u32, expected: [4]u32) bool {
+    for (actual, expected) |actual_limb, expected_limb| {
+        if (actual_limb != expected_limb) return true;
+    }
+    return false;
+}
+
+fn signedDivisionMatrixFails() bool {
+    var failed = false;
+    inline for (signed_division_cases) |case| {
+        wide_dividend = case.dividend;
+        wide_divisor = case.divisor;
+        wide_quotient = @splat(0);
+        @"compiler_rt.divmodei4.__divei4"(@ptrCast(&wide_quotient), @ptrCast(&wide_dividend), @ptrCast(&wide_divisor), 128);
+        failed = failed or limbsDiffer(wide_quotient, case.quotient);
+
+        wide_dividend = case.dividend;
+        wide_divisor = case.divisor;
+        wide_quotient = @splat(0);
+        wide_temporary = @splat(0);
+        @"compiler_rt.divmodei4.__divei5"(@ptrCast(&wide_quotient), @ptrCast(&wide_dividend), @ptrCast(&wide_divisor), &wide_temporary, 128);
+        failed = failed or limbsDiffer(wide_quotient, case.quotient);
+
+        wide_dividend = case.dividend;
+        wide_divisor = case.divisor;
+        wide_remainder = @splat(0);
+        @"compiler_rt.divmodei4.__modei4"(@ptrCast(&wide_remainder), @ptrCast(&wide_dividend), @ptrCast(&wide_divisor), 128);
+        failed = failed or limbsDiffer(wide_remainder, case.remainder);
+
+        wide_dividend = case.dividend;
+        wide_divisor = case.divisor;
+        wide_remainder = @splat(0);
+        wide_temporary = @splat(0);
+        @"compiler_rt.divmodei4.__modei5"(@ptrCast(&wide_remainder), @ptrCast(&wide_dividend), @ptrCast(&wide_divisor), &wide_temporary, 128);
+        failed = failed or limbsDiffer(wide_remainder, case.remainder);
+    }
+    return failed;
+}
 
 pub export fn _start() callconv(.c) noreturn {
     @setRuntimeSafety(false);
@@ -206,6 +307,8 @@ pub export fn _start() callconv(.c) noreturn {
     const neg_i64_bad: usize = @intFromBool(zllvm_neg_i64(12) != -12 or zllvm_neg_i64(-12) != 12);
     const umoddi3_bad: usize = @intFromBool(__umoddi3(123, 10) != 3 or __umoddi3(0x8000_0000_0000_0005, 7) != 6 or __umoddi3(0xffff_ffff_ffff_ffff, 16) != 15);
     const moddi3_bad: usize = @intFromBool(__moddi3(123, 10) != 3 or __moddi3(-123, 10) != -3 or __moddi3(123, -10) != 3 or __moddi3(-123, -10) != -3);
+    const wide_division_bad: usize = @intFromBool(@call(.never_inline, wideDivisionMatrixFails, .{}));
+    const signed_division_bad: usize = @intFromBool(@call(.never_inline, signedDivisionMatrixFails, .{}));
     const abs_i64_bad: usize = @intFromBool(zllvm_abs_i64(12) != 12 or zllvm_abs_i64(-12) != 12);
     const abs_i32_bad: usize = @intFromBool(zllvm_abs_i32(12) != 12 or zllvm_abs_i32(-12) != 12);
     const mul_i32_bad: usize = @intFromBool(zllvm_mul_i32(70000, 80000) != 1305032704);
@@ -218,7 +321,7 @@ pub export fn _start() callconv(.c) noreturn {
     const ne_i32_zero_bad: usize = @intFromBool(zllvm_ne_i32_zero(0) != 0 or zllvm_ne_i32_zero(7) != 8);
     var pointer_value: u32 = 1;
     const ptr_eq_null_bad: usize = @intFromBool(zllvm_ptr_eq_null(null) != 1 or zllvm_ptr_eq_null(&pointer_value) != 0 or zllvm_sgt_i32_imm(-1) != 0 or zllvm_sgt_i32_imm(15) != 0 or zllvm_sgt_i32_imm(16) != 1 or zllvm_ult_i32_imm(31) != 1 or zllvm_ult_i32_imm(32) != 0 or zllvm_ult_i32_imm(0x80000000) != 0 or zllvm_variable_i16_shifts(0x1234, 4) != 0x1234 or zllvm_i32_ashr_variable(-16, 2) != -4 or zllvm_i32_ashr_variable(16, 2) != 4 or zllvm_i32_ashr_immediate(-16) != -1 or zllvm_i32_ashr_immediate(16) != 0);
-    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19 + ugt_true_bad * 20 + ugt_false_bad * 21 + i6_positive_bad * 22 + i6_negative_bad * 23 + ugt_imm_true_bad * 24 + ugt_imm_false_bad * 25 + negative_true_bad * 26 + negative_false_bad * 27 + ne64_true_bad * 28 + ne64_false_bad * 29 + ctlz_one_bad * 30 + ctlz_sixteen_bad * 31 + sub_i6_zero_bad * 32 + sub_i6_one_bad * 33 + sub_i6_wrap_bad * 34 + spilled_cond_true_bad * 35 + spilled_cond_false_bad * 36 + variable_shl_bad * 37 + variable_lshr_bad * 38 + stack_byte_gep_bad * 39 + stack_chained_gep_bad * 40 + stack_element_gep_bad * 41 + spilled_phi_bad * 42 + spill_store_bad * 43 + store_array_base_bad * 44 + select_shifted_true_bad * 45 + select_shifted_false_bad * 46 + or_i64_clear_bad * 47 + or_i64_set_bad * 48 + stack_index_dependency_bad * 49 + sub_rhs_accumulator_bad * 50 + sum_loaded_i32_bad * 51 + add_truncated_rhs_bad * 52 + framed_early_return_bad * 53 + framed_later_return_bad * 54 + branch_chain_65_bad * 55 + inline_memcpy_bad * 56 + spilled_trunc_after_memcpy_bad * 57 + double_use_bad * 58 + uadd_sum_plain_bad * 59 + uadd_carry_plain_bad * 60 + uadd_sum_wrap_bad * 61 + uadd_carry_wrap_bad * 62 + mixed_frame_first_bad * 63 + mixed_frame_second_bad * 64 + negative_i32_true_bad * 65 + negative_i32_false_bad * 66 + stack_i1_true_bad * 67 + stack_i1_false_bad * 68 + xor_i32_bad * 69 + and_i8_odd_bad * 70 + and_i8_even_bad * 71 + byte_array_gep_bad * 72 + nonnegative_i32_true_bad * 73 + nonnegative_i32_false_bad * 74 + select_ptr_true_bad * 75 + select_ptr_false_bad * 76 + freeze_i128_bad * 77 + smul_positive_plain_bad * 78 + smul_negative_plain_bad * 79 + smul_positive_overflow_bad * 80 + smul_negative_overflow_bad * 81 + negative_i128_true_bad * 82 + negative_i128_false_bad * 83 + eq_min_i128_true_bad * 84 + eq_min_i128_false_bad * 85 + i128_guard_and_true_bad * 86 + i128_guard_and_false_bad * 87 + smul_i64_positive_plain_bad * 88 + smul_i64_negative_plain_bad * 89 + smul_i64_positive_overflow_bad * 90 + smul_i64_negative_overflow_bad * 91 + add_i64_large_imm_bad * 92 + multi_use_i64_binary_bad * 93 + eq_min_i32_bad * 94 + neg_i32_bad * 95 + neg_i128_bad * 96 + neg_i64_bad * 97 + abs_i64_bad * 98 + abs_i32_bad * 99 + mul_i32_bad * 100 + four_phi_bad * 101 + select_i1_bad * 102 + ctlz_defined_bad * 103 + ugt_i32_imm_bad * 104 + eq_i32_values_bad * 105 + fshl_i32_bad * 106 + ne_i32_zero_bad * 107 + ptr_eq_null_bad * 108 + i128_phi_bad * 109 + variable_lshr_i64_bad * 110 + variable_shl_i64_bad * 111 + umoddi3_bad * 112 + moddi3_bad * 113);
+    exit(product_bad * 11 + remainder_bad * 12 + ne_zero_bad * 13 + ne_nonzero_bad * 14 + gep_bad * 15 + ptr_eq_bad * 16 + ptr_ne_bad * 17 + spill_load_bad * 18 + phi_bad * 19 + ugt_true_bad * 20 + ugt_false_bad * 21 + i6_positive_bad * 22 + i6_negative_bad * 23 + ugt_imm_true_bad * 24 + ugt_imm_false_bad * 25 + negative_true_bad * 26 + negative_false_bad * 27 + ne64_true_bad * 28 + ne64_false_bad * 29 + ctlz_one_bad * 30 + ctlz_sixteen_bad * 31 + sub_i6_zero_bad * 32 + sub_i6_one_bad * 33 + sub_i6_wrap_bad * 34 + spilled_cond_true_bad * 35 + spilled_cond_false_bad * 36 + variable_shl_bad * 37 + variable_lshr_bad * 38 + stack_byte_gep_bad * 39 + stack_chained_gep_bad * 40 + stack_element_gep_bad * 41 + spilled_phi_bad * 42 + spill_store_bad * 43 + store_array_base_bad * 44 + select_shifted_true_bad * 45 + select_shifted_false_bad * 46 + or_i64_clear_bad * 47 + or_i64_set_bad * 48 + stack_index_dependency_bad * 49 + sub_rhs_accumulator_bad * 50 + sum_loaded_i32_bad * 51 + add_truncated_rhs_bad * 52 + framed_early_return_bad * 53 + framed_later_return_bad * 54 + branch_chain_65_bad * 55 + inline_memcpy_bad * 56 + spilled_trunc_after_memcpy_bad * 57 + double_use_bad * 58 + uadd_sum_plain_bad * 59 + uadd_carry_plain_bad * 60 + uadd_sum_wrap_bad * 61 + uadd_carry_wrap_bad * 62 + mixed_frame_first_bad * 63 + mixed_frame_second_bad * 64 + negative_i32_true_bad * 65 + negative_i32_false_bad * 66 + stack_i1_true_bad * 67 + stack_i1_false_bad * 68 + xor_i32_bad * 69 + and_i8_odd_bad * 70 + and_i8_even_bad * 71 + byte_array_gep_bad * 72 + nonnegative_i32_true_bad * 73 + nonnegative_i32_false_bad * 74 + select_ptr_true_bad * 75 + select_ptr_false_bad * 76 + freeze_i128_bad * 77 + smul_positive_plain_bad * 78 + smul_negative_plain_bad * 79 + smul_positive_overflow_bad * 80 + smul_negative_overflow_bad * 81 + negative_i128_true_bad * 82 + negative_i128_false_bad * 83 + eq_min_i128_true_bad * 84 + eq_min_i128_false_bad * 85 + i128_guard_and_true_bad * 86 + i128_guard_and_false_bad * 87 + smul_i64_positive_plain_bad * 88 + smul_i64_negative_plain_bad * 89 + smul_i64_positive_overflow_bad * 90 + smul_i64_negative_overflow_bad * 91 + add_i64_large_imm_bad * 92 + multi_use_i64_binary_bad * 93 + eq_min_i32_bad * 94 + neg_i32_bad * 95 + neg_i128_bad * 96 + neg_i64_bad * 97 + abs_i64_bad * 98 + abs_i32_bad * 99 + mul_i32_bad * 100 + four_phi_bad * 101 + select_i1_bad * 102 + ctlz_defined_bad * 103 + ugt_i32_imm_bad * 104 + eq_i32_values_bad * 105 + fshl_i32_bad * 106 + ne_i32_zero_bad * 107 + ptr_eq_null_bad * 108 + i128_phi_bad * 109 + variable_lshr_i64_bad * 110 + variable_shl_i64_bad * 111 + umoddi3_bad * 112 + moddi3_bad * 113 + wide_division_bad * 114 + signed_division_bad * 115);
 }
 
 fn loadI128(ptr: *i128) i128 {

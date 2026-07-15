@@ -4426,6 +4426,17 @@ One line per completed cycle, append-only, newest last. This is the
   Phase 5 before accepting the closures, then re-rank `fma`. Evidence
   `docs/evidence/std_debug_hello_inbox53_phase4_ei_default_bodies.summary`.
 
+- 2026-07-15 (this commit, INBOX-54) The generated-index correctness recovery
+  restores the semantic acceptance invalidated by the narrow-return P0 audit.
+  Local stack `i32` loads now preserve live accumulator values through the
+  existing clobber authority before writing EAX. A permanent PHI-edge
+  regression and an exact 54-operation native matrix re-prove `__udivei5`,
+  `__umodei4`, `__divei4`, `__divei5`, `__modei4`, and `__modei5`; the accepted-
+  row object audit finds no additional emitted hit. Report-all remains
+  443 / 284 / 159. Evidence
+  `docs/evidence/std_debug_hello_inbox54_generated_index_recovery.summary` and
+  `docs/evidence/distribution_all_after_inbox54_generated_index_recovery.summary`.
+
 - 2026-07-14 (this commit, INBOX-53 continuation phase 5 acceptance) The one
   cumulative family Tier 3 passes all 17 subgates against commit `9e3f78fe` /
   tree `97a7aa9451443a8a27f1e6850708991c9f39e243`. This accepts the six

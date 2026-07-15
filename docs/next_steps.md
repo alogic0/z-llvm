@@ -37,6 +37,18 @@ Stay on the selected goal until:
 
 ## Active Blocker
 
+INBOX-54 repairs the confirmed generated-index wrong-code in the accepted
+wide-division family. A local stack `i32` load wrote EAX without preserving an
+i64 value live only into a PHI edge; the shared load path now uses the existing
+accumulator-clobber authority. The exact 54-operation matrix passes for
+`__udivei5`, `__umodei4`, `__divei4`, `__divei5`, `__modei4`, and `__modei5`,
+and report-all remains 443 / 284 / 159. The accepted-row audit found no other
+accepted hit. Stop after the immediate Tier-3 acceptance and request review
+before the bounded fma program. Preopt sharding remains unauthorized.
+Evidence: `docs/evidence/std_debug_hello_inbox54_generated_index_recovery.summary`
+and
+`docs/evidence/distribution_all_after_inbox54_generated_index_recovery.summary`.
+
 INBOX-53 Phase 5 accepts the exact six-row EI family. The cumulative Tier 3
 passes all 17 subgates against commit `9e3f78fe` / tree
 `97a7aa9451443a8a27f1e6850708991c9f39e243`, accepting 443 / 284 / 159.
