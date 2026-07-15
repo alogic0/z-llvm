@@ -59,6 +59,13 @@ those slices):
 
 ## Tier 3 — full integration (`distribution-all`)
 
+The authoritative serial Tier-3 command is
+`zig build distribution-all -- --serial`. It uses the tracked 17-subgate
+inventory, exclusive runner-owned paths, immutable bundle identity checks, and
+durable headroom reporting. The earlier ignored
+`tmp/inbox66c_serial_tier3_fresh.sh` wrapper is obsolete historical evidence;
+it is not deleted, but must not be used for a new acceptance run.
+
 Run:
 
 - before closing a roadmap/tracker item;
