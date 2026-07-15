@@ -3,8 +3,8 @@
 schema_version: 1
 directive: `INBOX-53 continuation, phase 3`
 target: `x86_64-linux`
-validation_tier: 2 pending one phase-boundary Tier 3
-result: focused pass
+validation_tier: 3
+result: accepted
 closure_status: zero closures; six honest advances
 
 The accepted Phase 2 baseline is implementation `4fc11d68`, acceptance
@@ -86,7 +86,7 @@ summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emit
 report delta: directed_closures=0 directed_advances=6 collateral_emissions=0 new_failures=0
 full unit: pass; tests=1011/1011
 tier2: pass; steps=24/24 tests=1019/1019
-tier3: pending phase-boundary run
+tier3: pass; subgates=17/17 implementation=0d0fdb59 tree=81b43c4f67e4ba9b029f9fb8203b3287a6157da1
 ```
 
 Commands:
@@ -123,3 +123,8 @@ Prior evidence cannot be reused because Phase 2 predates the exact EI switch
 admission, six owned switch-edge stubs, and the new three-type executable and
 negative canaries. Commit the implementation and this preface before the
 single phase-boundary run.
+
+The single committed-tree run passes all 17 subgates for implementation
+`0d0fdb596892571d5d829f622e3fc6035583cc80` and tree
+`81b43c4f67e4ba9b029f9fb8203b3287a6157da1`. Acceptance evidence is in
+`docs/evidence/distribution_all_after_inbox53_phase3.summary`.
