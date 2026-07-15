@@ -6,7 +6,7 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-65 O0 validation-only acceptance stop
+## INBOX-66 ABI differential harness promotion (O1 prerequisite)
 
 | Field | Authoritative state |
 | --- | --- |
@@ -20,16 +20,17 @@ after that, this entry controls until another explicit directive replaces it.
 | Movement reviewed | The Supervisor and Reviewer reviewed the `+2/0/-2` movement and found it **benign** — a historical ledger-estimation correction, not a routing change: no precedence change, owner metadata is not emitted, manifest sorting occurs only in the manifest path (which returns before object emission), and the report stream is byte-identical to the accepted INBOX-63 report (`49a19f04`). No further row investigation is required before Tier 2. |
 | Validation result | **INBOX-65 passed** at docs-only HEAD `a72ca77d` over O0 code state `6ee8bd4e`: strengthened Tier 2 24/24 steps and 1034/1034 tests; exact byte-identical 443/285/158 report with unchanged first failure; full accepted cohort 285/285/0; accepted object byte-identical at SHA-256 `061a64e4…`; manifest byte-identical at SHA-256 `5d91960e…`. Evidence: [INBOX-65 acceptance](evidence/inbox65_o0_validation_acceptance.summary). |
 | Acceptance | O0 is **accepted**. **167 composed / 17 legacy / 101 fallback is the corrected canonical live owner ledger**, superseding the historical 165 / 17 / 103 estimate. |
-| Only authorized action | **Stop and return the INBOX-65 validation result for review.** No implementation or gate successor is authorized. No Tier 3 was run. |
-| Terminal state | O1, other O-slices, X1 implementation stages, harness promotion, and sharding remain unauthorized. |
+| Only authorized action | **INBOX-66 ABI differential harness promotion** — the agreed prerequisite for O1. Promote the provisional non-gating INBOX-60 harness to a mandatory Tier-2 gate: exactly 10 audited real compiler-rt rows (2 each integer/narrow-return/pointer-memory/i128/finite-FP, both owners, stop-not-substitute); a hook-produced provenance manifest with linker-map symbol resolution (reference-substitution fails via provenance, not digest equality); a separate `abi_diff_cases_attempted/matched` + `abi_diff_real_functions_matched` schema with a versioned counter migration; the `distribution_real_rows_gate.zig:678` candidate-only success claim removed (keep 100/100/100 ratchets, `real_programs_ok=0`); a controlled ReleaseSafe panic case with termination-class matching. Keep the compiler-rt 285 and distribution 100-row populations distinct. |
+| Acceptance | Exact 443/285/158 first-failure unchanged; accepted objects byte-identical (`061a64e4`); promoted harness + all negatives green in mandatory Tier 2; counter-schema migration versioned; distribution ratchets preserved; **one serial Tier 3** after a fresh headroom preflight. Any object/owner/report/route movement → stop and diagnose before Tier 3. |
+| Terminal state | Stop after acceptance and request review. **O1** (scoped: 7 ordered commits, XMM query-migration, bypass closure at `scalar:561/587`+`vector:661`+`cfg:821` with a source-level guard, explicit EFLAGS def/use/preserve/clobber APIs, one serial Tier 3) **remains unauthorized until this promotion is accepted.** O2-O6, X1, and sharding remain unauthorized. |
 
-Agreed sequence after O0 (each still needs its own directive): O1
-accumulator-definition transaction, then O2 ordinary GPR/pointer
-materialization; the ABI differential harness promotion (a separate
-gate-infrastructure change) and the x87/fp128 X1 stages proceed under serial
-Tier 3; preopt sharding stays deferred under the higher parallel readiness bar
-and is not auto-authorized until its own fresh preflight (and, if the ~119.9 GB
-observation regresses, freeing non-z_llvm disk or a further reviewed revision).
+Agreed sequence (each still needs its own directive): **INBOX-66 harness
+promotion first** (this is the O1 prerequisite), then O1 accumulator-definition
+transaction, then O2 ordinary GPR/pointer materialization; the x87/fp128 X1
+stages proceed under serial Tier 3; preopt sharding stays deferred under the
+higher parallel readiness bar and is not auto-authorized until its own fresh
+preflight (and, if the ~119.9 GB observation regresses, freeing non-z_llvm disk
+or a further reviewed revision).
 
 ## Current handoff and evidence
 
