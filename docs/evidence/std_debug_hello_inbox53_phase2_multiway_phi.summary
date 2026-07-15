@@ -3,9 +3,9 @@
 schema_version: 1
 directive: `INBOX-53 continuation, phase 2`
 target: `x86_64-linux`
-validation_tier: 2 pending one phase-boundary Tier 3
-result: focused pass
-closure_status: zero closures; six honest advances
+validation_tier: 3
+result: pass
+closure_status: accepted foundation; zero closures and six honest advances
 
 The accepted phase-1 baseline is commit `725818d2` at 443 selected / 278
 emitting / 165 failing. The frozen contract and 29-row census are in
@@ -82,7 +82,7 @@ summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emit
 report delta: directed_closures=0 directed_advances=6 collateral_emissions=0 new_failures=0
 full unit: pass; tests=1008/1008
 tier2: pass; steps=24/24 tests=1016/1016
-tier3: pending phase-boundary run
+tier3: pass; subgates=17/17 committed_tree=2a5a2889f848521a7cb125ad1bc2390e696d68de
 ```
 
 Commands:
@@ -100,7 +100,9 @@ Artifacts:
 - Tier 2 `tmp/inbox53_phase2_tier2.log`, sha256
   `5998a3b3cb86af96adb00d44c847fa60475ebebf41fbb7a44843f9e5bc2de567`;
 - temporary audit report `tmp/inbox53_phase2_audit_report.log`, identical to
-  the final report and containing zero scalar snapshot records.
+  the final report and containing zero scalar snapshot records;
+- Tier 3 acceptance
+  `docs/evidence/distribution_all_after_inbox53_phase2.summary`.
 
 ## Tier 3 Preface
 
@@ -121,4 +123,10 @@ Prior evidence cannot be reused because the newest accepted Tier 3 predates
 the i128 literal source admission, scalar overlap snapshots, and the new
 multiway/crossed executable canaries. Commit the implementation and this
 preface before the single phase-boundary run.
+
+The committed implementation is `4fc11d68` with tree
+`2a5a2889f848521a7cb125ad1bc2390e696d68de`. Its single Tier 3 passes all 17
+subgates. Phase 2 is accepted with zero closures and six advances. Stop for
+the Phase 3 exact EI entry-switch-edge review; no Phase 3 implementation is
+authorized by this record.
 

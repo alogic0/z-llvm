@@ -4352,6 +4352,16 @@ One line per completed cycle, append-only, newest last. This is the
   phase boundary is accepted. Evidence
   `docs/evidence/std_debug_hello_inbox53_phase2_multiway_phi.summary`.
 
+- 2026-07-14 (this commit, INBOX-53 continuation phase-2 acceptance) The
+  single committed-tree Tier 3 passes all 17 subgates for implementation
+  `4fc11d68` / tree `2a5a2889f848521a7cb125ad1bc2390e696d68de`.
+  The accepted report remains 443 / 278 / 165 with zero closures, six honest
+  FP-to-i128 advances, zero collateral emissions, and zero new failures.
+  Actual wall time was approximately 1,328.308 seconds; summed child duration
+  was 2,003.646 seconds. Phase 2 is complete. Stop for review of the frozen
+  Phase 3 exact EI entry-switch-edge contract. Evidence
+  `docs/evidence/distribution_all_after_inbox53_phase2.summary`.
+
 ## Ratchet State
 
 Latest recorded counters. Update in the same commit as the change; the
