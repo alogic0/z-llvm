@@ -77,9 +77,14 @@ The ten-percent floor (about 98.2 GB) must remain free at the projected peak;
 merely reaching it before starting is insufficient. The provisional parallel
 peak is **16 GiB** (at most four bounded shards, each a ~4 GiB envelope from the
 healthy three-mode AIR-export footprint), so `sharding_required_start` is about
-115.4 GB. Current free (~90-93 GB) is below that, so **sharding is not ready**;
-z_llvm-owned reclaimable (~2.8 GB) cannot close the gap. Freeing non-z_llvm
-space or a further reviewed revision is required before sharding.
+115.4 GB. The INBOX-63 serial Tier-3 per-subgate samples observed roughly
+119.9 GB free (starting `119978582016`, minimum sampled `119854436352` bytes),
+which now exceeds the 115.4 GB threshold. Sharding is nonetheless **NOT
+automatically authorized**: the required fresh `df` plus report-only retention
+inventory for a sharding preflight has not been performed, and no directive
+authorizes it. The stale ~90-93 GB figure is superseded; sharding remains
+deferred pending its own fresh preflight (and, if the observation regresses,
+freeing non-z_llvm space or a further reviewed revision).
 
 ## Per-INBOX and per-run `tmp/`
 
