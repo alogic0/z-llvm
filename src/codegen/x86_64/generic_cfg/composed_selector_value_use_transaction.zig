@@ -956,9 +956,7 @@ pub const ValueUseTransaction = struct {
                 try selector_state.validateAddressDependenciesForUse(transaction.selector, name.slice());
                 if (!try selector_state.valueIsLiveAtOrAfterCurrent(transaction.selector, name.slice()))
                     return error.ValueUseExpiredSource;
-                if (binding.vreg.class != request.expected.register_class)
-                    return error.ValueUseRegisterClassMismatch;
-                try validateExpectedType(request.expected, request.form);
+                try validateBindingCompatibility(binding, request, current);
                 try validateSourceView(current, request.form);
                 return current;
             },
@@ -1272,10 +1270,10 @@ pub const ValueUseTransaction = struct {
             .named => |*name| blk: {
                 // Deliberately resolve after all preparation/spill mutations.
                 const binding = transaction.selector.values.get(name.slice()) orelse return error.ValueUseUnresolvedSource;
-                if (binding.vreg.class != request.expected.register_class)
-                    return error.ValueUseRegisterClassMismatch;
                 try selector_state.validateAddressDependenciesForUse(transaction.selector, name.slice());
-                break :blk try transaction.resolveNamedCurrent(name.slice());
+                const current = try transaction.resolveNamedCurrent(name.slice());
+                try validateBindingCompatibility(binding, request, current);
+                break :blk current;
             },
             .null_value => {
                 try materializeNull(transaction.selector, request.destination);
@@ -2200,6 +2198,38 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     };
     if (!valid) return error.ValueUseDestinationFormMismatch;
+}
+
+/// Validates the canonical binding against semantic request intent. Exact
+/// class matches retain the ordinary contract. The sole compatible mismatch
+/// is an integer <=32 requested as gpr32 through a wider scalar GPR binding
+/// whose defined width covers the semantic value and whose current home has a
+/// native low32 view. This is a use-only interpretation: it neither changes
+/// the binding nor grants a durable relocation at the narrower class.
+fn validateBindingCompatibility(
+    binding: ValueBinding,
+    request: *const ValueUseTransaction.StoredRequest,
+    current: ValueLoc,
+) !void {
+    if (binding.vreg.class == request.expected.register_class) {
+        try validateExpectedType(request.expected, request.form);
+        return;
+    }
+    if (request.form != .gpr32 or request.expected.register_class != .gpr32 or
+        request.expected.ty != .int or request.expected.ty.int == 0 or
+        request.expected.ty.int > 32 or binding.vreg.class != .gpr64 or
+        binding.vreg.bits < request.expected.ty.int or !hasLow32View(current))
+    {
+        return error.ValueUseRegisterClassMismatch;
+    }
+    try validateExpectedType(request.expected, request.form);
+}
+
+fn hasLow32View(loc: ValueLoc) bool {
+    return switch (loc) {
+        .arg64, .scratch64, .rax, .spill64 => true,
+        else => false,
+    };
 }
 
 fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTransaction.UseForm) !void {
